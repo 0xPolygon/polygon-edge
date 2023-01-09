@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -15,7 +14,6 @@ import (
 
 const (
 	// safe numbers for the test
-	epochReward   = 1
 	minStake      = 1
 	minDelegation = 1
 )
@@ -59,7 +57,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 
 		validatorPubkeys[i] = pubKeyBig
 		validatorAddresses[i] = validator.Address
-		validatorStakes[i] = chain.ConvertWeiToTokensAmount(validator.Balance)
+		validatorStakes[i] = new(big.Int).Set(validator.Balance)
 	}
 
 	registerMessage, err := bls.MarshalMessageToBigInt([]byte(contracts.PolyBFTRegisterMessage))
@@ -69,7 +67,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 
 	params := map[string]interface{}{
 		"init": map[string]interface{}{
-			"epochReward":   big.NewInt(epochReward),
+			"epochReward":   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
 			"minStake":      big.NewInt(minStake),
 			"minDelegation": big.NewInt(minDelegation),
 			"epochSize":     new(big.Int).SetUint64(polyBFTConfig.EpochSize),

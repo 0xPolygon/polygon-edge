@@ -5,11 +5,11 @@ import (
 	"math/big"
 	"strconv"
 
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
+	metrics "github.com/armon/go-metrics"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -35,10 +35,8 @@ var (
 
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
-	// signer is the identity of the node submitting a checkpoint
-	signer ethgo.Key
-	// signerAddress is the address of the node submitting a checkpoint
-	signerAddress types.Address
+	// key is the identity of the node submitting a checkpoint
+	key ethgo.Key
 	// blockchain is abstraction for blockchain
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
@@ -47,6 +45,8 @@ type checkpointManager struct {
 	txRelayer txrelayer.TxRelayer
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
+	// checkpointManagerAddr is address of CheckpointManager smart contract
+	checkpointManagerAddr types.Address
 	// latestCheckpointID represents last checkpointed block number
 	latestCheckpointID uint64
 	// logger instance
@@ -54,16 +54,17 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(signer ethgo.Key, checkpointOffset uint64, txRelayer txrelayer.TxRelayer,
+func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
+	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
 	return &checkpointManager{
-		signer:            signer,
-		signerAddress:     types.Address(signer.Address()),
-		blockchain:        blockchain,
-		consensusBackend:  backend,
-		txRelayer:         txRelayer,
-		checkpointsOffset: checkpointOffset,
-		logger:            logger,
+		key:                   key,
+		blockchain:            blockchain,
+		consensusBackend:      backend,
+		txRelayer:             txRelayer,
+		checkpointsOffset:     checkpointOffset,
+		checkpointManagerAddr: checkpointManagerSC,
+		logger:                logger,
 	}
 }
 
@@ -75,8 +76,8 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	}
 
 	latestCheckpointBlockRaw, err := c.txRelayer.Call(
-		ethgo.Address(c.signerAddress),
-		ethgo.Address(helper.CheckpointManagerAddress),
+		c.key.Address(),
+		ethgo.Address(c.checkpointManagerAddr),
 		checkpointBlockNumMethodEncoded)
 	if err != nil {
 		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
@@ -102,24 +103,25 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 		"latest checkpoint block", lastCheckpointBlockNumber,
 		"checkpoint block", latestHeader.Number)
 
-	checkpointManagerAddr := ethgo.Address(helper.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(c.checkpointManagerAddr)
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
-		From: ethgo.Address(c.signerAddress),
+		From: c.key.Address(),
 	}
 	initialBlockNumber := lastCheckpointBlockNumber + 1
 
 	var (
 		parentExtra  *Extra
 		parentHeader *types.Header
+		currentExtra *Extra
 	)
 
 	if initialBlockNumber < latestHeader.Number {
 		found := false
-		parentHeader, found = c.blockchain.GetHeaderByNumber(lastCheckpointBlockNumber)
+		parentHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber)
 
 		if !found {
-			return fmt.Errorf("block %d was not found", lastCheckpointBlockNumber)
+			return fmt.Errorf("block %d was not found", initialBlockNumber)
 		}
 
 		parentExtra, err = GetIbftExtra(parentHeader.ExtraData)
@@ -129,39 +131,46 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 	}
 
 	// detect any pending (previously failed) checkpoints and send them
-	for blockNumber := initialBlockNumber; blockNumber < latestHeader.Number; blockNumber++ {
+	for blockNumber := initialBlockNumber + 1; blockNumber <= latestHeader.Number; blockNumber++ {
 		currentHeader, found := c.blockchain.GetHeaderByNumber(blockNumber)
 		if !found {
 			return fmt.Errorf("block %d was not found", blockNumber)
 		}
 
-		currentExtra, err := GetIbftExtra(currentHeader.ExtraData)
+		currentExtra, err = GetIbftExtra(currentHeader.ExtraData)
 		if err != nil {
 			return err
 		}
 
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
 		currentEpochNumber := currentExtra.Checkpoint.EpochNumber
-		parentHeader = currentHeader
-		parentExtra = currentExtra
-
 		// send pending checkpoints only for epoch ending blocks
 		if blockNumber == 1 || parentEpochNumber == currentEpochNumber {
+			parentHeader = currentHeader
+			parentExtra = currentExtra
+
 			continue
 		}
 
 		if err = c.encodeAndSendCheckpoint(txn, *parentHeader, *parentExtra, true); err != nil {
 			return err
 		}
+
+		parentHeader = currentHeader
+		parentExtra = currentExtra
 	}
 
-	// we need to send checkpoint for the latest block
-	extra, err := GetIbftExtra(latestHeader.ExtraData)
-	if err != nil {
-		return err
+	// latestHeader extra could be set in the for loop above
+	// (in case there were pending checkpoint blocks)
+	if currentExtra == nil {
+		// we need to send checkpoint for the latest block
+		currentExtra, err = GetIbftExtra(latestHeader.ExtraData)
+		if err != nil {
+			return err
+		}
 	}
 
-	return c.encodeAndSendCheckpoint(txn, latestHeader, *extra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(txn, latestHeader, *currentExtra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
@@ -188,7 +197,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	txn.Input = input
 
-	receipt, err := c.txRelayer.SendTransaction(txn, c.signer)
+	receipt, err := c.txRelayer.SendTransaction(txn, c.key)
 	if err != nil {
 		return err
 	}
@@ -197,13 +206,15 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
 
+	// update checkpoint block number metrics
+	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
 	c.logger.Debug("send checkpoint txn success", "block number", header.Number)
 
 	return nil
 }
 
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, headerHash types.Hash, extra Extra,
+func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra Extra,
 	nextValidators AccountSet) ([]byte, error) {
 	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
 	if err != nil {
@@ -218,13 +229,13 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(headerNumber uint64, header
 	params := map[string]interface{}{
 		"chainId": new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		"checkpointMetadata": map[string]interface{}{
-			"blockHash":               headerHash,
+			"blockHash":               blockHash,
 			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
 			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
 		},
 		"checkpoint": map[string]interface{}{
 			"epochNumber": new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-			"blockNumber": new(big.Int).SetUint64(headerNumber),
+			"blockNumber": new(big.Int).SetUint64(blockNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},
 		"signature":       encodedAggSigs,

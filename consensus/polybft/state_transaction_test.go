@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/abi"
@@ -14,22 +15,21 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 	t.Parallel()
 
 	const (
-		bundleSize  = uint64(2)
 		eventsCount = 10
 	)
 
 	stateSyncEvents := generateStateSyncEvents(t, eventsCount, 0)
 
-	trie1, err := createMerkleTree(stateSyncEvents, bundleSize)
+	trie1, err := createMerkleTree(stateSyncEvents)
 	require.NoError(t, err)
 
-	trie2, err := createMerkleTree(stateSyncEvents[0:len(stateSyncEvents)-1], bundleSize)
+	trie2, err := createMerkleTree(stateSyncEvents[0 : len(stateSyncEvents)-1])
 	require.NoError(t, err)
 
-	commitmentMessage1 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
-	commitmentMessage2 := NewCommitmentMessage(trie1.Hash(), 2, 8, bundleSize)
-	commitmentMessage3 := NewCommitmentMessage(trie1.Hash(), 6, 10, bundleSize)
-	commitmentMessage4 := NewCommitmentMessage(trie2.Hash(), 2, 8, bundleSize)
+	commitmentMessage1 := NewCommitmentMessage(trie1.Hash(), 2, 8)
+	commitmentMessage2 := NewCommitmentMessage(trie1.Hash(), 2, 8)
+	commitmentMessage3 := NewCommitmentMessage(trie1.Hash(), 6, 10)
+	commitmentMessage4 := NewCommitmentMessage(trie2.Hash(), 2, 8)
 
 	hash1, err := commitmentMessage1.Hash()
 	require.NoError(t, err)
@@ -49,8 +49,8 @@ func TestCommitmentMessage_Hash(t *testing.T) {
 func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 	t.Parallel()
 
-	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, eventsCount, epoch, bundleSize, uint64(2))
+	const epoch, eventsCount = uint64(100), 11
+	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, eventsCount, epoch, uint64(2))
 	expectedSignedCommitmentMsg := &CommitmentMessageSigned{
 		Message: commitmentMessage,
 		AggSignature: Signature{
@@ -74,135 +74,80 @@ func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 func TestCommitmentMessage_VerifyProof(t *testing.T) {
 	t.Parallel()
 
-	const epoch, bundleSize, eventsCount = uint64(100), uint64(3), 11
-	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, bundleSize, 0)
-	require.Equal(t, uint64(4), commitmentMessage.BundlesCount())
+	const epoch, eventsCount = uint64(100), 11
+	commitment, commitmentMessage, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, 0)
+	require.Equal(t, uint64(10), commitmentMessage.ToIndex-commitment.FromIndex)
 
-	for i := uint64(0); i < commitmentMessage.BundlesCount(); i++ {
-		until := (i + 1) * commitmentMessage.BundleSize
-		if until > uint64(len(stateSyncs)) {
-			until = uint64(len(stateSyncs))
+	for i, stateSync := range stateSyncs {
+		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
+		stateSyncsProof := &types.StateSyncProof{
+			Proof:     proof,
+			StateSync: stateSync,
 		}
 
-		proof := commitment.MerkleTree.GenerateProof(i, 0)
-		bundleProof := &BundleProof{
-			Proof:      proof,
-			StateSyncs: stateSyncs[i*commitmentMessage.BundleSize : until],
-		}
-		inputData, err := bundleProof.EncodeAbi()
+		inputData, err := stateSyncsProof.EncodeAbi()
 		require.NoError(t, err)
 
-		executionBundle := &BundleProof{}
-		require.NoError(t, executionBundle.DecodeAbi(inputData))
-		require.Equal(t, bundleProof.StateSyncs, executionBundle.StateSyncs)
+		executionStateSync := &types.StateSyncProof{}
+		require.NoError(t, executionStateSync.DecodeAbi(inputData))
+		require.Equal(t, stateSyncsProof.StateSync, executionStateSync.StateSync)
 
-		err = commitmentMessage.VerifyProof(executionBundle)
+		err = commitmentMessage.VerifyStateSyncProof(executionStateSync)
 		require.NoError(t, err)
 	}
 }
 
-func TestCommitmentMessage_GetBundleIdxFromStateSyncEventIdx(t *testing.T) {
+func TestCommitmentMessage_VerifyProof_NoStateSyncsInCommitment(t *testing.T) {
 	t.Parallel()
 
-	cases := []struct {
-		eventsCount int
-		bundleSize  uint64
-	}{
-		{5, 2},
-		{8, 3},
-		{16, 4},
-		{24, 7},
-	}
-	for _, c := range cases {
-		_, commitmentMessage, stateSyncEvents := buildCommitmentAndStateSyncs(t, c.eventsCount, 10, c.bundleSize, uint64(2))
-		for i, x := range stateSyncEvents {
-			bundleIdx := commitmentMessage.GetBundleIdxFromStateSyncEventIdx(x.ID)
-			require.Equal(t, uint64(i)/c.bundleSize, bundleIdx)
-		}
-	}
-}
-
-func TestCommitmentMessage_GetFirstStateSyncIndexFromBundleIndex(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		bundleSize    uint64
-		fromIndex     uint64
-		bundleIndex   uint64
-		expectedIndex uint64
-	}{
-		{5, 0, 0, 0},
-		{5, 5, 1, 10},
-		{10, 100, 3, 130},
-		{25, 275, 1, 300},
-		{3, 9, 0, 9},
-	}
-
-	for _, c := range cases {
-		commitment := &CommitmentMessage{
-			FromIndex:  c.fromIndex,
-			BundleSize: c.bundleSize,
-		}
-
-		assert.Equal(t, c.expectedIndex, commitment.GetFirstStateSyncIndexFromBundleIndex(c.bundleIndex))
-	}
-}
-
-func TestCommitmentMessage_VerifyProof_NoStateSyncsInBundle(t *testing.T) {
-	t.Parallel()
-
-	commitment := &CommitmentMessage{FromIndex: 0, ToIndex: 4, BundleSize: 5}
-	err := commitment.VerifyProof(&BundleProof{})
-	assert.ErrorContains(t, err, "no state sync events")
+	commitment := &CommitmentMessage{FromIndex: 0, ToIndex: 4}
+	err := commitment.VerifyStateSyncProof(&types.StateSyncProof{})
+	assert.ErrorContains(t, err, "no state sync event")
 }
 
 func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T) {
 	t.Parallel()
 
 	const (
-		bundleIndex = 0
-		bundleSize  = 5
-		fromIndex   = 0
-		toIndex     = 4
+		fromIndex = 0
+		toIndex   = 4
 	)
 
 	stateSyncs := generateStateSyncEvents(t, 5, 0)
-	trie, err := createMerkleTree(stateSyncs, bundleSize)
+	trie, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	proof := trie.GenerateProof(bundleIndex, 0)
+	proof := trie.GenerateProof(0, 0)
 
-	bundleProof := &BundleProof{
-		StateSyncs: stateSyncs[1:],
-		Proof:      proof,
+	stateSyncProof := &types.StateSyncProof{
+		StateSync: stateSyncs[4],
+		Proof:     proof,
 	}
 
 	commitment := &CommitmentMessage{
 		FromIndex:      fromIndex,
 		ToIndex:        toIndex,
-		BundleSize:     bundleSize,
 		MerkleRootHash: trie.Hash(),
 	}
 
-	assert.ErrorContains(t, commitment.VerifyProof(bundleProof), "not a member of merkle tree")
+	assert.ErrorContains(t, commitment.VerifyStateSyncProof(stateSyncProof), "not a member of merkle tree")
 }
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
-	epoch, bundleSize, startIdx uint64) (*Commitment, *CommitmentMessage, []*StateSyncEvent) {
+	epoch, startIdx uint64) (*Commitment, *CommitmentMessage, []*types.StateSyncEvent) {
 	t.Helper()
 
 	stateSyncEvents := generateStateSyncEvents(t, stateSyncsCount, startIdx)
 
 	fromIndex := stateSyncEvents[0].ID
 	toIndex := stateSyncEvents[len(stateSyncEvents)-1].ID
-	commitment, err := NewCommitment(epoch, fromIndex, toIndex, bundleSize, stateSyncEvents)
+	commitment, err := NewCommitment(epoch, stateSyncEvents)
 
 	require.NoError(t, err)
 
 	commitmentMsg := NewCommitmentMessage(commitment.MerkleTree.Hash(),
 		fromIndex,
-		toIndex,
-		bundleSize)
+		toIndex)
 
 	require.NoError(t, err)
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -173,4 +174,25 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 	copy(tmp[size-l:], bb)
 
 	return tmp
+}
+
+// ExtendByteSlice extends given byte slice by needLength parameter and trims it
+func ExtendByteSlice(b []byte, needLength int) []byte {
+	b = b[:cap(b)]
+
+	if n := needLength - len(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+
+	return b[:needLength]
+}
+
+// BigIntDivCeil performs integer division and rounds given result to next bigger integer number
+// It is calculated using this formula result = (a + b - 1) / b
+func BigIntDivCeil(a, b *big.Int) *big.Int {
+	result := new(big.Int)
+
+	return result.Add(a, b).
+		Sub(result, big.NewInt(1)).
+		Div(result, b)
 }

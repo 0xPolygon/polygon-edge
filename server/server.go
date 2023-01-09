@@ -15,6 +15,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
@@ -32,6 +35,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
@@ -140,11 +144,12 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
-	if err := m.setupTelemetry(); err != nil {
-		return nil, err
-	}
-
 	if config.Telemetry.PrometheusAddr != nil {
+		// Only setup telemetry if `PrometheusAddr` has been configured.
+		if err := m.setupTelemetry(); err != nil {
+			return nil, err
+		}
+
 		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
 	}
 
@@ -282,6 +287,13 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// start relayer
+	if config.Relayer {
+		if err := m.setupRelayer(); err != nil {
+			return nil, err
+		}
+	}
+
 	m.txpool.Start()
 
 	return m, nil
@@ -337,6 +349,10 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 	account, err := getAccountImpl(t.state, root, addr)
 
 	if err != nil {
+		if errors.Is(err, jsonrpc.ErrStateNotFound) {
+			return big.NewInt(0), nil
+		}
+
 		return big.NewInt(0), err
 	}
 
@@ -427,6 +443,29 @@ func (s *Server) setupConsensus() error {
 	}
 
 	s.consensus = consensus
+
+	return nil
+}
+
+// setupRelayer sets up the relayer
+func (s *Server) setupRelayer() error {
+	account, err := wallet.NewAccountFromSecret(s.secretsManager)
+	if err != nil {
+		return fmt.Errorf("failed to create account from secret: %w", err)
+	}
+
+	relayer := statesyncrelayer.NewRelayer(
+		s.config.DataDir,
+		s.config.JSONRPC.JSONRPCAddr.String(),
+		ethgo.Address(contracts.StateReceiverContract),
+		s.logger.Named("relayer"),
+		wallet.NewKey(account),
+	)
+
+	// start relayer
+	if err := relayer.Start(); err != nil {
+		return fmt.Errorf("failed to start relayer: %w", err)
+	}
 
 	return nil
 }

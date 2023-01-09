@@ -197,9 +197,3 @@ func TestGetGenesisAccountBalance(t *testing.T) {
 		})
 	}
 }
-
-func TestConvertWeiToTokensAmount(t *testing.T) {
-	t.Parallel()
-
-	require.Equal(t, big.NewInt(30), ConvertWeiToTokensAmount(new(big.Int).Mul(big.NewInt(30), big.NewInt(1e18))))
-}

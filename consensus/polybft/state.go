@@ -26,8 +26,8 @@ state sync events/
 commitments/
 |--> commitment.Message.ToIndex -> *CommitmentMessageSigned (json marshalled)
 
-bundles/
-|--> bundle.StateSyncs[0].Id -> *BundleProof (json marshalled)
+stateSyncProofs/
+|--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
 
 epochs/
 |--> epochNumber
@@ -38,13 +38,20 @@ validatorSnapshots/
 
 exit events/
 |--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
+
+proposer snapshot/
+|--> staticKey - only current one snapshot is preserved -> *ProposerSnapshot (json marshalled)
 */
 
 var (
 	// ABI
 	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
 	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
-	exitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+
+	// proposerSnapshotKey is a static key which is used to save latest proposer snapshot.
+	// (there will always be one object in bucket)
+	proposerSnapshotKey = []byte("proposerSnapshotKey")
 )
 
 const (
@@ -52,69 +59,18 @@ const (
 	// that can be stored in cache (both memory and db)
 	validatorSnapshotLimit = 100
 	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in memory
-	numberOfSnapshotsToLeaveInMemory = 2
-	// numberOfSnapshotsToLeaveInMemory defines a number of validator snapshots to leave in db
-	numberOfSnapshotsToLeaveInDB = 10
-	// number of stateSyncEvents to be processed before a commitment message can be created and gossiped
-	stateSyncMainBundleSize = 10
-	// number of stateSyncEvents to be grouped into one StateTransaction
-	stateSyncBundleSize = 1
+	numberOfSnapshotsToLeaveInMemory = 12
+	// numberOfSnapshotsToLeaveInDB defines a number of validator snapshots to leave in db
+	numberOfSnapshotsToLeaveInDB = 20
 )
 
 type exitEventNotFoundError struct {
-	exitID          uint64
-	epoch           uint64
-	checkpointBlock uint64
+	exitID uint64
+	epoch  uint64
 }
 
 func (e *exitEventNotFoundError) Error() string {
-	return fmt.Sprintf("could not find any exit event that has an id: %v, added in block: %v and epoch: %v",
-		e.exitID, e.checkpointBlock, e.epoch)
-}
-
-// TODO: remove and refactor to use types.StateSyncEvent
-// StateSyncEvent is a bridge event from the rootchain
-type StateSyncEvent types.StateSyncEvent
-
-// newStateSyncEvent creates an instance of pending state sync event.
-func newStateSyncEvent(
-	id uint64,
-	sender ethgo.Address,
-	target ethgo.Address,
-	data []byte,
-) *StateSyncEvent {
-	return &StateSyncEvent{
-		ID:       id,
-		Sender:   sender,
-		Receiver: target,
-		Data:     data,
-	}
-}
-
-func (s *StateSyncEvent) String() string {
-	return fmt.Sprintf("Id=%d, Sender=%v, Target=%v", s.ID, s.Sender, s.Receiver)
-}
-
-func decodeStateSyncEvent(log *ethgo.Log) (*StateSyncEvent, error) {
-	raw, err := stateTransferEventABI.ParseLog(log)
-	if err != nil {
-		return nil, err
-	}
-
-	eventGeneric, err := decodeEventData(raw, log,
-		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
-			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	stateSyncEvent, ok := eventGeneric.(*StateSyncEvent)
-	if !ok {
-		return nil, errors.New("failed to convert event to StateSyncEvent instance")
-	}
-
-	return stateSyncEvent, nil
+	return fmt.Sprintf("could not find any exit event that has an id: %v and epoch: %v", e.exitID, e.epoch)
 }
 
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
@@ -227,6 +183,13 @@ type TransportMessage struct {
 	EpochNumber uint64
 }
 
+func (t *TransportMessage) ToSignature() *MessageSignature {
+	return &MessageSignature{
+		Signature: t.Signature,
+		From:      t.NodeID,
+	}
+}
+
 var (
 	// bucket to store rootchain bridge events
 	syncStateEventsBucket = []byte("stateSyncEvents")
@@ -234,45 +197,46 @@ var (
 	exitEventsBucket = []byte("exitEvent")
 	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
-	// bucket to store bundles
-	bundlesBucket = []byte("bundles")
+	// bucket to store state sync proofs
+	stateSyncProofsBucket = []byte("stateSyncProofs")
 	// bucket to store epochs and all its nested buckets (message votes and message pool events)
 	epochsBucket = []byte("epochs")
 	// bucket to store message votes (signatures)
 	messageVotesBucket = []byte("votes")
 	// bucket to store validator snapshots
 	validatorSnapshotsBucket = []byte("validatorSnapshots")
+	// bucket to store proposer calculator snapshot
+	proposerCalcSnapshotBucket = []byte("proposerCalculatorSnapshot")
 	// array of all parent buckets
-	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, bundlesBucket,
-		epochsBucket, validatorSnapshotsBucket}
+	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, stateSyncProofsBucket,
+		epochsBucket, validatorSnapshotsBucket, proposerCalcSnapshotBucket}
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
 	// errCommitmentNotBuilt error message
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
-	// errNotAnExitEvent error message
-	errNotAnExitEvent = errors.New("log not an exit event")
 )
 
 // State represents a persistence layer which persists consensus data off-chain
 type State struct {
 	db     *bolt.DB
 	logger hclog.Logger
+	close  chan struct{}
 }
 
-func newState(path string, logger hclog.Logger) (*State, error) {
+func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	err = initMainDBBuckets(db)
-	if err != nil {
+	if err = initMainDBBuckets(db); err != nil {
 		return nil, err
 	}
 
 	state := &State{
 		db:     db,
 		logger: logger.Named("state"),
+		close:  closeCh,
 	}
 
 	return state, nil
@@ -294,29 +258,26 @@ func initMainDBBuckets(db *bolt.DB) error {
 	return err
 }
 
-// insertValidatorSnapshot inserts a validator snapshot for the given epoch to its bucket in db
-func (s *State) insertValidatorSnapshot(epoch uint64, validatorSnapshot AccountSet) error {
+// insertValidatorSnapshot inserts a validator snapshot for the given block to its bucket in db
+func (s *State) insertValidatorSnapshot(validatorSnapshot *validatorSnapshot) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		raw, err := validatorSnapshot.Marshal()
+		raw, err := json.Marshal(validatorSnapshot)
 		if err != nil {
 			return err
 		}
 
-		bucket := tx.Bucket(validatorSnapshotsBucket)
-
-		return bucket.Put(itob(epoch), raw)
+		return tx.Bucket(validatorSnapshotsBucket).Put(itob(validatorSnapshot.Epoch), raw)
 	})
 }
 
-// getValidatorSnapshot queries the validator snapshot for given epoch from db
-func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
-	var validatorSnapshot AccountSet
+// getValidatorSnapshot queries the validator snapshot for given block from db
+func (s *State) getValidatorSnapshot(epoch uint64) (*validatorSnapshot, error) {
+	var validatorSnapshot *validatorSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(validatorSnapshotsBucket)
-		v := bucket.Get(itob(epoch))
+		v := tx.Bucket(validatorSnapshotsBucket).Get(itob(epoch))
 		if v != nil {
-			return validatorSnapshot.Unmarshal(v)
+			return json.Unmarshal(v, &validatorSnapshot)
 		}
 
 		return nil
@@ -325,13 +286,33 @@ func (s *State) getValidatorSnapshot(epoch uint64) (AccountSet, error) {
 	return validatorSnapshot, err
 }
 
-// list iterates through all events in events bucket in db, unmarshals them, and returns as array
-func (s *State) list() ([]*StateSyncEvent, error) {
-	events := []*StateSyncEvent{}
+// getLastSnapshot returns the last snapshot saved in db
+// since they are stored by epoch number (uint64), they are sequentially stored,
+// so the latest epoch will be the last snapshot in db
+func (s *State) getLastSnapshot() (*validatorSnapshot, error) {
+	var snapshot *validatorSnapshot
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(validatorSnapshotsBucket).Cursor()
+		k, v := c.Last()
+		if k == nil {
+			// we have no snapshots in db
+			return nil
+		}
+
+		return json.Unmarshal(v, &snapshot)
+	})
+
+	return snapshot, err
+}
+
+// list iterates through all events in events bucket in db, un-marshals them, and returns as array
+func (s *State) list() ([]*types.StateSyncEvent, error) {
+	events := []*types.StateSyncEvent{}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket(syncStateEventsBucket).ForEach(func(k, v []byte) error {
-			var event *StateSyncEvent
+			var event *types.StateSyncEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -380,19 +361,19 @@ func insertExitEventToBucket(bucket *bolt.Bucket, exitEvent *ExitEvent) error {
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
-func (s *State) getExitEvent(exitEventID, epoch, checkpointBlockNumber uint64) (*ExitEvent, error) {
+func (s *State) getExitEvent(exitEventID, epoch uint64) (*ExitEvent, error) {
 	var exitEvent *ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(exitEventsBucket)
 
-		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID), itob(checkpointBlockNumber)}, nil)
-		v := bucket.Get(key)
-		if v == nil {
+		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID)}, nil)
+		k, v := bucket.Cursor().Seek(key)
+
+		if bytes.HasPrefix(k, key) == false || v == nil {
 			return &exitEventNotFoundError{
-				exitID:          exitEventID,
-				checkpointBlock: checkpointBlockNumber,
-				epoch:           epoch,
+				exitID: exitEventID,
+				epoch:  epoch,
 			}
 		}
 
@@ -448,7 +429,7 @@ func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bo
 }
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
-func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
+func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(event)
 		if err != nil {
@@ -463,10 +444,10 @@ func (s *State) insertStateSyncEvent(event *StateSyncEvent) error {
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
 // if there is an event with index that can not be found in db in given range, an error is returned
-func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*StateSyncEvent, error) {
-	var events []*StateSyncEvent
+func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
+	var events []*types.StateSyncEvent
 
-	err := s.db.Update(func(tx *bolt.Tx) error {
+	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
@@ -474,7 +455,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*S
 				return errNotEnoughStateSyncs
 			}
 
-			var event *StateSyncEvent
+			var event *types.StateSyncEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -542,50 +523,17 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 	return commitment, err
 }
 
-// cleanCommitments cleans all commitments that are older than the provided fromIndex, alongside their proofs
-func (s *State) cleanCommitments(stateSyncExecutionIndex uint64) error {
+// insertStateSyncProofs inserts the provided state sync proofs to db
+func (s *State) insertStateSyncProofs(stateSyncProof []*types.StateSyncProof) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		commitmentsBucket := tx.Bucket(commitmentsBucket)
-		commitmentsCursor := commitmentsBucket.Cursor()
-		for k, _ := commitmentsCursor.First(); k != nil; k, _ = commitmentsCursor.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				// reached a commitment that is not executed
-				break
-			}
-
-			if err := commitmentsBucket.Delete(k); err != nil {
-				return err
-			}
-		}
-
-		bundlesBucket := tx.Bucket(bundlesBucket)
-		bundlesCursor := bundlesBucket.Cursor()
-		for k, _ := bundlesCursor.First(); k != nil; k, _ = bundlesCursor.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				// reached a bundle that is not executed
-				break
-			}
-
-			if err := bundlesBucket.Delete(k); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-}
-
-// insertBundles inserts the provided bundles to db
-func (s *State) insertBundles(bundles []*BundleProof) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		bundlesBucket := tx.Bucket(bundlesBucket)
-		for _, b := range bundles {
-			raw, err := json.Marshal(b)
+		bucket := tx.Bucket(stateSyncProofsBucket)
+		for _, ssp := range stateSyncProof {
+			raw, err := json.Marshal(ssp)
 			if err != nil {
 				return err
 			}
 
-			if err := bundlesBucket.Put(itob(b.ID()), raw); err != nil {
+			if err := bucket.Put(itob(ssp.StateSync.ID), raw); err != nil {
 				return err
 			}
 		}
@@ -594,29 +542,21 @@ func (s *State) insertBundles(bundles []*BundleProof) error {
 	})
 }
 
-// getBundles gets bundles that are not executed
-func (s *State) getBundles(stateSyncExecutionIndex, maxNumberOfBundles uint64) ([]*BundleProof, error) {
-	var bundles []*BundleProof
+// getStateSyncProof gets state sync proof that are not executed
+func (s *State) getStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+	var ssp *types.StateSyncProof
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(bundlesBucket).Cursor()
-		processed := uint64(0)
-		for k, v := c.First(); k != nil && processed < maxNumberOfBundles; k, v = c.Next() {
-			if itou(k) >= stateSyncExecutionIndex {
-				var bundle *BundleProof
-				if err := json.Unmarshal(v, &bundle); err != nil {
-					return err
-				}
-
-				bundles = append(bundles, bundle)
-				processed++
+		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncID)); v != nil {
+			if err := json.Unmarshal(v, &ssp); err != nil {
+				return err
 			}
 		}
 
 		return nil
 	})
 
-	return bundles, err
+	return ssp, err
 }
 
 // insertMessageVote inserts given vote to signatures bucket of given epoch
@@ -757,17 +697,15 @@ func (s *State) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 		// paired list
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
-		if numberOfSnapshotsToLeaveInDB > 0 { // TODO this is always true?!
-			for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
-				key := itob(epoch)
-				value := bucket.Get(key)
-				if value == nil {
-					continue
-				}
-				keys = append(keys, key)
-				values = append(values, value)
-				epoch--
+		for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
+			key := itob(epoch)
+			value := bucket.Get(key)
+			if value == nil {
+				continue
 			}
+			keys = append(keys, key)
+			values = append(values, value)
+			epoch--
 		}
 
 		// removing an entire bucket is much faster than removing all keys
@@ -838,6 +776,34 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	}
 
 	return stats
+}
+
+// getProposerSnapshot gets latest proposer snapshot
+func (s *State) getProposerSnapshot() (*ProposerSnapshot, error) {
+	var snapshot *ProposerSnapshot
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		value := tx.Bucket(proposerCalcSnapshotBucket).Get(proposerSnapshotKey)
+		if value == nil {
+			return nil
+		}
+
+		return json.Unmarshal(value, &snapshot)
+	})
+
+	return snapshot, err
+}
+
+// writeProposerSnapshot writes proposer snapshot
+func (s *State) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
+	raw, err := json.Marshal(snapshot)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(proposerCalcSnapshotBucket).Put(proposerSnapshotKey, raw)
+	})
 }
 
 func itob(v uint64) []byte {

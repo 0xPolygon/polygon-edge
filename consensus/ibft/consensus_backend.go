@@ -1,6 +1,7 @@
 package ibft
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"time"
@@ -9,6 +10,7 @@ import (
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -56,10 +58,39 @@ func (i *backendIBFT) InsertBlock(
 		committedSealsMap[types.BytesToAddress(cm.Signer)] = cm.Signature
 	}
 
+	// Copy extra data for debugging purposes
+	extraDataOriginal := newBlock.Header.ExtraData
+	extraDataBackup := make([]byte, len(extraDataOriginal))
+	copy(extraDataBackup, extraDataOriginal)
+
 	// Push the committed seals to the header
 	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
+
+		return
+	}
+
+	// WriteCommittedSeals alters the extra data before writing the block
+	// It doesn't handle errors while pushing changes which can result in
+	// corrupted extra data.
+	// We don't know exact circumstance of the unmarshalRLP error
+	// This is a safety net to help us narrow down and also recover before
+	// writing the block
+	if err := i.ValidateExtraDataFormat(newBlock.Header); err != nil {
+		//Format committed seals to make them more readable
+		committedSealsStr := make([]string, len(committedSealsMap))
+		for i, seal := range committedSeals {
+			committedSealsStr[i] = fmt.Sprintf("{signer=%v signature=%v}",
+				hex.EncodeToHex(seal.Signer),
+				hex.EncodeToHex(seal.Signature))
+		}
+
+		i.logger.Error("cannot write block: corrupted extra data",
+			"err", err,
+			"before", hex.EncodeToHex(extraDataBackup),
+			"after", hex.EncodeToHex(header.ExtraData),
+			"committedSeals", committedSealsStr)
 
 		return
 	}
@@ -174,8 +205,9 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	// set the timestamp
-	header.Timestamp = uint64(time.Now().Unix())
+	// Set the header timestamp
+	potentialTimestamp := i.calcHeaderTimestamp(parent.Timestamp, time.Now())
+	header.Timestamp = uint64(potentialTimestamp.Unix())
 
 	parentCommittedSeals, err := i.extractParentCommittedSeals(parent)
 	if err != nil {
@@ -189,7 +221,16 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	txs := i.writeTransactions(gasLimit, header.Number, transition)
+	// Get the block transactions
+	writeCtx, cancelFn := context.WithDeadline(context.Background(), potentialTimestamp)
+	defer cancelFn()
+
+	txs := i.writeTransactions(
+		writeCtx,
+		gasLimit,
+		header.Number,
+		transition,
+	)
 
 	if err := i.PreCommitState(header, transition); err != nil {
 		return nil, err
@@ -223,6 +264,31 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	return block, nil
 }
 
+// calcHeaderTimestamp calculates the new block timestamp, based
+// on the block time and parent timestamp
+func (i *backendIBFT) calcHeaderTimestamp(parentUnix uint64, currentTime time.Time) time.Time {
+	var (
+		parentTimestamp    = time.Unix(int64(parentUnix), 0)
+		potentialTimestamp = parentTimestamp.Add(i.blockTime)
+	)
+
+	if potentialTimestamp.Before(currentTime) {
+		// The deadline for creating this next block
+		// has passed, round it to the nearest
+		// multiple of block time
+		// t........t+blockT...x (t+blockT.x; now).....t+blockT (potential)
+		potentialTimestamp = roundUpTime(currentTime, i.blockTime)
+	}
+
+	return potentialTimestamp
+}
+
+// roundUpTime rounds up the specified time to the
+// nearest higher multiple
+func roundUpTime(t time.Time, roundOn time.Duration) time.Time {
+	return t.Add(roundOn / 2).Round(roundOn)
+}
+
 type status uint8
 
 const (
@@ -242,6 +308,7 @@ type transitionInterface interface {
 }
 
 func (i *backendIBFT) writeTransactions(
+	writeCtx context.Context,
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
@@ -253,8 +320,6 @@ func (i *backendIBFT) writeTransactions(
 	}
 
 	var (
-		blockTimer = time.NewTimer(i.blockTime)
-
 		successful = 0
 		failed     = 0
 		skipped    = 0
@@ -275,7 +340,7 @@ func (i *backendIBFT) writeTransactions(
 write:
 	for {
 		select {
-		case <-blockTimer.C:
+		case <-writeCtx.Done():
 			return
 		default:
 			// execute transactions one by one
@@ -304,7 +369,7 @@ write:
 	}
 
 	//	wait for the timer to expire
-	<-blockTimer.C
+	<-writeCtx.Done()
 
 	return
 }

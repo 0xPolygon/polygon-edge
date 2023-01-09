@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -68,15 +67,6 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	return nil
 }
 
-// fillPremineMap fills the premine map for the genesis.json file with passed in balances and accounts
-func fillPremineMap(premineMap map[types.Address]*chain.GenesisAccount, premineInfos []*premineInfo) {
-	for _, premine := range premineInfos {
-		premineMap[premine.address] = &chain.GenesisAccount{
-			Balance: premine.balance,
-		}
-	}
-}
-
 // parsePremineInfo parses provided premine information and returns premine address and premine balance
 func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	address := types.ZeroAddress
@@ -98,41 +88,54 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	return &premineInfo{address: address, balance: amount}, nil
 }
 
-func ReadValidatorsByRegexp(dir, prefix string) ([]*polybft.Validator, error) {
-	if dir == "" {
-		dir = "."
+// GetValidatorKeyFiles returns file names which has validator secrets
+func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
+	if rootDir == "" {
+		rootDir = "."
 	}
 
-	files, err := ioutil.ReadDir(dir)
+	files, err := ioutil.ReadDir(rootDir)
 	if err != nil {
 		return nil, err
 	}
 
-	validCnt := 0
+	matchedFiles := 0
+	fileNames := make([]string, len(files))
 
 	for _, file := range files {
-		if file.IsDir() && strings.HasPrefix(file.Name(), prefix) {
-			files[validCnt] = file
-			validCnt++
+		fileName := file.Name()
+		if file.IsDir() && strings.HasPrefix(fileName, filePrefix) {
+			fileNames[matchedFiles] = fileName
+			matchedFiles++
 		}
 	}
-
-	files = files[0:validCnt]
+	// reslice to remove empty entries
+	fileNames = fileNames[:matchedFiles]
 
 	// we must sort files by number after the prefix not by name string
-	sort.Slice(files, func(i, j int) bool {
-		f := strings.TrimPrefix(files[i].Name(), prefix)
-		s := strings.TrimPrefix(files[j].Name(), prefix)
-		num1, _ := strconv.Atoi(strings.TrimLeft(f, "-"))
-		num2, _ := strconv.Atoi(strings.TrimLeft(s, "-"))
+	sort.Slice(fileNames, func(i, j int) bool {
+		first := strings.TrimPrefix(fileNames[i], filePrefix)
+		second := strings.TrimPrefix(fileNames[j], filePrefix)
+		num1, _ := strconv.Atoi(strings.TrimLeft(first, "-"))
+		num2, _ := strconv.Atoi(strings.TrimLeft(second, "-"))
 
 		return num1 < num2
 	})
 
-	validators := make([]*polybft.Validator, len(files))
+	return fileNames, nil
+}
 
-	for i, file := range files {
-		path := filepath.Join(dir, file.Name())
+// ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
+func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
+	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	validators := make([]*polybft.Validator, len(validatorKeyFiles))
+
+	for i, file := range validatorKeyFiles {
+		path := filepath.Join(dir, file)
 
 		account, nodeID, err := getSecrets(path)
 		if err != nil {

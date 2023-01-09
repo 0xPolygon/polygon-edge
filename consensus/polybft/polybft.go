@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -112,14 +111,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		consensusConfigJSON, err := json.Marshal(config.Params.Engine[engineName])
-		if err != nil {
-			return err
-		}
-
-		var polyBFTConfig PolyBFTConfig
-		err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
-
+		polyBFTConfig, err := GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
@@ -134,8 +126,17 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		if err != nil {
+			return fmt.Errorf("failed loading rootchain manifest: %w", err)
+		}
+
+		rootchainAdmin := types.ZeroAddress
+		if polyBFTConfig.IsBridgeEnabled() {
+			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
+		}
+
 		input, err = nativeTokenInitializer.Encode(
-			[]interface{}{helper.GetRootchainAdminAddr(), nativeTokenName, nativeTokenSymbol})
+			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}
@@ -172,7 +173,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// create bridge and consensus topics
-	if err := p.createTopics(); err != nil {
+	if err = p.createTopics(); err != nil {
 		return fmt.Errorf("cannot create topics: %w", err)
 	}
 
@@ -182,25 +183,27 @@ func (p *Polybft) Initialize() error {
 	// initialize polybft consensus data directory
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
-	if err := os.MkdirAll(p.dataDir, 0750); err != nil {
+	if err = os.MkdirAll(p.dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
 
 	p.state = stt
-	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.consensusConfig.EpochSize, p.blockchain)
+	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.blockchain)
 
 	// create runtime
-	p.initRuntime()
+	if err := p.initRuntime(); err != nil {
+		return err
+	}
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
 
-	if err := p.subscribeToIbftTopic(); err != nil {
-		return fmt.Errorf("topic subscription failed: %w", err)
+	if err = p.subscribeToIbftTopic(); err != nil {
+		return fmt.Errorf("IBFT topic subscription failed: %w", err)
 	}
 
 	return nil
@@ -215,11 +218,6 @@ func (p *Polybft) Start() error {
 		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
-	// we need to call restart epoch on runtime to initialize epoch state
-	if err := p.runtime.restartEpoch(p.blockchain.CurrentHeader()); err != nil {
-		return fmt.Errorf("consensus runtime start - restart epoch failed: %w", err)
-	}
-
 	// start syncing
 	go func() {
 		blockHandler := func(b *types.Block) bool {
@@ -229,14 +227,17 @@ func (p *Polybft) Start() error {
 		}
 
 		if err := p.syncer.Sync(blockHandler); err != nil {
-			panic(fmt.Errorf("failed to sync blocks. Error: %w", err))
+			p.logger.Error("blocks synchronization failed", "error", err)
 		}
 	}()
 
-	// start pbft process
+	// start consensus runtime
 	if err := p.startRuntime(); err != nil {
 		return fmt.Errorf("consensus runtime start failed: %w", err)
 	}
+
+	// start state DB process
+	go p.state.startStatsReleasing()
 
 	return nil
 }
@@ -244,14 +245,14 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:   p.consensusConfig,
-		Key:             p.key,
-		DataDir:         p.dataDir,
-		BridgeTransport: &runtimeTransportWrapper{p.bridgeTopic, p.logger},
-		State:           p.state,
-		blockchain:      p.blockchain,
-		polybftBackend:  p,
-		txPool:          p.txPool,
+		PolyBFTConfig:  p.consensusConfig,
+		Key:            p.key,
+		DataDir:        p.dataDir,
+		State:          p.state,
+		blockchain:     p.blockchain,
+		polybftBackend: p,
+		txPool:         p.txPool,
+		bridgeTopic:    p.bridgeTopic,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
@@ -266,24 +267,12 @@ func (p *Polybft) initRuntime() error {
 
 // startRuntime starts consensus runtime
 func (p *Polybft) startRuntime() error {
-	if p.runtime.IsBridgeEnabled() {
-		// start bridge event tracker
-		if err := p.runtime.startEventTracker(); err != nil {
-			return fmt.Errorf("starting event tracker  failed: %w", err)
-		}
-
-		// subscribe to bridge topic
-		if err := p.runtime.subscribeToBridgeTopic(p.bridgeTopic); err != nil {
-			return fmt.Errorf("bridge topic subscription failed: %w", err)
-		}
-	}
-
-	go p.startPbftProcess()
+	go p.startConsensusProtocol()
 
 	return nil
 }
 
-func (p *Polybft) startPbftProcess() {
+func (p *Polybft) startConsensusProtocol() {
 	// wait to have at least n peers connected. The 2 is just an initial heuristic value
 	// Most likely we will parametrize this in the future.
 	if !p.waitForNPeers() {
@@ -342,6 +331,8 @@ func (p *Polybft) startPbftProcess() {
 			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		}
 
+		now := time.Now()
+
 		select {
 		case <-syncerBlockCh:
 			if isValidator {
@@ -356,6 +347,8 @@ func (p *Polybft) startPbftProcess() {
 
 			return
 		}
+
+		p.logger.Debug("time to run the sequence", "seconds", time.Since(now))
 	}
 }
 
@@ -439,7 +432,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return fmt.Errorf("failed to calculate sign hash: %w", err)
 	}
 
-	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash); err != nil {
+	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash, p.logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
 			blockNumber, checkpointHash, err)
 	}
@@ -470,7 +463,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
-		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash); err != nil {
+		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, p.logger); err != nil {
 			return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %v: %w",
 				blockNumber, parentCheckpointHash, err)
 		}

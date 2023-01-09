@@ -20,10 +20,6 @@ var (
 	GenesisDifficulty = big.NewInt(131072)
 )
 
-const (
-	weiScalingFactor = int64(1e18) // 10^18
-)
-
 // Chain is the blockchain chain configuration
 type Chain struct {
 	Name      string   `json:"name"`
@@ -374,9 +370,4 @@ func GetGenesisAccountBalance(address types.Address, allocations map[types.Addre
 	}
 
 	return nil, fmt.Errorf("genesis account %s is not found among genesis allocations", address)
-}
-
-// ConvertWeiToTokensAmount converts provided wei amount to tokens amount
-func ConvertWeiToTokensAmount(weiAmount *big.Int) *big.Int {
-	return new(big.Int).Div(weiAmount, big.NewInt(weiScalingFactor))
 }

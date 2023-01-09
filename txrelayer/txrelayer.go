@@ -3,7 +3,6 @@ package txrelayer
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -13,8 +12,9 @@ import (
 )
 
 const (
-	defaultGasPrice = 1879048192 // 0x70000000
-	defaultGasLimit = 5242880    // 0x500000
+	defaultGasPrice   = 1879048192 // 0x70000000
+	defaultGasLimit   = 5242880    // 0x500000
+	DefaultRPCAddress = "http://127.0.0.1:8545"
 )
 
 var (
@@ -35,15 +35,17 @@ type TxRelayer interface {
 var _ TxRelayer = (*TxRelayerImpl)(nil)
 
 type TxRelayerImpl struct {
-	ipAddress string
-	client    *jsonrpc.Client
+	ipAddress      string
+	client         *jsonrpc.Client
+	receiptTimeout time.Duration
 
 	lock sync.Mutex
 }
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
-		ipAddress: "http://127.0.0.1:8545",
+		ipAddress:      "http://127.0.0.1:8545",
+		receiptTimeout: 50 * time.Millisecond,
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -64,11 +66,9 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 // Call executes a message call immediately without creating a transaction on the blockchain
 func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	callMsg := &ethgo.CallMsg{
-		From:     from,
-		To:       &to,
-		Data:     input,
-		GasPrice: defaultGasPrice,
-		Gas:      big.NewInt(defaultGasLimit),
+		From: from,
+		To:   &to,
+		Data: input,
 	}
 
 	return t.client.Eth().Call(callMsg, ethgo.Pending)
@@ -134,6 +134,8 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	}
 
 	txn.From = accounts[0]
+	txn.Gas = defaultGasLimit
+	txn.GasPrice = defaultGasPrice
 
 	txnHash, err := t.client.Eth().SendTransaction(txn)
 	if err != nil {
@@ -167,7 +169,7 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 			return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 		}
 
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(t.receiptTimeout)
 		count++
 	}
 }
@@ -183,5 +185,11 @@ func WithClient(client *jsonrpc.Client) TxRelayerOption {
 func WithIPAddress(ipAddress string) TxRelayerOption {
 	return func(t *TxRelayerImpl) {
 		t.ipAddress = ipAddress
+	}
+}
+
+func WithReceiptTimeout(receiptTimeout time.Duration) TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.receiptTimeout = receiptTimeout
 	}
 }

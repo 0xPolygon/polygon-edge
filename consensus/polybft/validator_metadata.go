@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strings"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -23,7 +24,7 @@ var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4
 type ValidatorMetadata struct {
 	Address     types.Address
 	BlsKey      *bls.PublicKey
-	VotingPower uint64
+	VotingPower *big.Int
 }
 
 // Equals checks ValidatorMetadata equality
@@ -32,7 +33,7 @@ func (v *ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 		return false
 	}
 
-	return v.EqualAddressAndBlsKey(b) && v.VotingPower == b.VotingPower
+	return v.EqualAddressAndBlsKey(b) && v.VotingPower.Cmp(b.VotingPower) == 0
 }
 
 // EqualAddressAndBlsKey checks ValidatorMetadata equality against Address and BlsKey fields
@@ -52,7 +53,7 @@ func (v *ValidatorMetadata) Copy() *ValidatorMetadata {
 	return &ValidatorMetadata{
 		Address:     types.BytesToAddress(v.Address[:]),
 		BlsKey:      blsKey,
-		VotingPower: v.VotingPower,
+		VotingPower: new(big.Int).Set(v.VotingPower),
 	}
 }
 
@@ -64,7 +65,7 @@ func (v *ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	// BlsKey
 	vv.Set(ar.NewCopyBytes(v.BlsKey.Marshal()))
 	// VotingPower
-	vv.Set(ar.NewBigInt(new(big.Int).SetUint64(v.VotingPower)))
+	vv.Set(ar.NewBigInt(v.VotingPower))
 
 	return vv
 }
@@ -109,19 +110,29 @@ func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
 		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
 	}
 
-	v.VotingPower = votingPower.Uint64()
+	v.VotingPower = new(big.Int).Set(votingPower)
 
 	return nil
 }
 
 // fmt.Stringer implementation
 func (v *ValidatorMetadata) String() string {
-	return fmt.Sprintf("Address=%v; BLS Key=%v; Voting Power=%d",
-		v.Address.String(), hex.EncodeToString(v.BlsKey.Marshal()), v.VotingPower)
+	return fmt.Sprintf("Address=%v; Voting Power=%d; BLS Key=%v;",
+		v.Address.String(), v.VotingPower, hex.EncodeToString(v.BlsKey.Marshal()))
 }
 
 // AccountSet is a type alias for slice of ValidatorMetadata instances
 type AccountSet []*ValidatorMetadata
+
+// fmt.Stringer implementation
+func (as AccountSet) String() string {
+	metadataString := make([]string, len(as))
+	for i, v := range as {
+		metadataString[i] = v.String()
+	}
+
+	return strings.Join(metadataString, "\n")
+}
 
 // GetAddresses aggregates addresses for given AccountSet
 func (as AccountSet) GetAddresses() []types.Address {
@@ -213,7 +224,7 @@ func (as AccountSet) AsGenericMaps() []map[string]interface{} {
 		accountSetMaps[i] = map[string]interface{}{
 			"_address":    v.Address,
 			"blsKey":      v.BlsKey.ToBigInt(),
-			"votingPower": new(big.Int).SetUint64(v.VotingPower),
+			"votingPower": new(big.Int).Set(v.VotingPower),
 		}
 	}
 
@@ -310,4 +321,14 @@ func (as AccountSet) Marshal() ([]byte, error) {
 // Unmarshal unmarshals AccountSet from JSON
 func (as *AccountSet) Unmarshal(b []byte) error {
 	return json.Unmarshal(b, as)
+}
+
+// GetTotalVotingPower calculates sum of voting power for each validator in the AccountSet
+func (as *AccountSet) GetTotalVotingPower() *big.Int {
+	totalVotingPower := big.NewInt(0)
+	for _, v := range *as {
+		totalVotingPower = totalVotingPower.Add(totalVotingPower, v.VotingPower)
+	}
+
+	return totalVotingPower
 }

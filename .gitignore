@@ -1,5 +1,6 @@
 peers.json
 genesis.json
+manifest.json
 secretsManagerConfig.json
 *-packr.go
 config*.json

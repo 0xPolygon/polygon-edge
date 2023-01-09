@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
-	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -18,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 )
@@ -35,10 +33,10 @@ func (m *blockchainMock) CurrentHeader() *types.Header {
 	return args.Get(0).(*types.Header) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) CommitBlock(block *types.Block) ([]*types.Receipt, error) {
+func (m *blockchainMock) CommitBlock(block *types.FullBlock) error {
 	args := m.Called(block)
 
-	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
+	return args.Error(0)
 }
 
 func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Address,
@@ -48,10 +46,10 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 	return args.Get(0).(blockBuilder), args.Error(1) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block) (*StateBlock, error) {
+func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
 	args := m.Called(parent, block)
 
-	return args.Get(0).(*StateBlock), args.Error(1) //nolint:forcetypeassert
+	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
 }
 
 func (m *blockchainMock) GetStateProviderForBlock(block *types.Header) (contract.Provider, error) {
@@ -70,17 +68,22 @@ func (m *blockchainMock) GetStateProvider(transition *state.Transition) contract
 
 func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) {
 	args := m.Called(number)
-	header, ok := args.Get(0).(*types.Header)
 
-	if ok {
-		return header, true
-	}
+	if len(args) == 1 {
+		header, ok := args.Get(0).(*types.Header)
 
-	getHeaderCallback, ok := args.Get(0).(func(number uint64) *types.Header)
-	if ok {
-		h := getHeaderCallback(number)
+		if ok {
+			return header, true
+		}
 
-		return h, h != nil
+		getHeaderCallback, ok := args.Get(0).(func(number uint64) *types.Header)
+		if ok {
+			h := getHeaderCallback(number)
+
+			return h, h != nil
+		}
+	} else if len(args) == 2 {
+		return args.Get(0).(*types.Header), args.Get(1).(bool) //nolint:forcetypeassert
 	}
 
 	panic("Unsupported mock for GetHeaderByNumber")
@@ -176,9 +179,9 @@ func (m *blockBuilderMock) Receipts() []*types.Receipt {
 	return args.Get(0).([]*types.Receipt) //nolint:forcetypeassert
 }
 
-func (m *blockBuilderMock) Build(handler func(*types.Header)) (*StateBlock, error) {
+func (m *blockBuilderMock) Build(handler func(*types.Header)) (*types.FullBlock, error) {
 	args := m.Called(handler)
-	builtBlock := args.Get(0).(*StateBlock) //nolint:forcetypeassert
+	builtBlock := args.Get(0).(*types.FullBlock) //nolint:forcetypeassert
 
 	handler(builtBlock.Block.Header)
 
@@ -210,21 +213,6 @@ func (m *systemStateMock) GetValidatorSet() (AccountSet, error) {
 	}
 
 	panic("systemStateMock.GetValidatorSet doesn't support such combination of arguments")
-}
-
-func (m *systemStateMock) GetNextExecutionIndex() (uint64, error) {
-	args := m.Called()
-	if len(args) == 1 {
-		index, _ := args.Get(0).(uint64)
-
-		return index, nil
-	} else if len(args) == 2 {
-		index, _ := args.Get(0).(uint64)
-
-		return index, args.Error(1)
-	}
-
-	return 0, nil
 }
 
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {
@@ -292,7 +280,7 @@ type checkpointBackendMock struct {
 	mock.Mock
 }
 
-func (c *checkpointBackendMock) BuildEventRoot(epoch uint64, nonCommittedExitEvents []*ExitEvent) (types.Hash, error) {
+func (c *checkpointBackendMock) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	args := c.Called()
 
 	return args.Get(0).(types.Hash), args.Error(1) //nolint:forcetypeassert
@@ -394,17 +382,8 @@ func (v *testValidators) getValidator(alias string) *testValidator {
 	return vv
 }
 
-func (v *testValidators) toValidatorSet() (*validatorSet, error) {
+func (v *testValidators) toValidatorSet() *validatorSet {
 	return NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
-}
-
-func (v *testValidators) toValidatorSetWithError(t *testing.T) *validatorSet {
-	t.Helper()
-
-	vs, err := NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
-	require.NoError(t, err)
-
-	return vs
 }
 
 func (v *testValidators) updateVotingPowers(votingPowersMap map[string]uint64) AccountSet {
@@ -460,7 +439,7 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 	return &ValidatorMetadata{
 		Address:     types.Address(v.account.Ecdsa.Address()),
 		BlsKey:      v.account.Bls.PublicKey(),
-		VotingPower: v.votingPower,
+		VotingPower: new(big.Int).SetUint64(v.votingPower),
 	}
 }
 

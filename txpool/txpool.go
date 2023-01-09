@@ -33,6 +33,9 @@ const (
 	maxAccountSkips = uint64(10)
 
 	pruningCooldown = 5000 * time.Millisecond
+
+	// txPoolMetrics is a prefix used for txpool-related metrics
+	txPoolMetrics = "txpool"
 )
 
 // errors
@@ -274,7 +277,7 @@ func NewTxPool(
 
 func (p *TxPool) updatePending(i int64) {
 	newPending := atomic.AddInt64(&p.pending, i)
-	metrics.SetGauge([]string{"pending_transactions"}, float32(newPending))
+	metrics.SetGauge([]string{txPoolMetrics, "pending_transactions"}, float32(newPending))
 }
 
 // Start runs the pool's main loop in the background.

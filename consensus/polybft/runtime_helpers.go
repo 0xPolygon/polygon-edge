@@ -1,41 +1,45 @@
 package polybft
 
+import (
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
+)
+
 // isEndOfPeriod checks if an end of a period (either it be sprint or epoch)
 // is reached with the current block (the parent block of the current fsm iteration)
 func isEndOfPeriod(blockNumber, periodSize uint64) bool {
 	return blockNumber%periodSize == 0
 }
 
-// calculateFirstBlockOfPeriod calculates the first block of a period
-func calculateFirstBlockOfPeriod(currentBlockNumber, periodSize uint64) uint64 {
-	if currentBlockNumber <= periodSize {
-		return 1 // it's the first epoch
+// getBlockData returns block header and extra
+func getBlockData(blockNumber uint64, blockchainBackend blockchainBackend) (*types.Header, *Extra, error) {
+	blockHeader, found := blockchainBackend.GetHeaderByNumber(blockNumber)
+	if !found {
+		return nil, nil, blockchain.ErrNoBlock
 	}
 
-	switch currentBlockNumber % periodSize {
-	case 1:
-		return currentBlockNumber
-	case 0:
-		return currentBlockNumber - periodSize + 1
-	default:
-		return currentBlockNumber - (currentBlockNumber % periodSize) + 1
+	blockExtra, err := GetIbftExtra(blockHeader.ExtraData)
+	if err != nil {
+		return nil, nil, err
 	}
+
+	return blockHeader, blockExtra, nil
 }
 
-// getEpochNumber returns epoch number for given blockNumber and epochSize.
-// Epoch number is derived as a result of division of block number and epoch size.
-// Since epoch number is 1-based (0 block represents special case zero epoch),
-// we are incrementing result by one for non epoch-ending blocks.
-func getEpochNumber(blockNumber, epochSize uint64) uint64 {
-	if isEndOfPeriod(blockNumber, epochSize) {
-		return blockNumber / epochSize
+// isEpochEndingBlock checks if given block is an epoch ending block
+func isEpochEndingBlock(blockNumber uint64, extra *Extra, blockchain blockchainBackend) (bool, error) {
+	if !extra.Validators.IsEmpty() {
+		// if validator set delta is not empty, the validator set was changed in this block
+		// meaning the epoch changed as well
+		return true, nil
 	}
 
-	return blockNumber/epochSize + 1
-}
+	_, nextBlockExtra, err := getBlockData(blockNumber+1, blockchain)
+	if err != nil {
+		return false, err
+	}
 
-// getEndEpochBlockNumber returns block number which corresponds
-// to the one at the beginning of the given epoch with regards to epochSize
-func getEndEpochBlockNumber(epoch, epochSize uint64) uint64 {
-	return epoch * epochSize
+	// validator set delta can be empty (no change in validator set happened)
+	// so we need to check if their epoch numbers are different
+	return extra.Checkpoint.EpochNumber != nextBlockExtra.Checkpoint.EpochNumber, nil
 }

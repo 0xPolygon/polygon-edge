@@ -40,12 +40,12 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
-func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*StateSyncEvent {
+func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*types.StateSyncEvent {
 	t.Helper()
 
-	stateSyncEvents := make([]*StateSyncEvent, eventsCount)
+	stateSyncEvents := make([]*types.StateSyncEvent, eventsCount)
 	for i := 0; i < eventsCount; i++ {
-		stateSyncEvents[i] = &StateSyncEvent{
+		stateSyncEvents[i] = &types.StateSyncEvent{
 			ID:     startIdx + uint64(i),
 			Sender: ethgo.Address(types.StringToAddress(fmt.Sprintf("0x5%d", i))),
 			Data:   generateRandomBytes(t),
@@ -64,4 +64,18 @@ func generateRandomBytes(t *testing.T) (result []byte) {
 	require.NoError(t, err, "Cannot generate random byte array content.")
 
 	return
+}
+
+// getEpochNumber returns epoch number for given blockNumber and epochSize.
+// Epoch number is derived as a result of division of block number and epoch size.
+// Since epoch number is 1-based (0 block represents special case zero epoch),
+// we are incrementing result by one for non epoch-ending blocks.
+func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
+	t.Helper()
+
+	if isEndOfPeriod(blockNumber, epochSize) {
+		return blockNumber / epochSize
+	}
+
+	return blockNumber/epochSize + 1
 }

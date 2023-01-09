@@ -150,56 +150,56 @@ func setFlags(cmd *cobra.Command) {
 
 	// PolyBFT
 	{
+		cmd.Flags().StringVar(
+			&params.manifestPath,
+			manifestPathFlag,
+			defaultManifestPath,
+			"the manifest file path, which contains genesis metadata",
+		)
+
 		cmd.Flags().IntVar(
 			&params.validatorSetSize,
 			validatorSetSizeFlag,
 			defaultValidatorSetSize,
 			"the total number of validators",
 		)
-		cmd.Flags().StringVar(
-			&params.polyBftValidatorPrefixPath,
-			polyBftValidatorPrefixPathFlag,
-			defaultPolyBftValidatorPrefixPath,
-			"prefix path for polybft validator folder directory",
-		)
+
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
 			sprintSizeFlag,
 			defaultSprintSize,
 			"the number of block included into a sprint",
 		)
+
 		cmd.Flags().DurationVar(
 			&params.blockTime,
 			blockTimeFlag,
 			defaultBlockTime,
 			"the predefined period which determines block creation frequency",
 		)
-		cmd.Flags().StringArrayVar(
-			&params.validators,
-			validatorsFlag,
-			[]string{},
-			"validators defined by user throughout a parameter (format: <address>:<blskey>)",
-		)
-		cmd.Flags().StringVar(
-			&params.premineValidators,
-			premineValidatorsFlag,
-			command.DefaultPremineBalance,
-			"the amount which will be premined to all the validators",
-		)
+
 		cmd.Flags().StringVar(
 			&params.smartContractsRootPath,
 			smartContractsRootPathFlag,
 			contracts.ContractsRootFolder,
 			"the smart contracts folder",
 		)
+
 		cmd.Flags().StringVar(
 			&params.bridgeJSONRPCAddr,
 			bridgeFlag,
 			"",
 			"the rootchain JSON RPC IP address. If present, node is running in bridge mode.",
 		)
+
+		cmd.Flags().Uint64Var(
+			&params.epochReward,
+			epochRewardFlag,
+			defaultEpochReward,
+			"reward size for block sealing",
+		)
+
 		cmd.Flags().Lookup(bridgeFlag).NoOptDefVal = "http://127.0.0.1:8545"
-		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, premineValidatorsFlag)
 	}
 }
 
@@ -234,7 +234,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var err error
 
 	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftGenesis()
+		err = params.generatePolyBftChainConfig()
 	} else {
 		err = params.generateGenesis()
 	}

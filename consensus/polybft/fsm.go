@@ -23,12 +23,10 @@ type blockBuilder interface {
 	Reset() error
 	WriteTx(*types.Transaction) error
 	Fill()
-	Build(func(h *types.Header)) (*StateBlock, error)
+	Build(func(h *types.Header)) (*types.FullBlock, error)
 	GetState() *state.Transition
 	Receipts() []*types.Receipt
 }
-
-const maxBundlesPerSprint = 50
 
 type fsm struct {
 	// PolyBFT consensus protocol configuration
@@ -45,6 +43,9 @@ type fsm struct {
 
 	// validators is the list of validators for this round
 	validators ValidatorSet
+
+	// proposerSnapshot keeps information about new proposer
+	proposerSnapshot *ProposerSnapshot
 
 	// blockBuilder is the block builder for proposers
 	blockBuilder blockBuilder
@@ -64,21 +65,14 @@ type fsm struct {
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
-	// bundleProofs is an array of bundles to be executed on end of sprint
-	bundleProofs []*BundleProof
-
-	// commitmentsToVerifyBundles is an array of commitment messages that were not executed yet,
-	// but are used to verify any bundles if they are included in state transactions
-	commitmentsToVerifyBundles []*CommitmentMessageSigned
-
-	// stateSyncExecutionIndex is the next state sync execution index in smart contract
-	stateSyncExecutionIndex uint64
-
 	// checkpointBackend provides functions for working with checkpoints and exit events
 	checkpointBackend checkpointBackend
 
 	// logger instance
 	logger hcf.Logger
+
+	// target is the block being computed
+	target *types.FullBlock
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -111,6 +105,9 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		}
 
 		validatorsDelta, err := createValidatorSetDelta(f.validators.Accounts(), nextValidators)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create validator set delta: %w", err)
+		}
 
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
@@ -145,12 +142,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	events, err := getExitEventsFromReceipts(f.epochNumber, parent.Number+1, f.blockBuilder.Receipts())
-	if err != nil {
-		return nil, err
-	}
-
-	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber, events)
+	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +173,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	f.logger.Debug("[FSM Build Proposal]",
 		"txs", len(stateBlock.Block.Transactions),
 		"hash", checkpointHash.String())
+
+	f.target = stateBlock
 
 	return stateBlock.Block.MarshalRLP(), nil
 }
@@ -290,7 +284,7 @@ func (f *fsm) Validate(proposal []byte) error {
 			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
-		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash); err != nil {
+		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
 			return fmt.Errorf(
 				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
 				f.parent.Number,
@@ -305,7 +299,8 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	if _, err = f.backend.ProcessBlock(f.parent, &block); err != nil {
+	stateBlock, err := f.backend.ProcessBlock(f.parent, &block)
+	if err != nil {
 		return err
 	}
 
@@ -315,6 +310,8 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "signed hash", checkpointHash)
+
+	f.target = stateBlock
 
 	return nil
 }
@@ -328,7 +325,7 @@ func (f *fsm) ValidateSender(msg *proto.Message) error {
 
 	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
 	if err != nil {
-		return fmt.Errorf("failed to ecrecover message: %w", err)
+		return fmt.Errorf("failed to recover address from signature: %w", err)
 	}
 
 	// verify the signature came from the sender
@@ -357,7 +354,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	}
 
 	commitmentMessageSignedExists := false
-	nextStateSyncBundleIndex := f.stateSyncExecutionIndex
 
 	for _, tx := range transactions {
 		if !tx.IsStateTx() {
@@ -441,10 +437,8 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 // Insert inserts the sealed proposal
 func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal proposal: %w", err)
-	}
+	newBlock := f.target.Block
+	receipts := f.target.Receipts
 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
@@ -495,13 +489,19 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	// Write extar data to header
 	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
-	receipts, err := f.backend.CommitBlock(newBlock)
-	if err != nil {
+	if err := f.backend.CommitBlock(&types.FullBlock{Block: newBlock, Receipts: receipts}); err != nil {
 		return nil, err
 	}
 
+	epoch := f.epochNumber
+	if f.isEndOfEpoch {
+		// exit events that happened in epoch ending blocks,
+		// should be added to the tree of the next epoch
+		epoch++
+	}
+
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(f.epochNumber, newBlock.Number(), receipts)
+	events, err := getExitEventsFromReceipts(epoch, newBlock.Number(), receipts)
 	if err != nil {
 		return newBlock, err
 	}
@@ -533,6 +533,10 @@ func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (Account
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
+	}
+
+	if f.logger.IsDebug() {
+		f.logger.Debug("getCurrentValidators", "Validator set", newValidators.String())
 	}
 
 	return newValidators, nil
@@ -622,8 +626,12 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 			continue
 		}
 
-		for j := 0; j < len(receipts[i].Logs); j++ {
-			event, err := decodeExitEvent(convertLog(receipts[i].Logs[j]), epoch, block)
+		for _, log := range receipts[i].Logs {
+			if log.Address != contracts.L2StateSenderContract {
+				continue
+			}
+
+			event, err := decodeExitEvent(convertLog(log), epoch, block)
 			if err != nil {
 				return nil, err
 			}

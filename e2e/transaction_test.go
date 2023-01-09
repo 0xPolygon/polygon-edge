@@ -226,61 +226,6 @@ func TestEthTransfer(t *testing.T) {
 	}
 }
 
-// Check whether the mined tx has from field
-func TestFromFieldInTx(t *testing.T) {
-	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
-	_, receiverAddr := tests.GenerateKeyAndAddr(t)
-
-	ibftManager := framework.NewIBFTServersManager(t,
-		1,
-		IBFTDirPrefix,
-		func(i int, config *framework.TestServerConfig) {
-			config.Premine(senderAddr, framework.EthToWei(10))
-		},
-	)
-
-	ctxForStart, cancelStart := context.WithTimeout(context.Background(), framework.DefaultTimeout)
-	defer cancelStart()
-
-	ibftManager.StartServers(ctxForStart)
-
-	srv := ibftManager.GetServer(0)
-
-	// Do the transfer
-	ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
-	defer cancel()
-
-	txn := &framework.PreparedTransaction{
-		From:     senderAddr,
-		To:       &receiverAddr,
-		GasPrice: big.NewInt(1048576),
-		Gas:      1000000,
-		Value:    framework.EthToWei(1),
-	}
-
-	receipt, err := srv.SendRawTx(ctx, txn, senderKey)
-	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
-
-	// json-rpc client in framework recovers from field, so call json-rpc directly
-	response := srv.CallJSONRPC(map[string]interface{}{
-		"id":      1,
-		"jsonrpc": "2.0",
-		"method":  "eth_getTransactionByHash",
-		"params": []interface{}{
-			receipt.TransactionHash,
-		},
-	})
-
-	result, ok := response["result"].(map[string]interface{})
-	assert.True(t, ok)
-
-	from, ok := result["from"].(string)
-	assert.True(t, ok)
-
-	assert.Equal(t, senderAddr.String(), from)
-}
-
 // getCount is a helper function for the stress test SC
 func getCount(
 	from types.Address,

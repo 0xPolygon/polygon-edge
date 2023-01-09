@@ -27,10 +27,12 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 		return `
 
 		struct Validator {
-			uint256[4] id;
+			uint256[4] blsKey;
 			uint256 stake;
 			uint256 totalStake;
-			uint256 data;
+			uint256 commission;
+			uint256 withdrawableRewards;
+			bool active;
 		}
 
 		function getCurrentValidatorSet() public returns (address[] memory) {
@@ -46,7 +48,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 				16798350082249088544573448433070681576641749462807627179536437108134609634615,
 				21427200503135995176566340351867145775962083994845221446131416289459495591422
 			];
-			return Validator(key, 10, 0, 0);
+			return Validator(key, 10, 10, 0, 0, true);
 		}
 
 		`
@@ -58,7 +60,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	bin, err := hex.DecodeString(solcContract.Bin)
 	assert.NoError(t, err)
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
@@ -72,26 +74,21 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	validators, err := st.GetValidatorSet()
 	assert.NoError(t, err)
 	assert.Equal(t, types.Address(ethgo.HexToAddress("1")), validators[0].Address)
-	assert.Equal(t, uint64(10), validators[0].VotingPower)
+	assert.Equal(t, new(big.Int).SetUint64(10), validators[0].VotingPower)
 }
 
-func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
+func TestSystemState_GetNextCommittedIndex(t *testing.T) {
 	t.Parallel()
 
-	var sideChainBridgeABI, _ = abi.NewABIFromList([]string{
-		"function setNextExecutionIndex(uint256 _index) public payable",
+	var sideChainBridgeABI, _ = abi.NewMethod(
 		"function setNextCommittedIndex(uint256 _index) public payable",
-	})
+	)
 
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `
-		uint256 public counter;
 		uint256 public lastCommittedId;
 		
-		function setNextExecutionIndex(uint256 _index) public payable {
-			counter = _index;
-		}
 		function setNextCommittedIndex(uint256 _index) public payable {
 			lastCommittedId = _index;
 		}`
@@ -103,7 +100,7 @@ func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
 	bin, err := hex.DecodeString(solcContract.Bin)
 	require.NoError(t, err)
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
@@ -114,23 +111,9 @@ func TestSystemState_GetNextExecutionAndCommittedIndex(t *testing.T) {
 	}
 
 	systemState := NewSystemState(&PolyBFTConfig{StateReceiverAddr: result.Address}, provider)
-	nextExecutionIndex, err := systemState.GetNextExecutionIndex()
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), nextExecutionIndex)
-
-	expectedNextExecutionIndex := uint64(30)
-	input, err := sideChainBridgeABI.GetMethod("setNextExecutionIndex").Encode([1]interface{}{expectedNextExecutionIndex})
-	assert.NoError(t, err)
-
-	_, err = provider.Call(ethgo.Address(result.Address), input, &contract.CallOpts{})
-	assert.NoError(t, err)
-
-	nextExecutionIndex, err = systemState.GetNextExecutionIndex()
-	assert.NoError(t, err)
-	assert.Equal(t, expectedNextExecutionIndex+1, nextExecutionIndex)
 
 	expectedNextCommittedIndex := uint64(45)
-	input, err = sideChainBridgeABI.GetMethod("setNextCommittedIndex").Encode([1]interface{}{expectedNextCommittedIndex})
+	input, err := sideChainBridgeABI.Encode([1]interface{}{expectedNextCommittedIndex})
 	assert.NoError(t, err)
 
 	_, err = provider.Call(ethgo.Address(result.Address), input, &contract.CallOpts{})
@@ -164,7 +147,7 @@ func TestSystemState_GetEpoch(t *testing.T) {
 	bin, err := hex.DecodeString(solcContract.Bin)
 	require.NoError(t, err)
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
@@ -188,20 +171,20 @@ func TestSystemState_GetEpoch(t *testing.T) {
 	require.Equal(t, expectedEpoch, epoch)
 }
 
-func TestStateProvider_Txn_Panics(t *testing.T) {
+func TestStateProvider_Txn_NotSupported(t *testing.T) {
 	t.Parallel()
 
-	transition := newTestTransition(t)
+	transition := newTestTransition(t, nil)
 
 	provider := &stateProvider{
 		transition: transition,
 	}
 
-	key := createTestKey(t)
-	require.Panics(t, func() { _, _ = provider.Txn(ethgo.ZeroAddress, key, []byte{0x1}) })
+	require.PanicsWithError(t, errSendTxnUnsupported.Error(),
+		func() { _, _ = provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1}) })
 }
 
-func newTestTransition(t *testing.T) *state.Transition {
+func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
 	t.Helper()
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
@@ -210,7 +193,7 @@ func newTestTransition(t *testing.T) *state.Transition {
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash := ex.WriteGenesis(nil)
+	rootHash := ex.WriteGenesis(alloc)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {
@@ -283,6 +266,7 @@ func Test_buildLogsFromReceipts(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

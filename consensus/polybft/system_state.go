@@ -14,13 +14,15 @@ import (
 	"github.com/umbracle/ethgo/contract"
 )
 
-var stateFunctions, _ = abi.NewABIFromList([]string{
+var StateFunctionsABI, _ = abi.NewABIFromList([]string{
 	"function currentEpochId() returns (uint256)",
 	"function getCurrentValidatorSet() returns (address[])",
-	"function getValidator(address) returns (tuple(uint256[4],uint256,uint256,uint256))",
+	"function getValidator(address)" +
+		" returns (tuple(uint256[4] blsKey, uint256 stake, uint256 totalStake, " +
+		"uint256 commission, uint256 withdrawableRewards, bool active))",
 })
 
-var sidechainBridgeFunctions, _ = abi.NewABIFromList([]string{
+var SidechainBridgeFunctionsABI, _ = abi.NewABIFromList([]string{
 	"function counter() returns (uint256)",
 	"function lastCommittedId() returns (uint256)",
 })
@@ -31,8 +33,6 @@ type SystemState interface {
 	GetValidatorSet() (AccountSet, error)
 	// GetEpoch retrieves current epoch number from the smart contract
 	GetEpoch() (uint64, error)
-	// GetNextExecutionIndex retrieves next bridge state sync index
-	GetNextExecutionIndex() (uint64, error)
 	// GetNextCommittedIndex retrieves next committed bridge state sync index
 	GetNextCommittedIndex() (uint64, error)
 }
@@ -50,11 +50,11 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 	s := &SystemStateImpl{}
 	s.validatorContract = contract.NewContract(
 		ethgo.Address(config.ValidatorSetAddr),
-		stateFunctions, contract.WithProvider(provider),
+		StateFunctionsABI, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
 		ethgo.Address(config.StateReceiverAddr),
-		sidechainBridgeFunctions,
+		SidechainBridgeFunctionsABI,
 		contract.WithProvider(provider),
 	)
 
@@ -78,7 +78,7 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 	queryValidator := func(addr ethgo.Address) (*ValidatorMetadata, error) {
 		output, err := s.validatorContract.Call("getValidator", ethgo.Latest, addr)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to call getValidator function: %w", err)
 		}
 
 		output, isOk = output["0"].(map[string]interface{})
@@ -86,20 +86,20 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to decode validator data")
 		}
 
-		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["0"].([4]*big.Int))
+		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["blsKey"].([4]*big.Int))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal BLS public key: %w", err)
 		}
 
-		stake, ok := output["1"].(*big.Int)
+		totalStake, ok := output["totalStake"].(*big.Int)
 		if !ok {
-			return nil, fmt.Errorf("failed to decode stake")
+			return nil, fmt.Errorf("failed to decode total stake")
 		}
 
 		val := &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
-			VotingPower: stake.Uint64(),
+			VotingPower: new(big.Int).Set(totalStake),
 		}
 
 		return val, nil
@@ -136,21 +136,6 @@ func (s *SystemStateImpl) GetEpoch() (uint64, error) {
 	}
 
 	return epochNumber.Uint64(), nil
-}
-
-// GetNextExecutionIndex retrieves next bridge state sync index
-func (s *SystemStateImpl) GetNextExecutionIndex() (uint64, error) {
-	rawResult, err := s.sidechainBridgeContract.Call("counter", ethgo.Latest)
-	if err != nil {
-		return 0, err
-	}
-
-	nextExecutionIndex, isOk := rawResult["0"].(*big.Int)
-	if !isOk {
-		return 0, fmt.Errorf("failed to decode next execution index")
-	}
-
-	return nextExecutionIndex.Uint64() + 1, nil
 }
 
 // GetNextCommittedIndex retrieves next committed bridge state sync index

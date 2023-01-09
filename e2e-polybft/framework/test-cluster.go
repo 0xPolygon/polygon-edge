@@ -74,6 +74,8 @@ type TestClusterConfig struct {
 	ValidatorPrefix   string
 	Binary            string
 	ValidatorSetSize  uint64
+	EpochSize         int
+	EpochReward       int
 
 	logsDirOnce sync.Once
 }
@@ -169,6 +171,17 @@ func WithBootnodeCount(cnt int) ClusterOption {
 		h.BootnodeCount = cnt
 	}
 }
+func WithEpochSize(epochSize int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.EpochSize = epochSize
+	}
+}
+
+func WithEpochReward(epochReward int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.EpochReward = epochReward
+	}
+}
 
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
@@ -185,11 +198,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	require.NoError(t, err)
 
 	config := &TestClusterConfig{
-		t:          t,
-		WithLogs:   isTrueEnv(envLogsEnabled),
-		WithStdout: isTrueEnv(envStdoutEnabled),
-		TmpDir:     tmpDir,
-		Binary:     resolveBinary(),
+		t:           t,
+		WithLogs:    isTrueEnv(envLogsEnabled),
+		WithStdout:  isTrueEnv(envStdoutEnabled),
+		TmpDir:      tmpDir,
+		Binary:      resolveBinary(),
+		EpochSize:   10,
+		EpochReward: 1,
 	}
 
 	if config.ContractsDir == "" {
@@ -221,6 +236,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
+	manifestPath := path.Join(tmpDir, "manifest.json")
+	// run manifest file creation
+	cluster.cmdRun("manifest",
+		"--path", manifestPath,
+		"--validators-path", tmpDir,
+		"--validators-prefix", cluster.Config.ValidatorPrefix)
+
 	if cluster.Config.HasBridge {
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
@@ -232,15 +254,24 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
-	genesisPath := path.Join(tmpDir, "genesis.json")
+	if cluster.Config.HasBridge {
+		err := cluster.Bridge.deployRootchainContracts(manifestPath)
+		require.NoError(t, err)
+
+		err = cluster.Bridge.fundValidators()
+		require.NoError(t, err)
+	}
+
 	{
 		// run genesis configuration population
 		args := []string{
 			"genesis",
+			"--manifest", manifestPath,
 			"--consensus", "polybft",
-			"--dir", genesisPath,
+			"--dir", path.Join(tmpDir, "genesis.json"),
 			"--contracts-path", defaultContractsPath,
-			"--epoch-size", "10",
+			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
+			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
 		}
 
@@ -256,7 +287,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge-json-rpc", rootchainIP)
 		}
 
-		validators, err := genesis.ReadValidatorsByRegexp(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 		require.NoError(t, err)
 
 		// premine all the validators by default
@@ -283,11 +314,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// run cmd init-genesis with all the arguments
 		err = cluster.cmdRun(args...)
-		require.NoError(t, err)
-	}
-
-	if cluster.Config.HasBridge {
-		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 	}
 
@@ -331,21 +357,7 @@ func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
 }
 
 func (c *TestCluster) cmdRun(args ...string) error {
-	var stdErr bytes.Buffer
-
-	cmd := exec.Command(c.Config.Binary, args...) //nolint:gosec
-	cmd.Stderr = &stdErr
-	cmd.Stdout = c.Config.GetStdout(args[0])
-
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	if stdErr.Len() > 0 {
-		return fmt.Errorf("failed to execute: %s", stdErr.String())
-	}
-
-	return nil
+	return runCommand(c.Config.Binary, args, c.Config.GetStdout(args[0]))
 }
 
 // EmitTransfer function is used to invoke e2e rootchain emit command
@@ -365,6 +377,7 @@ func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts str
 
 	return c.cmdRun("rootchain",
 		"emit",
+		"--manifest", path.Join(c.Config.TmpDir, "manifest.json"),
 		"--contract", contractAddress,
 		"--wallets", walletAddresses,
 		"--amounts", amounts)
@@ -469,4 +482,23 @@ func (c *TestCluster) getOpenPort() int64 {
 	c.initialPort++
 
 	return c.initialPort
+}
+
+// runCommand executes command with given arguments
+func runCommand(binary string, args []string, stdout io.Writer) error {
+	var stdErr bytes.Buffer
+
+	cmd := exec.Command(binary, args...)
+	cmd.Stderr = &stdErr
+	cmd.Stdout = stdout
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute command: %w", err)
+	}
+
+	if stdErr.Len() > 0 {
+		return fmt.Errorf("error during command execution: %s", stdErr.String())
+	}
+
+	return nil
 }

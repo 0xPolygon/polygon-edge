@@ -58,7 +58,7 @@ type Config struct {
 	// Config defines specific configuration parameters for the consensus
 	Config map[string]interface{}
 
-	// Path is the directory path for the consensus protocol tos tore information
+	// Path is the directory path for the consensus protocol to store information
 	Path string
 }
 
@@ -81,8 +81,8 @@ type Factory func(*Params) (Consensus, error)
 // BridgeDataProvider is an interface providing bridge related functions
 type BridgeDataProvider interface {
 	// GenerateExit proof generates proof of exit for given exit event
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) ([]types.Hash, error)
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error)
 
-	// GetStateSyncProof retrieves the StateSync Bundle proof
+	// GetStateSyncProof retrieves the StateSync proof
 	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
 }
