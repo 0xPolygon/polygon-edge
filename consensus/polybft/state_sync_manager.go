@@ -23,9 +23,8 @@ import (
 )
 
 const (
-	// maximum number of stateSyncEvents that a commitment can have
-	maxCommitmentSize = 10
 	// minimum number of stateSyncEvents that a commitment can have
+	// minimum number is 2 because smart contract expects that the merkle tree has at least two leafs
 	minCommitmentSize = 2
 )
 
@@ -51,11 +50,12 @@ func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         {
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr types.Address
-	jsonrpcAddr     string
-	dataDir         string
-	topic           topic
-	key             *wallet.Key
+	stateSenderAddr   types.Address
+	jsonrpcAddr       string
+	dataDir           string
+	topic             topic
+	key               *wallet.Key
+	maxCommitmentSize uint64
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -443,7 +443,8 @@ func (s *stateSyncManager) buildCommitment() error {
 	epoch := s.epoch
 	fromIndex := s.nextCommittedIndex
 
-	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex, fromIndex+maxCommitmentSize-1, false)
+	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex,
+		fromIndex+s.config.maxCommitmentSize-1, false)
 	if err != nil {
 		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
 	}

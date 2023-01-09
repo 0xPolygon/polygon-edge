@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	eventsBufferSize   = 10
+	maxCommitmentSize  = 10
 	stateFileName      = "consensusState.db"
 	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
 )
@@ -178,11 +178,12 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 			logger,
 			c.config.State,
 			&stateSyncConfig{
-				key:             c.config.Key,
-				stateSenderAddr: c.config.PolyBFTConfig.Bridge.BridgeAddr,
-				jsonrpcAddr:     c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:         c.config.DataDir,
-				topic:           c.config.bridgeTopic,
+				key:               c.config.Key,
+				stateSenderAddr:   c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				jsonrpcAddr:       c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:           c.config.DataDir,
+				topic:             c.config.bridgeTopic,
+				maxCommitmentSize: maxCommitmentSize,
 			},
 		)
 

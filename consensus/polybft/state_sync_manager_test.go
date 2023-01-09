@@ -29,11 +29,12 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 
 	s, err := NewStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
-			stateSenderAddr: types.Address{},
-			jsonrpcAddr:     "",
-			dataDir:         tmpDir,
-			topic:           topic,
-			key:             key.Key(),
+			stateSenderAddr:   types.Address{},
+			jsonrpcAddr:       "",
+			dataDir:           tmpDir,
+			topic:             topic,
+			key:               key.Key(),
+			maxCommitmentSize: maxCommitmentSize,
 		})
 
 	require.NoError(t, err)
