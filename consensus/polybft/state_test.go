@@ -283,7 +283,7 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 		}))
 	}
 
-	_, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize-1, true)
+	_, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize-1)
 	assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 }
 
@@ -302,7 +302,7 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 	t.Run("Return all - forced. Enough events", func(t *testing.T) {
 		t.Parallel()
 
-		events, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize-1, true)
+		events, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize-1)
 		require.NoError(t, err)
 		require.Equal(t, maxCommitmentSize, len(events))
 	})
@@ -310,14 +310,14 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 	t.Run("Return all - forced. Not enough events", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize+1, true)
+		_, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize+1)
 		require.ErrorIs(t, err, errNotEnoughStateSyncs)
 	})
 
 	t.Run("Return all you can. Enough events", func(t *testing.T) {
 		t.Parallel()
 
-		events, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize-1, false)
+		events, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize-1)
 		assert.NoError(t, err)
 		assert.Equal(t, maxCommitmentSize, len(events))
 	})
@@ -325,8 +325,8 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 	t.Run("Return all you can. Not enough events", func(t *testing.T) {
 		t.Parallel()
 
-		events, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize+1, false)
-		assert.NoError(t, err)
+		events, err := state.getStateSyncEventsForCommitment(0, maxCommitmentSize+1)
+		assert.ErrorIs(t, err, errNotEnoughStateSyncs)
 		assert.Equal(t, maxCommitmentSize, len(events))
 	})
 }

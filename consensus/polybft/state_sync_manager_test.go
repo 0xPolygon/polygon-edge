@@ -283,7 +283,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 	s.AddLog(goodLog)
 
-	stateSyncs, err = s.state.getStateSyncEventsForCommitment(0, 0, true)
+	stateSyncs, err = s.state.getStateSyncEventsForCommitment(0, 0)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
 	require.Len(t, s.pendingCommitments, 0)
@@ -350,7 +350,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.getStateSyncEventsForCommitment(0, 9, true)
+	events, err := s.state.getStateSyncEventsForCommitment(0, 9)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }

@@ -443,10 +443,7 @@ func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 }
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
-// based on the getAll flag, the function will try to get all events in range, and if it fails,
-// it will either return an error, or return all the events it can without returning an error
-func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64,
-	getAll bool) ([]*types.StateSyncEvent, error) {
+func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
 	var events []*types.StateSyncEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -454,11 +451,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64,
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(itob(i))
 			if v == nil {
-				if getAll {
-					return errNotEnoughStateSyncs
-				}
-
-				return nil
+				return errNotEnoughStateSyncs
 			}
 
 			var event *types.StateSyncEvent

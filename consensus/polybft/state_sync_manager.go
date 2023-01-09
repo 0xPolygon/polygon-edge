@@ -405,7 +405,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 		"toIndex", commitmentMsg.ToIndex,
 	)
 
-	events, err := s.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex, true)
+	events, err := s.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
 	if err != nil {
 		return err
 	}
@@ -444,8 +444,8 @@ func (s *stateSyncManager) buildCommitment() error {
 	fromIndex := s.nextCommittedIndex
 
 	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex,
-		fromIndex+s.config.maxCommitmentSize-1, false)
-	if err != nil {
+		fromIndex+s.config.maxCommitmentSize-1)
+	if err != nil && !errors.Is(err, errNotEnoughStateSyncs) {
 		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
 	}
 
