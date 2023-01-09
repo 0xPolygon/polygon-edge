@@ -254,7 +254,7 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 
 	// TODO - this condition will need to be changed to recognize that either slashing happened
 	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(block.Header.Number, c.epoch) {
+	if c.isFixedSizeOfEpochMet(block.Header.Number, epoch) {
 		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 

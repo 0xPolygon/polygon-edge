@@ -72,7 +72,7 @@ type stateSyncManager struct {
 	// per epoch fields
 	lock               sync.RWMutex
 	pendingCommitments []*Commitment
-	validatorSet       *validatorSet
+	validatorSet       ValidatorSet
 	epoch              uint64
 	nextCommittedIndex uint64
 }
@@ -86,10 +86,9 @@ type topic interface {
 // NewStateSyncManager creates a new instance of state sync manager
 func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
 	s := &stateSyncManager{
-		logger: logger.Named("state-sync"),
+		logger: logger.Named("state-sync-manager"),
 		state:  state,
 		config: config,
-		lock:   sync.RWMutex{},
 	}
 
 	return s, nil
@@ -218,7 +217,7 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 	}
 
 	if err := s.buildCommitment(); err != nil {
-		s.logger.Error("could not build a commitment on arrival of new state sync", "err", err)
+		s.logger.Error("could not build a commitment on arrival of new state sync", "err", err, "stateSyncID", event.ID)
 	}
 }
 
