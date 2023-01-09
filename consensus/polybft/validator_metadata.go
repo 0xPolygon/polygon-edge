@@ -1,13 +1,13 @@
 package polybft
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
+	"strings"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -126,13 +126,12 @@ type AccountSet []*ValidatorMetadata
 
 // fmt.Stringer implementation
 func (as AccountSet) String() string {
-	var buf bytes.Buffer
-	for _, v := range as {
-		buf.WriteString(v.String())
-		buf.WriteString("\n")
+	metadataString := make([]string, len(as))
+	for i, v := range as {
+		metadataString[i] = v.String()
 	}
 
-	return buf.String()
+	return strings.Join(metadataString, "\n")
 }
 
 // GetAddresses aggregates addresses for given AccountSet
