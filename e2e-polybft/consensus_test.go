@@ -233,7 +233,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	queryDelegator := func(blockNum uint64) (balance *big.Int, reward *big.Int) {
+	getDelegatorInfo := func(blockNum uint64) (balance *big.Int, reward *big.Int) {
 		var err error
 		balance, err = srv.JSONRPC().Eth().GetBalance(delegatorAddr, ethgo.Latest)
 		require.NoError(t, err)
@@ -246,7 +246,10 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		return
 	}
 
-	delegatorBalance, _ := queryDelegator(5)
+	currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+
+	delegatorBalance, _ := getDelegatorInfo(currentBlockNum)
 	require.Equal(t, fundAmount, delegatorBalance)
 
 	// delegate 10 native tokens
@@ -258,22 +261,31 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	cluster.WaitForBlock(10, 1*time.Minute)
 
 	// query delegator rewards
-	_, delegatorReward := queryDelegator(10)
-	// there should be at least 160 weis delegator rewards accumulated
-	// (at least 80 weis per epoch is accumulated if validator signs only single block)
-	require.Greater(t, delegatorReward.Uint64(), uint64(160))
+	_, delegatorReward := getDelegatorInfo(10)
+	// there should be at least 80 weis delegator rewards accumulated
+	// (80 weis per epoch is accumulated if validator signs only single block in entire epoch)
+	require.Greater(t, delegatorReward.Uint64(), uint64(80))
 
 	// undelegate rewards
 	require.NoError(t, srv.Undelegate(delegatorReward.Uint64(), delegatorSecretsPath, validatorAddr))
-	queryDelegator(10)
+	t.Logf("Rewards undelegated\n")
+
+	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	getDelegatorInfo(currentBlockNum)
 
 	// withdraw available rewards
 	require.NoError(t, srv.Withdraw(delegatorSecretsPath, delegatorAddr))
-	queryDelegator(10)
+	t.Logf("Funds are withdrawn\n")
+
+	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	getDelegatorInfo(currentBlockNum)
 
 	// wait for single epoch to process withdrawal
 	cluster.WaitForBlock(15, 1*time.Minute)
 
-	_, delegatorReward = queryDelegator(15)
+	// assert that delegator doesn't receive any rewards
+	_, delegatorReward = getDelegatorInfo(15)
 	require.Equal(t, big.NewInt(0), delegatorReward)
 }
