@@ -69,7 +69,6 @@ func setFlags(cmd *cobra.Command) {
 		"stake represents amount which is going to be staked by the new validator account",
 	)
 
-	helper.RegisterGRPCAddressFlag(cmd)
 	helper.RegisterJSONRPCFlag(cmd)
 }
 
