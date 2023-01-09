@@ -2745,7 +2745,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 	pool.Start()
 	defer pool.Close()
 
-	// subscribe to ennewTxqueue and promote events
+	// subscribe to enqueue and promote events
 	subscription := pool.eventManager.subscribe([]proto.EventType{proto.EventType_ENQUEUED, proto.EventType_PROMOTED})
 	defer pool.eventManager.cancelSubscription(subscription.subscriptionID)
 
@@ -2753,7 +2753,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 	// mutex for txHashMap
 	mux := &sync.RWMutex{}
 
-	// run max number of addTx in parallel
+	// run max number of addTx concurrently
 	for i := 0; i < int(defaultMaxAccountEnqueued); i++ {
 		go func(i uint64) {
 			tx := newTx(addr, i, 1)
@@ -2792,6 +2792,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 		}
 
 		if enqueuedCount == int(defaultMaxAccountEnqueued) && promotedCount == int(defaultMaxAccountEnqueued) {
+			// compare local tracker to pool internal
 			assert.Equal(t, defaultMaxAccountEnqueued, pool.Length())
 
 			// all transactions are promoted
