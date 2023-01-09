@@ -9,10 +9,6 @@ import (
 
 var domain, _ = hex.DecodeString("508e30424791cb9a71683381558c3da1979b6fa423b2d6db1396b1d94d7c4a78")
 
-func init() {
-	bnsnark1.SetDomain(domain)
-}
-
 type PrivateKey struct {
 	*bnsnark1.PrivateKey
 }
@@ -63,6 +59,15 @@ func (s *Signature) Aggregate(next *Signature) *Signature {
 	return &Signature{sign}
 }
 
+func (s *Signature) ToBigInt() ([2]*big.Int, error) {
+	bytes, err := s.Marshal()
+	if err != nil {
+		return [2]*big.Int{}, err
+	}
+
+	return BytesToBigInt2(bytes)
+}
+
 func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
 	s, err := p.PrivateKey.Sign(message)
 	if err != nil {
@@ -74,6 +79,12 @@ func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
 
 func (p *PrivateKey) PublicKey() *PublicKey {
 	return &PublicKey{p.PrivateKey.PublicKey()}
+}
+
+func (p *PublicKey) ToBigInt() [4]*big.Int {
+	result, _ := BytesToBigInt4(p.Marshal())
+
+	return result
 }
 
 // UnmarshalJSON implements the json.Marshaler interface.
@@ -92,6 +103,10 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 	return &Signature{oSignature}, nil
 }
 
+func UnmarshalSignatureFromBigInt(b [2]*big.Int) (*Signature, error) {
+	return UnmarshalSignature(BytesFromBigInt2(b))
+}
+
 func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 	oPublicKey, err := bnsnark1.UnmarshalPublicKey(raw)
 	if err != nil {
@@ -102,12 +117,7 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 }
 
 func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
-	opub, err := bnsnark1.UnmarshalPublicKeyFromBigInt(b)
-	if err != nil {
-		return nil, err
-	}
-
-	return &PublicKey{opub}, nil
+	return UnmarshalPublicKey(BytesFromBigInt4(b))
 }
 
 func UnmarshalPrivateKey(raw []byte) (*PrivateKey, error) {
@@ -128,14 +138,6 @@ func GenerateBlsKey() (*PrivateKey, error) {
 	return &PrivateKey{oPrivateKey}, nil
 }
 
-func MarshalMessageToBigInt(message []byte) ([2]*big.Int, error) {
-	return bnsnark1.MarshalMessageToBigInt(message)
-}
-
-func GetDomain() []byte {
-	return domain
-}
-
 func CreateRandomBlsKeys(total int) ([]*PrivateKey, error) {
 	oPrivateKeys, err := bnsnark1.CreateRandomBlsKeys(total)
 	if err != nil {
@@ -149,4 +151,23 @@ func CreateRandomBlsKeys(total int) ([]*PrivateKey, error) {
 	}
 
 	return result, nil
+}
+
+func GetDomain() []byte {
+	return domain
+}
+
+// MarshalMessageToBigInt marshalls message into two big ints
+// first we must convert message bytes to point and than for each coordinate we create big int
+func MarshalMessageToBigInt(message []byte) ([2]*big.Int, error) {
+	bytes, err := bnsnark1.MarshalMessage(message)
+	if err != nil {
+		return [2]*big.Int{}, err
+	}
+
+	return BytesToBigInt2(bytes)
+}
+
+func init() {
+	bnsnark1.SetDomain(domain)
 }
