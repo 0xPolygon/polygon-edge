@@ -21,9 +21,11 @@ import (
 )
 
 const (
-	minSyncPeers = 2
-	pbftProto    = "/pbft/0.2"
-	bridgeProto  = "/bridge/0.2"
+	minSyncPeers      = 2
+	pbftProto         = "/pbft/0.2"
+	bridgeProto       = "/bridge/0.2"
+	DisclaimerMessage = "**** POLYBFT CONSENSUS PROTOCOL IS IN EXPERIMENTAL PHASE AND IS NOT FULLY PRODUCTION READY. " +
+		"YOU ARE USING IT AT YOUR OWN RISK. ****"
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -211,6 +213,7 @@ func (p *Polybft) Initialize() error {
 
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
+	fmt.Println(DisclaimerMessage)
 	p.logger.Info("starting polybft consensus", "signer", p.key.String())
 
 	// start syncer (also initializes peer map)
