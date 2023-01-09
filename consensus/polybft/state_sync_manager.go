@@ -350,6 +350,8 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 	// build a new commitment at the end of the epoch
 	nextCommittedIndex, err := req.SystemState.GetNextCommittedIndex()
 	if err != nil {
+		s.lock.Unlock()
+
 		return err
 	}
 
