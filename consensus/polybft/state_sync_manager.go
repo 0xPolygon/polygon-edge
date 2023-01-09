@@ -29,7 +29,7 @@ const (
 
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
-	Init() error
+	Init(ctx context.Context) error
 	Commitment() (*CommitmentMessageSigned, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
@@ -40,7 +40,7 @@ var _ StateSyncManager = (*dummyStateSyncManager)(nil)
 // dummyStateSyncManager is used when bridge is not enabled
 type dummyStateSyncManager struct{}
 
-func (n *dummyStateSyncManager) Init() error                                   { return nil }
+func (n *dummyStateSyncManager) Init(ctx context.Context) error                { return nil }
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
@@ -52,7 +52,6 @@ type stateSyncConfig struct {
 	dataDir         string
 	topic           topic
 	key             *wallet.Key
-	ctx             context.Context
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -91,8 +90,8 @@ func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 }
 
 // Init subscribes to bridge topics (getting votes) and start the event tracker routine
-func (s *stateSyncManager) Init() error {
-	if err := s.initTracker(); err != nil {
+func (s *stateSyncManager) Init(ctx context.Context) error {
+	if err := s.initTracker(ctx); err != nil {
 		return fmt.Errorf("failed to init event tracker. Error: %w", err)
 	}
 
@@ -104,7 +103,7 @@ func (s *stateSyncManager) Init() error {
 }
 
 // initTracker starts a new event tracker (to receive new state sync events)
-func (s *stateSyncManager) initTracker() error {
+func (s *stateSyncManager) initTracker(ctx context.Context) error {
 	tracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
 		s.config.jsonrpcAddr,
@@ -112,7 +111,7 @@ func (s *stateSyncManager) initTracker() error {
 		s,
 		s.logger)
 
-	return tracker.Start(s.config.ctx)
+	return tracker.Start(ctx)
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)

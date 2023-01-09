@@ -119,9 +119,6 @@ type consensusRuntime struct {
 
 	// logger instance
 	logger hcf.Logger
-
-	// ctx is a context instance used for goroutines shutdown
-	ctx context.Context
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
@@ -136,11 +133,10 @@ func newConsensusRuntime(ctx context.Context, log hcf.Logger, config *runtimeCon
 		config:             config,
 		lastBuiltBlock:     config.blockchain.CurrentHeader(),
 		proposerCalculator: proposerCalculator,
-		ctx:                ctx,
 		logger:             log.Named("consensus_runtime"),
 	}
 
-	if err := runtime.initStateSyncManager(log); err != nil {
+	if err := runtime.initStateSyncManager(ctx, log); err != nil {
 		return nil, err
 	}
 
@@ -172,10 +168,10 @@ func newConsensusRuntime(ctx context.Context, log hcf.Logger, config *runtimeCon
 
 // initStateSyncManager initializes state sync manager
 // if bridge is not enabled, then a dummy state sync manager will be used
-func (c *consensusRuntime) initStateSyncManager(log hcf.Logger) error {
+func (c *consensusRuntime) initStateSyncManager(ctx context.Context, logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		stateSyncManager, err := NewStateSyncManager(
-			log,
+			logger,
 			c.config.State,
 			&stateSyncConfig{
 				key:             c.config.Key,
@@ -183,7 +179,6 @@ func (c *consensusRuntime) initStateSyncManager(log hcf.Logger) error {
 				jsonrpcAddr:     c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
 				dataDir:         c.config.DataDir,
 				topic:           c.config.bridgeTopic,
-				ctx:             c.ctx,
 			},
 		)
 
@@ -196,7 +191,7 @@ func (c *consensusRuntime) initStateSyncManager(log hcf.Logger) error {
 		c.stateSyncManager = &dummyStateSyncManager{}
 	}
 
-	return c.stateSyncManager.Init()
+	return c.stateSyncManager.Init(ctx)
 }
 
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
