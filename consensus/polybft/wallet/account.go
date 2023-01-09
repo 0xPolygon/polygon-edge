@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	bls "github.com/0xPolygon/bnsnark1/core"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/umbracle/ethgo/wallet"
 )

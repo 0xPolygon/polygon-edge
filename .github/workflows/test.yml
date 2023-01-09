@@ -22,24 +22,11 @@ jobs:
           submodules: recursive
           token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
-      - name: BuildMCL
-        run: make -j4  -C ./mcl
-
-      - name: Add to PATH
-        shell: bash
-        run: |
-          echo "$GITHUB_WORKSPACE/mcl/lib" >> $GITHUB_PATH
-
       - name: Install Dependencies
         run: ./setup-ci.sh
 
       - name: Run Go Test
         run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
-        env:
-          LD_LIBRARY_PATH: ${{ github.workspace }}/mcl/lib
-          DYLD_LIBRARY_PATH: ${{ github.workspace }}/mcl/lib
-          CGO_CFLAGS: -I${{ github.workspace }}/mcl/include
-          CGO_LDFLAGS: -L${{ github.workspace }}/mcl/lib
 
       - name: Upload coverage file to Codecov
         uses: codecov/codecov-action@v3

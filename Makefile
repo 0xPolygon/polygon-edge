@@ -1,4 +1,3 @@
-MCL_PATH=$(shell pwd)/mcl
 
 .PHONY: download-submodules
 download-submodules:
@@ -24,28 +23,16 @@ build:
 	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
 	$(eval TIME = $(shell date))
-	cd mcl && make -j4
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		go build -o polygon-edge -ldflags="\
-			-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)' \
-			-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
-			-X 'github.com/0xPolygon/polygon-edge/versioning.Branch=$(BRANCH)'\
-			-X 'github.com/0xPolygon/polygon-edge/versioning.BuildTime=$(TIME)'" \
+	go build -o polygon-edge -ldflags="\
+    	-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)' \
+		-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
+		-X 'github.com/0xPolygon/polygon-edge/versioning.Branch=$(BRANCH)'\
+		-X 'github.com/0xPolygon/polygon-edge/versioning.BuildTime=$(TIME)'" \
 	main.go
 
 .PHONY: lint
 lint:
-	cd mcl && make -j4
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		golangci-lint run --config .golangci.yml
+	golangci-lint run --config .golangci.yml
 
 .PHONY: generate-bsd-licenses
 generate-bsd-licenses:
@@ -53,51 +40,21 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	cd mcl && make -j4
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
+	go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
 
 .PHONY: test-e2e
 test-e2e:
-	cd mcl && make -j4
     # We need to build the binary with the race flag enabled
     # because it will get picked up and run during e2e tests
-    # and the e2e tests should error out if any kind of race is found	
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		go build -race -o artifacts/polygon-edge .
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		EDGE_BINARY=${PWD}/artifacts/polygon-edge \
-		go test -v -timeout=30m ./e2e/...
+    # and the e2e tests should error out if any kind of race is found
+	go build -race -o artifacts/polygon-edge .
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
 .PHONY: test-e2e-polybft
 test-e2e-polybft:
-	cd mcl && make -j4
     # We can not build with race because of a bug in boltdb dependency
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		go build -o artifacts/polygon-edge .
-	env PATH=$$PATH:$(MCL_PATH)/lib \
-		LD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		DYLD_LIBRARY_PATH=$(MCL_PATH)/lib \
-		CGO_CFLAGS="-I$(MCL_PATH)/include" \
-		CGO_LDFLAGS="-L$(MCL_PATH)/lib" \
-		EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
-		go test -v -timeout=30m ./e2e-polybft/...
+	go build -o artifacts/polygon-edge .
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/...
 
 .PHONY: compile-core-contracts
 compile-core-contracts:

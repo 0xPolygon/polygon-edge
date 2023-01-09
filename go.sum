@@ -48,8 +48,8 @@ dmitri.shuralyov.com/state v0.0.0-20180228185332-28bcc343414c/go.mod h1:0PRwlb0D
 filippo.io/edwards25519 v1.0.0-rc.1 h1:m0VOOB23frXZvAOK44usCgLWvtsxIoMCTBGJZlpmGfU=
 filippo.io/edwards25519 v1.0.0-rc.1/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7eHn5EwJns=
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
-github.com/0xPolygon/bnsnark1 v0.0.0-20221229091117-e3364be5bba7 h1:qIV7YRDSXAzSQqJJAyEzIgmc7Thqf/fV02VPo4Mi+pg=
-github.com/0xPolygon/bnsnark1 v0.0.0-20221229091117-e3364be5bba7/go.mod h1:9bfPywvNCPZU9Oa3ha3V4dsXpcu6EF8XWgW4AvR7OAk=
+github.com/0xPolygon/bnsnark1 v0.0.0-20230109104552-cb3719e0b064 h1:Vjt8QRiSG5zdr49Tjwt457qjIajuaDCAdtAHAL1JYZA=
+github.com/0xPolygon/bnsnark1 v0.0.0-20230109104552-cb3719e0b064/go.mod h1:9bfPywvNCPZU9Oa3ha3V4dsXpcu6EF8XWgW4AvR7OAk=
 github.com/0xPolygon/go-ibft v0.1.1-0.20221128092443-8b1e3f20c4c3 h1:q5TnFEnzDwaSOZGVkOhBzCkpHFY2zhCjYLkQuRCFR9c=
 github.com/0xPolygon/go-ibft v0.1.1-0.20221128092443-8b1e3f20c4c3/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=

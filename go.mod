@@ -68,7 +68,7 @@ require (
 )
 
 require (
-	github.com/0xPolygon/bnsnark1 v0.0.0-20221229091117-e3364be5bba7
+	github.com/0xPolygon/bnsnark1 v0.0.0-20230109104552-cb3719e0b064
 	github.com/dave/jennifer v1.6.0
 	golang.org/x/sync v0.0.0-20220929204114-8fcdb60fdcc0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
