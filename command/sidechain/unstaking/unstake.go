@@ -44,7 +44,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.accountDir,
 		sidechainHelper.AccountDirFlag,
 		"",
-		"the directory path with sender account secrets",
+		"the directory path where sender account secrets are stored",
 	)
 
 	cmd.Flags().BoolVar(
