@@ -307,7 +307,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	if len(elems) < 9 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected at leaset 9 but found %d", len(elems))
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected at least 9 but found %d", len(elems))
 	}
 
 	p.Hash(t.hash[:0], v)
