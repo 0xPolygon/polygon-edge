@@ -165,6 +165,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	return runtime, nil
 }
 
+// close is used to tear down allocated resources
 func (c *consensusRuntime) close() {
 	c.stateSyncManager.Close()
 }
