@@ -165,12 +165,17 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	return runtime, nil
 }
 
+// close is used to tear down allocated resources
+func (c *consensusRuntime) close() {
+	c.stateSyncManager.Close()
+}
+
 // initStateSyncManager initializes state sync manager
 // if bridge is not enabled, then a dummy state sync manager will be used
-func (c *consensusRuntime) initStateSyncManager(log hcf.Logger) error {
+func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		stateSyncManager, err := NewStateSyncManager(
-			log,
+			logger,
 			c.config.State,
 			&stateSyncConfig{
 				key:             c.config.Key,

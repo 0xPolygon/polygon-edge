@@ -62,7 +62,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 }
 
 type Polybft struct {
-	// close closes all the pbft consensus
+	// closeCh is used to signal that consensus protocol is stopped
 	closeCh chan struct{}
 
 	// ibft is the ibft engine
@@ -380,6 +380,7 @@ func (p *Polybft) Close() error {
 	}
 
 	close(p.closeCh)
+	p.runtime.close()
 
 	return nil
 }

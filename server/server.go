@@ -74,6 +74,9 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
+
+	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
+	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
 }
 
 var dirPaths = []string{
@@ -782,10 +785,15 @@ func (s *Server) Close() {
 		}
 	}
 
-	// close the txpool's main loop
+	// Stop state sync relayer
+	if s.stateSyncRelayer != nil {
+		s.stateSyncRelayer.Stop()
+	}
+
+	// Close the txpool's main loop
 	s.txpool.Close()
 
-	// close DataDog profiler
+	// Close DataDog profiler
 	s.closeDataDogProfiler()
 }
 

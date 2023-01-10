@@ -1,6 +1,7 @@
 package tracker
 
 import (
+	"context"
 	"os"
 	"path"
 	"sync"
@@ -77,7 +78,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 		contractAddr: addr,
 	}
 
-	err = tracker.Start()
+	err = tracker.Start(context.Background())
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)

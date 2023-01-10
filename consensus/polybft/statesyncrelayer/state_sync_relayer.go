@@ -1,6 +1,7 @@
 package statesyncrelayer
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"net"
@@ -29,6 +30,7 @@ type StateSyncRelayer struct {
 	client            *jsonrpc.Client
 	txRelayer         txrelayer.TxRelayer
 	key               ethgo.Key
+	closeCh           chan struct{}
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -74,6 +76,7 @@ func NewRelayer(
 		client:            client,
 		txRelayer:         txRelayer,
 		key:               key,
+		closeCh:           make(chan struct{}),
 	}
 }
 
@@ -86,7 +89,19 @@ func (r *StateSyncRelayer) Start() error {
 		r.logger,
 	)
 
-	return et.Start()
+	ctx, cancelFn := context.WithCancel(context.Background())
+
+	go func() {
+		<-r.closeCh
+		cancelFn()
+	}()
+
+	return et.Start(ctx)
+}
+
+// Stop function is used to tear down all the allocated resources
+func (r *StateSyncRelayer) Stop() {
+	close(r.closeCh)
 }
 
 func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {

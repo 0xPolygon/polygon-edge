@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -29,6 +30,7 @@ const (
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
 	Init() error
+	Close()
 	Commitment() (*CommitmentMessageSigned, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
@@ -40,6 +42,7 @@ var _ StateSyncManager = (*dummyStateSyncManager)(nil)
 type dummyStateSyncManager struct{}
 
 func (n *dummyStateSyncManager) Init() error                                   { return nil }
+func (n *dummyStateSyncManager) Close()                                        {}
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
@@ -61,7 +64,8 @@ type stateSyncManager struct {
 	logger hclog.Logger
 	state  *State
 
-	config *stateSyncConfig
+	config  *stateSyncConfig
+	closeCh chan struct{}
 
 	// per epoch fields
 	lock         sync.Mutex
@@ -101,8 +105,14 @@ func (s *stateSyncManager) Init() error {
 	return nil
 }
 
+func (s *stateSyncManager) Close() {
+	close(s.closeCh)
+}
+
 // initTracker starts a new event tracker (to receive new state sync events)
 func (s *stateSyncManager) initTracker() error {
+	ctx, cancelFn := context.WithCancel(context.Background())
+
 	tracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
 		s.config.jsonrpcAddr,
@@ -110,7 +120,12 @@ func (s *stateSyncManager) initTracker() error {
 		s,
 		s.logger)
 
-	return tracker.Start()
+	go func() {
+		<-s.closeCh
+		cancelFn()
+	}()
+
+	return tracker.Start(ctx)
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)
