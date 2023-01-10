@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -221,10 +220,10 @@ var (
 type State struct {
 	db     *bolt.DB
 	logger hclog.Logger
-	ctx    context.Context
+	close  chan struct{}
 }
 
-func newState(path string, logger hclog.Logger, ctx context.Context) (*State, error) {
+func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
@@ -237,7 +236,7 @@ func newState(path string, logger hclog.Logger, ctx context.Context) (*State, er
 	state := &State{
 		db:     db,
 		logger: logger.Named("state"),
-		ctx:    ctx,
+		close:  closeCh,
 	}
 
 	return state, nil

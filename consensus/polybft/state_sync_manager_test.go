@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -324,7 +323,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	s.config.stateSenderAddr = types.Address(addr)
 	s.config.jsonrpcAddr = server.HTTPAddr()
 
-	require.NoError(t, s.initTracker(context.Background()))
+	require.NoError(t, s.initTracker())
 
 	time.Sleep(2 * time.Second)
 

@@ -2,7 +2,6 @@
 package polybft
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -41,14 +40,11 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 
 	setupHeaderHashFunc()
 
-	ctx, cancelFn := context.WithCancel(context.Background())
-
 	polybft := &Polybft{
-		config:   params,
-		ctx:      ctx,
-		cancelFn: cancelFn,
-		logger:   logger,
-		txPool:   params.TxPool,
+		config:  params,
+		closeCh: make(chan struct{}),
+		logger:  logger,
+		txPool:  params.TxPool,
 	}
 
 	// initialize polybft consensus config
@@ -66,9 +62,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 }
 
 type Polybft struct {
-	// ctx and cancelFn are used to terminate child go routines
-	ctx      context.Context
-	cancelFn context.CancelFunc
+	// closeCh is used to signal that consensus protocol is stopped
+	closeCh chan struct{}
 
 	// ibft is the ibft engine
 	ibft *IBFTConsensusWrapper
@@ -194,7 +189,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.ctx)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -263,7 +258,7 @@ func (p *Polybft) initRuntime() error {
 		bridgeTopic:    p.bridgeTopic,
 	}
 
-	runtime, err := newConsensusRuntime(p.ctx, p.logger, runtimeConfig)
+	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
 	if err != nil {
 		return err
 	}
@@ -297,7 +292,7 @@ func (p *Polybft) startConsensusProtocol() {
 
 		for {
 			select {
-			case <-p.ctx.Done():
+			case <-p.closeCh:
 				return
 			case ev := <-eventCh:
 				// The blockchain notification system can eventually deliver
@@ -348,7 +343,7 @@ func (p *Polybft) startConsensusProtocol() {
 				p.logger.Info("canceled sequence", "sequence", latestHeader.Number+1)
 			}
 		case <-sequenceCh:
-		case <-p.ctx.Done():
+		case <-p.closeCh:
 			if isValidator {
 				stopSequence()
 			}
@@ -363,7 +358,7 @@ func (p *Polybft) startConsensusProtocol() {
 func (p *Polybft) waitForNPeers() bool {
 	for {
 		select {
-		case <-p.ctx.Done():
+		case <-p.closeCh:
 			return false
 		case <-time.After(2 * time.Second):
 		}
@@ -384,7 +379,8 @@ func (p *Polybft) Close() error {
 		}
 	}
 
-	p.cancelFn()
+	close(p.closeCh)
+	p.runtime.close()
 
 	return nil
 }

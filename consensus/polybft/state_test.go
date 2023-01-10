@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path"
@@ -29,7 +28,7 @@ func newTestState(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), context.Background())
+	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
 		t.Fatal(err)
 	}

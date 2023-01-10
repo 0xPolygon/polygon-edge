@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -122,7 +121,7 @@ type consensusRuntime struct {
 }
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
-func newConsensusRuntime(ctx context.Context, log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
+func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
 	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
@@ -136,7 +135,7 @@ func newConsensusRuntime(ctx context.Context, log hcf.Logger, config *runtimeCon
 		logger:             log.Named("consensus_runtime"),
 	}
 
-	if err := runtime.initStateSyncManager(ctx, log); err != nil {
+	if err := runtime.initStateSyncManager(log); err != nil {
 		return nil, err
 	}
 
@@ -166,9 +165,13 @@ func newConsensusRuntime(ctx context.Context, log hcf.Logger, config *runtimeCon
 	return runtime, nil
 }
 
+func (c *consensusRuntime) close() {
+	c.stateSyncManager.Close()
+}
+
 // initStateSyncManager initializes state sync manager
 // if bridge is not enabled, then a dummy state sync manager will be used
-func (c *consensusRuntime) initStateSyncManager(ctx context.Context, logger hcf.Logger) error {
+func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		stateSyncManager, err := NewStateSyncManager(
 			logger,
@@ -191,7 +194,7 @@ func (c *consensusRuntime) initStateSyncManager(ctx context.Context, logger hcf.
 		c.stateSyncManager = &dummyStateSyncManager{}
 	}
 
-	return c.stateSyncManager.Init(ctx)
+	return c.stateSyncManager.Init()
 }
 
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
