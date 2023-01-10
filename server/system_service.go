@@ -3,8 +3,11 @@ package server
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network/common"
@@ -18,6 +21,29 @@ type systemService struct {
 	proto.UnimplementedSystemServer
 
 	server *Server
+}
+
+func (s *systemService) GetTrace(ctx context.Context, req *proto.GetTraceRequest) (*proto.GetTraceResponse, error) {
+	path := filepath.Join(s.server.config.DataDir, "consensus")
+
+	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf("trace_%d", req.Number)))
+	if err != nil {
+		return nil, err
+	}
+
+	var traceData struct {
+		Trace map[string]string `json:"trace"`
+	}
+
+	if err := json.Unmarshal(data, &traceData); err != nil {
+		return nil, err
+	}
+
+	resp := &proto.GetTraceResponse{
+		Trace: traceData.Trace,
+	}
+
+	return resp, nil
 }
 
 // GetStatus returns the current system status, in the form of:

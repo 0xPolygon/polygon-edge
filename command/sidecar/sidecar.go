@@ -3,8 +3,6 @@ package sidecar
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -59,7 +57,6 @@ func newSidecar(grpcAddress string) (*sidecar, error) {
 }
 
 func (s *sidecar) run() {
-	path := "test-chain-dev/consensus"
 	lastBlock := int64(0)
 
 	for {
@@ -72,14 +69,12 @@ func (s *sidecar) run() {
 			continue
 		}
 
-		lastBlock = status.Current.Number
-
-		data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf("trace_%d", status.Current.Number)))
+		trace, err := s.clt.GetTrace(context.Background(), &proto.GetTraceRequest{Number: uint64(status.Current.Number)})
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println(string(data))
+		fmt.Println(trace.Trace)
 
 		select {
 		case <-time.After(500 * time.Millisecond):
