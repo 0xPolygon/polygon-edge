@@ -30,7 +30,6 @@ func GetCommand() *cobra.Command {
 		RunE:    runCommand,
 	}
 
-	helper.RegisterJSONRPCFlag(withdrawCmd)
 	setFlags(withdrawCmd)
 
 	return withdrawCmd
@@ -50,6 +49,8 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"address where to withdraw withdrawable amount",
 	)
+
+	helper.RegisterJSONRPCFlag(cmd)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -73,9 +74,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	addressTo := ethgo.Address(types.StringToAddress(params.addressTo))
-
-	encoded, err := withdrawABI.Encode([]interface{}{addressTo})
+	encoded, err := withdrawABI.Encode([]interface{}{ethgo.HexToAddress(params.addressTo)})
 	if err != nil {
 		return err
 	}

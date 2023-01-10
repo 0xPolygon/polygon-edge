@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"google.golang.org/grpc"
 )
@@ -177,4 +178,45 @@ func (t *TestServer) RegisterValidator(secrets string, balance string, stake str
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("register-validator"))
+}
+
+// Delegate delegates given amount by the account in secrets to validatorAddr validator
+func (t *TestServer) Delegate(amount uint64, secrets string, validatorAddr ethgo.Address) error {
+	args := []string{
+		"polybft",
+		"stake",
+		"--account", secrets,
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--delegate", validatorAddr.String(),
+		"--amount", strconv.FormatUint(amount, 10),
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("delegation"))
+}
+
+// Undelegate undelegates given amount by the account in secrets from validatorAddr validator
+func (t *TestServer) Undelegate(amount uint64, secrets string, validatorAddr ethgo.Address) error {
+	args := []string{
+		"polybft",
+		"unstake",
+		"--account", secrets,
+		"--undelegate", validatorAddr.String(),
+		"--amount", strconv.FormatUint(amount, 10),
+		"--jsonrpc", t.JSONRPCAddr(),
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("delegation"))
+}
+
+// Withdraw withdraws available balance to provided recipient address
+func (t *TestServer) Withdraw(secrets string, recipient ethgo.Address) error {
+	args := []string{
+		"polybft",
+		"withdraw",
+		"--account", secrets,
+		"--to", recipient.String(),
+		"--jsonrpc", t.JSONRPCAddr(),
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdrawal"))
 }
