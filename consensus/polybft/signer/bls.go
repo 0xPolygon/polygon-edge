@@ -65,7 +65,7 @@ func (s *Signature) ToBigInt() ([2]*big.Int, error) {
 		return [2]*big.Int{}, err
 	}
 
-	return BytesToBigInt2(bytes)
+	return bytesToBigInt2(bytes)
 }
 
 func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
@@ -82,7 +82,7 @@ func (p *PrivateKey) PublicKey() *PublicKey {
 }
 
 func (p *PublicKey) ToBigInt() [4]*big.Int {
-	result, _ := BytesToBigInt4(p.Marshal())
+	result, _ := bytesToBigInt4(p.Marshal())
 
 	return result
 }
@@ -104,7 +104,7 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 }
 
 func UnmarshalSignatureFromBigInt(b [2]*big.Int) (*Signature, error) {
-	return UnmarshalSignature(BytesFromBigInt2(b))
+	return UnmarshalSignature(bytesFromBigInt2(b))
 }
 
 func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
@@ -117,7 +117,7 @@ func UnmarshalPublicKey(raw []byte) (*PublicKey, error) {
 }
 
 func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
-	return UnmarshalPublicKey(BytesFromBigInt4(b))
+	return UnmarshalPublicKey(bytesFromBigInt4(b))
 }
 
 func UnmarshalPrivateKey(raw []byte) (*PrivateKey, error) {
@@ -165,7 +165,7 @@ func MarshalMessageToBigInt(message []byte) ([2]*big.Int, error) {
 		return [2]*big.Int{}, err
 	}
 
-	return BytesToBigInt2(bytes)
+	return bytesToBigInt2(bytes)
 }
 
 func init() {

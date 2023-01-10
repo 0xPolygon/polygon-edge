@@ -35,10 +35,54 @@ func Test_SolidityCompatibility(t *testing.T) {
 	require.True(t, sig.Verify(pub, message))
 }
 
+func TestPublic_VerifyAggregated(t *testing.T) {
+	t.Parallel()
+
+	const accountNumber = 5
+
+	msg := []byte("this is a message!")
+	signatures := make(Signatures, accountNumber)
+	publicKeys := make([]*PublicKey, accountNumber)
+
+	keys, err := CreateRandomBlsKeys(accountNumber)
+	require.NoError(t, err)
+
+	additionalKeys, err := CreateRandomBlsKeys(2)
+	require.NoError(t, err)
+
+	for i, key := range keys {
+		publicKeys[i] = key.PublicKey()
+		signatures[i], err = key.Sign(msg)
+
+		require.NoError(t, err)
+	}
+
+	signature := signatures.Aggregate()
+
+	assert.True(t, signature.VerifyAggregated(publicKeys, msg))
+	assert.False(t, signature.VerifyAggregated(publicKeys[1:], msg))
+
+	additionalSignature, err := additionalKeys[0].Sign(msg)
+	require.NoError(t, err)
+
+	signature = signature.Aggregate(additionalSignature)
+
+	assert.True(t, signature.VerifyAggregated(append(publicKeys[:], additionalKeys[0].PublicKey()), msg))
+	assert.False(t, signature.VerifyAggregated(append(publicKeys[:], additionalKeys[1].PublicKey()), msg))
+}
+
 func TestPublic_UnmarshalPublicKeyFromBigInt(t *testing.T) {
 	t.Parallel()
 
-	key, _ := GenerateBlsKey()
+	key, err := GenerateBlsKey()
+	require.NoError(t, err)
+
+	bytes, err := key.MarshalJSON()
+	require.NoError(t, err)
+
+	key, err = UnmarshalPrivateKey(bytes)
+	require.NoError(t, err)
+
 	pub := key.PublicKey()
 
 	pub2, err := UnmarshalPublicKeyFromBigInt(pub.ToBigInt())
@@ -57,42 +101,47 @@ func TestSignature_BigInt(t *testing.T) {
 	require.NoError(t, err)
 
 	sig1, err := bls1.Sign(validTestMsg)
-	assert.NoError(t, err)
-
-	_, err = sig1.ToBigInt()
 	require.NoError(t, err)
+
+	val, err := sig1.ToBigInt()
+	require.NoError(t, err)
+
+	sig2, err := UnmarshalSignatureFromBigInt(val)
+	require.NoError(t, err)
+
+	assert.Equal(t, sig1, sig2)
 }
 
 func Test_BytesToBigInt2WrongSize(t *testing.T) {
-	_, err := BytesToBigInt2(nil)
+	_, err := bytesToBigInt2(nil)
 	require.Error(t, err)
 
-	_, err = BytesToBigInt2(make([]byte, 63))
+	_, err = bytesToBigInt2(make([]byte, 63))
 	require.Error(t, err)
 
-	_, err = BytesToBigInt2(make([]byte, 65))
+	_, err = bytesToBigInt2(make([]byte, 65))
 	require.Error(t, err)
 
-	_, err = BytesToBigInt2(make([]byte, 64))
+	_, err = bytesToBigInt2(make([]byte, 64))
 	require.NoError(t, err)
 
-	_, err = BytesToBigInt2(append(make([]byte, 63), 12))
+	_, err = bytesToBigInt2(append(make([]byte, 63), 12))
 	require.NoError(t, err)
 }
 
 func Test_BytesToBigInt4WrongSize(t *testing.T) {
-	_, err := BytesToBigInt4(nil)
+	_, err := bytesToBigInt4(nil)
 	require.Error(t, err)
 
-	_, err = BytesToBigInt4(make([]byte, 127))
+	_, err = bytesToBigInt4(make([]byte, 127))
 	require.Error(t, err)
 
-	_, err = BytesToBigInt4(make([]byte, 129))
+	_, err = bytesToBigInt4(make([]byte, 129))
 	require.Error(t, err)
 
-	_, err = BytesToBigInt4(make([]byte, 128))
+	_, err = bytesToBigInt4(make([]byte, 128))
 	require.NoError(t, err)
 
-	_, err = BytesToBigInt4(append(make([]byte, 127), 8))
+	_, err = bytesToBigInt4(append(make([]byte, 127), 8))
 	require.NoError(t, err)
 }
