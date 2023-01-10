@@ -194,9 +194,5 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(arena.NewBytes([]byte{byte(t.Type)}))
 	}
 
-	if t.IsStateTx() {
-		vv.Set(arena.NewBytes((t.From).Bytes()))
-	}
-
 	return vv
 }

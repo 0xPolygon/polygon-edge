@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
@@ -893,13 +892,6 @@ func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
 	if msg.Gas != types.StateTransactionGasLimit {
 		return NewTransitionApplicationError(
 			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
-			true,
-		)
-	}
-
-	if msg.From != contracts.SystemCaller {
-		return NewTransitionApplicationError(
-			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
 			true,
 		)
 	}
