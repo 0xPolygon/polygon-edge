@@ -1,4 +1,4 @@
-package bls
+package signer
 
 import (
 	"encoding/hex"
@@ -13,26 +13,38 @@ type PrivateKey struct {
 	*bnsnark1.PrivateKey
 }
 
+func (p *PrivateKey) PublicKey() *PublicKey {
+	return &PublicKey{p.PrivateKey.PublicKey()}
+}
+
+func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
+	s, err := p.PrivateKey.Sign(message)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Signature{s}, nil
+}
+
 type PublicKey struct {
 	*bnsnark1.PublicKey
 }
 
-type Signature struct {
-	*bnsnark1.Signature
+func (p *PublicKey) ToBigInt() [4]*big.Int {
+	result, _ := bytesToBigInt4(p.Marshal())
+
+	return result
 }
 
-type Signatures []*Signature
+// UnmarshalJSON implements the json.Marshaler interface.
+func (p *PublicKey) UnmarshalJSON(raw []byte) error {
+	p.PublicKey = &bnsnark1.PublicKey{}
 
-func (s Signatures) Aggregate() *Signature {
-	oSignatures := make([]*bnsnark1.Signature, len(s))
+	return p.PublicKey.UnmarshalJSON(raw)
+}
 
-	for i, v := range s {
-		oSignatures[i] = v.Signature
-	}
-
-	oSignature := bnsnark1.AggregateSignatures(oSignatures)
-
-	return &Signature{oSignature}
+type Signature struct {
+	*bnsnark1.Signature
 }
 
 func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
@@ -68,30 +80,18 @@ func (s *Signature) ToBigInt() ([2]*big.Int, error) {
 	return bytesToBigInt2(bytes)
 }
 
-func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
-	s, err := p.PrivateKey.Sign(message)
-	if err != nil {
-		return nil, err
+type Signatures []*Signature
+
+func (s Signatures) Aggregate() *Signature {
+	oSignatures := make([]*bnsnark1.Signature, len(s))
+
+	for i, v := range s {
+		oSignatures[i] = v.Signature
 	}
 
-	return &Signature{s}, nil
-}
+	oSignature := bnsnark1.AggregateSignatures(oSignatures)
 
-func (p *PrivateKey) PublicKey() *PublicKey {
-	return &PublicKey{p.PrivateKey.PublicKey()}
-}
-
-func (p *PublicKey) ToBigInt() [4]*big.Int {
-	result, _ := bytesToBigInt4(p.Marshal())
-
-	return result
-}
-
-// UnmarshalJSON implements the json.Marshaler interface.
-func (p *PublicKey) UnmarshalJSON(raw []byte) error {
-	p.PublicKey = &bnsnark1.PublicKey{}
-
-	return p.PublicKey.UnmarshalJSON(raw)
+	return &Signature{oSignature}
 }
 
 func UnmarshalSignature(raw []byte) (*Signature, error) {

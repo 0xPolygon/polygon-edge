@@ -1,4 +1,4 @@
-package bls
+package signer
 
 import (
 	"fmt"

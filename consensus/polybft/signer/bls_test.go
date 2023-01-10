@@ -1,10 +1,11 @@
-package bls
+package signer
 
 import (
 	"encoding/hex"
 	"math/big"
 	"testing"
 
+	bnsnark1 "github.com/0xPolygon/bnsnark1/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -144,4 +145,16 @@ func Test_BytesToBigInt4WrongSize(t *testing.T) {
 
 	_, err = bytesToBigInt4(append(make([]byte, 127), 8))
 	require.NoError(t, err)
+}
+
+func Test_bytesFromBigInt4_Zero(t *testing.T) {
+	value := bytesFromBigInt4([4]*big.Int{big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)})
+
+	assert.Equal(t, bnsnark1.G2ToBytes(bnsnark1.G2Zero(new(bnsnark1.G2))), value)
+}
+
+func Test_bytesFromBigInt2_Zero(t *testing.T) {
+	value := bytesFromBigInt2([2]*big.Int{big.NewInt(0), big.NewInt(0)})
+
+	assert.Equal(t, bnsnark1.G1ToBytes(bnsnark1.G1Zero(new(bnsnark1.G1))), value)
 }
