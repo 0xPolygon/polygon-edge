@@ -429,7 +429,7 @@ func stake(sender *txnSender) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	receipt := sender.sendTransaction(&types.Transaction{
+	receipt := sender.sendTransaction(&types.LegacyTx{
 		To:    &stakeManager,
 		Input: input,
 		Value: stake,
