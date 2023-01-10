@@ -279,10 +279,11 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	l2syncID, ok := eventData["id"].(*big.Int)
 	require.True(t, ok)
 
-	l2SenderBlockData, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlock), true)
+	l2SenderBlockData, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlock), false)
 	require.NoError(t, err)
 	extra, err := polybft.GetIbftExtra(l2SenderBlockData.ExtraData)
 	require.NoError(t, err)
+	require.NotNil(t, extra.Checkpoint)
 
 	receipt, err = ABITransaction(l2TxRelayer, sidechainKey, contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))

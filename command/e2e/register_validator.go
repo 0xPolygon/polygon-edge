@@ -21,6 +21,11 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
+const (
+	defaultBalance = "0xD3C21BCECCEDA1000000" // 1e24
+	defaultStake   = "0x56BC75E2D63100000"    // 1e20
+)
+
 var params registerParams
 
 func GetCommand() *cobra.Command {
@@ -31,7 +36,6 @@ func GetCommand() *cobra.Command {
 		RunE:    runCommand,
 	}
 
-	helper.RegisterGRPCAddressFlag(registerCmd)
 	setFlags(registerCmd)
 
 	return registerCmd
@@ -50,9 +54,27 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"the directory path where registrator validator key is stored",
 	)
+
+	cmd.Flags().StringVar(
+		&params.balance,
+		balanceFlag,
+		defaultBalance,
+		"balance which is going to be funded to the new validator account",
+	)
+
+	cmd.Flags().StringVar(
+		&params.stake,
+		stakeFlag,
+		defaultStake,
+		"stake represents amount which is going to be staked by the new validator account",
+	)
+
+	helper.RegisterJSONRPCFlag(cmd)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
+	params.jsonRPCAddr = helper.GetJSONRPCAddress(cmd)
+
 	return params.validateFlags()
 }
 
@@ -372,7 +394,7 @@ func (t *txnSender) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 }
 
 func newDemoClient() (*jsonrpc.Client, error) {
-	client, err := jsonrpc.NewClient("http://localhost:9545")
+	client, err := jsonrpc.NewClient(params.jsonRPCAddr)
 	if err != nil {
 		return nil, fmt.Errorf("cannot connect with jsonrpc: %w", err)
 	}
@@ -402,10 +424,15 @@ func stake(sender *txnSender) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	receipt := sender.sendTransaction(&types.LegacyTx{
+	stake, err := types.ParseUint256orHex(&params.stake)
+	if err != nil {
+		return &asyncTxnImpl{err: err}
+	}
+
+	receipt := sender.sendTransaction(&types.Transaction{
 		To:    &stakeManager,
 		Input: input,
-		Value: big.NewInt(1000),
+		Value: stake,
 	})
 
 	return receipt
@@ -432,14 +459,17 @@ func whitelist(sender *txnSender, addr types.Address) asyncTxn {
 }
 
 func fund(sender *txnSender, addr types.Address) asyncTxn {
-	genesisAmount, _ := new(big.Int).SetString("1000000000000000000", 10)
+	balance, err := types.ParseUint256orHex(&params.balance)
+	if err != nil {
+		return &asyncTxnImpl{err: err}
+	}
 
-	receipt := sender.sendTransaction(&types.LegacyTx{
+	txn := &types.LegacyTx{
 		To:    &addr,
-		Value: genesisAmount,
-	})
+		Value: balance,
+	}
 
-	return receipt
+	return sender.sendTransaction(txn)
 }
 
 func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {

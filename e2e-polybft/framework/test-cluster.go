@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -63,6 +64,7 @@ type TestClusterConfig struct {
 
 	Name              string
 	Premine           []types.Address
+	PremineValidators string
 	HasBridge         bool
 	BootnodeCount     int
 	NonValidatorCount int
@@ -70,6 +72,7 @@ type TestClusterConfig struct {
 	WithStdout        bool
 	LogsDir           string
 	TmpDir            string
+	BlockGasLimit     uint64
 	ContractsDir      string
 	ValidatorPrefix   string
 	Binary            string
@@ -148,6 +151,12 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 	}
 }
 
+func WithPremineValidators(premineBalance string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.PremineValidators = premineBalance
+	}
+}
+
 func WithBridge() ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.HasBridge = true
@@ -183,6 +192,12 @@ func WithEpochReward(epochReward int) ClusterOption {
 	}
 }
 
+func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BlockGasLimit = blockGasLimit
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -198,13 +213,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	require.NoError(t, err)
 
 	config := &TestClusterConfig{
-		t:           t,
-		WithLogs:    isTrueEnv(envLogsEnabled),
-		WithStdout:  isTrueEnv(envStdoutEnabled),
-		TmpDir:      tmpDir,
-		Binary:      resolveBinary(),
-		EpochSize:   10,
-		EpochReward: 1,
+		t:                 t,
+		WithLogs:          isTrueEnv(envLogsEnabled),
+		WithStdout:        isTrueEnv(envStdoutEnabled),
+		TmpDir:            tmpDir,
+		Binary:            resolveBinary(),
+		EpochSize:         10,
+		EpochReward:       1,
+		BlockGasLimit:     1e7, // 10M
+		PremineValidators: command.DefaultPremineBalance,
 	}
 
 	if config.ContractsDir == "" {
@@ -228,20 +245,21 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	{
-		// run init account
-		err = cluster.cmdRun("polybft-secrets",
-			"--data-dir", path.Join(tmpDir, cluster.Config.ValidatorPrefix),
-			"--num", strconv.Itoa(validatorsCount),
-		)
+		// run init accounts
+		err = cluster.InitSecrets(cluster.Config.ValidatorPrefix, validatorsCount)
 		require.NoError(t, err)
 	}
 
 	manifestPath := path.Join(tmpDir, "manifest.json")
-	// run manifest file creation
-	cluster.cmdRun("manifest",
+	args := []string{
+		"manifest",
 		"--path", manifestPath,
 		"--validators-path", tmpDir,
-		"--validators-prefix", cluster.Config.ValidatorPrefix)
+		"--validators-prefix", cluster.Config.ValidatorPrefix,
+		"--premine-validators", cluster.Config.PremineValidators,
+	}
+	// run manifest file creation
+	require.NoError(t, cluster.cmdRun(args...))
 
 	if cluster.Config.HasBridge {
 		// start bridge
@@ -270,6 +288,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--consensus", "polybft",
 			"--dir", path.Join(tmpDir, "genesis.json"),
 			"--contracts-path", defaultContractsPath,
+			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
@@ -289,11 +308,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 		require.NoError(t, err)
-
-		// premine all the validators by default
-		for _, validator := range validators {
-			args = append(args, "--premine", validator.Address.String())
-		}
 
 		if cluster.Config.BootnodeCount > 0 {
 			cnt := cluster.Config.BootnodeCount
@@ -318,18 +332,18 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		cluster.initTestServer(t, i, true)
+		cluster.InitTestServer(t, i, true)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		offsetIndex := i + int(cluster.Config.ValidatorSetSize)
-		cluster.initTestServer(t, offsetIndex, false)
+		cluster.InitTestServer(t, offsetIndex, false)
 	}
 
 	return cluster
 }
 
-func (c *TestCluster) initTestServer(t *testing.T, i int, isValidator bool) {
+func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -493,6 +507,10 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 	cmd.Stdout = stdout
 
 	if err := cmd.Run(); err != nil {
+		if stdErr.Len() > 0 {
+			return fmt.Errorf("failed to execute command: %s", stdErr.String())
+		}
+
 		return fmt.Errorf("failed to execute command: %w", err)
 	}
 
@@ -501,4 +519,16 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 	}
 
 	return nil
+}
+
+// InitSecrets initializes account(s) secrets with given prefix.
+// (secrets are being stored in the temp directory created by given e2e test execution)
+func (c *TestCluster) InitSecrets(prefix string, count int) error {
+	args := []string{
+		"polybft-secrets",
+		"--data-dir", path.Join(c.Config.TmpDir, prefix),
+		"--num", strconv.Itoa(count),
+	}
+
+	return runCommand(c.Config.Binary, args, c.Config.GetStdout("polybft-secrets"))
 }
