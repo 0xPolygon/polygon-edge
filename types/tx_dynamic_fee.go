@@ -16,7 +16,7 @@ func (t *txDynamicFee) SetNonce(nonce uint64) Tx {
 
 // SetGasPrice sets the given transaction gas price.
 func (t *txDynamicFee) SetGasPrice(gasPrice *big.Int) Tx {
-	t.gasPrice = gasPrice
+	t.gasPrice = new(big.Int).Set(gasPrice)
 
 	return t
 }
@@ -37,7 +37,7 @@ func (t *txDynamicFee) SetTo(addr Address) Tx {
 
 // SetValue sets the given transaction value.
 func (t *txDynamicFee) SetValue(value *big.Int) Tx {
-	t.value = value
+	t.value = new(big.Int).Set(value)
 
 	return t
 }
@@ -58,9 +58,9 @@ func (t *txDynamicFee) SetFrom(from Address) Tx {
 
 // SetSignature sets the given signature values of the transaction.
 func (t *txDynamicFee) SetSignature(v *big.Int, r *big.Int, s *big.Int) Tx {
-	t.v = v
-	t.r = r
-	t.s = s
+	t.v = new(big.Int).Set(v)
+	t.r = new(big.Int).Set(r)
+	t.s = new(big.Int).Set(s)
 
 	return t
 }
