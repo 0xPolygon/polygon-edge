@@ -3,6 +3,11 @@ name: Test
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_HOST_URL:
+        required: true
 
 jobs:
   go_test:
