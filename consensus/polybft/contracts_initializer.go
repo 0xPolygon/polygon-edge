@@ -75,7 +75,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 		"validatorAddresses": validatorAddresses,
 		"validatorPubkeys":   validatorPubkeys,
 		"validatorStakes":    validatorStakes,
-		"newBls":             contracts.BLSContract, // address of the deployed BLS contract
+		"newBls":             types.BLSContract, // address of the deployed BLS contract
 		"newMessage":         registerMessage,
 		"governance":         polyBFTConfig.Governance,
 	}
@@ -89,7 +89,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 }
 
 func initContract(to types.Address, input []byte, contractName string, transition *state.Transition) error {
-	result := transition.Call2(contracts.SystemCaller, to, input,
+	result := transition.Call2(types.SystemCaller, to, input,
 		big.NewInt(0), 100_000_000)
 
 	if result.Failed() {

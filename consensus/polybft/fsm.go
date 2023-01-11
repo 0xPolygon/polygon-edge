@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
@@ -578,7 +577,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
 	tx := &types.Transaction{
-		From:     contracts.SystemCaller,
+		From:     types.SystemCaller,
 		To:       &target,
 		Type:     types.StateTx,
 		Input:    inputData,
@@ -601,7 +600,7 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 		}
 
 		for _, log := range receipts[i].Logs {
-			if log.Address != contracts.L2StateSenderContract {
+			if log.Address != types.L2StateSenderContract {
 				continue
 			}
 

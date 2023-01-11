@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -120,8 +119,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	systemState := polybft.NewSystemState(
 		&polybft.PolyBFTConfig{
-			StateReceiverAddr: contracts.StateReceiverContract,
-			ValidatorSetAddr:  contracts.ValidatorSetContract},
+			StateReceiverAddr: types.StateReceiverContract,
+			ValidatorSetAddr:  types.ValidatorSetContract},
 		&e2eStateProvider{txRelayer: txRelayer})
 
 	// create new account

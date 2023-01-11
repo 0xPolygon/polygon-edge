@@ -3,7 +3,6 @@ package statesyncrelayer
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/umbracle/ethgo"
@@ -54,7 +53,7 @@ func Test_executeStateSync(t *testing.T) {
 
 	txn := &ethgo.Transaction{
 		From:  key.Address(),
-		To:    (*ethgo.Address)(&contracts.StateReceiverContract),
+		To:    (*ethgo.Address)(&types.StateReceiverContract),
 		Input: input,
 		Gas:   types.StateTransactionGasLimit,
 	}

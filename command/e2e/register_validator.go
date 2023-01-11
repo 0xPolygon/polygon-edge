@@ -271,7 +271,7 @@ const (
 )
 
 var (
-	stakeManager      = contracts.ValidatorSetContract
+	stakeManager      = types.ValidatorSetContract
 	stakeFn, _        = abi.NewMethod("function stake()")
 	whitelistFn, _    = abi.NewMethod("function addToWhitelist(address[])")
 	registerFn, _     = abi.NewMethod("function register(uint256[2] signature, uint256[4] pubkey)")

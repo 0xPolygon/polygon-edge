@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -61,7 +60,7 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 	t.Parallel()
 
 	fsm := &fsm{
-		config:        &PolyBFTConfig{ValidatorSetAddr: contracts.ValidatorSetContract},
+		config:        &PolyBFTConfig{ValidatorSetAddr: types.ValidatorSetContract},
 		isEndOfEpoch:  true,
 		uptimeCounter: createTestUptimeCounter(t, nil, 10),
 	}
@@ -579,7 +578,7 @@ func TestFSM_VerifyStateTransactions_EndOfEpochWrongValidatorsUptimeTx(t *testin
 	uptimeCounter, err := createTestUptimeCounter(t, nil, 5).EncodeAbi()
 	require.NoError(t, err)
 
-	commitEpochTx := createStateTransactionWithData(contracts.ValidatorSetContract, uptimeCounter)
+	commitEpochTx := createStateTransactionWithData(types.ValidatorSetContract, uptimeCounter)
 	err = fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx})
 	assert.ErrorContains(t, err, "invalid uptime transaction")
 }
@@ -588,7 +587,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionAndSprintIsFalse(t *testing
 	t.Parallel()
 
 	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
-	dummyStateTx := &types.Transaction{To: &contracts.StateReceiverContract, Type: types.StateTx}
+	dummyStateTx := &types.Transaction{To: &types.StateReceiverContract, Type: types.StateTx}
 	err := fsm.VerifyStateTransactions([]*types.Transaction{dummyStateTx})
 	assert.ErrorContains(t, err, "state transaction in block which should not contain")
 }
@@ -1638,7 +1637,7 @@ func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	require.NoError(t, err)
 
 	return &types.Log{
-		Address: contracts.L2StateSenderContract,
+		Address: types.L2StateSenderContract,
 		Topics:  topics,
 		Data:    encodedData,
 	}

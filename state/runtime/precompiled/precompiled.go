@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -55,13 +54,13 @@ func (p *Precompiled) setupContracts() {
 	p.register("9", &blake2f{p})
 
 	// Native transfer precompile
-	p.register(contracts.NativeTransferPrecompile.String(), &nativeTransfer{})
+	p.register(types.NativeTransferPrecompile.String(), &nativeTransfer{})
 
 	// BLS aggregated signatures verification precompile
-	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
+	p.register(types.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
 
 	// Console precompile
-	p.register(contracts.ConsolePrecompile.String(), &console{})
+	p.register(types.ConsolePrecompile.String(), &console{})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {

@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -547,7 +546,7 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
 	polybftConfig := &PolyBFTConfig{
-		ValidatorSetAddr: contracts.ValidatorSetContract,
+		ValidatorSetAddr: types.ValidatorSetContract,
 		EpochSize:        epochSize,
 		SprintSize:       sprintSize,
 	}

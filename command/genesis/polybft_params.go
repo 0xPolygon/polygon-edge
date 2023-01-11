@@ -16,7 +16,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -73,8 +72,8 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		// use 1st account as governance address
 		Governance:        manifest.GenesisValidators[0].Address,
 		Bridge:            bridge,
-		ValidatorSetAddr:  contracts.ValidatorSetContract,
-		StateReceiverAddr: contracts.StateReceiverContract,
+		ValidatorSetAddr:  types.ValidatorSetContract,
+		StateReceiverAddr: types.StateReceiverContract,
 	}
 
 	chainConfig := &chain.Chain{
@@ -180,37 +179,37 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 			// Validator contract
 			name:         "ChildValidatorSet",
 			relativePath: "child/ChildValidatorSet.sol",
-			address:      contracts.ValidatorSetContract,
+			address:      types.ValidatorSetContract,
 		},
 		{
 			// State receiver contract
 			name:         "StateReceiver",
 			relativePath: "child/StateReceiver.sol",
-			address:      contracts.StateReceiverContract,
+			address:      types.StateReceiverContract,
 		},
 		{
 			// Native Token contract (Matic ERC-20)
 			name:         "MRC20",
 			relativePath: "child/MRC20.sol",
-			address:      contracts.NativeTokenContract,
+			address:      types.NativeTokenContract,
 		},
 		{
 			// BLS contract
 			name:         "BLS",
 			relativePath: "common/BLS.sol",
-			address:      contracts.BLSContract,
+			address:      types.BLSContract,
 		},
 		{
 			// Merkle contract
 			name:         "Merkle",
 			relativePath: "common/Merkle.sol",
-			address:      contracts.MerkleContract,
+			address:      types.MerkleContract,
 		},
 		{
 			// L2StateSender contract
 			name:         "L2StateSender",
 			relativePath: "child/L2StateSender.sol",
-			address:      contracts.L2StateSenderContract,
+			address:      types.L2StateSenderContract,
 		},
 	}
 

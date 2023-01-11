@@ -896,6 +896,13 @@ func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
 		)
 	}
 
+	if msg.From != types.SystemCaller {
+		return NewTransitionApplicationError(
+			fmt.Errorf("state transaction sender must be %v, but got %v", types.SystemCaller, msg.From),
+			true,
+		)
+	}
+
 	if msg.To == nil || *msg.To == types.ZeroAddress {
 		return NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),

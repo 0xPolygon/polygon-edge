@@ -8,7 +8,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -56,8 +55,8 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 		return nil, err
 	}
 
-	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		ethgo.Address(contracts.ValidatorSetContract), encode)
+	response, err := txRelayer.Call(ethgo.Address(types.SystemCaller),
+		ethgo.Address(types.ValidatorSetContract), encode)
 	if err != nil {
 		return nil, err
 	}
@@ -93,8 +92,8 @@ func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address
 		return nil, fmt.Errorf("failed to encode input parameters for getDelegatorReward fn: %w", err)
 	}
 
-	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		ethgo.Address(contracts.ValidatorSetContract), input)
+	response, err := txRelayer.Call(ethgo.Address(types.SystemCaller),
+		ethgo.Address(types.ValidatorSetContract), input)
 	if err != nil {
 		return nil, err
 	}

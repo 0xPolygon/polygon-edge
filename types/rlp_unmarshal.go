@@ -366,6 +366,28 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if t.Type, err = ReadRlpTxType(elems[9]); err != nil {
 			return err
 		}
+
+		if t.IsStateTx() {
+			// From
+			// (we need to set From field for state transaction,
+			// because we are using predefined address for sending such transactions)
+			// Note: it can be empty in case it is sent from SystemCaller address
+			vv, err := v.Get(10).Bytes()
+			if err != nil {
+				return err
+			}
+
+			rawAddressLength := len(vv)
+			if rawAddressLength == 0 {
+				// address not set, we assume that it must be SystemCaller
+				t.From = SystemCaller
+			} else if rawAddressLength != AddressLength {
+				return fmt.Errorf("incorrect address")
+			} else {
+				// address is not SystemCaller, but it's length is correct
+				t.From = BytesToAddress(vv)
+			}
+		}
 	}
 
 	return nil

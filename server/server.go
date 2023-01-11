@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
@@ -460,7 +459,7 @@ func (s *Server) setupRelayer() error {
 	relayer := statesyncrelayer.NewRelayer(
 		s.config.DataDir,
 		s.config.JSONRPC.JSONRPCAddr.String(),
-		ethgo.Address(contracts.StateReceiverContract),
+		ethgo.Address(types.StateReceiverContract),
 		s.logger.Named("relayer"),
 		wallet.NewKey(account),
 	)

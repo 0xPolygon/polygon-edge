@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -288,7 +287,7 @@ func TestPerformExit(t *testing.T) {
 		senderAddress: {
 			Balance: big.NewInt(100000000000),
 		},
-		contracts.BLSContract: {
+		types.BLSContract: {
 			Code: contractsapi.BLS.DeployedBytecode,
 		},
 		bn256Addr: {
@@ -441,7 +440,7 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	rcAddress := result.Address
 
 	init, err := rootchainArtifact.Abi.GetMethod("initialize").Encode([4]interface{}{
-		contracts.BLSContract,
+		types.BLSContract,
 		bn256Addr,
 		bls.GetDomain(),
 		accSet.AsGenericMaps()})

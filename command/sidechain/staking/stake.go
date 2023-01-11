@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -109,7 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	txn := &ethgo.Transaction{
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
-		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
+		To:       (*ethgo.Address)(&types.ValidatorSetContract),
 		Value:    big.NewInt(int64(params.amount)),
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}

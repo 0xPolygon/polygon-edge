@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -166,7 +165,7 @@ func (r *StateSyncRelayer) executeStateSync(stateSyncProof *types.StateSyncProof
 	// execute the state sync
 	txn := &ethgo.Transaction{
 		From:     r.key.Address(),
-		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
+		To:       (*ethgo.Address)(&types.StateReceiverContract),
 		GasPrice: 0,
 		Gas:      types.StateTransactionGasLimit,
 		Input:    input,

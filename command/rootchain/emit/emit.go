@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -20,7 +19,7 @@ var (
 	params emitParams
 
 	contractsToParamTypes = map[string]string{
-		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
+		types.NativeTokenContract.String(): "tuple(address,uint256)",
 	}
 
 	syncStateAbiMethod, _ = abi.NewMethod("function syncState(address receiver, bytes data)")
@@ -51,7 +50,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.address,
 		contractFlag,
-		contracts.NativeTokenContract.String(),
+		types.NativeTokenContract.String(),
 		"ERC20 bridge contract address",
 	)
 

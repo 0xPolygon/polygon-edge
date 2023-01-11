@@ -19,7 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -84,7 +83,7 @@ func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.
 	// execute the state sync
 	txn := &ethgo.Transaction{
 		From:     account.Address(),
-		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
+		To:       (*ethgo.Address)(&types.StateReceiverContract),
 		GasPrice: 0,
 		Gas:      types.StateTransactionGasLimit,
 		Input:    input,
@@ -123,7 +122,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
+			types.NativeTokenContract.String(),
 			strings.Join(wallets[:], ","),
 			strings.Join(amounts[:], ","),
 		),
@@ -186,7 +185,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
+			types.NativeTokenContract.String(),
 			strings.Join(wallets[:2], ","),
 			strings.Join(amounts[:2], ","),
 		),
@@ -204,7 +203,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that we submitted the minimal commitment to smart contract
-	result, err := txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	result, err := txRelayer.Call(accounts[0].Address(), ethgo.Address(types.StateReceiverContract), encode)
 	require.NoError(t, err)
 
 	lastCommittedID, err := strconv.ParseUint(result, 0, 64)
@@ -215,7 +214,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
+			types.NativeTokenContract.String(),
 			strings.Join(wallets[2:], ","),
 			strings.Join(amounts[2:], ","),
 		),
@@ -225,7 +224,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
 	// check that the second (larger commitment) was also submitted in epoch
-	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(types.StateReceiverContract), encode)
 	require.NoError(t, err)
 
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
@@ -359,7 +358,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
 	l1ExitTestAddr := receipt.ContractAddress
-	l2StateSenderAddress := ethgo.Address(contracts.L2StateSenderContract)
+	l2StateSenderAddress := ethgo.Address(types.L2StateSenderContract)
 
 	// Start test
 	// send crosschain transaction on l2 and get exit id
