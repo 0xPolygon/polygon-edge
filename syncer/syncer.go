@@ -238,11 +238,10 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.F
 				continue
 			}
 
-			if err := s.blockchain.VerifyFinalizedBlock(block); err != nil {
+			fullBlock, err := s.blockchain.VerifyFinalizedBlock(block)
+			if err != nil {
 				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
-
-			fullBlock := &types.FullBlock{Block: block}
 
 			if err := s.blockchain.WriteFullBlock(fullBlock, syncerName); err != nil {
 				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)

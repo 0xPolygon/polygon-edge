@@ -679,44 +679,48 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 // outside the method call
 func (b *Blockchain) VerifyPotentialBlock(block *types.Block) error {
 	// Do just the initial block verification
-	return b.verifyBlock(block)
+	_, err := b.verifyBlock(block)
+
+	return err
 }
 
 // VerifyFinalizedBlock verifies that the block is valid by performing a series of checks.
 // It is assumed that the block status is sealed (committed)
-func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {
+func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) (*types.FullBlock, error) {
 	// Make sure the consensus layer verifies this block header
 	if err := b.consensus.VerifyHeader(block.Header); err != nil {
-		return fmt.Errorf("failed to verify the header: %w", err)
+		return nil, fmt.Errorf("failed to verify the header: %w", err)
 	}
 
 	// Do the initial block verification
-	if err := b.verifyBlock(block); err != nil {
-		return err
+	receipts, err := b.verifyBlock(block)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return &types.FullBlock{Block: block, Receipts: receipts}, nil
 }
 
 // verifyBlock does the base (common) block verification steps by
 // verifying the block body as well as the parent information
-func (b *Blockchain) verifyBlock(block *types.Block) error {
+func (b *Blockchain) verifyBlock(block *types.Block) ([]*types.Receipt, error) {
 	// Make sure the block is present
 	if block == nil {
-		return ErrNoBlock
+		return nil, ErrNoBlock
 	}
 
 	// Make sure the block is in line with the parent block
 	if err := b.verifyBlockParent(block); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Make sure the block body data is valid
-	if err := b.verifyBlockBody(block); err != nil {
-		return err
+	receipts, err := b.verifyBlockBody(block)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	return receipts, nil
 }
 
 // verifyBlockParent makes sure that the child block is in line
@@ -774,7 +778,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 // - The trie roots match up (state, transactions, receipts, uncles)
 // - The receipts match up
 // - The execution result matches up
-func (b *Blockchain) verifyBlockBody(block *types.Block) error {
+func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, error) {
 	// Make sure the Uncles root matches up
 	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
 		b.logger.Error(fmt.Sprintf(
@@ -783,7 +787,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 			block.Header.Sha3Uncles,
 		))
 
-		return ErrInvalidSha3Uncles
+		return nil, ErrInvalidSha3Uncles
 	}
 
 	// Make sure the transactions root matches up
@@ -794,21 +798,21 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) error {
 			block.Header.TxRoot,
 		))
 
-		return ErrInvalidTxRoot
+		return nil, ErrInvalidTxRoot
 	}
 
 	// Execute the transactions in the block and grab the result
 	blockResult, executeErr := b.executeBlockTransactions(block)
 	if executeErr != nil {
-		return fmt.Errorf("unable to execute block transactions, %w", executeErr)
+		return nil, fmt.Errorf("unable to execute block transactions, %w", executeErr)
 	}
 
 	// Verify the local execution result with the proposed block data
 	if err := blockResult.verifyBlockResult(block); err != nil {
-		return fmt.Errorf("unable to verify block execution result, %w", err)
+		return nil, fmt.Errorf("unable to verify block execution result, %w", err)
 	}
 
-	return nil
+	return blockResult.Receipts, nil
 }
 
 // verifyBlockResult verifies that the block transaction execution result
@@ -900,15 +904,6 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	evnt := &Event{Source: source}
 	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
-	}
-
-	if fblock.Receipts == nil { // Fetch the block receipts from cache if not already set
-		blockReceipts, receiptsErr := b.extractBlockReceipts(block)
-		if receiptsErr != nil {
-			return receiptsErr
-		}
-
-		fblock.Receipts = blockReceipts
 	}
 
 	// write the receipts, do it only after the header has been written.
