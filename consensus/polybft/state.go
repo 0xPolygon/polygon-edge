@@ -443,7 +443,6 @@ func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 }
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
-// if there is an event with index that can not be found in db in given range, an error is returned
 func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
 	var events []*types.StateSyncEvent
 

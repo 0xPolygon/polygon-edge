@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -129,7 +130,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(30, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
 
 	client := cluster.Servers[0].JSONRPC()
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
@@ -137,6 +138,101 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 
 	// commitments should've been stored
 	// execute the state syncs
+	for i := 0; i < num; i++ {
+		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
+	}
+
+	// the transactions are mined and there should be a success events
+	id := stateSyncResultEvent.ID()
+	filter := &ethgo.LogFilter{
+		Topics: [][]*ethgo.Hash{
+			{&id},
+		},
+	}
+
+	filter.SetFromUint64(0)
+	filter.SetToUint64(100)
+
+	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
+	require.NoError(t, err)
+
+	// Assert that all state syncs are executed successfully
+	checkLogs(t, logs, num)
+}
+
+func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
+	const num = 10
+
+	var (
+		accounts         = make([]ethgo.Key, num)
+		wallets, amounts [num]string
+		premine          [num]types.Address
+	)
+
+	for i := 0; i < num; i++ {
+		accounts[i], _ = ethgow.GenerateKey()
+		premine[i] = types.Address(accounts[i].Address())
+		wallets[i] = premine[i].String()
+		amounts[i] = fmt.Sprintf("%d", 100)
+	}
+
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...), framework.WithEpochSize(30))
+	defer cluster.Stop()
+
+	// wait for a couple of blocks
+	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+
+	// send two transactions to the bridge so that we have a minimal commitment
+	require.NoError(
+		t,
+		cluster.EmitTransfer(
+			contracts.NativeTokenContract.String(),
+			strings.Join(wallets[:2], ","),
+			strings.Join(amounts[:2], ","),
+		),
+	)
+
+	// wait for a few more sprints
+	require.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
+
+	client := cluster.Servers[0].JSONRPC()
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	require.NoError(t, err)
+
+	lastCommittedIDMethod := polybft.SidechainBridgeFunctionsABI.GetMethod("lastCommittedId")
+	encode, err := lastCommittedIDMethod.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	// check that we submitted the minimal commitment to smart contract
+	result, err := txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	require.NoError(t, err)
+
+	lastCommittedID, err := strconv.ParseUint(result, 0, 64)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), lastCommittedID)
+
+	// send some more transactions to the bridge to build another commitment in epoch
+	require.NoError(
+		t,
+		cluster.EmitTransfer(
+			contracts.NativeTokenContract.String(),
+			strings.Join(wallets[2:], ","),
+			strings.Join(amounts[2:], ","),
+		),
+	)
+
+	// wait for a few more sprints
+	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+
+	// check that the second (larger commitment) was also submitted in epoch
+	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	require.NoError(t, err)
+
+	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
+	require.NoError(t, err)
+	require.Equal(t, uint64(10), lastCommittedID)
+
+	// execute all state syncs in submitted commitments
 	for i := 0; i < num; i++ {
 		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
 	}

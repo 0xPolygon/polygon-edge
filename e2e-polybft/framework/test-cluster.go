@@ -180,6 +180,7 @@ func WithBootnodeCount(cnt int) ClusterOption {
 		h.BootnodeCount = cnt
 	}
 }
+
 func WithEpochSize(epochSize int) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.EpochSize = epochSize

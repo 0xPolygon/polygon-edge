@@ -182,19 +182,17 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 func (f *fsm) stateTransactions() []*types.Transaction {
 	var txns []*types.Transaction
 
-	if f.isEndOfEpoch {
-		if f.proposerCommitmentToRegister != nil {
-			// add register commitment transaction
-			inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
-			if err != nil {
-				f.logger.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
+	if f.proposerCommitmentToRegister != nil {
+		// add register commitment transaction
+		inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
+		if err != nil {
+			f.logger.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
 
-				return nil
-			}
-
-			txns = append(txns,
-				createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+			return nil
 		}
+
+		txns = append(txns,
+			createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 	}
 
 	f.logger.Debug("Apply state transaction", "num", len(txns))

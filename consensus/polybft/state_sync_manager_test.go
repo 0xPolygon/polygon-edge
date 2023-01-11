@@ -29,11 +29,12 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 
 	s, err := NewStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
-			stateSenderAddr: types.Address{},
-			jsonrpcAddr:     "",
-			dataDir:         tmpDir,
-			topic:           topic,
-			key:             key.Key(),
+			stateSenderAddr:   types.Address{},
+			jsonrpcAddr:       "",
+			dataDir:           tmpDir,
+			topic:             topic,
+			key:               key.Key(),
+			maxCommitmentSize: maxCommitmentSize,
 		})
 
 	require.NoError(t, err)
@@ -50,32 +51,32 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
 	// there are no state syncs
-	commitment, err := s.buildCommitment(0, 0)
-	require.NoError(t, err)
-	require.Nil(t, commitment)
+	require.NoError(t, s.buildCommitment())
+	require.Nil(t, s.pendingCommitments)
 
-	stateSyncs10 := generateStateSyncEvents(t, 20, 0)
+	stateSyncs10 := generateStateSyncEvents(t, 10, 0)
 
-	// add 5 state syncs starting in index 0, it will not generate a commitment
+	// add 5 state syncs starting in index 0, it will generate one smaller commitment
 	for i := 0; i < 5; i++ {
 		require.NoError(t, s.state.insertStateSyncEvent(stateSyncs10[i]))
 	}
 
-	commitment, err = s.buildCommitment(0, 0)
-	require.NoError(t, err)
-	require.Nil(t, commitment)
+	require.NoError(t, s.buildCommitment())
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].FromIndex)
+	require.Equal(t, uint64(4), s.pendingCommitments[0].ToIndex)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].Epoch)
 
-	// add the next 5 state syncs, at that point
+	// add the next 5 state syncs, at that point, so that it generates a larger commitment
 	for i := 5; i < 10; i++ {
 		require.NoError(t, s.state.insertStateSyncEvent(stateSyncs10[i]))
 	}
 
-	commitment, err = s.buildCommitment(0, 0)
-	require.NoError(t, err)
-
-	require.Equal(t, commitment.Epoch, uint64(0))
-	require.Equal(t, commitment.FromIndex, uint64(0))
-	require.Equal(t, commitment.ToIndex, uint64(9))
+	require.NoError(t, s.buildCommitment())
+	require.Len(t, s.pendingCommitments, 2)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].FromIndex)
+	require.Equal(t, uint64(9), s.pendingCommitments[1].ToIndex)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].Epoch)
 
 	// the message was sent
 	require.NotNil(t, s.config.topic.(*mockTopic).consume()) //nolint
@@ -181,11 +182,11 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	tree, err := NewMerkleTree([][]byte{{0x1}})
 	require.NoError(t, err)
 
-	s.commitment = &Commitment{
-		MerkleTree: tree,
+	s.pendingCommitments = []*Commitment{
+		{MerkleTree: tree},
 	}
 
-	hash, err := s.commitment.Hash()
+	hash, err := s.pendingCommitments[0].Hash()
 	require.NoError(t, err)
 
 	msg := newMockMsg().WithHash(hash.Bytes())
@@ -217,15 +218,13 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 		require.NoError(t, s.state.insertStateSyncEvent(evnt))
 	}
 
-	commitment, err := s.buildCommitment(0, 0)
-	require.NoError(t, err)
-
-	s.commitment = commitment
+	require.NoError(t, s.buildCommitment())
+	require.Len(t, s.pendingCommitments, 1)
 
 	mockMsg := &CommitmentMessageSigned{
 		Message: &CommitmentMessage{
-			FromIndex: commitment.FromIndex,
-			ToIndex:   commitment.ToIndex,
+			FromIndex: s.pendingCommitments[0].FromIndex,
+			ToIndex:   s.pendingCommitments[0].ToIndex,
 		},
 	}
 
@@ -239,6 +238,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 			Transactions: []*types.Transaction{tx},
 		},
 	}
+
 	require.NoError(t, s.PostBlock(req))
 
 	for i := uint64(0); i < 10; i++ {
@@ -248,7 +248,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	}
 }
 
-func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
+func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
@@ -274,7 +274,7 @@ func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
 	goodLog := &ethgo.Log{
 		Topics: []ethgo.Hash{
 			stateTransferEventABI.ID(),
-			ethgo.BytesToHash([]byte{0x1}), // state sync index 1
+			ethgo.BytesToHash([]byte{0x0}), // state sync index 0
 			ethgo.ZeroHash,
 			ethgo.ZeroHash,
 		},
@@ -283,9 +283,32 @@ func TestStateSyncerManager_EventTracker_AddLog(t *testing.T) {
 
 	s.AddLog(goodLog)
 
-	stateSyncs, err = s.state.getStateSyncEventsForCommitment(1, 1)
+	stateSyncs, err = s.state.getStateSyncEventsForCommitment(0, 0)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
+	require.Len(t, s.pendingCommitments, 0)
+
+	// add one more log to have a minimum commitment
+	goodLog2 := goodLog.Copy()
+	goodLog2.Topics[1] = ethgo.BytesToHash([]byte{0x1}) // state sync index 1
+	s.AddLog(goodLog2)
+
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].FromIndex)
+	require.Equal(t, uint64(1), s.pendingCommitments[0].ToIndex)
+
+	// add two more logs to have larger commitments
+	goodLog3 := goodLog.Copy()
+	goodLog3.Topics[1] = ethgo.BytesToHash([]byte{0x2}) // state sync index 2
+	s.AddLog(goodLog3)
+
+	goodLog4 := goodLog.Copy()
+	goodLog4.Topics[1] = ethgo.BytesToHash([]byte{0x3}) // state sync index 3
+	s.AddLog(goodLog4)
+
+	require.Len(t, s.pendingCommitments, 3)
+	require.Equal(t, uint64(0), s.pendingCommitments[2].FromIndex)
+	require.Equal(t, uint64(3), s.pendingCommitments[2].ToIndex)
 }
 
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {

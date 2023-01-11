@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	eventsBufferSize   = 10
+	maxCommitmentSize  = 10
 	stateFileName      = "consensusState.db"
 	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
 )
@@ -178,11 +178,12 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 			logger,
 			c.config.State,
 			&stateSyncConfig{
-				key:             c.config.Key,
-				stateSenderAddr: c.config.PolyBFTConfig.Bridge.BridgeAddr,
-				jsonrpcAddr:     c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:         c.config.DataDir,
-				topic:           c.config.bridgeTopic,
+				key:               c.config.Key,
+				stateSenderAddr:   c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				jsonrpcAddr:       c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:           c.config.DataDir,
+				topic:             c.config.bridgeTopic,
+				maxCommitmentSize: maxCommitmentSize,
 			},
 		)
 
@@ -242,19 +243,19 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(block.Header)
 
-	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
-		c.logger.Error("failed to post block state sync", "err", err)
-	}
-
 	var (
 		epoch = c.epoch
 		err   error
 	)
 
+	// handle commitment and proofs creation
+	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
+		c.logger.Error("failed to post block state sync", "err", err)
+	}
+
 	// TODO - this condition will need to be changed to recognize that either slashing happened
 	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(block.Header.Number, c.epoch) {
+	if c.isFixedSizeOfEpochMet(block.Header.Number, epoch) {
 		if epoch, err = c.restartEpoch(block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -320,12 +321,14 @@ func (c *consensusRuntime) FSM() error {
 		logger:            c.logger.Named("fsm"),
 	}
 
-	commitment, err := c.stateSyncManager.Commitment()
-	if err != nil {
-		return err
-	}
+	if isEndOfSprint {
+		commitment, err := c.stateSyncManager.Commitment()
+		if err != nil {
+			return err
+		}
 
-	ff.proposerCommitmentToRegister = commitment
+		ff.proposerCommitmentToRegister = commitment
+	}
 
 	if isEndOfEpoch {
 		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
@@ -403,7 +406,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	)
 
 	reqObj := &PostEpochRequest{
-		BlockNumber:  header.Number,
 		SystemState:  systemState,
 		NewEpochID:   epochNumber,
 		ValidatorSet: NewValidatorSet(validatorSet, c.logger),
