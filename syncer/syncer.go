@@ -159,7 +159,7 @@ func (s *syncer) HasSyncPeer() bool {
 }
 
 // Sync syncs block with the best peer until callback returns true
-func (s *syncer) Sync(callback func(*types.Block) bool) error {
+func (s *syncer) Sync(callback func(*types.FullBlock) bool) error {
 	localLatest := s.blockchain.Header().Number
 	skipList := make(map[peer.ID]bool)
 
@@ -208,7 +208,7 @@ func (s *syncer) Sync(callback func(*types.Block) bool) error {
 }
 
 // bulkSyncWithPeer syncs block with a given peer
-func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.Block) bool) (uint64, bool, error) {
+func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.FullBlock) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
 	shouldTerminate := false
 
@@ -242,11 +242,13 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.B
 				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
 
-			if err := s.blockchain.WriteBlock(block, syncerName); err != nil {
+			fullBlock := &types.FullBlock{Block: block}
+
+			if err := s.blockchain.WriteFullBlock(fullBlock, syncerName); err != nil {
 				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 
-			shouldTerminate = newBlockCallback(block)
+			shouldTerminate = newBlockCallback(fullBlock)
 
 			lastReceivedNumber = block.Number()
 		case <-time.After(s.blockTimeout):

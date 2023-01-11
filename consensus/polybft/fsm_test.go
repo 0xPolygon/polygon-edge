@@ -175,11 +175,11 @@ func TestFSM_BuildProposal_WithExitEvents(t *testing.T) {
 
 	commitedSeals := []*messages.CommittedSeal{}
 
-	block, err := fsm.Insert(proposal, commitedSeals)
+	fullBlock, err := fsm.Insert(proposal, commitedSeals)
 
 	require.NoError(t, err)
-	require.Equal(t, parentBlockNumber+1, block.Number())
-	require.Equal(t, parent.Hash, block.ParentHash())
+	require.Equal(t, parentBlockNumber+1, fullBlock.Block.Number())
+	require.Equal(t, parent.Hash, fullBlock.Block.ParentHash())
 
 	events, err := runtime.state.getExitEventsByEpoch(epoch)
 	require.NoError(t, err)
@@ -992,11 +992,11 @@ func TestFSM_Insert_Good(t *testing.T) {
 
 	fsm.target = buildBlock
 
-	block, err := fsm.Insert(proposal, commitedSeals)
+	fullBlock, err := fsm.Insert(proposal, commitedSeals)
 
 	require.NoError(t, err)
 	mBackendMock.AssertExpectations(t)
-	assert.Equal(t, parentBlockNumber+1, block.Number())
+	assert.Equal(t, parentBlockNumber+1, fullBlock.Block.Number())
 }
 
 func TestFSM_Insert_InvalidNode(t *testing.T) {
@@ -1426,12 +1426,12 @@ func TestFSM_InsertBlock_HasEpochEndingExitEvents(t *testing.T) {
 
 	proposal := buildBlock.Block.MarshalRLP()
 
-	// insert block
-	block, err := fsm.Insert(proposal, commitedSeals)
+	// insert fullBlock
+	fullBlock, err := fsm.Insert(proposal, commitedSeals)
 
 	require.NoError(t, err)
 	mBackendMock.AssertExpectations(t)
-	assert.Equal(t, parentBlockNumber+1, block.Number())
+	assert.Equal(t, parentBlockNumber+1, fullBlock.Block.Number())
 
 	// check that exit event was not added in current epoch
 	_, err = state.getExitEvent(exitEventID, epoch)
@@ -1445,7 +1445,7 @@ func TestFSM_InsertBlock_HasEpochEndingExitEvents(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, epoch+1, exitEvent.EpochNumber)
 	require.Equal(t, exitEventID, exitEvent.ID)
-	require.Equal(t, block.Header.Number, exitEvent.BlockNumber)
+	require.Equal(t, fullBlock.Block.Header.Number, exitEvent.BlockNumber)
 
 	// check that the exit event is in exit event root for next epoch
 	exitRootHash, err := runtime.BuildEventRoot(epoch + 1)

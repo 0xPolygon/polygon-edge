@@ -225,23 +225,23 @@ func (c *consensusRuntime) IsBridgeEnabled() bool {
 }
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
-func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
+func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if c.lastBuiltBlock != nil && c.lastBuiltBlock.Number >= block.Number() {
+	if c.lastBuiltBlock != nil && c.lastBuiltBlock.Number >= fullBlock.Block.Number() {
 		c.logger.Debug("on block inserted already handled",
-			"current", c.lastBuiltBlock.Number, "block", block.Number())
+			"current", c.lastBuiltBlock.Number, "block", fullBlock.Block.Number())
 
 		return
 	}
 
-	if err := updateBlockMetrics(block, c.lastBuiltBlock); err != nil {
+	if err := updateBlockMetrics(fullBlock.Block, c.lastBuiltBlock); err != nil {
 		c.logger.Error("failed to update block metrics", "error", err)
 	}
 
 	// after the block has been written we reset the txpool so that the old transactions are removed
-	c.config.txPool.ResetWithHeaders(block.Header)
+	c.config.txPool.ResetWithHeaders(fullBlock.Block.Header)
 
 	var (
 		epoch = c.epoch
@@ -249,28 +249,28 @@ func (c *consensusRuntime) OnBlockInserted(block *types.Block) {
 	)
 
 	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: block}); err != nil {
+	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: fullBlock.Block}); err != nil {
 		c.logger.Error("failed to post block state sync", "err", err)
 	}
 
 	// TODO - this condition will need to be changed to recognize that either slashing happened
 	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(block.Header.Number, epoch) {
-		if epoch, err = c.restartEpoch(block.Header); err != nil {
+	if c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch) {
+		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
 		}
 	}
 
-	if err := c.proposerCalculator.Update(block.Number()); err != nil {
+	if err := c.proposerCalculator.Update(fullBlock.Block.Number()); err != nil {
 		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
-	c.lastBuiltBlock = block.Header
+	c.lastBuiltBlock = fullBlock.Block.Header
 }
 
 // FSM creates a new instance of fsm
@@ -731,7 +731,7 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
 
-	block, err := fsm.Insert(proposal, committedSeals)
+	fullBlock, err := fsm.Insert(proposal, committedSeals)
 	if err != nil {
 		c.logger.Error("cannot insert proposal", "error", err)
 
@@ -739,8 +739,8 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 	}
 
 	if c.IsBridgeEnabled() {
-		if (fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(block.Header.Number)) &&
-			bytes.Equal(c.config.Key.Address().Bytes(), block.Header.Miner) {
+		if (fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(fullBlock.Block.Header.Number)) &&
+			bytes.Equal(c.config.Key.Address().Bytes(), fullBlock.Block.Header.Miner) {
 			go func(header types.Header, epochNumber uint64) {
 				if err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
 					c.logger.Warn("failed to submit checkpoint",
@@ -748,13 +748,13 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 						"epoch number", epochNumber,
 						"error", err)
 				}
-			}(*block.Header, fsm.epochNumber)
+			}(*fullBlock.Block.Header, fsm.epochNumber)
 
-			c.checkpointManager.latestCheckpointID = block.Number()
+			c.checkpointManager.latestCheckpointID = fullBlock.Block.Number()
 		}
 	}
 
-	c.OnBlockInserted(block)
+	c.OnBlockInserted(fullBlock)
 }
 
 // ID return ID (address actually) of the current node

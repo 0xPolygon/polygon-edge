@@ -902,6 +902,15 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 		return err
 	}
 
+	if fblock.Receipts == nil { // Fetch the block receipts from cache if not already set
+		blockReceipts, receiptsErr := b.extractBlockReceipts(block)
+		if receiptsErr != nil {
+			return receiptsErr
+		}
+
+		fblock.Receipts = blockReceipts
+	}
+
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage

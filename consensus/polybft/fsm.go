@@ -406,14 +406,13 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // Insert inserts the sealed proposal
-func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.Block, error) {
-	newBlock := f.target.Block
-	receipts := f.target.Receipts
+func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.FullBlock, error) {
+	newBlock := &types.FullBlock{Block: f.target.Block, Receipts: f.target.Receipts}
 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(newBlock.Header.ExtraData)
+	extra, _ := GetIbftExtra(newBlock.Block.Header.ExtraData)
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
@@ -457,9 +456,9 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	// Write extar data to header
-	newBlock.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	newBlock.Block.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
-	if err := f.backend.CommitBlock(&types.FullBlock{Block: newBlock, Receipts: receipts}); err != nil {
+	if err := f.backend.CommitBlock(newBlock); err != nil {
 		return nil, err
 	}
 
@@ -471,7 +470,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(epoch, newBlock.Number(), receipts)
+	events, err := getExitEventsFromReceipts(epoch, newBlock.Block.Number(), newBlock.Receipts)
 	if err != nil {
 		return newBlock, err
 	}

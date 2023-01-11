@@ -223,7 +223,7 @@ func (p *Polybft) Start() error {
 
 	// start syncing
 	go func() {
-		blockHandler := func(b *types.Block) bool {
+		blockHandler := func(b *types.FullBlock) bool {
 			p.runtime.OnBlockInserted(b)
 
 			return false

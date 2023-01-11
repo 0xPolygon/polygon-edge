@@ -559,7 +559,7 @@ func (tp *syncerMock) HasSyncPeer() bool {
 	return args[0].(bool) //nolint
 }
 
-func (tp *syncerMock) Sync(func(*types.Block) bool) error {
+func (tp *syncerMock) Sync(func(*types.FullBlock) bool) error {
 	args := tp.Called()
 
 	return args.Error(0)

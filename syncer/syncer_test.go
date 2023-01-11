@@ -41,6 +41,7 @@ type mockBlockchain struct {
 	getBlockByNumberHandler     func(uint64, bool) (*types.Block, bool)
 	verifyFinalizedBlockHandler func(*types.Block) error
 	writeBlockHandler           func(*types.Block) error
+	writeFullBlockHandler       func(*types.FullBlock) error
 }
 
 func (m *mockBlockchain) SubscribeEvents() blockchain.Subscription {
@@ -61,6 +62,10 @@ func (m *mockBlockchain) VerifyFinalizedBlock(b *types.Block) error {
 
 func (m *mockBlockchain) WriteBlock(b *types.Block, s string) error {
 	return m.writeBlockHandler(b)
+}
+
+func (m *mockBlockchain) WriteFullBlock(b *types.FullBlock, s string) error {
+	return m.writeFullBlockHandler(b)
 }
 
 func newSimpleHeaderHandler(num uint64) func() *types.Header {
@@ -496,7 +501,7 @@ func TestSync(t *testing.T) {
 
 		// local
 		beginningHeight     uint64
-		createBlockCallback func() func(*types.Block) bool
+		createBlockCallback func() func(*types.FullBlock) bool
 
 		// peers
 		peerStatuses []*NoForkPeer
@@ -517,9 +522,9 @@ func TestSync(t *testing.T) {
 		{
 			name:            "should sync blocks to the latest successfully",
 			beginningHeight: 0,
-			createBlockCallback: func() func(*types.Block) bool {
-				return func(b *types.Block) bool {
-					return b.Number() >= 10
+			createBlockCallback: func() func(*types.FullBlock) bool {
+				return func(b *types.FullBlock) bool {
+					return b.Block.Number() >= 10
 				}
 			},
 			peerStatuses: []*NoForkPeer{
@@ -547,9 +552,9 @@ func TestSync(t *testing.T) {
 		{
 			name:            "should sync blocks with multiple peers",
 			beginningHeight: 0,
-			createBlockCallback: func() func(*types.Block) bool {
-				return func(b *types.Block) bool {
-					return b.Number() >= 10
+			createBlockCallback: func() func(*types.FullBlock) bool {
+				return func(b *types.FullBlock) bool {
+					return b.Block.Number() >= 10
 				}
 			},
 			peerStatuses: []*NoForkPeer{
@@ -608,9 +613,9 @@ func TestSync(t *testing.T) {
 					&mockBlockchain{
 						headerHandler:               newSimpleHeaderHandler(latestBlockNumber),
 						verifyFinalizedBlockHandler: test.createVerifyFinalizedBlockHandler(),
-						writeBlockHandler: func(b *types.Block) error {
-							syncedBlocks = append(syncedBlocks, b)
-							latestBlockNumber = b.Number()
+						writeFullBlockHandler: func(b *types.FullBlock) error {
+							syncedBlocks = append(syncedBlocks, b.Block)
+							latestBlockNumber = b.Block.Number()
 
 							return nil
 						},
@@ -681,14 +686,14 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 		// local
 		beginningHeight uint64
 		blockTimeout    time.Duration
-		blockCallback   func(*types.Block) bool
+		blockCallback   func(*types.FullBlock) bool
 
 		// peers
 		getBlocksHandler func(id peer.ID, start uint64, timeoutPerBlock time.Duration) (<-chan *types.Block, error)
 
 		// handlers
 		verifyFinalizedBlockHandler func(*types.Block) error
-		writeBlockHandler           func(*types.Block) error
+		writeFullBlockHandler       func(*types.FullBlock) error
 
 		// results
 		blocks                []*types.Block
@@ -700,7 +705,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			name:            "should sync blocks to the latest successfully",
 			beginningHeight: 0,
 			blockTimeout:    time.Second,
-			blockCallback: func(b *types.Block) bool {
+			blockCallback: func(b *types.FullBlock) bool {
 				return false
 			},
 			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
@@ -709,7 +714,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
 				return nil
 			},
-			writeBlockHandler: func(b *types.Block) error {
+			writeFullBlockHandler: func(b *types.FullBlock) error {
 				return nil
 			},
 			blocks:                blocks[:10],
@@ -721,7 +726,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			name:            "should return error if GetBlocks returns error",
 			beginningHeight: 0,
 			blockTimeout:    time.Second,
-			blockCallback: func(b *types.Block) bool {
+			blockCallback: func(b *types.FullBlock) bool {
 				return false
 			},
 			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
@@ -730,7 +735,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
 				return nil
 			},
-			writeBlockHandler: func(b *types.Block) error {
+			writeFullBlockHandler: func(b *types.FullBlock) error {
 				return nil
 			},
 			blocks:                []*types.Block{},
@@ -742,7 +747,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			name:            "should return error if verification is failed",
 			beginningHeight: 0,
 			blockTimeout:    time.Second,
-			blockCallback: func(b *types.Block) bool {
+			blockCallback: func(b *types.FullBlock) bool {
 				return false
 			},
 			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
@@ -755,7 +760,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 
 				return nil
 			},
-			writeBlockHandler: func(b *types.Block) error {
+			writeFullBlockHandler: func(b *types.FullBlock) error {
 				return nil
 			},
 			blocks:                blocks[:5],
@@ -767,7 +772,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			name:            "should return error if block insertion is failed",
 			beginningHeight: 0,
 			blockTimeout:    time.Second,
-			blockCallback: func(b *types.Block) bool {
+			blockCallback: func(b *types.FullBlock) bool {
 				return false
 			},
 			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
@@ -776,8 +781,8 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
 				return nil
 			},
-			writeBlockHandler: func(b *types.Block) error {
-				if b.Number() > 5 {
+			writeFullBlockHandler: func(b *types.FullBlock) error {
+				if b.Block.Number() > 5 {
 					return errBlockInsertionFailed
 				}
 
@@ -792,7 +797,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			name:            "should return error in case of timeout",
 			beginningHeight: 0,
 			blockTimeout:    500 * time.Millisecond,
-			blockCallback: func(b *types.Block) bool {
+			blockCallback: func(b *types.FullBlock) bool {
 				return false
 			},
 			getBlocksHandler: func(id peer.ID, start uint64, _ time.Duration) (<-chan *types.Block, error) {
@@ -801,7 +806,7 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 			verifyFinalizedBlockHandler: func(b *types.Block) error {
 				return nil
 			},
-			writeBlockHandler: func(b *types.Block) error {
+			writeFullBlockHandler: func(b *types.FullBlock) error {
 				return nil
 			},
 			blocks:                []*types.Block{},
@@ -825,12 +830,12 @@ func Test_bulkSyncWithPeer(t *testing.T) {
 					&mockBlockchain{
 						headerHandler:               newSimpleHeaderHandler(test.beginningHeight),
 						verifyFinalizedBlockHandler: test.verifyFinalizedBlockHandler,
-						writeBlockHandler: func(b *types.Block) error {
-							if err := test.writeBlockHandler(b); err != nil {
+						writeFullBlockHandler: func(b *types.FullBlock) error {
+							if err := test.writeFullBlockHandler(b); err != nil {
 								return err
 							}
 
-							syncedBlocks = append(syncedBlocks, b)
+							syncedBlocks = append(syncedBlocks, b.Block)
 
 							return nil
 						},
