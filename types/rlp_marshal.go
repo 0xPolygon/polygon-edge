@@ -4,6 +4,7 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+//
 type RLPMarshaler interface {
 	MarshalRLPTo(dst []byte) []byte
 }
