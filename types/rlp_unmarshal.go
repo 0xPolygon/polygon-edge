@@ -384,3 +384,23 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	return nil
 }
+
+func ReadRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
+	bytes, err := rlpValue.Bytes()
+	if err != nil {
+		return LegacyTx, err
+	}
+
+	if len(bytes) != 1 {
+		return LegacyTx, fmt.Errorf("expected 1 byte transaction type, but size is %d", len(bytes))
+	}
+
+	b := TxType(bytes[0])
+
+	switch b {
+	case LegacyTx, StateTx:
+		return b, nil
+	default:
+		return LegacyTx, fmt.Errorf("invalid tx type value: %d", bytes[0])
+	}
+}

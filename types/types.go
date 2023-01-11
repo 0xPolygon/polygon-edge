@@ -153,3 +153,14 @@ var (
 	// EmptyUncleHash is the root when there are no uncles
 	EmptyUncleHash = StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
 )
+
+// CopyPtr copies an address.
+func (a *Address) CopyPtr() *Address {
+	if a == nil {
+		return nil
+	}
+
+	cpy := *a
+
+	return &cpy
+}
