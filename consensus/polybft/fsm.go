@@ -407,7 +407,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 // Insert inserts the sealed proposal
 func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.FullBlock, error) {
-	newBlock := &types.FullBlock{Block: f.target.Block, Receipts: f.target.Receipts}
+	newBlock := f.target
 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
