@@ -2,8 +2,8 @@
 
 set -e
 
-POLYGON_EDGE_BIN=./polygon-edge
-GENESIS_PATH=/genesis/genesis.json
+POLYGON_EDGE_BIN=/polygon-edge/polygon-edge
+GENESIS_PATH=/data/genesis.json
 
 case "$1" in
 
@@ -12,11 +12,11 @@ case "$1" in
           echo "Secrets have already been generated."
       else
           echo "Generating secrets..."
-          secrets=$("$POLYGON_EDGE_BIN" secrets init --num 4 --data-dir data- --json)
+          secrets=$("$POLYGON_EDGE_BIN" secrets init --num 4 --data-dir /data/data- --json)
           echo "Secrets have been successfully generated"
 
           echo "Generating genesis file..."
-          "$POLYGON_EDGE_BIN" genesis \
+          cd /data && "$POLYGON_EDGE_BIN" genesis \
             --dir "$GENESIS_PATH" \
             --consensus ibft \
             --ibft-validators-prefix-path data- \
