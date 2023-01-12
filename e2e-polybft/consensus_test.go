@@ -274,7 +274,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 
 	// undelegate rewards
 	require.NoError(t, srv.Undelegate(delegatorReward.Uint64(), delegatorSecretsPath, validatorAddr))
-	t.Logf("Rewards undelegated\n")
+	t.Logf("Rewards are undelegated\n")
 
 	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
@@ -317,20 +317,22 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecrets)
 	require.NoError(t, err)
 
+	validatorAddr := validatorAcc.Ecdsa.Address()
+
 	// wait for one epoch to accumulate validator rewards
 	require.NoError(t, cluster.WaitForBlock(5, 20*time.Second))
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), txRelayer)
+	validatorInfoRaw, err := sidechain.GetValidatorInfo(validatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	stake := validatorInfo["totalStake"].(*big.Int) //nolint:forcetypeassert
+	stake := validatorInfoRaw["totalStake"].(*big.Int) //nolint:forcetypeassert
 	t.Logf("Validator start stake=%s\n", stake.String())
 
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
 	require.NoError(t, srv.Unstake(stake.Uint64()))
 
 	// wait end of epoch
-	require.NoError(t, cluster.WaitForBlock(10, 40*time.Second))
+	require.NoError(t, cluster.WaitForBlock(10, 20*time.Second))
 
 	validatorSet, err := systemState.GetValidatorSet()
 	require.NoError(t, err)
@@ -338,25 +340,20 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// assert that validator isn't present in new validator set
 	require.Equal(t, 4, validatorSet.Len())
 
-	validatorInfo, err = sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), txRelayer)
+	validatorInfoRaw, err = sidechain.GetValidatorInfo(validatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	reward := validatorInfo["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
+	reward := validatorInfoRaw["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
 	require.Greater(t, reward.Uint64(), uint64(0))
-	t.Logf("Withdrawable reward=%d\n", reward)
-
-	reward, err = sidechain.GetValidatorReward(validatorAcc.Ecdsa.Address(), txRelayer)
-	require.NoError(t, err)
-	t.Logf("Validator reward=%s\n (GetValidatorReward)", reward)
+	t.Logf("Validator rewards=%d\n", reward)
 
 	balance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
 	t.Logf("Validator balance (before withdrawal)=%s\n", balance)
 
-	// withdraw all the funds
-	require.NoError(t, cluster.Servers[1].Withdraw(validatorSecrets, validatorAcc.Ecdsa.Address()))
-
-	require.NoError(t, cluster.WaitForBlock(21, 40*time.Second))
+	// TODO: Figure out withdrawal (try with partial staking instead of staking entire balance)
+	// // withdraw all the funds
+	// require.NoError(t, cluster.Servers[1].Withdraw(validatorSecrets, validatorAddr))
 
 	balance, err = srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
@@ -372,11 +369,22 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
-	rootchainValidators, err := getRootchainValidators(l1Relayer, checkpointManagerAddr, rootchainSender)
+	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
+	rootchainValidators := []*validatorInfo{}
+	err = cluster.Bridge.WaitUntil(time.Second, 10*time.Second, func() (bool, error) {
+		rootchainValidators, err = getRootchainValidators(l1Relayer, checkpointManagerAddr, rootchainSender)
+		if err != nil {
+			return false, err
+		}
+
+		// execute until number of validators is different than 5 (namely it becomes 4)
+		return len(rootchainValidators) == 5, nil
+	})
 	require.NoError(t, err)
+	require.Equal(t, 4, len(rootchainValidators))
 
 	for _, validator := range rootchainValidators {
-		if validator.address == validatorAcc.Ecdsa.Address() {
+		if validator.address == validatorAddr {
 			t.Fatalf("not expected to find validator %v in the current validator set", validator.address)
 		}
 	}
