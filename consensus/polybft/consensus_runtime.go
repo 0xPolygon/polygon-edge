@@ -421,6 +421,10 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
+	if err := c.checkpointManager.PostEpoch(reqObj); err != nil {
+		return nil, err
+	}
+
 	return &epochMetadata{
 		Number:            epochNumber,
 		Validators:        validatorSet,
