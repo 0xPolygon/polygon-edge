@@ -242,7 +242,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	for _, elem := range logsElems {
 		log := &Log{}
-		if err := log.UnmarshalRLPFrom(p, elem); err != nil {
+		if err = log.UnmarshalRLPFrom(p, elem); err != nil {
 			return err
 		}
 
@@ -270,7 +270,7 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	// address
-	if err := elems[0].GetAddr(l.Address[:]); err != nil {
+	if err = elems[0].GetAddr(l.Address[:]); err != nil {
 		return err
 	}
 	// topics
@@ -301,14 +301,13 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPFrom unmarshals a Transaction in RLP format
 func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
-	elems, err := v.GetElems()
-	if err != nil {
-		return err
+	if v.Len() < 10 {
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected 10 but found %d", v.Len())
 	}
 
-	if len(elems) < 10 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 10 but found %d", len(elems))
-	}
+	var err error
+
+	p.Hash(t.Hash[:0], v)
 
 	// Setup defaults
 	t.GasPrice = new(big.Int)
@@ -319,8 +318,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	t.R = new(big.Int)
 	t.S = new(big.Int)
 	t.From = ZeroAddress
-
-	p.Hash(t.Hash[:0], v)
 
 	// Type
 	i := 0
