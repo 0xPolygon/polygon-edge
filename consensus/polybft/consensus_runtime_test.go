@@ -227,7 +227,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		lastBuiltBlock:   &types.Header{Number: header.Number - 1},
 		stateSyncManager: &dummyStateSyncManager{},
 	}
-	runtime.OnBlockInserted(builtBlock)
+	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
 	require.True(t, runtime.state.isEpochInserted(currentEpochNumber+1))
 	require.Equal(t, newEpochNumber, runtime.epoch.Number)
@@ -281,7 +281,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
-	runtime.OnBlockInserted(builtBlock)
+	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
 	require.Equal(t, header.Number, runtime.lastBuiltBlock.Number)
 }

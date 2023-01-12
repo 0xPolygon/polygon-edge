@@ -197,7 +197,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		Receipts: transition.Receipts(),
 	})
 
-	if err := d.blockchain.VerifyFinalizedBlock(block); err != nil {
+	if _, err := d.blockchain.VerifyFinalizedBlock(block); err != nil {
 		return err
 	}
 
