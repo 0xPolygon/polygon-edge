@@ -301,11 +301,14 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPFrom unmarshals a Transaction in RLP format
 func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
-	if v.Len() < 9 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", v.Len())
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
 	}
 
-	var err error
+	if len(elems) < 9 {
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", v.Len())
+	}
 
 	p.Hash(t.Hash[:0], v)
 
@@ -321,84 +324,84 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	t.From = ZeroAddress
 
 	// nonce
-	if t.Nonce, err = v.Get(0).GetUint64(); err != nil {
+	if t.Nonce, err = elems[0].GetUint64(); err != nil {
 		return err
 	}
 
 	// gasPrice
-	if err = v.Get(1).GetBigInt(t.GasPrice); err != nil {
+	if err = elems[1].GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
 
 	// gas
-	if t.Gas, err = v.Get(2).GetUint64(); err != nil {
+	if t.Gas, err = elems[2].GetUint64(); err != nil {
 		return err
 	}
 
 	// to
-	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
+	if vv, _ := elems[3].Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
 		t.To = &addr
 	}
 
 	// value
-	if err = v.Get(4).GetBigInt(t.Value); err != nil {
+	if err = elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
 
 	// input
-	if t.Input, err = v.Get(5).GetBytes(t.Input[:0]); err != nil {
+	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
 		return err
 	}
 
 	// V
-	if err = v.Get(6).GetBigInt(t.V); err != nil {
+	if err = elems[6].GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
-	if err = v.Get(7).GetBigInt(t.R); err != nil {
+	if err = elems[7].GetBigInt(t.R); err != nil {
 		return err
 	}
 
 	// S
-	if err = v.Get(8).GetBigInt(t.S); err != nil {
+	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
 	}
 
-	if v.Len() > 9 {
+	if len(elems) > 9 {
 		// Type
-		if t.Type, err = readRlpTxType(v.Get(9)); err != nil {
+		if t.Type, err = readRlpTxType(elems[9]); err != nil {
 			return err
 		}
 
 		switch t.Type {
 		case StateTx:
-			if v.Len() != 11 {
+			if len(elems) != 11 {
 				return fmt.Errorf("incorrect number of elements to decode state tx, expected 11 but found %d", v.Len())
 			}
 
 			// We need to set From field for state transaction,
 			// because we are using unique, predefined address, for sending such transactions
 			// From
-			if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
+			if vv, err := elems[10].Bytes(); err == nil && len(vv) == AddressLength {
 				// address
 				addr := BytesToAddress(vv)
 				t.From = addr
 			}
 		case DynamicGeeTx:
-			if v.Len() != 12 {
+			if len(elems) != 12 {
 				return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 12 but found %d", v.Len())
 			}
 
 			// gasFeeCap
-			if err = v.Get(10).GetBigInt(t.GasFeeCap); err != nil {
+			if err = elems[10].GetBigInt(t.GasFeeCap); err != nil {
 				return err
 			}
 
 			// gasTipCap
-			if err = v.Get(11).GetBigInt(t.GasTipCap); err != nil {
+			if err = elems[11].GetBigInt(t.GasTipCap); err != nil {
 				return err
 			}
 		}
