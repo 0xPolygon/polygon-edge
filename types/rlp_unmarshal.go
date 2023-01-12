@@ -367,7 +367,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 
-		if t.IsStateTx() {
+		if t.Type == StateTx {
 			// We need to set From field for state transaction,
 			// because we are using unique, predefined address, for sending such transactions
 			// From

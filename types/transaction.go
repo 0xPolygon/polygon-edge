@@ -8,21 +8,46 @@ import (
 )
 
 const (
-	StateTransactionGasLimit = 1000000 // some arbitrary default gas limit for state transactions
+	// StateTransactionGasLimit is arbitrary default gas limit for state transactions
+	StateTransactionGasLimit = 1000000
 )
 
+// TxType is the transaction type.
+type TxType byte
+
+// List of supported transaction types
+const (
+	LegacyTx     TxType = 0x0
+	StateTx      TxType = 0x7f
+	DynamicGeeTx TxType = 0x8f
+)
+
+// String returns string representation of the transaction type.
+func (t TxType) String() (s string) {
+	switch t {
+	case LegacyTx:
+		return "LegacyTx"
+	case StateTx:
+		return "StateTx"
+	case DynamicGeeTx:
+		return "DynamicGeeTx"
+	default:
+		return "UnknownTX"
+	}
+}
+
 type Transaction struct {
-	Nonce    uint64
-	GasPrice *big.Int
-	Gas      uint64
-	To       *Address
-	Value    *big.Int
-	Input    []byte
-	V        *big.Int
-	R        *big.Int
-	S        *big.Int
-	Hash     Hash
-	From     Address
+	Nonce     uint64
+	GasPrice  *big.Int
+	GasTipCap *big.Int
+	GasFeeCap *big.Int
+	Gas       uint64
+	To        *Address
+	Value     *big.Int
+	Input     []byte
+	V, R, S   *big.Int
+	Hash      Hash
+	From      Address
 
 	Type TxType
 
@@ -33,14 +58,6 @@ type Transaction struct {
 // IsContractCreation checks if tx is contract creation
 func (t *Transaction) IsContractCreation() bool {
 	return t.To == nil
-}
-
-func (t *Transaction) IsLegacyTx() bool {
-	return t.Type == LegacyTx
-}
-
-func (t *Transaction) IsStateTx() bool {
-	return t.Type == StateTx
 }
 
 // ComputeHash computes the hash of the transaction
