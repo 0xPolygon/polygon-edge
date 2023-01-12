@@ -251,7 +251,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// Type
 	if len(elems) >= 5 {
-		if r.TransactionType, err = ReadRlpTxType(elems[4]); err != nil {
+		if r.TransactionType, err = readRlpTxType(elems[4]); err != nil {
 			return err
 		}
 	}
@@ -320,7 +320,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	t.From = ZeroAddress
 
 	// Type
-	if t.Type, err = ReadRlpTxType(v.Get(0)); err != nil {
+	if t.Type, err = readRlpTxType(v.Get(0)); err != nil {
 		return err
 	}
 
@@ -400,7 +400,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	return nil
 }
 
-func ReadRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
+func readRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
 	bytes, err := rlpValue.Bytes()
 	if err != nil {
 		return LegacyTx, err
