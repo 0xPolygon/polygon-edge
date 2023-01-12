@@ -307,7 +307,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	if len(elems) < 9 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", v.Len())
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", len(elems))
 	}
 
 	p.Hash(t.Hash[:0], v)
@@ -376,7 +376,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		switch t.Type {
 		case StateTx:
 			if len(elems) != 11 {
-				return fmt.Errorf("incorrect number of elements to decode state tx, expected 11 but found %d", v.Len())
+				return fmt.Errorf("incorrect number of elements to decode state tx, expected 11 but found %d", len(elems))
 			}
 
 			// We need to set From field for state transaction,
@@ -389,7 +389,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			}
 		case DynamicFeeTx:
 			if len(elems) != 12 {
-				return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 12 but found %d", v.Len())
+				return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 12 but found %d", len(elems))
 			}
 
 			t.GasFeeCap = new(big.Int)
