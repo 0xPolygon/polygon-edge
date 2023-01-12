@@ -301,8 +301,8 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPFrom unmarshals a Transaction in RLP format
 func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
-	if v.Len() < 10 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 10 but found %d", v.Len())
+	if v.Len() < 9 {
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", v.Len())
 	}
 
 	var err error
@@ -367,7 +367,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	if v.Len() >= 10 {
+	if v.Len() > 9 {
 		// Type
 		if t.Type, err = readRlpTxType(v.Get(9)); err != nil {
 			return err
