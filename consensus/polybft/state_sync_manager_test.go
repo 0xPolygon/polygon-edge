@@ -234,8 +234,10 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	tx := createStateTransactionWithData(types.Address{}, txData)
 
 	req := &PostBlockRequest{
-		Block: &types.Block{
-			Transactions: []*types.Transaction{tx},
+		FullBlock: &types.FullBlock{
+			Block: &types.Block{
+				Transactions: []*types.Transaction{tx},
+			},
 		},
 	}
 

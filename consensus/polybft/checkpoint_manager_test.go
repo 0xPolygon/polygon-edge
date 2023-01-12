@@ -267,10 +267,59 @@ func TestCheckpointManager_isCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger())
+			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
 			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber))
 		})
 	}
+}
+
+func TestCheckpointManager_PostBlock(t *testing.T) {
+	const (
+		numOfReceipts = 5
+		block         = 5
+		epoch         = 1
+	)
+
+	state := newTestState(t)
+
+	receipts := make([]*types.Receipt, numOfReceipts)
+	for i := 0; i < numOfReceipts; i++ {
+		receipts[i] = &types.Receipt{Logs: []*types.Log{
+			createTestLogForExitEvent(t, uint64(i)),
+		}}
+	}
+
+	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}, Receipts: receipts},
+		Epoch: epoch}
+
+	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), 5, types.ZeroAddress,
+		nil, nil, nil, hclog.NewNullLogger(), state)
+
+	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
+		req.IsEpochEndingBlock = false
+		require.NoError(t, checkpointManager.PostBlock(req))
+
+		exitEvents, err := state.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+			return exitEvent.BlockNumber == block
+		})
+
+		require.NoError(t, err)
+		require.Len(t, exitEvents, numOfReceipts)
+		require.Equal(t, uint64(epoch), exitEvents[0].EpochNumber)
+	})
+
+	t.Run("PostBlock - epoch ending block (exit events are saved to the next epoch)", func(t *testing.T) {
+		req.IsEpochEndingBlock = true
+		require.NoError(t, checkpointManager.PostBlock(req))
+
+		exitEvents, err := state.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+			return exitEvent.BlockNumber == block
+		})
+
+		require.NoError(t, err)
+		require.Len(t, exitEvents, numOfReceipts)
+		require.Equal(t, uint64(epoch+1), exitEvents[0].EpochNumber)
+	})
 }
 
 func TestPerformExit(t *testing.T) {
@@ -533,4 +582,23 @@ func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 	require.True(t, ok, "failed to extract block number from submit checkpoint inputs")
 
 	return blockNumber.Uint64()
+}
+
+func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
+	t.Helper()
+
+	topics := make([]types.Hash, 4)
+	topics[0] = types.Hash(exitEventABI.ID())
+	topics[1] = types.BytesToHash(itob(exitEventID))
+	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
+	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
+	someType := abi.MustNewType("tuple(string firstName, string lastName)")
+	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+	require.NoError(t, err)
+
+	return &types.Log{
+		Address: contracts.L2StateSenderContract,
+		Topics:  topics,
+		Data:    encodedData,
+	}
 }

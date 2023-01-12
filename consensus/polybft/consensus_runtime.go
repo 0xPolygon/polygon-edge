@@ -46,8 +46,6 @@ type txPoolInterface interface {
 type checkpointBackend interface {
 	// BuildEventRoot generates an event root hash from exit events in given epoch
 	BuildEventRoot(epoch uint64) (types.Hash, error)
-	// InsertExitEvents inserts provided exit events to persistence storage
-	InsertExitEvents(exitEvents []*ExitEvent) error
 }
 
 // epochMetadata is the static info for epoch currently being processed
@@ -153,7 +151,8 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 			txRelayer,
 			config.blockchain,
 			config.polybftBackend,
-			log.Named("checkpoint_manager"))
+			log.Named("checkpoint_manager"),
+			runtime.state)
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
@@ -246,16 +245,23 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
+		// TODO - this will need to take inconsideration if slashing occurred
+		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
+	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
+
 	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: fullBlock.Block}); err != nil {
+	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block state sync", "err", err)
 	}
 
-	// TODO - this condition will need to be changed to recognize that either slashing happened
-	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch) {
+	// handle exit events that happened in block
+	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	}
+
+	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -507,11 +513,6 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	}
 
 	return commitEpoch, nil
-}
-
-// InsertExitEvents is an implementation of checkpointBackend interface
-func (c *consensusRuntime) InsertExitEvents(exitEvents []*ExitEvent) error {
-	return c.state.insertExitEvents(exitEvents)
 }
 
 // BuildEventRoot is an implementation of checkpointBackend interface

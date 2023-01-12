@@ -362,14 +362,18 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 }
 
 type PostBlockRequest struct {
-	// Block is a reference of the executed block
-	Block *types.Block
+	// FullBlock is a reference of the executed block
+	FullBlock *types.FullBlock
+	// Epoch is the epoch number of the executed block
+	Epoch uint64
+	// IsEpochEndingBlock indicates if this is the last block in epoch
+	IsEpochEndingBlock bool
 }
 
 // PostBlock notifies state sync manager that a block was finalized,
 // so that it can build state sync proofs if a block has a commitment submission transaction
 func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
-	commitment, err := getCommitmentMessageSignedTx(req.Block.Transactions)
+	commitment, err := getCommitmentMessageSignedTx(req.FullBlock.Block.Transactions)
 	if err != nil {
 		return err
 	}
