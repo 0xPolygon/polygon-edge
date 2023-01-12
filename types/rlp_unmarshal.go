@@ -383,7 +383,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		}
 	case DynamicGeeTx:
 		if v.Len() != 11 {
-			return fmt.Errorf("incorrect number of elements to decode dynamic fee transaction, expected 11 but found %d", v.Len())
+			return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 11 but found %d", v.Len())
 		}
 
 		// gasFeeCap
