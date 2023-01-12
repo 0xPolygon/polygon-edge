@@ -336,7 +336,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	// to
-	if vv, _ := elems[3].Bytes(); len(vv) == 20 {
+	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
 		t.To = &addr
@@ -382,7 +382,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			// We need to set From field for state transaction,
 			// because we are using unique, predefined address, for sending such transactions
 			// From
-			if vv, err := elems[10].Bytes(); err == nil && len(vv) == AddressLength {
+			if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
 				// address
 				addr := BytesToAddress(vv)
 				t.From = addr
