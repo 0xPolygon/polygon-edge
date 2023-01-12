@@ -387,7 +387,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 				addr := BytesToAddress(vv)
 				t.From = addr
 			}
-		case DynamicGeeTx:
+		case DynamicFeeTx:
 			if len(elems) != 12 {
 				return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 12 but found %d", v.Len())
 			}
@@ -423,7 +423,7 @@ func readRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
 	b := TxType(bytes[0])
 
 	switch b {
-	case LegacyTx, StateTx, DynamicGeeTx:
+	case LegacyTx, StateTx, DynamicFeeTx:
 		return b, nil
 	default:
 		return LegacyTx, fmt.Errorf("invalid tx type value: %d", bytes[0])

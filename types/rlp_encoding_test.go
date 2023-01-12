@@ -145,7 +145,7 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	txTypes := []TxType{
 		StateTx,
 		LegacyTx,
-		DynamicGeeTx,
+		DynamicFeeTx,
 	}
 
 	for _, v := range txTypes {

@@ -19,7 +19,7 @@ type TxType byte
 const (
 	LegacyTx     TxType = 0x0
 	StateTx      TxType = 0x7f
-	DynamicGeeTx TxType = 0x8f
+	DynamicFeeTx TxType = 0x8f
 )
 
 // String returns string representation of the transaction type.
@@ -29,8 +29,8 @@ func (t TxType) String() (s string) {
 		return "LegacyTx"
 	case StateTx:
 		return "StateTx"
-	case DynamicGeeTx:
-		return "DynamicGeeTx"
+	case DynamicFeeTx:
+		return "DynamicFeeTx"
 	default:
 		return "UnknownTX"
 	}

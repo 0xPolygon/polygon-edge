@@ -196,7 +196,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 		switch t.Type {
 		case StateTx:
 			vv.Set(arena.NewBytes((t.From).Bytes()))
-		case DynamicGeeTx:
+		case DynamicFeeTx:
 			// Add EIP-1559 related fields.
 			// For non-dynamic-fee-tx gas price is used.
 			vv.Set(arena.NewBigInt(t.GasFeeCap))
