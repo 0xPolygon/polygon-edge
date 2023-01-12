@@ -885,27 +885,6 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) error {
 	block := fblock.Block
 
-	return b.writeBlockInternal(block, source,
-		func(b *types.Block) ([]*types.Receipt, error) {
-			// Provide the block receipts
-			return fblock.Receipts, nil
-		})
-}
-
-// WriteBlock writes a single block to the local blockchain.
-// It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
-	return b.writeBlockInternal(block, source,
-		func(block *types.Block) ([]*types.Receipt, error) {
-			// Calculate block receipts
-			return b.extractBlockReceipts(block)
-		})
-}
-
-// writeBlockInternal writes a single block to the local blockchain.
-// It doesn't do any kind of verification, only commits the block to the DB
-func (b *Blockchain) writeBlockInternal(block *types.Block, source string,
-	receiptsProvider func(*types.Block) ([]*types.Receipt, error)) error {
 	b.writeLock.Lock()
 	defer b.writeLock.Unlock()
 
@@ -917,7 +896,64 @@ func (b *Blockchain) writeBlockInternal(block *types.Block, source string,
 
 	header := block.Header
 
-	// Write transactions
+	if err := b.writeBody(block); err != nil {
+		return err
+	}
+
+	// Write the header to the chain
+	evnt := &Event{Source: source}
+	if err := b.writeHeaderImpl(evnt, header); err != nil {
+		return err
+	}
+
+	// write the receipts, do it only after the header has been written.
+	// Otherwise, a client might ask for a header once the receipt is valid,
+	// but before it is written into the storage
+	if err := b.db.WriteReceipts(block.Hash(), fblock.Receipts); err != nil {
+		return err
+	}
+
+	// update snapshot
+	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
+		return err
+	}
+
+	b.dispatchEvent(evnt)
+
+	// Update the average gas price
+	b.updateGasPriceAvgWithBlock(block)
+
+	logArgs := []interface{}{
+		"number", header.Number,
+		"txs", len(block.Transactions),
+		"hash", header.Hash,
+		"parent", header.ParentHash,
+	}
+
+	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
+		diff := header.Timestamp - prevHeader.Timestamp
+		logArgs = append(logArgs, "generation_time_in_seconds", diff)
+	}
+
+	b.logger.Info("new block", logArgs...)
+
+	return nil
+}
+
+// WriteBlock writes a single block to the local blockchain.
+// It doesn't do any kind of verification, only commits the block to the DB
+func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
+	b.writeLock.Lock()
+	defer b.writeLock.Unlock()
+
+	if block.Number() <= b.Header().Number {
+		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
+
+		return nil
+	}
+
+	header := block.Header
+
 	if err := b.writeBody(block); err != nil {
 		return err
 	}
@@ -929,19 +965,19 @@ func (b *Blockchain) writeBlockInternal(block *types.Block, source string,
 	}
 
 	// Fetch the block receipts
-	receipts, err := receiptsProvider(block)
-	if err != nil {
-		return err
+	blockReceipts, receiptsErr := b.extractBlockReceipts(block)
+	if receiptsErr != nil {
+		return receiptsErr
 	}
 
-	// Write the receipts, do it only after the header has been written.
+	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	if err := b.db.WriteReceipts(block.Hash(), receipts); err != nil {
+	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
 		return err
 	}
 
-	// Update snapshot
+	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
