@@ -30,13 +30,13 @@ func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
 		}
 		g.MulScalar(signature, signature, p.p)
 	*/
-	messagePoint, err := ellipticcurve.HashToG1(message, GetDomain())
+	messagePoint, err := HashToG107(message)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Signature{
-		p: messagePoint.ScalarMultiplication(&messagePoint, p.p),
+		p: messagePoint.ScalarMultiplication(messagePoint, p.p),
 	}, nil
 }
 

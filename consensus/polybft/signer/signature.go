@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	ellipticcurve "github.com/consensys/gnark-crypto/ecc/bn254"
 )
 
@@ -44,7 +45,7 @@ func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
 			return e
 		}
 	*/
-	messagePoint, err := ellipticcurve.HashToG1(message, GetDomain())
+	messagePoint, err := HashToG107(message)
 	if err != nil {
 		return false
 	}
@@ -53,7 +54,7 @@ func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
 	sigInv.Neg(s.p)
 
 	result, err := ellipticcurve.PairingCheck(
-		[]ellipticcurve.G1Affine{messagePoint, sigInv},
+		[]ellipticcurve.G1Affine{*messagePoint, sigInv},
 		[]ellipticcurve.G2Affine{*publicKey.p, *ellipticCurveG2})
 
 	return err == nil && result
@@ -112,6 +113,20 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 	}
 
 	return &Signature{p: output}, nil
+}
+
+func UnmarshalSignatureFromBigInt(b [2]*big.Int) (*Signature, error) {
+	const size = 32
+
+	var pubKeyBuf []byte
+
+	pt1 := common.PadLeftOrTrim(b[0].Bytes(), size)
+	pt2 := common.PadLeftOrTrim(b[1].Bytes(), size)
+
+	pubKeyBuf = append(pubKeyBuf, pt1...)
+	pubKeyBuf = append(pubKeyBuf, pt2...)
+
+	return UnmarshalSignature(pubKeyBuf)
 }
 
 // ToBigInt marshalls signature (which is point) to 2 big ints - one for each coordinate
