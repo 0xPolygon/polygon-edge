@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -56,8 +57,7 @@ func (p *PublicKey) MarshalJSON() ([]byte, error) {
 func (p *PublicKey) UnmarshalJSON(b []byte) error {
 	var d []byte
 
-	err := json.Unmarshal(b, &d)
-	if err != nil {
+	if err := json.Unmarshal(b, &d); err != nil {
 		return err
 	}
 
@@ -99,6 +99,12 @@ func (p PublicKey) ToBigInt() [4]*big.Int {
 	}
 
 	return res
+}
+
+func (p PublicKey) String() string {
+	return fmt.Sprintf("(%s %s, %s %s)",
+		p.p.X.A0.String(), p.p.X.A1.String(),
+		p.p.Y.A0.String(), p.p.Y.A1.String())
 }
 
 // UnmarshalPublicKeyFromBigInt unmarshals public key from 4 big ints

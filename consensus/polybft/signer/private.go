@@ -14,7 +14,7 @@ type PrivateKey struct {
 // PublicKey returns the public key from the PrivateKey
 func (p *PrivateKey) PublicKey() *PublicKey {
 	public := new(ellipticcurve.G2Affine)
-	public.Set(ellipticCurveG2)
+	public.Set(baseG2)
 	// g2.MulScalar(public, g2.One(), p.p)
 
 	return &PublicKey{p: public.ScalarMultiplication(public, p.p)}
@@ -52,7 +52,10 @@ func (p *PrivateKey) MarshalJSON() ([]byte, error) {
 // UnmarshalPrivateKey reads the private key from the given byte array
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	p := new(big.Int)
-	err := p.UnmarshalJSON(data)
 
-	return &PrivateKey{p: p}, err
+	if err := p.UnmarshalJSON(data); err != nil {
+		return nil, err
+	}
+
+	return &PrivateKey{p: p}, nil
 }

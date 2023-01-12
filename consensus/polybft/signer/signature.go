@@ -3,6 +3,7 @@ package bls
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -55,7 +56,7 @@ func (s *Signature) Verify(publicKey *PublicKey, message []byte) bool {
 
 	result, err := ellipticcurve.PairingCheck(
 		[]ellipticcurve.G1Affine{*messagePoint, sigInv},
-		[]ellipticcurve.G2Affine{*publicKey.p, *ellipticCurveG2})
+		[]ellipticcurve.G2Affine{*publicKey.p, *baseG2})
 
 	return err == nil && result
 }
@@ -142,6 +143,11 @@ func (s Signature) ToBigInt() ([2]*big.Int, error) {
 	}
 
 	return res, nil
+}
+
+func (s Signature) String() string {
+	return fmt.Sprintf("(%s, %s)",
+		s.p.X.String(), s.p.Y.String())
 }
 
 // Signatures is a slice of signatures

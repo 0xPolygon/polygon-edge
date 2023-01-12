@@ -12,20 +12,23 @@ import (
 )
 
 var (
-	maxBigInt, _    = new(big.Int).SetString("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001", 16)
-	ellipticCurveG2 *ellipticcurve.G2Affine
+	maxBigInt, _ = new(big.Int).SetString("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001", 16)
+	baseG2       *ellipticcurve.G2Affine
 
 	r1 = ellipticcurvefp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
 	r2 = ellipticcurvefp.Element{0xf32cfc5b538afa89, 0xb5e71911d44501fb, 0x47ab1eff0a417ff6, 0x06d89f71cab8351f}
 )
 
 func init() {
-	v1, _ := new(big.Int).SetString("10857046999023057135944570762232829481370756359578518086990519993285655852781", 10)
-	v2, _ := new(big.Int).SetString("11559732032986387107991004021392285783925812861821192530917403151452391805634", 10)
-	v3, _ := new(big.Int).SetString("8495653923123431417604973247489272438418190587263600148770280649306958101930", 10)
-	v4, _ := new(big.Int).SetString("4082367875863433681332203403145435568316851327593401208105741076214120093531", 10)
-	pk, _ := UnmarshalPublicKeyFromBigInt([4]*big.Int{v1, v2, v3, v4})
-	ellipticCurveG2 = pk.p
+	g2 := ellipticcurve.G2Jac{}
+	g2.X.A0 = ellipticcurvefp.Element{0x8e83b5d102bc2026, 0xdceb1935497b0172, 0xfbb8264797811adf, 0x19573841af96503b}
+	g2.X.A1 = ellipticcurvefp.Element{0xafb4737da84c6140, 0x6043dd5a5802d8c4, 0x09e950fc52a02f86, 0x14fef0833aea7b6b}
+	g2.Y.A0 = ellipticcurvefp.Element{0x619dfa9d886be9f6, 0xfe7fd297f59e9b78, 0xff9e1a62231b7dfe, 0x28fd7eebae9e4206}
+	g2.Y.A1 = ellipticcurvefp.Element{0x64095b56c71856ee, 0xdc57f922327d3cbb, 0x55f935be33351076, 0x0da4a0e693fd6482}
+	g2.Z.A0 = ellipticcurvefp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
+	g2.Z.A1 = ellipticcurvefp.Element{0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000}
+
+	baseG2 = new(ellipticcurve.G2Affine).FromJacobian(&g2)
 }
 
 // GenerateBlsKey creates a random private and its corresponding public keys
@@ -196,10 +199,7 @@ func from48Bytes(in []byte) (*ellipticcurvefp.Element, error) {
 		0x2e1043978c993ec8,
 	}
 
-	e0 = e0.Mul(e0, &F)
-	e1 = e1.Mul(e1, e0)
-
-	return e1, nil
+	return e1.Add(e1, e0.Mul(e0, &F)), nil
 }
 
 func fpFromBytes(in []byte) (*ellipticcurvefp.Element, error) {
@@ -218,17 +218,15 @@ func fpFromBytes(in []byte) (*ellipticcurvefp.Element, error) {
 
 	copy(padded[size-l:], in[:])
 
-	component := [4]uint64{}
+	fe := ellipticcurvefp.Element{}
 
 	for i := 0; i < 4; i++ {
 		a := size - i*8
-		component[i] = uint64(padded[a-1]) | uint64(padded[a-2])<<8 |
+		fe[i] = uint64(padded[a-1]) | uint64(padded[a-2])<<8 |
 			uint64(padded[a-3])<<16 | uint64(padded[a-4])<<24 |
 			uint64(padded[a-5])<<32 | uint64(padded[a-6])<<40 |
 			uint64(padded[a-7])<<48 | uint64(padded[a-8])<<56
 	}
-
-	fe := ellipticcurvefp.Element{component[0], component[1], component[2], component[3]}
 
 	return fe.Mul(&fe, &r2), nil
 }

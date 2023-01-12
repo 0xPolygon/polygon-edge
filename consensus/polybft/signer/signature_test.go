@@ -21,13 +21,26 @@ func Test_VerifySignature(t *testing.T) {
 	blsKey, err := GenerateBlsKey()
 	require.NoError(t, err)
 
+	blsKey2, err := GenerateBlsKey()
+	require.NoError(t, err)
+
 	publicKey := blsKey.PublicKey()
 
 	signature, err := blsKey.Sign(validTestMsg)
 	require.NoError(t, err)
 
-	assert.True(t, signature.Verify(publicKey, validTestMsg))
-	assert.False(t, signature.Verify(publicKey, invalidTestMsg))
+	oPk, err := UnmarshalPublicKey(publicKey.Marshal())
+	require.NoError(t, err)
+
+	sigBytes, err := signature.Marshal()
+	require.NoError(t, err)
+
+	oSig, err := UnmarshalSignature(sigBytes)
+	require.NoError(t, err)
+
+	assert.True(t, oSig.Verify(oPk, validTestMsg))
+	assert.False(t, oSig.Verify(oPk, invalidTestMsg))
+	assert.False(t, oSig.Verify(blsKey2.PublicKey(), validTestMsg))
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
@@ -83,17 +96,13 @@ func Test_AggregatedSignature(t *testing.T) {
 		}
 	}
 
-	aggSignature := allSignatures.Aggregate()
+	manuallyAggPubs := allPubs[0]
 
-	var manuallyAggPubs *PublicKey
-
-	for i, pubKey := range allPubs {
-		if i == 0 {
-			manuallyAggPubs = pubKey
-		} else {
-			manuallyAggPubs = manuallyAggPubs.aggregate(pubKey)
-		}
+	for _, pubKey := range allPubs[1:] {
+		manuallyAggPubs = manuallyAggPubs.aggregate(pubKey)
 	}
+
+	aggSignature := allSignatures.Aggregate()
 
 	verifed := manuallyAggSignature.Verify(manuallyAggPubs, validTestMsg)
 	assert.True(t, verifed)
