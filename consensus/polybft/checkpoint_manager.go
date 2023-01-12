@@ -277,7 +277,7 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 }
 
 // PostEpoch notifies the checkpoint manager that an epoch has changed,
-// so that it can discard any previous epoch commitments, and build a new one (since validator set changed)
+// so that it can update any exit events that happened in the epoch ending block of the previous epoch
 func (c *checkpointManager) PostEpoch(req *PostEpochRequest) error {
 	// update any exit events that happened in the last block of previous epoch and move them to the current one
 	// this is done to make sure we know they are finalized properly
