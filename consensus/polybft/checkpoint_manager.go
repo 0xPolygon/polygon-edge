@@ -35,6 +35,30 @@ var (
 	defaultCheckpointsOffset = uint64(900)
 )
 
+type CheckpointManager interface {
+	PostBlock(req *PostBlockRequest) error
+	PostEpoch(req *PostEpochRequest) error
+	IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool
+	SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error
+	SetLatestCheckpointID(checkpointNumber uint64)
+}
+
+var _ CheckpointManager = (*dummyCheckpointManager)(nil)
+
+type dummyCheckpointManager struct{}
+
+func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyCheckpointManager) PostEpoch(req *PostEpochRequest) error { return nil }
+func (d *dummyCheckpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
+	return false
+}
+func (d *dummyCheckpointManager) SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error {
+	return nil
+}
+func (d *dummyCheckpointManager) SetLatestCheckpointID(checkpointNumber uint64) {}
+
+var _ CheckpointManager = (*checkpointManager)(nil)
+
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
 	// key is the identity of the node submitting a checkpoint
@@ -98,8 +122,13 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	return latestCheckpointBlockNum, nil
 }
 
-// submitCheckpoint sends a transaction with checkpoint data to the rootchain
-func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
+// SetLatestCheckpointID sets the latestCheckpointID field
+func (c *checkpointManager) SetLatestCheckpointID(checkpointNumber uint64) {
+	c.latestCheckpointID = checkpointNumber
+}
+
+// SubmitCheckpoint sends a transaction with checkpoint data to the rootchain
+func (c *checkpointManager) SubmitCheckpoint(latestHeader *types.Header, isEndOfEpoch bool) error {
 	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
@@ -158,7 +187,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 			continue
 		}
 
-		if err = c.encodeAndSendCheckpoint(txn, *parentHeader, *parentExtra, true); err != nil {
+		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
 			return err
 		}
 
@@ -176,13 +205,13 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 		}
 	}
 
-	return c.encodeAndSendCheckpoint(txn, latestHeader, *currentExtra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(txn, latestHeader, currentExtra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
 func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
-	header types.Header, extra Extra, isEndOfEpoch bool) error {
+	header *types.Header, extra *Extra, isEndOfEpoch bool) error {
 	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
 
 	nextEpochValidators := AccountSet{}
@@ -220,7 +249,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 }
 
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra Extra,
+func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra *Extra,
 	nextValidators AccountSet) ([]byte, error) {
 	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
 	if err != nil {
@@ -252,10 +281,11 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 	return submitCheckpointMethod.Encode(params)
 }
 
-// isCheckpointBlock returns true for blocks in the middle of the epoch
+// IsCheckpointBlock returns true for blocks in the middle of the epoch
 // which are offset by predefined count of blocks
-func (c *checkpointManager) isCheckpointBlock(blockNumber uint64) bool {
-	return blockNumber == c.latestCheckpointID+c.checkpointsOffset
+// or if given block is an epoch ending block
+func (c *checkpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
+	return isEpochEndingBlock || blockNumber == c.latestCheckpointID+c.checkpointsOffset
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
