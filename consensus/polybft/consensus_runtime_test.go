@@ -224,8 +224,9 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			Number:            currentEpochNumber,
 			FirstBlockInEpoch: header.Number - epochSize + 1,
 		},
-		lastBuiltBlock:   &types.Header{Number: header.Number - 1},
-		stateSyncManager: &dummyStateSyncManager{},
+		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
+		stateSyncManager:  &dummyStateSyncManager{},
+		checkpointManager: &checkpointManager{state: config.State},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
