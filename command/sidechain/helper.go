@@ -28,6 +28,8 @@ const (
 var (
 	getDelegatorRewardMethod, _ = abi.NewMethod(
 		"getDelegatorReward(address validator, address delegator) returns (uint256)")
+	getValidatorRewardMethod, _ = abi.NewMethod(
+		"getValidatorReward(address validator) returns (uint256)")
 )
 
 func CheckIfDirectoryExist(dir string) error {
@@ -105,4 +107,26 @@ func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address
 	}
 
 	return delegatorReward, nil
+}
+
+// GetDelegatorReward queries delegator reward for given validator address
+func GetValidatorReward(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*big.Int, error) {
+	input, err := getValidatorRewardMethod.Encode([]interface{}{validatorAddr})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode input parameters for getDelegatorReward fn: %w", err)
+	}
+
+	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
+		ethgo.Address(contracts.ValidatorSetContract), input)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorReward, err := types.ParseUint256orHex(&response)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode hex response, %w", err)
+	}
+
+	return validatorReward, nil
 }

@@ -149,6 +149,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Block Number=%d\n", block.Number)
 
+	// unmarshal header extra data
 	extra, err := polybft.GetIbftExtra(block.ExtraData)
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
@@ -293,4 +294,90 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	// assert that delegator doesn't receive any rewards
 	_, delegatorReward = getDelegatorInfo(15)
 	require.Equal(t, big.NewInt(0), delegatorReward)
+}
+
+func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithEpochReward(10000),
+		framework.WithEpochSize(5),
+		framework.WithPremineValidators("10000000000000000000")) // 10 native tokens
+	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
+	srv := cluster.Servers[0]
+
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	systemState := polybft.NewSystemState(
+		&polybft.PolyBFTConfig{
+			StateReceiverAddr: contracts.StateReceiverContract,
+			ValidatorSetAddr:  contracts.ValidatorSetContract},
+		&e2eStateProvider{txRelayer: txRelayer})
+
+	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecrets)
+	require.NoError(t, err)
+
+	// wait for one epoch to accumulate validator rewards
+	require.NoError(t, cluster.WaitForBlock(5, 20*time.Second))
+
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), txRelayer)
+	require.NoError(t, err)
+
+	stake := validatorInfo["totalStake"].(*big.Int) //nolint:forcetypeassert
+	t.Logf("Validator start stake=%s\n", stake.String())
+
+	// unstake entire balance (which should remove validator from the validator set in next epoch)
+	require.NoError(t, srv.Unstake(stake.Uint64()))
+
+	// wait end of epoch
+	require.NoError(t, cluster.WaitForBlock(10, 40*time.Second))
+
+	validatorSet, err := systemState.GetValidatorSet()
+	require.NoError(t, err)
+
+	// assert that validator isn't present in new validator set
+	require.Equal(t, 4, validatorSet.Len())
+
+	validatorInfo, err = sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(), txRelayer)
+	require.NoError(t, err)
+
+	reward := validatorInfo["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
+	require.Greater(t, reward.Uint64(), uint64(0))
+	t.Logf("Withdrawable reward=%d\n", reward)
+
+	reward, err = sidechain.GetValidatorReward(validatorAcc.Ecdsa.Address(), txRelayer)
+	require.NoError(t, err)
+	t.Logf("Validator reward=%s\n (GetValidatorReward)", reward)
+
+	balance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
+	require.NoError(t, err)
+	t.Logf("Validator balance (before withdrawal)=%s\n", balance)
+
+	// withdraw all the funds
+	require.NoError(t, cluster.Servers[1].Withdraw(validatorSecrets, validatorAcc.Ecdsa.Address()))
+
+	require.NoError(t, cluster.WaitForBlock(21, 40*time.Second))
+
+	balance, err = srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
+	require.NoError(t, err)
+	t.Logf("Validator balance (after withdrawal)=%s\n", balance)
+
+	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
+	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
+
+	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
+	rootchainValidators, err := getRootchainValidators(l1Relayer, checkpointManagerAddr, rootchainSender)
+	require.NoError(t, err)
+
+	for _, validator := range rootchainValidators {
+		if validator.address == validatorAcc.Ecdsa.Address() {
+			t.Fatalf("not expected to find validator %v in the current validator set", validator.address)
+		}
+	}
 }

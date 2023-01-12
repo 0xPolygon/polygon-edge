@@ -495,12 +495,6 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifa
 	}, key)
 }
 
-type validatorInfo struct {
-	address    ethgo.Address
-	rewards    *big.Int
-	totalStake *big.Int
-}
-
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	const (
 		finalBlockNumber   = 20
