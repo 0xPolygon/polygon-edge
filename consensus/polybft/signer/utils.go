@@ -5,30 +5,49 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"math/big"
 
-	ellipticcurve "github.com/consensys/gnark-crypto/ecc/bn254"
-	ellipticcurvefp "github.com/consensys/gnark-crypto/ecc/bn254/fp"
+	"github.com/consensys/gnark-crypto/ecc/bn254"
+	"github.com/consensys/gnark-crypto/ecc/bn254/fp"
 )
 
 var (
 	maxBigInt, _ = new(big.Int).SetString("30644e72e131a029b85045b68181585d2833e84879b9709143e1f593f0000001", 16)
-	baseG2       *ellipticcurve.G2Affine
+	baseG2       *bn254.G2Affine
 
-	r1 = ellipticcurvefp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
-	r2 = ellipticcurvefp.Element{0xf32cfc5b538afa89, 0xb5e71911d44501fb, 0x47ab1eff0a417ff6, 0x06d89f71cab8351f}
+	// fpR1 = fp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
+	fpR2 = fp.Element{0xf32cfc5b538afa89, 0xb5e71911d44501fb, 0x47ab1eff0a417ff6, 0x06d89f71cab8351f}
+
+	// b coefficient for G1
+	fpBCoef = fp.Element{0x7a17caa950ad28d7, 0x1f6ac17ae15521b9, 0x334bea4e696bd284, 0x2a1f6744ce179d8e}
+
+	// sqrt(-3)
+	fpSqrtMinus3 = fp.Element{0x3e424383c39ad5b9, 0x28ed3f00245fdc6a, 0x4a2e7e8c1e5ebdfa, 0x05b858f624573163}
+
+	// (sqrt(-3) - 1) / 2
+	fpZZ = fp.Element{0x71930c11d782e155, 0xa6bb947cffbe3323, 0xaa303344d4741444, 0x2c3b3f0d26594943}
+
+	fpOne = fp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
+
+	// -1
+	fpNegativeOne = fp.Element{0x68c3488912edefaa, 0x8d087f6872aabf4f, 0x51e1a24709081231, 0x2259d6b14729c0fa}
+
+	bigPMinus1Over2, _ = new(big.Int).SetString("183227397098d014dc2822db40c0ac2ecbc0b548b438e5469e10460b6c3e7ea3", 16)
+
+	bigPPlus1Over4, _ = new(big.Int).SetString("c19139cb84c680a6e14116da060561765e05aa45a1c72a34f082305b61f3f52", 16)
 )
 
 func init() {
-	g2 := ellipticcurve.G2Jac{}
-	g2.X.A0 = ellipticcurvefp.Element{0x8e83b5d102bc2026, 0xdceb1935497b0172, 0xfbb8264797811adf, 0x19573841af96503b}
-	g2.X.A1 = ellipticcurvefp.Element{0xafb4737da84c6140, 0x6043dd5a5802d8c4, 0x09e950fc52a02f86, 0x14fef0833aea7b6b}
-	g2.Y.A0 = ellipticcurvefp.Element{0x619dfa9d886be9f6, 0xfe7fd297f59e9b78, 0xff9e1a62231b7dfe, 0x28fd7eebae9e4206}
-	g2.Y.A1 = ellipticcurvefp.Element{0x64095b56c71856ee, 0xdc57f922327d3cbb, 0x55f935be33351076, 0x0da4a0e693fd6482}
-	g2.Z.A0 = ellipticcurvefp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
-	g2.Z.A1 = ellipticcurvefp.Element{0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000}
+	g2 := bn254.G2Jac{}
+	g2.X.A0 = fp.Element{0x8e83b5d102bc2026, 0xdceb1935497b0172, 0xfbb8264797811adf, 0x19573841af96503b}
+	g2.X.A1 = fp.Element{0xafb4737da84c6140, 0x6043dd5a5802d8c4, 0x09e950fc52a02f86, 0x14fef0833aea7b6b}
+	g2.Y.A0 = fp.Element{0x619dfa9d886be9f6, 0xfe7fd297f59e9b78, 0xff9e1a62231b7dfe, 0x28fd7eebae9e4206}
+	g2.Y.A1 = fp.Element{0x64095b56c71856ee, 0xdc57f922327d3cbb, 0x55f935be33351076, 0x0da4a0e693fd6482}
+	g2.Z.A0 = fp.Element{0xd35d438dc58f0d9d, 0x0a78eb28f5c70b3d, 0x666ea36f7879462c, 0x0e0a77c19a07df2f}
+	g2.Z.A1 = fp.Element{0x0000000000000000, 0x0000000000000000, 0x0000000000000000, 0x0000000000000000}
 
-	baseG2 = new(ellipticcurve.G2Affine).FromJacobian(&g2)
+	baseG2 = new(bn254.G2Affine).FromJacobian(&g2)
 }
 
 // GenerateBlsKey creates a random private and its corresponding public keys
@@ -70,7 +89,7 @@ func MarshalMessageToBigInt(message []byte) ([2]*big.Int, error) {
 
 	var b bytes.Buffer
 
-	if err := ellipticcurve.NewEncoder(&b, ellipticcurve.RawEncoding()).Encode(pg1); err != nil {
+	if err := bn254.NewEncoder(&b, bn254.RawEncoding()).Encode(pg1); err != nil {
 		return [2]*big.Int{}, err
 	}
 
@@ -83,25 +102,39 @@ func MarshalMessageToBigInt(message []byte) ([2]*big.Int, error) {
 }
 
 // HashToG107 converts message to G1 point https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-07
-func HashToG107(message []byte) (*ellipticcurve.G1Affine, error) {
+func HashToG107(message []byte) (*bn254.G1Affine, error) {
 	hashRes, err := hashToFpXMDSHA256(message, GetDomain(), 2)
 	if err != nil {
 		return nil, err
 	}
 
-	p0 := ellipticcurve.MapToG1(hashRes[0])
-	p1 := ellipticcurve.MapToG1(hashRes[1])
+	p0, err := mapToPointFT(&hashRes[0])
+	if err != nil {
+		return nil, err
+	}
 
-	return p0.Add(&p0, &p1), nil
+	p1, err := mapToPointFT(&hashRes[1])
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(p0.String())
+	fmt.Println(p1.String())
+
+	p0.Add(p0, p1)
+
+	fmt.Println(p0.String())
+
+	return p0, nil
 }
 
-func hashToFpXMDSHA256(msg []byte, domain []byte, count int) ([]ellipticcurvefp.Element, error) {
+func hashToFpXMDSHA256(msg []byte, domain []byte, count int) ([]fp.Element, error) {
 	randBytes, err := expandMsgSHA256XMD(msg, domain, count*48)
 	if err != nil {
 		return nil, err
 	}
 
-	els := make([]ellipticcurvefp.Element, count)
+	els := make([]fp.Element, count)
 
 	for i := 0; i < count; i++ {
 		value, err := from48Bytes(randBytes[i*48 : (i+1)*48])
@@ -170,7 +203,116 @@ func expandMsgSHA256XMD(msg []byte, domain []byte, outLen int) ([]byte, error) {
 	return out[:outLen], nil
 }
 
-func from48Bytes(in []byte) (*ellipticcurvefp.Element, error) {
+// MapToPointTI applies Fouque Tibouchi map to point method
+func mapToPointFT(t *fp.Element) (*bn254.G1Affine, error) {
+	g1J := bn254.G1Jac{}
+
+	a, t2, w := fp.Element{}, fp.Element{}, fp.Element{}
+
+	// t^2 + fpBCoef + fpOne // 	a.Add(w.Add(t2.Square(t), &fpBCoef), &fpOne)
+	t2.Square(t)
+	a.Add(&t2, &fpBCoef)
+	a.Add(&a, &fpOne)
+
+	st := fp.Element{}
+	st.Mul(&fpSqrtMinus3, t)
+
+	w0 := fp.Element{}
+	w0.Mul(&st, &a)
+	w0.Inverse(&w0)
+
+	w.Square(&st)
+	w.Mul(&w, &w0)
+
+	e := fp.Element{}
+	isQuadraticNonResidue := !e.Exp(*t, bigPMinus1Over2).IsOne()
+
+	// x1 = fpZZ - t * w
+	tw, x1 := fp.Element{}, fp.Element{}
+	x1.Sub(&fpZZ, tw.Mul(t, &w))
+
+	y := fp.Element{}
+	y.Square(&x1)
+	y.Mul(&y, &x1)
+	y.Add(&y, &fpBCoef)
+
+	if customSqrt(&y, &y) {
+		if isQuadraticNonResidue {
+			y.Neg(&y)
+		}
+
+		g1J.X = x1
+		g1J.Y = y
+		g1J.Z = fpOne
+
+		return new(bn254.G1Affine).FromJacobian(&g1J), nil
+	}
+
+	// x2
+	x2 := fp.Element{}
+	x2.Sub(&fpNegativeOne, &x1)
+
+	y.Square(&x2)
+	y.Mul(&y, &x2)
+	y.Add(&y, &fpBCoef)
+
+	if customSqrt(&y, &y) {
+		if isQuadraticNonResidue {
+			y.Neg(&y)
+		}
+
+		g1J.X = x2
+		g1J.Y = y
+		g1J.Z = fpOne
+
+		return new(bn254.G1Affine).FromJacobian(&g1J), nil
+	}
+
+	// x3
+	x3 := fp.Element{}
+	x3.Square(&a)
+	x3.Square(&x3)
+	x3.Mul(&x3, &w0)
+	x3.Mul(&x3, &w0)
+	x3.Add(&x3, &fpOne)
+
+	y.Square(&x3)
+	y.Mul(&y, &x3)
+	y.Add(&y, &fpBCoef)
+
+	if !customSqrt(&y, &y) {
+		return nil, errors.New("bad implementation")
+	}
+
+	if isQuadraticNonResidue {
+		y.Neg(&y)
+	}
+
+	g1J.X = x3
+	g1J.Y = y
+	g1J.Z = fpOne
+
+	return new(bn254.G1Affine).FromJacobian(&g1J), nil
+}
+
+func customSqrt(c, a *fp.Element) bool {
+	// if sqrt(y, y) {
+	// func sqrt(c, a *fe) bool {
+	// 	u, v := new(fe).set(a), new(fe)
+	// 	exp(c, a, pPlus1Over4)
+	// 	square(v, c)
+	// 	return u.equal(v)
+	// }
+	u, v := fp.Element{}, fp.Element{}
+
+	u.Set(a)
+	c.Exp(*a, bigPPlus1Over4)
+	v.Square(c)
+
+	return u.Equal(&v)
+}
+
+func from48Bytes(in []byte) (*fp.Element, error) {
 	if len(in) != 48 {
 		return nil, errors.New("input string should be equal 48 bytes")
 	}
@@ -192,7 +334,7 @@ func from48Bytes(in []byte) (*ellipticcurvefp.Element, error) {
 	}
 
 	// F = 2 ^ 192 * R
-	F := ellipticcurvefp.Element{
+	F := fp.Element{
 		0xd9e291c2cdd22cd6,
 		0xc722ccf2a40f0271,
 		0xa49e35d611a2ac87,
@@ -202,7 +344,7 @@ func from48Bytes(in []byte) (*ellipticcurvefp.Element, error) {
 	return e1.Add(e1, e0.Mul(e0, &F)), nil
 }
 
-func fpFromBytes(in []byte) (*ellipticcurvefp.Element, error) {
+func fpFromBytes(in []byte) (*fp.Element, error) {
 	const size = 32
 
 	if len(in) != size {
@@ -218,7 +360,7 @@ func fpFromBytes(in []byte) (*ellipticcurvefp.Element, error) {
 
 	copy(padded[size-l:], in[:])
 
-	fe := ellipticcurvefp.Element{}
+	fe := fp.Element{}
 
 	for i := 0; i < 4; i++ {
 		a := size - i*8
@@ -228,5 +370,5 @@ func fpFromBytes(in []byte) (*ellipticcurvefp.Element, error) {
 			uint64(padded[a-7])<<48 | uint64(padded[a-8])<<56
 	}
 
-	return fe.Mul(&fe, &r2), nil
+	return fe.Mul(&fe, &fpR2), nil
 }
