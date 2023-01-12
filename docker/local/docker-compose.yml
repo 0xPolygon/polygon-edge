@@ -17,25 +17,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command:
-      [
-        "server",
-        "--data-dir",
-        "/data",
-        "--chain",
-        "/genesis/genesis.json",
-        "--grpc-address",
-        "0.0.0.0:9632",
-        "--libp2p",
-        "0.0.0.0:1478",
-        "--jsonrpc",
-        "0.0.0.0:8545",
-        "--prometheus",
-        "0.0.0.0:5001",
-        "--seal",
-        "--log-level",
-        "DEBUG"
-      ]
+    command: ["server", "--data-dir", "/data/data-1", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -53,25 +35,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command:
-      [
-        "server",
-        "--data-dir",
-        "/data",
-        "--chain",
-        "/genesis/genesis.json",
-        "--grpc-address",
-        "0.0.0.0:9632",
-        "--libp2p",
-        "0.0.0.0:1478",
-        "--jsonrpc",
-        "0.0.0.0:8545",
-        "--prometheus",
-        "0.0.0.0:5001",
-        "--seal",
-        "--log-level",
-        "DEBUG"
-      ]
+    command: ["server", "--data-dir", "/data/data-2", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -89,25 +53,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command:
-      [
-        "server",
-        "--data-dir",
-        "/data",
-        "--chain",
-        "/genesis/genesis.json",
-        "--grpc-address",
-        "0.0.0.0:9632",
-        "--libp2p",
-        "0.0.0.0:1478",
-        "--jsonrpc",
-        "0.0.0.0:8545",
-        "--prometheus",
-        "0.0.0.0:5001",
-        "--seal",
-        "--log-level",
-        "DEBUG"
-      ]
+    command: ["server", "--data-dir", "/data/data-3", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -125,25 +71,7 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
-    command:
-      [
-        "server",
-        "--data-dir",
-        "/data",
-        "--chain",
-        "/genesis/genesis.json",
-        "--grpc-address",
-        "0.0.0.0:9632",
-        "--libp2p",
-        "0.0.0.0:1478",
-        "--jsonrpc",
-        "0.0.0.0:8545",
-        "--prometheus",
-        "0.0.0.0:5001",
-        "--seal",
-        "--log-level",
-        "DEBUG"
-      ]
+    command: ["server", "--data-dir", "/data/data-4", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
         condition: service_completed_successfully

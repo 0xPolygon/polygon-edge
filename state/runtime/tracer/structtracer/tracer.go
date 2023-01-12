@@ -143,7 +143,7 @@ func (t *StructTracer) CaptureState(
 
 	t.captureMemory(memory)
 
-	t.captureStack(stack)
+	t.captureStack(stack, sp)
 
 	t.captureStorage(
 		stack,
@@ -169,14 +169,19 @@ func (t *StructTracer) captureMemory(
 
 func (t *StructTracer) captureStack(
 	stack []*big.Int,
+	sp int,
 ) {
 	if !t.Config.EnableStack {
 		return
 	}
 
-	t.currentStack = make([]*big.Int, len(stack))
+	t.currentStack = make([]*big.Int, sp)
 
 	for i, v := range stack {
+		if i >= sp {
+			break
+		}
+
 		t.currentStack[i] = new(big.Int).Set(v)
 	}
 }
