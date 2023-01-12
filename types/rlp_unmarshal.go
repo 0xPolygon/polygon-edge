@@ -313,10 +313,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	p.Hash(t.Hash[:0], v)
 
 	// Setup defaults
-	t.Type = LegacyTx
 	t.GasPrice = new(big.Int)
-	t.GasFeeCap = new(big.Int)
-	t.GasTipCap = new(big.Int)
 	t.Value = new(big.Int)
 	t.V = new(big.Int)
 	t.R = new(big.Int)
@@ -394,6 +391,9 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			if len(elems) != 12 {
 				return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 12 but found %d", v.Len())
 			}
+
+			t.GasFeeCap = new(big.Int)
+			t.GasTipCap = new(big.Int)
 
 			// gasFeeCap
 			if err = elems[10].GetBigInt(t.GasFeeCap); err != nil {
