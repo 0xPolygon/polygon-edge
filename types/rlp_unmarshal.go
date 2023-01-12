@@ -320,90 +320,80 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	t.From = ZeroAddress
 
 	// Type
-	i := 0
-	if t.Type, err = ReadRlpTxType(v.Get(i)); err != nil {
+	if t.Type, err = ReadRlpTxType(v.Get(0)); err != nil {
 		return err
 	}
 
 	// nonce
-	i++
-	if t.Nonce, err = v.Get(i).GetUint64(); err != nil {
+	if t.Nonce, err = v.Get(1).GetUint64(); err != nil {
 		return err
 	}
 
 	// gasPrice
-	i++
-	if err = v.Get(i).GetBigInt(t.GasPrice); err != nil {
+	if err = v.Get(2).GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
 
-	if t.Type == DynamicGeeTx {
-		// gasFeeCap
-		i++
-		if err = v.Get(i).GetBigInt(t.GasFeeCap); err != nil {
-			return err
-		}
-
-		// gasTipCap
-		i++
-		if err = v.Get(i).GetBigInt(t.GasTipCap); err != nil {
-			return err
-		}
-	}
-
 	// gas
-	i++
-	if t.Gas, err = v.Get(i).GetUint64(); err != nil {
+	if t.Gas, err = v.Get(3).GetUint64(); err != nil {
 		return err
 	}
 
 	// to
-	i++
-	if vv, _ := v.Get(i).Bytes(); len(vv) == 20 {
+	if vv, _ := v.Get(4).Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
 		t.To = &addr
 	}
 
 	// value
-	i++
-	if err = v.Get(i).GetBigInt(t.Value); err != nil {
+	if err = v.Get(5).GetBigInt(t.Value); err != nil {
 		return err
 	}
 
 	// input
-	i++
-	if t.Input, err = v.Get(i).GetBytes(t.Input[:0]); err != nil {
+	if t.Input, err = v.Get(6).GetBytes(t.Input[:0]); err != nil {
 		return err
 	}
 
 	// V
-	i++
-	if err = v.Get(i).GetBigInt(t.V); err != nil {
+	if err = v.Get(7).GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
-	i++
-	if err = v.Get(i).GetBigInt(t.R); err != nil {
+	if err = v.Get(8).GetBigInt(t.R); err != nil {
 		return err
 	}
 
 	// S
-	i++
-	if err = v.Get(i).GetBigInt(t.S); err != nil {
+	if err = v.Get(9).GetBigInt(t.S); err != nil {
 		return err
 	}
 
-	if t.Type == StateTx {
+	switch t.Type {
+	case StateTx:
 		// We need to set From field for state transaction,
 		// because we are using unique, predefined address, for sending such transactions
 		// From
-		i++
-		if vv, err := v.Get(i).Bytes(); err == nil && len(vv) == AddressLength {
+		if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
 			// address
 			addr := BytesToAddress(vv)
 			t.From = addr
+		}
+	case DynamicGeeTx:
+		if v.Len() != 11 {
+			return fmt.Errorf("incorrect number of elements to decode dynamic fee transaction, expected 11 but found %d", v.Len())
+		}
+
+		// gasFeeCap
+		if err = v.Get(10).GetBigInt(t.GasFeeCap); err != nil {
+			return err
+		}
+
+		// gasTipCap
+		if err = v.Get(11).GetBigInt(t.GasTipCap); err != nil {
+			return err
 		}
 	}
 

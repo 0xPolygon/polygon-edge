@@ -175,14 +175,6 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(arena.NewUint(t.Nonce))
 	vv.Set(arena.NewBigInt(t.GasPrice))
-
-	// Add EIP-1559 related fields.
-	// For non-dynamic-fee-tx gas price is used.
-	if t.Type == DynamicGeeTx {
-		vv.Set(arena.NewBigInt(t.GasFeeCap))
-		vv.Set(arena.NewBigInt(t.GasTipCap))
-	}
-
 	vv.Set(arena.NewUint(t.Gas))
 
 	// Address may be empty
@@ -200,8 +192,14 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBigInt(t.R))
 	vv.Set(arena.NewBigInt(t.S))
 
-	if t.Type == StateTx {
+	switch t.Type {
+	case StateTx:
 		vv.Set(arena.NewBytes((t.From).Bytes()))
+	case DynamicGeeTx:
+		// Add EIP-1559 related fields.
+		// For non-dynamic-fee-tx gas price is used.
+		vv.Set(arena.NewBigInt(t.GasFeeCap))
+		vv.Set(arena.NewBigInt(t.GasTipCap))
 	}
 
 	return vv
