@@ -295,31 +295,15 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), 5, types.ZeroAddress,
 		nil, nil, nil, hclog.NewNullLogger(), state)
 
-	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
-		req.IsEpochEndingBlock = false
-		require.NoError(t, checkpointManager.PostBlock(req))
+	require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
-			return exitEvent.BlockNumber == block
-		})
-
-		require.NoError(t, err)
-		require.Len(t, exitEvents, numOfReceipts)
-		require.Equal(t, uint64(epoch), exitEvents[0].EpochNumber)
+	exitEvents, err := state.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		return exitEvent.BlockNumber == block
 	})
 
-	t.Run("PostBlock - epoch ending block (exit events are saved to the next epoch)", func(t *testing.T) {
-		req.IsEpochEndingBlock = true
-		require.NoError(t, checkpointManager.PostBlock(req))
-
-		exitEvents, err := state.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
-			return exitEvent.BlockNumber == block
-		})
-
-		require.NoError(t, err)
-		require.Len(t, exitEvents, numOfReceipts)
-		require.Equal(t, uint64(epoch+1), exitEvents[0].EpochNumber)
-	})
+	require.NoError(t, err)
+	require.Len(t, exitEvents, numOfReceipts)
+	require.Equal(t, uint64(epoch), exitEvents[0].EpochNumber)
 }
 
 func TestPerformExit(t *testing.T) {

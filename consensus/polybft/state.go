@@ -398,34 +398,82 @@ func (s *State) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEve
 	})
 }
 
-// getExitEvents returns exit events for given epoch and provided filter
-func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
-	var events []*ExitEvent
+// updateExitEvents updates the exit events that happened in given block and old epoch to the provided new epoch
+// that means their key in db changes, so we have to remove the old event and reinsert the new one
+func (s *State) updateExitEvents(blockNumber, oldEpoch, newEpoch uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		exitEvents, err := getExitEvents(tx, oldEpoch, func(exitEvent *ExitEvent) bool {
+			return exitEvent.BlockNumber == blockNumber
+		})
 
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(exitEventsBucket).Cursor()
-		prefix := itob(epoch)
+		if err != nil {
+			return err
+		}
 
-		for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			var event *ExitEvent
-			if err := json.Unmarshal(v, &event); err != nil {
+		bucket := tx.Bucket(exitEventsBucket)
+
+		for _, e := range exitEvents {
+			oldKey := bytes.Join([][]byte{itob(e.EpochNumber),
+				itob(e.ID), itob(e.BlockNumber)}, nil)
+
+			if err := bucket.Delete(oldKey); err != nil {
+				// remove old event
 				return err
 			}
 
-			if filter(event) {
-				events = append(events, event)
+			e.EpochNumber = newEpoch
+			if err := insertExitEventToBucket(bucket, e); err != nil {
+				// insert updated event because its key changed
+				return err
 			}
 		}
 
 		return nil
 	})
+}
+
+// getExitEvents returns exit events for given epoch and provided filter
+func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
+	var events []*ExitEvent
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		exitEvents, err := getExitEvents(tx, epoch, filter)
+
+		if err != nil {
+			return err
+		}
+
+		events = exitEvents
+
+		return nil
+	})
+
+	return events, err
+}
+
+func getExitEvents(tx *bolt.Tx, epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
+	c := tx.Bucket(exitEventsBucket).Cursor()
+	prefix := itob(epoch)
+
+	var events []*ExitEvent
+
+	for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
+		var event *ExitEvent
+		if err := json.Unmarshal(v, &event); err != nil {
+			return nil, err
+		}
+
+		if filter(event) {
+			events = append(events, event)
+		}
+	}
 
 	// enforce sequential order
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].ID < events[j].ID
 	})
 
-	return events, err
+	return events, nil
 }
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
