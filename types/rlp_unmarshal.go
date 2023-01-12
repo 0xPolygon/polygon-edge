@@ -310,6 +310,16 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return fmt.Errorf("incorrect number of elements to decode transaction, expected 10 but found %d", len(elems))
 	}
 
+	// Setup defaults
+	t.GasPrice = new(big.Int)
+	t.GasFeeCap = new(big.Int)
+	t.GasTipCap = new(big.Int)
+	t.Value = new(big.Int)
+	t.V = new(big.Int)
+	t.R = new(big.Int)
+	t.S = new(big.Int)
+	t.From = ZeroAddress
+
 	p.Hash(t.Hash[:0], v)
 
 	// Type
@@ -326,7 +336,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// gasPrice
 	i++
-	t.GasPrice = new(big.Int)
 	if err = v.Get(i).GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
@@ -334,14 +343,12 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if t.Type == DynamicGeeTx {
 		// gasFeeCap
 		i++
-		t.GasFeeCap = new(big.Int)
 		if err = v.Get(i).GetBigInt(t.GasFeeCap); err != nil {
 			return err
 		}
 
 		// gasTipCap
 		i++
-		t.GasTipCap = new(big.Int)
 		if err = v.Get(i).GetBigInt(t.GasTipCap); err != nil {
 			return err
 		}
@@ -355,7 +362,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// to
 	i++
-	t.To = nil
 	if vv, _ := v.Get(i).Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
@@ -364,7 +370,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// value
 	i++
-	t.Value = new(big.Int)
 	if err = v.Get(i).GetBigInt(t.Value); err != nil {
 		return err
 	}
@@ -377,21 +382,18 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// V
 	i++
-	t.V = new(big.Int)
 	if err = v.Get(i).GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
 	i++
-	t.R = new(big.Int)
 	if err = v.Get(i).GetBigInt(t.R); err != nil {
 		return err
 	}
 
 	// S
 	i++
-	t.S = new(big.Int)
 	if err = v.Get(i).GetBigInt(t.S); err != nil {
 		return err
 	}
@@ -401,7 +403,6 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// because we are using unique, predefined address, for sending such transactions
 		// From
 		i++
-		t.From = ZeroAddress
 		if vv, err := v.Get(i).Bytes(); err == nil && len(vv) == AddressLength {
 			// address
 			addr := BytesToAddress(vv)
