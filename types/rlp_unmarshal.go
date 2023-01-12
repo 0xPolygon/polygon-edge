@@ -197,7 +197,7 @@ func (r *Receipt) UnmarshalRLP(input []byte) error {
 	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
 }
 
-// UnmarshalRLP unmarshals a Receipt in RLP format
+// UnmarshalRLPFrom unmarshals a Receipt in RLP format
 func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
@@ -306,79 +306,106 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	if len(elems) < 9 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", len(elems))
+	if len(elems) < 10 {
+		return fmt.Errorf("incorrect number of elements to decode transaction, expected 10 but found %d", len(elems))
 	}
 
 	p.Hash(t.Hash[:0], v)
 
+	// Type
+	i := 0
+	if t.Type, err = ReadRlpTxType(v.Get(i)); err != nil {
+		return err
+	}
+
 	// nonce
-	if t.Nonce, err = elems[0].GetUint64(); err != nil {
+	i++
+	if t.Nonce, err = v.Get(i).GetUint64(); err != nil {
 		return err
 	}
+
 	// gasPrice
+	i++
 	t.GasPrice = new(big.Int)
-	if err := elems[1].GetBigInt(t.GasPrice); err != nil {
+	if err = v.Get(i).GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
+
+	if t.Type == DynamicGeeTx {
+		// gasFeeCap
+		i++
+		t.GasFeeCap = new(big.Int)
+		if err = v.Get(i).GetBigInt(t.GasFeeCap); err != nil {
+			return err
+		}
+
+		// gasTipCap
+		i++
+		t.GasTipCap = new(big.Int)
+		if err = v.Get(i).GetBigInt(t.GasTipCap); err != nil {
+			return err
+		}
+	}
+
 	// gas
-	if t.Gas, err = elems[2].GetUint64(); err != nil {
+	i++
+	if t.Gas, err = v.Get(i).GetUint64(); err != nil {
 		return err
 	}
+
 	// to
-	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
+	i++
+	t.To = nil
+	if vv, _ := v.Get(i).Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
 		t.To = &addr
-	} else {
-		// reset To
-		t.To = nil
 	}
+
 	// value
+	i++
 	t.Value = new(big.Int)
-	if err := elems[4].GetBigInt(t.Value); err != nil {
+	if err = v.Get(i).GetBigInt(t.Value); err != nil {
 		return err
 	}
+
 	// input
-	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
+	i++
+	if t.Input, err = v.Get(i).GetBytes(t.Input[:0]); err != nil {
 		return err
 	}
 
 	// V
+	i++
 	t.V = new(big.Int)
-	if err = elems[6].GetBigInt(t.V); err != nil {
+	if err = v.Get(i).GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
+	i++
 	t.R = new(big.Int)
-	if err = elems[7].GetBigInt(t.R); err != nil {
+	if err = v.Get(i).GetBigInt(t.R); err != nil {
 		return err
 	}
+
 	// S
+	i++
 	t.S = new(big.Int)
-	if err = elems[8].GetBigInt(t.S); err != nil {
+	if err = v.Get(i).GetBigInt(t.S); err != nil {
 		return err
 	}
 
-	if len(elems) >= 10 {
-		// Type
-		if t.Type, err = ReadRlpTxType(elems[9]); err != nil {
-			return err
-		}
-
-		if t.Type == StateTx {
-			// We need to set From field for state transaction,
-			// because we are using unique, predefined address, for sending such transactions
-			// From
-			if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
-				// address
-				addr := BytesToAddress(vv)
-				t.From = addr
-			} else {
-				// reset From
-				t.From = ZeroAddress
-			}
+	if t.Type == StateTx {
+		// We need to set From field for state transaction,
+		// because we are using unique, predefined address, for sending such transactions
+		// From
+		i++
+		t.From = ZeroAddress
+		if vv, err := v.Get(i).Bytes(); err == nil && len(vv) == AddressLength {
+			// address
+			addr := BytesToAddress(vv)
+			t.From = addr
 		}
 	}
 
@@ -398,7 +425,7 @@ func ReadRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
 	b := TxType(bytes[0])
 
 	switch b {
-	case LegacyTx, StateTx:
+	case LegacyTx, StateTx, DynamicGeeTx:
 		return b, nil
 	default:
 		return LegacyTx, fmt.Errorf("invalid tx type value: %d", bytes[0])
