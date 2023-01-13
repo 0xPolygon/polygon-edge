@@ -23,11 +23,31 @@ var (
 	errTest = errors.New("test")
 )
 
-// a mock object that returns error in UnmarshalJSON
+// a mock returning an error in UnmarshalJSON
 type fakeUnmarshalerStruct struct{}
 
 func (s *fakeUnmarshalerStruct) UnmarshalJSON(data []byte) error {
 	return errTest
+}
+
+type mockSigner struct {
+	signer.Signer
+
+	TypeFn                func() validators.ValidatorType
+	EcrecoverFromHeaderFn func(*types.Header) (types.Address, error)
+	GetValidatorsFn       func(*types.Header) (validators.Validators, error)
+}
+
+func (m *mockSigner) Type() validators.ValidatorType {
+	return m.TypeFn()
+}
+
+func (m *mockSigner) EcrecoverFromHeader(h *types.Header) (types.Address, error) {
+	return m.EcrecoverFromHeaderFn(h)
+}
+
+func (m *mockSigner) GetValidators(h *types.Header) (validators.Validators, error) {
+	return m.GetValidatorsFn(h)
 }
 
 func Test_isJSONSyntaxError(t *testing.T) {
@@ -109,7 +129,6 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 		epochSize              uint64
 		err                    error
 	}{
-		// XXX: create other test
 		{
 			name:                   "should return error if initialize fails",
 			storedSnapshotMetadata: createTestMetadataJSON(0),
@@ -144,6 +163,77 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 			epochSize: 10,
 			err:       nil,
 		},
+		// the below cases recover snapshots from local chain,
+		// but this test just makes sure constructor doesn't return an error
+		// because snapshot package has tests covering such cases
+		{
+			name:                   "should succeed and recover snapshots from headers when the files don't exist",
+			storedSnapshotMetadata: "",
+			storedSnapshots:        "",
+			blockchain: &store.MockBlockchain{
+				HeaderFn: func() *types.Header {
+					return &types.Header{Number: 0}
+				},
+			},
+			signer: &mockSigner{
+				GetValidatorsFn: func(h *types.Header) (validators.Validators, error) {
+					// height of the header HeaderFn returns
+					assert.Equal(t, uint64(0), h.Number)
+
+					return &validators.Set{}, nil
+				},
+			},
+			epochSize: 10,
+			err:       nil,
+		},
+		{
+			name:                   "should succeed and recover snapshots from headers when the metadata file is broken",
+			storedSnapshotMetadata: "broken data",
+			storedSnapshots: fmt.Sprintf("[%s]", createTestSnapshotJSON(
+				t,
+				&snapshot.Snapshot{
+					Number: 10,
+					Hash:   types.BytesToHash([]byte{0x10}).String(),
+					Set:    validators.NewECDSAValidatorSet(),
+					Votes:  []*store.Vote{},
+				},
+			)),
+			blockchain: &store.MockBlockchain{
+				HeaderFn: func() *types.Header {
+					return &types.Header{Number: 0}
+				},
+			},
+			signer: &mockSigner{
+				GetValidatorsFn: func(h *types.Header) (validators.Validators, error) {
+					// height of the header HeaderFn returns
+					assert.Equal(t, uint64(0), h.Number)
+
+					return &validators.Set{}, nil
+				},
+			},
+			epochSize: 10,
+			err:       nil,
+		},
+		{
+			name:                   "should succeed and recover snapshots from headers when the snapshots file is broken",
+			storedSnapshotMetadata: createTestMetadataJSON(0),
+			storedSnapshots:        "broken",
+			blockchain: &store.MockBlockchain{
+				HeaderFn: func() *types.Header {
+					return &types.Header{Number: 0}
+				},
+			},
+			signer: &mockSigner{
+				GetValidatorsFn: func(h *types.Header) (validators.Validators, error) {
+					// height of the header HeaderFn returns
+					assert.Equal(t, uint64(0), h.Number)
+
+					return &validators.Set{}, nil
+				},
+			},
+			epochSize: 10,
+			err:       nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -154,15 +244,19 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 
 			dirPath := createTestTempDirectory(t)
 
-			assert.NoError(
-				t,
-				os.WriteFile(path.Join(dirPath, snapshotMetadataFilename), []byte(test.storedSnapshotMetadata), os.ModePerm),
-			)
+			if len(test.storedSnapshotMetadata) != 0 {
+				assert.NoError(
+					t,
+					os.WriteFile(path.Join(dirPath, snapshotMetadataFilename), []byte(test.storedSnapshotMetadata), os.ModePerm),
+				)
+			}
 
-			assert.NoError(
-				t,
-				os.WriteFile(path.Join(dirPath, snapshotSnapshotsFilename), []byte(test.storedSnapshots), os.ModePerm),
-			)
+			if len(test.storedSnapshots) != 0 {
+				assert.NoError(
+					t,
+					os.WriteFile(path.Join(dirPath, snapshotSnapshotsFilename), []byte(test.storedSnapshots), os.ModePerm),
+				)
+			}
 
 			store, err := NewSnapshotValidatorStoreWrapper(
 				hclog.NewNullLogger(),
