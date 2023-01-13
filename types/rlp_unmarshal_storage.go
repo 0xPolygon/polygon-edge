@@ -1,6 +1,7 @@
 package types
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/umbracle/fastrlp"
@@ -30,11 +31,24 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		return err
 	}
 
-	for _, txn := range txns {
+	for i := 0; i < len(txns); i++ {
+		txType := LegacyTx
+		if txns[i].Type() == fastrlp.TypeBytes {
+			// Parse Transaction Type if Bytes come first
+			if err := txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
+				return err
+			}
+
+			i++
+		}
+
 		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalStoreRLPFrom(p, txn); err != nil {
+		if err := bTxn.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
+
+		bTxn.Type = txType
+		bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)
 	}
@@ -58,7 +72,22 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
-	return UnmarshalRlp(t.UnmarshalStoreRLPFrom, input)
+	txType := LegacyTx
+
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
+		var err error
+		if txType, err = txTypeFromByte(input[0]); err != nil {
+			return err
+		}
+	}
+
+	if err := UnmarshalRlp(t.UnmarshalStoreRLPFrom, input); err != nil {
+		return err
+	}
+
+	t.Type = txType
+
+	return nil
 }
 
 func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -67,8 +96,17 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 		return err
 	}
 
-	if len(elems) < 2 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 2 but found %d", len(elems))
+	// come TransactionType first if exist
+	if len(elems) != 2 && len(elems) != 3 {
+		return errors.New("expected 2 or 3 elements")
+	}
+
+	if len(elems) == 3 {
+		if err := t.Type.UnmarshalRLPFrom(p, elems[0]); err != nil {
+			return err
+		}
+
+		elems = elems[1:]
 	}
 
 	// consensus part
@@ -79,6 +117,8 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	if err = elems[1].GetAddr(t.From[:]); err != nil {
 		return err
 	}
+
+	t.ComputeHash()
 
 	return nil
 }
@@ -93,20 +133,45 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		return err
 	}
 
-	for _, elem := range elems {
+	for i := 0; i < len(elems); i++ {
+		txType := LegacyTx
+		if elems[i].Type() == fastrlp.TypeBytes {
+			if err := txType.UnmarshalRLPFrom(p, elems[i]); err != nil {
+				return err
+			}
+
+			i++
+		}
+
 		rr := &Receipt{}
-		if err := rr.UnmarshalStoreRLPFrom(p, elem); err != nil {
+		if err := rr.UnmarshalStoreRLPFrom(p, elems[i]); err != nil {
 			return err
 		}
 
-		(*r) = append(*r, rr)
+		rr.TransactionType = txType
+		*r = append(*r, rr)
 	}
 
 	return nil
 }
 
 func (r *Receipt) UnmarshalStoreRLP(input []byte) error {
-	return UnmarshalRlp(r.UnmarshalStoreRLPFrom, input)
+	txType := LegacyTx
+
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
+		var err error
+		if txType, err = txTypeFromByte(input[0]); err != nil {
+			return err
+		}
+	}
+
+	if err := UnmarshalRlp(r.UnmarshalStoreRLPFrom, input); err != nil {
+		return err
+	}
+
+	r.TransactionType = txType
+
+	return nil
 }
 
 func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -115,8 +180,17 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 		return err
 	}
 
-	if len(elems) < 3 {
-		return fmt.Errorf("incorrect number of elements to decode receipt, expected at least 3 but found %d", len(elems))
+	if len(elems) < 4 {
+		return errors.New("expected at least 4 elements")
+	}
+
+	// come TransactionType first if exist
+	if len(elems) == 5 {
+		if err := r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
+			return err
+		}
+
+		elems = elems[1:]
 	}
 
 	if err := r.UnmarshalRLPFrom(p, elems[0]); err != nil {

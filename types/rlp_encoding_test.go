@@ -60,9 +60,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	unmarshalledTxn.ComputeHash()
 
 	txn.Hash = unmarshalledTxn.Hash
-	if !reflect.DeepEqual(txn, unmarshalledTxn) {
-		t.Fatal("[ERROR] Unmarshalled transaction not equal to base transaction")
-	}
+	assert.Equal(t, txn, unmarshalledTxn, "[ERROR] Unmarshalled transaction not equal to base transaction")
 }
 
 func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
@@ -132,11 +130,13 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
+	addrFrom := StringToAddress("22")
 	originalTx := &Transaction{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
 		To:       &addrTo,
+		From:     addrFrom,
 		Value:    big.NewInt(1),
 		Input:    []byte{1, 2},
 		V:        big.NewInt(25),
