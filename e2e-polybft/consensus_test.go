@@ -158,19 +158,20 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
 
-	// query validators
-	validators, err := systemState.GetValidatorSet()
-	require.NoError(t, err)
+	validators := polybft.AccountSet{}
+	// assert that new validator is among validator set
+	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
+		// query validators
+		validators, err = systemState.GetValidatorSet()
+		require.NoError(t, err)
+
+		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+	}))
 
 	// assert that correct validators hash gets submitted
 	validatorsHash, err := validators.Hash()
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, validatorsHash)
-
-	// assert that new validator is among validator set
-	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
-		return validators.ContainsAddress((types.Address(newValidatorAddr)))
-	}))
 
 	// query registered validator
 	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
