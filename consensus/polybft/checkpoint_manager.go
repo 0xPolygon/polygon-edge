@@ -40,6 +40,7 @@ type CheckpointManager interface {
 	IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool
 	SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error
 	SetLastSentBlock(blockNumber uint64)
+	BuildEventRoot(epoch uint64) (types.Hash, error)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
@@ -54,6 +55,9 @@ func (d *dummyCheckpointManager) SubmitCheckpoint(header *types.Header, isEndOfE
 	return nil
 }
 func (d *dummyCheckpointManager) SetLastSentBlock(blockNumber uint64) {}
+func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
+	return types.ZeroHash, nil
+}
 
 var _ CheckpointManager = (*checkpointManager)(nil)
 
@@ -303,6 +307,25 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	}
 
 	return c.state.insertExitEvents(events)
+}
+
+// BuildEventRoot returns an exit event root hash for exit tree of given epoch
+func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
+	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	if len(exitEvents) == 0 {
+		return types.ZeroHash, nil
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return tree.Hash(), nil
 }
 
 // getExitEventsFromReceipts parses logs from receipts to find exit events

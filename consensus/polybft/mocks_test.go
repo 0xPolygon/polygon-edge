@@ -274,24 +274,6 @@ func (t *transportMock) Multicast(msg interface{}) {
 	_ = t.Called(msg)
 }
 
-var _ checkpointBackend = (*checkpointBackendMock)(nil)
-
-type checkpointBackendMock struct {
-	mock.Mock
-}
-
-func (c *checkpointBackendMock) BuildEventRoot(epoch uint64) (types.Hash, error) {
-	args := c.Called()
-
-	return args.Get(0).(types.Hash), args.Error(1) //nolint:forcetypeassert
-}
-
-func (c *checkpointBackendMock) InsertExitEvents(exitEvents []*ExitEvent) error {
-	c.Called()
-
-	return nil
-}
-
 type testValidators struct {
 	validators map[string]*testValidator
 }

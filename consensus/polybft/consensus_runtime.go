@@ -42,12 +42,6 @@ type txPoolInterface interface {
 	ResetWithHeaders(...*types.Header)
 }
 
-// checkpointBackend is an interface providing functions for working with checkpoints and exit evens
-type checkpointBackend interface {
-	// BuildEventRoot generates an event root hash from exit events in given epoch
-	BuildEventRoot(epoch uint64) (types.Hash, error)
-}
-
 // epochMetadata is the static info for epoch currently being processed
 type epochMetadata struct {
 	// Number is the number of the epoch
@@ -311,6 +305,7 @@ func (c *consensusRuntime) FSM() error {
 		c.config.PolyBFTConfig.BlockTime,
 		c.logger,
 	)
+
 	if err != nil {
 		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
@@ -324,12 +319,17 @@ func (c *consensusRuntime) FSM() error {
 
 	valSet := NewValidatorSet(epoch.Validators, c.logger)
 
+	exitRootHash, err := c.checkpointManager.BuildEventRoot(epoch.Number)
+	if err != nil {
+		return fmt.Errorf("could not build exit root hash for fsm: %w", err)
+	}
+
 	ff := &fsm{
 		config:            c.config.PolyBFTConfig,
 		parent:            parent,
 		backend:           c.config.blockchain,
 		polybftBackend:    c.config.polybftBackend,
-		checkpointBackend: c,
+		exitEventRootHash: exitRootHash,
 		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
 		validators:        valSet,
@@ -526,25 +526,6 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	}
 
 	return commitEpoch, nil
-}
-
-// BuildEventRoot is an implementation of checkpointBackend interface
-func (c *consensusRuntime) BuildEventRoot(epoch uint64) (types.Hash, error) {
-	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	if len(exitEvents) == 0 {
-		return types.ZeroHash, nil
-	}
-
-	tree, err := createExitTree(exitEvents)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	return tree.Hash(), nil
 }
 
 // GenerateExitProof generates proof of exit
