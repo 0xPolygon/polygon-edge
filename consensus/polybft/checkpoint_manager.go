@@ -39,7 +39,7 @@ type CheckpointManager interface {
 	PostBlock(req *PostBlockRequest) error
 	IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool
 	SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error
-	SetLatestCheckpointID(checkpointNumber uint64)
+	SetLastSentBlock(blockNumber uint64)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
@@ -53,7 +53,7 @@ func (d *dummyCheckpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEn
 func (d *dummyCheckpointManager) SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error {
 	return nil
 }
-func (d *dummyCheckpointManager) SetLatestCheckpointID(checkpointNumber uint64) {}
+func (d *dummyCheckpointManager) SetLastSentBlock(blockNumber uint64) {}
 
 var _ CheckpointManager = (*checkpointManager)(nil)
 
@@ -71,8 +71,8 @@ type checkpointManager struct {
 	checkpointsOffset uint64
 	// checkpointManagerAddr is address of CheckpointManager smart contract
 	checkpointManagerAddr types.Address
-	// latestCheckpointID represents last checkpoint block number
-	latestCheckpointID uint64
+	// lastSentBlock represents the last block on which a checkpoint transaction was sent
+	lastSentBlock uint64
 	// logger instance
 	logger hclog.Logger
 	// state boltDb instance
@@ -120,9 +120,9 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	return latestCheckpointBlockNum, nil
 }
 
-// SetLatestCheckpointID sets the latestCheckpointID field
-func (c *checkpointManager) SetLatestCheckpointID(checkpointNumber uint64) {
-	c.latestCheckpointID = checkpointNumber
+// SetLastSentBlock sets the lastSentBlock field
+func (c *checkpointManager) SetLastSentBlock(blockNumber uint64) {
+	c.lastSentBlock = blockNumber
 }
 
 // SubmitCheckpoint sends a transaction with checkpoint data to the rootchain
@@ -283,7 +283,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 // which are offset by predefined count of blocks
 // or if given block is an epoch ending block
 func (c *checkpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
-	return isEpochEndingBlock || blockNumber == c.latestCheckpointID+c.checkpointsOffset
+	return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
@@ -302,13 +302,7 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	if len(events) > 0 {
-		if err := c.state.insertExitEvents(events); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return c.state.insertExitEvents(events)
 }
 
 // getExitEventsFromReceipts parses logs from receipts to find exit events
@@ -316,10 +310,6 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 	events := make([]*ExitEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
-		if len(receipts[i].Logs) == 0 {
-			continue
-		}
-
 		for _, log := range receipts[i].Logs {
 			if log.Address != contracts.L2StateSenderContract {
 				continue

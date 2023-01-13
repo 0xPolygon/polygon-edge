@@ -763,7 +763,7 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 			}
 		}(fullBlock.Block.Header, fsm.epochNumber)
 
-		c.checkpointManager.SetLatestCheckpointID(fullBlock.Block.Number())
+		c.checkpointManager.SetLastSentBlock(fullBlock.Block.Number())
 	}
 
 	c.OnBlockInserted(fullBlock)

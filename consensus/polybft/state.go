@@ -330,6 +330,11 @@ func (s *State) list() ([]*types.StateSyncEvent, error) {
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
 func (s *State) insertExitEvents(exitEvents []*ExitEvent) error {
+	if len(exitEvents) == 0 {
+		// small optimization
+		return nil
+	}
+
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(exitEventsBucket)
 		for i := 0; i < len(exitEvents); i++ {
