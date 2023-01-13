@@ -153,6 +153,11 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
 
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
+	require.NoError(t, err)
+
+	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
+
 	// query validators
 	validators, err := systemState.GetValidatorSet()
 	require.NoError(t, err)
@@ -162,14 +167,13 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, validatorsHash)
 
-	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
-	require.NoError(t, err)
-
 	// assert that new validator is among validator set
-	require.True(t, validators.ContainsAddress(types.Address(newValidatorAcc.Ecdsa.Address())))
+	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
+		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+	}))
 
 	// query registered validator
-	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
+	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
 	require.NoError(t, err)
 
 	// assert registered validator's stake
@@ -181,7 +185,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster.WaitForBlock(20, 2*time.Minute)
 
 	// query registered validator
-	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
+	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
 	require.NoError(t, err)
 
 	// assert registered validator's rewards
