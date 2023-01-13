@@ -312,20 +312,13 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	p.Hash(t.Hash[:0], v)
 
-	// Setup defaults
-	t.GasPrice = new(big.Int)
-	t.Value = new(big.Int)
-	t.V = new(big.Int)
-	t.R = new(big.Int)
-	t.S = new(big.Int)
-	t.From = ZeroAddress
-
 	// nonce
 	if t.Nonce, err = elems[0].GetUint64(); err != nil {
 		return err
 	}
 
 	// gasPrice
+	t.GasPrice = new(big.Int)
 	if err = elems[1].GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
@@ -343,6 +336,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	// value
+	t.Value = new(big.Int)
 	if err = elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
@@ -353,16 +347,19 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	// V
+	t.V = new(big.Int)
 	if err = elems[6].GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
+	t.R = new(big.Int)
 	if err = elems[7].GetBigInt(t.R); err != nil {
 		return err
 	}
 
 	// S
+	t.S = new(big.Int)
 	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
 	}
@@ -381,7 +378,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 			// We need to set From field for state transaction,
 			// because we are using unique, predefined address, for sending such transactions
-			// From
+			t.From = ZeroAddress
 			if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
 				// address
 				addr := BytesToAddress(vv)
@@ -392,15 +389,14 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 				return fmt.Errorf("incorrect number of elements to decode dynamic fee tx, expected 12 but found %d", len(elems))
 			}
 
-			t.GasFeeCap = new(big.Int)
-			t.GasTipCap = new(big.Int)
-
 			// gasFeeCap
+			t.GasFeeCap = new(big.Int)
 			if err = elems[10].GetBigInt(t.GasFeeCap); err != nil {
 				return err
 			}
 
 			// gasTipCap
+			t.GasTipCap = new(big.Int)
 			if err = elems[11].GetBigInt(t.GasTipCap); err != nil {
 				return err
 			}
