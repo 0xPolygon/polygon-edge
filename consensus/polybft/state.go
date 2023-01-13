@@ -434,21 +434,22 @@ func (s *State) updateExitEvents(blockNumber, oldEpoch, newEpoch uint64) error {
 
 // getExitEvents returns exit events for given epoch and provided filter
 func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
-	var events []*ExitEvent
+	var (
+		exitEvents []*ExitEvent
+		err        error
+	)
 
-	err := s.db.View(func(tx *bolt.Tx) error {
-		exitEvents, err := getExitEvents(tx, epoch, filter)
+	err = s.db.View(func(tx *bolt.Tx) error {
+		exitEvents, err = getExitEvents(tx, epoch, filter)
 
 		if err != nil {
 			return err
 		}
 
-		events = exitEvents
-
 		return nil
 	})
 
-	return events, err
+	return exitEvents, err
 }
 
 func getExitEvents(tx *bolt.Tx, epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
