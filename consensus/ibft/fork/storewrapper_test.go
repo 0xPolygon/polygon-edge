@@ -23,6 +23,67 @@ var (
 	errTest = errors.New("test")
 )
 
+// a mock object that returns error in UnmarshalJSON
+type fakeUnmarshalerStruct struct{}
+
+func (s *fakeUnmarshalerStruct) UnmarshalJSON(data []byte) error {
+	return errTest
+}
+
+func Test_isJSONSyntaxError(t *testing.T) {
+	t.Parallel()
+
+	var (
+		// create some special errors
+		snaps   = []*snapshot.Snapshot{}
+		fakeStr = &fakeUnmarshalerStruct{}
+
+		invalidJSONErr      = json.Unmarshal([]byte("foo"), &snaps)
+		invalidUnmarshalErr = json.Unmarshal([]byte("{}"), fakeStr)
+	)
+
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "should return false for nil",
+			err:      nil,
+			expected: false,
+		},
+		{
+			name:     "should return false for custom error",
+			err:      errTest,
+			expected: false,
+		},
+		{
+			name:     "should return marshal for json.InvalidUnmarshalError",
+			err:      invalidUnmarshalErr,
+			expected: false,
+		},
+		{
+			name:     "should return json.SyntaxError",
+			err:      invalidJSONErr,
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(
+				t,
+				test.expected,
+				isJSONSyntaxError(test.err),
+			)
+		})
+	}
+}
+
 func createTestMetadataJSON(height uint64) string {
 	return fmt.Sprintf(`{"LastBlock": %d}`, height)
 }
@@ -48,24 +109,7 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 		epochSize              uint64
 		err                    error
 	}{
-		{
-			name:                   "should return error if loading metadata fails",
-			storedSnapshotMetadata: `hoge`,
-			storedSnapshots:        "",
-			blockchain:             nil,
-			signer:                 nil,
-			epochSize:              0,
-			err:                    &json.SyntaxError{},
-		},
-		{
-			name:                   "should return error if loading snapshots fails",
-			storedSnapshotMetadata: createTestMetadataJSON(10),
-			storedSnapshots:        `fuga`,
-			blockchain:             nil,
-			signer:                 nil,
-			epochSize:              0,
-			err:                    &json.SyntaxError{},
-		},
+		// XXX: create other test
 		{
 			name:                   "should return error if initialize fails",
 			storedSnapshotMetadata: createTestMetadataJSON(0),
