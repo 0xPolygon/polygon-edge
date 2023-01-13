@@ -5,7 +5,9 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 )
@@ -106,4 +108,15 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStateSyncRelayer_Stop(t *testing.T) {
+	t.Parallel()
+
+	key, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	r := NewRelayer("test-chain-1", "http://127.0.0.1:8545", ethgo.Address(contracts.StateReceiverContract), hclog.NewNullLogger(), key)
+
+	require.NotPanics(t, func() { r.Stop() })
 }
