@@ -355,6 +355,13 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	require.Len(t, events, 10)
 }
 
+func TestStateSyncManager_Close_NoPanic(t *testing.T) {
+	t.Parallel()
+
+	mgr := newTestStateSyncManager(t, newTestValidator("A", 100))
+	require.NotPanics(t, func() { mgr.Close() })
+}
+
 type mockTopic struct {
 	published proto.Message
 }

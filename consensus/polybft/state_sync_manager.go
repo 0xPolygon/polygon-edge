@@ -86,9 +86,10 @@ type topic interface {
 // NewStateSyncManager creates a new instance of state sync manager
 func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
 	s := &stateSyncManager{
-		logger: logger.Named("state-sync-manager"),
-		state:  state,
-		config: config,
+		logger:  logger.Named("state-sync-manager"),
+		state:   state,
+		config:  config,
+		closeCh: make(chan struct{}),
 	}
 
 	return s, nil
