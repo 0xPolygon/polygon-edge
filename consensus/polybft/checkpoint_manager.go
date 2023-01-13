@@ -3,9 +3,11 @@ package polybft
 import (
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	metrics "github.com/armon/go-metrics"
@@ -33,6 +35,28 @@ var (
 	defaultCheckpointsOffset = uint64(900)
 )
 
+type CheckpointManager interface {
+	PostBlock(req *PostBlockRequest) error
+	IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool
+	SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error
+	SetLastSentBlock(blockNumber uint64)
+}
+
+var _ CheckpointManager = (*dummyCheckpointManager)(nil)
+
+type dummyCheckpointManager struct{}
+
+func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyCheckpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
+	return false
+}
+func (d *dummyCheckpointManager) SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error {
+	return nil
+}
+func (d *dummyCheckpointManager) SetLastSentBlock(blockNumber uint64) {}
+
+var _ CheckpointManager = (*checkpointManager)(nil)
+
 // checkpointManager encapsulates logic for checkpoint data submission
 type checkpointManager struct {
 	// key is the identity of the node submitting a checkpoint
@@ -47,16 +71,19 @@ type checkpointManager struct {
 	checkpointsOffset uint64
 	// checkpointManagerAddr is address of CheckpointManager smart contract
 	checkpointManagerAddr types.Address
-	// latestCheckpointID represents last checkpointed block number
-	latestCheckpointID uint64
+	// lastSentBlock represents the last block on which a checkpoint transaction was sent
+	lastSentBlock uint64
 	// logger instance
 	logger hclog.Logger
+	// state boltDb instance
+	state *State
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
 func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
-	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger) *checkpointManager {
+	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
+	state *State) *checkpointManager {
 	return &checkpointManager{
 		key:                   key,
 		blockchain:            blockchain,
@@ -65,6 +92,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		checkpointsOffset:     checkpointOffset,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
+		state:                 state,
 	}
 }
 
@@ -92,8 +120,13 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	return latestCheckpointBlockNum, nil
 }
 
-// submitCheckpoint sends a transaction with checkpoint data to the rootchain
-func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfEpoch bool) error {
+// SetLastSentBlock sets the lastSentBlock field
+func (c *checkpointManager) SetLastSentBlock(blockNumber uint64) {
+	c.lastSentBlock = blockNumber
+}
+
+// SubmitCheckpoint sends a transaction with checkpoint data to the rootchain
+func (c *checkpointManager) SubmitCheckpoint(latestHeader *types.Header, isEndOfEpoch bool) error {
 	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
@@ -152,7 +185,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 			continue
 		}
 
-		if err = c.encodeAndSendCheckpoint(txn, *parentHeader, *parentExtra, true); err != nil {
+		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
 			return err
 		}
 
@@ -170,13 +203,13 @@ func (c *checkpointManager) submitCheckpoint(latestHeader types.Header, isEndOfE
 		}
 	}
 
-	return c.encodeAndSendCheckpoint(txn, latestHeader, *currentExtra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(txn, latestHeader, currentExtra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
 func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
-	header types.Header, extra Extra, isEndOfEpoch bool) error {
+	header *types.Header, extra *Extra, isEndOfEpoch bool) error {
 	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
 
 	nextEpochValidators := AccountSet{}
@@ -214,7 +247,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 }
 
 // abiEncodeCheckpointBlock encodes checkpoint data into ABI format for a given header
-func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra Extra,
+func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHash types.Hash, extra *Extra,
 	nextValidators AccountSet) ([]byte, error) {
 	aggs, err := bls.UnmarshalSignature(extra.Committed.AggregatedSignature)
 	if err != nil {
@@ -246,8 +279,60 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 	return submitCheckpointMethod.Encode(params)
 }
 
-// isCheckpointBlock returns true for blocks in the middle of the epoch
-// which are offseted by predefined count of blocks
-func (c *checkpointManager) isCheckpointBlock(blockNumber uint64) bool {
-	return blockNumber == c.latestCheckpointID+c.checkpointsOffset
+// IsCheckpointBlock returns true for blocks in the middle of the epoch
+// which are offset by predefined count of blocks
+// or if given block is an epoch ending block
+func (c *checkpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
+	return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
+}
+
+// PostBlock is called on every insert of finalized block (either from consensus or syncer)
+// It will read any exit event that happened in block and insert it to state boltDb
+func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
+	epoch := req.Epoch
+	if req.IsEpochEndingBlock {
+		// exit events that happened in epoch ending blocks,
+		// should be added to the tree of the next epoch
+		epoch++
+	}
+
+	// commit exit events only when we finalize a block
+	events, err := getExitEventsFromReceipts(epoch, req.FullBlock.Block.Number(), req.FullBlock.Receipts)
+	if err != nil {
+		return err
+	}
+
+	return c.state.insertExitEvents(events)
+}
+
+// getExitEventsFromReceipts parses logs from receipts to find exit events
+func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) ([]*ExitEvent, error) {
+	events := make([]*ExitEvent, 0)
+
+	for i := 0; i < len(receipts); i++ {
+		for _, log := range receipts[i].Logs {
+			if log.Address != contracts.L2StateSenderContract {
+				continue
+			}
+
+			event, err := decodeExitEvent(convertLog(log), epoch, block)
+			if err != nil {
+				return nil, err
+			}
+
+			if event == nil {
+				// valid case, not an exit event
+				continue
+			}
+
+			events = append(events, event)
+		}
+	}
+
+	// enforce sequential order
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].ID < events[j].ID
+	})
+
+	return events, nil
 }

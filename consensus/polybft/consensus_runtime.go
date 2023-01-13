@@ -46,8 +46,6 @@ type txPoolInterface interface {
 type checkpointBackend interface {
 	// BuildEventRoot generates an event root hash from exit events in given epoch
 	BuildEventRoot(epoch uint64) (types.Hash, error)
-	// InsertExitEvents inserts provided exit events to persistence storage
-	InsertExitEvents(exitEvents []*ExitEvent) error
 }
 
 // epochMetadata is the static info for epoch currently being processed
@@ -108,7 +106,7 @@ type consensusRuntime struct {
 	activeValidatorFlag uint32
 
 	// checkpointManager represents abstraction for checkpoint submission
-	checkpointManager *checkpointManager
+	checkpointManager CheckpointManager
 
 	// proposerCalculator is the object which manipulates with ProposerSnapshot
 	proposerCalculator *ProposerCalculator
@@ -139,21 +137,8 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, err
 	}
 
-	if runtime.IsBridgeEnabled() {
-		// enable checkpoint manager
-		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
-		if err != nil {
-			return nil, err
-		}
-
-		runtime.checkpointManager = newCheckpointManager(
-			wallet.NewEcdsaSigner(config.Key),
-			defaultCheckpointsOffset,
-			config.PolyBFTConfig.Bridge.CheckpointAddr,
-			txRelayer,
-			config.blockchain,
-			config.polybftBackend,
-			log.Named("checkpoint_manager"))
+	if err := runtime.initCheckpointManager(log); err != nil {
+		return nil, err
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
@@ -197,6 +182,32 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	}
 
 	return c.stateSyncManager.Init()
+}
+
+// initCheckpointManager initializes checkpoint manager
+// if bridge is not enabled, then a dummy checkpoint manager will be used
+func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
+	if c.IsBridgeEnabled() {
+		// enable checkpoint manager
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+		if err != nil {
+			return err
+		}
+
+		c.checkpointManager = newCheckpointManager(
+			wallet.NewEcdsaSigner(c.config.Key),
+			defaultCheckpointsOffset,
+			c.config.PolyBFTConfig.Bridge.CheckpointAddr,
+			txRelayer,
+			c.config.blockchain,
+			c.config.polybftBackend,
+			logger.Named("checkpoint_manager"),
+			c.state)
+	} else {
+		c.checkpointManager = &dummyCheckpointManager{}
+	}
+
+	return nil
 }
 
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
@@ -246,16 +257,23 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
+		// TODO - this will need to take inconsideration if slashing occurred
+		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
+	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
+
 	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: fullBlock.Block}); err != nil {
+	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block state sync", "err", err)
 	}
 
-	// TODO - this condition will need to be changed to recognize that either slashing happened
-	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch) {
+	// handle exit events that happened in block
+	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	}
+
+	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -406,9 +424,10 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	)
 
 	reqObj := &PostEpochRequest{
-		SystemState:  systemState,
-		NewEpochID:   epochNumber,
-		ValidatorSet: NewValidatorSet(validatorSet, c.logger),
+		SystemState:       systemState,
+		NewEpochID:        epochNumber,
+		FirstBlockOfEpoch: firstBlockInEpoch,
+		ValidatorSet:      NewValidatorSet(validatorSet, c.logger),
 	}
 
 	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
@@ -507,11 +526,6 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	}
 
 	return commitEpoch, nil
-}
-
-// InsertExitEvents is an implementation of checkpointBackend interface
-func (c *consensusRuntime) InsertExitEvents(exitEvents []*ExitEvent) error {
-	return c.state.insertExitEvents(exitEvents)
 }
 
 // BuildEventRoot is an implementation of checkpointBackend interface
@@ -738,20 +752,18 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 		return
 	}
 
-	if c.IsBridgeEnabled() {
-		if (fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(fullBlock.Block.Header.Number)) &&
-			bytes.Equal(c.config.Key.Address().Bytes(), fullBlock.Block.Header.Miner) {
-			go func(header types.Header, epochNumber uint64) {
-				if err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
-					c.logger.Warn("failed to submit checkpoint",
-						"checkpoint block", header.Number,
-						"epoch number", epochNumber,
-						"error", err)
-				}
-			}(*fullBlock.Block.Header, fsm.epochNumber)
+	if c.checkpointManager.IsCheckpointBlock(fullBlock.Block.Header.Number, fsm.isEndOfEpoch) &&
+		bytes.Equal(c.config.Key.Address().Bytes(), fullBlock.Block.Header.Miner) {
+		go func(header *types.Header, epochNumber uint64) {
+			if err := c.checkpointManager.SubmitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
+				c.logger.Warn("failed to submit checkpoint",
+					"checkpoint block", header.Number,
+					"epoch number", epochNumber,
+					"error", err)
+			}
+		}(fullBlock.Block.Header, fsm.epochNumber)
 
-			c.checkpointManager.latestCheckpointID = fullBlock.Block.Number()
-		}
+		c.checkpointManager.SetLastSentBlock(fullBlock.Block.Number())
 	}
 
 	c.OnBlockInserted(fullBlock)
