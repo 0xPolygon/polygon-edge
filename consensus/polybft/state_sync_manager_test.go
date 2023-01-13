@@ -355,7 +355,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	require.Len(t, events, 10)
 }
 
-func TestStateSyncManager_Close_NoPanic(t *testing.T) {
+func TestStateSyncManager_Close(t *testing.T) {
 	t.Parallel()
 
 	mgr := newTestStateSyncManager(t, newTestValidator("A", 100))
