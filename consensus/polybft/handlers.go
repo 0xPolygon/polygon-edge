@@ -7,6 +7,8 @@ type PostBlockRequest struct {
 	FullBlock *types.FullBlock
 	// Epoch is the epoch number of the executed block
 	Epoch uint64
+	// IsEpochEndingBlock indicates if this was the last block of given epoch
+	IsEpochEndingBlock bool
 }
 
 type PostEpochRequest struct {

@@ -505,46 +505,6 @@ func TestState_getProposerSnapshot_writeProposerSnapshot(t *testing.T) {
 	require.Equal(t, newSnapshot, snap)
 }
 
-func TestState_updateExitEvents(t *testing.T) {
-	t.Parallel()
-
-	const (
-		oldEpoch            = 1
-		newEpoch            = 2
-		numOfBlocksPerEpoch = 5
-		numOfExitsPerBlock  = 5
-	)
-
-	state := newTestState(t)
-
-	insertTestExitEvents(t, state, 1, numOfBlocksPerEpoch, numOfExitsPerBlock)
-
-	exitEvents, err := state.getExitEvents(oldEpoch, func(exitEvent *ExitEvent) bool {
-		return exitEvent.BlockNumber == 5
-	})
-
-	require.NoError(t, err)
-	require.Len(t, exitEvents, numOfExitsPerBlock)
-	require.Equal(t, uint64(oldEpoch), exitEvents[0].EpochNumber)
-
-	require.NoError(t, state.updateExitEvents(5, oldEpoch, newEpoch))
-
-	exitEvents, err = state.getExitEvents(oldEpoch, func(exitEvent *ExitEvent) bool {
-		return exitEvent.BlockNumber == 5
-	})
-
-	require.NoError(t, err)
-	require.Empty(t, exitEvents, 0)
-
-	exitEvents, err = state.getExitEvents(newEpoch, func(exitEvent *ExitEvent) bool {
-		return exitEvent.BlockNumber == 5
-	})
-
-	require.NoError(t, err)
-	require.Len(t, exitEvents, numOfExitsPerBlock)
-	require.Equal(t, uint64(newEpoch), exitEvents[0].EpochNumber)
-}
-
 func insertTestExitEvents(t *testing.T, state *State,
 	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) {
 	t.Helper()

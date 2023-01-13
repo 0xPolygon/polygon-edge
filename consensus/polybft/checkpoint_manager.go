@@ -37,7 +37,6 @@ var (
 
 type CheckpointManager interface {
 	PostBlock(req *PostBlockRequest) error
-	PostEpoch(req *PostEpochRequest) error
 	IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool
 	SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error
 	SetLatestCheckpointID(checkpointNumber uint64)
@@ -48,7 +47,6 @@ var _ CheckpointManager = (*dummyCheckpointManager)(nil)
 type dummyCheckpointManager struct{}
 
 func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (d *dummyCheckpointManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyCheckpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
 	return false
 }
@@ -291,8 +289,15 @@ func (c *checkpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingB
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
 func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
+	epoch := req.Epoch
+	if req.IsEpochEndingBlock {
+		// exit events that happened in epoch ending blocks,
+		// should be added to the tree of the next epoch
+		epoch++
+	}
+
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(req.Epoch, req.FullBlock.Block.Number(), req.FullBlock.Receipts)
+	events, err := getExitEventsFromReceipts(epoch, req.FullBlock.Block.Number(), req.FullBlock.Receipts)
 	if err != nil {
 		return err
 	}
@@ -304,14 +309,6 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	}
 
 	return nil
-}
-
-// PostEpoch notifies the checkpoint manager that an epoch has changed,
-// so that it can update any exit events that happened in the epoch ending block of the previous epoch
-func (c *checkpointManager) PostEpoch(req *PostEpochRequest) error {
-	// update any exit events that happened in the last block of previous epoch and move them to the current one
-	// this is done to make sure we know they are finalized properly
-	return c.state.updateExitEvents(req.FirstBlockOfEpoch-1, req.NewEpochID-1, req.NewEpochID)
 }
 
 // getExitEventsFromReceipts parses logs from receipts to find exit events

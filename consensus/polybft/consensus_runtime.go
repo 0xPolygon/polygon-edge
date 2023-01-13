@@ -257,9 +257,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
+		// TODO - this will need to take inconsideration if slashing occurred
+		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
-	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number}
+	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
 
 	// handle commitment and proofs creation
 	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
@@ -271,8 +273,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		c.logger.Error("failed to post block in checkpoint manager", "err", err)
 	}
 
-	// TODO - this will need to take inconsideration if slashing occurred
-	if c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch) {
+	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
@@ -430,10 +431,6 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	}
 
 	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
-		return nil, err
-	}
-
-	if err := c.checkpointManager.PostEpoch(reqObj); err != nil {
 		return nil, err
 	}
 
