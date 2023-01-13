@@ -590,7 +590,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 
 		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
-		// waiting until condition is true (namely when block 20 gets checkpointed)
-		return actualCheckpointBlock >= finalBlockNumber, nil
+		return actualCheckpointBlock == finalBlockNumber, nil
 	}))
 }
