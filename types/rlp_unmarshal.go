@@ -376,9 +376,10 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 				return fmt.Errorf("incorrect number of elements to decode state tx, expected 11 but found %d", len(elems))
 			}
 
+			t.From = ZeroAddress
+
 			// We need to set From field for state transaction,
 			// because we are using unique, predefined address, for sending such transactions
-			t.From = ZeroAddress
 			if vv, err := v.Get(10).Bytes(); err == nil && len(vv) == AddressLength {
 				// address
 				addr := BytesToAddress(vv)
