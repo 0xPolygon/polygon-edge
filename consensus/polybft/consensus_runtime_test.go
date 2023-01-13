@@ -226,7 +226,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		},
 		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
 		stateSyncManager:  &dummyStateSyncManager{},
-		checkpointManager: &checkpointManager{state: config.State},
+		checkpointManager: &dummyCheckpointManager{},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
@@ -606,56 +606,6 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		Signature: signature}
 	assert.ErrorContains(t, validateVote(vote, epoch),
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
-}
-
-func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
-
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
-	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
-
-	// manually create merkle tree for a desired checkpoint to verify the generated proof
-	tree, err := NewMerkleTree(checkpointEvents)
-	require.NoError(t, err)
-
-	proof, err := runtime.GenerateExitProof(1, 1, 1)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	t.Run("Generate and validate exit proof", func(t *testing.T) {
-		t.Parallel()
-		// verify generated proof on desired tree
-		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Proof, tree.Hash()))
-	})
-
-	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
-		t.Parallel()
-
-		// copy and make proof invalid
-		invalidProof := make([]types.Hash, len(proof.Proof))
-		copy(invalidProof, proof.Proof)
-		invalidProof[0][0]++
-
-		// verify generated proof on desired tree
-		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
-	})
-
-	t.Run("Generate exit proof - no event", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := runtime.GenerateExitProof(21, 1, 1)
-		require.ErrorContains(t, err, "could not find any exit event that has an id")
-	})
 }
 
 func TestConsensusRuntime_IsValidSender(t *testing.T) {
