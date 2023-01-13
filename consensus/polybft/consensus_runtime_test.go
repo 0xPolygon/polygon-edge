@@ -348,9 +348,10 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators:        validators.getPublicIdentities(),
 			FirstBlockInEpoch: 1,
 		},
-		lastBuiltBlock:   lastBlock,
-		state:            newTestState(t),
-		stateSyncManager: &dummyStateSyncManager{},
+		lastBuiltBlock:    lastBlock,
+		state:             newTestState(t),
+		stateSyncManager:  &dummyStateSyncManager{},
+		checkpointManager: &dummyCheckpointManager{},
 	}
 
 	err := runtime.FSM()
@@ -418,6 +419,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 		config:             config,
 		lastBuiltBlock:     lastBuiltBlock,
 		stateSyncManager:   &dummyStateSyncManager{},
+		checkpointManager:  &dummyCheckpointManager{},
 	}
 
 	err := runtime.FSM()
@@ -606,41 +608,6 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
 }
 
-func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
-
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
-
-	t.Run("Get exit event root hash", func(t *testing.T) {
-		t.Parallel()
-
-		tree, err := NewMerkleTree(encodedEvents)
-		require.NoError(t, err)
-
-		hash, err := runtime.BuildEventRoot(1)
-		require.NoError(t, err)
-		require.Equal(t, tree.Hash(), hash)
-	})
-
-	t.Run("Get exit event root hash - no events", func(t *testing.T) {
-		t.Parallel()
-
-		hash, err := runtime.BuildEventRoot(2)
-		require.NoError(t, err)
-		require.Equal(t, types.Hash{}, hash)
-	})
-}
-
 func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
 	t.Parallel()
 
@@ -723,6 +690,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 		stateSyncManager:   &dummyStateSyncManager{},
+		checkpointManager:  &dummyCheckpointManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -925,6 +893,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 		stateSyncManager:   &dummyStateSyncManager{},
+		checkpointManager:  &dummyCheckpointManager{},
 	}
 
 	require.NoError(t, runtime.FSM())

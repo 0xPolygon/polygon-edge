@@ -64,14 +64,14 @@ type fsm struct {
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
-	// checkpointBackend provides functions for working with checkpoints and exit events
-	checkpointBackend checkpointBackend
-
 	// logger instance
 	logger hcf.Logger
 
 	// target is the block being computed
 	target *types.FullBlock
+
+	// exitEventRootHash is the calculated root hash for given checkpoint block
+	exitEventRootHash types.Hash
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -141,17 +141,12 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber)
-	if err != nil {
-		return nil, err
-	}
-
 	extra.Checkpoint = &CheckpointData{
 		BlockRound:            currentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,
-		EventRoot:             eventRoot,
+		EventRoot:             f.exitEventRootHash,
 	}
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {

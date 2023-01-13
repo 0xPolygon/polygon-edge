@@ -339,6 +339,39 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	})
 }
 
+func TestCheckpointManager_BuildEventRoot(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	checkpointManager := &checkpointManager{state: state}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+
+	t.Run("Get exit event root hash", func(t *testing.T) {
+		t.Parallel()
+
+		tree, err := NewMerkleTree(encodedEvents)
+		require.NoError(t, err)
+
+		hash, err := checkpointManager.BuildEventRoot(1)
+		require.NoError(t, err)
+		require.Equal(t, tree.Hash(), hash)
+	})
+
+	t.Run("Get exit event root hash - no events", func(t *testing.T) {
+		t.Parallel()
+
+		hash, err := checkpointManager.BuildEventRoot(2)
+		require.NoError(t, err)
+		require.Equal(t, types.Hash{}, hash)
+	})
+}
+
 func TestPerformExit(t *testing.T) {
 	t.Parallel()
 
