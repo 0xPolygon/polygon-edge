@@ -278,7 +278,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 
 		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
-		return actualCheckpointBlock < expectedCheckpointBlock, nil
+		return actualCheckpointBlock == expectedCheckpointBlock, nil
 	}
 
 	// wait for a single epoch to be checkpointed
@@ -591,6 +591,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
 		// waiting until condition is true (namely when block 20 gets checkpointed)
-		return actualCheckpointBlock < finalBlockNumber, nil
+		return actualCheckpointBlock >= finalBlockNumber, nil
 	}))
 }
