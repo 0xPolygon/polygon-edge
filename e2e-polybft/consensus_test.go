@@ -374,11 +374,10 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	err = cluster.Bridge.WaitUntil(time.Second, 10*time.Second, func() (bool, error) {
 		rootchainValidators, err = getRootchainValidators(l1Relayer, checkpointManagerAddr, rootchainSender)
 		if err != nil {
-			return false, err
+			return true, err
 		}
 
-		// execute until number of validators is different than 5 (namely it becomes 4)
-		return len(rootchainValidators) == 5, nil
+		return len(rootchainValidators) == 4, nil
 	})
 	require.NoError(t, err)
 	require.Equal(t, 4, len(rootchainValidators))
