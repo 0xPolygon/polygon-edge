@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/big"
 	"sort"
 	"time"
 
@@ -216,6 +215,13 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
+	val := command.DefaultPremineBalance
+
+	contractBalance, err := types.ParseUint256orHex(&val)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, contract := range genesisContracts {
 		artifact, err := artifact.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
@@ -223,7 +229,7 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 		}
 
 		allocations[contract.address] = &chain.GenesisAccount{
-			Balance: big.NewInt(0),
+			Balance: contractBalance,
 			Code:    artifact.DeployedBytecode,
 		}
 	}
