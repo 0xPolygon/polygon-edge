@@ -325,11 +325,11 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	validatorInfoRaw, err := sidechain.GetValidatorInfo(validatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	stake := validatorInfoRaw["totalStake"].(*big.Int) //nolint:forcetypeassert
-	t.Logf("Validator start stake=%s\n", stake.String())
+	initialStake := validatorInfoRaw["totalStake"].(*big.Int) //nolint:forcetypeassert
+	t.Logf("Stake (before unstake)=%s\n", initialStake.String())
 
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
-	require.NoError(t, srv.Unstake(stake.Uint64()))
+	require.NoError(t, srv.Unstake(initialStake.Uint64()))
 
 	// wait end of epoch
 	require.NoError(t, cluster.WaitForBlock(10, 20*time.Second))
@@ -344,20 +344,21 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, err)
 
 	reward := validatorInfoRaw["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
+	t.Logf("Rewards=%d\n", reward)
+	t.Logf("Stake (after unstake)=%d\n", validatorInfoRaw["totalStake"].(*big.Int)) //nolint:forcetypeassert
 	require.Greater(t, reward.Uint64(), uint64(0))
-	t.Logf("Validator rewards=%d\n", reward)
 
-	balance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
+	oldValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
-	t.Logf("Validator balance (before withdrawal)=%s\n", balance)
+	t.Logf("Balance (before withdrawal)=%s\n", oldValidatorBalance)
 
-	// TODO: Figure out withdrawal (try with partial staking instead of staking entire balance)
-	// // withdraw all the funds
-	// require.NoError(t, cluster.Servers[1].Withdraw(validatorSecrets, validatorAddr))
+	// withdraw (stake + rewards)
+	require.NoError(t, srv.Withdraw(validatorSecrets, validatorAddr))
 
-	balance, err = srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
+	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
-	t.Logf("Validator balance (after withdrawal)=%s\n", balance)
+	t.Logf("Balance (after withdrawal)=%s\n", newValidatorBalance)
+	require.True(t, newValidatorBalance.Cmp(oldValidatorBalance) > 0)
 
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
