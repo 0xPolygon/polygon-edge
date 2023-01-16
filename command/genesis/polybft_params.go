@@ -30,11 +30,9 @@ const (
 	bridgeFlag                 = "bridge-json-rpc"
 
 	defaultManifestPath     = "./manifest.json"
-	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
-	defaultBridge           = false
 	defaultEpochReward      = 1
 
 	bootnodePortStart = 30301
@@ -165,6 +163,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		ExtraData:  genesisExtraData,
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
+		BaseFee:    chain.GenesisBaseFee,
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
