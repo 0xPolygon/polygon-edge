@@ -165,6 +165,11 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	h.SetNonce(nonce)
 
+	// basefee
+	if h.BaseFee, err = elems[15].GetUint64(); err != nil {
+		return err
+	}
+
 	// compute the hash after the decoding
 	h.ComputeHash()
 
