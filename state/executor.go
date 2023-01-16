@@ -168,6 +168,7 @@ func (e *Executor) BeginTxn(
 		Timestamp:  int64(header.Timestamp),
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		BaseFee:    new(big.Int).SetUint64(header.BaseFee),
 		GasLimit:   int64(header.GasLimit),
 		ChainID:    int64(e.config.ChainID),
 	}
@@ -496,8 +497,25 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice)
 	t.state.AddBalance(msg.From, remaining)
 
-	// pay the coinbase
+	// define effective tip based on tx type
+	effectiveTip := msg.GasPrice
+	if t.config.London {
+		effectiveTip = new(big.Int).Set(msg.GasTipCap)
+		secondTipOption := new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee)
+		if secondTipOption.Cmp(effectiveTip) == -1 {
+			effectiveTip = secondTipOption
+		}
+	}
+
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
+
+	if t.config.London {
+		burntContractAddress := t.config.CalculateBurntContract(t.ctx.Number)
+		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
+		t.state.AddBalance(burntContractAddress, burnAmount)
+	}
+
+	// pay the coinbase
 	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
 	// return gas to the pool
