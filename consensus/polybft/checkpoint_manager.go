@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -37,10 +38,8 @@ var (
 
 type CheckpointManager interface {
 	PostBlock(req *PostBlockRequest) error
-	IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool
-	SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error
-	SetLastSentBlock(blockNumber uint64)
 	BuildEventRoot(epoch uint64) (types.Hash, error)
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
@@ -48,15 +47,11 @@ var _ CheckpointManager = (*dummyCheckpointManager)(nil)
 type dummyCheckpointManager struct{}
 
 func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (d *dummyCheckpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
-	return false
-}
-func (d *dummyCheckpointManager) SubmitCheckpoint(header *types.Header, isEndOfEpoch bool) error {
-	return nil
-}
-func (d *dummyCheckpointManager) SetLastSentBlock(blockNumber uint64) {}
 func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return types.ZeroHash, nil
+}
+func (d *dummyCheckpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
+	return types.ExitProof{}, nil
 }
 
 var _ CheckpointManager = (*checkpointManager)(nil)
@@ -124,13 +119,8 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 	return latestCheckpointBlockNum, nil
 }
 
-// SetLastSentBlock sets the lastSentBlock field
-func (c *checkpointManager) SetLastSentBlock(blockNumber uint64) {
-	c.lastSentBlock = blockNumber
-}
-
-// SubmitCheckpoint sends a transaction with checkpoint data to the rootchain
-func (c *checkpointManager) SubmitCheckpoint(latestHeader *types.Header, isEndOfEpoch bool) error {
+// submitCheckpoint sends a transaction with checkpoint data to the rootchain
+func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOfEpoch bool) error {
 	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
@@ -283,10 +273,10 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 	return submitCheckpointMethod.Encode(params)
 }
 
-// IsCheckpointBlock returns true for blocks in the middle of the epoch
+// isCheckpointBlock returns true for blocks in the middle of the epoch
 // which are offset by predefined count of blocks
 // or if given block is an epoch ending block
-func (c *checkpointManager) IsCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
+func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
 	return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
 }
 
@@ -306,7 +296,25 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	return c.state.insertExitEvents(events)
+	if err := c.state.insertExitEvents(events); err != nil {
+		return err
+	}
+
+	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock) &&
+		bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner) {
+		go func(header *types.Header, epochNumber uint64) {
+			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {
+				c.logger.Warn("failed to submit checkpoint",
+					"checkpoint block", header.Number,
+					"epoch number", epochNumber,
+					"error", err)
+			}
+		}(req.FullBlock.Block.Header, req.Epoch)
+
+		c.lastSentBlock = req.FullBlock.Block.Number()
+	}
+
+	return nil
 }
 
 // BuildEventRoot returns an exit event root hash for exit tree of given epoch
@@ -326,6 +334,44 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	}
 
 	return tree.Hash(), nil
+}
+
+// GenerateExitProof generates proof of exit
+func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
+	exitEvent, err := c.state.getExitEvent(exitID, epoch)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	e, err := ExitEventABIType.Encode(exitEvent)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	tree, err := createExitTree(exitEvents)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	leafIndex, err := tree.LeafIndex(e)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	proof, err := tree.GenerateProofForLeaf(e, 0)
+	if err != nil {
+		return types.ExitProof{}, err
+	}
+
+	return types.ExitProof{
+		Proof:     proof,
+		LeafIndex: leafIndex,
+	}, nil
 }
 
 // getExitEventsFromReceipts parses logs from receipts to find exit events

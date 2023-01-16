@@ -528,42 +528,9 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	return commitEpoch, nil
 }
 
-// GenerateExitProof generates proof of exit
+// GenerateExitProof generates proof of exit and is a bridge endpoint store function
 func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
-	exitEvent, err := c.state.getExitEvent(exitID, epoch)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	e, err := ExitEventABIType.Encode(exitEvent)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	tree, err := createExitTree(exitEvents)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	leafIndex, err := tree.LeafIndex(e)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	proof, err := tree.GenerateProofForLeaf(e, 0)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	return types.ExitProof{
-		Proof:     proof,
-		LeafIndex: leafIndex,
-	}, nil
+	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
 }
 
 // GetStateSyncProof returns the proof for the state sync
@@ -731,20 +698,6 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 		c.logger.Error("cannot insert proposal", "error", err)
 
 		return
-	}
-
-	if c.checkpointManager.IsCheckpointBlock(fullBlock.Block.Header.Number, fsm.isEndOfEpoch) &&
-		bytes.Equal(c.config.Key.Address().Bytes(), fullBlock.Block.Header.Miner) {
-		go func(header *types.Header, epochNumber uint64) {
-			if err := c.checkpointManager.SubmitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
-				c.logger.Warn("failed to submit checkpoint",
-					"checkpoint block", header.Number,
-					"epoch number", epochNumber,
-					"error", err)
-			}
-		}(fullBlock.Block.Header, fsm.epochNumber)
-
-		c.checkpointManager.SetLastSentBlock(fullBlock.Block.Number())
 	}
 
 	c.OnBlockInserted(fullBlock)
