@@ -966,18 +966,3 @@ func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 
 	return NewMerkleTree(data)
 }
-
-// getSealersForBlock checks who sealed a given block and updates the counter
-func getSealersForBlock(sealersCounter map[types.Address]uint64,
-	blockExtra *Extra, validators AccountSet) error {
-	signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
-	if err != nil {
-		return err
-	}
-
-	for _, a := range signers.GetAddresses() {
-		sealersCounter[a]++
-	}
-
-	return nil
-}

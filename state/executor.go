@@ -134,7 +134,7 @@ func (e *Executor) ProcessBlock(
 	return txn, nil
 }
 
-// StateAt returns snapshot at given root
+// State returns snapshot at given root
 func (e *Executor) State() State {
 	return e.state
 }
@@ -164,13 +164,14 @@ func (e *Executor) BeginTxn(
 	newTxn := NewTxn(auxSnap2)
 
 	txCtx := runtime.TxContext{
-		Coinbase:   coinbaseReceiver,
-		Timestamp:  int64(header.Timestamp),
-		Number:     int64(header.Number),
-		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
-		BaseFee:    new(big.Int).SetUint64(header.BaseFee),
-		GasLimit:   int64(header.GasLimit),
-		ChainID:    int64(e.config.ChainID),
+		Coinbase:     coinbaseReceiver,
+		Timestamp:    int64(header.Timestamp),
+		Number:       int64(header.Number),
+		Difficulty:   types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		BaseFee:      new(big.Int).SetUint64(header.BaseFee),
+		GasLimit:     int64(header.GasLimit),
+		ChainID:      int64(e.config.ChainID),
+		BurnContract: e.config.CalculateBurntContract(header.Number),
 	}
 
 	txn := &Transition{
@@ -510,9 +511,8 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
 
 	if t.config.London {
-		burntContractAddress := t.config.CalculateBurntContract(t.ctx.Number)
 		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
-		t.state.AddBalance(burntContractAddress, burnAmount)
+		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
 	}
 
 	// pay the coinbase
