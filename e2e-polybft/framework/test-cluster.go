@@ -443,7 +443,7 @@ func (c *TestCluster) WaitUntil(dur time.Duration, handler func() bool) error {
 		case <-time.After(2 * time.Second):
 		}
 
-		if !handler() {
+		if handler() {
 			return nil
 		}
 	}
@@ -484,12 +484,13 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 func (c *TestCluster) WaitForGeneric(dur time.Duration, fn func(*TestServer) bool) error {
 	return c.WaitUntil(dur, func() bool {
 		for _, srv := range c.Servers {
-			if srv.isRunning() && !fn(srv) { // if server is stopped - skip it
-				return true
+			// query only running servers
+			if srv.isRunning() && !fn(srv) {
+				return false
 			}
 		}
 
-		return false
+		return true
 	})
 }
 

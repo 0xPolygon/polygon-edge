@@ -71,11 +71,11 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 			}
 			t.Logf("Balance %s %s", receiver, balance)
 			if balance.Uint64() != uint64(sendAmount) {
-				return true
+				return false
 			}
 		}
 
-		return false
+		return true
 	})
 	require.NoError(t, err)
 }
@@ -104,7 +104,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 				return true
 			}
 
-			return balance.Cmp(big.NewInt(0)) == 0
+			return balance.Cmp(big.NewInt(0)) > 0
 		})
 
 		return err
