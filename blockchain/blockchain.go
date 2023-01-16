@@ -22,8 +22,17 @@ import (
 )
 
 const (
-	BlockGasTargetDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations
-	defaultCacheSize      int    = 100  // The default size for Blockchain LRU cache structures
+	// ElasticityMultiplier is the value to bound the maximum gas limit an EIP-1559 block may have.
+	ElasticityMultiplier = 2
+
+	// DefaultBaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks.
+	DefaultBaseFeeChangeDenom = 8
+
+	// BlockGasTargetDivisor is the bound divisor of the gas limit, used in update calculations
+	BlockGasTargetDivisor uint64 = 1024
+
+	// defaultCacheSize is the default size for Blockchain LRU cache structures
+	defaultCacheSize int = 100
 )
 
 var (
@@ -1433,4 +1442,36 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 // Close closes the DB connection
 func (b *Blockchain) Close() error {
 	return b.db.Close()
+}
+
+// CalculateBaseFee calculates the basefee of the header.
+func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
+	if !b.config.Params.Forks.IsLondon(parent.Number) {
+		return chain.GenesisBaseFee
+	}
+
+	var (
+		parentGasTarget = parent.GasLimit / ElasticityMultiplier
+	)
+
+	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
+	if parent.GasUsed == parentGasTarget {
+		return parent.BaseFee
+	}
+
+	if parent.GasUsed > parentGasTarget {
+		// If the parent block used more gas than its target, the baseFee should increase.
+		gasUsedDelta := parent.GasUsed - parentGasTarget
+		y := parent.BaseFee * gasUsedDelta / parentGasTarget
+		baseFeeDelta := y / DefaultBaseFeeChangeDenom
+
+		return parent.BaseFee + common.Max(baseFeeDelta, 1)
+	}
+
+	// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
+	gasUsedDelta := parentGasTarget - parent.GasUsed
+	y := parent.BaseFee * gasUsedDelta / parentGasTarget
+	baseFeeDelta := y / DefaultBaseFeeChangeDenom
+
+	return common.Max(parent.BaseFee-baseFeeDelta, 0)
 }

@@ -127,11 +127,11 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		logger:             log.Named("consensus_runtime"),
 	}
 
-	if err := runtime.initStateSyncManager(log); err != nil {
+	if err = runtime.initStateSyncManager(log); err != nil {
 		return nil, err
 	}
 
-	if err := runtime.initCheckpointManager(log); err != nil {
+	if err = runtime.initCheckpointManager(log); err != nil {
 		return nil, err
 	}
 
@@ -258,12 +258,12 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
 
 	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
+	if err = c.stateSyncManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block state sync", "err", err)
 	}
 
 	// handle exit events that happened in block
-	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
+	if err = c.checkpointManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block in checkpoint manager", "err", err)
 	}
 
@@ -275,7 +275,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		}
 	}
 
-	if err := c.proposerCalculator.Update(fullBlock.Block.Number()); err != nil {
+	if err = c.proposerCalculator.Update(fullBlock.Block.Number()); err != nil {
 		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
 		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
@@ -298,7 +298,7 @@ func (c *consensusRuntime) FSM() error {
 		return errNotAValidator
 	}
 
-	blockBuilder, err := c.config.blockchain.NewBlockBuilder(
+	bb, err := c.config.blockchain.NewBlockBuilder(
 		parent,
 		types.Address(c.config.Key.Address()),
 		c.config.txPool,
@@ -331,7 +331,7 @@ func (c *consensusRuntime) FSM() error {
 		polybftBackend:    c.config.polybftBackend,
 		exitEventRootHash: exitRootHash,
 		epochNumber:       epoch.Number,
-		blockBuilder:      blockBuilder,
+		blockBuilder:      bb,
 		validators:        valSet,
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
