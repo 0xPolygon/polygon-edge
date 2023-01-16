@@ -37,30 +37,21 @@ type validatorInfo struct {
 
 // getRootchainValidators queries rootchain validator set
 func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, sender ethgo.Address) ([]*validatorInfo, error) {
-	getValidatorCount := func() (uint64, error) {
-		validatorCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
-			checkpointManagerAddr, sender, "currentValidatorSetLength")
-		if err != nil {
-			return 0, err
-		}
-
-		actualValidatorCount, err := types.ParseUint64orHex(&validatorCountRaw)
-		if err != nil {
-			return 0, err
-		}
-
-		return actualValidatorCount, nil
+	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
+		checkpointManagerAddr, sender, "currentValidatorSetLength")
+	if err != nil {
+		return nil, err
 	}
 
-	numberOfValidators, err := getValidatorCount()
+	validatorsCount, err := types.ParseUint64orHex(&validatorsCountRaw)
 	if err != nil {
 		return nil, err
 	}
 
 	currentValidatorSetMethod := contractsapi.CheckpointManager.Abi.GetMethod("currentValidatorSet")
-	validators := make([]*validatorInfo, numberOfValidators)
+	validators := make([]*validatorInfo, validatorsCount)
 
-	for i := 0; i < int(numberOfValidators); i++ {
+	for i := 0; i < int(validatorsCount); i++ {
 		validatorRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
 			checkpointManagerAddr, sender, "currentValidatorSet", i)
 		if err != nil {
