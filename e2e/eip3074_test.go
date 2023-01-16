@@ -181,7 +181,43 @@ func TestBasicInvoker(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, testReceiverKey.Address(), checkAddr)
 
-	accountInvokerContract, accountInvokerAddr := deployArtifact("AccountSessionInvoker.json", senderKey)
-	_ = accountInvokerContract
-	_ = accountInvokerAddr
+	// do same with account session invoker
+
+	sessionInvokerContract, sessionInvokerAddr := deployArtifact("AccountSessionInvoker.json", senderKey)
+
+	// create session token
+	sessionToken := invoker.SessionToken{
+		Delegate:   types.Address(testReceiverKey.Address()),
+		Expiration: big.NewInt(0),
+	}
+
+	// check session token hash
+	res, err = sessionInvokerContract.Call("hashSessionToken", ethgo.Latest, sessionToken)
+	require.NoError(t, err)
+	checkHash, ok = res["0"].([32]byte)
+	require.True(t, ok)
+
+	// check hash
+	sessionTokenHash, err := sessionToken.InvokerHash()
+	require.NoError(t, err)
+	require.Equal(t, checkHash[:], sessionTokenHash)
+
+	// ???
+	res, err = sessionInvokerContract.Call("getCommitHash", ethgo.Latest, sessionToken)
+	require.NoError(t, err)
+	checkHash, ok = res["0"].([32]byte)
+	require.True(t, ok)
+
+	var invokerSignature invoker.InvokerSignature
+	err = invokerSignature.SignCommit(testReceiverKey, checkHash[:], sessionInvokerAddr)
+	require.NoError(t, err)
+
+	sessionTx, err := sessionInvokerContract.Txn("invoke", invokerSignature, sessionToken, tps.Payloads())
+	require.NoError(t, err)
+
+	err = sessionTx.Do()
+	require.NoError(t, err)
+	rcpt, err = invokeTx.Wait()
+	require.NoError(t, err)
+
 }

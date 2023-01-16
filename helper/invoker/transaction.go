@@ -202,7 +202,7 @@ var sessionTokenType = ethgo.Keccak256([]byte("SessionToken(address delegate,uin
 func (tp *SessionToken) InvokerHash() (h []byte, err error) {
 
 	var t *abi.Type
-	if t, err = abi.NewType("tuple(address delegate, uint256 expiration)"); err != nil {
+	if t, err = abi.NewType("tuple(bytes32 typeHash, address delegate, uint256 expiration)"); err != nil {
 		return
 	}
 
