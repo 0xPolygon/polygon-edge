@@ -25,6 +25,7 @@ type TestServerConfig struct {
 	DataDir     string
 	Chain       string
 	LogLevel    string
+	Relayer     bool
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -130,6 +131,10 @@ func (t *TestServer) Start() {
 
 	if config.Seal {
 		args = append(args, "--seal")
+	}
+
+	if config.Relayer {
+		args = append(args, "--relayer")
 	}
 
 	// Start the server

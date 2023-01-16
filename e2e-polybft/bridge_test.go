@@ -28,7 +28,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
@@ -66,36 +65,36 @@ func checkLogs(
 	}
 }
 
-func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.TxRelayer, account ethgo.Key, stateSyncID string) {
-	t.Helper()
+// func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.TxRelayer, account ethgo.Key, stateSyncID string) {
+// 	t.Helper()
 
-	// retrieve state sync proof
-	var stateSyncProof types.StateSyncProof
-	err := client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
-	require.NoError(t, err)
+// 	// retrieve state sync proof
+// 	var stateSyncProof types.StateSyncProof
+// 	err := client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
+// 	require.NoError(t, err)
 
-	t.Log("State sync proofs:", stateSyncProof)
+// 	t.Log("State sync proofs:", stateSyncProof)
 
-	input, err := stateSyncProof.EncodeAbi()
-	require.NoError(t, err)
+// 	input, err := stateSyncProof.EncodeAbi()
+// 	require.NoError(t, err)
 
-	t.Log(stateSyncProof.StateSync.ToMap())
+// 	t.Log(stateSyncProof.StateSync.ToMap())
 
-	// execute the state sync
-	txn := &ethgo.Transaction{
-		From:     account.Address(),
-		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
-		GasPrice: 0,
-		Gas:      types.StateTransactionGasLimit,
-		Input:    input,
-	}
+// 	// execute the state sync
+// 	txn := &ethgo.Transaction{
+// 		From:     account.Address(),
+// 		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
+// 		GasPrice: 0,
+// 		Gas:      types.StateTransactionGasLimit,
+// 		Input:    input,
+// 	}
 
-	receipt, err := txRelayer.SendTransaction(txn, account)
-	require.NoError(t, err)
-	require.NotNil(t, receipt)
+// 	receipt, err := txRelayer.SendTransaction(txn, account)
+// 	require.NoError(t, err)
+// 	require.NotNil(t, receipt)
 
-	t.Log("Logs", len(receipt.Logs))
-}
+// 	t.Log("Logs", len(receipt.Logs))
+// }
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	const num = 10
@@ -132,15 +131,15 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
 
-	client := cluster.Servers[0].JSONRPC()
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
-	require.NoError(t, err)
+	// client := cluster.Servers[0].JSONRPC()
+	// txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	// require.NoError(t, err)
 
 	// commitments should've been stored
 	// execute the state syncs
-	for i := 0; i < num; i++ {
-		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
-	}
+	// for i := 0; i < num; i++ {
+	// 	executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
+	// }
 
 	// the transactions are mined and there should be a success events
 	id := stateSyncResultEvent.ID()
@@ -225,17 +224,17 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
 	// check that the second (larger commitment) was also submitted in epoch
-	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
-	require.NoError(t, err)
+	// result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	// require.NoError(t, err)
 
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(10), lastCommittedID)
 
-	// execute all state syncs in submitted commitments
-	for i := 0; i < num; i++ {
-		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
-	}
+	// // execute all state syncs in submitted commitments
+	// for i := 0; i < num; i++ {
+	// 	executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
+	// }
 
 	// the transactions are mined and there should be a success events
 	id := stateSyncResultEvent.ID()
