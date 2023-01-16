@@ -184,3 +184,39 @@ func (tp *TransactionPayload) InvokerHash() (h []byte, err error) {
 	h = ethgo.Keccak256(encBytes)
 	return
 }
+
+type SessionToken struct {
+	Delegate   types.Address `abi:"delegate"`
+	Expiration *big.Int      `abi:"expiration"`
+}
+
+type encSessionToken struct {
+	TypeHash   [32]byte      `abi:"typeHash"`
+	Delegate   types.Address `abi:"delegate"`
+	Expiration *big.Int      `abi:"expiration"`
+}
+
+// from AccountSessionInvoker.sol: SESSION_TOKEN_TYPE
+var sessionTokenType = ethgo.Keccak256([]byte("SessionToken(address delegate,uint256 expiration)"))
+
+func (tp *SessionToken) InvokerHash() (h []byte, err error) {
+
+	var t *abi.Type
+	if t, err = abi.NewType("tuple(address delegate, uint256 expiration)"); err != nil {
+		return
+	}
+
+	enc := encSessionToken{
+		Delegate:   tp.Delegate,
+		Expiration: tp.Expiration,
+	}
+	copy(enc.TypeHash[:], sessionTokenType)
+
+	var encBytes []byte
+	if encBytes, err = abi.Encode(&enc, t); err != nil {
+		return
+	}
+
+	h = ethgo.Keccak256(encBytes)
+	return
+}

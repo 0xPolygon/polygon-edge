@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/invoker"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -85,33 +84,28 @@ func TestBasicInvoker(t *testing.T) {
 
 	srv := ibftManager.GetServer(0)
 
-	invokerArt, err := getTestArtifact("AccountAbstractionInvoker.json")
-	require.NoError(t, err)
-	require.True(t, len(invokerArt.Bin) > 0)
+	deployArtifact := func(name string, withKey *ecdsa.PrivateKey) (*contract.Contract, ethgo.Address) {
+		art, err := getTestArtifact(name)
+		require.NoError(t, err)
+		require.True(t, len(art.Bin) > 0)
 
-	invokerAbi, err := abi.NewABI(invokerArt.Abi)
-	require.NoError(t, err)
+		abi, err := abi.NewABI(art.Abi)
+		require.NoError(t, err)
 
-	invokerAddr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(invokerArt.Bin, "0x"), senderKey)
-	require.NoError(t, err)
-	require.NotNil(t, invokerAddr)
+		addr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(art.Bin, "0x"), withKey)
+		require.NoError(t, err)
+		require.NotNil(t, addr)
 
-	mockArt, err := getTestArtifact("MockContract.json")
-	require.NoError(t, err)
-	require.True(t, len(invokerArt.Bin) > 0)
+		sk := &testECDSAKey{k: withKey}
+		contract := contract.NewContract(addr, abi,
+			contract.WithJsonRPC(srv.JSONRPC().Eth()),
+			contract.WithSender(sk),
+		)
+		return contract, addr
+	}
 
-	mockAbi, err := abi.NewABI(mockArt.Abi)
-	require.NoError(t, err)
-
-	mockAddr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(mockArt.Bin, "0x"), senderKey)
-	require.NoError(t, err)
-	require.NotNil(t, invokerAddr)
-
-	sk := &testECDSAKey{k: senderKey}
-	invokerContract := contract.NewContract(invokerAddr, invokerAbi,
-		contract.WithJsonRPC(srv.JSONRPC().Eth()),
-		contract.WithSender(sk),
-	)
+	invokerContract, invokerAddr := deployArtifact("AccountAbstractionInvoker.json", senderKey)
+	mockContract, mockAddr := deployArtifact("MockContract.json", senderKey)
 
 	res, err := invokerContract.Call("DOMAIN_SEPARATOR", ethgo.Latest)
 	require.NoError(t, err)
@@ -143,10 +137,9 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, checkHash[:], th)
 
-	k := &testECDSAKey{k: receiverKey}
-
+	testReceiverKey := &testECDSAKey{k: receiverKey}
 	it := invoker.InvokerTransaction{
-		From:     types.Address(k.Address()),
+		From:     types.Address(testReceiverKey.Address()),
 		Nonce:    big.NewInt(0),
 		Payloads: tps,
 	}
@@ -170,13 +163,8 @@ func TestBasicInvoker(t *testing.T) {
 
 	var is invoker.InvokerSignature
 
-	err = is.SignCommit(k, checkHash[:], invokerAddr)
+	err = is.SignCommit(testReceiverKey, checkHash[:], invokerAddr)
 	require.NoError(t, err)
-
-	println(is.String())
-	println(hex.EncodeToHex(checkHash[:]))
-	println(k.Address().String())
-	println(invokerAddr.String())
 
 	invokeTx, err := invokerContract.Txn("invoke", is, it)
 	require.NoError(t, err)
@@ -187,14 +175,13 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, rcpt.GasUsed > 0) // whatever ...
 
-	mockContract := contract.NewContract(mockAddr, mockAbi,
-		contract.WithJsonRPC(srv.JSONRPC().Eth()),
-	)
-
 	res, err = mockContract.Call("lastSender", ethgo.Latest)
 	require.NoError(t, err)
 	checkAddr, ok := res["0"].(ethgo.Address)
 	require.True(t, ok)
-	require.Equal(t, k.Address(), checkAddr)
+	require.Equal(t, testReceiverKey.Address(), checkAddr)
 
+	accountInvokerContract, accountInvokerAddr := deployArtifact("AccountSessionInvoker.json", senderKey)
+	_ = accountInvokerContract
+	_ = accountInvokerAddr
 }
