@@ -91,7 +91,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 		logger:           hclog.NewNullLogger(),
 	}
 
-	err := c.SubmitCheckpoint(headersMap.getHeader(blocksCount), false)
+	err := c.submitCheckpoint(headersMap.getHeader(blocksCount), false)
 	require.NoError(t, err)
 	txRelayerMock.AssertExpectations(t)
 
@@ -285,7 +285,7 @@ func TestCheckpointManager_IsCheckpointBlock(t *testing.T) {
 			t.Parallel()
 
 			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
-			require.Equal(t, c.isCheckpointBlock, checkpointMgr.IsCheckpointBlock(c.blockNumber, c.isEpochEndingBlock))
+			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber, c.isEpochEndingBlock))
 		})
 	}
 }
@@ -369,6 +369,56 @@ func TestCheckpointManager_BuildEventRoot(t *testing.T) {
 		hash, err := checkpointManager.BuildEventRoot(2)
 		require.NoError(t, err)
 		require.Equal(t, types.Hash{}, hash)
+	})
+}
+
+func TestCheckpointManager_GenerateExitProof(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numOfBlocks         = 10
+		numOfEventsPerBlock = 2
+	)
+
+	state := newTestState(t)
+	checkpointManager := &checkpointManager{
+		state: state,
+	}
+
+	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
+
+	// manually create merkle tree for a desired checkpoint to verify the generated proof
+	tree, err := NewMerkleTree(checkpointEvents)
+	require.NoError(t, err)
+
+	proof, err := checkpointManager.GenerateExitProof(1, 1, 1)
+	require.NoError(t, err)
+	require.NotNil(t, proof)
+
+	t.Run("Generate and validate exit proof", func(t *testing.T) {
+		t.Parallel()
+		// verify generated proof on desired tree
+		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Proof, tree.Hash()))
+	})
+
+	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
+		t.Parallel()
+
+		// copy and make proof invalid
+		invalidProof := make([]types.Hash, len(proof.Proof))
+		copy(invalidProof, proof.Proof)
+		invalidProof[0][0]++
+
+		// verify generated proof on desired tree
+		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+	})
+
+	t.Run("Generate exit proof - no event", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := checkpointManager.GenerateExitProof(21, 1, 1)
+		require.ErrorContains(t, err, "could not find any exit event that has an id")
 	})
 }
 
