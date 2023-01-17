@@ -56,9 +56,7 @@ func NewBlockBuilder(params *BlockBuilderParams) (*BlockBuilder, error) {
 		params: params,
 	}
 
-	if err := builder.Reset(); err != nil {
-		return nil, err
-	}
+	builder.Reset()
 
 	return builder, nil
 }
@@ -84,7 +82,7 @@ type BlockBuilder struct {
 
 // Reset is used to indicate that the current block building has been interrupted
 // and it has to clean any data
-func (b *BlockBuilder) Reset() error {
+func (b *BlockBuilder) Reset() {
 	b.header = &types.Header{
 		ParentHash:   b.params.Parent.Hash,
 		Number:       b.params.Parent.Number + 1,
@@ -100,6 +98,19 @@ func (b *BlockBuilder) Reset() error {
 
 	b.block = nil
 	b.txns = []*types.Transaction{}
+}
+
+// Init block builder before adding transaction and actual block building
+func (b *BlockBuilder) Init() error {
+	// set the timestamp
+	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
+	headerTime := parentTime.Add(b.params.BlockTime)
+
+	if headerTime.Before(time.Now()) {
+		headerTime = time.Now()
+	}
+
+	b.header.Timestamp = uint64(headerTime.Unix())
 
 	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
 	if err != nil {

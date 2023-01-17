@@ -153,10 +153,17 @@ type blockBuilderMock struct {
 	mock.Mock
 }
 
-func (m *blockBuilderMock) Reset() error {
+func (m *blockBuilderMock) Reset() {
 	_ = m.Called()
+}
 
-	return nil
+func (m *blockBuilderMock) Init() error {
+	args := m.Called()
+	if len(args) == 0 {
+		return nil
+	}
+
+	return args.Error(0)
 }
 
 func (m *blockBuilderMock) WriteTx(tx *types.Transaction) error {
