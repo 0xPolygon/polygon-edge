@@ -99,8 +99,9 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		premineInfos[i] = premineInfo
 		validatorPreminesMap[premineInfo.address] = i
 
+		// TODO: @Stefan-Ethernal change this to Stake when https://github.com/0xPolygon/polygon-edge/pull/1137 gets merged
 		// increment total stake
-		totalStake.Add(totalStake, validator.Stake)
+		totalStake.Add(totalStake, validator.Balance)
 	}
 
 	// deploy genesis contracts
