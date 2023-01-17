@@ -446,7 +446,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, check
 	}
 
 	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return false, errors.New("Failed to get transaction")
+		return false, errors.New("transaction execution failed")
 	}
 
 	result, err := ABICall(l1TxRelayer, contractsapi.ExitHelper, exitHelperAddr, adminAddr, "processedExits", big.NewInt(int64(exitEventID)))
