@@ -37,13 +37,9 @@ type BlockBuilderParams struct {
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
-	builder := &BlockBuilder{
+	return &BlockBuilder{
 		params: params,
 	}
-
-	builder.Reset()
-
-	return builder
 }
 
 var _ blockBuilder = &BlockBuilder{}
@@ -65,9 +61,16 @@ type BlockBuilder struct {
 	state *state.Transition
 }
 
-// Reset is used to indicate that the current block building has been interrupted
-// and it has to clean any data
-func (b *BlockBuilder) Reset() {
+// Init initializes block builder before adding transactions and actual block building
+func (b *BlockBuilder) Init() error {
+	// set the timestamp
+	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
+	headerTime := parentTime.Add(b.params.BlockTime)
+
+	if headerTime.Before(time.Now()) {
+		headerTime = time.Now()
+	}
+
 	b.header = &types.Header{
 		ParentHash:   b.params.Parent.Hash,
 		Number:       b.params.Parent.Number + 1,
@@ -78,23 +81,8 @@ func (b *BlockBuilder) Reset() {
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
 		GasLimit:     b.params.GasLimit,
+		Timestamp:    uint64(headerTime.Unix()),
 	}
-
-	b.block = nil
-	b.txns = []*types.Transaction{}
-}
-
-// Init block builder before adding transaction and actual block building
-func (b *BlockBuilder) Init() error {
-	// set the timestamp
-	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
-	headerTime := parentTime.Add(b.params.BlockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
-	b.header.Timestamp = uint64(headerTime.Unix())
 
 	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
 	if err != nil {
@@ -102,6 +90,8 @@ func (b *BlockBuilder) Init() error {
 	}
 
 	b.state = transition
+	b.block = nil
+	b.txns = []*types.Transaction{}
 
 	return nil
 }

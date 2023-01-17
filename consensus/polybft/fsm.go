@@ -18,7 +18,6 @@ import (
 )
 
 type blockBuilder interface {
-	Reset()
 	Init() error
 	WriteTx(*types.Transaction) error
 	Fill()
