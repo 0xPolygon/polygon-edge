@@ -326,15 +326,13 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	const (
 		userNumber = 10
-		epochSize  = 5
+		epochSize  = 30
 	)
 
 	sidechainKeys := make([]*ethgow.Key, userNumber)
 	accountAddress := make([]types.Address, userNumber)
-	extras := make([]*polybft.Extra, userNumber)
-	l2SenderBlocks := make([]uint64, userNumber)
-	exitEventIDs := make([]*big.Int, userNumber)
 
+	err := errors.New("")
 	for i := 0; i < userNumber; i++ {
 		key, err := ethgow.GenerateKey()
 		require.NoError(t, err)
@@ -342,21 +340,21 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		sidechainKeys[i] = key
 		accountAddress[i] = types.Address(sidechainKeys[i].Address())
 	}
+
 	// initialize rootchain admin key to default one
-	err := rootchainHelper.InitRootchainAdminKey("")
-	require.NoError(t, err)
+	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithPremine(accountAddress...),
 		framework.WithEpochSize(epochSize),
 	)
+
 	defer cluster.Stop()
 
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
 	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
@@ -385,58 +383,24 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[i], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
 		require.NoError(t, err)
 		require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
-		l2SenderBlocks[i] = receipt.BlockNumber
-
-		eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
-		require.NoError(t, err)
-
-		exitEventID, ok := eventData["id"].(*big.Int)
-		require.True(t, ok)
-
-		exitEventIDs[i] = exitEventID
-
-		block, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlocks[i]), false)
-		require.NoError(t, err)
-		extras[i], err = polybft.GetIbftExtra(block.ExtraData)
-		require.NoError(t, err)
-		require.NotNil(t, extras[i].Checkpoint)
 	}
 
-	failCounter := 0
+	require.NoError(t, cluster.WaitForBlock(epochSize+10, 2*time.Minute))
 
-	for range time.Tick(time.Second) {
-		currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
-		require.NoError(t, err)
+	checkpointBlock := uint64(epochSize)
+	checkpointEpoch := uint64(1)
 
-		currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
-		require.NoError(t, err)
-
-		if currentEpoch >= extras[userNumber-1].Checkpoint.EpochNumber {
-			break
-		}
-
-		if failCounter > 300 {
-			t.Fatal("desired epoch not achieved")
-		}
-		failCounter++
-	}
+	var proof types.ExitProof
 
 	for i := 0; i < userNumber; i++ {
-		if l2SenderBlocks[i]%epochSize == 0 {
-			proof, err := getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIDs[i].Uint64(), extras[i].Checkpoint.EpochNumber+1, (extras[i].Checkpoint.EpochNumber+1)*10)
-			require.NoError(t, err)
+		exitID := uint64(i + 1) // because exit events start form ID = 1
+		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
 
-			exitEventProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, (extras[i].Checkpoint.EpochNumber+1)*10, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIDs[i].Uint64())
-			require.NoError(t, err)
-			require.True(t, exitEventProcessed)
-		} else {
-			proof, err := getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIDs[i].Uint64(), extras[i].Checkpoint.EpochNumber, extras[i].Checkpoint.EpochNumber*10)
-			require.NoError(t, err)
+		require.NoError(t, err)
 
-			exitEventProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, extras[i].Checkpoint.EpochNumber*10, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIDs[i].Uint64())
-			require.NoError(t, err)
-			require.True(t, exitEventProcessed)
-		}
+		isProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitID)
+		require.NoError(t, err)
+		require.True(t, isProcessed)
 	}
 }
 
@@ -458,6 +422,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, check
 		proofExitEventEncoded,
 		proof.Proof,
 	)
+
 	if err != nil {
 		return false, err
 	}
@@ -471,7 +436,12 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, check
 		return false, err
 	}
 
-	return result == "1", nil
+	parserRes, err := types.ParseUint64orHex(&result)
+	if err != nil {
+		return false, err
+	}
+
+	return parserRes == uint64(1), nil
 }
 
 func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
