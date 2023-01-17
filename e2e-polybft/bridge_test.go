@@ -325,20 +325,21 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	const (
-		userNumber = 10
-		epochSize  = 30
+		userNumber      = 10
+		epochSize       = 30
+		checkpointBlock = uint64(epochSize)
+		checkpointEpoch = uint64(1)
 	)
 
 	sidechainKeys := make([]*ethgow.Key, userNumber)
 	accountAddress := make([]types.Address, userNumber)
 
-	err := errors.New("")
 	for i := 0; i < userNumber; i++ {
 		key, err := ethgow.GenerateKey()
 		require.NoError(t, err)
 
 		sidechainKeys[i] = key
-		accountAddress[i] = types.Address(sidechainKeys[i].Address())
+		accountAddress[i] = types.Address(key.Address())
 	}
 
 	// initialize rootchain admin key to default one
@@ -355,6 +356,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
 
+	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
 	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
@@ -385,15 +387,31 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 	}
 
-	require.NoError(t, cluster.WaitForBlock(epochSize+10, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(epochSize, 2*time.Minute))
 
-	checkpointBlock := uint64(epochSize)
-	checkpointEpoch := uint64(1)
+	fail := 0
+
+	for range time.Tick(time.Second) {
+		currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
+		require.NoError(t, err)
+
+		currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
+		require.NoError(t, err)
+
+		if currentEpoch >= checkpointEpoch {
+			break
+		}
+
+		if fail > 300 {
+			t.Fatal("epoch havent achieved")
+		}
+		fail++
+	}
 
 	var proof types.ExitProof
 
 	for i := 0; i < userNumber; i++ {
-		exitID := uint64(i + 1) // because exit events start form ID = 1
+		exitID := uint64(i + 1) // because exit events start from ID = 1
 		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
 
 		require.NoError(t, err)
