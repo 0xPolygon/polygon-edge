@@ -490,7 +490,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
 		require.NoError(t, err)
 
-		exitEventIds[j+(i-1)*userNumber] = eventData["id"].(*big.Int).Uint64()
+		exitEventIds[j+(i-1)*userNumber] = eventData["id"].(*big.Int).Uint64() //nolint:forcetypeassert
 	}
 
 	for i := 1; i <= roundNumber; i++ {
