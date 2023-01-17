@@ -161,6 +161,11 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
+	burnContract := types.ZeroAddress
+	if forkConfig.London {
+		burnContract = e.config.CalculateBurntContract(header.Number)
+	}
+
 	newTxn := NewTxn(auxSnap2)
 
 	txCtx := runtime.TxContext{
@@ -171,7 +176,7 @@ func (e *Executor) BeginTxn(
 		BaseFee:      new(big.Int).SetUint64(header.BaseFee),
 		GasLimit:     int64(header.GasLimit),
 		ChainID:      int64(e.config.ChainID),
-		BurnContract: e.config.CalculateBurntContract(header.Number),
+		BurnContract: burnContract,
 	}
 
 	txn := &Transition{
