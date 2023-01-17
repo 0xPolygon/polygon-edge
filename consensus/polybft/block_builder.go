@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -24,9 +23,6 @@ type BlockBuilderParams struct {
 	// Coinbase that is signing the block
 	Coinbase types.Address
 
-	// Vanity extra for the block
-	Extra []byte
-
 	// GasLimit is the gas limit for the block
 	GasLimit uint64
 
@@ -40,25 +36,14 @@ type BlockBuilderParams struct {
 	TxPool txPoolInterface
 }
 
-func NewBlockBuilder(params *BlockBuilderParams) (*BlockBuilder, error) {
-	// extra can only be 32 size max. it is better to trim that to return
-	// an error that we have to propagate. It should be up to higher level
-	// code to error if the extra supplied by the user is too big.
-	if len(params.Extra) > signer.IstanbulExtraVanity {
-		params.Extra = params.Extra[:signer.IstanbulExtraVanity]
-	}
-
-	if params.Extra == nil {
-		params.Extra = make([]byte, 0)
-	}
-
+func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
 	builder := &BlockBuilder{
 		params: params,
 	}
 
 	builder.Reset()
 
-	return builder, nil
+	return builder
 }
 
 var _ blockBuilder = &BlockBuilder{}
@@ -88,7 +73,6 @@ func (b *BlockBuilder) Reset() {
 		Number:       b.params.Parent.Number + 1,
 		Miner:        b.params.Coinbase[:],
 		Difficulty:   1,
-		ExtraData:    b.params.Extra,
 		StateRoot:    types.EmptyRootHash, // this avoids needing state for now
 		TxRoot:       types.EmptyRootHash,
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
