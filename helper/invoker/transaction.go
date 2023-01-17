@@ -11,14 +11,19 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-type InvokerSignature struct {
-	R *big.Int `abi:"r"`
-	S *big.Int `abi:"s"`
-	V bool     `abi:"v"`
-}
-
-func (is *InvokerSignature) String() string {
-	return fmt.Sprintf("r: %v, s: %v v: %v", hex.EncodeToHex(is.R.Bytes()), hex.EncodeToHex(is.S.Bytes()), is.V)
+func invokerCommit(domainSeparator []byte, hasher func() (h []byte, err error)) (c []byte, err error) {
+	// EIP 191 signatures
+	// 0x19: EIP 191 specifier byte
+	// 0x01: signed data is structured data
+	values := []byte{0x19, 0x01}
+	values = append(values, domainSeparator...)
+	var h []byte
+	if h, err = hasher(); err != nil {
+		return
+	}
+	values = append(values, h...)
+	c = ethgo.Keccak256(values)
+	return
 }
 
 func eip3074Magic(commit []byte, invokerAddr types.Address) []byte {
@@ -29,6 +34,16 @@ func eip3074Magic(commit []byte, invokerAddr types.Address) []byte {
 	copy(msg[13:33], invokerAddr.Bytes())
 	copy(msg[33:], commit)
 	return ethgo.Keccak256(msg[:])
+}
+
+type InvokerSignature struct {
+	R *big.Int `abi:"r"`
+	S *big.Int `abi:"s"`
+	V bool     `abi:"v"`
+}
+
+func (is *InvokerSignature) String() string {
+	return fmt.Sprintf("r: %v, s: %v v: %v", hex.EncodeToHex(is.R.Bytes()), hex.EncodeToHex(is.S.Bytes()), is.V)
 }
 
 func (is *InvokerSignature) Recover(commit []byte, invokerAddr types.Address) (addr types.Address) {
@@ -70,12 +85,6 @@ type InvokerTransaction struct {
 	Payloads []TransactionPayload `abi:"payloads"` // should this be an array of pointers?
 }
 
-func (it *InvokerTransaction) ComputeHash() *InvokerTransaction {
-	return it
-}
-
-// return keccak256(abi.encode(TRANSACTION_TYPE, transaction.from, transaction.nonce, hashPayloads(transaction.payloads)));
-
 type encTransaction struct {
 	TypeHash     [32]byte      `abi:"typeHash"`
 	From         types.Address `abi:"from"`
@@ -84,17 +93,6 @@ type encTransaction struct {
 }
 
 var transactionType = ethgo.Keccak256([]byte("Transaction(address from,uint256 nonce,TransactionPayload[] payloads)TransactionPayload(address to,uint256 value,uint256 gasLimit,bytes data)"))
-
-func (it *InvokerTransaction) InvokerCommit(domainSeparator []byte) (c []byte, err error) {
-	values := []byte{0x19, 0x01}
-	values = append(values, domainSeparator...)
-	if c, err = it.InvokerHash(); err != nil {
-		return
-	}
-	values = append(values, c...)
-	c = ethgo.Keccak256(values)
-	return
-}
 
 func (it *InvokerTransaction) InvokerHash() (h []byte, err error) {
 
@@ -121,7 +119,10 @@ func (it *InvokerTransaction) InvokerHash() (h []byte, err error) {
 
 	h = ethgo.Keccak256(encBytes)
 	return
+}
 
+func (it *InvokerTransaction) InvokerCommit(domainSeparator []byte) ([]byte, error) {
+	return invokerCommit(domainSeparator, it.InvokerHash)
 }
 
 type TransactionPayloads []TransactionPayload
@@ -134,7 +135,6 @@ func (tps TransactionPayloads) InvokerHash() (h []byte, err error) {
 		}
 		values = append(values, h...)
 	}
-	// return keccak256(abi.encodePacked(values));
 	h = ethgo.Keccak256(values)
 	return
 }
@@ -219,4 +219,8 @@ func (tp *SessionToken) InvokerHash() (h []byte, err error) {
 
 	h = ethgo.Keccak256(encBytes)
 	return
+}
+
+func (tp *SessionToken) InvokerCommit(domainSeparator []byte) ([]byte, error) {
+	return invokerCommit(domainSeparator, tp.InvokerHash)
 }
