@@ -503,6 +503,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if t.config.London {
 		effectiveTip = new(big.Int).Set(msg.GasTipCap)
 		secondTipOption := new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee)
+
 		if secondTipOption.Cmp(effectiveTip) == -1 {
 			effectiveTip = secondTipOption
 		}

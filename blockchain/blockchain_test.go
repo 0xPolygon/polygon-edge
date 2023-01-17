@@ -1355,6 +1355,8 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
+
 			fork := chain.Fork(5)
 			blockchain := Blockchain{
 				config: &chain.Chain{

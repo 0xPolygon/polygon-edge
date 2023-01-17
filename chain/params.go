@@ -26,14 +26,18 @@ func (p *Params) CalculateBurntContract(number uint64) types.Address {
 	for k := range p.BurntContract {
 		keys = append(keys, k)
 	}
+
 	sort.Strings(keys)
+
 	for i := 0; i < len(keys)-1; i++ {
 		valUint, _ := strconv.ParseUint(keys[i], 10, 64)
 		valUintNext, _ := strconv.ParseUint(keys[i+1], 10, 64)
+
 		if number > valUint && number < valUintNext {
 			return types.StringToAddress(p.BurntContract[keys[i]])
 		}
 	}
+
 	return types.StringToAddress(p.BurntContract[keys[len(keys)-1]])
 }
 
