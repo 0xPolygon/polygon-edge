@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"time"
 
@@ -88,20 +89,24 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		Bootnodes: p.bootnodes,
 	}
 
-	// deploy genesis contracts
-	allocs, err := p.deployContracts()
-	if err != nil {
-		return err
-	}
-
 	premineInfos := make([]*premineInfo, len(manifest.GenesisValidators))
 	validatorPreminesMap := make(map[types.Address]int, len(manifest.GenesisValidators))
+	totalStake := big.NewInt(0)
 
-	// populate premine info for validator accounts
 	for i, validator := range manifest.GenesisValidators {
+		// populate premine info for validator accounts
 		premineInfo := &premineInfo{address: validator.Address, balance: validator.Balance}
 		premineInfos[i] = premineInfo
 		validatorPreminesMap[premineInfo.address] = i
+
+		// increment total stake
+		totalStake.Add(totalStake, validator.Stake)
+	}
+
+	// deploy genesis contracts
+	allocs, err := p.deployContracts(totalStake)
+	if err != nil {
+		return err
 	}
 
 	// either premine non-validator or override validator accounts balance
@@ -169,7 +174,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccount, error) {
+func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
 	genesisContracts := []struct {
 		name         string
 		relativePath string
@@ -215,22 +220,23 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
-	val := command.DefaultPremineBalance
-
-	contractBalance, err := types.ParseUint256orHex(&val)
-	if err != nil {
-		return nil, err
-	}
-
 	for _, contract := range genesisContracts {
 		artifact, err := artifact.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
 		if err != nil {
 			return nil, err
 		}
 
-		allocations[contract.address] = &chain.GenesisAccount{
-			Balance: contractBalance,
-			Code:    artifact.DeployedBytecode,
+		// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
+		if contract.name == "ChildValidatorSet" {
+			allocations[contract.address] = &chain.GenesisAccount{
+				Balance: totalStake,
+				Code:    artifact.DeployedBytecode,
+			}
+		} else {
+			allocations[contract.address] = &chain.GenesisAccount{
+				Balance: big.NewInt(0),
+				Code:    artifact.DeployedBytecode,
+			}
 		}
 	}
 
