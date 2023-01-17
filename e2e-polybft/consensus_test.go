@@ -114,6 +114,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000),
 		framework.WithPremineValidators(premineBalance))
+	defer cluster.Stop()
 	srv := cluster.Servers[0]
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
@@ -209,6 +210,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
 		framework.WithPremineValidators(premineBalance))
+	defer cluster.Stop()
 
 	// init delegator account
 	require.NoError(t, cluster.InitSecrets(delegatorSecrets, 1))
