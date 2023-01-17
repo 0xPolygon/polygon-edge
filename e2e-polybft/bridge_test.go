@@ -413,7 +413,6 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	for i := 0; i < userNumber; i++ {
 		exitID := uint64(i + 1) // because exit events start from ID = 1
 		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
-
 		require.NoError(t, err)
 
 		isProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitID)
