@@ -328,24 +328,28 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		userNumber = 10
 		epochSize  = 5
 	)
+
 	sidechainKeys := make([]*ethgow.Key, userNumber)
 	accountAddress := make([]types.Address, userNumber)
 	extras := make([]*polybft.Extra, userNumber)
 	l2SenderBlocks := make([]uint64, userNumber)
-	l2SyncIDs := make([]*big.Int, userNumber)
-	err := errors.New("")
+	exitEventIDs := make([]*big.Int, userNumber)
+
 	for i := 0; i < userNumber; i++ {
-		sidechainKeys[i], err = ethgow.GenerateKey()
+		key, err := ethgow.GenerateKey()
 		require.NoError(t, err)
+
+		sidechainKeys[i] = key
 		accountAddress[i] = types.Address(sidechainKeys[i].Address())
 	}
 	// initialize rootchain admin key to default one
-	err = rootchainHelper.InitRootchainAdminKey("")
+	err := rootchainHelper.InitRootchainAdminKey("")
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithPremine(accountAddress...),
+		framework.WithEpochSize(epochSize),
 	)
 	defer cluster.Stop()
 
@@ -377,7 +381,6 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	// Start test
 	// send crosschain transaction on l2 and get exit id
 	stateSenderData := []byte{123}
-	var ok bool
 	for i := 0; i < userNumber; i++ {
 		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[i], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
 		require.NoError(t, err)
@@ -387,20 +390,20 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
 		require.NoError(t, err)
 
-		l2SyncIDs[i], ok = eventData["id"].(*big.Int)
+		exitEventID, ok := eventData["id"].(*big.Int)
 		require.True(t, ok)
 
-		l2SenderBlockData, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlocks[i]), false)
+		exitEventIDs[i] = exitEventID
+
+		block, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlocks[i]), false)
 		require.NoError(t, err)
-		extras[i], err = polybft.GetIbftExtra(l2SenderBlockData.ExtraData)
+		extras[i], err = polybft.GetIbftExtra(block.ExtraData)
 		require.NoError(t, err)
 		require.NotNil(t, extras[i].Checkpoint)
-
-		//receipt, err = ABITransaction(l2TxRelayer, sidechainKeys[i], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
-		//require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
-		//require.NoError(t, err)
 	}
-	fail := 0
+
+	failCounter := 0
+
 	for range time.Tick(time.Second) {
 		currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
 		require.NoError(t, err)
@@ -412,52 +415,40 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 			break
 		}
 
-		if fail > 300 {
-			t.Fatal("epoch havent achieved")
+		if failCounter > 300 {
+			t.Fatal("desired epoch not achieved")
 		}
-		fail++
+		failCounter++
 	}
-	var proof types.ExitProof
+
 	for i := 0; i < userNumber; i++ {
-
 		if l2SenderBlocks[i]%epochSize == 0 {
-
-			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), l2SyncIDs[i].Uint64(), extras[i].Checkpoint.EpochNumber+1, (extras[i].Checkpoint.EpochNumber+1)*10)
-
+			proof, err := getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIDs[i].Uint64(), extras[i].Checkpoint.EpochNumber+1, (extras[i].Checkpoint.EpochNumber+1)*10)
 			require.NoError(t, err)
 
-			results, err := getExitProofNumber(sidechainKeys[i], proof, (extras[i].Checkpoint.EpochNumber+1)*10, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, l2SyncIDs[i].Uint64())
+			exitEventProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, (extras[i].Checkpoint.EpochNumber+1)*10, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIDs[i].Uint64())
 			require.NoError(t, err)
-			require.Equal(t, results, uint64(1))
+			require.True(t, exitEventProcessed)
 		} else {
-			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), l2SyncIDs[i].Uint64(), extras[i].Checkpoint.EpochNumber, extras[i].Checkpoint.EpochNumber*10)
-
+			proof, err := getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIDs[i].Uint64(), extras[i].Checkpoint.EpochNumber, extras[i].Checkpoint.EpochNumber*10)
 			require.NoError(t, err)
 
-			results, err := getExitProofNumber(sidechainKeys[i], proof, extras[i].Checkpoint.EpochNumber*10, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, l2SyncIDs[i].Uint64())
+			exitEventProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, extras[i].Checkpoint.EpochNumber*10, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIDs[i].Uint64())
 			require.NoError(t, err)
-			require.Equal(t, results, uint64(1))
+			require.True(t, exitEventProcessed)
 		}
-
 	}
-
-	/* results, err = getExitProofNumber(sidechainKeys[1], proof, extra, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer)
-	require.NoError(t, err)
-	require.Equal(t, results, uint64(1))
-	results, err = getExitProofNumber(sidechainKeys[2], proof, extra, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer)
-	require.NoError(t, err)
-	require.Equal(t, results, uint64(1)) */
 }
 
-func getExitProofNumber(sidechainKey *ethgow.Key, proof types.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, idNumber uint64) (uint64, error) {
+func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
-		ID:       idNumber,
+		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,
 		Data:     stateSenderData,
 	})
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 
 	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
@@ -468,22 +459,19 @@ func getExitProofNumber(sidechainKey *ethgow.Key, proof types.ExitProof, checkpo
 		proof.Proof,
 	)
 	if err != nil {
-		return 0, err
+		return false, err
 	}
+
 	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return 0, errors.New("Failed to get transaction")
+		return false, errors.New("Failed to get transaction")
 	}
 
-	res, err := ABICall(l1TxRelayer, contractsapi.ExitHelper, exitHelperAddr, adminAddr, "processedExits", big.NewInt(int64(idNumber)))
+	result, err := ABICall(l1TxRelayer, contractsapi.ExitHelper, exitHelperAddr, adminAddr, "processedExits", big.NewInt(int64(exitEventID)))
 	if err != nil {
-		return 0, err
+		return false, err
 	}
 
-	parserRes, err := types.ParseUint64orHex(&res)
-	if err != nil {
-		return 0, err
-	}
-	return parserRes, nil
+	return result == "1", nil
 }
 
 func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
