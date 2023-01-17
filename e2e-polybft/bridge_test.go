@@ -420,6 +420,117 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		require.True(t, isProcessed)
 	}
 }
+func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
+	const (
+		userNumber      = 6
+		epochSize       = 10
+		roundNumber     = 3
+		checkpointBlock = uint64(epochSize)
+		checkpointEpoch = uint64(1)
+	)
+
+	exitEventIds := make([]uint64, userNumber*roundNumber)
+
+	sidechainKeys := make([]*ethgow.Key, userNumber)
+	accountAddress := make([]types.Address, userNumber)
+
+	for i := 0; i < userNumber; i++ {
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		sidechainKeys[i] = key
+		accountAddress[i] = types.Address(key.Address())
+	}
+
+	// initialize rootchain admin key to default one
+	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithPremine(accountAddress...),
+		framework.WithEpochSize(epochSize),
+	)
+
+	defer cluster.Stop()
+
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
+	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
+	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
+
+	// wait for a couple of blocks
+	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
+
+	// init rpc clients
+	l1TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(txrelayer.DefaultRPCAddress))
+	require.NoError(t, err)
+	l2TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// deploy L1ExitTest contract
+	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.L1ExitTestBytecode},
+		rootchainHelper.GetRootchainAdminKey())
+	require.NoError(t, err)
+	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
+
+	l1ExitTestAddr := receipt.ContractAddress
+	l2StateSenderAddress := ethgo.Address(contracts.L2StateSenderContract)
+
+	// Start test
+	// send crosschain transaction on l2 and get exit id
+	stateSenderData := []byte{123}
+	//g, _ := errgroup.WithContext(context.Background())
+	addTransaction := func(j, i uint64) {
+		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[j], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
+		require.NoError(t, err)
+		require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
+
+		eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
+		require.NoError(t, err)
+
+		exitEventIds[j+(i-1)*userNumber] = eventData["id"].(*big.Int).Uint64()
+	}
+
+	for i := 1; i <= roundNumber; i++ {
+		for j := 0; j < userNumber; j++ {
+			go addTransaction(uint64(j), uint64(i))
+		}
+		require.NoError(t, cluster.WaitForBlock(uint64((i)*epochSize), 2*time.Minute))
+
+		fail := 0
+
+		for range time.Tick(time.Second) {
+			currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
+			require.NoError(t, err)
+
+			currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
+			require.NoError(t, err)
+
+			if currentEpoch >= uint64(i)*checkpointEpoch {
+				break
+			}
+
+			if fail > 300 {
+				t.Fatal("epoch havent achieved")
+			}
+			fail++
+		}
+	}
+
+	var proof types.ExitProof
+
+	for i := 0; i < roundNumber; i++ {
+		for j := 0; j < userNumber; j++ {
+			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber], uint64(i+1)*checkpointEpoch, uint64(i+1)*checkpointBlock)
+			require.NoError(t, err)
+			isProcessed, err := isExitEventProcessed(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
+			require.NoError(t, err)
+			require.True(t, isProcessed)
+		}
+	}
+}
 
 func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
