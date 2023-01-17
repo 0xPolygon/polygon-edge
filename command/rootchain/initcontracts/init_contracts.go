@@ -463,7 +463,7 @@ func validatorSetToABISlice(o command.OutputFormatter,
 		accSet[i] = &polybft.ValidatorMetadata{
 			Address:     validator.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(validator.Balance),
+			VotingPower: new(big.Int).Set(validator.Stake),
 		}
 	}
 

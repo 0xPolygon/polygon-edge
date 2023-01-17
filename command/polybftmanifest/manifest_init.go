@@ -20,6 +20,7 @@ import (
 const (
 	manifestPathFlag      = "path"
 	premineValidatorsFlag = "premine-validators"
+	stakeFlag             = "stake"
 	validatorsFlag        = "validators"
 	validatorsPathFlag    = "validators-path"
 	validatorsPrefixFlag  = "validators-prefix"
@@ -100,6 +101,13 @@ func setFlags(cmd *cobra.Command) {
 		"the ID of the chain",
 	)
 
+	cmd.Flags().StringVar(
+		&params.stakeRaw,
+		stakeFlag,
+		"",
+		"the amount which will be staked by all the validators",
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPrefixFlag)
 }
@@ -130,14 +138,29 @@ type manifestInitParams struct {
 	validatorsPath       string
 	validatorsPrefixPath string
 	premineValidators    []string
+	stakeRaw             string
+	stake                *big.Int
 	validators           []string
 	chainID              int64
 }
 
 func (p *manifestInitParams) validateFlags() error {
-	if _, err := os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
+	var (
+		stake *big.Int
+		err   error
+	)
+
+	if _, err = os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
 	}
+
+	if p.stakeRaw != "" {
+		if stake, err = types.ParseUint256orHex(&p.stakeRaw); err != nil {
+			return fmt.Errorf("invalid stake amount provided '%s': %w", p.stakeRaw, err)
+		}
+	}
+
+	p.stake = stake
 
 	return nil
 }
@@ -162,6 +185,12 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	defaultBalance, err := types.ParseUint256orHex(&defaultBalanceRaw)
 	if err != nil {
 		return nil, fmt.Errorf("provided invalid premine validators balance: %s", defaultBalanceRaw)
+	}
+
+	stake := p.stake
+	// stake not provided => use validator balance as stake
+	if stake == nil {
+		stake = new(big.Int).Set(defaultBalance)
 	}
 
 	if len(p.validators) > 0 {
@@ -199,6 +228,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				BlsKey:       trimmedBLSKey,
 				BlsSignature: parts[3],
 				Balance:      getBalance(addr, premineMap, defaultBalance),
+				Stake:        stake,
 			}
 		}
 
@@ -217,6 +247,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 
 	for _, v := range validators {
 		v.Balance = getBalance(v.Address, premineMap, defaultBalance)
+		v.Stake = stake
 	}
 
 	return validators, nil

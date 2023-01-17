@@ -84,6 +84,7 @@ type Validator struct {
 	BlsKey        string
 	BlsSignature  string
 	Balance       *big.Int
+	Stake         *big.Int
 	MultiAddr     string
 }
 
@@ -92,12 +93,14 @@ type validatorRaw struct {
 	BlsKey       string        `json:"blsKey"`
 	BlsSignature string        `json:"blsSignature"`
 	Balance      *string       `json:"balance"`
+	Stake        *string       `json:"stake"`
 	MultiAddr    string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
 	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
+	raw.Stake = types.EncodeBigInt(v.Stake)
 
 	return json.Marshal(raw)
 }
@@ -115,8 +118,13 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 	v.BlsKey = raw.BlsKey
 	v.BlsSignature = raw.BlsSignature
 	v.MultiAddr = raw.MultiAddr
-	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
+	v.Balance, err = types.ParseUint256orHex(raw.Balance)
+	if err != nil {
+		return err
+	}
+
+	v.Stake, err = types.ParseUint256orHex(raw.Stake)
 	if err != nil {
 		return err
 	}
@@ -165,7 +173,7 @@ func (v Validator) ToValidatorInitAPIBinding() (*contractsapi.ValidatorInit, err
 		Addr:      v.Address,
 		Pubkey:    pubKey.ToBigInt(),
 		Signature: signBigInts,
-		Stake:     new(big.Int).Set(v.Balance),
+		Stake:     new(big.Int).Set(v.Stake),
 	}, nil
 }
 
@@ -179,7 +187,7 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 	metadata := &ValidatorMetadata{
 		Address:     v.Address,
 		BlsKey:      blsKey,
-		VotingPower: new(big.Int).Set(v.Balance),
+		VotingPower: new(big.Int).Set(v.Stake),
 	}
 
 	return metadata, nil
