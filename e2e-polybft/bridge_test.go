@@ -183,9 +183,6 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
 	// check that the second (larger commitment) was also submitted in epoch
-	// result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
-	// require.NoError(t, err)
-
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(10), lastCommittedID)
