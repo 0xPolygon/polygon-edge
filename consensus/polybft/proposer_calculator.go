@@ -194,35 +194,27 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 	return pc.snapshot.Copy(), true
 }
 
-func (pc *ProposerCalculator) Update(blockNumber uint64) error {
-	const saveEveryNIterations = 5
-
+// PostBlock is called on every insert of finalized block (either from consensus or syncer)
+// It will update priorities and save the updated snapshot to db
+func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
+	blockNumber := req.FullBlock.Block.Number()
 	pc.logger.Info("Update proposal snapshot started", "block", blockNumber)
 
 	from := pc.snapshot.Height
 
+	// using a for loop if in some previous block, an error occurred while updating snapshot
+	// so that we can recalculate it to have accurate priorities
+	// Note, this will change once we introduce component wide global transaction
 	for height := from; height <= blockNumber; height++ {
 		if err := pc.updatePerBlock(height); err != nil {
 			return err
 		}
-
-		// write snapshot every saveEveryNIterations iterations
-		// this way, we prevent data loss on long calculations
-		if (height-from+1)%saveEveryNIterations == 0 {
-			if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
-				return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", height, err)
-			}
-		}
 	}
 
-	// write snapshot if not already written
-	if (blockNumber-from+1)%saveEveryNIterations != 0 {
-		if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
-			return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
-		}
+	if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
+		return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
 	}
 
-	// requires Lock
 	pc.logger.Info("Update proposal snapshot finished", "block", blockNumber)
 
 	return nil
