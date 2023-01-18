@@ -3,6 +3,7 @@ package e2e
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"os"
@@ -84,28 +85,42 @@ func TestBasicInvoker(t *testing.T) {
 
 	srv := ibftManager.GetServer(0)
 
-	deployArtifact := func(name string, withKey *ecdsa.PrivateKey) (*contract.Contract, ethgo.Address) {
+	deployArtifact := func(name string, withKey *ecdsa.PrivateKey, args []interface{}) (*contract.Contract, ethgo.Address) {
 		art, err := getTestArtifact(name)
 		require.NoError(t, err)
 		require.True(t, len(art.Bin) > 0)
 
-		abi, err := abi.NewABI(art.Abi)
+		theAbi, err := abi.NewABI(art.Abi)
 		require.NoError(t, err)
 
-		addr, err := srv.DeployContract(context.Background(), strings.TrimPrefix(art.Bin, "0x"), withKey)
+		binStr := strings.TrimPrefix(art.Bin, "0x")
+		if theAbi.Constructor != nil && theAbi.Constructor.Inputs != nil && len(args) > 0 {
+
+			constructorArgs, err := abi.Encode(args, theAbi.Constructor.Inputs)
+			require.NoError(t, err)
+
+			binary, err := hex.DecodeString(binStr)
+			require.NoError(t, err)
+
+			binary = append(binary, constructorArgs...)
+			binStr = hex.EncodeToString(binary)
+		}
+
+		addr, err := srv.DeployContract(context.Background(), binStr, withKey)
 		require.NoError(t, err)
 		require.NotNil(t, addr)
 
 		sk := &testECDSAKey{k: withKey}
-		contract := contract.NewContract(addr, abi,
+		artifact := contract.NewContract(addr, theAbi,
 			contract.WithJsonRPC(srv.JSONRPC().Eth()),
 			contract.WithSender(sk),
 		)
-		return contract, addr
+
+		return artifact, addr
 	}
 
-	invokerContract, invokerAddr := deployArtifact("AccountAbstractionInvoker.json", senderKey)
-	mockContract, mockAddr := deployArtifact("MockContract.json", senderKey)
+	invokerContract, invokerAddr := deployArtifact("AccountAbstractionInvoker.json", senderKey, nil)
+	mockContract, mockAddr := deployArtifact("MockContract.json", senderKey, nil)
 
 	res, err := invokerContract.Call("DOMAIN_SEPARATOR", ethgo.Latest)
 	require.NoError(t, err)
@@ -175,15 +190,32 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, rcpt.GasUsed > 0) // whatever ...
 
+	// check counter is incremented too (should be 1 here)
 	res, err = mockContract.Call("lastSender", ethgo.Latest)
 	require.NoError(t, err)
 	checkAddr, ok := res["0"].(ethgo.Address)
 	require.True(t, ok)
 	require.Equal(t, testReceiverKey.Address(), checkAddr)
 
+	res, err = mockContract.Call("counter", ethgo.Latest)
+	require.NoError(t, err)
+	checkCounter, ok := res["0"].(*big.Int)
+	require.True(t, ok)
+	require.Equal(t, big.NewInt(1), checkCounter)
+
 	// do same with account session invoker
 
-	sessionInvokerContract, sessionInvokerAddr := deployArtifact("AccountSessionInvoker.json", senderKey)
+	// whitelisted senders
+	allowed := []types.Address{senderAddr}
+	args := []interface{}{allowed}
+
+	sessionInvokerContract, sessionInvokerAddr := deployArtifact("AccountSessionInvoker.json", senderKey, args)
+
+	res, err = sessionInvokerContract.Call("isWhitelisted", ethgo.Latest, senderAddr)
+	require.NoError(t, err)
+	isWhitelisted, ok := res["0"].(bool)
+	require.True(t, ok)
+	require.True(t, isWhitelisted)
 
 	sessionToken := invoker.SessionToken{
 		Delegate:   senderAddr,
@@ -212,8 +244,7 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 
 	err = sessionTx.Do()
-	require.Error(t, err)
+	require.NoError(t, err)
 	rcpt, err = invokeTx.Wait()
 	require.NoError(t, err)
-
 }

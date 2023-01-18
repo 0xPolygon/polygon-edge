@@ -12,10 +12,10 @@ import (
 )
 
 func invokerCommit(domainSeparator []byte, hasher func() (h []byte, err error)) (c []byte, err error) {
-	// EIP 191 signatures
-	// 0x19: EIP 191 specifier byte
-	// 0x01: signed data is structured data
-	values := []byte{0x19, 0x01}
+	values := []byte{
+		0x19, // EIP 191 specifier byte
+		0x01, // signifies signed data is structured data
+	}
 	values = append(values, domainSeparator...)
 	var h []byte
 	if h, err = hasher(); err != nil {
