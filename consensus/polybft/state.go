@@ -214,6 +214,8 @@ var (
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
 	// errCommitmentNotBuilt error message
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errNoCommitmentForStateSync error message
+	errNoCommitmentForStateSync = errors.New("no commitment found for given state sync event")
 )
 
 // State represents a persistence layer which persists consensus data off-chain
@@ -561,6 +563,24 @@ func (s *State) getStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, er
 	})
 
 	return ssp, err
+}
+
+// getCommitmentForStateSync returns the commitment that contains given state sync event if it exists
+func (s *State) getCommitmentForStateSync(stateSyncID uint64) (*CommitmentMessageSigned, error) {
+	var commitment *CommitmentMessageSigned
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(commitmentsBucket).Cursor()
+
+		k, v := c.Seek(itob(stateSyncID))
+		if k == nil {
+			return errNoCommitmentForStateSync
+		}
+
+		return json.Unmarshal(v, &commitment)
+	})
+
+	return commitment, err
 }
 
 // insertMessageVote inserts given vote to signatures bucket of given epoch

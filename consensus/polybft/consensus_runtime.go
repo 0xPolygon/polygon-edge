@@ -535,16 +535,7 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 
 // GetStateSyncProof returns the proof for the state sync
 func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
-	proof, err := c.state.getStateSyncProof(stateSyncID)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
-	}
-
-	if proof == nil {
-		return nil, fmt.Errorf("cannot find state sync proof containing StateSync id %d", stateSyncID)
-	}
-
-	return proof, nil
+	return c.stateSyncManager.GetStateSyncProof(stateSyncID)
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field
