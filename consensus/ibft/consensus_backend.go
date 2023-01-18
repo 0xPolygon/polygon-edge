@@ -40,12 +40,10 @@ func (i *backendIBFT) BuildEthereumBlock(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
-// TODO: Yoshiki please do this change, we need to make sure that on validating (when syncing) we make sure that
-// the committed seals are verifying against ProposedBlock (structure found in go-ibft/messages/proto/messages.pb.go
-// the ProposedBlock is hashed as proto.Marshal(ProposedBlock) and then keccakk hashed.
+// InsertProposal inserts a proposal of which the consensus has been got
 func (i *backendIBFT) InsertBlock(
 	ethereumBlock []byte,
-	roundNumber uint64,
+	round uint64,
 	committedSeals []*messages.CommittedSeal,
 ) {
 	newBlock := &types.Block{}
@@ -67,7 +65,7 @@ func (i *backendIBFT) InsertBlock(
 	copy(extraDataBackup, extraDataOriginal)
 
 	// Push the committed seals to the header
-	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, roundNumber, committedSealsMap)
+	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, round, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
@@ -144,7 +142,7 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 
 func (i *backendIBFT) HasQuorum(
 	blockNumber uint64,
-	msgs []*proto.Message,
+	messages []*proto.Message,
 	msgType proto.MessageType,
 ) bool {
 	validators, err := i.forkManager.GetValidators(blockNumber)
@@ -158,28 +156,18 @@ func (i *backendIBFT) HasQuorum(
 		return false
 	}
 
-	var (
-		numMsgs = len(msgs)
-		quorum  = i.quorumSize(blockNumber)(validators)
-	)
+	quorum := i.quorumSize(blockNumber)(validators)
 
 	switch msgType {
 	case proto.MessageType_PREPREPARE:
-		return numMsgs >= 1
+		return len(messages) > 0
 	case proto.MessageType_PREPARE:
-		return numMsgs >= quorum-1
+		return len(messages) >= quorum-1
 	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
-		return numMsgs >= quorum
+		return len(messages) >= quorum
+	default:
+		return false
 	}
-
-	// should not reach here
-	i.logger.Warn(
-		"invalid message type when calculation quorum",
-		"height", blockNumber,
-		"messageType", msgType,
-	)
-
-	return false
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header

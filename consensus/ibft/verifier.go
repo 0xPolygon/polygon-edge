@@ -16,18 +16,22 @@ import (
 // calculateProposalHashFromBlockBytes is a helper method to marshal ethereum block in bytes
 // and pass to calculateProposalHash
 func (i *backendIBFT) calculateProposalHashFromBlockBytes(
-	signer signer.Signer,
-	ethereumBlockBytes []byte,
+	proposal []byte,
 	round *uint64,
 ) (types.Hash, error) {
-	ethereumBlock := &types.Block{}
-	if err := ethereumBlock.UnmarshalRLP(ethereumBlockBytes); err != nil {
+	block := &types.Block{}
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		return types.ZeroHash, err
+	}
+
+	signer, err := i.forkManager.GetSigner(block.Number())
+	if err != nil {
 		return types.ZeroHash, err
 	}
 
 	return i.calculateProposalHash(
 		signer,
-		ethereumBlock.Header,
+		block.Header,
 		round,
 	)
 }
@@ -55,7 +59,7 @@ func (i *backendIBFT) calculateProposalHash(
 	), nil
 }
 
-func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
+func (i *backendIBFT) IsValidBlock(ethereumBlock []byte) bool {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -63,8 +67,8 @@ func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	)
 
 	// retrieve the newBlock proposal
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("IsValidBlock: fail to unmarshal block", "err", err)
+	if err := newBlock.UnmarshalRLP(ethereumBlock); err != nil {
+		i.logger.Error("IsValidProposal: fail to unmarshal block", "err", err)
 
 		return false
 	}
@@ -179,11 +183,7 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
-	proposalHash, err := i.calculateProposalHashFromBlockBytes(
-		i.currentSigner,
-		proposal.EthereumBlock,
-		&proposal.Round,
-	)
+	proposalHash, err := i.calculateProposalHashFromBlockBytes(proposal.EthereumBlock, &proposal.Round)
 	if err != nil {
 		return false
 	}

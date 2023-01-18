@@ -235,7 +235,7 @@ func (s *SignerImpl) VerifyCommittedSeals(
 	quorumSize int,
 ) error {
 	rawMsg := crypto.Keccak256(
-		wrapCommitHash(hash[:]),
+		wrapCommitHash(hash.Bytes()),
 	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
