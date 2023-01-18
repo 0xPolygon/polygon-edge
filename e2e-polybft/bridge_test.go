@@ -650,6 +650,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000))
+	defer cluster.Stop()
 
 	// load manifest file
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
