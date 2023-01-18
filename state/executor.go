@@ -163,7 +163,10 @@ func (e *Executor) BeginTxn(
 
 	burnContract := types.ZeroAddress
 	if forkConfig.London {
-		burnContract = e.config.CalculateBurntContract(header.Number)
+		burnContract, err = e.config.CalculateBurntContract(header.Number)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	newTxn := NewTxn(auxSnap2)

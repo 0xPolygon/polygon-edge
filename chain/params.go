@@ -1,11 +1,17 @@
 package chain
 
 import (
+	"errors"
 	"math/big"
 	"sort"
 	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	// ErrBurntContractAddressMissing is the error when a contract address is not provided
+	ErrBurntContractAddressMissing = errors.New("burnt contract address missing")
 )
 
 // Params are all the set of params for the chain
@@ -21,10 +27,14 @@ type Params struct {
 }
 
 // CalculateBurntContract calculates burn contract address for the given block number
-func (p *Params) CalculateBurntContract(number uint64) types.Address {
+func (p *Params) CalculateBurntContract(number uint64) (types.Address, error) {
 	keys := make([]string, 0, len(p.BurntContract))
 	for k := range p.BurntContract {
 		keys = append(keys, k)
+	}
+
+	if len(keys) == 0 {
+		return types.ZeroAddress, ErrBurntContractAddressMissing
 	}
 
 	sort.Strings(keys)
@@ -34,11 +44,11 @@ func (p *Params) CalculateBurntContract(number uint64) types.Address {
 		valUintNext, _ := strconv.ParseUint(keys[i+1], 10, 64)
 
 		if number > valUint && number < valUintNext {
-			return types.StringToAddress(p.BurntContract[keys[i]])
+			return types.StringToAddress(p.BurntContract[keys[i]]), nil
 		}
 	}
 
-	return types.StringToAddress(p.BurntContract[keys[len(keys)-1]])
+	return types.StringToAddress(p.BurntContract[keys[len(keys)-1]]), nil
 }
 
 func (p *Params) GetEngine() string {

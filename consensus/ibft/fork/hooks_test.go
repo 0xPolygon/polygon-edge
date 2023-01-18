@@ -277,9 +277,14 @@ func newTestTransition(
 
 	st := itrie.NewState(itrie.NewMemoryStorage())
 
-	ex := state.NewExecutor(&chain.Params{
+	params := &chain.Params{
 		Forks: chain.AllForksEnabled,
-	}, st, hclog.NewNullLogger())
+	}
+
+	// TODO: Enable london hardfork
+	params.Forks.London = chain.NewFork(100000000000000)
+
+	ex := state.NewExecutor(params, st, hclog.NewNullLogger())
 
 	rootHash := ex.WriteGenesis(nil)
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
