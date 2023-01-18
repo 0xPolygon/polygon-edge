@@ -182,6 +182,10 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(28, 2*time.Minute))
 
+	// check that we submitted the minimal commitment to smart contract
+	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	require.NoError(t, err)
+
 	// check that the second (larger commitment) was also submitted in epoch
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
