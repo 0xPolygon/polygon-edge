@@ -335,9 +335,9 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		if cluster.Config.HasBridge && i == 1 {
 			cluster.InitTestServer(t, i, true, true /* relayer */)
+		} else {
+			cluster.InitTestServer(t, i, true, false /* relayer */)
 		}
-
-		cluster.InitTestServer(t, i, true, false /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {

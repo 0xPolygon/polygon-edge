@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"net"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -20,7 +19,7 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
-var commitEvent = abi.MustNewEvent(`event NewCommitment(uint256 startId, uint256 endId, bytes32 root)`)
+var commitEvent = abi.MustNewEvent(`event NewCommitment(uint256 indexed startId, uint256 indexed endId, bytes32 root)`)
 
 type StateSyncRelayer struct {
 	dataDir           string
@@ -110,24 +109,33 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 	if commitEvent.Match(log) {
 		vals, err := commitEvent.ParseLog(log)
 		if err != nil {
-			panic(err)
+			r.logger.Info("Failed to parse log", "err", err)
+
+			return
 		}
 
-		var startID uint64
-		if sid, ok := vals["startId"].(big.Int); ok {
-			startID = sid.Uint64()
+		var (
+			startID, endID *big.Int
+			ok             bool
+		)
+
+		if startID, ok = vals["startId"].(*big.Int); !ok {
+			r.logger.Error("Failed to parse startId")
+
+			return
 		}
 
-		var endID uint64
-		if eid, ok := vals["endId"].(big.Int); ok {
-			endID = eid.Uint64()
+		if endID, ok = vals["endId"].(*big.Int); !ok {
+			r.logger.Error("Failed to parse endId")
+
+			return
 		}
 
 		r.logger.Info("Commit", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
-		for i := startID; i <= endID; i++ {
+		for i := startID.Int64(); i <= endID.Int64(); i++ {
 			// query the state sync proof
-			stateSyncProof, err := r.queryStateSyncProof(strconv.Itoa(int(i)))
+			stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", int(i)))
 			if err != nil {
 				r.logger.Error("Failed to query state sync proof", "err", err)
 
@@ -136,7 +144,11 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 
 			if err := r.executeStateSync(stateSyncProof); err != nil {
 				r.logger.Error("Failed to execute state sync", "err", err)
+
+				continue
 			}
+
+			r.logger.Info("State sync executed", "stateSyncID", i)
 		}
 	}
 }
@@ -151,7 +163,7 @@ func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.State
 		return nil, err
 	}
 
-	r.logger.Debug(fmt.Sprintf("state sync proof: %v", stateSyncProof))
+	r.logger.Info(fmt.Sprintf("state sync proof: %v", stateSyncProof))
 
 	return &stateSyncProof, nil
 }
@@ -177,8 +189,8 @@ func (r *StateSyncRelayer) executeStateSync(stateSyncProof *types.StateSyncProof
 		return fmt.Errorf("failed to send state sync transaction: %w", err)
 	}
 
-	if receipt.Status == uint64(types.ReceiptSuccess) {
-		return fmt.Errorf("state sync execution failed")
+	if receipt.Status == uint64(types.ReceiptFailed) {
+		return fmt.Errorf("state sync execution failed: %d", stateSyncProof.StateSync.ID)
 	}
 
 	return nil
