@@ -396,9 +396,7 @@ func (i *backendIBFT) verifyHeaderImpl(
 }
 
 // VerifyHeader wrapper for verifying headers
-func (i *backendIBFT) VerifyBlock(block *types.Block) error {
-	header := block.Header
-
+func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 	parent, ok := i.blockchain.GetHeaderByNumber(header.Number - 1)
 	if !ok {
 		return fmt.Errorf(
@@ -432,9 +430,9 @@ func (i *backendIBFT) VerifyBlock(block *types.Block) error {
 		return err
 	}
 
-	hashForCS, err := i.calculateProposalHash(
+	hashForCommittedSeal, err := i.calculateProposalHash(
 		headerSigner,
-		block,
+		header,
 		extra.RoundNumber,
 	)
 	if err != nil {
@@ -444,7 +442,7 @@ func (i *backendIBFT) VerifyBlock(block *types.Block) error {
 	// verify the Committed Seals
 	// CommittedSeals exists only in the finalized header
 	if err := headerSigner.VerifyCommittedSeals(
-		hashForCS,
+		hashForCommittedSeal,
 		extra.CommittedSeals,
 		validators,
 		i.quorumSize(header.Number)(validators),
@@ -591,19 +589,19 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 		return err
 	}
 
-	parentBlock, ok := i.blockchain.GetBlockByHash(parent.Hash, true)
+	parentHeader, ok := i.blockchain.GetHeaderByHash(parent.Hash)
 	if !ok {
-		return fmt.Errorf("block %s not found", parent.Hash)
+		return fmt.Errorf("header %s not found", parent.Hash)
 	}
 
-	parentExtra, err := parentSigner.GetIBFTExtra(parentBlock.Header)
+	parentExtra, err := parentSigner.GetIBFTExtra(parentHeader)
 	if err != nil {
 		return err
 	}
 
 	parentHash, err := i.calculateProposalHash(
 		parentSigner,
-		parentBlock,
+		parentHeader,
 		parentExtra.RoundNumber,
 	)
 	if err != nil {

@@ -1,9 +1,9 @@
 package signer
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -42,21 +42,29 @@ type Seals interface {
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
 }
 
-func parseRoundNumber(v *fastrlp.Value) (*uint64, error) {
-	roundBytes := v.Raw()
-	if len(roundBytes) > 0 {
-		bigRound := new(big.Int).SetBytes(roundBytes)
-
-		if !bigRound.IsUint64() {
-			return nil, ErrRoundNumberOverflow
-		}
-
-		round := bigRound.Uint64()
-
-		return &round, nil
+// parseRoundNumber parses RLP-encoded bytes into round
+// FYI, Extra has 8 bytes space for round in order to distinguish between null and 0
+func parseRound(v *fastrlp.Value) (*uint64, error) {
+	roundBytes, err := v.Bytes()
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	if len(roundBytes) > 8 {
+		return nil, ErrRoundNumberOverflow
+	}
+
+	round := binary.BigEndian.Uint64(roundBytes)
+
+	return &round, nil
+}
+
+// toRoundBytes converts uint64 round to bytes
+func toRoundBytes(round uint64) []byte {
+	roundBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(roundBytes, round)
+
+	return roundBytes
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra
@@ -89,7 +97,9 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	}
 
 	if i.RoundNumber != nil {
-		vv.Set(ar.NewUint(*i.RoundNumber))
+		vv.Set(ar.NewBytes(
+			toRoundBytes(*i.RoundNumber),
+		))
 	}
 
 	return vv
@@ -133,8 +143,9 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		}
 	}
 
+	// Round
 	if len(elems) >= 5 {
-		roundNumber, err := parseRoundNumber(elems[4])
+		roundNumber, err := parseRound(elems[4])
 		if err != nil {
 			return err
 		}
@@ -166,8 +177,9 @@ func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrl
 		}
 	}
 
+	// Round
 	if len(elems) >= 5 {
-		roundNumber, err := parseRoundNumber(elems[4])
+		roundNumber, err := parseRound(elems[4])
 		if err != nil {
 			return err
 		}
@@ -259,6 +271,7 @@ func packProposerSealIntoExtra(
 				newArrayValue.Set(oldValues[3])
 			}
 
+			// Round
 			if len(oldValues) >= 5 {
 				newArrayValue.Set(oldValues[4])
 			}
@@ -298,7 +311,9 @@ func packCommittedSealsAndRoundNumberIntoExtra(
 			}
 
 			if roundNumber != nil {
-				newArrayValue.Set(ar.NewUint(*roundNumber))
+				newArrayValue.Set(ar.NewBytes(
+					toRoundBytes(*roundNumber),
+				))
 			}
 
 			return nil

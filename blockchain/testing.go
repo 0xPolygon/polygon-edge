@@ -222,28 +222,28 @@ func NewMockBlockchain(
 
 // Verifier delegators
 
-type verifyBlockDelegate func(*types.Block) error
+type verifyHeaderDelegate func(*types.Header) error
 type processHeadersDelegate func([]*types.Header) error
 type getBlockCreatorDelegate func(*types.Header) (types.Address, error)
 type preStateCommitDelegate func(*types.Header, *state.Transition) error
 
 type MockVerifier struct {
-	verifyBlockFn     verifyBlockDelegate
+	verifyHeaderFn    verifyHeaderDelegate
 	processHeadersFn  processHeadersDelegate
 	getBlockCreatorFn getBlockCreatorDelegate
 	preStateCommitFn  preStateCommitDelegate
 }
 
-func (m *MockVerifier) VerifyBlock(block *types.Block) error {
-	if m.verifyBlockFn != nil {
-		return m.verifyBlockFn(block)
+func (m *MockVerifier) VerifyHeader(header *types.Header) error {
+	if m.verifyHeaderFn != nil {
+		return m.verifyHeaderFn(header)
 	}
 
 	return nil
 }
 
-func (m *MockVerifier) HookVerifyBlock(fn verifyBlockDelegate) {
-	m.verifyBlockFn = fn
+func (m *MockVerifier) HookVerifyHeader(fn verifyHeaderDelegate) {
+	m.verifyHeaderFn = fn
 }
 
 func (m *MockVerifier) ProcessHeaders(headers []*types.Header) error {

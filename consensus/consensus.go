@@ -19,8 +19,8 @@ import (
 // Consensus is the public interface for consensus mechanism
 // Each consensus mechanism must implement this interface in order to be valid
 type Consensus interface {
-	// VerifyBlock verifies the block is correct
-	VerifyBlock(block *types.Block) error
+	// VerifyHeader verifies the header is correct
+	VerifyHeader(header *types.Header) error
 
 	// ProcessHeaders updates the snapshot based on the verified headers
 	ProcessHeaders(headers []*types.Header) error

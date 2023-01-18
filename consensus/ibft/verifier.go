@@ -2,6 +2,7 @@ package ibft
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 
 	"github.com/0xPolygon/go-ibft/messages"
@@ -9,7 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"google.golang.org/protobuf/proto"
 )
 
 // Verifier impl for go-ibft
@@ -27,7 +27,7 @@ func (i *backendIBFT) calculateProposalHashFromBlockBytes(
 
 	return i.calculateProposalHash(
 		signer,
-		ethereumBlock,
+		ethereumBlock.Header,
 		round,
 	)
 }
@@ -36,37 +36,22 @@ func (i *backendIBFT) calculateProposalHashFromBlockBytes(
 // which includes round number block is finalized at
 func (i *backendIBFT) calculateProposalHash(
 	signer signer.Signer,
-	block *types.Block,
+	header *types.Header,
 	round *uint64,
 ) (types.Hash, error) {
 	if round == nil {
 		// legacy hash calculation
-		return block.Hash(), nil
+		return header.Hash, nil
 	}
 
-	filteredHeader, err := signer.FilterHeaderForHash(block.Header)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	blockForHash := &types.Block{
-		Header:       filteredHeader.ComputeHash(),
-		Transactions: block.Transactions,
-		Uncles:       block.Uncles,
-	}
-
-	proposedBlock := &protoIBFT.ProposedBlock{
-		EthereumBlock: blockForHash.MarshalRLP(),
-		Round:         *round,
-	}
-
-	proposedBlockBytes, err := proto.Marshal(proposedBlock)
-	if err != nil {
-		return types.ZeroHash, err
-	}
+	roundBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(roundBytes, *round)
 
 	return types.BytesToHash(
-		crypto.Keccak256(proposedBlockBytes),
+		crypto.Keccak256(
+			header.Hash.Bytes(),
+			roundBytes,
+		),
 	), nil
 }
 
