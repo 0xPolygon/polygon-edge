@@ -190,7 +190,6 @@ func TestBasicInvoker(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, rcpt.GasUsed > 0) // whatever ...
 
-	// check counter is incremented too (should be 1 here)
 	res, err = mockContract.Call("lastSender", ethgo.Latest)
 	require.NoError(t, err)
 	checkAddr, ok := res["0"].(ethgo.Address)
@@ -205,13 +204,13 @@ func TestBasicInvoker(t *testing.T) {
 
 	// do same with account session invoker
 
-	// whitelisted senders
-	allowed := []types.Address{senderAddr}
+	// whitelisted contracts
+	allowed := []types.Address{types.Address(mockAddr.Address())}
 	args := []interface{}{allowed}
 
 	sessionInvokerContract, sessionInvokerAddr := deployArtifact("AccountSessionInvoker.json", senderKey, args)
 
-	res, err = sessionInvokerContract.Call("isWhitelisted", ethgo.Latest, senderAddr)
+	res, err = sessionInvokerContract.Call("isWhitelisted", ethgo.Latest, mockAddr)
 	require.NoError(t, err)
 	isWhitelisted, ok := res["0"].(bool)
 	require.True(t, ok)
@@ -245,6 +244,12 @@ func TestBasicInvoker(t *testing.T) {
 
 	err = sessionTx.Do()
 	require.NoError(t, err)
-	rcpt, err = invokeTx.Wait()
+	rcpt, err = sessionTx.Wait()
 	require.NoError(t, err)
+
+	res, err = mockContract.Call("counter", ethgo.Latest)
+	require.NoError(t, err)
+	checkCounter, ok = res["0"].(*big.Int)
+	require.True(t, ok)
+	require.Equal(t, big.NewInt(2), checkCounter)
 }
