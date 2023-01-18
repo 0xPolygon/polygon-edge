@@ -27,6 +27,7 @@ const (
 	epochSizeFlag     = "epoch-size"
 	epochRewardFlag   = "epoch-reward"
 	blockGasLimitFlag = "block-gas-limit"
+	burntContractFlag = "burnt-contract"
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
@@ -63,6 +64,8 @@ type genesisParams struct {
 
 	blockGasLimit uint64
 	isPos         bool
+
+	burntContracts []string
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -320,9 +323,10 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID: int(p.chainID),
-			Forks:   chain.AllForksEnabled,
-			Engine:  p.consensusEngineConfig,
+			ChainID:       int(p.chainID),
+			Forks:         chain.AllForksEnabled,
+			Engine:        p.consensusEngineConfig,
+			BurntContract: map[string]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -335,6 +339,15 @@ func (p *genesisParams) initGenesisConfig() error {
 		}
 
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
+	}
+
+	for _, burntContract := range p.burntContracts {
+		block, address, err := parseBurntContractInfo(burntContract)
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Genesis.Config.BurntContract[block.String()] = address.String()
 	}
 
 	for _, premineRaw := range p.premine {

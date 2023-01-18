@@ -88,6 +88,29 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	return &premineInfo{address: address, balance: amount}, nil
 }
 
+// parseBurntContractInfo parses provided burnt contract information and returns burnt contract block and address
+func parseBurntContractInfo(burntContractInfoRaw string) (*big.Int, types.Address, error) {
+	block := new(big.Int)
+	address := types.ZeroAddress
+
+	delimiterIdx := strings.Index(burntContractInfoRaw, ":")
+	if delimiterIdx == -1 {
+		return nil, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>")
+	}
+
+	blockRaw := burntContractInfoRaw[:delimiterIdx]
+
+	// <block>:<address>
+	var err error
+	if block, err = types.ParseUint256orHex(&blockRaw); err != nil {
+		return nil, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
+	}
+
+	address = types.StringToAddress(burntContractInfoRaw[delimiterIdx+1:])
+
+	return block, address, nil
+}
+
 // GetValidatorKeyFiles returns file names which has validator secrets
 func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 	if rootDir == "" {

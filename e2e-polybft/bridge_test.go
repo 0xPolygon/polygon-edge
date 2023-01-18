@@ -113,7 +113,11 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 		amounts[i] = fmt.Sprintf("%d", 100)
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithPremine(premine[:]...),
+		framework.WithBurntContract(0, types.ZeroAddress),
+	)
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
