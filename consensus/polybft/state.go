@@ -577,7 +577,15 @@ func (s *State) getCommitmentForStateSync(stateSyncID uint64) (*CommitmentMessag
 			return errNoCommitmentForStateSync
 		}
 
-		return json.Unmarshal(v, &commitment)
+		if err := json.Unmarshal(v, &commitment); err != nil {
+			return err
+		}
+
+		if !commitment.ContainsStateSync(stateSyncID) {
+			return errNoCommitmentForStateSync
+		}
+
+		return nil
 	})
 
 	return commitment, err
