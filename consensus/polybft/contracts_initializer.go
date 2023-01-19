@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -19,20 +20,6 @@ const (
 )
 
 var (
-	childValidatorSetInitializer, _ = abi.NewMethod("function initialize(" +
-		"tuple(uint256 epochReward, uint256 minStake, uint256 minDelegation, uint256 epochSize) init," +
-		"address[] validatorAddresses," +
-		"uint256[4][] validatorPubkeys," +
-		"uint256[] validatorStakes," +
-		"address newBls," +
-		"uint256[2] newMessage," +
-		"address governance)")
-
-	nativeTokenInitializer, _ = abi.NewMethod("function initialize(" +
-		"address predicate_," +
-		"string name_," +
-		"string symbol_)")
-
 	nativeTokenName   = "Polygon"
 	nativeTokenSymbol = "MATIC"
 )
@@ -80,7 +67,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 		"governance":         polyBFTConfig.Governance,
 	}
 
-	input, err := childValidatorSetInitializer.Encode(params)
+	input, err := contractsapi.ChildValidatorSet.Abi.Methods["initialize"].Encode(params)
 	if err != nil {
 		return nil, err
 	}

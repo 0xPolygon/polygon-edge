@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -15,11 +16,10 @@ import (
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
-var commitEvent = abi.MustNewEvent(`event NewCommitment(uint256 indexed startId, uint256 indexed endId, bytes32 root)`)
+var commitEvent = contractsapi.StateReceiver.Abi.Events["NewCommitment"]
 
 type StateSyncRelayer struct {
 	dataDir           string

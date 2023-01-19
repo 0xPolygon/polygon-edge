@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -14,24 +15,16 @@ import (
 	metrics "github.com/armon/go-metrics"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
-	currentCheckpointBlockNumMethod, _ = abi.NewMethod("function currentCheckpointBlockNumber() returns (uint256)")
+	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
 
 	// submitCheckpointMethod is an ABI method object representation for
 	// submit checkpoint function on CheckpointManager contract
-	submitCheckpointMethod, _ = abi.NewMethod("function submit(" +
-		"uint256 chainId," +
-		"tuple(bytes32 blockHash, uint256 blockRound, bytes32 currentValidatorSetHash) checkpointMetadata," +
-		"tuple(uint256 epochNumber, uint256 blockNumber, bytes32 eventRoot) checkpoint," +
-		"uint256[2] signature," +
-		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet," +
-		"bytes bitmap)")
-
+	submitCheckpointMethod, _ = contractsapi.CheckpointManager.Abi.Methods["submit"]
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
 )
