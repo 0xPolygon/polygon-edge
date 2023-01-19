@@ -119,14 +119,14 @@ func (e *Executor) ProcessBlock(
 
 	for _, t := range block.Transactions {
 		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
-			if err := txn.WriteFailedReceipt(t); err != nil {
+			if err = txn.WriteFailedReceipt(t); err != nil {
 				return nil, err
 			}
 
 			continue
 		}
 
-		if err := txn.Write(t); err != nil {
+		if err = txn.Write(t); err != nil {
 			return nil, err
 		}
 	}
@@ -248,16 +248,18 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
+	var err error
 
-	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
+	if txn.From == emptyFrom &&
+		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
 		// Decrypt the from address
-		from, err := signer.Sender(txn)
+		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
+
+		// Decrypt the from address
+		txn.From, err = signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
-
-		txn.From = from
 	}
 
 	receipt := &types.Receipt{
@@ -282,7 +284,8 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 func (t *Transition) Write(txn *types.Transaction) error {
 	var err error
 
-	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
+	if txn.From == emptyFrom &&
+		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
@@ -399,6 +402,34 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	return nil
 }
 
+func (t *Transition) londonCheck(msg *types.Transaction) error {
+	if msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
+		if l := msg.GasFeeCap.BitLen(); l > 256 {
+			return fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", ErrFeeCapVeryHigh,
+				msg.From.String(), l)
+		}
+
+		if l := msg.GasTipCap.BitLen(); l > 256 {
+			return fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", ErrTipVeryHigh,
+				msg.From.String(), l)
+		}
+
+		if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+			return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ErrTipAboveFeeCap,
+				msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+		}
+
+		// This will panic if baseFee is nil, but basefee presence is verified
+		// as part of header validation.
+		if msg.GasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
+			return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
+				msg.From.String(), msg.GasFeeCap, t.ctx.BaseFee)
+		}
+	}
+
+	return nil
+}
+
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
 	nonce := t.state.GetNonce(msg.From)
 
@@ -419,6 +450,22 @@ var (
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
+
+	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
+	// transaction with a tip higher than the total fee cap.
+	ErrTipAboveFeeCap = errors.New("max priority fee per gas higher than max fee per gas")
+
+	// ErrTipVeryHigh is a sanity error to avoid extremely big numbers specified
+	// in the tip field.
+	ErrTipVeryHigh = errors.New("max priority fee per gas higher than 2^256-1")
+
+	// ErrFeeCapVeryHigh is a sanity error to avoid extremely big numbers specified
+	// in the fee cap field.
+	ErrFeeCapVeryHigh = errors.New("max fee per gas higher than 2^256-1")
+
+	// ErrFeeCapTooLow is returned if the transaction fee cap is less than the
+	// the base fee of the block.
+	ErrFeeCapTooLow = errors.New("max fee per gas less than block base fee")
 )
 
 type TransitionApplicationError struct {
@@ -448,18 +495,22 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	if msg.Type == types.StateTx {
-		if err := checkAndProcessStateTx(msg, t); err != nil {
-			return nil, err
-		}
+	var err error
+
+	if msg.Type == types.DynamicFeeTx {
+		err = checkAndProcessDynamicFeeTx(msg, t)
+	} else if msg.Type == types.LegacyTx {
+		err = checkAndProcessLegacyTx(msg, t)
 	} else {
-		if err := checkAndProcessLegacyTx(msg, t); err != nil {
-			return nil, err
-		}
+		err = checkAndProcessStateTx(msg, t)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	// the amount of gas required is available in the block
-	if err := t.subGasPool(msg.Gas); err != nil {
+	if err = t.subGasPool(msg.Gas); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
@@ -889,6 +940,29 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	}
 
 	return cost, nil
+}
+
+// checkAndProcessDynamicFeeTx - first check if this message satisfies all consensus rules before
+// applying the message. The rules include these clauses:
+// 1. the nonce of the message caller is correct
+// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+func checkAndProcessDynamicFeeTx(msg *types.Transaction, t *Transition) error {
+	// 1. the nonce of the message caller is correct
+	if err := t.nonceCheck(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+	if err := t.subGasLimitPrice(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	// 3. make sure london-related fields are correct
+	if err := t.londonCheck(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	return nil
 }
 
 // checkAndProcessLegacyTx - first check if this message satisfies all consensus rules before
