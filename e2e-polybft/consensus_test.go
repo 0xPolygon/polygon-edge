@@ -114,6 +114,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000),
 		framework.WithPremineValidators(premineBalance))
+	defer cluster.Stop()
 	srv := cluster.Servers[0]
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
@@ -153,23 +154,28 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
 
-	// query validators
-	validators, err := systemState.GetValidatorSet()
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
 	require.NoError(t, err)
+
+	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
+
+	validators := polybft.AccountSet{}
+	// assert that new validator is among validator set
+	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
+		// query validators
+		validators, err = systemState.GetValidatorSet()
+		require.NoError(t, err)
+
+		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+	}))
 
 	// assert that correct validators hash gets submitted
 	validatorsHash, err := validators.Hash()
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, validatorsHash)
 
-	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
-	require.NoError(t, err)
-
-	// assert that new validator is among validator set
-	require.True(t, validators.ContainsAddress(types.Address(newValidatorAcc.Ecdsa.Address())))
-
 	// query registered validator
-	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
+	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
 	require.NoError(t, err)
 
 	// assert registered validator's stake
@@ -181,7 +187,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster.WaitForBlock(20, 2*time.Minute)
 
 	// query registered validator
-	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAcc.Ecdsa.Address(), txRelayer)
+	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
 	require.NoError(t, err)
 
 	// assert registered validator's rewards
@@ -204,6 +210,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
 		framework.WithPremineValidators(premineBalance))
+	defer cluster.Stop()
 
 	// init delegator account
 	require.NoError(t, cluster.InitSecrets(delegatorSecrets, 1))

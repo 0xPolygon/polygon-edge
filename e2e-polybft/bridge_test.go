@@ -3,6 +3,7 @@ package e2e
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -233,7 +234,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 
 		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
-		return actualCheckpointBlock < expectedCheckpointBlock, nil
+		return actualCheckpointBlock == expectedCheckpointBlock, nil
 	}
 
 	// wait for a single epoch to be checkpointed
@@ -278,17 +279,33 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 }
 
 func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
-	sidechainKey, err := ethgow.GenerateKey()
-	require.NoError(t, err)
+	const (
+		userNumber      = 10
+		epochSize       = 30
+		checkpointBlock = uint64(epochSize)
+		checkpointEpoch = uint64(1)
+	)
+
+	sidechainKeys := make([]*ethgow.Key, userNumber)
+	accountAddress := make([]types.Address, userNumber)
+
+	for i := 0; i < userNumber; i++ {
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		sidechainKeys[i] = key
+		accountAddress[i] = types.Address(key.Address())
+	}
 
 	// initialize rootchain admin key to default one
-	err = rootchainHelper.InitRootchainAdminKey("")
-	require.NoError(t, err)
+	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
-		framework.WithPremine(types.Address(sidechainKey.Address())),
+		framework.WithPremine(accountAddress...),
+		framework.WithEpochSize(epochSize),
 	)
+
 	defer cluster.Stop()
 
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
@@ -319,28 +336,14 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	// Start test
 	// send crosschain transaction on l2 and get exit id
 	stateSenderData := []byte{123}
-	receipt, err = ABITransaction(l2TxRelayer, sidechainKey, contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
-	require.NoError(t, err)
-	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
-	l2SenderBlock := receipt.BlockNumber
+	for i := 0; i < userNumber; i++ {
+		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[i], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
+		require.NoError(t, err)
+		require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
+	}
 
-	eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
-	require.NoError(t, err)
+	require.NoError(t, cluster.WaitForBlock(epochSize, 2*time.Minute))
 
-	l2syncID, ok := eventData["id"].(*big.Int)
-	require.True(t, ok)
-
-	l2SenderBlockData, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(l2SenderBlock), false)
-	require.NoError(t, err)
-	extra, err := polybft.GetIbftExtra(l2SenderBlockData.ExtraData)
-	require.NoError(t, err)
-	require.NotNil(t, extra.Checkpoint)
-
-	receipt, err = ABITransaction(l2TxRelayer, sidechainKey, contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
-	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
-	require.NoError(t, err)
-
-	// wait when a new checkpoint will be accepted
 	fail := 0
 
 	for range time.Tick(time.Second) {
@@ -350,7 +353,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
 		require.NoError(t, err)
 
-		if currentEpoch >= extra.Checkpoint.EpochNumber {
+		if currentEpoch >= checkpointEpoch {
 			break
 		}
 
@@ -360,32 +363,168 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		fail++
 	}
 
-	proof, err := getExitProof(cluster.Servers[0].JSONRPCAddr(), l2syncID.Uint64(), extra.Checkpoint.EpochNumber, extra.Checkpoint.EpochNumber*10)
+	var proof types.ExitProof
+
+	for i := 0; i < userNumber; i++ {
+		exitID := uint64(i + 1) // because exit events start from ID = 1
+		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
+		require.NoError(t, err)
+
+		isProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitID)
+		require.NoError(t, err)
+		require.True(t, isProcessed)
+	}
+}
+func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
+	const (
+		userNumber      = 6
+		epochSize       = 10
+		roundNumber     = 3
+		checkpointBlock = uint64(epochSize)
+		checkpointEpoch = uint64(1)
+	)
+
+	exitEventIds := make([]uint64, userNumber*roundNumber)
+
+	sidechainKeys := make([]*ethgow.Key, userNumber)
+	accountAddress := make([]types.Address, userNumber)
+
+	for i := 0; i < userNumber; i++ {
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		sidechainKeys[i] = key
+		accountAddress[i] = types.Address(key.Address())
+	}
+
+	// initialize rootchain admin key to default one
+	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithPremine(accountAddress...),
+		framework.WithEpochSize(epochSize),
+	)
+
+	defer cluster.Stop()
+
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
 
+	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
+	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
+
+	// wait for a couple of blocks
+	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
+
+	// init rpc clients
+	l1TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(txrelayer.DefaultRPCAddress))
+	require.NoError(t, err)
+	l2TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// deploy L1ExitTest contract
+	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.L1ExitTestBytecode},
+		rootchainHelper.GetRootchainAdminKey())
+	require.NoError(t, err)
+	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
+
+	l1ExitTestAddr := receipt.ContractAddress
+	l2StateSenderAddress := ethgo.Address(contracts.L2StateSenderContract)
+
+	// Start test
+	// send crosschain transaction on l2 and get exit id
+	stateSenderData := []byte{123}
+	//g, _ := errgroup.WithContext(context.Background())
+	addTransaction := func(j, i uint64) {
+		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[j], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
+		require.NoError(t, err)
+		require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
+
+		eventData, err := contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ParseLog(receipt.Logs[0])
+		require.NoError(t, err)
+
+		exitEventIds[j+(i-1)*userNumber] = eventData["id"].(*big.Int).Uint64() //nolint:forcetypeassert
+	}
+
+	for i := 1; i <= roundNumber; i++ {
+		for j := 0; j < userNumber; j++ {
+			go addTransaction(uint64(j), uint64(i))
+		}
+		require.NoError(t, cluster.WaitForBlock(uint64((i)*epochSize), 2*time.Minute))
+
+		fail := 0
+
+		for range time.Tick(time.Second) {
+			currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
+			require.NoError(t, err)
+
+			currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
+			require.NoError(t, err)
+
+			if currentEpoch >= uint64(i)*checkpointEpoch {
+				break
+			}
+
+			if fail > 300 {
+				t.Fatal("epoch havent achieved")
+			}
+			fail++
+		}
+	}
+
+	var proof types.ExitProof
+
+	for i := 0; i < roundNumber; i++ {
+		for j := 0; j < userNumber; j++ {
+			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber], uint64(i+1)*checkpointEpoch, uint64(i+1)*checkpointBlock)
+			require.NoError(t, err)
+			isProcessed, err := isExitEventProcessed(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
+			require.NoError(t, err)
+			require.True(t, isProcessed)
+		}
+	}
+}
+
+func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
-		ID:       1,
+		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,
 		Data:     stateSenderData,
 	})
-	require.NoError(t, err)
+	if err != nil {
+		return false, err
+	}
 
-	receipt, err = ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
+	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
 		"exit",
-		big.NewInt(int64(extra.Checkpoint.EpochNumber*10)),
+		big.NewInt(int64(checkpointBlock)),
 		proof.LeafIndex,
 		proofExitEventEncoded,
 		proof.Proof,
 	)
-	require.NoError(t, err)
-	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
-	res, err := ABICall(l1TxRelayer, contractsapi.ExitHelper, exitHelperAddr, adminAddr, "processedExits", big.NewInt(1))
-	require.NoError(t, err)
-	parserRes, err := types.ParseUint64orHex(&res)
-	require.NoError(t, err)
-	require.Equal(t, parserRes, uint64(1))
+	if err != nil {
+		return false, err
+	}
+
+	if receipt.Status != uint64(types.ReceiptSuccess) {
+		return false, errors.New("transaction execution failed")
+	}
+
+	result, err := ABICall(l1TxRelayer, contractsapi.ExitHelper, exitHelperAddr, adminAddr, "processedExits", big.NewInt(int64(exitEventID)))
+	if err != nil {
+		return false, err
+	}
+
+	parserRes, err := types.ParseUint64orHex(&result)
+	if err != nil {
+		return false, err
+	}
+
+	return parserRes == uint64(1), nil
 }
 
 func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
@@ -466,6 +605,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000))
+	defer cluster.Stop()
 
 	// load manifest file
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
@@ -545,7 +685,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 
 		t.Logf("Checkpoint block: %d\n", actualCheckpointBlock)
 
-		// waiting until condition is true (namely when block 20 gets checkpointed)
-		return actualCheckpointBlock < finalBlockNumber, nil
+		return actualCheckpointBlock == finalBlockNumber, nil
 	}))
 }

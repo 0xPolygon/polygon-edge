@@ -116,7 +116,7 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 			return err
 		}
 
-		if !isConditionMet {
+		if isConditionMet {
 			return nil
 		}
 	}
