@@ -228,7 +228,7 @@ func (c *state) Run() ([]byte, error) {
 
 	for !c.stop {
 		op, ok = c.CurrentOpCode()
-		gasCopy := c.gas
+		gasCopy, ipCopy := c.gas, uint64(c.ip)
 
 		c.captureState(int(op))
 
@@ -241,7 +241,7 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
-			c.captureExecutionError(op.String(), c.ip, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy, 0)
 
 			break
 		}
@@ -249,7 +249,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
-			c.captureExecutionError(op.String(), c.ip, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
 
 			break
 		}
@@ -257,15 +257,15 @@ func (c *state) Run() ([]byte, error) {
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
-			c.captureExecutionError(op.String(), c.ip, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
 
 			break
 		}
 
-		c.captureSuccessfulExecution(op.String(), gasCopy)
-
 		// execute the instruction
 		inst.inst(c)
+
+		c.captureSuccessfulExecution(op.String(), ipCopy, gasCopy, gasCopy-c.gas)
 
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
@@ -406,7 +406,9 @@ func (c *state) captureState(opCode int) {
 
 func (c *state) captureSuccessfulExecution(
 	opCode string,
+	ip uint64,
 	gas uint64,
+	consumedGas uint64,
 ) {
 	tracer := c.host.GetTracer()
 
@@ -416,10 +418,10 @@ func (c *state) captureSuccessfulExecution(
 
 	tracer.ExecuteState(
 		c.msg.Address,
-		uint64(c.ip),
+		ip,
 		opCode,
 		gas,
-		c.currentConsumedGas,
+		consumedGas,
 		c.returnData,
 		c.msg.Depth,
 		c.err,
@@ -431,6 +433,7 @@ func (c *state) captureExecutionError(
 	opCode string,
 	ip int,
 	gas uint64,
+	consumedGas uint64,
 ) {
 	tracer := c.host.GetTracer()
 
@@ -443,7 +446,7 @@ func (c *state) captureExecutionError(
 		uint64(ip),
 		opCode,
 		gas,
-		c.currentConsumedGas,
+		consumedGas,
 		c.returnData,
 		c.msg.Depth,
 		c.err,

@@ -709,6 +709,16 @@ func Test_newTracer(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("should return error if arg is nil", func(t *testing.T) {
+		t.Parallel()
+
+		tracer, cancel, err := newTracer(nil)
+
+		assert.Nil(t, tracer)
+		assert.Nil(t, cancel)
+		assert.ErrorIs(t, ErrNoConfig, err)
+	})
+
 	t.Run("GetResult should return errExecutionTimeout if timeout happens", func(t *testing.T) {
 		t.Parallel()
 

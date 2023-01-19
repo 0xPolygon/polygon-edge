@@ -19,6 +19,8 @@ var (
 	ErrExecutionTimeout = errors.New("execution timeout")
 	// ErrTraceGenesisBlock is an error returned when tracing genesis block which can't be traced
 	ErrTraceGenesisBlock = errors.New("genesis is not traceable")
+	// ErrNoConfig is an error returns when config is empty
+	ErrNoConfig = errors.New("missing config object")
 )
 
 type debugBlockchainStore interface {
@@ -134,11 +136,11 @@ func (d *Debug) TraceTransaction(
 	}
 
 	tracer, cancel, err := newTracer(config)
-	defer cancel()
-
 	if err != nil {
 		return nil, err
 	}
+
+	defer cancel()
 
 	return d.store.TraceTxn(block, tx.Hash, tracer)
 }
@@ -201,6 +203,10 @@ func newTracer(config *TraceConfig) (
 		timeout = defaultTraceTimeout
 		err     error
 	)
+
+	if config == nil {
+		return nil, nil, ErrNoConfig
+	}
 
 	if config.Timeout != nil {
 		if timeout, err = time.ParseDuration(*config.Timeout); err != nil {
