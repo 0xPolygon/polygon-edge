@@ -29,6 +29,8 @@ jobs:
     needs: build
     secrets:
       GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   container_image_build:
     name: Build/Push Container Image
