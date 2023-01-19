@@ -163,7 +163,7 @@ func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.State
 		return nil, err
 	}
 
-	r.logger.Info(fmt.Sprintf("state sync proof: %v", stateSyncProof))
+	r.logger.Debug(fmt.Sprintf("state sync proof: %v", stateSyncProof))
 
 	return &stateSyncProof, nil
 }
