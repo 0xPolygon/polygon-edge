@@ -351,12 +351,12 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (t *Transaction) UnmarshalRLP(input []byte) error {
-	txType := LegacyTx
+	t.Type = LegacyTx
 	offset := 0
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
-		if txType, err = txTypeFromByte(input[0]); err != nil {
+		if t.Type, err = txTypeFromByte(input[0]); err != nil {
 			return err
 		}
 
@@ -366,8 +366,6 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 	if err := UnmarshalRlp(t.UnmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
-
-	t.Type = txType
 
 	return nil
 }
