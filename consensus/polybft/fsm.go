@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
@@ -65,14 +64,14 @@ type fsm struct {
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
-	// checkpointBackend provides functions for working with checkpoints and exit events
-	checkpointBackend checkpointBackend
-
 	// logger instance
 	logger hcf.Logger
 
 	// target is the block being computed
 	target *types.FullBlock
+
+	// exitEventRootHash is the calculated root hash for given checkpoint block
+	exitEventRootHash types.Hash
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -142,17 +141,12 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	eventRoot, err := f.checkpointBackend.BuildEventRoot(f.epochNumber)
-	if err != nil {
-		return nil, err
-	}
-
 	extra.Checkpoint = &CheckpointData{
 		BlockRound:            currentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
 		NextValidatorsHash:    nextValidatorsHash,
-		EventRoot:             eventRoot,
+		EventRoot:             f.exitEventRootHash,
 	}
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
@@ -462,25 +456,6 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 		return nil, err
 	}
 
-	epoch := f.epochNumber
-	if f.isEndOfEpoch {
-		// exit events that happened in epoch ending blocks,
-		// should be added to the tree of the next epoch
-		epoch++
-	}
-
-	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(epoch, newBlock.Block.Number(), newBlock.Receipts)
-	if err != nil {
-		return newBlock, err
-	}
-
-	if len(events) > 0 {
-		if err := f.checkpointBackend.InsertExitEvents(events); err != nil {
-			return nil, err
-		}
-	}
-
 	return newBlock, nil
 }
 
@@ -588,40 +563,4 @@ func createStateTransactionWithData(target types.Address, inputData []byte) *typ
 	tx.ComputeHash()
 
 	return tx
-}
-
-// getExitEventsFromReceipts parses logs from receipts to find exit events
-func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) ([]*ExitEvent, error) {
-	events := make([]*ExitEvent, 0)
-
-	for i := 0; i < len(receipts); i++ {
-		if len(receipts[i].Logs) == 0 {
-			continue
-		}
-
-		for _, log := range receipts[i].Logs {
-			if log.Address != contracts.L2StateSenderContract {
-				continue
-			}
-
-			event, err := decodeExitEvent(convertLog(log), epoch, block)
-			if err != nil {
-				return nil, err
-			}
-
-			if event == nil {
-				// valid case, not an exit event
-				continue
-			}
-
-			events = append(events, event)
-		}
-	}
-
-	// enforce sequential order
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].ID < events[j].ID
-	})
-
-	return events, nil
 }

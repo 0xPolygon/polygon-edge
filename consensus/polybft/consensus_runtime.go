@@ -42,14 +42,6 @@ type txPoolInterface interface {
 	ResetWithHeaders(...*types.Header)
 }
 
-// checkpointBackend is an interface providing functions for working with checkpoints and exit evens
-type checkpointBackend interface {
-	// BuildEventRoot generates an event root hash from exit events in given epoch
-	BuildEventRoot(epoch uint64) (types.Hash, error)
-	// InsertExitEvents inserts provided exit events to persistence storage
-	InsertExitEvents(exitEvents []*ExitEvent) error
-}
-
 // epochMetadata is the static info for epoch currently being processed
 type epochMetadata struct {
 	// Number is the number of the epoch
@@ -108,7 +100,7 @@ type consensusRuntime struct {
 	activeValidatorFlag uint32
 
 	// checkpointManager represents abstraction for checkpoint submission
-	checkpointManager *checkpointManager
+	checkpointManager CheckpointManager
 
 	// proposerCalculator is the object which manipulates with ProposerSnapshot
 	proposerCalculator *ProposerCalculator
@@ -139,21 +131,8 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, err
 	}
 
-	if runtime.IsBridgeEnabled() {
-		// enable checkpoint manager
-		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
-		if err != nil {
-			return nil, err
-		}
-
-		runtime.checkpointManager = newCheckpointManager(
-			wallet.NewEcdsaSigner(config.Key),
-			defaultCheckpointsOffset,
-			config.PolyBFTConfig.Bridge.CheckpointAddr,
-			txRelayer,
-			config.blockchain,
-			config.polybftBackend,
-			log.Named("checkpoint_manager"))
+	if err := runtime.initCheckpointManager(log); err != nil {
+		return nil, err
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
@@ -197,6 +176,32 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	}
 
 	return c.stateSyncManager.Init()
+}
+
+// initCheckpointManager initializes checkpoint manager
+// if bridge is not enabled, then a dummy checkpoint manager will be used
+func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
+	if c.IsBridgeEnabled() {
+		// enable checkpoint manager
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+		if err != nil {
+			return err
+		}
+
+		c.checkpointManager = newCheckpointManager(
+			wallet.NewEcdsaSigner(c.config.Key),
+			defaultCheckpointsOffset,
+			c.config.PolyBFTConfig.Bridge.CheckpointAddr,
+			txRelayer,
+			c.config.blockchain,
+			c.config.polybftBackend,
+			logger.Named("checkpoint_manager"),
+			c.state)
+	} else {
+		c.checkpointManager = &dummyCheckpointManager{}
+	}
+
+	return nil
 }
 
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
@@ -246,26 +251,33 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
+		// TODO - this will need to take inconsideration if slashing occurred
+		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
+	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
+
 	// handle commitment and proofs creation
-	if err := c.stateSyncManager.PostBlock(&PostBlockRequest{Block: fullBlock.Block}); err != nil {
+	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block state sync", "err", err)
 	}
 
-	// TODO - this condition will need to be changed to recognize that either slashing happened
-	// or epoch reached its fixed size
-	if c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch) {
+	// handle exit events that happened in block
+	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	}
+
+	// update proposer priorities
+	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
+		c.logger.Error("Could not update proposer calculator", "err", err)
+	}
+
+	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
 		}
-	}
-
-	if err := c.proposerCalculator.Update(fullBlock.Block.Number()); err != nil {
-		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
-		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
@@ -293,6 +305,7 @@ func (c *consensusRuntime) FSM() error {
 		c.config.PolyBFTConfig.BlockTime,
 		c.logger,
 	)
+
 	if err != nil {
 		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
@@ -306,12 +319,17 @@ func (c *consensusRuntime) FSM() error {
 
 	valSet := NewValidatorSet(epoch.Validators, c.logger)
 
+	exitRootHash, err := c.checkpointManager.BuildEventRoot(epoch.Number)
+	if err != nil {
+		return fmt.Errorf("could not build exit root hash for fsm: %w", err)
+	}
+
 	ff := &fsm{
 		config:            c.config.PolyBFTConfig,
 		parent:            parent,
 		backend:           c.config.blockchain,
 		polybftBackend:    c.config.polybftBackend,
-		checkpointBackend: c,
+		exitEventRootHash: exitRootHash,
 		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
 		validators:        valSet,
@@ -406,9 +424,10 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	)
 
 	reqObj := &PostEpochRequest{
-		SystemState:  systemState,
-		NewEpochID:   epochNumber,
-		ValidatorSet: NewValidatorSet(validatorSet, c.logger),
+		SystemState:       systemState,
+		NewEpochID:        epochNumber,
+		FirstBlockOfEpoch: firstBlockInEpoch,
+		ValidatorSet:      NewValidatorSet(validatorSet, c.logger),
 	}
 
 	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
@@ -509,66 +528,9 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	return commitEpoch, nil
 }
 
-// InsertExitEvents is an implementation of checkpointBackend interface
-func (c *consensusRuntime) InsertExitEvents(exitEvents []*ExitEvent) error {
-	return c.state.insertExitEvents(exitEvents)
-}
-
-// BuildEventRoot is an implementation of checkpointBackend interface
-func (c *consensusRuntime) BuildEventRoot(epoch uint64) (types.Hash, error) {
-	exitEvents, err := c.state.getExitEventsByEpoch(epoch)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	if len(exitEvents) == 0 {
-		return types.ZeroHash, nil
-	}
-
-	tree, err := createExitTree(exitEvents)
-	if err != nil {
-		return types.ZeroHash, err
-	}
-
-	return tree.Hash(), nil
-}
-
-// GenerateExitProof generates proof of exit
+// GenerateExitProof generates proof of exit and is a bridge endpoint store function
 func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
-	exitEvent, err := c.state.getExitEvent(exitID, epoch)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	e, err := ExitEventABIType.Encode(exitEvent)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	exitEvents, err := c.state.getExitEventsForProof(epoch, checkpointBlock)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	tree, err := createExitTree(exitEvents)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	leafIndex, err := tree.LeafIndex(e)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	proof, err := tree.GenerateProofForLeaf(e, 0)
-	if err != nil {
-		return types.ExitProof{}, err
-	}
-
-	return types.ExitProof{
-		Proof:     proof,
-		LeafIndex: leafIndex,
-	}, nil
+	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
 }
 
 // GetStateSyncProof returns the proof for the state sync
@@ -736,22 +698,6 @@ func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messag
 		c.logger.Error("cannot insert proposal", "error", err)
 
 		return
-	}
-
-	if c.IsBridgeEnabled() {
-		if (fsm.isEndOfEpoch || c.checkpointManager.isCheckpointBlock(fullBlock.Block.Header.Number)) &&
-			bytes.Equal(c.config.Key.Address().Bytes(), fullBlock.Block.Header.Miner) {
-			go func(header types.Header, epochNumber uint64) {
-				if err := c.checkpointManager.submitCheckpoint(header, fsm.isEndOfEpoch); err != nil {
-					c.logger.Warn("failed to submit checkpoint",
-						"checkpoint block", header.Number,
-						"epoch number", epochNumber,
-						"error", err)
-				}
-			}(*fullBlock.Block.Header, fsm.epochNumber)
-
-			c.checkpointManager.latestCheckpointID = fullBlock.Block.Number()
-		}
 	}
 
 	c.OnBlockInserted(fullBlock)

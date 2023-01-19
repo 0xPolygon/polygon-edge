@@ -224,8 +224,9 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			Number:            currentEpochNumber,
 			FirstBlockInEpoch: header.Number - epochSize + 1,
 		},
-		lastBuiltBlock:   &types.Header{Number: header.Number - 1},
-		stateSyncManager: &dummyStateSyncManager{},
+		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
+		stateSyncManager:  &dummyStateSyncManager{},
+		checkpointManager: &dummyCheckpointManager{},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
@@ -347,9 +348,10 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators:        validators.getPublicIdentities(),
 			FirstBlockInEpoch: 1,
 		},
-		lastBuiltBlock:   lastBlock,
-		state:            newTestState(t),
-		stateSyncManager: &dummyStateSyncManager{},
+		lastBuiltBlock:    lastBlock,
+		state:             newTestState(t),
+		stateSyncManager:  &dummyStateSyncManager{},
+		checkpointManager: &dummyCheckpointManager{},
 	}
 
 	err := runtime.FSM()
@@ -417,6 +419,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 		config:             config,
 		lastBuiltBlock:     lastBuiltBlock,
 		stateSyncManager:   &dummyStateSyncManager{},
+		checkpointManager:  &dummyCheckpointManager{},
 	}
 
 	err := runtime.FSM()
@@ -605,91 +608,6 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
 }
 
-func TestConsensusRuntime_getExitEventRootHash(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
-
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
-
-	t.Run("Get exit event root hash", func(t *testing.T) {
-		t.Parallel()
-
-		tree, err := NewMerkleTree(encodedEvents)
-		require.NoError(t, err)
-
-		hash, err := runtime.BuildEventRoot(1)
-		require.NoError(t, err)
-		require.Equal(t, tree.Hash(), hash)
-	})
-
-	t.Run("Get exit event root hash - no events", func(t *testing.T) {
-		t.Parallel()
-
-		hash, err := runtime.BuildEventRoot(2)
-		require.NoError(t, err)
-		require.Equal(t, types.Hash{}, hash)
-	})
-}
-
-func TestConsensusRuntime_GenerateExitProof(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
-	)
-
-	state := newTestState(t)
-	runtime := &consensusRuntime{
-		state: state,
-	}
-
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
-	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
-
-	// manually create merkle tree for a desired checkpoint to verify the generated proof
-	tree, err := NewMerkleTree(checkpointEvents)
-	require.NoError(t, err)
-
-	proof, err := runtime.GenerateExitProof(1, 1, 1)
-	require.NoError(t, err)
-	require.NotNil(t, proof)
-
-	t.Run("Generate and validate exit proof", func(t *testing.T) {
-		t.Parallel()
-		// verify generated proof on desired tree
-		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Proof, tree.Hash()))
-	})
-
-	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
-		t.Parallel()
-
-		// copy and make proof invalid
-		invalidProof := make([]types.Hash, len(proof.Proof))
-		copy(invalidProof, proof.Proof)
-		invalidProof[0][0]++
-
-		// verify generated proof on desired tree
-		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
-	})
-
-	t.Run("Generate exit proof - no event", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := runtime.GenerateExitProof(21, 1, 1)
-		require.ErrorContains(t, err, "could not find any exit event that has an id")
-	})
-}
-
 func TestConsensusRuntime_IsValidSender(t *testing.T) {
 	t.Parallel()
 
@@ -722,6 +640,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 		stateSyncManager:   &dummyStateSyncManager{},
+		checkpointManager:  &dummyCheckpointManager{},
 	}
 
 	require.NoError(t, runtime.FSM())
@@ -924,6 +843,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 		stateSyncManager:   &dummyStateSyncManager{},
+		checkpointManager:  &dummyCheckpointManager{},
 	}
 
 	require.NoError(t, runtime.FSM())

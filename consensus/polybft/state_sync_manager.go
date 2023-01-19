@@ -86,9 +86,10 @@ type topic interface {
 // NewStateSyncManager creates a new instance of state sync manager
 func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
 	s := &stateSyncManager{
-		logger: logger.Named("state-sync-manager"),
-		state:  state,
-		config: config,
+		logger:  logger.Named("state-sync-manager"),
+		state:   state,
+		config:  config,
+		closeCh: make(chan struct{}),
 	}
 
 	return s, nil
@@ -325,18 +326,6 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(commitment *Commi
 	return result, publicKeys, nil
 }
 
-type PostEpochRequest struct {
-	// NewEpochID is the id of the new epoch
-	NewEpochID uint64
-
-	// SystemState is the state of the governance smart contracts
-	// after this block
-	SystemState SystemState
-
-	// ValidatorSet is the validator set for the new epoch
-	ValidatorSet *validatorSet
-}
-
 // PostEpoch notifies the state sync manager that an epoch has changed,
 // so that it can discard any previous epoch commitments, and build a new one (since validator set changed)
 func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
@@ -361,15 +350,10 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 	return s.buildCommitment()
 }
 
-type PostBlockRequest struct {
-	// Block is a reference of the executed block
-	Block *types.Block
-}
-
 // PostBlock notifies state sync manager that a block was finalized,
 // so that it can build state sync proofs if a block has a commitment submission transaction
 func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
-	commitment, err := getCommitmentMessageSignedTx(req.Block.Transactions)
+	commitment, err := getCommitmentMessageSignedTx(req.FullBlock.Block.Transactions)
 	if err != nil {
 		return err
 	}

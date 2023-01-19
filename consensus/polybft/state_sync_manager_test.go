@@ -234,8 +234,10 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	tx := createStateTransactionWithData(types.Address{}, txData)
 
 	req := &PostBlockRequest{
-		Block: &types.Block{
-			Transactions: []*types.Transaction{tx},
+		FullBlock: &types.FullBlock{
+			Block: &types.Block{
+				Transactions: []*types.Transaction{tx},
+			},
 		},
 	}
 
@@ -353,6 +355,13 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	events, err := s.state.getStateSyncEventsForCommitment(0, 9)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
+}
+
+func TestStateSyncManager_Close(t *testing.T) {
+	t.Parallel()
+
+	mgr := newTestStateSyncManager(t, newTestValidator("A", 100))
+	require.NotPanics(t, func() { mgr.Close() })
 }
 
 type mockTopic struct {
