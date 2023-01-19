@@ -42,12 +42,14 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			i++
 		}
 
-		bTxn := &Transaction{}
+		bTxn := &Transaction{
+			Type: txType,
+		}
+
 		if err = bTxn.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
 
-		bTxn.Type = txType
 		bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)
@@ -72,22 +74,16 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
-	txType := LegacyTx
+	t.Type = LegacyTx
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
-		if txType, err = txTypeFromByte(input[0]); err != nil {
+		if t.Type, err = txTypeFromByte(input[0]); err != nil {
 			return err
 		}
 	}
 
-	if err := UnmarshalRlp(t.UnmarshalStoreRLPFrom, input); err != nil {
-		return err
-	}
-
-	t.Type = txType
-
-	return nil
+	return UnmarshalRlp(t.UnmarshalStoreRLPFrom, input)
 }
 
 func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -144,12 +140,14 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 			i++
 		}
 
-		rr := &Receipt{}
+		rr := &Receipt{
+			TransactionType: txType,
+		}
+
 		if err = rr.UnmarshalStoreRLPFrom(p, elems[i]); err != nil {
 			return err
 		}
 
-		rr.TransactionType = txType
 		*r = append(*r, rr)
 	}
 
@@ -157,22 +155,16 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 }
 
 func (r *Receipt) UnmarshalStoreRLP(input []byte) error {
-	txType := LegacyTx
+	r.TransactionType = LegacyTx
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
-		if txType, err = txTypeFromByte(input[0]); err != nil {
+		if r.TransactionType, err = txTypeFromByte(input[0]); err != nil {
 			return err
 		}
 	}
 
-	if err := UnmarshalRlp(r.UnmarshalStoreRLPFrom, input); err != nil {
-		return err
-	}
-
-	r.TransactionType = txType
-
-	return nil
+	return UnmarshalRlp(r.UnmarshalStoreRLPFrom, input)
 }
 
 func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
@@ -187,14 +179,14 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 
 	// come TransactionType first if exist
 	if len(elems) == 5 {
-		if err := r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
+		if err = r.TransactionType.UnmarshalRLPFrom(p, elems[0]); err != nil {
 			return err
 		}
 
 		elems = elems[1:]
 	}
 
-	if err := r.UnmarshalRLPFrom(p, elems[0]); err != nil {
+	if err = r.UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
 
@@ -217,7 +209,7 @@ func (r *Receipt) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) err
 	// tx hash
 	// backwards compatibility, old receipts did not marshal a TxHash
 	if len(elems) == 4 {
-		vv, err := elems[3].Bytes()
+		vv, err = elems[3].Bytes()
 		if err != nil {
 			return err
 		}
