@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	StateSyncABIType = abi.MustNewType(
+	stateSyncABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
 
 	ExecuteStateSyncABIMethod = contractsapi.StateReceiver.Abi.Methods["execute"]
@@ -44,7 +44,7 @@ func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 
 // ToABI converts StateSyncEvent to ABI
 func (sse *StateSyncEvent) EncodeAbi() ([]byte, error) {
-	return StateSyncABIType.Encode([]interface{}{sse.ToMap()})
+	return stateSyncABIType.Encode([]interface{}{sse.ToMap()})
 }
 
 func (sse *StateSyncEvent) String() string {
