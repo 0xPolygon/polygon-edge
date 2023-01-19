@@ -70,7 +70,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// header
 	b.Header = &Header{}
-	if err := b.Header.UnmarshalRLPFrom(p, elems[0]); err != nil {
+	if err = b.Header.UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
 
@@ -83,7 +83,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	for i := 0; i < len(txns); i++ {
 		txType := LegacyTx
 		if txns[i].Type() == fastrlp.TypeBytes {
-			if err := txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
+			if err = txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
 				return err
 			}
 
@@ -91,7 +91,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		}
 
 		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalRLPFrom(p, txns[i]); err != nil {
+		if err = bTxn.UnmarshalRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
 
@@ -392,7 +392,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// gasPrice
 	t.GasPrice = new(big.Int)
-	if err := elems[1].GetBigInt(t.GasPrice); err != nil {
+	if err = elems[1].GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
 
@@ -413,7 +413,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// value
 	t.Value = new(big.Int)
-	if err := elems[4].GetBigInt(t.Value); err != nil {
+	if err = elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
 
@@ -449,8 +449,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// From
 		if vv, err := v.Get(9).Bytes(); err == nil && len(vv) == AddressLength {
 			// address
-			addr := BytesToAddress(vv)
-			t.From = addr
+			t.From = BytesToAddress(vv)
 		}
 	}
 

@@ -35,7 +35,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		txType := LegacyTx
 		if txns[i].Type() == fastrlp.TypeBytes {
 			// Parse Transaction Type if Bytes come first
-			if err := txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
+			if err = txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
 				return err
 			}
 
@@ -43,7 +43,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		}
 
 		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
+		if err = bTxn.UnmarshalStoreRLPFrom(p, txns[i]); err != nil {
 			return err
 		}
 
@@ -61,7 +61,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	for _, uncle := range uncles {
 		bUncle := &Header{}
-		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
+		if err = bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
 			return err
 		}
 
@@ -102,7 +102,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	}
 
 	if len(elems) == 3 {
-		if err := t.Type.UnmarshalRLPFrom(p, elems[0]); err != nil {
+		if err = t.Type.UnmarshalRLPFrom(p, elems[0]); err != nil {
 			return err
 		}
 
@@ -110,9 +110,10 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	}
 
 	// consensus part
-	if err := t.UnmarshalRLPFrom(p, elems[0]); err != nil {
+	if err = t.UnmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
+
 	// context part
 	if err = elems[1].GetAddr(t.From[:]); err != nil {
 		return err
@@ -136,7 +137,7 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 	for i := 0; i < len(elems); i++ {
 		txType := LegacyTx
 		if elems[i].Type() == fastrlp.TypeBytes {
-			if err := txType.UnmarshalRLPFrom(p, elems[i]); err != nil {
+			if err = txType.UnmarshalRLPFrom(p, elems[i]); err != nil {
 				return err
 			}
 
@@ -144,7 +145,7 @@ func (r *Receipts) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		}
 
 		rr := &Receipt{}
-		if err := rr.UnmarshalStoreRLPFrom(p, elems[i]); err != nil {
+		if err = rr.UnmarshalStoreRLPFrom(p, elems[i]); err != nil {
 			return err
 		}
 
