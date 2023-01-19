@@ -227,19 +227,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			return nil, err
 		}
 
-		// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
-		if contract.name == "ChildValidatorSet" {
-			allocations[contract.address] = &chain.GenesisAccount{
-				Balance: totalStake,
-				Code:    artifact.DeployedBytecode,
-			}
-		} else {
-			allocations[contract.address] = &chain.GenesisAccount{
-				Balance: big.NewInt(0),
-				Code:    artifact.DeployedBytecode,
-			}
+		allocations[contract.address] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    artifact.DeployedBytecode,
 		}
 	}
+
+	// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
+	allocations[contracts.ValidatorSetContract].Balance = totalStake
 
 	return allocations, nil
 }
