@@ -98,7 +98,7 @@ func (t *Transaction) UnmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 
 	// come TransactionType first if exist
 	if len(elems) != 2 && len(elems) != 3 {
-		return errors.New("expected 2 or 3 elements")
+		return fmt.Errorf("incorrect number of elements, expected 2 or 3 but found %d", len(elems))
 	}
 
 	if len(elems) == 3 {
