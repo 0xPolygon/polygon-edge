@@ -83,7 +83,7 @@ jobs:
           echo "$HOME/.yarn/bin" >> $GITHUB_PATH
       - name: Notify Slack
         if: false
-        uses: slackapi/slack-github-action@v1.22.0
+        uses: slackapi/slack-github-action@v1.23.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
@@ -116,7 +116,7 @@ jobs:
         name: Open Pandora's Box
         run: |
           pandoras-box -url ${{ secrets.PANDORAS_TARGET }} --mode "${{ inputs.mode }}" -m "${{ secrets.PANDORAS_MNEMONIC }}" -b ${{ inputs.transaction_batch }} -t ${{ inputs.transaction_count }} -o pandorasConsequences.json
-          echo "::set-output name=tps::$(cat pandorasConsequences.json | jq -r '.averageTPS')"
+          echo "tps=$(cat pandorasConsequences.json | jq -r '.averageTPS')" >> $GITHUB_OUTPUT
       - name: Archive Pandora's Consequences
         continue-on-error: true
         uses: actions/upload-artifact@v3
@@ -124,7 +124,7 @@ jobs:
           name: pandoras-consequences-report
           path: pandorasConsequences.json
       - name: Notify Slack
-        uses: slackapi/slack-github-action@v1.22.0
+        uses: slackapi/slack-github-action@v1.23.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
