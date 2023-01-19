@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,7 +64,7 @@ type TestClusterConfig struct {
 	t *testing.T
 
 	Name              string
-	Premine           []types.Address
+	Premine           []string // address[:amount]
 	PremineValidators string
 	HasBridge         bool
 	BootnodeCount     int
@@ -79,6 +80,7 @@ type TestClusterConfig struct {
 	ValidatorSetSize  uint64
 	EpochSize         int
 	EpochReward       int
+	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
 	logsDirOnce sync.Once
 }
@@ -87,7 +89,7 @@ func (c *TestClusterConfig) Dir(name string) string {
 	return filepath.Join(c.TmpDir, name)
 }
 
-func (c *TestClusterConfig) GetStdout(name string) io.Writer {
+func (c *TestClusterConfig) GetStdout(name string, custom ...io.Writer) io.Writer {
 	writers := []io.Writer{}
 
 	if c.WithLogs {
@@ -112,6 +114,10 @@ func (c *TestClusterConfig) GetStdout(name string) io.Writer {
 
 	if c.WithStdout {
 		writers = append(writers, os.Stdout)
+	}
+
+	if len(custom) > 0 {
+		writers = append(writers, custom...)
 	}
 
 	if len(writers) == 0 {
@@ -147,13 +153,21 @@ type ClusterOption func(*TestClusterConfig)
 
 func WithPremine(addresses ...types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.Premine = append(h.Premine, addresses...)
+		for _, a := range addresses {
+			h.Premine = append(h.Premine, a.String())
+		}
 	}
 }
 
 func WithPremineValidators(premineBalance string) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.PremineValidators = premineBalance
+	}
+}
+
+func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.SecretsCallback = fn
 	}
 }
 
@@ -247,8 +261,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	{
 		// run init accounts
-		err = cluster.InitSecrets(cluster.Config.ValidatorPrefix, validatorsCount)
+		addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, validatorsCount)
 		require.NoError(t, err)
+
+		if cluster.Config.SecretsCallback != nil {
+			cluster.Config.SecretsCallback(addresses, cluster.Config)
+		}
 	}
 
 	manifestPath := path.Join(tmpDir, "manifest.json")
@@ -296,8 +314,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		if len(cluster.Config.Premine) != 0 {
-			for _, addr := range cluster.Config.Premine {
-				args = append(args, "--premine", addr.String())
+			for _, premine := range cluster.Config.Premine {
+				args = append(args, "--premine", premine)
 			}
 		}
 
@@ -526,12 +544,27 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 
 // InitSecrets initializes account(s) secrets with given prefix.
 // (secrets are being stored in the temp directory created by given e2e test execution)
-func (c *TestCluster) InitSecrets(prefix string, count int) error {
+func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, error) {
+	var b bytes.Buffer
+
 	args := []string{
 		"polybft-secrets",
 		"--data-dir", path.Join(c.Config.TmpDir, prefix),
 		"--num", strconv.Itoa(count),
 	}
+	stdOut := c.Config.GetStdout("polybft-secrets", &b)
 
-	return runCommand(c.Config.Binary, args, c.Config.GetStdout("polybft-secrets"))
+	if err := runCommand(c.Config.Binary, args, stdOut); err != nil {
+		return nil, err
+	}
+
+	re := regexp.MustCompile("\\(address\\) = 0x([a-fA-F0-9]+)")
+	parsed := re.FindAllStringSubmatch(b.String(), -1)
+	result := make([]types.Address, len(parsed))
+
+	for i, v := range parsed {
+		result[i] = types.StringToAddress(v[1])
+	}
+
+	return result, nil
 }
