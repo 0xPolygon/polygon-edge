@@ -77,7 +77,7 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid proof data")
 	}
 
-	stateSyncEventEncoded, isOk := result["stateSync"].(map[string]interface{})
+	stateSyncEventEncoded, isOk := result["obj"].(map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid state sync data")
 	}

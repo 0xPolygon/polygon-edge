@@ -254,7 +254,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
 		},
 		"checkpoint": map[string]interface{}{
-			"epochNumber": new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
+			"epoch":       new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
 			"blockNumber": new(big.Int).SetUint64(blockNumber),
 			"eventRoot":   extra.Checkpoint.EventRoot,
 		},
