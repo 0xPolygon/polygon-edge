@@ -18,7 +18,7 @@ import (
 
 var (
 	params           withdrawParams
-	withdrawEventABI = contractsapi.ChildValidatorSet.Abi.Events["WIthdrawal"]
+	withdrawEventABI = contractsapi.ChildValidatorSet.Abi.Events["Withdrawal"]
 )
 
 func GetCommand() *cobra.Command {
