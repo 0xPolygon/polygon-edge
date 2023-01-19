@@ -109,7 +109,7 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 	if commitEvent.Match(log) {
 		vals, err := commitEvent.ParseLog(log)
 		if err != nil {
-			r.logger.Info("Failed to parse log", "err", err)
+			r.logger.Error("Failed to parse log", "err", err)
 
 			return
 		}
