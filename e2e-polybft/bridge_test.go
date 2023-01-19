@@ -98,7 +98,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(28, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are mined and there should be a success events
 	id := stateSyncResultEvent.ID()
