@@ -45,7 +45,7 @@ proposer snapshot/
 
 var (
 	// ABI
-	stateTransferEventABI = contractsapi.StateReceiver.Abi.Events["StateSynced"]
+	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
 	exitEventABI          = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
 	ExitEventABIType      = exitEventABI.Inputs
 
