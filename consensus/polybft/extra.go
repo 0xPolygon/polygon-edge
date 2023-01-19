@@ -142,6 +142,16 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
+// Validate contains extra data validation logic
+func (i *Extra) Validate(header *types.Header, parentExtra *Extra,
+	currentValidators AccountSet, nextValidators AccountSet) error {
+	if err := i.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
 func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	var addedValidators, updatedValidators AccountSet
@@ -511,6 +521,61 @@ func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash type
 	}
 
 	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
+}
+
+// Validate encapsulates validation logic for checkpoint data
+func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
+	currentValidators AccountSet, nextValidators AccountSet) error {
+	if c.EpochNumber != parentCheckpoint.EpochNumber {
+		if c.EpochNumber != parentCheckpoint.EpochNumber+1 {
+			// epoch-beginning block
+			// epoch number must be incremented by one compared to parent block's checkpoint
+			return fmt.Errorf("invalid epoch number for epoch-beginning block")
+		}
+	}
+
+	if c.CurrentValidatorsHash == types.ZeroHash {
+		return fmt.Errorf("current validators hash must not be empty")
+	}
+
+	if c.NextValidatorsHash == types.ZeroHash {
+		return fmt.Errorf("next validators hash must not be empty")
+	}
+
+	if currentValidators == nil || nextValidators == nil {
+		return nil
+	}
+
+	// check if currentValidatorsHash, present in CheckpointData is correct
+	currentValidatorsHash, err := currentValidators.Hash()
+	if err != nil {
+		return fmt.Errorf("failed to calculate current validators hash: %w", err)
+	}
+
+	if currentValidatorsHash != c.CurrentValidatorsHash {
+		return fmt.Errorf("current validators hashes don't match")
+	}
+
+	// check if nextValidatorsHash, present in CheckpointData is correct
+	nextValidatorsHash, err := nextValidators.Hash()
+	if err != nil {
+		return fmt.Errorf("failed to calculate next validators hash: %w", err)
+	}
+
+	if nextValidatorsHash != c.NextValidatorsHash {
+		return fmt.Errorf("next validators hashes don't match")
+	}
+
+	// epoch ending blocks have validator set transitions
+	if !currentValidators.Equals(nextValidators) {
+		// epoch ending blocks should have the same epoch number as parent block
+		// (as they belong to the same epoch)
+		if c.EpochNumber != parentCheckpoint.EpochNumber {
+			return fmt.Errorf("epoch number should not change for epoch-ending block")
+		}
+	}
+
+	return nil
 }
 
 // GetIbftExtraClean returns unmarshaled extra field from the passed in header,

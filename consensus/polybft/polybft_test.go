@@ -145,18 +145,33 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		MixHash:    PolyBFTMixDigest,
 		Difficulty: 1,
 	}
-	updateHeaderExtra(currentHeader, currentDelta, nil, &CheckpointData{EpochNumber: 2}, nil)
+	updateHeaderExtra(currentHeader, currentDelta, nil,
+		&CheckpointData{
+			EpochNumber:           2,
+			CurrentValidatorsHash: types.StringToHash("Foo"),
+			NextValidatorsHash:    types.StringToHash("Bar"),
+		}, nil)
 
 	currentHeader.Hash[0] = currentHeader.Hash[0] + 1
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "invalid header hash")
 
-	// forget Parent field (parent signature) intentionally
-	updateHeaderExtra(currentHeader, currentDelta, nil, nil, accountSetCurrent)
+	// omit Parent field (parent signature) intentionally
+	updateHeaderExtra(currentHeader, currentDelta, nil,
+		&CheckpointData{
+			EpochNumber:           1,
+			CurrentValidatorsHash: types.StringToHash("Foo"),
+			NextValidatorsHash:    types.StringToHash("Bar")},
+		accountSetCurrent)
 
 	// since parent signature is intentionally disregarded the following error is expected
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
-	updateHeaderExtra(currentHeader, currentDelta, parentCommitment, nil, accountSetCurrent)
+	updateHeaderExtra(currentHeader, currentDelta, parentCommitment,
+		&CheckpointData{
+			EpochNumber:           1,
+			CurrentValidatorsHash: types.StringToHash("Foo"),
+			NextValidatorsHash:    types.StringToHash("Bar")},
+		accountSetCurrent)
 
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 

@@ -428,6 +428,15 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", blockNumber, err)
 	}
 
+	parentExtra, err := GetIbftExtra(parent.ExtraData)
+	if err != nil {
+		return err
+	}
+
+	if err := extra.Validate(header, parentExtra, nil, nil); err != nil {
+		return err
+	}
+
 	if extra.Committed == nil {
 		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
 	}
@@ -456,11 +465,6 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 				blockNumber,
 				err,
 			)
-		}
-
-		parentExtra, err := GetIbftExtra(parent.ExtraData)
-		if err != nil {
-			return err
 		}
 
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(p.blockchain.GetChainID(), parent.Number, parent.Hash)

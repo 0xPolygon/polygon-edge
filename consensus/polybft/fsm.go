@@ -227,11 +227,6 @@ func (f *fsm) Validate(proposal []byte) error {
 		return fmt.Errorf("failed to validate, cannot decode block data. Error: %w", err)
 	}
 
-	extra, err := GetIbftExtra(block.Header.ExtraData)
-	if err != nil {
-		return err
-	}
-
 	// validate header fields
 	if err := validateHeaderFields(f.parent, block.Header); err != nil {
 		return fmt.Errorf(
@@ -242,9 +237,42 @@ func (f *fsm) Validate(proposal []byte) error {
 		)
 	}
 
-	blockExtra, err := GetIbftExtra(block.Header.ExtraData)
+	currentExtra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
 		return fmt.Errorf("cannot get extra data:%w", err)
+	}
+
+	parentExtra, err := GetIbftExtra(f.parent.ExtraData)
+	if err != nil {
+		return err
+	}
+
+	currentValidators := f.validators.Accounts()
+	nextValidators := f.validators.Accounts()
+
+	if f.isEndOfEpoch {
+		if err := f.blockBuilder.Reset(); err != nil {
+			return fmt.Errorf("failed to initialize block builder: %w", err)
+		}
+
+		// we need to write commit epoch transaction to intermediate state,
+		// in order to be able to query next validator set
+		if err := f.blockBuilder.WriteTx(block.Transactions[0]); err != nil {
+			return err
+		}
+
+		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
+		if err != nil {
+			return err
+		}
+	}
+
+	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
+		return err
+	}
+
+	if err := currentExtra.Validate(block.Header, parentExtra, currentValidators, nextValidators); err != nil {
+		return err
 	}
 
 	// TODO: Validate validator set delta?
@@ -261,17 +289,12 @@ func (f *fsm) Validate(proposal []byte) error {
 
 		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
 
-		parentExtra, err := GetIbftExtra(f.parent.ExtraData)
-		if err != nil {
-			return err
-		}
-
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
 		if err != nil {
 			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
 		}
 
-		if err := blockExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
+		if err := currentExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
 			return fmt.Errorf(
 				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
 				f.parent.Number,
@@ -282,16 +305,12 @@ func (f *fsm) Validate(proposal []byte) error {
 		}
 	}
 
-	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
-		return err
-	}
-
 	stateBlock, err := f.backend.ProcessBlock(f.parent, &block)
 	if err != nil {
 		return err
 	}
 
-	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+	checkpointHash, err := currentExtra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 	if err != nil {
 		return fmt.Errorf("failed to calculate signed hash: %w", err)
 	}

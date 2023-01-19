@@ -670,3 +670,113 @@ func TestCheckpointData_Hash(t *testing.T) {
 
 	require.Equal(t, origHash, copyHash)
 }
+
+func TestCheckpointData_Validate(t *testing.T) {
+	t.Parallel()
+
+	currentValidators := newTestValidators(5).getPublicIdentities()
+	nextValidators := newTestValidators(3).getPublicIdentities()
+
+	currentValidatorsHash, err := currentValidators.Hash()
+	require.NoError(t, err)
+
+	nextValidatorsHash, err := nextValidators.Hash()
+	require.NoError(t, err)
+
+	cases := []struct {
+		name                  string
+		parentEpochNumber     uint64
+		epochNumber           uint64
+		currentValidators     AccountSet
+		nextValidators        AccountSet
+		currentValidatorsHash types.Hash
+		nextValidatorsHash    types.Hash
+		errString             string
+	}{
+		{
+			name:                  "Valid (validator set changes)",
+			parentEpochNumber:     2,
+			epochNumber:           2,
+			currentValidators:     currentValidators,
+			nextValidators:        nextValidators,
+			currentValidatorsHash: currentValidatorsHash,
+			nextValidatorsHash:    nextValidatorsHash,
+			errString:             "",
+		},
+		{
+			name:                  "Valid (validator set remains the same)",
+			parentEpochNumber:     2,
+			epochNumber:           2,
+			currentValidators:     currentValidators,
+			nextValidators:        currentValidators,
+			currentValidatorsHash: currentValidatorsHash,
+			nextValidatorsHash:    currentValidatorsHash,
+			errString:             "",
+		},
+		{
+			name:              "Invalid (gap in epoch numbers)",
+			parentEpochNumber: 2,
+			epochNumber:       6,
+			errString:         "invalid epoch number for epoch-beginning block",
+		},
+		{
+			name:              "Invalid (empty currentValidatorsHash)",
+			currentValidators: currentValidators,
+			nextValidators:    currentValidators,
+			errString:         "current validators hash must not be empty",
+		},
+		{
+			name:                  "Invalid (empty nextValidatorsHash)",
+			currentValidators:     currentValidators,
+			nextValidators:        currentValidators,
+			currentValidatorsHash: currentValidatorsHash,
+			errString:             "next validators hash must not be empty",
+		},
+		{
+			name:                  "Invalid (incorrect currentValidatorsHash)",
+			currentValidators:     currentValidators,
+			nextValidators:        currentValidators,
+			currentValidatorsHash: nextValidatorsHash,
+			nextValidatorsHash:    nextValidatorsHash,
+			errString:             "current validators hashes don't match",
+		},
+		{
+			name:                  "Invalid (incorrect nextValidatorsHash)",
+			currentValidators:     nextValidators,
+			nextValidators:        nextValidators,
+			currentValidatorsHash: nextValidatorsHash,
+			nextValidatorsHash:    currentValidatorsHash,
+			errString:             "next validators hashes don't match",
+		},
+		{
+			name:                  "Invalid (validator set and epoch numbers change)",
+			parentEpochNumber:     2,
+			epochNumber:           3,
+			currentValidators:     currentValidators,
+			nextValidators:        nextValidators,
+			currentValidatorsHash: currentValidatorsHash,
+			nextValidatorsHash:    nextValidatorsHash,
+			errString:             "epoch number should not change for epoch-ending block",
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			checkpoint := &CheckpointData{
+				EpochNumber:           c.epochNumber,
+				CurrentValidatorsHash: c.currentValidatorsHash,
+				NextValidatorsHash:    c.nextValidatorsHash,
+			}
+			parentCheckpoint := &CheckpointData{EpochNumber: c.parentEpochNumber}
+			err := checkpoint.Validate(parentCheckpoint, c.currentValidators, c.nextValidators)
+
+			if c.errString != "" {
+				require.ErrorContains(t, err, c.errString)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

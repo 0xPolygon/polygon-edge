@@ -1225,9 +1225,12 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	validators := newTestValidators(accountsCount)
 	validatorsMetadata := validators.getPublicIdentities()
 
+	extra := createTestExtraObject(validatorsMetadata, AccountSet{}, 4, signaturesCount, signaturesCount)
+	validatorsHash, err := validatorsMetadata.Hash()
+	extra.Checkpoint = &CheckpointData{CurrentValidatorsHash: validatorsHash, NextValidatorsHash: validatorsHash}
 	parent := &types.Header{
 		Number:    parentBlockNumber,
-		ExtraData: createTestExtra(validatorsMetadata, AccountSet{}, 4, signaturesCount, signaturesCount),
+		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 	parent.ComputeHash()
 
@@ -1237,15 +1240,12 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	validatorSet := NewValidatorSet(validatorsMetadata, hclog.NewNullLogger())
 
 	fsm := &fsm{
-		parent:                       parent,
-		config:                       &PolyBFTConfig{Bridge: &BridgeConfig{}},
-		backend:                      &blockchainMock{},
-		polybftBackend:               polybftBackendMock,
-		validators:                   validatorSet,
-		proposerCommitmentToRegister: createTestCommitment(t, validators.getPrivateIdentities()),
-		isEndOfEpoch:                 true,
-		uptimeCounter:                createTestUptimeCounter(t, validatorsMetadata, 10),
-		logger:                       hclog.NewNullLogger(),
+		parent:         parent,
+		config:         &PolyBFTConfig{Bridge: &BridgeConfig{}},
+		backend:        &blockchainMock{},
+		polybftBackend: polybftBackendMock,
+		validators:     validatorSet,
+		logger:         hclog.NewNullLogger(),
 	}
 
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
