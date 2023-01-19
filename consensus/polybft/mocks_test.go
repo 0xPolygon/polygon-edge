@@ -153,7 +153,7 @@ type blockBuilderMock struct {
 	mock.Mock
 }
 
-func (m *blockBuilderMock) Init() error {
+func (m *blockBuilderMock) Reset() error {
 	args := m.Called()
 	if len(args) == 0 {
 		return nil

@@ -18,7 +18,7 @@ import (
 )
 
 type blockBuilder interface {
-	Init() error
+	Reset() error
 	WriteTx(*types.Transaction) error
 	Fill()
 	Build(func(h *types.Header)) (*types.FullBlock, error)
@@ -87,7 +87,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
 	nextValidators := f.validators.Accounts()
 
-	if err := f.blockBuilder.Init(); err != nil {
+	if err := f.blockBuilder.Reset(); err != nil {
 		return nil, fmt.Errorf("failed to initialize block builder: %w", err)
 	}
 

@@ -289,7 +289,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("WriteTx", mock.Anything).Return(errors.New("error")).Once()
-	mBlockBuilder.On("Init").Return(error(nil)).Once()
+	mBlockBuilder.On("Reset").Return(error(nil)).Once()
 
 	validatorSet := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 
@@ -397,7 +397,7 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	blockBuilderMock := &blockBuilderMock{}
 	blockBuilderMock.On("Build", mock.Anything).Return(stateBlock).Once()
 	blockBuilderMock.On("Fill").Once()
-	blockBuilderMock.On("Init").Return(error(nil)).Once()
+	blockBuilderMock.On("Reset").Return(error(nil)).Once()
 
 	systemStateMock := new(systemStateMock)
 
@@ -437,7 +437,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 	blockBuilderMock := new(blockBuilderMock)
 	blockBuilderMock.On("WriteTx", mock.Anything).Return(error(nil)).Once()
 	blockBuilderMock.On("GetState").Return(transition).Once()
-	blockBuilderMock.On("Init").Return(error(nil)).Once()
+	blockBuilderMock.On("Reset").Return(error(nil)).Once()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetValidatorSet").Return(nil, errors.New("failed to get validators set")).Once()
@@ -1351,7 +1351,7 @@ func newBlockBuilderMock(stateBlock *types.FullBlock) *blockBuilderMock {
 	mBlockBuilder := new(blockBuilderMock)
 	mBlockBuilder.On("Build", mock.Anything).Return(stateBlock).Once()
 	mBlockBuilder.On("Fill", mock.Anything).Once()
-	mBlockBuilder.On("Init", mock.Anything).Return(error(nil)).Once()
+	mBlockBuilder.On("Reset", mock.Anything).Return(error(nil)).Once()
 
 	return mBlockBuilder
 }

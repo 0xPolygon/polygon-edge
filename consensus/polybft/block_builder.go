@@ -62,7 +62,7 @@ type BlockBuilder struct {
 }
 
 // Init initializes block builder before adding transactions and actual block building
-func (b *BlockBuilder) Init() error {
+func (b *BlockBuilder) Reset() error {
 	// set the timestamp
 	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
 	headerTime := parentTime.Add(b.params.BlockTime)
