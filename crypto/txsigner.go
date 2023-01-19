@@ -47,7 +47,14 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	v := a.NewArray()
 	v.Set(a.NewUint(tx.Nonce))
-	v.Set(a.NewBigInt(tx.GasPrice))
+
+	if tx.Type == types.DynamicFeeTx {
+		v.Set(a.NewBigInt(tx.GasFeeCap))
+		v.Set(a.NewBigInt(tx.GasTipCap))
+	} else {
+		v.Set(a.NewBigInt(tx.GasPrice))
+	}
+
 	v.Set(a.NewUint(tx.Gas))
 
 	if tx.To == nil {
