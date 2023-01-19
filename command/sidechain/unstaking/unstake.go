@@ -91,12 +91,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	var encoded []byte
 	if params.self {
-		encoded, err = contractsapi.CheckpointManager.Abi.Methods["unstake"].Encode([]interface{}{params.amount})
+		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["unstake"].Encode([]interface{}{params.amount})
 		if err != nil {
 			return err
 		}
 	} else {
-		encoded, err = contractsapi.CheckpointManager.Abi.Methods["undelegate"].Encode(
+		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["undelegate"].Encode(
 			[]interface{}{ethgo.HexToAddress(params.undelegateAddress), params.amount})
 		if err != nil {
 			return err
