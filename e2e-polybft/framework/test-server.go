@@ -165,6 +165,20 @@ func (t *TestServer) Stake(amount uint64) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
 }
 
+// Unstake unstakes given amount from validator account encapsulated by given server instance
+func (t *TestServer) Unstake(amount uint64) error {
+	args := []string{
+		"polybft",
+		"unstake",
+		"--account", t.config.DataDir,
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--amount", strconv.FormatUint(amount, 10),
+		"--self",
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
+}
+
 // RegisterValidator is a wrapper function which registers new validator with given balance and stake
 func (t *TestServer) RegisterValidator(secrets string, balance string, stake string) error {
 	args := []string{
