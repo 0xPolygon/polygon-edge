@@ -19,8 +19,8 @@ type SecretsManagerConfig struct {
 // WriteConfig writes the current configuration to the specified path
 func (c *SecretsManagerConfig) WriteConfig(path string) error {
 	jsonBytes, _ := json.MarshalIndent(c, "", " ")
-
-	return os.WriteFile(path, jsonBytes, os.ModePerm)
+	/* #nosec */
+	return os.WriteFile(path, jsonBytes, 0660)
 }
 
 // ReadConfig reads the SecretsManagerConfig from the specified path

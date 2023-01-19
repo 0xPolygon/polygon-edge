@@ -70,12 +70,12 @@ func generateConfig(config config.Config) error {
 	if err != nil {
 		return fmt.Errorf("could not marshal config struct, %w", err)
 	}
-
+	/* #nosec */
 	if err := os.WriteFile(
 		fmt.Sprintf("default-config.%s", paramFlagValues.FileType),
 		data,
-		os.ModePerm); err != nil {
-		return errors.New("could not create and write config file")
+		0660); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
 	return nil

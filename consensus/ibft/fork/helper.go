@@ -52,8 +52,8 @@ func writeDataStore(path string, obj interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	if err := os.WriteFile(path, data, os.ModePerm); err != nil {
+	/* #nosec */
+	if err := os.WriteFile(path, data, 0660); err != nil {
 		return err
 	}
 

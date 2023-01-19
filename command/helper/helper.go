@@ -238,8 +238,8 @@ func WriteGenesisConfigToDisk(genesisConfig *chain.Chain, genesisPath string) er
 	if err != nil {
 		return fmt.Errorf("failed to generate genesis: %w", err)
 	}
-
-	if err := os.WriteFile(genesisPath, data, os.ModePerm); err != nil {
+	/* #nosec */
+	if err := os.WriteFile(genesisPath, data, 0660); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
 

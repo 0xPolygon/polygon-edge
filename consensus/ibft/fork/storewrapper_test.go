@@ -112,12 +112,12 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 
 			assert.NoError(
 				t,
-				os.WriteFile(path.Join(dirPath, snapshotMetadataFilename), []byte(test.storedSnapshotMetadata), os.ModePerm),
+				os.WriteFile(path.Join(dirPath, snapshotMetadataFilename), []byte(test.storedSnapshotMetadata), 0660),
 			)
 
 			assert.NoError(
 				t,
-				os.WriteFile(path.Join(dirPath, snapshotSnapshotsFilename), []byte(test.storedSnapshots), os.ModePerm),
+				os.WriteFile(path.Join(dirPath, snapshotSnapshotsFilename), []byte(test.storedSnapshots), 0660),
 			)
 
 			store, err := NewSnapshotValidatorStoreWrapper(

@@ -189,8 +189,8 @@ func (m *Manifest) Save(manifestPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
 	}
-
-	if err := os.WriteFile(filepath.Clean(manifestPath), data, os.ModePerm); err != nil {
+	/* #nosec */
+	if err := os.WriteFile(filepath.Clean(manifestPath), data, 0660); err != nil {
 		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
 	}
 
