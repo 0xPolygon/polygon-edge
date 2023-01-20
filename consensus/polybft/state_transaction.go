@@ -139,6 +139,11 @@ type CommitmentMessageSigned struct {
 	PublicKeys   [][]byte
 }
 
+// ContainsStateSync checks if commitment contains given state sync event
+func (cm *CommitmentMessageSigned) ContainsStateSync(stateSyncID uint64) bool {
+	return cm.Message.FromIndex <= stateSyncID && cm.Message.ToIndex >= stateSyncID
+}
+
 // EncodeAbi contains logic for encoding arbitrary data into ABI format
 func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 	commitment := map[string]interface{}{
