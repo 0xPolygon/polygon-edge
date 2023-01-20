@@ -201,12 +201,8 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBigInt(t.R))
 	vv.Set(arena.NewBigInt(t.S))
 
-	if t.Type != LegacyTx {
-		vv.Set(arena.NewBytes([]byte{byte(t.Type)}))
-
-		if t.Type == StateTx {
-			vv.Set(arena.NewBytes((t.From).Bytes()))
-		}
+	if t.Type == StateTx {
+		vv.Set(arena.NewBytes((t.From).Bytes()))
 	}
 
 	return vv

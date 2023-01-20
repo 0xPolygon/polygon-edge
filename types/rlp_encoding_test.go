@@ -149,15 +149,17 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	}
 
 	for _, v := range txTypes {
-		originalTx.Type = v
-		originalTx.ComputeHash()
+		t.Run(v.String(), func(t *testing.T) {
+			originalTx.Type = v
+			originalTx.ComputeHash()
 
-		txRLP := originalTx.MarshalRLP()
+			txRLP := originalTx.MarshalRLP()
 
-		unmarshalledTx := new(Transaction)
-		assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
+			unmarshalledTx := new(Transaction)
+			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
-		unmarshalledTx.ComputeHash()
-		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+			unmarshalledTx.ComputeHash()
+			assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+		})
 	}
 }

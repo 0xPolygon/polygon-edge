@@ -116,7 +116,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithPremine(premine[:]...),
-		framework.WithBurntContract(0, types.ZeroAddress),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
 	)
 	defer cluster.Stop()
 
