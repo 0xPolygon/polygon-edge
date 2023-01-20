@@ -81,12 +81,15 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	for i := 0; i < len(txns); i++ {
+		// Non-legacy tx raw contains a tx type prefix in the beginning according to EIP-2718.
+		// Here we check if the first element is a tx type and unmarshal it first.
 		txType := LegacyTx
 		if txns[i].Type() == fastrlp.TypeBytes {
 			if err = txType.UnmarshalRLPFrom(p, txns[i]); err != nil {
 				return err
 			}
 
+			// Then we increment element number in order to go to the actual tx data raw below.
 			i++
 		}
 
@@ -216,13 +219,15 @@ func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	for i := 0; i < len(elems); i++ {
+		// Non-legacy tx raw contains a tx type prefix in the beginning according to EIP-2718.
+		// Here we check if the first element is a tx type and unmarshal it first.
 		txType := LegacyTx
 		if elems[i].Type() == fastrlp.TypeBytes {
-			// Parse Transaction Type if Bytes come first
 			if err = txType.UnmarshalRLPFrom(p, elems[i]); err != nil {
 				return err
 			}
 
+			// Then we increment element number in order to go to the actual tx data raw below.
 			i++
 		}
 
