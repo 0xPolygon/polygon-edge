@@ -143,7 +143,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster.WaitForBlock(5, 1*time.Minute)
 
 	// start new validator
-	cluster.InitTestServer(t, 6, true)
+	cluster.InitTestServer(t, 6, true, false)
 
 	// assert that validators hash is correct
 	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)

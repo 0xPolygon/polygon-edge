@@ -462,7 +462,7 @@ func (s *Server) setupRelayer() error {
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
 		s.logger.Named("relayer"),
-		wallet.NewKey(account),
+		wallet.NewEcdsaSigner(wallet.NewKey(account)),
 	)
 
 	// start relayer
