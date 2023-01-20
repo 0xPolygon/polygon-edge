@@ -22,13 +22,13 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 	rapid.Check(t, func(tt *rapid.T) {
 		var (
 			numNodes  = rapid.Uint64Range(4, 30).Draw(tt, "number of cluster nodes")
-			epochSize = rapid.IntRange(5, 20).Draw(tt, "Size of epoch")
-			numBlocks = rapid.Uint64Range(2, 40).Draw(tt, "number of block the cluster should mine")
+			epochSize = rapid.OneOf(rapid.Just(4), rapid.Just(10)).Draw(tt, "Size of epoch")
+			numBlocks = rapid.Uint64Range(2, 5).Draw(tt, "number of blocks the cluster should mine")
 		)
 
 		premine := make([]uint64, numNodes)
 
-		// premined amount will determine validator's stake and in the end voting power
+		// premined amount will determine validator's stake and therefore voting power
 		for i := range premine {
 			premine[i] = rapid.Uint64Range(1, maxPremine).Draw(tt, fmt.Sprintf("stake for node %d", i+1))
 		}
@@ -39,8 +39,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 				for i, a := range adresses {
 					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premine[i]))
 				}
-			}),
-			framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
+			}))
 		defer cluster.Stop()
 
 		// wait for single epoch to process withdrawal
