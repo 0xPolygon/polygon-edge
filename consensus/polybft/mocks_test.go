@@ -154,9 +154,12 @@ type blockBuilderMock struct {
 }
 
 func (m *blockBuilderMock) Reset() error {
-	_ = m.Called()
+	args := m.Called()
+	if len(args) == 0 {
+		return nil
+	}
 
-	return nil
+	return args.Error(0)
 }
 
 func (m *blockBuilderMock) WriteTx(tx *types.Transaction) error {
