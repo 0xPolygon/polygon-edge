@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"reflect"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -17,10 +18,7 @@ import (
 var (
 	commitmentABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, bytes32 root)")
 
-	commitABIMethod, _ = abi.NewMethod("function commit(" +
-		"tuple(uint256 startId, uint256 endId, bytes32 root) commitment," +
-		"bytes signature," +
-		"bytes bitmap)")
+	commitABIMethod = contractsapi.StateReceiver.Abi.Methods["commit"]
 )
 
 // StateTransactionInput is an abstraction for different state transaction inputs

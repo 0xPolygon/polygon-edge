@@ -28,15 +28,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
 var (
-	stateSyncResultEvent = abi.MustNewEvent(`event StateSyncResult(
-		uint256 indexed counter,
-		bool indexed status,
-		bytes message)`)
+	stateSyncResultEvent = contractsapi.StateReceiver.Abi.Events["StateSyncResult"]
 )
 
 const (
@@ -158,7 +154,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	require.NoError(t, err)
 
-	lastCommittedIDMethod := polybft.SidechainBridgeFunctionsABI.GetMethod("lastCommittedId")
+	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
 	encode, err := lastCommittedIDMethod.Encode([]interface{}{})
 	require.NoError(t, err)
 

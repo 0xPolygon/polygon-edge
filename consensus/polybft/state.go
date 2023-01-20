@@ -9,12 +9,12 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 /*
@@ -45,9 +45,9 @@ proposer snapshot/
 
 var (
 	// ABI
-	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
-	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
-	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
+	exitEventABI          = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
+	ExitEventABIType      = exitEventABI.Inputs
 
 	// proposerSnapshotKey is a static key which is used to save latest proposer snapshot.
 	// (there will always be one object in bucket)

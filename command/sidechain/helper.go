@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -23,11 +22,6 @@ const (
 	AmountFlag     = "amount"
 
 	DefaultGasPrice = 1879048192 // 0x70000000
-)
-
-var (
-	getDelegatorRewardMethod, _ = abi.NewMethod(
-		"getDelegatorReward(address validator, address delegator) returns (uint256)")
 )
 
 func CheckIfDirectoryExist(dir string) error {
@@ -49,7 +43,7 @@ func GetAccountFromDir(dir string) (*wallet.Account, error) {
 
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address
 func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (map[string]interface{}, error) {
-	getValidatorMethod := polybft.StateFunctionsABI.GetMethod("getValidator")
+	getValidatorMethod := contractsapi.ChildValidatorSet.Abi.GetMethod("getValidator")
 
 	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
 	if err != nil {
@@ -88,7 +82,8 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 // GetDelegatorReward queries delegator reward for given validator and delegator addresses
 func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address,
 	txRelayer txrelayer.TxRelayer) (*big.Int, error) {
-	input, err := getDelegatorRewardMethod.Encode([]interface{}{validatorAddr, delegatorAddr})
+	input, err := contractsapi.ChildValidatorSet.Abi.Methods["getValidatorReward"].Encode(
+		[]interface{}{validatorAddr, delegatorAddr})
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode input parameters for getDelegatorReward fn: %w", err)
 	}
