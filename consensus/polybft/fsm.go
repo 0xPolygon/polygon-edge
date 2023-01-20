@@ -94,7 +94,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 			return nil, err
 		}
 
-		if err := f.blockBuilder.WriteTx(tx); err != nil {
+		if err = f.blockBuilder.WriteTx(tx); err != nil {
 			return nil, fmt.Errorf("failed to commit validators uptime transaction: %w", err)
 		}
 
@@ -114,7 +114,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 	if f.config.IsBridgeEnabled() {
 		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.WriteTx(tx); err != nil {
+			if err = f.blockBuilder.WriteTx(tx); err != nil {
 				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
 			}
 		}

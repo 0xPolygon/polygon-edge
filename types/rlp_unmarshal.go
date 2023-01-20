@@ -331,7 +331,7 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	// TODO: Fix per EIP-2718
 	// Use gasPrice value for eip-1559 fields by default
 	t.GasTipCap = new(big.Int).Set(t.GasPrice)
-	t.GasFeeCap = new(big.Int).Set(t.GasFeeCap)
+	t.GasFeeCap = new(big.Int).Set(t.GasPrice)
 
 	// gas
 	if t.Gas, err = elems[2].GetUint64(); err != nil {

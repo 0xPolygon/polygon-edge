@@ -559,7 +559,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// define effective tip based on tx type
 	effectiveTip := msg.GasPrice
-	if t.config.London {
+	if t.config.London && msg.Type != types.StateTx {
 		effectiveTip = new(big.Int).Set(msg.GasTipCap)
 		secondTipOption := new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee)
 
@@ -570,7 +570,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
 
-	if t.config.London {
+	if t.config.London && msg.Type != types.StateTx {
 		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
 		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
 	}
