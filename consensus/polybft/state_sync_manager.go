@@ -406,9 +406,12 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSy
 		}
 
 		proof, err = s.state.getStateSyncProof(stateSyncID)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
+		}
 	}
 
-	return proof, err
+	return proof, nil
 }
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
