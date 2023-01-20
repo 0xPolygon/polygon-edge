@@ -20,10 +20,10 @@ func TestEncoding_Method(t *testing.T) {
 	cases := []method{
 		// empty commit
 		&Commit{
-			Bundle: Bundle{
+			Commitment: Commitment{
 				StartID: big.NewInt(1),
 				EndID:   big.NewInt(1),
-				Leaves:  big.NewInt(1),
+				Root:    types.EmptyRootHash,
 			},
 			Signature: []byte{},
 			Bitmap:    []byte{},

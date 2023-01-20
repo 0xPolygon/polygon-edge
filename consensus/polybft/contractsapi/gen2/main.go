@@ -24,8 +24,12 @@ func main() {
 			"child/StateReceiver",
 			[]string{
 				"commit",
+				"execute",
 			},
-			[]string{},
+			[]string{
+				"StateSyncResult",
+				"NewCommitment",
+			},
 		},
 		{
 			"child/ChildValidatorSet",
@@ -36,10 +40,19 @@ func main() {
 		},
 		{
 			"root/StateSender",
-			[]string{},
+			[]string{
+				"syncState",
+			},
 			[]string{
 				"StateSynced",
 			},
+		},
+		{
+			"root/CheckpointManager",
+			[]string{
+				"submit",
+			},
+			[]string{},
 		},
 	}
 
@@ -141,6 +154,7 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 		// []byte and [n]byte get rendered as []uint68 and [n]uint8, since we do not have any
 		// uint8 internally in polybft, we can use regexp to replace those values with the
 		// correct byte representation
+		typ = strings.Replace(typ, "[32]uint8", "types.Hash", -1)
 		typ = strings.Replace(typ, "]uint8", "]byte", -1)
 
 		// Replacement of Id for ID to make the linter happy
