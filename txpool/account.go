@@ -19,23 +19,18 @@ type accountsMap struct {
 
 // Intializes an account for the given address.
 func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
-	a, _ := m.LoadOrStore(addr, &account{})
-	newAccount := a.(*account) //nolint:forcetypeassert
-	// run only once
-	newAccount.init.Do(func() {
-		// create queues
-		newAccount.enqueued = newAccountQueue()
-		newAccount.promoted = newAccountQueue()
-
-		//	set the limit for enqueued txs
-		newAccount.maxEnqueued = m.maxEnqueuedLimit
-
-		// set the nonce
-		newAccount.setNonce(nonce)
-
-		// update global count
-		atomic.AddUint64(&m.count, 1)
+	a, loaded := m.LoadOrStore(addr, &account{
+		enqueued:    newAccountQueue(),
+		promoted:    newAccountQueue(),
+		maxEnqueued: m.maxEnqueuedLimit,
+		nextNonce:   nonce,
 	})
+	newAccount := a.(*account) //nolint:forcetypeassert
+
+	if !loaded {
+		// update global count if it was a store
+		atomic.AddUint64(&m.count, 1)
+	}
 
 	return newAccount
 }
@@ -153,7 +148,6 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 // indicating the account's enqueued transaction(s)
 // are ready to be moved to the promoted queue.
 type account struct {
-	init               sync.Once
 	enqueued, promoted *accountQueue
 	nextNonce          uint64
 	demotions          uint64
