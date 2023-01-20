@@ -34,6 +34,15 @@ func (t *Topic) createObj() proto.Message {
 	return message
 }
 
+func (t *Topic) Close() {
+	if t.topic != nil {
+		t.topic.Close()
+		t.topic = nil
+	}
+
+	close(t.closeCh)
+}
+
 func (t *Topic) Publish(obj proto.Message) error {
 	data, err := proto.Marshal(obj)
 	if err != nil {
@@ -65,6 +74,11 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{},
 	for {
 		msg, err := sub.Next(ctx)
 		if err != nil {
+			// Above cancelFn() called.
+			if err == ctx.Err() {
+				break
+			}
+
 			t.logger.Error("failed to get topic", "err", err)
 
 			continue
@@ -90,9 +104,10 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 	}
 
 	tt := &Topic{
-		logger: s.logger.Named(protoID),
-		topic:  topic,
-		typ:    reflect.TypeOf(obj).Elem(),
+		logger:  s.logger.Named(protoID),
+		topic:   topic,
+		typ:     reflect.TypeOf(obj).Elem(),
+		closeCh: make(chan struct{}),
 	}
 
 	return tt, nil
