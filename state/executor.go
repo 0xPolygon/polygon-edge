@@ -386,6 +386,46 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 	return &t.ctx
 }
 
+func (t *Transition) londonPrefill(msg *types.Transaction) *types.Transaction {
+	if t.ctx.BaseFee == nil {
+		// If there's no basefee, then it must be a non-1559 execution
+		if msg.GasPrice == nil {
+			msg.GasPrice = new(big.Int)
+		}
+
+		msg.GasFeeCap = new(big.Int).Set(msg.GasPrice)
+		msg.GasTipCap = new(big.Int).Set(msg.GasPrice)
+	} else {
+		// A basefee is provided, necessitating 1559-type execution
+		if msg.GasPrice != nil {
+			// User specified the legacy gas field, convert to 1559 gas typing
+			msg.GasFeeCap = new(big.Int).Set(msg.GasPrice)
+			msg.GasTipCap = new(big.Int).Set(msg.GasPrice)
+		} else {
+			// User specified 1559 gas feilds (or none), use those
+			if msg.GasFeeCap == nil {
+				msg.GasFeeCap = new(big.Int)
+			}
+
+			if msg.GasTipCap == nil {
+				msg.GasTipCap = new(big.Int)
+			}
+
+			// Backfill the legacy gasPrice for EVM execution, unless we're all zeroes
+			msg.GasPrice = new(big.Int)
+
+			if msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
+				msg.GasPrice = new(big.Int).Add(msg.GasTipCap, t.ctx.BaseFee)
+				if msg.GasFeeCap.Cmp(msg.GasPrice) == -1 {
+					msg.GasPrice = new(big.Int).Set(msg.GasFeeCap)
+				}
+			}
+		}
+	}
+
+	return msg
+}
+
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	// deduct the upfront max gas cost
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
@@ -495,6 +535,9 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
+	// FIXME: Not sure this is the right place for such kind of modifications
+	msg = t.londonPrefill(msg)
+
 	var err error
 
 	if msg.Type == types.DynamicFeeTx {
