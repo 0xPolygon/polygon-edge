@@ -14,6 +14,14 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+const (
+	contractVariableName   = "%sContract"
+	contractStructName     = "%sContractImpl"
+	contractVariableFormat = "%s = &%s{Artifact: %s}"
+	abiTypeNameFormat      = "var %sABIType = abi.MustNewType(\"%s\")"
+	eventNameFormat        = "%sEvent"
+)
+
 func main() {
 	cases := []struct {
 		contractName string
@@ -64,8 +72,38 @@ func main() {
 	rr := render{}
 
 	res := []string{}
+	globalVariables := []string{}
 
 	for _, c := range cases {
+		tmpl := `type {{.StructName}} struct {
+			Artifact *artifact.Artifact
+
+			{{.Fields}}
+		}`
+
+		genContractFields := func(fields []string) string {
+			structFields := make([]string, len(fields))
+
+			for i := 0; i < len(fields); i++ {
+				title := strings.Title(fields[i])
+				structFields[i] = fmt.Sprintf("%s %s", title, title)
+			}
+
+			return strings.Join(structFields, "\n")
+		}
+
+		inputs := map[string]interface{}{
+			"StructName": fmt.Sprintf(contractStructName, c.contractName),
+			"Fields":     genContractFields(c.methods),
+		}
+
+		globalVariables = append(globalVariables, fmt.Sprintf(contractVariableFormat,
+			fmt.Sprintf(contractVariableName, c.contractName), inputs["StructName"], c.contractName))
+
+		contractStruct := renderTmpl(tmpl, inputs)
+
+		res = append(res, contractStruct)
+
 		for _, method := range c.methods {
 			res = append(res, rr.GenMethod(c.contractName, c.artifact.Abi.Methods[method]))
 		}
@@ -81,13 +119,17 @@ package contractsapi
 import (
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo"
 )
 
-`
+var (
 
+`
+	str += strings.Join(globalVariables, "\n")
+	str += ")\n"
 	str += strings.Join(res, "\n")
 
 	output, err := format.Source([]byte(str))
@@ -99,9 +141,6 @@ import (
 	if err := ioutil.WriteFile("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
 		panic(err)
 	}
-}
-
-type render struct {
 }
 
 func genType(name string, obj *abi.Type, res *[]string) string {
@@ -159,8 +198,7 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 }
 
 func genNestedType(name string, obj *abi.Type, res *[]string) string {
-	*res = append(*res, fmt.Sprintf("var %sABIType = abi.MustNewType(\"%s\")",
-		strings.Title(name), obj.Format(true)))
+	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, strings.Title(name), obj.Format(true)))
 
 	result := genType(name, obj, res)
 	*res = append(*res, genAbiFuncsForNestedType(name))
@@ -188,8 +226,11 @@ func genAbiFuncsForNestedType(name string) string {
 	return renderTmpl(tmpl, inputs)
 }
 
+type render struct {
+}
+
 func (r *render) GenEvent(event *abi.Event) string {
-	name := event.Name + "Event"
+	name := fmt.Sprintf(eventNameFormat, event.Name)
 
 	res := []string{}
 	genType(name, event.Inputs, &res)
