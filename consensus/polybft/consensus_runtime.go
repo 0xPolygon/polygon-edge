@@ -280,11 +280,6 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		}
 	}
 
-	if err = c.proposerCalculator.Update(fullBlock.Block.Number()); err != nil {
-		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
-		c.logger.Warn("Could not update proposer calculator", "err", err)
-	}
-
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
 	c.lastBuiltBlock = fullBlock.Block.Header
