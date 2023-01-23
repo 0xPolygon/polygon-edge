@@ -12,10 +12,10 @@ type RLPStoreUnmarshaler interface {
 }
 
 func (b *Body) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(b.UnmarshalRLPFrom, input)
+	return UnmarshalRlp(b.unmarshalRLPFrom, input)
 }
 
-func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	tuple, err := v.GetElems()
 	if err != nil {
 		return err
@@ -119,7 +119,7 @@ func (r *Receipts) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 			TransactionType: txType,
 		}
 
-		if err := obj.unmarshalRLPFrom(p, v); err != nil {
+		if err := obj.unmarshalStoreRLPFrom(p, v); err != nil {
 			return err
 		}
 

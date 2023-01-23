@@ -292,6 +292,7 @@ func (r *Receipt) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if r.CumulativeGasUsed, err = elems[1].GetUint64(); err != nil {
 		return err
 	}
+
 	// logsBloom
 	if _, err = elems[2].GetBytes(r.LogsBloom[:0], 256); err != nil {
 		return err
