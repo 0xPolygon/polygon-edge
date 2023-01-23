@@ -240,7 +240,7 @@ var emptyFrom = types.Address{}
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-	if txn.From == emptyFrom && txn.IsLegacyTx() {
+	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
 		// Decrypt the from address
 		from, err := signer.Sender(txn)
 		if err != nil {
@@ -272,7 +272,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 func (t *Transition) Write(txn *types.Transaction) error {
 	var err error
 
-	if txn.From == emptyFrom && txn.IsLegacyTx() {
+	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
@@ -438,7 +438,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	if msg.IsStateTx() {
+	if msg.Type == types.StateTx {
 		if err := checkAndProcessStateTx(msg, t); err != nil {
 			return nil, err
 		}

@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/umbracle/fastrlp"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -60,9 +62,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	unmarshalledTxn.ComputeHash()
 
 	txn.Hash = unmarshalledTxn.Hash
-	if !reflect.DeepEqual(txn, unmarshalledTxn) {
-		t.Fatal("[ERROR] Unmarshalled transaction not equal to base transaction")
-	}
+	assert.Equal(t, txn, unmarshalledTxn, "[ERROR] Unmarshalled transaction not equal to base transaction")
 }
 
 func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {
@@ -132,11 +132,13 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
+	addrFrom := StringToAddress("22")
 	originalTx := &Transaction{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
 		To:       &addrTo,
+		From:     addrFrom,
 		Value:    big.NewInt(1),
 		Input:    []byte{1, 2},
 		V:        big.NewInt(25),
@@ -160,5 +162,41 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 
 		unmarshalledTx.ComputeHash()
 		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+	}
+}
+
+func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
+	testTable := []struct {
+		name        string
+		txType      TxType
+		expectedErr bool
+	}{
+		{
+			name:   "StateTx",
+			txType: StateTx,
+		},
+		{
+			name:   "LegacyTx",
+			txType: LegacyTx,
+		},
+		{
+			name:        "undefined type",
+			txType:      TxType(0x09),
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range testTable {
+		ar := &fastrlp.Arena{}
+
+		var txType TxType
+		err := txType.unmarshalRLPFrom(nil, ar.NewBytes([]byte{byte(tt.txType)}))
+
+		if tt.expectedErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, tt.txType, txType)
+		}
 	}
 }

@@ -4,6 +4,10 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+const (
+	RLPSingleByteUpperLimit = 0x7f
+)
+
 type RLPMarshaler interface {
 	MarshalRLPTo(dst []byte) []byte
 }
@@ -35,6 +39,10 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	} else {
 		v0 := ar.NewArray()
 		for _, tx := range b.Transactions {
+			if tx.Type != LegacyTx {
+				v0.Set(ar.NewBytes([]byte{byte(tx.Type)}))
+			}
+
 			v0.Set(tx.MarshalRLPWith(ar))
 		}
 		vv.Set(v0)
@@ -92,7 +100,12 @@ func (r Receipts) MarshalRLPTo(dst []byte) []byte {
 
 func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
+
 	for _, rr := range *r {
+		if !rr.IsLegacyTx() {
+			vv.Set(a.NewBytes([]byte{byte(rr.TransactionType)}))
+		}
+
 		vv.Set(rr.MarshalRLPWith(a))
 	}
 
@@ -104,6 +117,10 @@ func (r *Receipt) MarshalRLP() []byte {
 }
 
 func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
+	if !r.IsLegacyTx() {
+		dst = append(dst, byte(r.TransactionType))
+	}
+
 	return MarshalRLPTo(r.MarshalRLPWith, dst)
 }
 
@@ -120,10 +137,6 @@ func (r *Receipt) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(a.NewUint(r.CumulativeGasUsed))
 	vv.Set(a.NewCopyBytes(r.LogsBloom[:]))
 	vv.Set(r.MarshalLogsWith(a))
-
-	if !r.IsLegacyTx() {
-		vv.Set(a.NewBytes([]byte{byte(r.TransactionType)}))
-	}
 
 	return vv
 }
@@ -164,6 +177,10 @@ func (t *Transaction) MarshalRLP() []byte {
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
+	if t.Type != LegacyTx {
+		dst = append(dst, byte(t.Type))
+	}
+
 	return MarshalRLPTo(t.MarshalRLPWith, dst)
 }
 
@@ -190,11 +207,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBigInt(t.R))
 	vv.Set(arena.NewBigInt(t.S))
 
-	if !t.IsLegacyTx() {
-		vv.Set(arena.NewBytes([]byte{byte(t.Type)}))
-	}
-
-	if t.IsStateTx() {
+	if t.Type == StateTx {
 		vv.Set(arena.NewBytes((t.From).Bytes()))
 	}
 
