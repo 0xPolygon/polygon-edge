@@ -12,6 +12,7 @@ var (
 	stateSyncABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
 
+	// this will change to use the generated code, but for now, we leave it as is, because of the circular import
 	ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
 		"bytes32[] proof, " +
 		"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
@@ -78,7 +79,7 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid proof data")
 	}
 
-	stateSyncEventEncoded, isOk := result["obj"].(map[string]interface{})
+	stateSyncEventEncoded, isOk := result["stateSync"].(map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid state sync data")
 	}
