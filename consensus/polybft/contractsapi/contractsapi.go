@@ -11,13 +11,13 @@ import (
 )
 
 var (
-	StateReceiverContract     = &StateReceiverContractImpl{Artifact: StateReceiver}
-	ChildValidatorSetContract = &ChildValidatorSetContractImpl{Artifact: ChildValidatorSet}
-	StateSenderContract       = &StateSenderContractImpl{Artifact: StateSender}
-	CheckpointManagerContract = &CheckpointManagerContractImpl{Artifact: CheckpointManager}
+	StateReceiverContract     = &stateReceiverContractImpl{Artifact: StateReceiver}
+	ChildValidatorSetContract = &childValidatorSetContractImpl{Artifact: ChildValidatorSet}
+	StateSenderContract       = &stateSenderContractImpl{Artifact: StateSender}
+	CheckpointManagerContract = &checkpointManagerContractImpl{Artifact: CheckpointManager}
 )
 
-type StateReceiverContractImpl struct {
+type stateReceiverContractImpl struct {
 	Artifact *artifact.Artifact
 
 	Commit  Commit
@@ -112,7 +112,7 @@ func (N *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(NewCommitmentEventType, log, N)
 }
 
-type ChildValidatorSetContractImpl struct {
+type childValidatorSetContractImpl struct {
 	Artifact *artifact.Artifact
 
 	CommitEpoch CommitEpoch
@@ -179,7 +179,7 @@ func (c *CommitEpoch) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
 
-type StateSenderContractImpl struct {
+type stateSenderContractImpl struct {
 	Artifact *artifact.Artifact
 
 	SyncState SyncState
@@ -213,7 +213,7 @@ func (S *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(StateSyncedEventType, log, S)
 }
 
-type CheckpointManagerContractImpl struct {
+type checkpointManagerContractImpl struct {
 	Artifact *artifact.Artifact
 
 	Submit Submit
