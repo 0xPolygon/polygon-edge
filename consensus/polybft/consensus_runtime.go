@@ -267,17 +267,17 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		c.logger.Error("failed to post block in checkpoint manager", "err", err)
 	}
 
+	// update proposer priorities
+	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
+		c.logger.Error("Could not update proposer calculator", "err", err)
+	}
+
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 
 			return
 		}
-	}
-
-	if err := c.proposerCalculator.Update(fullBlock.Block.Number()); err != nil {
-		// do not return if proposer snapshot hasn't been inserted, next call of OnBlockInserted will catch-up
-		c.logger.Warn("Could not update proposer calculator", "err", err)
 	}
 
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
@@ -535,16 +535,7 @@ func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint
 
 // GetStateSyncProof returns the proof for the state sync
 func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
-	proof, err := c.state.getStateSyncProof(stateSyncID)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
-	}
-
-	if proof == nil {
-		return nil, fmt.Errorf("cannot find state sync proof containing StateSync id %d", stateSyncID)
-	}
-
-	return proof, nil
+	return c.stateSyncManager.GetStateSyncProof(stateSyncID)
 }
 
 // setIsActiveValidator updates the activeValidatorFlag field

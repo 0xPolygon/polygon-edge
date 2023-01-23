@@ -333,18 +333,18 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		cluster.InitTestServer(t, i, true)
+		cluster.InitTestServer(t, i, true, cluster.Config.HasBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		offsetIndex := i + int(cluster.Config.ValidatorSetSize)
-		cluster.InitTestServer(t, offsetIndex, false)
+		cluster.InitTestServer(t, offsetIndex, false, false /* relayer */)
 	}
 
 	return cluster
 }
 
-func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool) {
+func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, relayer bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -356,6 +356,7 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool) {
 		config.Chain = c.Config.Dir("genesis.json")
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
+		config.Relayer = relayer
 	})
 
 	// watch the server for stop signals. It is important to fix the specific
@@ -443,7 +444,7 @@ func (c *TestCluster) WaitUntil(dur time.Duration, handler func() bool) error {
 		case <-time.After(2 * time.Second):
 		}
 
-		if !handler() {
+		if handler() {
 			return nil
 		}
 	}
@@ -484,12 +485,13 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 func (c *TestCluster) WaitForGeneric(dur time.Duration, fn func(*TestServer) bool) error {
 	return c.WaitUntil(dur, func() bool {
 		for _, srv := range c.Servers {
-			if srv.isRunning() && !fn(srv) { // if server is stopped - skip it
-				return true
+			// query only running servers
+			if srv.isRunning() && !fn(srv) {
+				return false
 			}
 		}
 
-		return false
+		return true
 	})
 }
 

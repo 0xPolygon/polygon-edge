@@ -8,21 +8,18 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
 	params           stakeParams
-	stakeABI         = abi.MustNewMethod("function stake()")
-	delegateABI      = abi.MustNewMethod("function delegate(address validator, bool restake)")
-	stakeEventABI    = abi.MustNewEvent("event Staked(address indexed validator, uint256 amount)")
-	delegateEventABI = abi.MustNewEvent("event Delegated(address indexed delegator," +
-		"address indexed validator, uint256 amount)")
+	stakeEventABI    = contractsapi.ChildValidatorSet.Abi.Events["Staked"]
+	delegateEventABI = contractsapi.ChildValidatorSet.Abi.Events["Delegated"]
 )
 
 func GetCommand() *cobra.Command {
@@ -94,13 +91,14 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	var encoded []byte
 	if params.self {
-		encoded, err = stakeABI.Encode([]interface{}{})
+		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["stake"].Encode([]interface{}{})
 		if err != nil {
 			return err
 		}
 	} else {
 		delegateToAddress := types.StringToAddress(params.delegateAddress)
-		encoded, err = delegateABI.Encode([]interface{}{ethgo.Address(delegateToAddress), false})
+		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["delegate"].Encode(
+			[]interface{}{ethgo.Address(delegateToAddress), false})
 		if err != nil {
 			return err
 		}

@@ -160,7 +160,7 @@ func (p *blockchainWrapper) NewBlockBuilder(
 		GasLimit:  gasLimit,
 		TxPool:    txPool,
 		Logger:    logger,
-	})
+	}), nil
 }
 
 // GetSystemState is an implementation of blockchainBackend interface

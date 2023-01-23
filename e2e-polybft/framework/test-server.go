@@ -25,6 +25,7 @@ type TestServerConfig struct {
 	DataDir     string
 	Chain       string
 	LogLevel    string
+	Relayer     bool
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -132,6 +133,10 @@ func (t *TestServer) Start() {
 		args = append(args, "--seal")
 	}
 
+	if config.Relayer {
+		args = append(args, "--relayer")
+	}
+
 	// Start the server
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
 
@@ -156,6 +161,20 @@ func (t *TestServer) Stake(amount uint64) error {
 	args := []string{
 		"polybft",
 		"stake",
+		"--account", t.config.DataDir,
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--amount", strconv.FormatUint(amount, 10),
+		"--self",
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
+}
+
+// Unstake unstakes given amount from validator account encapsulated by given server instance
+func (t *TestServer) Unstake(amount uint64) error {
+	args := []string{
+		"polybft",
+		"unstake",
 		"--account", t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--amount", strconv.FormatUint(amount, 10),

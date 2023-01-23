@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -17,7 +18,6 @@ import (
 	gc "github.com/mitchellh/go-glint/components"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
@@ -272,13 +272,10 @@ const (
 
 var (
 	stakeManager      = contracts.ValidatorSetContract
-	stakeFn, _        = abi.NewMethod("function stake()")
-	whitelistFn, _    = abi.NewMethod("function addToWhitelist(address[])")
-	registerFn, _     = abi.NewMethod("function register(uint256[2] signature, uint256[4] pubkey)")
-	newValidatorEvent = abi.MustNewEvent(`event NewValidator(
-		address indexed validator,
-		uint256[4] blsKey
-	)`)
+	stakeFn           = contractsapi.ChildValidatorSet.Abi.Methods["stake"]
+	whitelistFn       = contractsapi.ChildValidatorSet.Abi.Methods["addToWhitelist"]
+	registerFn        = contractsapi.ChildValidatorSet.Abi.Methods["register"]
+	newValidatorEvent = contractsapi.ChildValidatorSet.Abi.Events["NewValidator"]
 )
 
 type asyncTxn interface {

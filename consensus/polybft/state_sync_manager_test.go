@@ -364,6 +364,86 @@ func TestStateSyncManager_Close(t *testing.T) {
 	require.NotPanics(t, func() { mgr.Close() })
 }
 
+func TestStateSyncManager_GetProofs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		stateSyncID = uint64(5)
+	)
+
+	state := newTestState(t)
+	insertTestStateSyncProofs(t, state, maxCommitmentSize)
+
+	stateSyncManager := &stateSyncManager{state: state}
+
+	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
+	require.NoError(t, err)
+	require.Equal(t, stateSyncID, proof.StateSync.ID)
+	require.NotEmpty(t, proof.Proof)
+}
+
+func TestStateSyncManager_GetProofs_NoProof_NoCommitment(t *testing.T) {
+	t.Parallel()
+
+	const (
+		stateSyncID = uint64(5)
+	)
+
+	stateSyncManager := &stateSyncManager{state: newTestState(t)}
+
+	_, err := stateSyncManager.GetStateSyncProof(stateSyncID)
+	require.ErrorContains(t, err, "cannot find commitment for StateSync id")
+}
+
+func TestStateSyncManager_GetProofs_NoProof_HasCommitment_NoStateSyncs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		stateSyncID = uint64(5)
+	)
+
+	state := newTestState(t)
+	require.NoError(t, state.insertCommitmentMessage(createTestCommitmentMessage(t, 1)))
+
+	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
+
+	_, err := stateSyncManager.GetStateSyncProof(stateSyncID)
+	require.ErrorContains(t, err, "failed to get state sync events for commitment to build proofs")
+}
+
+func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		stateSyncID = uint64(5)
+		fromIndex   = uint64(1)
+		epoch       = uint64(1)
+	)
+
+	state := newTestState(t)
+	stateSyncs := generateStateSyncEvents(t, maxCommitmentSize, fromIndex)
+
+	tree, err := createMerkleTree(stateSyncs)
+	require.NoError(t, err)
+
+	commitment := &CommitmentMessage{FromIndex: fromIndex, ToIndex: maxCommitmentSize, Epoch: epoch, MerkleRootHash: tree.Hash()}
+
+	for _, sse := range stateSyncs {
+		require.NoError(t, state.insertStateSyncEvent(sse))
+	}
+
+	require.NoError(t, state.insertCommitmentMessage(&CommitmentMessageSigned{Message: commitment}))
+
+	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
+
+	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
+	require.NoError(t, err)
+	require.Equal(t, stateSyncID, proof.StateSync.ID)
+	require.NotEmpty(t, proof.Proof)
+
+	require.NoError(t, commitment.VerifyStateSyncProof(proof))
+}
+
 type mockTopic struct {
 	published proto.Message
 }

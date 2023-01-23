@@ -334,8 +334,7 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 func TestState_insertCommitmentMessage(t *testing.T) {
 	t.Parallel()
 
-	commitment, err := createTestCommitmentMessage(11)
-	require.NoError(t, err)
+	commitment := createTestCommitmentMessage(t, 11)
 
 	state := newTestState(t)
 	assert.NoError(t, state.insertCommitmentMessage(commitment))
@@ -351,8 +350,7 @@ func TestState_StateSync_insertAndGetStateSyncProof(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
-	commitment, err := createTestCommitmentMessage(0)
-	require.NoError(t, err)
+	commitment := createTestCommitmentMessage(t, 0)
 	require.NoError(t, state.insertCommitmentMessage(commitment))
 
 	insertTestStateSyncProofs(t, state, 10)
@@ -524,12 +522,55 @@ func insertTestExitEvents(t *testing.T, state *State,
 	}
 }
 
-func insertTestCommitments(t *testing.T, state *State, epoch, numberOfCommitments uint64) {
+func TestState_getCommitmentForStateSync(t *testing.T) {
+	const (
+		numOfCommitments = 10
+	)
+
+	state := newTestState(t)
+
+	insertTestCommitments(t, state, numOfCommitments)
+
+	var cases = []struct {
+		stateSyncID   uint64
+		hasCommitment bool
+	}{
+		{1, true},
+		{10, true},
+		{11, true},
+		{7, true},
+		{999, false},
+		{121, false},
+		{99, true},
+		{101, true},
+		{111, false},
+		{75, true},
+		{5, true},
+		{102, true},
+		{211, false},
+		{21, true},
+		{30, true},
+		{81, true},
+		{90, true},
+	}
+
+	for _, c := range cases {
+		commitment, err := state.getCommitmentForStateSync(c.stateSyncID)
+
+		if c.hasCommitment {
+			require.NoError(t, err)
+			require.Equal(t, c.hasCommitment, commitment.ContainsStateSync(c.stateSyncID))
+		} else {
+			require.ErrorIs(t, errNoCommitmentForStateSync, err)
+		}
+	}
+}
+
+func insertTestCommitments(t *testing.T, state *State, numberOfCommitments uint64) {
 	t.Helper()
 
 	for i := uint64(0); i <= numberOfCommitments; i++ {
-		commitment, err := createTestCommitmentMessage(i * maxCommitmentSize)
-		require.NoError(t, err)
+		commitment := createTestCommitmentMessage(t, i*maxCommitmentSize+1)
 		require.NoError(t, state.insertCommitmentMessage(commitment))
 	}
 }
@@ -559,15 +600,16 @@ func createTestStateSync(index uint64) *types.StateSyncEvent {
 	}
 }
 
-func createTestCommitmentMessage(fromIndex uint64) (*CommitmentMessageSigned, error) {
+func createTestCommitmentMessage(t *testing.T, fromIndex uint64) *CommitmentMessageSigned {
+	t.Helper()
+
 	tree, err := NewMerkleTree([][]byte{
 		{0, 1},
 		{2, 3},
 		{4, 5},
 	})
-	if err != nil {
-		return nil, err
-	}
+
+	require.NoError(t, err)
 
 	msg := &CommitmentMessage{
 		MerkleRootHash: tree.Hash(),
@@ -578,5 +620,5 @@ func createTestCommitmentMessage(fromIndex uint64) (*CommitmentMessageSigned, er
 	return &CommitmentMessageSigned{
 		Message:      msg,
 		AggSignature: Signature{},
-	}, nil
+	}
 }

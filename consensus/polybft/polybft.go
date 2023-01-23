@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -137,7 +138,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
 		}
 
-		input, err = nativeTokenInitializer.Encode(
+		input, err = contractsapi.MRC20.Abi.Methods["initialize"].Encode(
 			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
