@@ -13,7 +13,7 @@ type RLPUnmarshaler interface {
 
 type unmarshalRLPFunc func(p *fastrlp.Parser, v *fastrlp.Value) error
 
-type unmarshalRLPFromCbFunc func(TxType, *fastrlp.Parser, *fastrlp.Value) error
+type unmarshalRLPFromFunc func(TxType, *fastrlp.Parser, *fastrlp.Value) error
 
 func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	pr := fastrlp.DefaultParserPool.Get()
@@ -36,7 +36,7 @@ func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	return nil
 }
 
-func unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value, cb unmarshalRLPFromCbFunc) error {
+func unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value, cb unmarshalRLPFromFunc) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
