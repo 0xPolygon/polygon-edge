@@ -35,7 +35,7 @@ func (b *Body) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			return err
 		}
 
-		bTxn.ComputeHash()
+		bTxn = bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)
 
