@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -88,6 +87,10 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
 	nextValidators := f.validators.Accounts()
 
+	if err := f.blockBuilder.Reset(); err != nil {
+		return nil, fmt.Errorf("failed to initialize block builder: %w", err)
+	}
+
 	if f.isEndOfEpoch {
 		tx, err := f.createValidatorsUptimeTx()
 		if err != nil {
@@ -123,14 +126,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	// fill the block with transactions
 	f.blockBuilder.Fill()
 
-	// set the timestamp
-	parentTime := time.Unix(int64(parent.Timestamp), 0)
-	headerTime := parentTime.Add(f.config.BlockTime)
-
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
-	}
-
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
 	if err != nil {
 		return nil, err
@@ -150,7 +145,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
-		h.Timestamp = uint64(headerTime.Unix())
 		h.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyBFTMixDigest
 	})

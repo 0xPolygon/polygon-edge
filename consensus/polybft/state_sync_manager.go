@@ -33,6 +33,7 @@ type StateSyncManager interface {
 	Init() error
 	Close()
 	Commitment() (*CommitmentMessageSigned, error)
+	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
 }
@@ -47,6 +48,9 @@ func (n *dummyStateSyncManager) Close()                                        {
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
+func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+	return nil, nil
+}
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
@@ -381,6 +385,35 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 	return nil
 }
 
+// GetStateSyncProof returns the proof for the state sync
+func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+	proof, err := s.state.getStateSyncProof(stateSyncID)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
+	}
+
+	if proof == nil {
+		// check if we might've missed a commitment. if it is so, we didn't build proofs for it while syncing
+		// if we are all synced up, commitment will be saved through PostBlock, but we wont have proofs,
+		// so we will build them now and save them to db so that we have proofs for missed commitment
+		commitment, err := s.state.getCommitmentForStateSync(stateSyncID)
+		if err != nil {
+			return nil, fmt.Errorf("cannot find commitment for StateSync id %d: %w", stateSyncID, err)
+		}
+
+		if err := s.buildProofs(commitment.Message); err != nil {
+			return nil, fmt.Errorf("cannot build proofs for commitment for StateSync id %d: %w", stateSyncID, err)
+		}
+
+		proof, err = s.state.getStateSyncProof(stateSyncID)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
+		}
+	}
+
+	return proof, nil
+}
+
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
 func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 	s.logger.Debug(
@@ -391,7 +424,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 
 	events, err := s.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get state sync events for commitment to build proofs. Error: %w", err)
 	}
 
 	tree, err := createMerkleTree(events)
@@ -475,7 +508,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	}
 
 	// gossip message
-	s.Multicast(&TransportMessage{
+	s.multicast(&TransportMessage{
 		Hash:        hashBytes,
 		Signature:   signature,
 		NodeID:      s.config.key.String(),
@@ -493,8 +526,8 @@ func (s *stateSyncManager) buildCommitment() error {
 	return nil
 }
 
-// Multicast publishes given message to the rest of the network
-func (s *stateSyncManager) Multicast(msg interface{}) {
+// multicast publishes given message to the rest of the network
+func (s *stateSyncManager) multicast(msg interface{}) {
 	data, err := json.Marshal(msg)
 	if err != nil {
 		s.logger.Warn("failed to marshal bridge message", "err", err)

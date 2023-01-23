@@ -28,16 +28,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
 var (
-	stateSyncResultEvent = abi.MustNewEvent(`event StateSyncResult(
-		uint256 indexed counter,
-		bool indexed status,
-		bytes message)`)
+	stateSyncResultEvent = contractsapi.StateReceiver.Abi.Events["StateSyncResult"]
 )
 
 const (
@@ -65,37 +60,6 @@ func checkLogs(
 
 		assert.True(t, status)
 	}
-}
-
-func executeStateSync(t *testing.T, client *jsonrpc.Client, txRelayer txrelayer.TxRelayer, account ethgo.Key, stateSyncID string) {
-	t.Helper()
-
-	// retrieve state sync proof
-	var stateSyncProof types.StateSyncProof
-	err := client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
-	require.NoError(t, err)
-
-	t.Log("State sync proofs:", stateSyncProof)
-
-	input, err := stateSyncProof.EncodeAbi()
-	require.NoError(t, err)
-
-	t.Log(stateSyncProof.StateSync.ToMap())
-
-	// execute the state sync
-	txn := &ethgo.Transaction{
-		From:     account.Address(),
-		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
-		GasPrice: 0,
-		Gas:      types.StateTransactionGasLimit,
-		Input:    input,
-	}
-
-	receipt, err := txRelayer.SendTransaction(txn, account)
-	require.NoError(t, err)
-	require.NotNil(t, receipt)
-
-	t.Log("Logs", len(receipt.Logs))
 }
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
@@ -131,17 +95,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
-
-	client := cluster.Servers[0].JSONRPC()
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
-	require.NoError(t, err)
-
-	// commitments should've been stored
-	// execute the state syncs
-	for i := 0; i < num; i++ {
-		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
-	}
+	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are mined and there should be a success events
 	id := stateSyncResultEvent.ID()
@@ -200,7 +154,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	require.NoError(t, err)
 
-	lastCommittedIDMethod := polybft.SidechainBridgeFunctionsABI.GetMethod("lastCommittedId")
+	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
 	encode, err := lastCommittedIDMethod.Encode([]interface{}{})
 	require.NoError(t, err)
 
@@ -223,22 +177,19 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(40, 3*time.Minute))
 
-	// check that the second (larger commitment) was also submitted in epoch
+	// check that we submitted the minimal commitment to smart contract
 	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
 	require.NoError(t, err)
 
+	// check that the second (larger commitment) was also submitted in epoch
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
 	require.Equal(t, uint64(10), lastCommittedID)
 
-	// execute all state syncs in submitted commitments
-	for i := 0; i < num; i++ {
-		executeStateSync(t, client, txRelayer, accounts[i], fmt.Sprintf("%x", i+1))
-	}
-
-	// the transactions are mined and there should be a success events
+	// the transactions are mined and state syncs should be executed by the relayer
+	// and there should be a success events
 	id := stateSyncResultEvent.ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{

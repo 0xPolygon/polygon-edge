@@ -8,21 +8,18 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
 	params             unstakeParams
-	unstakeABI         = abi.MustNewMethod("function unstake(uint256 amount)")
-	undelegateABI      = abi.MustNewMethod("function undelegate(address validator, uint256 amount)")
-	unstakeEventABI    = abi.MustNewEvent("event Unstaked(address indexed validator, uint256 amount)")
-	undelegateEventABI = abi.MustNewEvent("event Undelegated(address indexed delegator," +
-		"address indexed validator, uint256 amount)")
+	unstakeEventABI    = contractsapi.ChildValidatorSet.Abi.Events["Unstaked"]
+	undelegateEventABI = contractsapi.ChildValidatorSet.Abi.Events["Undelegated"]
 )
 
 func GetCommand() *cobra.Command {
@@ -94,12 +91,13 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	var encoded []byte
 	if params.self {
-		encoded, err = unstakeABI.Encode([]interface{}{params.amount})
+		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["unstake"].Encode([]interface{}{params.amount})
 		if err != nil {
 			return err
 		}
 	} else {
-		encoded, err = undelegateABI.Encode([]interface{}{ethgo.HexToAddress(params.undelegateAddress), params.amount})
+		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["undelegate"].Encode(
+			[]interface{}{ethgo.HexToAddress(params.undelegateAddress), params.amount})
 		if err != nil {
 			return err
 		}

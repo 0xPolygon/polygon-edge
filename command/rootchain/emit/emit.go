@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -23,7 +24,7 @@ var (
 		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
 	}
 
-	syncStateAbiMethod, _ = abi.NewMethod("function syncState(address receiver, bytes data)")
+	syncStateAbiMethod = contractsapi.StateSender.Abi.Methods["syncState"]
 )
 
 // GetCommand returns the rootchain emit command

@@ -8,18 +8,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
 	params           withdrawParams
-	withdrawABI      = abi.MustNewMethod("function withdraw(address to)")
-	withdrawEventABI = abi.MustNewEvent("event Withdrawal(address indexed account, address indexed to, uint256 amount)")
+	withdrawEventABI = contractsapi.ChildValidatorSet.Abi.Events["Withdrawal"]
 )
 
 func GetCommand() *cobra.Command {
@@ -74,7 +73,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encoded, err := withdrawABI.Encode([]interface{}{ethgo.HexToAddress(params.addressTo)})
+	encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["withdraw"].Encode(
+		[]interface{}{ethgo.HexToAddress(params.addressTo)})
 	if err != nil {
 		return err
 	}
