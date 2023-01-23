@@ -184,8 +184,11 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 		typ = strings.Replace(typ, "[32]uint8", "types.Hash", -1)
 		typ = strings.Replace(typ, "]uint8", "]byte", -1)
 
+		// Trim the leading _ from name if it exists
+		fieldName := strings.TrimPrefix(tupleElem.Name, "_")
+
 		// Replacement of Id for ID to make the linter happy
-		fieldName := strings.Title(tupleElem.Name)
+		fieldName = strings.Title(fieldName)
 		fieldName = strings.Replace(fieldName, "Id", "ID", -1)
 
 		str = append(str, fmt.Sprintf("%s %s `abi:\"%s\"`", fieldName, typ, tupleElem.Name))

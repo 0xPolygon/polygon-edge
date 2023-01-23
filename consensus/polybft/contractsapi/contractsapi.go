@@ -254,7 +254,7 @@ func (c *Checkpoint) DecodeAbi(buf []byte) error {
 var NewValidatorSetABIType = abi.MustNewType("tuple(address _address,uint256[4] blsKey,uint256 votingPower)")
 
 type NewValidatorSet struct {
-	_address    types.Address `abi:"_address"`
+	Address     types.Address `abi:"_address"`
 	BlsKey      [4]*big.Int   `abi:"blsKey"`
 	VotingPower *big.Int      `abi:"votingPower"`
 }
