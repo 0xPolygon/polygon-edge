@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/umbracle/fastrlp"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -160,5 +162,41 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 
 		unmarshalledTx.ComputeHash()
 		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+	}
+}
+
+func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
+	testTable := []struct {
+		name        string
+		txType      TxType
+		expectedErr bool
+	}{
+		{
+			name:   "StateTx",
+			txType: StateTx,
+		},
+		{
+			name:   "LegacyTx",
+			txType: LegacyTx,
+		},
+		{
+			name:        "undefined type",
+			txType:      TxType(0x09),
+			expectedErr: true,
+		},
+	}
+
+	for _, tt := range testTable {
+		ar := &fastrlp.Arena{}
+
+		var txType TxType
+		err := txType.unmarshalRLPFrom(nil, ar.NewBytes([]byte{byte(tt.txType)}))
+
+		if tt.expectedErr {
+			assert.Error(t, err)
+		} else {
+			assert.NoError(t, err)
+			assert.Equal(t, tt.txType, txType)
+		}
 	}
 }
