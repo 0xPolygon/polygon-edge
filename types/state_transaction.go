@@ -4,17 +4,16 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
 var (
-	StateSyncABIType = abi.MustNewType(
+	stateSyncABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
 
-	ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
-		"bytes32[] proof, " +
-		"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
+	ExecuteStateSyncABIMethod = contractsapi.StateReceiver.Abi.Methods["execute"]
 )
 
 const (
@@ -45,7 +44,7 @@ func (sse *StateSyncEvent) ToMap() map[string]interface{} {
 
 // ToABI converts StateSyncEvent to ABI
 func (sse *StateSyncEvent) EncodeAbi() ([]byte, error) {
-	return StateSyncABIType.Encode([]interface{}{sse.ToMap()})
+	return stateSyncABIType.Encode([]interface{}{sse.ToMap()})
 }
 
 func (sse *StateSyncEvent) String() string {
@@ -78,7 +77,7 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid proof data")
 	}
 
-	stateSyncEventEncoded, isOk := result["stateSync"].(map[string]interface{})
+	stateSyncEventEncoded, isOk := result["obj"].(map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid state sync data")
 	}

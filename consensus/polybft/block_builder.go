@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -24,9 +23,6 @@ type BlockBuilderParams struct {
 	// Coinbase that is signing the block
 	Coinbase types.Address
 
-	// Vanity extra for the block
-	Extra []byte
-
 	// GasLimit is the gas limit for the block
 	GasLimit uint64
 
@@ -43,27 +39,10 @@ type BlockBuilderParams struct {
 	BaseFee uint64
 }
 
-func NewBlockBuilder(params *BlockBuilderParams) (*BlockBuilder, error) {
-	// extra can only be 32 size max. it is better to trim that to return
-	// an error that we have to propagate. It should be up to higher level
-	// code to error if the extra supplied by the user is too big.
-	if len(params.Extra) > signer.IstanbulExtraVanity {
-		params.Extra = params.Extra[:signer.IstanbulExtraVanity]
-	}
-
-	if params.Extra == nil {
-		params.Extra = make([]byte, 0)
-	}
-
-	builder := &BlockBuilder{
+func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
+	return &BlockBuilder{
 		params: params,
 	}
-
-	if err := builder.Reset(); err != nil {
-		return nil, err
-	}
-
-	return builder, nil
 }
 
 var _ blockBuilder = &BlockBuilder{}
@@ -85,25 +64,29 @@ type BlockBuilder struct {
 	state *state.Transition
 }
 
-// Reset is used to indicate that the current block building has been interrupted
-// and it has to clean any data
+// Init initializes block builder before adding transactions and actual block building
 func (b *BlockBuilder) Reset() error {
+	// set the timestamp
+	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
+	headerTime := parentTime.Add(b.params.BlockTime)
+
+	if headerTime.Before(time.Now()) {
+		headerTime = time.Now()
+	}
+
 	b.header = &types.Header{
 		ParentHash:   b.params.Parent.Hash,
 		Number:       b.params.Parent.Number + 1,
 		Miner:        b.params.Coinbase[:],
 		Difficulty:   1,
-		ExtraData:    b.params.Extra,
 		StateRoot:    types.EmptyRootHash, // this avoids needing state for now
 		TxRoot:       types.EmptyRootHash,
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
 		GasLimit:     b.params.GasLimit,
 		BaseFee:      b.params.BaseFee,
+		Timestamp:    uint64(headerTime.Unix()),
 	}
-
-	b.block = nil
-	b.txns = []*types.Transaction{}
 
 	transition, err := b.params.Executor.BeginTxn(b.params.Parent.StateRoot, b.header, b.params.Coinbase)
 	if err != nil {
@@ -111,6 +94,8 @@ func (b *BlockBuilder) Reset() error {
 	}
 
 	b.state = transition
+	b.block = nil
+	b.txns = []*types.Transaction{}
 
 	return nil
 }

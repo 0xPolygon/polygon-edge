@@ -88,20 +88,25 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		Bootnodes: p.bootnodes,
 	}
 
-	// deploy genesis contracts
-	allocs, err := p.deployContracts()
-	if err != nil {
-		return err
-	}
-
 	premineInfos := make([]*premineInfo, len(manifest.GenesisValidators))
 	validatorPreminesMap := make(map[types.Address]int, len(manifest.GenesisValidators))
+	totalStake := big.NewInt(0)
 
-	// populate premine info for validator accounts
 	for i, validator := range manifest.GenesisValidators {
+		// populate premine info for validator accounts
 		premineInfo := &premineInfo{address: validator.Address, balance: validator.Balance}
 		premineInfos[i] = premineInfo
 		validatorPreminesMap[premineInfo.address] = i
+
+		// TODO: @Stefan-Ethernal change this to Stake when https://github.com/0xPolygon/polygon-edge/pull/1137 gets merged
+		// increment total stake
+		totalStake.Add(totalStake, validator.Balance)
+	}
+
+	// deploy genesis contracts
+	allocs, err := p.deployContracts(totalStake)
+	if err != nil {
+		return err
 	}
 
 	// either premine non-validator or override validator accounts balance
@@ -179,7 +184,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccount, error) {
+func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
 	genesisContracts := []struct {
 		name         string
 		relativePath string
@@ -236,6 +241,9 @@ func (p *genesisParams) deployContracts() (map[types.Address]*chain.GenesisAccou
 			Code:    artifact.DeployedBytecode,
 		}
 	}
+
+	// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
+	allocations[contracts.ValidatorSetContract].Balance = totalStake
 
 	return allocations, nil
 }

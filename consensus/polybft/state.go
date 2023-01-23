@@ -9,12 +9,12 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 /*
@@ -45,9 +45,9 @@ proposer snapshot/
 
 var (
 	// ABI
-	stateTransferEventABI = abi.MustNewEvent("event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)")   //nolint:lll
-	exitEventABI          = abi.MustNewEvent("event L2StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data)") //nolint:lll
-	ExitEventABIType      = abi.MustNewType("tuple(uint256 id, address sender, address receiver, bytes data)")
+	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
+	exitEventABI          = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
+	ExitEventABIType      = exitEventABI.Inputs
 
 	// proposerSnapshotKey is a static key which is used to save latest proposer snapshot.
 	// (there will always be one object in bucket)
@@ -214,6 +214,8 @@ var (
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
 	// errCommitmentNotBuilt error message
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
+	// errNoCommitmentForStateSync error message
+	errNoCommitmentForStateSync = errors.New("no commitment found for given state sync event")
 )
 
 // State represents a persistence layer which persists consensus data off-chain
@@ -561,6 +563,32 @@ func (s *State) getStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, er
 	})
 
 	return ssp, err
+}
+
+// getCommitmentForStateSync returns the commitment that contains given state sync event if it exists
+func (s *State) getCommitmentForStateSync(stateSyncID uint64) (*CommitmentMessageSigned, error) {
+	var commitment *CommitmentMessageSigned
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(commitmentsBucket).Cursor()
+
+		k, v := c.Seek(itob(stateSyncID))
+		if k == nil {
+			return errNoCommitmentForStateSync
+		}
+
+		if err := json.Unmarshal(v, &commitment); err != nil {
+			return err
+		}
+
+		if !commitment.ContainsStateSync(stateSyncID) {
+			return errNoCommitmentForStateSync
+		}
+
+		return nil
+	})
+
+	return commitment, err
 }
 
 // insertMessageVote inserts given vote to signatures bucket of given epoch

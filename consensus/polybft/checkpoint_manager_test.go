@@ -169,7 +169,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	blockRound, ok := checkpointMetadata["blockRound"].(*big.Int)
 	require.True(t, ok)
 
-	epochNumber, ok := checkpointData["epochNumber"].(*big.Int)
+	epochNumber, ok := checkpointData["epoch"].(*big.Int)
 	require.True(t, ok)
 
 	blockNumber, ok := checkpointData["blockNumber"].(*big.Int)

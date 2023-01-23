@@ -6,6 +6,8 @@ services:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
+    image: local/polygon-edge
+    container_name: polygon-edge-bootstrapper
     command: [ "init", "${EDGE_CONSENSUS:-ibft}" ]
     volumes:
       - data:/data
@@ -14,9 +16,8 @@ services:
 
   ## RUN NODES
   node-1:
-    build:
-      context: ../../
-      dockerfile: docker/local/Dockerfile
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-1
     command: ["server", "--data-dir", "/data/data-1", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
@@ -32,9 +33,8 @@ services:
     restart: on-failure
 
   node-2:
-    build:
-      context: ../../
-      dockerfile: docker/local/Dockerfile
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-2
     command: ["server", "--data-dir", "/data/data-2", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
@@ -50,9 +50,8 @@ services:
     restart: on-failure
 
   node-3:
-    build:
-      context: ../../
-      dockerfile: docker/local/Dockerfile
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-3
     command: ["server", "--data-dir", "/data/data-3", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:
@@ -68,9 +67,8 @@ services:
     restart: on-failure
 
   node-4:
-    build:
-      context: ../../
-      dockerfile: docker/local/Dockerfile
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-4
     command: ["server", "--data-dir", "/data/data-4", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
     depends_on:
       init:

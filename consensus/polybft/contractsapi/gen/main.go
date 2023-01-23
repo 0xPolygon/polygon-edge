@@ -50,6 +50,18 @@ func main() {
 			"root/StateSender.sol",
 			"StateSender",
 		},
+		{
+			"child/ChildValidatorSet.sol",
+			"ChildValidatorSet",
+		},
+		{
+			"child/System.sol",
+			"System",
+		},
+		{
+			"child/MRC20.sol",
+			"MRC20",
+		},
 	}
 
 	for _, v := range readContracts {

@@ -7,25 +7,12 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/contract"
 )
-
-var StateFunctionsABI, _ = abi.NewABIFromList([]string{
-	"function currentEpochId() returns (uint256)",
-	"function getCurrentValidatorSet() returns (address[])",
-	"function getValidator(address)" +
-		" returns (tuple(uint256[4] blsKey, uint256 stake, uint256 totalStake, " +
-		"uint256 commission, uint256 withdrawableRewards, bool active))",
-})
-
-var SidechainBridgeFunctionsABI, _ = abi.NewABIFromList([]string{
-	"function counter() returns (uint256)",
-	"function lastCommittedId() returns (uint256)",
-})
 
 // SystemState is an interface to interact with the consensus system contracts in the chain
 type SystemState interface {
@@ -50,11 +37,11 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 	s := &SystemStateImpl{}
 	s.validatorContract = contract.NewContract(
 		ethgo.Address(config.ValidatorSetAddr),
-		StateFunctionsABI, contract.WithProvider(provider),
+		contractsapi.ChildValidatorSet.Abi, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
 		ethgo.Address(config.StateReceiverAddr),
-		SidechainBridgeFunctionsABI,
+		contractsapi.StateReceiver.Abi,
 		contract.WithProvider(provider),
 	)
 

@@ -162,7 +162,7 @@ func (p *blockchainWrapper) NewBlockBuilder(
 		BaseFee:   p.blockchain.CalculateBaseFee(parent),
 		TxPool:    txPool,
 		Logger:    logger,
-	})
+	}), nil
 }
 
 // GetSystemState is an implementation of blockchainBackend interface

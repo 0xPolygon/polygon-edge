@@ -11,7 +11,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -36,16 +35,6 @@ const (
 
 var (
 	params initContractsParams
-
-	initCheckpointManager, _ = abi.NewMethod("function initialize(" +
-		// BLS contract address
-		"address newBls," +
-		// BN256G2 contract address
-		"address newBn256G2," +
-		// domain used for BLS signing
-		"bytes32 newDomain," +
-		// rootchain validator set
-		"tuple(address _address, uint256[4] blsKey, uint256 votingPower)[] newValidatorSet)")
 
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
@@ -279,7 +268,7 @@ func initializeCheckpointManager(
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
 
-	initCheckpointInput, err := initCheckpointManager.Encode(
+	initCheckpointInput, err := contractsapi.CheckpointManager.Abi.Methods["initialize"].Encode(
 		[]interface{}{
 			manifest.RootchainConfig.BLSAddress,
 			manifest.RootchainConfig.BN256G2Address,
