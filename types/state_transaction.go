@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -13,7 +12,9 @@ var (
 	stateSyncABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
 
-	ExecuteStateSyncABIMethod = contractsapi.StateReceiver.Abi.Methods["execute"]
+	ExecuteStateSyncABIMethod, _ = abi.NewMethod("function execute(" +
+		"bytes32[] proof, " +
+		"tuple(uint256 id, address sender, address receiver, bytes data) stateSync)")
 )
 
 const (

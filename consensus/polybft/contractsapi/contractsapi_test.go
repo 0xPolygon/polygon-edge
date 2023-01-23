@@ -20,7 +20,7 @@ func TestEncoding_Method(t *testing.T) {
 	cases := []method{
 		// empty commit
 		&Commit{
-			Commitment: Commitment{
+			Commitment: &Commitment{
 				StartID: big.NewInt(1),
 				EndID:   big.NewInt(1),
 				Root:    types.EmptyRootHash,
@@ -31,13 +31,13 @@ func TestEncoding_Method(t *testing.T) {
 		// empty commit epoch
 		&CommitEpoch{
 			ID: big.NewInt(1),
-			Epoch: Epoch{
+			Epoch: &Epoch{
 				StartBlock: big.NewInt(1),
 				EndBlock:   big.NewInt(1),
 			},
-			Uptime: Uptime{
+			Uptime: &Uptime{
 				EpochID: big.NewInt(1),
-				UptimeData: []UptimeData{
+				UptimeData: []*UptimeData{
 					{
 						Validator:    types.Address{0x1},
 						SignedBlocks: big.NewInt(1),
@@ -61,4 +61,24 @@ func TestEncoding_Method(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, obj, c)
 	}
+}
+
+func TestEncoding_Struct(t *testing.T) {
+	t.Parallel()
+
+	commitment := &Commitment{
+		StartID: big.NewInt(1),
+		EndID:   big.NewInt(10),
+		Root:    types.StringToHash("hash"),
+	}
+
+	encoding, err := commitment.EncodeAbi()
+	require.NoError(t, err)
+
+	commitmentDecoded := &Commitment{}
+
+	require.NoError(t, commitmentDecoded.DecodeAbi(encoding))
+	require.Equal(t, commitment.StartID, commitmentDecoded.StartID)
+	require.Equal(t, commitment.EndID, commitmentDecoded.EndID)
+	require.Equal(t, commitment.Root, commitmentDecoded.Root)
 }

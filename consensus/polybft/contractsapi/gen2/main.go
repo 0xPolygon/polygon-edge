@@ -5,23 +5,25 @@ import (
 	"fmt"
 	"go/format"
 	"io/ioutil"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
 
+	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/umbracle/ethgo/abi"
 )
 
 func main() {
 	cases := []struct {
-		contract string
-		methods  []string
-		events   []string
+		contractName string
+		artifact     *artifact.Artifact
+		methods      []string
+		events       []string
 	}{
 		{
-			"child/StateReceiver",
+			"StateReceiver",
+			gensc.StateReceiver,
 			[]string{
 				"commit",
 				"execute",
@@ -32,14 +34,16 @@ func main() {
 			},
 		},
 		{
-			"child/ChildValidatorSet",
+			"ChildValidatorSet",
+			gensc.ChildValidatorSet,
 			[]string{
 				"commitEpoch",
 			},
 			[]string{},
 		},
 		{
-			"root/StateSender",
+			"StateSender",
+			gensc.StateSender,
 			[]string{
 				"syncState",
 			},
@@ -48,7 +52,8 @@ func main() {
 			},
 		},
 		{
-			"root/CheckpointManager",
+			"CheckpointManager",
+			gensc.CheckpointManager,
 			[]string{
 				"submit",
 			},
@@ -61,24 +66,12 @@ func main() {
 	res := []string{}
 
 	for _, c := range cases {
-		base := filepath.Base(c.contract)
-
-		contract, err := ioutil.ReadFile("./core-contracts/artifacts/contracts/" + c.contract + ".sol/" + base + ".json")
-		if err != nil {
-			panic(err)
-		}
-
-		ar, err := artifact.DecodeArtifact(contract)
-		if err != nil {
-			panic(err)
-		}
-
 		for _, method := range c.methods {
-			res = append(res, rr.Gen(ar.Abi.Methods[method]))
+			res = append(res, rr.GenMethod(c.contractName, c.artifact.Abi.Methods[method]))
 		}
 
 		for _, event := range c.events {
-			res = append(res, rr.GenEvent(ar.Abi.Events[event]))
+			res = append(res, rr.GenEvent(c.artifact.Abi.Events[event]))
 		}
 	}
 
@@ -91,12 +84,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo"
-)
-
-var (
-	_ = big.NewInt
-	_ = types.Address{}
-	_ = ethgo.Log{}
 )
 
 `
@@ -132,15 +119,16 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 		elem := tupleElem.Elem
 
 		var typ string
+
 		if elem.Kind() == abi.KindTuple {
 			// Struct
-			typ = genType(tupleElem.Name, tupleElem.Elem, res)
+			typ = genNestedType(tupleElem.Name, tupleElem.Elem, res)
 		} else if elem.Kind() == abi.KindSlice && elem.Elem().Kind() == abi.KindTuple {
 			// []Struct
-			typ = "[]" + genType(tupleElem.Name, elem.Elem(), res)
+			typ = "[]" + genNestedType(tupleElem.Name, elem.Elem(), res)
 		} else if elem.Kind() == abi.KindArray && elem.Elem().Kind() == abi.KindTuple {
 			// [n]Struct
-			typ = "[" + strconv.Itoa(elem.Size()) + "]" + genType(tupleElem.Name, elem.Elem(), res)
+			typ = "[" + strconv.Itoa(elem.Size()) + "]" + genNestedType(tupleElem.Name, elem.Elem(), res)
 		} else if elem.Kind() == abi.KindAddress {
 			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
 			// this only works for simple types and not for []address inputs. This is good enough since
@@ -168,6 +156,36 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 	*res = append(*res, strings.Join(str, "\n"))
 
 	return name
+}
+
+func genNestedType(name string, obj *abi.Type, res *[]string) string {
+	*res = append(*res, fmt.Sprintf("var %sABIType = abi.MustNewType(\"%s\")",
+		strings.Title(name), obj.Format(true)))
+
+	result := genType(name, obj, res)
+	*res = append(*res, genAbiFuncsForNestedType(name))
+
+	return "*" + result
+}
+
+func genAbiFuncsForNestedType(name string) string {
+	tmpl := `func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+		return {{.Name}}ABIType.Encode({{.Sig}})
+	}
+	
+	func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+		return decodeStruct({{.Name}}ABIType, buf, &{{.Sig}})
+	}`
+
+	title := strings.Title(name)
+
+	inputs := map[string]interface{}{
+		"Sig":   string(name[0]),
+		"Name":  title,
+		"TName": title,
+	}
+
+	return renderTmpl(tmpl, inputs)
 }
 
 func (r *render) GenEvent(event *abi.Event) string {
@@ -203,28 +221,24 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 	return renderTmpl(tmplStr, inputs)
 }
 
-func (r *render) Gen(method *abi.Method) string {
-	name := method.Name
+func (r *render) GenMethod(contractName string, method *abi.Method) string {
+	methodName := method.Name
 
 	res := []string{}
-	genType(name, method.Inputs, &res)
+	genType(methodName, method.Inputs, &res)
 
 	// write encode/decode functions
 	tmplStr := `
-var (
-	{{.Name}}Type = abi.MustNewMethod("{{.Type}}") //nolint:all
-)
-
 {{range .Structs}}
 	{{.}}
 {{ end }}
 
 func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
-	return {{.Name}}Type.Encode({{.Sig}})
+	return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})
 }
 
 func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
-	return decodeMethod({{.Name}}Type, buf, {{.Sig}})
+	return decodeMethod({{.ContractName}}.Abi.Methods["{{.Name}}"], buf, {{.Sig}})
 }`
 
 	methodType := "function " + method.Name + "("
@@ -239,11 +253,12 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 	}
 
 	inputs := map[string]interface{}{
-		"Structs": res,
-		"Type":    methodType,
-		"Sig":     string(name[0]),
-		"Name":    name,
-		"TName":   strings.Title(name),
+		"Structs":      res,
+		"Type":         methodType,
+		"Sig":          string(methodName[0]),
+		"Name":         methodName,
+		"ContractName": contractName,
+		"TName":        strings.Title(methodName),
 	}
 
 	return renderTmpl(tmplStr, inputs)

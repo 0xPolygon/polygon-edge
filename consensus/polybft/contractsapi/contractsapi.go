@@ -9,15 +9,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-var (
-	_ = big.NewInt
-	_ = types.Address{}
-	_ = ethgo.Log{}
-)
-
-var (
-	commitType = abi.MustNewMethod("function commit(tuple(uint256 startId,uint256 endId,bytes32 root) commitment,bytes signature,bytes bitmap)") //nolint:all
-)
+var CommitmentABIType = abi.MustNewType("tuple(uint256 startId,uint256 endId,bytes32 root)")
 
 type Commitment struct {
 	StartID *big.Int   `abi:"startId"`
@@ -25,23 +17,29 @@ type Commitment struct {
 	Root    types.Hash `abi:"root"`
 }
 
+func (c *Commitment) EncodeAbi() ([]byte, error) {
+	return CommitmentABIType.Encode(c)
+}
+
+func (c *Commitment) DecodeAbi(buf []byte) error {
+	return decodeStruct(CommitmentABIType, buf, &c)
+}
+
 type Commit struct {
-	Commitment Commitment `abi:"commitment"`
-	Signature  []byte     `abi:"signature"`
-	Bitmap     []byte     `abi:"bitmap"`
+	Commitment *Commitment `abi:"commitment"`
+	Signature  []byte      `abi:"signature"`
+	Bitmap     []byte      `abi:"bitmap"`
 }
 
 func (c *Commit) EncodeAbi() ([]byte, error) {
-	return commitType.Encode(c)
+	return StateReceiver.Abi.Methods["commit"].Encode(c)
 }
 
 func (c *Commit) DecodeAbi(buf []byte) error {
-	return decodeMethod(commitType, buf, c)
+	return decodeMethod(StateReceiver.Abi.Methods["commit"], buf, c)
 }
 
-var (
-	executeType = abi.MustNewMethod("function execute(bytes32[] proof,tuple(uint256 id,address sender,address receiver,bytes data) obj)") //nolint:all
-)
+var ObjABIType = abi.MustNewType("tuple(uint256 id,address sender,address receiver,bytes data)")
 
 type Obj struct {
 	ID       *big.Int      `abi:"id"`
@@ -50,17 +48,25 @@ type Obj struct {
 	Data     []byte        `abi:"data"`
 }
 
+func (o *Obj) EncodeAbi() ([]byte, error) {
+	return ObjABIType.Encode(o)
+}
+
+func (o *Obj) DecodeAbi(buf []byte) error {
+	return decodeStruct(ObjABIType, buf, &o)
+}
+
 type Execute struct {
 	Proof []types.Hash `abi:"proof"`
-	Obj   Obj          `abi:"obj"`
+	Obj   *Obj         `abi:"obj"`
 }
 
 func (e *Execute) EncodeAbi() ([]byte, error) {
-	return executeType.Encode(e)
+	return StateReceiver.Abi.Methods["execute"].Encode(e)
 }
 
 func (e *Execute) DecodeAbi(buf []byte) error {
-	return decodeMethod(executeType, buf, e)
+	return decodeMethod(StateReceiver.Abi.Methods["execute"], buf, e)
 }
 
 var (
@@ -91,9 +97,7 @@ func (N *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(NewCommitmentEventType, log, N)
 }
 
-var (
-	commitEpochType = abi.MustNewMethod("function commitEpoch(uint256 id,tuple(uint256 startBlock,uint256 endBlock,bytes32 epochRoot) epoch,tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks) uptime)") //nolint:all
-)
+var EpochABIType = abi.MustNewType("tuple(uint256 startBlock,uint256 endBlock,bytes32 epochRoot)")
 
 type Epoch struct {
 	StartBlock *big.Int   `abi:"startBlock"`
@@ -101,34 +105,58 @@ type Epoch struct {
 	EpochRoot  types.Hash `abi:"epochRoot"`
 }
 
+func (e *Epoch) EncodeAbi() ([]byte, error) {
+	return EpochABIType.Encode(e)
+}
+
+func (e *Epoch) DecodeAbi(buf []byte) error {
+	return decodeStruct(EpochABIType, buf, &e)
+}
+
+var UptimeABIType = abi.MustNewType("tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks)")
+
+var UptimeDataABIType = abi.MustNewType("tuple(address validator,uint256 signedBlocks)")
+
 type UptimeData struct {
 	Validator    types.Address `abi:"validator"`
 	SignedBlocks *big.Int      `abi:"signedBlocks"`
 }
 
+func (u *UptimeData) EncodeAbi() ([]byte, error) {
+	return UptimeDataABIType.Encode(u)
+}
+
+func (u *UptimeData) DecodeAbi(buf []byte) error {
+	return decodeStruct(UptimeDataABIType, buf, &u)
+}
+
 type Uptime struct {
-	EpochID     *big.Int     `abi:"epochId"`
-	UptimeData  []UptimeData `abi:"uptimeData"`
-	TotalBlocks *big.Int     `abi:"totalBlocks"`
+	EpochID     *big.Int      `abi:"epochId"`
+	UptimeData  []*UptimeData `abi:"uptimeData"`
+	TotalBlocks *big.Int      `abi:"totalBlocks"`
+}
+
+func (u *Uptime) EncodeAbi() ([]byte, error) {
+	return UptimeABIType.Encode(u)
+}
+
+func (u *Uptime) DecodeAbi(buf []byte) error {
+	return decodeStruct(UptimeABIType, buf, &u)
 }
 
 type CommitEpoch struct {
 	ID     *big.Int `abi:"id"`
-	Epoch  Epoch    `abi:"epoch"`
-	Uptime Uptime   `abi:"uptime"`
+	Epoch  *Epoch   `abi:"epoch"`
+	Uptime *Uptime  `abi:"uptime"`
 }
 
 func (c *CommitEpoch) EncodeAbi() ([]byte, error) {
-	return commitEpochType.Encode(c)
+	return ChildValidatorSet.Abi.Methods["commitEpoch"].Encode(c)
 }
 
 func (c *CommitEpoch) DecodeAbi(buf []byte) error {
-	return decodeMethod(commitEpochType, buf, c)
+	return decodeMethod(ChildValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
-
-var (
-	syncStateType = abi.MustNewMethod("function syncState(address receiver,bytes data)") //nolint:all
-)
 
 type SyncState struct {
 	Receiver types.Address `abi:"receiver"`
@@ -136,11 +164,11 @@ type SyncState struct {
 }
 
 func (s *SyncState) EncodeAbi() ([]byte, error) {
-	return syncStateType.Encode(s)
+	return StateSender.Abi.Methods["syncState"].Encode(s)
 }
 
 func (s *SyncState) DecodeAbi(buf []byte) error {
-	return decodeMethod(syncStateType, buf, s)
+	return decodeMethod(StateSender.Abi.Methods["syncState"], buf, s)
 }
 
 var (
@@ -158,9 +186,7 @@ func (S *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(StateSyncedEventType, log, S)
 }
 
-var (
-	submitType = abi.MustNewMethod("function submit(uint256 chainId,tuple(bytes32 blockHash,uint256 blockRound,bytes32 currentValidatorSetHash) checkpointMetadata,tuple(uint256 epoch,uint256 blockNumber,bytes32 eventRoot) checkpoint,uint256[2] signature,tuple(address _address,uint256[4] blsKey,uint256 votingPower)[] newValidatorSet,bytes bitmap)") //nolint:all
-)
+var CheckpointMetadataABIType = abi.MustNewType("tuple(bytes32 blockHash,uint256 blockRound,bytes32 currentValidatorSetHash)")
 
 type CheckpointMetadata struct {
 	BlockHash               types.Hash `abi:"blockHash"`
@@ -168,11 +194,31 @@ type CheckpointMetadata struct {
 	CurrentValidatorSetHash types.Hash `abi:"currentValidatorSetHash"`
 }
 
+func (c *CheckpointMetadata) EncodeAbi() ([]byte, error) {
+	return CheckpointMetadataABIType.Encode(c)
+}
+
+func (c *CheckpointMetadata) DecodeAbi(buf []byte) error {
+	return decodeStruct(CheckpointMetadataABIType, buf, &c)
+}
+
+var CheckpointABIType = abi.MustNewType("tuple(uint256 epoch,uint256 blockNumber,bytes32 eventRoot)")
+
 type Checkpoint struct {
 	Epoch       *big.Int   `abi:"epoch"`
 	BlockNumber *big.Int   `abi:"blockNumber"`
 	EventRoot   types.Hash `abi:"eventRoot"`
 }
+
+func (c *Checkpoint) EncodeAbi() ([]byte, error) {
+	return CheckpointABIType.Encode(c)
+}
+
+func (c *Checkpoint) DecodeAbi(buf []byte) error {
+	return decodeStruct(CheckpointABIType, buf, &c)
+}
+
+var NewValidatorSetABIType = abi.MustNewType("tuple(address _address,uint256[4] blsKey,uint256 votingPower)")
 
 type NewValidatorSet struct {
 	_address    types.Address `abi:"_address"`
@@ -180,19 +226,27 @@ type NewValidatorSet struct {
 	VotingPower *big.Int      `abi:"votingPower"`
 }
 
+func (n *NewValidatorSet) EncodeAbi() ([]byte, error) {
+	return NewValidatorSetABIType.Encode(n)
+}
+
+func (n *NewValidatorSet) DecodeAbi(buf []byte) error {
+	return decodeStruct(NewValidatorSetABIType, buf, &n)
+}
+
 type Submit struct {
-	ChainID            *big.Int           `abi:"chainId"`
-	CheckpointMetadata CheckpointMetadata `abi:"checkpointMetadata"`
-	Checkpoint         Checkpoint         `abi:"checkpoint"`
-	Signature          [2]*big.Int        `abi:"signature"`
-	NewValidatorSet    []NewValidatorSet  `abi:"newValidatorSet"`
-	Bitmap             []byte             `abi:"bitmap"`
+	ChainID            *big.Int            `abi:"chainId"`
+	CheckpointMetadata *CheckpointMetadata `abi:"checkpointMetadata"`
+	Checkpoint         *Checkpoint         `abi:"checkpoint"`
+	Signature          [2]*big.Int         `abi:"signature"`
+	NewValidatorSet    []*NewValidatorSet  `abi:"newValidatorSet"`
+	Bitmap             []byte              `abi:"bitmap"`
 }
 
 func (s *Submit) EncodeAbi() ([]byte, error) {
-	return submitType.Encode(s)
+	return CheckpointManager.Abi.Methods["submit"].Encode(s)
 }
 
 func (s *Submit) DecodeAbi(buf []byte) error {
-	return decodeMethod(submitType, buf, s)
+	return decodeMethod(CheckpointManager.Abi.Methods["submit"], buf, s)
 }
