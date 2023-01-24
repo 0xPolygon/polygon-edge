@@ -71,40 +71,9 @@ func main() {
 	}
 
 	rr := render{}
-
 	res := []string{}
-	globalVariables := []string{}
 
 	for _, c := range cases {
-		tmpl := `type {{.StructName}} struct {
-			Artifact *artifact.Artifact
-
-			{{.Fields}}
-		}`
-
-		genContractFields := func(fields []string) string {
-			structFields := make([]string, len(fields))
-
-			for i := 0; i < len(fields); i++ {
-				title := strings.Title(fields[i])
-				structFields[i] = fmt.Sprintf("%s %s", title, title)
-			}
-
-			return strings.Join(structFields, "\n")
-		}
-
-		inputs := map[string]interface{}{
-			"StructName": fmt.Sprintf(contractStructName, firstCharacterLowercase(c.contractName)),
-			"Fields":     genContractFields(c.methods),
-		}
-
-		globalVariables = append(globalVariables, fmt.Sprintf(contractVariableFormat,
-			fmt.Sprintf(contractVariableName, c.contractName), inputs["StructName"], c.contractName))
-
-		contractStruct := renderTmpl(tmpl, inputs)
-
-		res = append(res, contractStruct)
-
 		for _, method := range c.methods {
 			res = append(res, rr.GenMethod(c.contractName, c.artifact.Abi.Methods[method]))
 		}
@@ -120,17 +89,12 @@ package contractsapi
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo"
 )
 
-var (
-
 `
-	str += strings.Join(globalVariables, "\n")
-	str += ")\n"
 	str += strings.Join(res, "\n")
 
 	output, err := format.Source([]byte(str))
@@ -162,7 +126,7 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 
 		if elem.Kind() == abi.KindTuple {
 			// Struct
-			typ = genNestedType(tupleElem.Name, tupleElem.Elem, res)
+			typ = genNestedType(tupleElem.Name, elem, res)
 		} else if elem.Kind() == abi.KindSlice && elem.Elem().Kind() == abi.KindTuple {
 			// []Struct
 			typ = "[]" + genNestedType(tupleElem.Name, elem.Elem(), res)

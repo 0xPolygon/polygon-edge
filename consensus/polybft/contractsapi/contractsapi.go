@@ -4,25 +4,10 @@ package contractsapi
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
-
-var (
-	StateReceiverContract     = &stateReceiverContractImpl{Artifact: StateReceiver}
-	ChildValidatorSetContract = &childValidatorSetContractImpl{Artifact: ChildValidatorSet}
-	StateSenderContract       = &stateSenderContractImpl{Artifact: StateSender}
-	CheckpointManagerContract = &checkpointManagerContractImpl{Artifact: CheckpointManager}
-)
-
-type stateReceiverContractImpl struct {
-	Artifact *artifact.Artifact
-
-	Commit  Commit
-	Execute Execute
-}
 
 var CommitmentABIType = abi.MustNewType("tuple(uint256 startId,uint256 endId,bytes32 root)")
 
@@ -104,12 +89,6 @@ func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
 }
 
-type childValidatorSetContractImpl struct {
-	Artifact *artifact.Artifact
-
-	CommitEpoch CommitEpoch
-}
-
 var EpochABIType = abi.MustNewType("tuple(uint256 startBlock,uint256 endBlock,bytes32 epochRoot)")
 
 type Epoch struct {
@@ -171,12 +150,6 @@ func (c *CommitEpoch) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
 
-type stateSenderContractImpl struct {
-	Artifact *artifact.Artifact
-
-	SyncState SyncState
-}
-
 type SyncState struct {
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`
@@ -199,12 +172,6 @@ type StateSyncedEvent struct {
 
 func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
-}
-
-type checkpointManagerContractImpl struct {
-	Artifact *artifact.Artifact
-
-	Submit Submit
 }
 
 var CheckpointMetadataABIType = abi.MustNewType("tuple(bytes32 blockHash,uint256 blockRound,bytes32 currentValidatorSetHash)")

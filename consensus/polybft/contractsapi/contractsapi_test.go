@@ -82,22 +82,3 @@ func TestEncoding_Struct(t *testing.T) {
 	require.Equal(t, commitment.EndID, commitmentDecoded.EndID)
 	require.Equal(t, commitment.Root, commitmentDecoded.Root)
 }
-
-func TestEncoding_Contract(t *testing.T) {
-	t.Parallel()
-
-	StateReceiverContract.Commit.Commitment = &Commitment{StartID: big.NewInt(1), EndID: big.NewInt(10), Root: types.StringToHash("hash")}
-	StateReceiverContract.Commit.Signature = []byte{11, 12}
-	StateReceiverContract.Commit.Bitmap = []byte{0, 1}
-
-	data, err := StateReceiverContract.Commit.EncodeAbi()
-	require.NoError(t, err)
-
-	StateReceiverContract.Commit = Commit{}
-
-	require.NoError(t, StateReceiverContract.Commit.DecodeAbi(data))
-	require.Equal(t, big.NewInt(1), StateReceiverContract.Commit.Commitment.StartID)
-	require.Equal(t, big.NewInt(10), StateReceiverContract.Commit.Commitment.EndID)
-	require.Equal(t, []byte{11, 12}, StateReceiverContract.Commit.Signature)
-	require.Equal(t, []byte{0, 1}, StateReceiverContract.Commit.Bitmap)
-}
