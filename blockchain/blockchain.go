@@ -1450,17 +1450,15 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 		return chain.GenesisBaseFee
 	}
 
-	var (
-		parentGasTarget = parent.GasLimit / elasticityMultiplier
-	)
+	parentGasTarget := parent.GasLimit / elasticityMultiplier
 
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
 	if parent.GasUsed == parentGasTarget {
 		return parent.BaseFee
 	}
 
+	// If the parent block used more gas than its target, the baseFee should increase.
 	if parent.GasUsed > parentGasTarget {
-		// If the parent block used more gas than its target, the baseFee should increase.
 		gasUsedDelta := parent.GasUsed - parentGasTarget
 		y := parent.BaseFee * gasUsedDelta / parentGasTarget
 		baseFeeDelta := y / defaultBaseFeeChangeDenom
@@ -1468,7 +1466,7 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 		return parent.BaseFee + common.Max(baseFeeDelta, 1)
 	}
 
-	// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
+	// Otherwise, if the parent block used less gas than its target, the baseFee should decrease.
 	gasUsedDelta := parentGasTarget - parent.GasUsed
 	y := parent.BaseFee * gasUsedDelta / parentGasTarget
 	baseFeeDelta := y / defaultBaseFeeChangeDenom

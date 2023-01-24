@@ -6,15 +6,17 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -415,10 +417,7 @@ func (t *Transition) londonPrefill(msg *types.Transaction) *types.Transaction {
 			msg.GasPrice = new(big.Int)
 
 			if msg.GasFeeCap.BitLen() > 0 || msg.GasTipCap.BitLen() > 0 {
-				msg.GasPrice = new(big.Int).Add(msg.GasTipCap, t.ctx.BaseFee)
-				if msg.GasFeeCap.Cmp(msg.GasPrice) == -1 {
-					msg.GasPrice = new(big.Int).Set(msg.GasFeeCap)
-				}
+				msg.GasPrice = common.BigMin(new(big.Int).Add(msg.GasTipCap, t.ctx.BaseFee), msg.GasFeeCap)
 			}
 		}
 	}
@@ -603,23 +602,21 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// define effective tip based on tx type
 	effectiveTip := msg.GasPrice
 	if t.config.London && msg.Type != types.StateTx {
-		effectiveTip = new(big.Int).Set(msg.GasTipCap)
-		secondTipOption := new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee)
-
-		if secondTipOption.Cmp(effectiveTip) == -1 {
-			effectiveTip = secondTipOption
-		}
+		effectiveTip = common.BigMin(
+			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
+			new(big.Int).Set(msg.GasTipCap),
+		)
 	}
 
-	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
+	// Pay the coinbase
+	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), effectiveTip)
+	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
+	// Burn some amount if the london hardfork is applied
 	if t.config.London && msg.Type != types.StateTx {
 		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
 		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
 	}
-
-	// pay the coinbase
-	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
