@@ -12,7 +12,7 @@ case "$1" in
           echo "Secrets have already been generated."
       else
           echo "Generating secrets..."
-          secrets=$("$POLYGON_EDGE_BIN" secrets init --num 4 --data-dir /data/data- --json)
+          secrets=$("$POLYGON_EDGE_BIN" secrets init --num 4 --data-dir /data/data- --insecure --json)
           echo "Secrets have been successfully generated"
 
           echo "Generating genesis file..."
