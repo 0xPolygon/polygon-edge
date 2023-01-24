@@ -3,12 +3,14 @@ package polybft
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"sync"
 	"testing"
 	"time"
 
+	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -339,7 +341,7 @@ func TestState_insertCommitmentMessage(t *testing.T) {
 	state := newTestState(t)
 	assert.NoError(t, state.insertCommitmentMessage(commitment))
 
-	commitmentFromDB, err := state.getCommitmentMessage(commitment.Message.ToIndex)
+	commitmentFromDB, err := state.getCommitmentMessage(commitment.Message.EndID.Uint64())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, commitmentFromDB)
@@ -558,7 +560,7 @@ func TestState_getCommitmentForStateSync(t *testing.T) {
 		commitment, err := state.getCommitmentForStateSync(c.stateSyncID)
 
 		if c.hasCommitment {
-			require.NoError(t, err)
+			require.NoError(t, err, fmt.Sprintf("state sync %v", c.stateSyncID))
 			require.Equal(t, c.hasCommitment, commitment.ContainsStateSync(c.stateSyncID))
 		} else {
 			require.ErrorIs(t, errNoCommitmentForStateSync, err)
@@ -611,10 +613,10 @@ func createTestCommitmentMessage(t *testing.T, fromIndex uint64) *CommitmentMess
 
 	require.NoError(t, err)
 
-	msg := &CommitmentMessage{
-		MerkleRootHash: tree.Hash(),
-		FromIndex:      fromIndex,
-		ToIndex:        fromIndex + maxCommitmentSize - 1,
+	msg := &gensc.Commitment{
+		Root:    tree.Hash(),
+		StartID: big.NewInt(int64(fromIndex)),
+		EndID:   big.NewInt(int64(fromIndex + maxCommitmentSize - 1)),
 	}
 
 	return &CommitmentMessageSigned{

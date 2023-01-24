@@ -7,18 +7,12 @@ import (
 	"math/big"
 	"reflect"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/mapstructure"
 	"github.com/umbracle/ethgo/abi"
-)
-
-var (
-	commitmentABIType = abi.MustNewType("tuple(uint256 startId, uint256 endId, bytes32 root)")
-
-	commitABIMethod = contractsapi.StateReceiver.Abi.Methods["commit"]
 )
 
 // StateTransactionInput is an abstraction for different state transaction inputs
@@ -39,38 +33,34 @@ const (
 	stTypeEndEpoch         = "end-epoch"
 )
 
-// Commitment holds merkle trie of bridge transactions accompanied by epoch number
-type Commitment struct {
+// PendingCommitment holds merkle trie of bridge transactions accompanied by epoch number
+type PendingCommitment struct {
+	*gensc.Commitment
 	MerkleTree *MerkleTree
 	Epoch      uint64
-	FromIndex  uint64
-	ToIndex    uint64
 }
 
 // NewCommitment creates a new commitment object
-func NewCommitment(epoch uint64, stateSyncEvents []*types.StateSyncEvent) (*Commitment, error) {
+func NewCommitment(epoch uint64, stateSyncEvents []*types.StateSyncEvent) (*PendingCommitment, error) {
 	tree, err := createMerkleTree(stateSyncEvents)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Commitment{
+	return &PendingCommitment{
 		MerkleTree: tree,
 		Epoch:      epoch,
-		FromIndex:  stateSyncEvents[0].ID,
-		ToIndex:    stateSyncEvents[len(stateSyncEvents)-1].ID,
+		Commitment: &gensc.Commitment{
+			StartID: big.NewInt(int64(stateSyncEvents[0].ID)),
+			EndID:   big.NewInt(int64(stateSyncEvents[len(stateSyncEvents)-1].ID)),
+			Root:    tree.Hash(),
+		},
 	}, nil
 }
 
 // Hash calculates hash value for commitment object.
-func (cm *Commitment) Hash() (types.Hash, error) {
-	commitment := map[string]interface{}{
-		"startId": cm.FromIndex,
-		"endId":   cm.ToIndex,
-		"root":    cm.MerkleTree.Hash(),
-	}
-
-	data, err := commitmentABIType.Encode(commitment)
+func (cm *PendingCommitment) Hash() (types.Hash, error) {
+	data, err := cm.Commitment.EncodeAbi()
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -78,34 +68,18 @@ func (cm *Commitment) Hash() (types.Hash, error) {
 	return crypto.Keccak256Hash(data), nil
 }
 
-// CommitmentMessage holds metadata for bridge transactions
-type CommitmentMessage struct {
-	MerkleRootHash types.Hash
-	FromIndex      uint64
-	ToIndex        uint64
-	Epoch          uint64
-}
+var _ StateTransactionInput = &CommitmentMessageSigned{}
 
-// NewCommitmentMessage creates a new commitment message based on provided merkle root hash
-// where fromIndex represents an id of the first state event index in commitment
-// where toIndex represents an id of the last state event index in commitment
-func NewCommitmentMessage(merkleRootHash types.Hash, fromIndex, toIndex uint64) *CommitmentMessage {
-	return &CommitmentMessage{
-		MerkleRootHash: merkleRootHash,
-		FromIndex:      fromIndex,
-		ToIndex:        toIndex,
-	}
+// CommitmentMessageSigned encapsulates commitment message with aggregated signatures
+type CommitmentMessageSigned struct {
+	Message      *gensc.Commitment
+	AggSignature Signature
+	PublicKeys   [][]byte
 }
 
 // Hash calculates hash value for commitment object.
-func (cm *CommitmentMessage) Hash() (types.Hash, error) {
-	commitment := map[string]interface{}{
-		"startId": cm.FromIndex,
-		"endId":   cm.ToIndex,
-		"root":    cm.MerkleRootHash,
-	}
-
-	data, err := commitmentABIType.Encode(commitment)
+func (cm *CommitmentMessageSigned) Hash() (types.Hash, error) {
+	data, err := cm.Message.EncodeAbi()
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -115,7 +89,7 @@ func (cm *CommitmentMessage) Hash() (types.Hash, error) {
 
 // VerifyStateSyncProof validates given state sync proof
 // against merkle trie root hash contained in the CommitmentMessage
-func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSyncProof) error {
+func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *types.StateSyncProof) error {
 	if stateSyncProof.StateSync == nil {
 		return errors.New("no state sync event")
 	}
@@ -125,44 +99,28 @@ func (cm CommitmentMessage) VerifyStateSyncProof(stateSyncProof *types.StateSync
 		return err
 	}
 
-	return VerifyProof(stateSyncProof.StateSync.ID-cm.FromIndex, hash, stateSyncProof.Proof, cm.MerkleRootHash)
-}
-
-var _ StateTransactionInput = &CommitmentMessageSigned{}
-
-// CommitmentMessageSigned encapsulates commitment message with aggregated signatures
-type CommitmentMessageSigned struct {
-	Message      *CommitmentMessage
-	AggSignature Signature
-	PublicKeys   [][]byte
+	return VerifyProof(stateSyncProof.StateSync.ID-cm.Message.StartID.Uint64(),
+		hash, stateSyncProof.Proof, cm.Message.Root)
 }
 
 // ContainsStateSync checks if commitment contains given state sync event
 func (cm *CommitmentMessageSigned) ContainsStateSync(stateSyncID uint64) bool {
-	return cm.Message.FromIndex <= stateSyncID && cm.Message.ToIndex >= stateSyncID
+	return cm.Message.StartID.Uint64() <= stateSyncID && cm.Message.EndID.Uint64() >= stateSyncID
 }
 
 // EncodeAbi contains logic for encoding arbitrary data into ABI format
 func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
-	commitment := map[string]interface{}{
-		"startId": cm.Message.FromIndex,
-		"endId":   cm.Message.ToIndex,
-		"root":    cm.Message.MerkleRootHash,
-	}
-
 	blsVerificationPart, err := precompiled.BlsVerificationABIType.Encode(
 		[2]interface{}{cm.PublicKeys, cm.AggSignature.Bitmap})
 	if err != nil {
 		return nil, err
 	}
 
-	data := map[string]interface{}{
-		"commitment": commitment,
-		"signature":  cm.AggSignature.AggregatedSignature,
-		"bitmap":     blsVerificationPart,
-	}
+	gensc.StateReceiverContract.Commit.Commitment = cm.Message
+	gensc.StateReceiverContract.Commit.Signature = cm.AggSignature.AggregatedSignature
+	gensc.StateReceiverContract.Commit.Bitmap = blsVerificationPart
 
-	return commitABIMethod.Encode(data)
+	return gensc.StateReceiverContract.Commit.EncodeAbi()
 }
 
 // DecodeAbi contains logic for decoding given ABI data
@@ -171,32 +129,12 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
-	rawResult, err := commitABIMethod.Inputs.Decode(txData[abiMethodIDLength:])
+	err := gensc.StateReceiverContract.Commit.DecodeAbi(txData)
 	if err != nil {
 		return err
 	}
 
-	result, isOk := rawResult.(map[string]interface{})
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not convert decoded data to map")
-	}
-
-	commitmentPart, isOk := result["commitment"].(map[string]interface{})
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find commitment part")
-	}
-
-	aggregatedSignature, isOk := result["signature"].([]byte)
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find signature part")
-	}
-
-	blsVerificationPart, isOk := result["bitmap"].([]byte)
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find bls verification part")
-	}
-
-	decoded, err := precompiled.BlsVerificationABIType.Decode(blsVerificationPart)
+	decoded, err := precompiled.BlsVerificationABIType.Decode(gensc.StateReceiverContract.Commit.Bitmap)
 	if err != nil {
 		return err
 	}
@@ -216,29 +154,10 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data. Could not find bitmap part")
 	}
 
-	merkleRoot, isOk := commitmentPart["root"].([types.HashLength]byte)
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find merkle root hash")
-	}
-
-	fromIndexPart, isOk := commitmentPart["startId"].(*big.Int)
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find startId")
-	}
-
-	fromIndex := fromIndexPart.Uint64()
-
-	toIndexPart, isOk := commitmentPart["endId"].(*big.Int)
-	if !isOk {
-		return fmt.Errorf("invalid commitment data. Could not find endId")
-	}
-
-	toIndex := toIndexPart.Uint64()
-
 	*cm = CommitmentMessageSigned{
-		Message: NewCommitmentMessage(merkleRoot, fromIndex, toIndex),
+		Message: gensc.StateReceiverContract.Commit.Commitment,
 		AggSignature: Signature{
-			AggregatedSignature: aggregatedSignature,
+			AggregatedSignature: gensc.StateReceiverContract.Commit.Signature,
 			Bitmap:              bitmap,
 		},
 		PublicKeys: publicKeys,
@@ -261,7 +180,7 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 
 	var obj StateTransactionInput
 
-	if bytes.Equal(sig, commitABIMethod.ID()) {
+	if bytes.Equal(sig, gensc.StateReceiver.Abi.Methods["commit"].ID()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
 	} else {
@@ -280,7 +199,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 		// skip non state CommitmentMessageSigned transactions
 		if tx.Type != types.StateTx ||
 			len(tx.Input) < abiMethodIDLength ||
-			!bytes.Equal(tx.Input[:abiMethodIDLength], commitABIMethod.ID()) {
+			!bytes.Equal(tx.Input[:abiMethodIDLength], gensc.StateReceiver.Abi.Methods["commit"].ID()) {
 			continue
 		}
 

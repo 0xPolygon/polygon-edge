@@ -378,7 +378,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash, err)
 			}
 
-			hash, err := stateTxData.Message.Hash()
+			hash, err := stateTxData.Hash()
 			if err != nil {
 				return err
 			}

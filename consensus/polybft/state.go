@@ -505,7 +505,7 @@ func (s *State) insertCommitmentMessage(commitment *CommitmentMessageSigned) err
 			return err
 		}
 
-		if err := tx.Bucket(commitmentsBucket).Put(itob(commitment.Message.ToIndex), raw); err != nil {
+		if err := tx.Bucket(commitmentsBucket).Put(itob(commitment.Message.EndID.Uint64()), raw); err != nil {
 			return err
 		}
 

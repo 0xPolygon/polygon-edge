@@ -988,21 +988,8 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 		eventsSize       = 40
 	)
 
-	var commitments [commitmentsCount]*CommitmentMessage
+	_, signedCommitment, _ := buildCommitmentAndStateSyncs(t, eventsSize, uint64(3), from)
 
-	for i := 0; i < commitmentsCount; i++ {
-		_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, eventsSize, uint64(3), eventsSize*uint64(i))
-		commitments[i] = commitmentMessage
-	}
-
-	signedCommitment := &CommitmentMessageSigned{
-		Message: commitments[0],
-		AggSignature: Signature{
-			AggregatedSignature: []byte{1, 2},
-			Bitmap:              []byte{1},
-		},
-		PublicKeys: [][]byte{},
-	}
 	f := &fsm{
 		config:                       &PolyBFTConfig{},
 		isEndOfEpoch:                 true,
@@ -1011,6 +998,7 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 		uptimeCounter:                createTestUptimeCounter(t, nil, 10),
 		logger:                       hclog.NewNullLogger(),
 	}
+
 	txs := f.stateTransactions()
 
 	for i, tx := range txs {
@@ -1042,26 +1030,22 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 	t.Parallel()
 
 	var (
-		commitmentMessages [2]*CommitmentMessage
-		commitments        [2]*Commitment
-		stateSyncs         [2][]*types.StateSyncEvent
-		signedCommitments  [2]*CommitmentMessageSigned
+		commitments       [2]*PendingCommitment
+		stateSyncs        [2][]*types.StateSyncEvent
+		signedCommitments [2]*CommitmentMessageSigned
 	)
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
-	commitments[0], commitmentMessages[0], stateSyncs[0] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
-	commitments[1], commitmentMessages[1], stateSyncs[1] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 12)
+	commitments[0], signedCommitments[0], stateSyncs[0] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
+	commitments[1], signedCommitments[1], stateSyncs[1] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 12)
 
 	executeForValidators := func(aliases ...string) error {
-		for i, x := range commitmentMessages {
+		for _, sc := range signedCommitments {
 			// add register commitment state transaction
-			hash, err := x.Hash()
+			hash, err := sc.Hash()
 			require.NoError(t, err)
 			signature := createSignature(t, validators.getPrivateIdentities(aliases...), hash)
-			signedCommitments[i] = &CommitmentMessageSigned{
-				Message:      x,
-				AggSignature: *signature,
-			}
+			sc.AggSignature = *signature
 		}
 
 		f := &fsm{
@@ -1072,8 +1056,8 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 
 		var txns []*types.Transaction
 
-		for i := range commitmentMessages {
-			inputData, err := signedCommitments[i].EncodeAbi()
+		for i, sc := range signedCommitments {
+			inputData, err := sc.EncodeAbi()
 			require.NoError(t, err)
 
 			if i == 0 {
@@ -1109,24 +1093,22 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
+	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: true,
 		config:        &PolyBFTConfig{},
 		validators:    validators.toValidatorSet(),
 	}
 
-	hash, err := commitmentMessage.Hash()
+	hash, err := commitmentMessageSigned.Hash()
 	require.NoError(t, err)
 
 	var txns []*types.Transaction
 
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B"), hash)
-	cmSigned := &CommitmentMessageSigned{
-		Message:      commitmentMessage,
-		AggSignature: *signature,
-	}
-	inputData, err := cmSigned.EncodeAbi()
+	commitmentMessageSigned.AggSignature = *signature
+
+	inputData, err := commitmentMessageSigned.EncodeAbi()
 	require.NoError(t, err)
 
 	txns = append(txns,
@@ -1140,14 +1122,14 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
+	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: true,
 		config:        &PolyBFTConfig{},
 		validators:    validators.toValidatorSet(),
 	}
 
-	hash, err := commitmentMessage.Hash()
+	hash, err := commitmentMessageSigned.Hash()
 	require.NoError(t, err)
 
 	var txns []*types.Transaction
@@ -1157,15 +1139,12 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message")).Marshal()
 	require.NoError(t, err)
 
-	cmSigned := &CommitmentMessageSigned{
-		Message: commitmentMessage,
-		AggSignature: Signature{
-			Bitmap:              signature.Bitmap,
-			AggregatedSignature: invalidSignature,
-		},
+	commitmentMessageSigned.AggSignature = Signature{
+		Bitmap:              signature.Bitmap,
+		AggregatedSignature: invalidSignature,
 	}
 
-	inputData, err := cmSigned.EncodeAbi()
+	inputData, err := commitmentMessageSigned.EncodeAbi()
 	require.NoError(t, err)
 
 	txns = append(txns,
@@ -1179,7 +1158,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	t.Parallel()
 
 	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-	_, commitmentMessage, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
+	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 
 	validatorSet := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 
@@ -1189,22 +1168,20 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 		validators:    validatorSet,
 	}
 
-	hash, err := commitmentMessage.Hash()
+	hash, err := commitmentMessageSigned.Hash()
 	require.NoError(t, err)
 
 	var txns []*types.Transaction
 
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
-	cmSigned := &CommitmentMessageSigned{
-		Message:      commitmentMessage,
-		AggSignature: *signature,
-	}
-	inputData, err := cmSigned.EncodeAbi()
+	commitmentMessageSigned.AggSignature = *signature
+
+	inputData, err := commitmentMessageSigned.EncodeAbi()
 	require.NoError(t, err)
 
 	txns = append(txns,
 		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
-	inputData, err = cmSigned.EncodeAbi()
+	inputData, err = commitmentMessageSigned.EncodeAbi()
 	require.NoError(t, err)
 
 	txns = append(txns,
@@ -1315,10 +1292,9 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 		bitmap.Set(uint64(i))
 	}
 
-	stateSyncsTrie, err := createMerkleTree(stateSyncEvents)
+	commitment, err := NewCommitment(1, stateSyncEvents)
 	require.NoError(t, err)
 
-	commitment := NewCommitmentMessage(stateSyncsTrie.Hash(), 0, uint64(len(stateSyncEvents)))
 	hash, err := commitment.Hash()
 	require.NoError(t, err)
 
@@ -1342,7 +1318,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	assert.NoError(t, err)
 
 	return &CommitmentMessageSigned{
-		Message:      commitment,
+		Message:      commitment.Commitment,
 		AggSignature: signature,
 	}
 }
