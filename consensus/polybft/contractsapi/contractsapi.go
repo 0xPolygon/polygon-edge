@@ -91,7 +91,7 @@ type StateSyncResultEvent struct {
 }
 
 func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateReceiver.Abi.Events["StateSyncResultEvent"], log, s)
+	return decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
 }
 
 type NewCommitmentEvent struct {
@@ -101,7 +101,7 @@ type NewCommitmentEvent struct {
 }
 
 func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateReceiver.Abi.Events["NewCommitmentEvent"], log, n)
+	return decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
 }
 
 type childValidatorSetContractImpl struct {
@@ -198,7 +198,7 @@ type StateSyncedEvent struct {
 }
 
 func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSender.Abi.Events["StateSyncedEvent"], log, s)
+	return decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
 }
 
 type checkpointManagerContractImpl struct {
