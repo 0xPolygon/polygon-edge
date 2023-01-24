@@ -24,28 +24,28 @@ var (
 func TestStorage(t *testing.T, m PlaceholderStorage) {
 	t.Helper()
 
-	t.Run("", func(t *testing.T) {
+	t.Run("testCanonicalChain", func(t *testing.T) {
 		testCanonicalChain(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testDifficulty", func(t *testing.T) {
 		testDifficulty(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testHead", func(t *testing.T) {
 		testHead(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testForks", func(t *testing.T) {
 		testForks(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testHeader", func(t *testing.T) {
 		testHeader(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testBody", func(t *testing.T) {
 		testBody(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testWriteCanonicalHeader", func(t *testing.T) {
 		testWriteCanonicalHeader(t, m)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("testReceipts", func(t *testing.T) {
 		testReceipts(t, m)
 	})
 }
@@ -379,13 +379,11 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 	}
 
 	receipts := []*types.Receipt{r0, r1}
-
 	if err := s.WriteReceipts(h.Hash, receipts); err != nil {
 		t.Fatal(err)
 	}
 
 	found, err := s.ReadReceipts(h.Hash)
-
 	if err != nil {
 		t.Fatal(err)
 	}
