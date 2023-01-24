@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,7 +95,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 
 	for i, stateSync := range stateSyncs {
 		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
-		stateSyncsProof := &types.StateSyncProof{
+		stateSyncsProof := &contracts.StateSyncProof{
 			Proof:     proof,
 			StateSync: stateSync,
 		}
@@ -102,7 +103,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		inputData, err := stateSyncsProof.EncodeAbi()
 		require.NoError(t, err)
 
-		executionStateSync := &types.StateSyncProof{}
+		executionStateSync := &contracts.StateSyncProof{}
 		require.NoError(t, executionStateSync.DecodeAbi(inputData))
 		require.Equal(t, stateSyncsProof.StateSync, executionStateSync.StateSync)
 
@@ -115,7 +116,7 @@ func TestCommitmentMessage_VerifyProof_NoStateSyncsInCommitment(t *testing.T) {
 	t.Parallel()
 
 	commitment := &CommitmentMessageSigned{Message: &contractsapi.Commitment{StartID: big.NewInt(1), EndID: big.NewInt(10)}}
-	err := commitment.VerifyStateSyncProof(&types.StateSyncProof{})
+	err := commitment.VerifyStateSyncProof(&contracts.StateSyncProof{})
 	assert.ErrorContains(t, err, "no state sync event")
 }
 
@@ -133,7 +134,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 
 	proof := trie.GenerateProof(0, 0)
 
-	stateSyncProof := &types.StateSyncProof{
+	stateSyncProof := &contracts.StateSyncProof{
 		StateSync: stateSyncs[4],
 		Proof:     proof,
 	}
@@ -150,7 +151,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 }
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
-	epoch, startIdx uint64) (*PendingCommitment, *CommitmentMessageSigned, []*types.StateSyncEvent) {
+	epoch, startIdx uint64) (*PendingCommitment, *CommitmentMessageSigned, []*contracts.StateSyncEvent) {
 	t.Helper()
 
 	stateSyncEvents := generateStateSyncEvents(t, stateSyncsCount, startIdx)

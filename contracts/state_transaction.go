@@ -1,9 +1,10 @@
-package types
+package contracts
 
 import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -54,7 +55,7 @@ func (sse *StateSyncEvent) String() string {
 }
 
 type StateSyncProof struct {
-	Proof     []Hash
+	Proof     []types.Hash
 	StateSync *StateSyncEvent
 }
 
@@ -79,7 +80,7 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid proof data")
 	}
 
-	stateSyncEventEncoded, isOk := result["stateSync"].(map[string]interface{})
+	stateSyncEventEncoded, isOk := result["obj"].(map[string]interface{})
 	if !isOk {
 		return fmt.Errorf("invalid state sync data")
 	}
@@ -116,9 +117,9 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		Data:     data,
 	}
 
-	proof := make([]Hash, len(proofEncoded))
+	proof := make([]types.Hash, len(proofEncoded))
 	for i := 0; i < len(proofEncoded); i++ {
-		proof[i] = Hash(proofEncoded[i])
+		proof[i] = types.Hash(proofEncoded[i])
 	}
 
 	*ssp = StateSyncProof{
@@ -130,6 +131,6 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 }
 
 type ExitProof struct {
-	Proof     []Hash
+	Proof     []types.Hash
 	LeafIndex uint64
 }

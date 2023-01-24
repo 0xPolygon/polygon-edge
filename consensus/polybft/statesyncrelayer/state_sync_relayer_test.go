@@ -45,12 +45,12 @@ func Test_executeStateSync(t *testing.T) {
 		key:       key,
 	}
 
-	sp := &types.StateSyncProof{
+	sp := &contracts.StateSyncProof{
 		Proof:     []types.Hash{},
-		StateSync: &types.StateSyncEvent{},
+		StateSync: &contracts.StateSyncEvent{},
 	}
 
-	input, _ := types.ExecuteStateSyncABIMethod.Encode(
+	input, _ := contracts.ExecuteStateSyncABIMethod.Encode(
 		[2]interface{}{sp.Proof, sp.StateSync.ToMap()},
 	)
 

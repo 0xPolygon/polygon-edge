@@ -154,9 +154,9 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 }
 
 // queryStateSyncProof queries the state sync proof
-func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof, error) {
+func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*contracts.StateSyncProof, error) {
 	// retrieve state sync proof
-	var stateSyncProof types.StateSyncProof
+	var stateSyncProof contracts.StateSyncProof
 
 	err := r.client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
 	if err != nil {
@@ -169,7 +169,7 @@ func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.State
 }
 
 // executeStateSync executes the state sync
-func (r *StateSyncRelayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
+func (r *StateSyncRelayer) executeStateSync(stateSyncProof *contracts.StateSyncProof) error {
 	input, err := stateSyncProof.EncodeAbi()
 	if err != nil {
 		return err

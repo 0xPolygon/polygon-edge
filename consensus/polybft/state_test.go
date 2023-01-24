@@ -12,6 +12,7 @@ import (
 
 	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -279,7 +280,7 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 	state := newTestState(t)
 
 	for i := 0; i < maxCommitmentSize-2; i++ {
-		assert.NoError(t, state.insertStateSyncEvent(&types.StateSyncEvent{
+		assert.NoError(t, state.insertStateSyncEvent(&contracts.StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
 		}))
@@ -295,7 +296,7 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 	state := newTestState(t)
 
 	for i := 0; i < maxCommitmentSize; i++ {
-		assert.NoError(t, state.insertStateSyncEvent(&types.StateSyncEvent{
+		assert.NoError(t, state.insertStateSyncEvent(&contracts.StateSyncEvent{
 			ID:   uint64(i),
 			Data: []byte{1, 2},
 		}))
@@ -580,10 +581,10 @@ func insertTestCommitments(t *testing.T, state *State, numberOfCommitments uint6
 func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs uint64) {
 	t.Helper()
 
-	ssProofs := make([]*types.StateSyncProof, numberOfProofs)
+	ssProofs := make([]*contracts.StateSyncProof, numberOfProofs)
 
 	for i := uint64(0); i < numberOfProofs; i++ {
-		proofs := &types.StateSyncProof{
+		proofs := &contracts.StateSyncProof{
 			Proof:     []types.Hash{types.BytesToHash(generateRandomBytes(t))},
 			StateSync: createTestStateSync(i),
 		}
@@ -593,8 +594,8 @@ func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs uint64
 	require.NoError(t, state.insertStateSyncProofs(ssProofs))
 }
 
-func createTestStateSync(index uint64) *types.StateSyncEvent {
-	return &types.StateSyncEvent{
+func createTestStateSync(index uint64) *contracts.StateSyncEvent {
+	return &contracts.StateSyncEvent{
 		ID:       index,
 		Sender:   ethgo.ZeroAddress,
 		Receiver: ethgo.ZeroAddress,

@@ -15,6 +15,7 @@ import (
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -34,7 +35,7 @@ type StateSyncManager interface {
 	Init() error
 	Close()
 	Commitment() (*CommitmentMessageSigned, error)
-	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
+	GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
 }
@@ -49,7 +50,7 @@ func (n *dummyStateSyncManager) Close()                                        {
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
-func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
 	return nil, nil
 }
 
@@ -385,7 +386,7 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 }
 
 // GetStateSyncProof returns the proof for the state sync
-func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
 	proof, err := s.state.getStateSyncProof(stateSyncID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
@@ -434,12 +435,12 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.Commitment) e
 		return err
 	}
 
-	stateSyncProofs := make([]*types.StateSyncProof, len(events))
+	stateSyncProofs := make([]*contracts.StateSyncProof, len(events))
 
 	for i, event := range events {
 		p := tree.GenerateProof(uint64(i), 0)
 
-		stateSyncProofs[i] = &types.StateSyncProof{
+		stateSyncProofs[i] = &contracts.StateSyncProof{
 			Proof:     p,
 			StateSync: event,
 		}
@@ -549,8 +550,8 @@ func newStateSyncEvent(
 	sender ethgo.Address,
 	target ethgo.Address,
 	data []byte,
-) *types.StateSyncEvent {
-	return &types.StateSyncEvent{
+) *contracts.StateSyncEvent {
+	return &contracts.StateSyncEvent{
 		ID:       id,
 		Sender:   sender,
 		Receiver: target,
@@ -558,7 +559,7 @@ func newStateSyncEvent(
 	}
 }
 
-func decodeStateSyncEvent(log *ethgo.Log) (*types.StateSyncEvent, error) {
+func decodeStateSyncEvent(log *ethgo.Log) (*contracts.StateSyncEvent, error) {
 	raw, err := stateTransferEventABI.ParseLog(log)
 	if err != nil {
 		return nil, err
@@ -572,7 +573,7 @@ func decodeStateSyncEvent(log *ethgo.Log) (*types.StateSyncEvent, error) {
 		return nil, err
 	}
 
-	stateSyncEvent, ok := eventGeneric.(*types.StateSyncEvent)
+	stateSyncEvent, ok := eventGeneric.(*contracts.StateSyncEvent)
 	if !ok {
 		return nil, errors.New("failed to convert event to StateSyncEvent instance")
 	}

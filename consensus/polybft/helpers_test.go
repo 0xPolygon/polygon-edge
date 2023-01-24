@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -52,12 +53,12 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
-func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*types.StateSyncEvent {
+func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contracts.StateSyncEvent {
 	t.Helper()
 
-	stateSyncEvents := make([]*types.StateSyncEvent, eventsCount)
+	stateSyncEvents := make([]*contracts.StateSyncEvent, eventsCount)
 	for i := 0; i < eventsCount; i++ {
-		stateSyncEvents[i] = &types.StateSyncEvent{
+		stateSyncEvents[i] = &contracts.StateSyncEvent{
 			ID:     startIdx + uint64(i),
 			Sender: ethgo.Address(types.StringToAddress(fmt.Sprintf("0x5%d", i))),
 			Data:   generateRandomBytes(t),

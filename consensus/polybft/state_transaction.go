@@ -8,6 +8,7 @@ import (
 	"reflect"
 
 	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -41,7 +42,7 @@ type PendingCommitment struct {
 }
 
 // NewCommitment creates a new commitment object
-func NewCommitment(epoch uint64, stateSyncEvents []*types.StateSyncEvent) (*PendingCommitment, error) {
+func NewCommitment(epoch uint64, stateSyncEvents []*contracts.StateSyncEvent) (*PendingCommitment, error) {
 	tree, err := createMerkleTree(stateSyncEvents)
 	if err != nil {
 		return nil, err
@@ -89,7 +90,7 @@ func (cm *CommitmentMessageSigned) Hash() (types.Hash, error) {
 
 // VerifyStateSyncProof validates given state sync proof
 // against merkle trie root hash contained in the CommitmentMessage
-func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *types.StateSyncProof) error {
+func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *contracts.StateSyncProof) error {
 	if stateSyncProof.StateSync == nil {
 		return errors.New("no state sync event")
 	}
@@ -116,11 +117,13 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		return nil, err
 	}
 
-	gensc.StateReceiverContract.Commit.Commitment = cm.Message
-	gensc.StateReceiverContract.Commit.Signature = cm.AggSignature.AggregatedSignature
-	gensc.StateReceiverContract.Commit.Bitmap = blsVerificationPart
+	commit := &gensc.Commit{
+		Commitment: cm.Message,
+		Signature:  cm.AggSignature.AggregatedSignature,
+		Bitmap:     blsVerificationPart,
+	}
 
-	return gensc.StateReceiverContract.Commit.EncodeAbi()
+	return commit.EncodeAbi()
 }
 
 // DecodeAbi contains logic for decoding given ABI data
@@ -129,12 +132,14 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
-	err := gensc.StateReceiverContract.Commit.DecodeAbi(txData)
+	commit := gensc.Commit{}
+
+	err := commit.DecodeAbi(txData)
 	if err != nil {
 		return err
 	}
 
-	decoded, err := precompiled.BlsVerificationABIType.Decode(gensc.StateReceiverContract.Commit.Bitmap)
+	decoded, err := precompiled.BlsVerificationABIType.Decode(commit.Bitmap)
 	if err != nil {
 		return err
 	}
@@ -155,9 +160,9 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 	}
 
 	*cm = CommitmentMessageSigned{
-		Message: gensc.StateReceiverContract.Commit.Commitment,
+		Message: commit.Commitment,
 		AggSignature: Signature{
-			AggregatedSignature: gensc.StateReceiverContract.Commit.Signature,
+			AggregatedSignature: commit.Signature,
 			Bitmap:              bitmap,
 		},
 		PublicKeys: publicKeys,
@@ -215,7 +220,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 	return nil, nil
 }
 
-func createMerkleTree(stateSyncEvents []*types.StateSyncEvent) (*MerkleTree, error) {
+func createMerkleTree(stateSyncEvents []*contracts.StateSyncEvent) (*MerkleTree, error) {
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {

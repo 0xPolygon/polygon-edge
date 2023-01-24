@@ -1031,7 +1031,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 
 	var (
 		commitments       [2]*PendingCommitment
-		stateSyncs        [2][]*types.StateSyncEvent
+		stateSyncs        [2][]*contracts.StateSyncEvent
 		signedCommitments [2]*CommitmentMessageSigned
 	)
 
@@ -1279,7 +1279,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	t.Helper()
 
 	bitmap := bitmap.Bitmap{}
-	stateSyncEvents := make([]*types.StateSyncEvent, len(accounts))
+	stateSyncEvents := make([]*contracts.StateSyncEvent, len(accounts))
 
 	for i := 0; i < len(accounts); i++ {
 		stateSyncEvents[i] = newStateSyncEvent(

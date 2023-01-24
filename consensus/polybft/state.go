@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
@@ -309,12 +310,12 @@ func (s *State) getLastSnapshot() (*validatorSnapshot, error) {
 }
 
 // list iterates through all events in events bucket in db, un-marshals them, and returns as array
-func (s *State) list() ([]*types.StateSyncEvent, error) {
-	events := []*types.StateSyncEvent{}
+func (s *State) list() ([]*contracts.StateSyncEvent, error) {
+	events := []*contracts.StateSyncEvent{}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket(syncStateEventsBucket).ForEach(func(k, v []byte) error {
-			var event *types.StateSyncEvent
+			var event *contracts.StateSyncEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -436,7 +437,7 @@ func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bo
 }
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
-func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
+func (s *State) insertStateSyncEvent(event *contracts.StateSyncEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(event)
 		if err != nil {
@@ -450,8 +451,8 @@ func (s *State) insertStateSyncEvent(event *types.StateSyncEvent) error {
 }
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
-func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*types.StateSyncEvent, error) {
-	var events []*types.StateSyncEvent
+func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*contracts.StateSyncEvent, error) {
+	var events []*contracts.StateSyncEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
@@ -461,7 +462,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*t
 				return errNotEnoughStateSyncs
 			}
 
-			var event *types.StateSyncEvent
+			var event *contracts.StateSyncEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -530,7 +531,7 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 }
 
 // insertStateSyncProofs inserts the provided state sync proofs to db
-func (s *State) insertStateSyncProofs(stateSyncProof []*types.StateSyncProof) error {
+func (s *State) insertStateSyncProofs(stateSyncProof []*contracts.StateSyncProof) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(stateSyncProofsBucket)
 		for _, ssp := range stateSyncProof {
@@ -549,8 +550,8 @@ func (s *State) insertStateSyncProofs(stateSyncProof []*types.StateSyncProof) er
 }
 
 // getStateSyncProof gets state sync proof that are not executed
-func (s *State) getStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
-	var ssp *types.StateSyncProof
+func (s *State) getStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
+	var ssp *contracts.StateSyncProof
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncID)); v != nil {
