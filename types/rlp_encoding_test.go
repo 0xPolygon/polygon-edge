@@ -134,16 +134,18 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
 	originalTx := &Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(11),
-		Gas:      11,
-		To:       &addrTo,
-		From:     addrFrom,
-		Value:    big.NewInt(1),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(25),
-		S:        big.NewInt(26),
-		R:        big.NewInt(27),
+		Nonce:     0,
+		GasPrice:  big.NewInt(11),
+		GasFeeCap: big.NewInt(12),
+		GasTipCap: big.NewInt(13),
+		Gas:       11,
+		To:        &addrTo,
+		From:      addrFrom,
+		Value:     big.NewInt(1),
+		Input:     []byte{1, 2},
+		V:         big.NewInt(25),
+		S:         big.NewInt(26),
+		R:         big.NewInt(27),
 	}
 
 	txTypes := []TxType{
@@ -179,6 +181,10 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 		{
 			name:   "LegacyTx",
 			txType: LegacyTx,
+		},
+		{
+			name:   "DynamicFeeTx",
+			txType: DynamicFeeTx,
 		},
 		{
 			name:        "undefined type",

@@ -27,7 +27,7 @@ func txTypeFromByte(b byte) (TxType, error) {
 	tt := TxType(b)
 
 	switch tt {
-	case LegacyTx, StateTx:
+	case LegacyTx, StateTx, DynamicFeeTx:
 		return tt, nil
 	default:
 		return tt, fmt.Errorf("unknown transaction type: %d", b)
