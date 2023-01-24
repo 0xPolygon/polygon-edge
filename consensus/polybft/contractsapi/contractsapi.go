@@ -94,8 +94,8 @@ type StateSyncResultEvent struct {
 	Message []byte   `abi:"message"`
 }
 
-func (S *StateSyncResultEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSyncResultEventType, log, S)
+func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) error {
+	return decodeEvent(StateSyncResultEventType, log, s)
 }
 
 var (
@@ -108,8 +108,8 @@ type NewCommitmentEvent struct {
 	Root    types.Hash `abi:"root"`
 }
 
-func (N *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(NewCommitmentEventType, log, N)
+func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
+	return decodeEvent(NewCommitmentEventType, log, n)
 }
 
 type childValidatorSetContractImpl struct {
@@ -209,8 +209,8 @@ type StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (S *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSyncedEventType, log, S)
+func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
+	return decodeEvent(StateSyncedEventType, log, s)
 }
 
 type checkpointManagerContractImpl struct {

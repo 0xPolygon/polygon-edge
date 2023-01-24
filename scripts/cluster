@@ -41,7 +41,7 @@ function startServerFromDockerCompose() {
         ;;
       "polybft")
         cd core-contracts && npm install && npm run compile && cd -
-        go run ./consensus/polybft/contractsapi/gen/main.go
+        go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
         EDGE_CONSENSUS=polybft docker-compose -f ./docker/local/docker-compose.yml up -d --build
         ;;
     esac

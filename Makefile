@@ -59,5 +59,5 @@ test-e2e-polybft:
 .PHONY: compile-core-contracts
 compile-core-contracts:
 	cd core-contracts && npm install && npm run compile
-	go run ./consensus/polybft/contractsapi/gen/main.go
+	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
 

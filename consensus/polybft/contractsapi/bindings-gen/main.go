@@ -258,7 +258,7 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 	inputs := map[string]interface{}{
 		"Structs": res,
 		"Type":    eventType,
-		"Sig":     string(name[0]),
+		"Sig":     strings.ToLower(string(name[0])),
 		"Name":    name,
 		"TName":   strings.Title(name),
 	}
