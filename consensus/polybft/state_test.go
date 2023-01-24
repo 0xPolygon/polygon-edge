@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -49,8 +49,14 @@ func TestState_InsertEvent(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
-	evnt1 := newStateSyncEvent(0, ethgo.Address{}, ethgo.Address{}, nil)
-	err := state.insertStateSyncEvent(evnt1)
+	event1 := &contractsapi.StateSyncedEvent{
+		ID:       big.NewInt(0),
+		Sender:   types.Address{},
+		Receiver: types.Address{},
+		Data:     []byte{},
+	}
+
+	err := state.insertStateSyncEvent(event1)
 	assert.NoError(t, err)
 
 	events, err := state.list()
@@ -280,8 +286,8 @@ func TestState_getStateSyncEventsForCommitment_NotEnoughEvents(t *testing.T) {
 	state := newTestState(t)
 
 	for i := 0; i < maxCommitmentSize-2; i++ {
-		assert.NoError(t, state.insertStateSyncEvent(&contracts.StateSyncEvent{
-			ID:   uint64(i),
+		assert.NoError(t, state.insertStateSyncEvent(&contractsapi.StateSyncedEvent{
+			ID:   big.NewInt(int64(i)),
 			Data: []byte{1, 2},
 		}))
 	}
@@ -296,8 +302,8 @@ func TestState_getStateSyncEventsForCommitment(t *testing.T) {
 	state := newTestState(t)
 
 	for i := 0; i < maxCommitmentSize; i++ {
-		assert.NoError(t, state.insertStateSyncEvent(&contracts.StateSyncEvent{
-			ID:   uint64(i),
+		assert.NoError(t, state.insertStateSyncEvent(&contractsapi.StateSyncedEvent{
+			ID:   big.NewInt(int64(i)),
 			Data: []byte{1, 2},
 		}))
 	}
@@ -361,7 +367,7 @@ func TestState_StateSync_insertAndGetStateSyncProof(t *testing.T) {
 	proofFromDB, err := state.getStateSyncProof(1)
 
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), proofFromDB.StateSync.ID)
+	assert.Equal(t, uint64(1), proofFromDB.StateSync.ID.Uint64())
 	assert.NotNil(t, proofFromDB.Proof)
 }
 
@@ -578,12 +584,12 @@ func insertTestCommitments(t *testing.T, state *State, numberOfCommitments uint6
 	}
 }
 
-func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs uint64) {
+func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs int64) {
 	t.Helper()
 
 	ssProofs := make([]*contracts.StateSyncProof, numberOfProofs)
 
-	for i := uint64(0); i < numberOfProofs; i++ {
+	for i := int64(0); i < numberOfProofs; i++ {
 		proofs := &contracts.StateSyncProof{
 			Proof:     []types.Hash{types.BytesToHash(generateRandomBytes(t))},
 			StateSync: createTestStateSync(i),
@@ -594,11 +600,11 @@ func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs uint64
 	require.NoError(t, state.insertStateSyncProofs(ssProofs))
 }
 
-func createTestStateSync(index uint64) *contracts.StateSyncEvent {
-	return &contracts.StateSyncEvent{
-		ID:       index,
-		Sender:   ethgo.ZeroAddress,
-		Receiver: ethgo.ZeroAddress,
+func createTestStateSync(index int64) *contractsapi.StateSyncedEvent {
+	return &contractsapi.StateSyncedEvent{
+		ID:       big.NewInt(index),
+		Sender:   types.ZeroAddress,
+		Receiver: types.ZeroAddress,
 		Data:     []byte{0, 1},
 	}
 }
@@ -614,7 +620,7 @@ func createTestCommitmentMessage(t *testing.T, fromIndex uint64) *CommitmentMess
 
 	require.NoError(t, err)
 
-	msg := &gensc.Commitment{
+	msg := &contractsapi.Commitment{
 		Root:    tree.Hash(),
 		StartID: big.NewInt(int64(fromIndex)),
 		EndID:   big.NewInt(int64(fromIndex + maxCommitmentSize - 1)),

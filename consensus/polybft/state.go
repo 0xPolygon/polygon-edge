@@ -310,12 +310,12 @@ func (s *State) getLastSnapshot() (*validatorSnapshot, error) {
 }
 
 // list iterates through all events in events bucket in db, un-marshals them, and returns as array
-func (s *State) list() ([]*contracts.StateSyncEvent, error) {
-	events := []*contracts.StateSyncEvent{}
+func (s *State) list() ([]*contractsapi.StateSyncedEvent, error) {
+	events := []*contractsapi.StateSyncedEvent{}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket(syncStateEventsBucket).ForEach(func(k, v []byte) error {
-			var event *contracts.StateSyncEvent
+			var event *contractsapi.StateSyncedEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -437,7 +437,7 @@ func (s *State) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bo
 }
 
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
-func (s *State) insertStateSyncEvent(event *contracts.StateSyncEvent) error {
+func (s *State) insertStateSyncEvent(event *contractsapi.StateSyncedEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(event)
 		if err != nil {
@@ -446,13 +446,13 @@ func (s *State) insertStateSyncEvent(event *contracts.StateSyncEvent) error {
 
 		bucket := tx.Bucket(syncStateEventsBucket)
 
-		return bucket.Put(itob(event.ID), raw)
+		return bucket.Put(itob(event.ID.Uint64()), raw)
 	})
 }
 
 // getStateSyncEventsForCommitment returns state sync events for commitment
-func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*contracts.StateSyncEvent, error) {
-	var events []*contracts.StateSyncEvent
+func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*contractsapi.StateSyncedEvent, error) {
+	var events []*contractsapi.StateSyncedEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
@@ -462,7 +462,7 @@ func (s *State) getStateSyncEventsForCommitment(fromIndex, toIndex uint64) ([]*c
 				return errNotEnoughStateSyncs
 			}
 
-			var event *contracts.StateSyncEvent
+			var event *contractsapi.StateSyncedEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
 			}
@@ -540,7 +540,7 @@ func (s *State) insertStateSyncProofs(stateSyncProof []*contracts.StateSyncProof
 				return err
 			}
 
-			if err := bucket.Put(itob(ssp.StateSync.ID), raw); err != nil {
+			if err := bucket.Put(itob(ssp.StateSync.ID.Uint64()), raw); err != nil {
 				return err
 			}
 		}

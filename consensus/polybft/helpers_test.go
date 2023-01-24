@@ -3,15 +3,15 @@ package polybft
 import (
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 func createTestKey(t *testing.T) *wallet.Key {
@@ -53,14 +53,14 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
-func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contracts.StateSyncEvent {
+func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contractsapi.StateSyncedEvent {
 	t.Helper()
 
-	stateSyncEvents := make([]*contracts.StateSyncEvent, eventsCount)
+	stateSyncEvents := make([]*contractsapi.StateSyncedEvent, eventsCount)
 	for i := 0; i < eventsCount; i++ {
-		stateSyncEvents[i] = &contracts.StateSyncEvent{
-			ID:     startIdx + uint64(i),
-			Sender: ethgo.Address(types.StringToAddress(fmt.Sprintf("0x5%d", i))),
+		stateSyncEvents[i] = &contractsapi.StateSyncedEvent{
+			ID:     big.NewInt(int64(startIdx + uint64(i))),
+			Sender: types.StringToAddress(fmt.Sprintf("0x5%d", i)),
 			Data:   generateRandomBytes(t),
 		}
 	}

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"path"
 	"sync"
 
@@ -210,8 +209,9 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event, err := decodeStateSyncEvent(eventLog)
-	if err != nil {
+	event := &contractsapi.StateSyncedEvent{}
+
+	if err := event.ParseLog(eventLog); err != nil {
 		s.logger.Error("could not decode state sync event", "err", err)
 
 		return
@@ -347,6 +347,7 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 		return err
 	}
 
+	s.logger.Info("Post epoch received", "NextCommittedIndex", nextCommittedIndex)
 	s.nextCommittedIndex = nextCommittedIndex
 
 	s.lock.Unlock()
@@ -367,6 +368,10 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 		return nil
 	}
 
+	s.logger.Info("PostBlock received",
+		"From", commitment.Message.StartID.Uint64(),
+		"To", commitment.Message.EndID.Uint64())
+
 	if err := s.state.insertCommitmentMessage(commitment); err != nil {
 		return fmt.Errorf("insert commitment message error: %w", err)
 	}
@@ -378,7 +383,7 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	// update the nextCommittedIndex since a commitment was submitted
-	s.nextCommittedIndex = commitment.Message.StartID.Uint64() + 1
+	s.nextCommittedIndex = commitment.Message.EndID.Uint64() + 1
 	// commitment was submitted, so discard what we have in memory, so we can build a new one
 	s.pendingCommitments = nil
 
@@ -475,7 +480,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	}
 
 	if len(s.pendingCommitments) > 0 &&
-		s.pendingCommitments[len(s.pendingCommitments)-1].StartID.Uint64() >= stateSyncEvents[len(stateSyncEvents)-1].ID {
+		s.pendingCommitments[len(s.pendingCommitments)-1].StartID.Cmp(stateSyncEvents[len(stateSyncEvents)-1].ID) >= 0 {
 		// already built a commitment of this size which is pending to be submitted
 		return nil
 	}
@@ -542,41 +547,4 @@ func (s *stateSyncManager) multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
-}
-
-// newStateSyncEvent creates an instance of pending state sync event.
-func newStateSyncEvent(
-	id uint64,
-	sender ethgo.Address,
-	target ethgo.Address,
-	data []byte,
-) *contracts.StateSyncEvent {
-	return &contracts.StateSyncEvent{
-		ID:       id,
-		Sender:   sender,
-		Receiver: target,
-		Data:     data,
-	}
-}
-
-func decodeStateSyncEvent(log *ethgo.Log) (*contracts.StateSyncEvent, error) {
-	raw, err := stateTransferEventABI.ParseLog(log)
-	if err != nil {
-		return nil, err
-	}
-
-	eventGeneric, err := decodeEventData(raw, log,
-		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
-			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	stateSyncEvent, ok := eventGeneric.(*contracts.StateSyncEvent)
-	if !ok {
-		return nil, errors.New("failed to convert event to StateSyncEvent instance")
-	}
-
-	return stateSyncEvent, nil
 }

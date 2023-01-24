@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"reflect"
 
-	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
@@ -36,13 +36,13 @@ const (
 
 // PendingCommitment holds merkle trie of bridge transactions accompanied by epoch number
 type PendingCommitment struct {
-	*gensc.Commitment
+	*contractsapi.Commitment
 	MerkleTree *MerkleTree
 	Epoch      uint64
 }
 
 // NewCommitment creates a new commitment object
-func NewCommitment(epoch uint64, stateSyncEvents []*contracts.StateSyncEvent) (*PendingCommitment, error) {
+func NewCommitment(epoch uint64, stateSyncEvents []*contractsapi.StateSyncedEvent) (*PendingCommitment, error) {
 	tree, err := createMerkleTree(stateSyncEvents)
 	if err != nil {
 		return nil, err
@@ -51,9 +51,9 @@ func NewCommitment(epoch uint64, stateSyncEvents []*contracts.StateSyncEvent) (*
 	return &PendingCommitment{
 		MerkleTree: tree,
 		Epoch:      epoch,
-		Commitment: &gensc.Commitment{
-			StartID: big.NewInt(int64(stateSyncEvents[0].ID)),
-			EndID:   big.NewInt(int64(stateSyncEvents[len(stateSyncEvents)-1].ID)),
+		Commitment: &contractsapi.Commitment{
+			StartID: stateSyncEvents[0].ID,
+			EndID:   stateSyncEvents[len(stateSyncEvents)-1].ID,
 			Root:    tree.Hash(),
 		},
 	}, nil
@@ -73,7 +73,7 @@ var _ StateTransactionInput = &CommitmentMessageSigned{}
 
 // CommitmentMessageSigned encapsulates commitment message with aggregated signatures
 type CommitmentMessageSigned struct {
-	Message      *gensc.Commitment
+	Message      *contractsapi.Commitment
 	AggSignature Signature
 	PublicKeys   [][]byte
 }
@@ -100,7 +100,7 @@ func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *contract
 		return err
 	}
 
-	return VerifyProof(stateSyncProof.StateSync.ID-cm.Message.StartID.Uint64(),
+	return VerifyProof(stateSyncProof.StateSync.ID.Uint64()-cm.Message.StartID.Uint64(),
 		hash, stateSyncProof.Proof, cm.Message.Root)
 }
 
@@ -117,7 +117,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		return nil, err
 	}
 
-	commit := &gensc.Commit{
+	commit := &contractsapi.Commit{
 		Commitment: cm.Message,
 		Signature:  cm.AggSignature.AggregatedSignature,
 		Bitmap:     blsVerificationPart,
@@ -132,7 +132,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
-	commit := gensc.Commit{}
+	commit := contractsapi.Commit{}
 
 	err := commit.DecodeAbi(txData)
 	if err != nil {
@@ -185,7 +185,7 @@ func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
 
 	var obj StateTransactionInput
 
-	if bytes.Equal(sig, gensc.StateReceiver.Abi.Methods["commit"].ID()) {
+	if bytes.Equal(sig, contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
 	} else {
@@ -204,7 +204,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 		// skip non state CommitmentMessageSigned transactions
 		if tx.Type != types.StateTx ||
 			len(tx.Input) < abiMethodIDLength ||
-			!bytes.Equal(tx.Input[:abiMethodIDLength], gensc.StateReceiver.Abi.Methods["commit"].ID()) {
+			!bytes.Equal(tx.Input[:abiMethodIDLength], contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
 			continue
 		}
 
@@ -220,7 +220,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 	return nil, nil
 }
 
-func createMerkleTree(stateSyncEvents []*contracts.StateSyncEvent) (*MerkleTree, error) {
+func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*MerkleTree, error) {
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {

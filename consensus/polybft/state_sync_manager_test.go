@@ -244,6 +244,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	}
 
 	require.NoError(t, s.PostBlock(req))
+	require.Equal(t, mockMsg.Message.EndID.Uint64()+1, s.nextCommittedIndex)
 
 	for i := uint64(0); i < 10; i++ {
 		proof, err := s.state.getStateSyncProof(i)
@@ -380,7 +381,7 @@ func TestStateSyncManager_GetProofs(t *testing.T) {
 
 	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
 	require.NoError(t, err)
-	require.Equal(t, stateSyncID, proof.StateSync.ID)
+	require.Equal(t, stateSyncID, proof.StateSync.ID.Uint64())
 	require.NotEmpty(t, proof.Proof)
 }
 
@@ -445,7 +446,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 
 	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
 	require.NoError(t, err)
-	require.Equal(t, stateSyncID, proof.StateSync.ID)
+	require.Equal(t, stateSyncID, proof.StateSync.ID.Uint64())
 	require.NotEmpty(t, proof.Proof)
 
 	require.NoError(t, commitment.VerifyStateSyncProof(proof))

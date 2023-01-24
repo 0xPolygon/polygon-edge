@@ -105,7 +105,11 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 
 		executionStateSync := &contracts.StateSyncProof{}
 		require.NoError(t, executionStateSync.DecodeAbi(inputData))
-		require.Equal(t, stateSyncsProof.StateSync, executionStateSync.StateSync)
+		require.Equal(t, stateSyncsProof.StateSync.ID.Uint64(), executionStateSync.StateSync.ID.Uint64())
+		require.Equal(t, stateSyncsProof.StateSync.Sender, executionStateSync.StateSync.Sender)
+		require.Equal(t, stateSyncsProof.StateSync.Receiver, executionStateSync.StateSync.Receiver)
+		require.Equal(t, stateSyncsProof.StateSync.Data, executionStateSync.StateSync.Data)
+		require.Equal(t, stateSyncsProof.Proof, executionStateSync.Proof)
 
 		err = commitmentSigned.VerifyStateSyncProof(executionStateSync)
 		require.NoError(t, err)
@@ -151,7 +155,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 }
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
-	epoch, startIdx uint64) (*PendingCommitment, *CommitmentMessageSigned, []*contracts.StateSyncEvent) {
+	epoch, startIdx uint64) (*PendingCommitment, *CommitmentMessageSigned, []*contractsapi.StateSyncedEvent) {
 	t.Helper()
 
 	stateSyncEvents := generateStateSyncEvents(t, stateSyncsCount, startIdx)

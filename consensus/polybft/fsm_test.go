@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -1031,7 +1032,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 
 	var (
 		commitments       [2]*PendingCommitment
-		stateSyncs        [2][]*contracts.StateSyncEvent
+		stateSyncs        [2][]*contractsapi.StateSyncedEvent
 		signedCommitments [2]*CommitmentMessageSigned
 	)
 
@@ -1279,15 +1280,15 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	t.Helper()
 
 	bitmap := bitmap.Bitmap{}
-	stateSyncEvents := make([]*contracts.StateSyncEvent, len(accounts))
+	stateSyncEvents := make([]*contractsapi.StateSyncedEvent, len(accounts))
 
 	for i := 0; i < len(accounts); i++ {
-		stateSyncEvents[i] = newStateSyncEvent(
-			uint64(i),
-			accounts[i].Ecdsa.Address(),
-			accounts[0].Ecdsa.Address(),
-			[]byte{},
-		)
+		stateSyncEvents[i] = &contractsapi.StateSyncedEvent{
+			ID:       big.NewInt(int64(i)),
+			Sender:   types.Address(accounts[i].Ecdsa.Address()),
+			Receiver: types.Address(accounts[0].Ecdsa.Address()),
+			Data:     []byte{},
+		}
 
 		bitmap.Set(uint64(i))
 	}
