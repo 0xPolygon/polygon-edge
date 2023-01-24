@@ -35,6 +35,9 @@ const (
 
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
+
+	// property based tests enabled
+	envPropertyBaseTestEnabled = "E2E_PROPERTY_TESTS"
 )
 
 const (
@@ -80,6 +83,7 @@ type TestClusterConfig struct {
 	ValidatorSetSize  uint64
 	EpochSize         int
 	EpochReward       int
+	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
 	logsDirOnce sync.Once
@@ -213,6 +217,12 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
+func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.PropertyBaseTests = propertyBaseTests
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -220,18 +230,12 @@ func isTrueEnv(e string) bool {
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	t.Helper()
 
-	if !isTrueEnv(envE2ETestsEnabled) {
-		t.Skip("Integration tests are disabled.")
-	}
-
-	tmpDir, err := os.MkdirTemp("/tmp", "e2e-polybft-")
-	require.NoError(t, err)
+	var err error
 
 	config := &TestClusterConfig{
 		t:                 t,
 		WithLogs:          isTrueEnv(envLogsEnabled),
 		WithStdout:        isTrueEnv(envStdoutEnabled),
-		TmpDir:            tmpDir,
 		Binary:            resolveBinary(),
 		EpochSize:         10,
 		EpochReward:       1,
@@ -251,6 +255,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		opt(config)
 	}
 
+	if !config.PropertyBaseTests && !isTrueEnv(envE2ETestsEnabled) ||
+		config.PropertyBaseTests && !isTrueEnv(envPropertyBaseTestEnabled) {
+		t.Skip("Integration tests are disabled.")
+	}
+
+	config.TmpDir, err = os.MkdirTemp("/tmp", "e2e-polybft-")
+	require.NoError(t, err)
+
 	cluster := &TestCluster{
 		Servers:     []*TestServer{},
 		Config:      config,
@@ -269,11 +281,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 	}
 
-	manifestPath := path.Join(tmpDir, "manifest.json")
+	manifestPath := path.Join(config.TmpDir, "manifest.json")
 	args := []string{
 		"manifest",
 		"--path", manifestPath,
-		"--validators-path", tmpDir,
+		"--validators-path", config.TmpDir,
 		"--validators-prefix", cluster.Config.ValidatorPrefix,
 		"--premine-validators", cluster.Config.PremineValidators,
 	}
@@ -305,7 +317,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"genesis",
 			"--manifest", manifestPath,
 			"--consensus", "polybft",
-			"--dir", path.Join(tmpDir, "genesis.json"),
+			"--dir", path.Join(config.TmpDir, "genesis.json"),
 			"--contracts-path", defaultContractsPath,
 			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),

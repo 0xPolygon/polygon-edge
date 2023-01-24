@@ -3,8 +3,6 @@ package e2e
 import (
 	"fmt"
 	"math"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,14 +11,7 @@ import (
 	"pgregory.net/rapid"
 )
 
-// property based tests enabled
-const envPropertyBaseTestEnabled = "E2E_PROPERTY_TESTS"
-
 func TestProperty_DifferentVotingPower(t *testing.T) {
-	if strings.ToLower(os.Getenv(envPropertyBaseTestEnabled)) != "true" {
-		t.Skip("Property based tests are disabled.")
-	}
-
 	t.Parallel()
 
 	const (
@@ -31,7 +22,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 	rapid.Check(t, func(tt *rapid.T) {
 		var (
 			numNodes  = rapid.Uint64Range(4, 8).Draw(tt, "number of cluster nodes")
-			epochSize = rapid.OneOf(rapid.Just(4), rapid.Just(10)).Draw(tt, "Size of epoch")
+			epochSize = rapid.OneOf(rapid.Just(4), rapid.Just(10)).Draw(tt, "epoch size")
 			numBlocks = rapid.Uint64Range(2, 5).Draw(tt, "number of blocks the cluster should mine")
 		)
 
@@ -44,6 +35,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 
 		cluster := framework.NewTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
+			framework.WithPropertyBaseTests(true),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i, a := range adresses {
 					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premine[i]))
