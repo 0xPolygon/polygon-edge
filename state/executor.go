@@ -534,7 +534,8 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	// FIXME: Not sure this is the right place for such kind of modifications
+	// FIXME: Not sure it is the right place for such kind of modifications
+	// Maybe I should move it to tx pool since this is the transaction entrypoint.
 	msg = t.londonPrefill(msg)
 
 	var err error
