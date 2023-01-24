@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
-	"unicode"
 
 	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
@@ -291,15 +290,4 @@ func encodeFuncTuple(t *abi.Type) string {
 	str = strings.TrimSuffix(str, ")")
 
 	return str
-}
-
-func firstCharacterLowercase(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-
-	r := []rune(s)
-	r[0] = unicode.ToLower(r[0])
-
-	return string(r)
 }
