@@ -583,9 +583,9 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 	uptime, err := consensusRuntime.calculateUptime(lastBuiltBlock, consensusRuntime.epoch)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, uptime)
-	assert.Equal(t, uint64(epoch), uptime.EpochID)
-	assert.Equal(t, uint64(epochStartBlock), uptime.Epoch.StartBlock)
-	assert.Equal(t, uint64(epochEndBlock), uptime.Epoch.EndBlock)
+	assert.Equal(t, uint64(epoch), uptime.ID.Uint64())
+	assert.Equal(t, uint64(epochStartBlock), uptime.Epoch.StartBlock.Uint64())
+	assert.Equal(t, uint64(epochEndBlock), uptime.Epoch.EndBlock.Uint64())
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)

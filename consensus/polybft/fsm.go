@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -52,7 +53,7 @@ type fsm struct {
 	epochNumber uint64
 
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
-	uptimeCounter *CommitEpoch
+	uptimeCounter *contractsapi.CommitEpoch
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool

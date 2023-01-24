@@ -182,7 +182,7 @@ func TestStateTransaction_Signature(t *testing.T) {
 		sig string
 	}{
 		{
-			commitEpochMethod,
+			contractsapi.ChildValidatorSet.Abi.GetMethod("commitEpoch"),
 			"410899c9",
 		},
 	}
@@ -195,11 +195,18 @@ func TestStateTransaction_Signature(t *testing.T) {
 func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
-	cases := []StateTransactionInput{
-		// empty commit epoch
-		&CommitEpoch{
-			Uptime: Uptime{
-				UptimeData: []ValidatorUptime{},
+	cases := []contractsapi.StateTransactionInput{
+		&contractsapi.CommitEpoch{
+			ID: big.NewInt(1),
+			Epoch: &contractsapi.Epoch{
+				StartBlock: big.NewInt(1),
+				EndBlock:   big.NewInt(10),
+				EpochRoot:  types.Hash{},
+			},
+			Uptime: &contractsapi.Uptime{
+				EpochID:     big.NewInt(1),
+				TotalBlocks: big.NewInt(10),
+				UptimeData:  []*contractsapi.UptimeData{},
 			},
 		},
 	}
@@ -211,7 +218,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 
 		// use reflection to create another type and decode
 		val := reflect.New(reflect.TypeOf(c).Elem()).Interface()
-		obj, ok := val.(StateTransactionInput)
+		obj, ok := val.(contractsapi.StateTransactionInput)
 		assert.True(t, ok)
 
 		err = obj.DecodeAbi(res)

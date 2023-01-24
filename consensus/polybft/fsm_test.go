@@ -1333,19 +1333,19 @@ func newBlockBuilderMock(stateBlock *types.FullBlock) *blockBuilderMock {
 	return mBlockBuilder
 }
 
-func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize uint64) *CommitEpoch {
+func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpoch {
 	t.Helper()
 
 	if validatorSet == nil {
 		validatorSet = newTestValidators(5).getPublicIdentities()
 	}
 
-	uptime := Uptime{EpochID: 0}
-	commitEpoch := &CommitEpoch{
-		EpochID: 0,
-		Epoch: Epoch{
-			StartBlock: 1,
-			EndBlock:   1 + epochSize,
+	uptime := &contractsapi.Uptime{EpochID: big.NewInt(0), TotalBlocks: big.NewInt(int64(epochSize))}
+	commitEpoch := &contractsapi.CommitEpoch{
+		ID: big.NewInt(0),
+		Epoch: &contractsapi.Epoch{
+			StartBlock: big.NewInt(1),
+			EndBlock:   big.NewInt(int64(epochSize + 1)),
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
@@ -1356,7 +1356,7 @@ func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize ui
 		validatorIndex := indexToStart
 		for j := 0; j < validatorSet.Len()-1; j++ {
 			validatorIndex = validatorIndex % validatorSet.Len()
-			uptime.addValidatorUptime(validatorSet[validatorIndex].Address, 1)
+			uptime.AddValidatorUptime(validatorSet[validatorIndex].Address, 1)
 			validatorIndex++
 		}
 

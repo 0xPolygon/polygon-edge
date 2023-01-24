@@ -4,29 +4,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/big"
-	"reflect"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/mitchellh/mapstructure"
-	"github.com/umbracle/ethgo/abi"
 )
-
-// StateTransactionInput is an abstraction for different state transaction inputs
-type StateTransactionInput interface {
-	// EncodeAbi contains logic for encoding arbitrary data into ABI format
-	EncodeAbi() ([]byte, error)
-	// DecodeAbi contains logic for decoding given ABI data
-	DecodeAbi(b []byte) error
-	// Type returns type of state transaction input
-	Type() StateTransactionType
-}
-
-type StateTransactionType string
 
 const (
 	abiMethodIDLength      = 4
@@ -69,7 +53,7 @@ func (cm *PendingCommitment) Hash() (types.Hash, error) {
 	return crypto.Keccak256Hash(data), nil
 }
 
-var _ StateTransactionInput = &CommitmentMessageSigned{}
+var _ contractsapi.StateTransactionInput = &CommitmentMessageSigned{}
 
 // CommitmentMessageSigned encapsulates commitment message with aggregated signatures
 type CommitmentMessageSigned struct {
@@ -172,18 +156,18 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 }
 
 // Type returns type of state transaction input
-func (cm *CommitmentMessageSigned) Type() StateTransactionType {
+func (cm *CommitmentMessageSigned) Type() contractsapi.StateTransactionType {
 	return stTypeBridgeCommitment
 }
 
-func decodeStateTransaction(txData []byte) (StateTransactionInput, error) {
+func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, error) {
 	if len(txData) < abiMethodIDLength {
 		return nil, fmt.Errorf("state transactions have input")
 	}
 
 	sig := txData[:abiMethodIDLength]
 
-	var obj StateTransactionInput
+	var obj contractsapi.StateTransactionInput
 
 	if bytes.Equal(sig, contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
 		// bridge commitment
@@ -233,128 +217,4 @@ func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*Merkle
 	}
 
 	return NewMerkleTree(ssh)
-}
-
-var _ StateTransactionInput = &CommitEpoch{}
-
-var (
-	commitEpochMethod, _ = abi.NewMethod("function commitEpoch(" +
-		// new epoch id
-		"uint256 id," +
-		// Epoch
-		"tuple(uint256 startBlock, uint256 endBlock, bytes32 epochRoot) epoch," +
-		// Uptime
-		"tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks) uptime)")
-)
-
-// Epoch holds the data about epoch execution (when it started and when it ended)
-type Epoch struct {
-	StartBlock uint64     `abi:"startBlock"`
-	EndBlock   uint64     `abi:"endBlock"`
-	EpochRoot  types.Hash `abi:"epochRoot"`
-}
-
-// Uptime holds the data about number of times validators sealed blocks
-// in a given epoch
-type Uptime struct {
-	EpochID     uint64            `abi:"epochId"`
-	UptimeData  []ValidatorUptime `abi:"uptimeData"`
-	TotalBlocks uint64            `abi:"totalBlocks"`
-}
-
-func (u *Uptime) addValidatorUptime(address types.Address, count uint64) {
-	if u.UptimeData == nil {
-		u.UptimeData = []ValidatorUptime{}
-	}
-
-	u.UptimeData = append(u.UptimeData, ValidatorUptime{
-		Address: address,
-		Count:   count,
-	})
-}
-
-// ValidatorUptime contains data about how many blocks a given validator has sealed
-// in a single period (epoch)
-type ValidatorUptime struct {
-	Address types.Address `abi:"validator"`
-	Count   uint64        `abi:"signedBlocks"`
-}
-
-// CommitEpoch contains data that is sent to ChildValidatorSet contract
-// to distribute rewards on the end of an epoch
-type CommitEpoch struct {
-	EpochID uint64 `abi:"id"`
-	Epoch   Epoch  `abi:"epoch"`
-	Uptime  Uptime `abi:"uptime"`
-}
-
-// EncodeAbi encodes the commit epoch object to be placed in a transaction
-func (c *CommitEpoch) EncodeAbi() ([]byte, error) {
-	return commitEpochMethod.Encode(c)
-}
-
-// DecodeAbi decodes the commit epoch object from the given transaction
-func (c *CommitEpoch) DecodeAbi(txData []byte) error {
-	return decodeStruct(commitEpochMethod.Inputs, txData, &c)
-}
-
-// Type returns the state transaction type for given data
-func (c *CommitEpoch) Type() StateTransactionType {
-	return stTypeEndEpoch
-}
-
-func decodeStruct(t *abi.Type, input []byte, out interface{}) error {
-	if len(input) < abiMethodIDLength {
-		return fmt.Errorf("invalid commitment data, len = %d", len(input))
-	}
-
-	input = input[abiMethodIDLength:]
-
-	val, err := abi.Decode(t, input)
-	if err != nil {
-		return err
-	}
-
-	metadata := &mapstructure.Metadata{}
-	dc := &mapstructure.DecoderConfig{
-		Result:     out,
-		DecodeHook: customHook,
-		TagName:    "abi",
-		Metadata:   metadata,
-	}
-
-	ms, err := mapstructure.NewDecoder(dc)
-	if err != nil {
-		return err
-	}
-
-	if err = ms.Decode(val); err != nil {
-		return err
-	}
-
-	if len(metadata.Unused) != 0 {
-		return fmt.Errorf("some keys not used: %v", metadata.Unused)
-	}
-
-	return nil
-}
-
-var bigTyp = reflect.TypeOf(new(big.Int))
-
-func customHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
-	if f == bigTyp && t.Kind() == reflect.Uint64 {
-		// convert big.Int to uint64 (if possible)
-		b, ok := data.(*big.Int)
-		if !ok {
-			return nil, fmt.Errorf("data not a big.Int")
-		}
-
-		if !b.IsUint64() {
-			return nil, fmt.Errorf("cannot format big.Int to uint64")
-		}
-
-		return b.Uint64(), nil
-	}
-
-	return data, nil
 }
