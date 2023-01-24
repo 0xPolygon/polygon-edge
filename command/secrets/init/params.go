@@ -9,26 +9,29 @@ import (
 )
 
 const (
-	dataDirFlag = "data-dir"
-	configFlag  = "config"
-	ecdsaFlag   = "ecdsa"
-	blsFlag     = "bls"
-	networkFlag = "network"
-	numFlag     = "num"
+	dataDirFlag        = "data-dir"
+	configFlag         = "config"
+	ecdsaFlag          = "ecdsa"
+	blsFlag            = "bls"
+	networkFlag        = "network"
+	numFlag            = "num"
+	insecureLocalStore = "insecure"
 )
 
 var (
-	errInvalidConfig   = errors.New("invalid secrets configuration")
-	errInvalidParams   = errors.New("no config file or data directory passed in")
-	errUnsupportedType = errors.New("unsupported secrets manager")
+	errInvalidConfig                  = errors.New("invalid secrets configuration")
+	errInvalidParams                  = errors.New("no config file or data directory passed in")
+	errUnsupportedType                = errors.New("unsupported secrets manager")
+	errSecureLocalStoreNotImplemented = errors.New("secure local store not yet implemented")
 )
 
 type initParams struct {
-	dataDir          string
-	configPath       string
-	generatesECDSA   bool
-	generatesBLS     bool
-	generatesNetwork bool
+	dataDir            string
+	configPath         string
+	generatesECDSA     bool
+	generatesBLS       bool
+	generatesNetwork   bool
+	insecureLocalStore bool
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
@@ -89,6 +92,12 @@ func (ip *initParams) parseConfig() error {
 }
 
 func (ip *initParams) initLocalSecretsManager() error {
+	if !ip.insecureLocalStore {
+		//TODO: implement encryption mechanism for local secrets manager
+		return errSecureLocalStoreNotImplemented
+	}
+
+	// setup local secrets manager
 	local, err := helper.SetupLocalSecretsManager(ip.dataDir)
 	if err != nil {
 		return err
@@ -145,6 +154,8 @@ func (ip *initParams) getResult() (command.CommandResult, error) {
 	if res.NodeID, err = helper.LoadNodeID(ip.secretsManager); err != nil {
 		return nil, err
 	}
+
+	res.Insecure = ip.insecureLocalStore
 
 	return res, nil
 }
