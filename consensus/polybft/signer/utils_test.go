@@ -17,7 +17,7 @@ func Test_SingleSign(t *testing.T) {
 
 	// Sign valid message
 	signature, err := blsKey.Sign(validTestMsg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	isOk := signature.Verify(blsKey.PublicKey(), validTestMsg)
 	assert.True(t, isOk)
@@ -36,7 +36,11 @@ func Test_AggregatedSign(t *testing.T) {
 	keys, err := CreateRandomBlsKeys(participantsNumber) // create keys for validators
 	require.NoError(t, err)
 
-	pubKeys := collectPublicKeys(keys)
+	pubKeys := make([]*PublicKey, len(keys))
+
+	for i, key := range keys {
+		pubKeys[i] = key.PublicKey()
+	}
 
 	var isOk bool
 

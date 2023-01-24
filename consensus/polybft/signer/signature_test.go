@@ -34,6 +34,7 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 	bls1, _ := GenerateBlsKey()
 	bls2, _ := GenerateBlsKey()
 	bls3, _ := GenerateBlsKey()
+
 	sig1, err := bls1.Sign(validTestMsg)
 	require.NoError(t, err)
 	sig2, err := bls2.Sign(validTestMsg)
@@ -43,13 +44,13 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 
 	verified := sig1.Aggregate(sig2).
 		Aggregate(sig3).Aggregate(&Signature{}).
-		Verify(bls1.PublicKey().aggregate(bls2.PublicKey()).
-			aggregate(bls3.PublicKey()).aggregate(&PublicKey{}), validTestMsg)
+		Verify(bls1.PublicKey().Aggregate(bls2.PublicKey()).
+			Aggregate(bls3.PublicKey()).Aggregate(&PublicKey{}), validTestMsg)
 	assert.True(t, verified)
 
 	notVerified := sig1.Aggregate(sig2).
 		Aggregate(sig3).
-		Verify(bls1.PublicKey().aggregate(bls2.PublicKey()).aggregate(bls3.PublicKey()), invalidTestMsg)
+		Verify(bls1.PublicKey().Aggregate(bls2.PublicKey()).Aggregate(bls3.PublicKey()), invalidTestMsg)
 	assert.False(t, notVerified)
 }
 
@@ -61,7 +62,12 @@ func Test_AggregatedSignature(t *testing.T) {
 	blsKeys, err := CreateRandomBlsKeys(participantsNumber)
 	require.NoError(t, err)
 
-	allPubs := collectPublicKeys(blsKeys)
+	allPubs := make([]*PublicKey, len(blsKeys))
+
+	for i, key := range blsKeys {
+		allPubs[i] = key.PublicKey()
+	}
+
 	aggPubs := aggregatePublicKeys(allPubs)
 	allSignatures := Signatures{}
 
@@ -87,7 +93,7 @@ func Test_AggregatedSignature(t *testing.T) {
 		if i == 0 {
 			manuallyAggPubs = pubKey
 		} else {
-			manuallyAggPubs = manuallyAggPubs.aggregate(pubKey)
+			manuallyAggPubs = manuallyAggPubs.Aggregate(pubKey)
 		}
 	}
 

@@ -1,6 +1,7 @@
 package bls
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,6 +25,9 @@ func Test_PublicMarshal(t *testing.T) {
 
 	assert.Equal(t, pubKey, publicKeyUnmarshalled)
 	assert.Equal(t, publicKeyMarshalled, publicKeyUnmarshalled.Marshal())
+
+	assert.Nil(t, new(PublicKey).Marshal())
+	assert.Equal(t, [4]*big.Int{}, new(PublicKey).ToBigInt())
 }
 
 func TestPublic_UnmarshalPublicKeyFromBigInt(t *testing.T) {
