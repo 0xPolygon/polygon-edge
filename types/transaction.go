@@ -22,6 +22,17 @@ const (
 	DynamicFeeTx TxType = 0x8f
 )
 
+func txTypeFromByte(b byte) (TxType, error) {
+	tt := TxType(b)
+
+	switch tt {
+	case LegacyTx, StateTx:
+		return tt, nil
+	default:
+		return tt, fmt.Errorf("unknown transaction type: %d", b)
+	}
+}
+
 // String returns string representation of the transaction type.
 func (t TxType) String() (s string) {
 	switch t {
@@ -31,9 +42,9 @@ func (t TxType) String() (s string) {
 		return "StateTx"
 	case DynamicFeeTx:
 		return "DynamicFeeTx"
-	default:
-		return "UnknownTX"
 	}
+
+	return
 }
 
 type Transaction struct {
