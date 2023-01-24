@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	RLPSingleByteUpperLimit = 0x7f
+	RLPSingleByteUpperLimit = 0x8f
 )
 
 type RLPMarshaler interface {
