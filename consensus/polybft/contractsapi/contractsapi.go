@@ -84,10 +84,6 @@ func (e *Execute) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateReceiver.Abi.Methods["execute"], buf, e)
 }
 
-var (
-	StateSyncResultEventType = abi.MustNewEvent("event StateSyncResult(uint256 indexed counter,bool indexed status,bytes message)") //nolint:all
-)
-
 type StateSyncResultEvent struct {
 	Counter *big.Int `abi:"counter"`
 	Status  bool     `abi:"status"`
@@ -95,12 +91,8 @@ type StateSyncResultEvent struct {
 }
 
 func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSyncResultEventType, log, s)
+	return decodeEvent(StateReceiver.Abi.Events["StateSyncResultEvent"], log, s)
 }
-
-var (
-	NewCommitmentEventType = abi.MustNewEvent("event NewCommitment(uint256 indexed startId,uint256 indexed endId,bytes32 root)") //nolint:all
-)
 
 type NewCommitmentEvent struct {
 	StartID *big.Int   `abi:"startId"`
@@ -109,7 +101,7 @@ type NewCommitmentEvent struct {
 }
 
 func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(NewCommitmentEventType, log, n)
+	return decodeEvent(StateReceiver.Abi.Events["NewCommitmentEvent"], log, n)
 }
 
 type childValidatorSetContractImpl struct {
@@ -198,10 +190,6 @@ func (s *SyncState) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateSender.Abi.Methods["syncState"], buf, s)
 }
 
-var (
-	StateSyncedEventType = abi.MustNewEvent("event StateSynced(uint256 indexed id,address indexed sender,address indexed receiver,bytes data)") //nolint:all
-)
-
 type StateSyncedEvent struct {
 	ID       *big.Int      `abi:"id"`
 	Sender   types.Address `abi:"sender"`
@@ -210,7 +198,7 @@ type StateSyncedEvent struct {
 }
 
 func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSyncedEventType, log, s)
+	return decodeEvent(StateSender.Abi.Events["StateSyncedEvent"], log, s)
 }
 
 type checkpointManagerContractImpl struct {

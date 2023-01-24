@@ -110,7 +110,7 @@ func main() {
 		}
 
 		for _, event := range c.events {
-			res = append(res, rr.GenEvent(c.artifact.Abi.Events[event]))
+			res = append(res, rr.GenEvent(c.contractName, c.artifact.Abi.Events[event]))
 		}
 	}
 
@@ -233,7 +233,7 @@ func genAbiFuncsForNestedType(name string) string {
 type render struct {
 }
 
-func (r *render) GenEvent(event *abi.Event) string {
+func (r *render) GenEvent(contractName string, event *abi.Event) string {
 	name := fmt.Sprintf(eventNameFormat, event.Name)
 
 	res := []string{}
@@ -241,26 +241,20 @@ func (r *render) GenEvent(event *abi.Event) string {
 
 	// write encode/decode functions
 	tmplStr := `
-var (
-	{{.Name}}Type = abi.MustNewEvent("{{.Type}}") //nolint:all
-)
-
 {{range .Structs}}
 	{{.}}
 {{ end }}
 
 func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
-	return decodeEvent({{.Name}}Type, log, {{.Sig}})
+	return decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
 }`
 
-	eventType := "event " + event.Name + "(" + encodeFuncTuple(event.Inputs) + ")"
-
 	inputs := map[string]interface{}{
-		"Structs": res,
-		"Type":    eventType,
-		"Sig":     strings.ToLower(string(name[0])),
-		"Name":    name,
-		"TName":   strings.Title(name),
+		"Structs":      res,
+		"Sig":          strings.ToLower(string(name[0])),
+		"Name":         name,
+		"TName":        strings.Title(name),
+		"ContractName": contractName,
 	}
 
 	return renderTmpl(tmplStr, inputs)
