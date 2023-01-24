@@ -321,6 +321,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  p.extraData,
 			GasUsed:    command.DefaultGenesisGasUsed,
+			BaseFee:    command.DefaultGenesisBaseFee,
 		},
 		Params: &chain.Params{
 			ChainID:       int(p.chainID),
@@ -331,6 +332,15 @@ func (p *genesisParams) initGenesisConfig() error {
 		Bootnodes: p.bootnodes,
 	}
 
+	for _, burntContract := range p.burntContracts {
+		block, address, err := parseBurntContractInfo(burntContract)
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Params.BurntContract[block.String()] = address.String()
+	}
+
 	// Predeploy staking smart contract if needed
 	if p.shouldPredeployStakingSC() {
 		stakingAccount, err := p.predeployStakingSC()
@@ -339,15 +349,6 @@ func (p *genesisParams) initGenesisConfig() error {
 		}
 
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
-	}
-
-	for _, burntContract := range p.burntContracts {
-		block, address, err := parseBurntContractInfo(burntContract)
-		if err != nil {
-			return err
-		}
-
-		chainConfig.Genesis.Config.BurntContract[block.String()] = address.String()
 	}
 
 	for _, premineRaw := range p.premine {
