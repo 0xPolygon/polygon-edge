@@ -1,7 +1,7 @@
 package bls
 
 import (
-	"encoding/json"
+	"encoding/base64"
 	"fmt"
 	"math/big"
 
@@ -19,21 +19,21 @@ func (p *PublicKey) Marshal() []byte {
 	return p.g2.Marshal()
 }
 
-// MarshalJSON implements the json.Marshaler interface.
-func (p *PublicKey) MarshalJSON() ([]byte, error) {
-	return json.Marshal(p.Marshal())
+// MarshalText implements the json.Marshaler interface.
+func (p *PublicKey) MarshalText() ([]byte, error) {
+	dst := base64.StdEncoding.EncodeToString(p.Marshal())
+
+	return []byte(dst), nil
 }
 
-// UnmarshalJSON implements the json.Marshaler interface.
-func (p *PublicKey) UnmarshalJSON(jsonBytes []byte) error {
-	var bytes []byte
-
-	err := json.Unmarshal(jsonBytes, &bytes)
+// UnmarshalText implements encoding.TextMarshaler interface
+func (p *PublicKey) UnmarshalText(buf []byte) error {
+	res, err := base64.StdEncoding.DecodeString(string(buf))
 	if err != nil {
 		return err
 	}
 
-	pub, err := UnmarshalPublicKey(bytes)
+	pub, err := UnmarshalPublicKey(res)
 	if err != nil {
 		return err
 	}
