@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -2727,5 +2728,75 @@ func TestSetSealing(t *testing.T) {
 				pool.getSealing(),
 			)
 		})
+	}
+}
+
+func TestBatchTx_SingleAccount(t *testing.T) {
+	t.Parallel()
+
+	_, addr := tests.GenerateKeyAndAddr(t)
+
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+
+	pool.SetSigner(&mockSigner{})
+
+	// start event handler goroutines
+	pool.Start()
+	defer pool.Close()
+
+	// subscribe to enqueue and promote events
+	subscription := pool.eventManager.subscribe([]proto.EventType{proto.EventType_ENQUEUED, proto.EventType_PROMOTED})
+	defer pool.eventManager.cancelSubscription(subscription.subscriptionID)
+
+	txHashMap := map[types.Hash]struct{}{}
+	// mutex for txHashMap
+	mux := &sync.RWMutex{}
+
+	// run max number of addTx concurrently
+	for i := 0; i < int(defaultMaxAccountEnqueued); i++ {
+		go func(i uint64) {
+			tx := newTx(addr, i, 1)
+
+			tx.ComputeHash()
+
+			// add transaction hash to map
+			mux.Lock()
+			txHashMap[tx.Hash] = struct{}{}
+			mux.Unlock()
+
+			// submit transaction to pool
+			pool.addTx(local, tx)
+		}(uint64(i))
+	}
+
+	enqueuedCount := 0
+	promotedCount := 0
+
+	// wait for all the submitted transactions to be promoted
+	for {
+		ev := <-subscription.subscriptionChannel
+
+		// check if valid transaction hash
+		mux.Lock()
+		_, hashExists := txHashMap[types.StringToHash(ev.TxHash)]
+		mux.Unlock()
+
+		assert.True(t, hashExists)
+
+		// increment corresponding event type's count
+		if ev.Type == proto.EventType_ENQUEUED {
+			enqueuedCount++
+		} else if ev.Type == proto.EventType_PROMOTED {
+			promotedCount++
+		}
+
+		if enqueuedCount == int(defaultMaxAccountEnqueued) && promotedCount == int(defaultMaxAccountEnqueued) {
+			// compare local tracker to pool internal
+			assert.Equal(t, defaultMaxAccountEnqueued, pool.Length())
+
+			// all transactions are promoted
+			break
+		}
 	}
 }
