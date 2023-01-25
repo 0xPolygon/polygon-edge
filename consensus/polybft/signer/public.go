@@ -13,23 +13,6 @@ type PublicKey struct {
 	g2 *bn256.G2
 }
 
-// Aggregate aggregates the given public key with current one
-func (p *PublicKey) Aggregate(next *PublicKey) *PublicKey {
-	newp := new(bn256.G2)
-
-	if p.g2 != nil {
-		if next.g2 != nil {
-			newp.Add(p.g2, next.g2)
-		} else {
-			newp.Set(p.g2)
-		}
-	} else if next.g2 != nil {
-		newp.Set(next.g2)
-	}
-
-	return &PublicKey{g2: newp}
-}
-
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
 	if p.g2 == nil {
@@ -104,11 +87,13 @@ func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 	return UnmarshalPublicKey(pubKeyBuf[:])
 }
 
-// aggregatePublicKeys calculates P1 + P2 + ...
-func aggregatePublicKeys(pubs []*PublicKey) *PublicKey {
+type PublicKeys []*PublicKey
+
+// Aggregate aggregates all public keys into one
+func (pks PublicKeys) Aggregate() *PublicKey {
 	newp := new(bn256.G2)
 
-	for _, x := range pubs {
+	for _, x := range pks {
 		if x.g2 != nil {
 			newp.Add(newp, x.g2)
 		}

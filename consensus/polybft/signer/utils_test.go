@@ -45,7 +45,6 @@ func Test_AggregatedSign(t *testing.T) {
 	var isOk bool
 
 	signatures := Signatures{}
-	aggSignature := new(Signature)
 
 	// test all signatures at once
 	for i := 0; i < len(keys); i++ {
@@ -54,17 +53,8 @@ func Test_AggregatedSign(t *testing.T) {
 
 		signatures = append(signatures, sign)
 
-		// verify correctness of IncludeSignature
-		aggSignature = aggSignature.Aggregate(sign)
-
-		isOk = aggSignature.VerifyAggregated(pubKeys[:i+1], validTestMsg)
-		assert.True(t, isOk)
-
-		isOk = aggSignature.VerifyAggregated(pubKeys[:i+1], invalidTestMsg)
-		assert.False(t, isOk)
-
 		// verify correctness of AggregateSignature
-		aggSig := (signatures[:i+1]).Aggregate()
+		aggSig := signatures.Aggregate()
 
 		isOk = aggSig.VerifyAggregated(pubKeys[:i+1], validTestMsg)
 		assert.True(t, isOk)

@@ -121,15 +121,16 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 
 	bmp := bitmap.Bitmap{}
 	i := uint64(0)
-	signature := &bls.Signature{}
+
+	var signatures bls.Signatures
 
 	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signature = signature.Aggregate(v.mustSign(proposalHash))
+		signatures = append(signatures, v.mustSign(proposalHash))
 		bmp.Set(i)
 		i++
 	})
 
-	aggSignature, err := signature.Marshal()
+	aggSignature, err := signatures.Aggregate().Marshal()
 	require.NoError(t, err)
 
 	extra := &Extra{Checkpoint: checkpoint}
@@ -512,15 +513,16 @@ func TestPerformExit(t *testing.T) {
 
 	bmp := bitmap.Bitmap{}
 	i := uint64(0)
-	signature := &bls.Signature{}
+
+	var signatures bls.Signatures
 
 	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signature = signature.Aggregate(v.mustSign(checkpointHash[:]))
+		signatures = append(signatures, v.mustSign(checkpointHash[:]))
 		bmp.Set(i)
 		i++
 	})
 
-	aggSignature, err := signature.Marshal()
+	aggSignature, err := signatures.Aggregate().Marshal()
 	require.NoError(t, err)
 
 	extra := &Extra{

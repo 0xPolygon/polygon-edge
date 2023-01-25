@@ -24,26 +24,7 @@ func (s *Signature) Verify(pub *PublicKey, message []byte) bool {
 
 // VerifyAggregated checks the BLS signature of the message against the aggregated public keys of its signers
 func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg []byte) bool {
-	aggPubs := aggregatePublicKeys(publicKeys)
-
-	return s.Verify(aggPubs, msg)
-}
-
-// Aggregate adds the given signatures
-func (s *Signature) Aggregate(next *Signature) *Signature {
-	newp := new(bn256.G1)
-
-	if s.g1 != nil {
-		if next.g1 != nil {
-			newp.Add(s.g1, next.g1)
-		} else {
-			newp.Set(s.g1)
-		}
-	} else if next.g1 != nil {
-		newp.Set(next.g1)
-	}
-
-	return &Signature{g1: newp}
+	return s.Verify(PublicKeys(publicKeys).Aggregate(), msg)
 }
 
 // Marshal the signature to bytes.
@@ -86,7 +67,7 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 // Signatures is a slice of signatures
 type Signatures []*Signature
 
-// Aggregate sums the given array of signatures
+// Aggregate aggregates all signatures into one
 func (sigs Signatures) Aggregate() *Signature {
 	g1 := new(bn256.G1)
 

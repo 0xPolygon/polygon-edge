@@ -42,15 +42,13 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 	sig3, err := bls3.Sign(validTestMsg)
 	require.NoError(t, err)
 
-	verified := sig1.Aggregate(sig2).
-		Aggregate(sig3).Aggregate(&Signature{}).
-		Verify(bls1.PublicKey().Aggregate(bls2.PublicKey()).
-			Aggregate(bls3.PublicKey()).Aggregate(&PublicKey{}), validTestMsg)
+	signatures := Signatures{sig1, sig2, sig3, &Signature{}}
+	publicKeys := PublicKeys{bls1.PublicKey(), bls2.PublicKey(), bls3.PublicKey(), &PublicKey{}}
+
+	verified := signatures.Aggregate().Verify(publicKeys.Aggregate(), validTestMsg)
 	assert.True(t, verified)
 
-	notVerified := sig1.Aggregate(sig2).
-		Aggregate(sig3).
-		Verify(bls1.PublicKey().Aggregate(bls2.PublicKey()).Aggregate(bls3.PublicKey()), invalidTestMsg)
+	notVerified := signatures.Aggregate().Verify(publicKeys.Aggregate(), invalidTestMsg)
 	assert.False(t, notVerified)
 }
 
@@ -68,58 +66,26 @@ func Test_AggregatedSignature(t *testing.T) {
 		allPubs[i] = key.PublicKey()
 	}
 
-	aggPubs := aggregatePublicKeys(allPubs)
-	allSignatures := Signatures{}
+	var (
+		publicKeys PublicKeys
+		signatures Signatures
+	)
 
-	var manuallyAggSignature *Signature
-
-	for i, key := range blsKeys {
+	for _, key := range blsKeys {
 		signature, err := key.Sign(validTestMsg)
 		require.NoError(t, err)
 
-		allSignatures = append(allSignatures, signature)
-		if i == 0 {
-			manuallyAggSignature = allSignatures[i]
-		} else {
-			manuallyAggSignature = manuallyAggSignature.Aggregate(allSignatures[i])
-		}
+		signatures = append(signatures, signature)
+		publicKeys = append(publicKeys, key.PublicKey())
 	}
 
-	aggSignature := allSignatures.Aggregate()
+	aggSignature := signatures.Aggregate()
+	aggPubs := publicKeys.Aggregate()
 
-	var manuallyAggPubs *PublicKey
-
-	for i, pubKey := range allPubs {
-		if i == 0 {
-			manuallyAggPubs = pubKey
-		} else {
-			manuallyAggPubs = manuallyAggPubs.Aggregate(pubKey)
-		}
-	}
-
-	verifed := manuallyAggSignature.Verify(manuallyAggPubs, validTestMsg)
-	assert.True(t, verifed)
-
-	verifed = manuallyAggSignature.Verify(manuallyAggPubs, invalidTestMsg)
-	assert.False(t, verifed)
-
-	verifed = manuallyAggSignature.Verify(aggPubs, validTestMsg)
-	assert.True(t, verifed)
-
-	verifed = manuallyAggSignature.Verify(aggPubs, invalidTestMsg)
-	assert.False(t, verifed)
-
-	verifed = aggSignature.Verify(manuallyAggPubs, validTestMsg)
-	assert.True(t, verifed)
-
-	verifed = aggSignature.Verify(manuallyAggPubs, invalidTestMsg)
-	assert.False(t, verifed)
-
-	verifed = aggSignature.Verify(aggPubs, validTestMsg)
-	assert.True(t, verifed)
-
-	verifed = aggSignature.Verify(aggPubs, invalidTestMsg)
-	assert.False(t, verifed)
+	assert.True(t, aggSignature.Verify(aggPubs, validTestMsg))
+	assert.False(t, aggSignature.Verify(aggPubs, invalidTestMsg))
+	assert.True(t, aggSignature.VerifyAggregated([]*PublicKey(publicKeys), validTestMsg))
+	assert.False(t, aggSignature.VerifyAggregated([]*PublicKey(publicKeys), invalidTestMsg))
 }
 
 func TestSignature_BigInt(t *testing.T) {
