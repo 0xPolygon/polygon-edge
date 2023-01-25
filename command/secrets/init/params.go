@@ -96,9 +96,9 @@ func (ip *initParams) parseConfig() error {
 
 func (ip *initParams) initLocalSecretsManager() error {
 	if !ip.insecureLocalStore {
-		//storing secrets on a local file system should only be allowed with --insecure flag
-		//to raise awareness that it should be only used in development/testing
-		//production environment should use one of the supported secrets managers
+		//Storing secrets on a local file system should only be allowed with --insecure flag,
+		//to raise awareness that it should be only used in development/testing environments.
+		//Production setups should use one of the supported secrets managers
 		return errSecureLocalStoreNotImplemented
 	}
 
