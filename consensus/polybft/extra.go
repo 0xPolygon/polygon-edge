@@ -534,12 +534,11 @@ func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash type
 // ValidateBasic encapsulates basic validation logic for checkpoint data.
 // It only checks epoch numbers validity and whether validators hashes are non-empty.
 func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
-	if c.EpochNumber != parentCheckpoint.EpochNumber {
-		if c.EpochNumber != parentCheckpoint.EpochNumber+1 {
-			// epoch-beginning block
-			// epoch number must be incremented by one compared to parent block's checkpoint
-			return fmt.Errorf("invalid epoch number for epoch-beginning block")
-		}
+	if c.EpochNumber != parentCheckpoint.EpochNumber &&
+		c.EpochNumber != parentCheckpoint.EpochNumber+1 {
+		// epoch-beginning block
+		// epoch number must be incremented by one compared to parent block's checkpoint
+		return fmt.Errorf("invalid epoch number for epoch-beginning block")
 	}
 
 	if c.CurrentValidatorsHash == types.ZeroHash {
@@ -581,12 +580,11 @@ func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 	}
 
 	// epoch ending blocks have validator set transitions
-	if !currentValidators.Equals(nextValidators) {
+	if !currentValidators.Equals(nextValidators) &&
+		c.EpochNumber != parentCheckpoint.EpochNumber {
 		// epoch ending blocks should have the same epoch number as parent block
 		// (as they belong to the same epoch)
-		if c.EpochNumber != parentCheckpoint.EpochNumber {
-			return fmt.Errorf("epoch number should not change for epoch-ending block")
-		}
+		return fmt.Errorf("epoch number should not change for epoch-ending block")
 	}
 
 	return nil
