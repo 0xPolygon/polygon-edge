@@ -2,6 +2,7 @@ package bls
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
@@ -56,9 +57,18 @@ func UnmarshalSignature(raw []byte) (*Signature, error) {
 	}
 
 	g1 := new(bn256.G1)
-
 	if _, err := g1.Unmarshal(raw); err != nil {
 		return nil, err
+	}
+
+	// check if it is the point at infinity
+	if g1.IsInfinity() {
+		return nil, errInfinityPoint
+	}
+
+	// check if not part of the subgroup
+	if !g1.InCorrectSubgroup() {
+		return nil, fmt.Errorf("incorrect subgroup")
 	}
 
 	return &Signature{g1: g1}, nil

@@ -2,6 +2,7 @@ package bls
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -36,12 +37,12 @@ func (p *PublicKey) UnmarshalJSON(jsonBytes []byte) error {
 		return err
 	}
 
-	g2 := new(bn256.G2)
-	if _, err := g2.Unmarshal(bytes); err != nil {
+	pub, err := UnmarshalPublicKey(bytes)
+	if err != nil {
 		return err
 	}
 
-	p.g2 = g2
+	p.g2 = pub.g2
 
 	return nil
 }
@@ -67,6 +68,16 @@ func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
 
 	if _, err := g2.Unmarshal(data); err != nil {
 		return nil, err
+	}
+
+	// check if it is the point at infinity
+	if g2.IsInfinity() {
+		return nil, errInfinityPoint
+	}
+
+	// check if not part of the subgroup
+	if !g2.InCorrectSubgroup() {
+		return nil, fmt.Errorf("incorrect subgroup")
 	}
 
 	return &PublicKey{g2: g2}, nil

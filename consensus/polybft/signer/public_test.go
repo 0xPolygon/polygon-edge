@@ -58,3 +58,8 @@ func TestPublic_MarshalUnmarshalJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, pubKey, newPubKey)
 }
+
+func TestPublicKey_UnmarshalInfinityPoint(t *testing.T) {
+	_, err := UnmarshalPublicKey(make([]byte, 128))
+	require.Error(t, err, errInfinityPoint)
+}

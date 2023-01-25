@@ -3,11 +3,14 @@ package bls
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
+
+var errInfinityPoint = fmt.Errorf("infinity point")
 
 var (
 	// negated g2 point

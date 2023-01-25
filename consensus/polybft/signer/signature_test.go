@@ -129,6 +129,11 @@ func TestSignature_Unmarshal(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestSignature_UnmarshalInfinityPoint(t *testing.T) {
+	_, err := UnmarshalSignature(make([]byte, 64))
+	require.Error(t, err, errInfinityPoint)
+}
+
 // testGenRandomBytes generates byte array with random data
 func testGenRandomBytes(t *testing.T, size int) (blk []byte) {
 	t.Helper()
