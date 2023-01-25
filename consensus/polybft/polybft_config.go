@@ -11,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -190,7 +191,7 @@ func (m *Manifest) Save(manifestPath string) error {
 		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
 	}
 
-	if err := os.WriteFile(filepath.Clean(manifestPath), data, os.ModePerm); err != nil {
+	if err := common.CreateFileSafe(filepath.Clean(manifestPath), data, 0660, false); err != nil {
 		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
 	}
 

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
 )
 
@@ -53,7 +54,7 @@ func writeDataStore(path string, obj interface{}) error {
 		return err
 	}
 
-	if err := os.WriteFile(path, data, os.ModePerm); err != nil {
+	if err := common.CreateFileSafe(path, data, 0660, false); err != nil {
 		return err
 	}
 
