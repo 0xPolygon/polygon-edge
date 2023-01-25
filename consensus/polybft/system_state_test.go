@@ -191,6 +191,9 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
+		BurntContract: map[string]string{
+			"0": types.ZeroAddress.String(), // TODO: Deploy real address if needed
+		},
 	}, st, hclog.NewNullLogger())
 
 	rootHash := ex.WriteGenesis(alloc)
