@@ -22,7 +22,10 @@ var (
 	errInvalidConfig                  = errors.New("invalid secrets configuration")
 	errInvalidParams                  = errors.New("no config file or data directory passed in")
 	errUnsupportedType                = errors.New("unsupported secrets manager")
-	errSecureLocalStoreNotImplemented = errors.New("secure local store not yet implemented")
+	errSecureLocalStoreNotImplemented = errors.New(
+		"use a secrets backend, or supply an --insecure flag " +
+			"to store the private keys locally on the filesystem, " +
+			"avoid doing so in production")
 )
 
 type initParams struct {
@@ -93,7 +96,9 @@ func (ip *initParams) parseConfig() error {
 
 func (ip *initParams) initLocalSecretsManager() error {
 	if !ip.insecureLocalStore {
-		//TODO: implement encryption mechanism for local secrets manager
+		//storing secrets on a local file system should only be allowed with --insecure flag
+		//to raise awareness that it should be only used in development/testing
+		//production environment should use one of the supported secrets managers
 		return errSecureLocalStoreNotImplemented
 	}
 
