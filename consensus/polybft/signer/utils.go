@@ -3,13 +3,11 @@ package bls
 import (
 	"crypto/rand"
 	"math/big"
-
-	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
 // GenerateBlsKey creates a random private and its corresponding public keys
 func GenerateBlsKey() (*PrivateKey, error) {
-	s, err := rand.Int(rand.Reader, bn256.Order)
+	s, err := randomK(rand.Reader)
 	if err != nil {
 		return nil, err
 	}

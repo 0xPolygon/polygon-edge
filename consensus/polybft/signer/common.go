@@ -1,7 +1,10 @@
 package bls
 
 import (
+	"crypto/rand"
 	"encoding/hex"
+	"io"
+	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
@@ -35,4 +38,15 @@ func mustG2Point(str string) *bn256.G2 {
 // Returns bls/bn254 domain
 func GetDomain() []byte {
 	return domain
+}
+
+func randomK(r io.Reader) (k *big.Int, err error) {
+	for {
+		k, err = rand.Int(r, bn256.Order)
+		if k.Sign() > 0 || err != nil {
+			// The key cannot ever be zero, otherwise the cryptographic properties
+			// of the curve do not hold.
+			return
+		}
+	}
 }
