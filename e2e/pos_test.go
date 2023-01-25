@@ -120,6 +120,7 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 			config.SetIBFTPoS(true)
 			config.SetMinValidatorCount(minValidatorCount)
 			config.SetMaxValidatorCount(maxValidatorCount)
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		})
 
 	t.Cleanup(func() {
@@ -181,6 +182,7 @@ func TestPoS_Stake(t *testing.T) {
 			config.PremineValidatorBalance(defaultBalance)
 			config.Premine(stakerAddr, defaultBalance)
 			config.SetIBFTPoS(true)
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		})
 
 	t.Cleanup(func() {
@@ -244,6 +246,7 @@ func TestPoS_Unstake(t *testing.T) {
 			config.SetEpochSize(2) // Need to leave room for the endblock
 			config.PremineValidatorBalance(defaultBalance)
 			config.SetIBFTPoS(true)
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		})
 
 	t.Cleanup(func() {
@@ -769,6 +772,7 @@ func TestSnapshotUpdating(t *testing.T) {
 			config.SetEpochSize(epochSize)
 			config.Premine(faucetAddr, defaultBalance)
 			config.SetIBFTPoS(true)
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		})
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

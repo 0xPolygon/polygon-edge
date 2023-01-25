@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/types"
+
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/validators"
 )
@@ -32,6 +34,8 @@ func TestClusterBlockSync(t *testing.T) {
 					config.SetIBFTDirPrefix(dirPrefix)
 					config.SetIBFTDir(fmt.Sprintf("%s%d", dirPrefix, i))
 				}
+
+				config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 			})
 
 		startContext, startCancelFn := context.WithTimeout(context.Background(), time.Minute)

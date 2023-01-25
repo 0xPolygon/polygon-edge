@@ -37,6 +37,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
 			config.PremineValidatorBalance(defaultBalance)
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		})
 
 	// Set switch configuration into genesis.json

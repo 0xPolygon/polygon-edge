@@ -52,6 +52,7 @@ func TestGenesisBlockGasLimit(t *testing.T) {
 				func(i int, config *framework.TestServerConfig) {
 					config.Premine(addr, framework.EthToWei(10))
 					config.SetBlockTime(1)
+					config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 
 					if testCase.blockGasLimit != 0 {
 						config.SetBlockLimit(testCase.blockGasLimit)
@@ -214,6 +215,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 					groups.String(),
 				},
 			})
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		},
 	)
 

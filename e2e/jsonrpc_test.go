@@ -31,6 +31,7 @@ func TestJsonRPC(t *testing.T) {
 		func(i int, config *framework.TestServerConfig) {
 			config.Premine(types.Address(fund.Address()), framework.EthToWei(10))
 			config.SetBlockTime(1)
+			config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 		},
 	)
 

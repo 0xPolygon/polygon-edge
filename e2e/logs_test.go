@@ -32,6 +32,7 @@ func TestNewFilter_Logs(t *testing.T) {
 				config.SetValidatorType(validatorType)
 				config.Premine(addr, framework.EthToWei(10))
 				config.SetBlockTime(1)
+				config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 			},
 		)
 
@@ -115,6 +116,7 @@ func TestNewFilter_Block(t *testing.T) {
 				config.SetValidatorType(validatorType)
 				config.Premine(from, framework.EthToWei(10))
 				config.SetBlockTime(1)
+				config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 			},
 		)
 
@@ -185,6 +187,7 @@ func TestFilterValue(t *testing.T) {
 				config.SetValidatorType(validatorType)
 				config.Premine(addr, framework.EthToWei(10))
 				config.SetBlockTime(1)
+				config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 			},
 		)
 

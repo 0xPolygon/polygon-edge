@@ -129,6 +129,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				IBFTDirPrefix,
 				func(i int, config *framework.TestServerConfig) {
 					config.Premine(senderAddr, framework.EthToWei(10))
+					config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 				})
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)

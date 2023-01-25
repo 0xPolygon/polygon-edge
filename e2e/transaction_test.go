@@ -364,6 +364,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 				config.SetValidatorType(validatorType)
 				config.Premine(sender, defaultBalance)
 				config.SetBlockLimit(20000000)
+				config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 			})
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
