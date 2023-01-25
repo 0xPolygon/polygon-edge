@@ -142,9 +142,17 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
+// ValidateBasic contains extra data basic set of validations
+func (i *Extra) ValidateBasic(parentExtra *Extra) error {
+	if err := i.Checkpoint.ValidateBasic(parentExtra.Checkpoint); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Validate contains extra data validation logic
-func (i *Extra) Validate(header *types.Header, parentExtra *Extra,
-	currentValidators AccountSet, nextValidators AccountSet) error {
+func (i *Extra) Validate(parentExtra *Extra, currentValidators AccountSet, nextValidators AccountSet) error {
 	if err := i.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators); err != nil {
 		return err
 	}
@@ -523,9 +531,9 @@ func (c *CheckpointData) Hash(chainID uint64, blockNumber uint64, blockHash type
 	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
 }
 
-// Validate encapsulates validation logic for checkpoint data
-func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
-	currentValidators AccountSet, nextValidators AccountSet) error {
+// ValidateBasic encapsulates basic validation logic for checkpoint data.
+// It only checks epoch numbers validity and whether validators hashes are non-empty.
+func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
 	if c.EpochNumber != parentCheckpoint.EpochNumber {
 		if c.EpochNumber != parentCheckpoint.EpochNumber+1 {
 			// epoch-beginning block
@@ -542,8 +550,14 @@ func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 		return fmt.Errorf("next validators hash must not be empty")
 	}
 
-	if currentValidators == nil || nextValidators == nil {
-		return nil
+	return nil
+}
+
+// Validate encapsulates validation logic for checkpoint data
+func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
+	currentValidators AccountSet, nextValidators AccountSet) error {
+	if err := c.ValidateBasic(parentCheckpoint); err != nil {
+		return err
 	}
 
 	// check if currentValidatorsHash, present in CheckpointData is correct

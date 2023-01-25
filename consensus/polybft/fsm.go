@@ -271,12 +271,13 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	if err := currentExtra.Validate(block.Header, parentExtra, currentValidators, nextValidators); err != nil {
+	if err := currentExtra.Validate(parentExtra, currentValidators, nextValidators); err != nil {
 		return err
 	}
 
 	// TODO: Validate validator set delta?
 
+	// TODO: Move signature validation logic to Extra
 	blockNumber := block.Number()
 	if blockNumber > 1 {
 		// verify parent signature
