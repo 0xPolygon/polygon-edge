@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -33,6 +34,7 @@ func TestDiscovery(t *testing.T) {
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
+		config.SetBurntContract(0, types.ZeroAddress)
 	}
 
 	for _, tt := range tests {

@@ -340,6 +340,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyValidators), senderAddr))
 		config.SetIBFTPoS(true)
 		config.SetBlockLimit(5000000000)
+		config.SetBurntContract(0, types.ZeroAddress)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -485,6 +486,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		// This call will add numDummyStakers + 1 staking address to the staking SC.
 		// This is done in order to pump the stakedAmount value on the staking SC
 		config.SetDevStakingAddresses(append(generateStakingAddresses(numDummyStakers), senderAddr))
+		config.SetBurntContract(0, types.ZeroAddress)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
@@ -623,6 +625,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 		config.SetBlockLimit(blockGasLimit)
 		config.SetDevStakingAddresses(generateStakingAddresses(numDummyStakers))
 		config.SetIBFTPoS(true)
+		config.SetBurntContract(0, types.ZeroAddress)
 	})
 	srv := srvs[0]
 	client := srv.JSONRPC()
