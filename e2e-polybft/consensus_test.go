@@ -126,7 +126,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		&e2eStateProvider{txRelayer: txRelayer})
 
 	// create new account
-	require.NoError(t, cluster.InitSecrets(newValidatorSecrets, 1))
+	_, err = cluster.InitSecrets(newValidatorSecrets, 1)
+	require.NoError(t, err)
 
 	// assert that account is created
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
@@ -215,7 +216,9 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	defer cluster.Stop()
 
 	// init delegator account
-	require.NoError(t, cluster.InitSecrets(delegatorSecrets, 1))
+	_, err = cluster.InitSecrets(delegatorSecrets, 1)
+	require.NoError(t, err)
+
 	srv := cluster.Servers[0]
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
