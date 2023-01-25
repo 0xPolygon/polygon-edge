@@ -337,6 +337,18 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
+	// add base fee
+	if t.Config.BaseFee != 0 {
+		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
+	}
+
+	// add burnt contracts
+	if len(t.Config.BurntContracts) != 0 {
+		for block, addr := range t.Config.BurntContracts {
+			args = append(args, "--burnt-contract", fmt.Sprintf("%d:%s", block, addr))
+		}
+	}
+
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 
@@ -420,18 +432,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 	if t.Config.ShowsLog || t.Config.SaveLogs {
 		args = append(args, "--log-level", "debug")
-	}
-
-	// add base fee
-	if t.Config.BaseFee != 0 {
-		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
-	}
-
-	// add burnt contracts
-	if len(t.Config.BurntContracts) != 0 {
-		for block, addr := range t.Config.BurntContracts {
-			args = append(args, "--burnt-contract", fmt.Sprintf("%d:%s", block, addr))
-		}
 	}
 
 	// add block gas target
