@@ -422,6 +422,18 @@ func (t *TestServer) Start(ctx context.Context) error {
 		args = append(args, "--log-level", "debug")
 	}
 
+	// add base fee
+	if t.Config.BaseFee != 0 {
+		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
+	}
+
+	// add burnt contracts
+	if len(t.Config.BurntContracts) != 0 {
+		for block, addr := range t.Config.BurntContracts {
+			args = append(args, "--burnt-contract", fmt.Sprintf("%d:%s", block, addr))
+		}
+	}
+
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))

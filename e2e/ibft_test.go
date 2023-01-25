@@ -60,6 +60,7 @@ func TestIbft_Transfer(t *testing.T) {
 					config.SetBlockTime(tc.blockTime)
 					config.SetIBFTBaseTimeout(tc.ibftBaseTimeout)
 					config.SetValidatorType(tc.validatorType)
+					config.SetBurntContract(0, types.ZeroAddress) // TODO:  Deploy test contract
 				},
 			)
 

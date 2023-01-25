@@ -50,6 +50,7 @@ type TestServerConfig struct {
 	EpochSize               uint64                   // The epoch size in blocks for the IBFT layer
 	BlockGasLimit           uint64                   // Block gas limit
 	BlockGasTarget          uint64                   // Gas target for new blocks
+	BaseFee                 uint64                   // Initial base fee
 	ShowsLog                bool                     // Flag specifying if logs are shown
 	Name                    string                   // Name of the server
 	SaveLogs                bool                     // Flag specifying if logs are saved
@@ -61,6 +62,7 @@ type TestServerConfig struct {
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
 	PredeployParams         *PredeployParams
+	BurntContracts          map[uint64]types.Address
 }
 
 func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
@@ -116,6 +118,20 @@ func (t *TestServerConfig) PremineValidatorBalance(balance *big.Int) {
 // SetBlockGasTarget sets the gas target for the test server
 func (t *TestServerConfig) SetBlockGasTarget(target uint64) {
 	t.BlockGasTarget = target
+}
+
+// SetBaseFee sets the given base fee for the test server
+func (t *TestServerConfig) SetBaseFee(baseFee uint64) {
+	t.BaseFee = baseFee
+}
+
+// SetBurntContract sets the given burnt contract for the test server
+func (t *TestServerConfig) SetBurntContract(block uint64, address types.Address) {
+	if t.BurntContracts == nil {
+		t.BurntContracts = map[uint64]types.Address{}
+	}
+
+	t.BurntContracts[block] = address
 }
 
 // SetConsensus callback sets consensus
