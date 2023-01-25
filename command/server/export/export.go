@@ -76,7 +76,7 @@ func generateConfig(config config.Config) error {
 		data,
 		0660,
 		false); err != nil {
-		return errors.New("could not create and write config file")
+		return fmt.Errorf("failed to create config file %w", err)
 	}
 
 	return nil
