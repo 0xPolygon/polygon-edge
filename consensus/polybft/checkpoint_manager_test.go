@@ -36,7 +36,9 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 		epochSize   = 2
 	)
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
+	var aliases = []string{"A", "B", "C", "D", "E"}
+
+	validators := newTestValidatorsWithAliases(aliases)
 	validatorsMetadata := validators.getPublicIdentities()
 	txRelayerMock := newDummyTxRelayer(t)
 	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
@@ -52,8 +54,21 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 	var (
 		headersMap  = &testHeadersMap{}
 		epochNumber = uint64(1)
+		dummyMsg    = []byte("checkpoint")
+		idx         = uint64(0)
 		header      *types.Header
+		bitmap      bitmap.Bitmap
+		signatures  bls.Signatures
 	)
+
+	validators.iterAcct(aliases, func(t *testValidator) {
+		bitmap.Set(idx)
+		signatures = append(signatures, t.mustSign(dummyMsg))
+		idx++
+	})
+
+	signature, err := signatures.Aggregate().Marshal()
+	require.NoError(t, err)
 
 	for i := uint64(1); i <= blocksCount; i++ {
 		if i%epochSize == 1 {
@@ -65,6 +80,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 			}
 			extra := createTestExtraObject(validatorsMetadata, validatorsMetadata, 3, 3, 3)
 			extra.Checkpoint = checkpoint
+			extra.Committed = &Signature{Bitmap: bitmap, AggregatedSignature: signature}
 			header = &types.Header{
 				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 			}
@@ -91,7 +107,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 		logger:           hclog.NewNullLogger(),
 	}
 
-	err := c.submitCheckpoint(headersMap.getHeader(blocksCount), false)
+	err = c.submitCheckpoint(headersMap.getHeader(blocksCount), false)
 	require.NoError(t, err)
 	txRelayerMock.AssertExpectations(t)
 

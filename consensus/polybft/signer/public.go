@@ -46,9 +46,6 @@ func (p *PublicKey) UnmarshalJSON(jsonBytes []byte) error {
 // ToBigInt converts public key to 4 big ints
 func (p *PublicKey) ToBigInt() [4]*big.Int {
 	blsKey := p.Marshal()
-	if len(blsKey) != 128 {
-		return [4]*big.Int{}
-	}
 
 	return [4]*big.Int{
 		new(big.Int).SetBytes(blsKey[32:64]),
