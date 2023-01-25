@@ -1,7 +1,6 @@
 package bls
 
 import (
-	"errors"
 	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
@@ -22,16 +21,7 @@ func (p *PrivateKey) PublicKey() *PublicKey {
 
 // MarshalJSON marshal the key to json bytes.
 func (p *PrivateKey) MarshalJSON() ([]byte, error) {
-	if p.s == nil {
-		return nil, errors.New("cannot marshal empty private key")
-	}
-
 	return p.s.MarshalJSON()
-}
-
-// Marshal marshal the key to bytes.
-func (p *PrivateKey) Marshal() ([]byte, error) {
-	return p.s.Bytes(), nil
 }
 
 // Sign generates a simple BLS signature of the given message

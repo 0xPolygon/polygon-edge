@@ -42,8 +42,8 @@ func Test_AggregatedSignatureSimple(t *testing.T) {
 	sig3, err := bls3.Sign(validTestMsg)
 	require.NoError(t, err)
 
-	signatures := Signatures{sig1, sig2, sig3, &Signature{}}
-	publicKeys := PublicKeys{bls1.PublicKey(), bls2.PublicKey(), bls3.PublicKey(), &PublicKey{}}
+	signatures := Signatures{sig1, sig2, sig3}
+	publicKeys := PublicKeys{bls1.PublicKey(), bls2.PublicKey(), bls3.PublicKey()}
 
 	verified := signatures.Aggregate().Verify(publicKeys.Aggregate(), validTestMsg)
 	assert.True(t, verified)

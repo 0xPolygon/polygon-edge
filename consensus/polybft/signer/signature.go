@@ -30,10 +30,6 @@ func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg []byte) bool {
 
 // Marshal the signature to bytes.
 func (s *Signature) Marshal() ([]byte, error) {
-	if s.g1 == nil {
-		return nil, errors.New("cannot marshal empty signature")
-	}
-
 	return s.g1.Marshal(), nil
 }
 
@@ -82,9 +78,7 @@ func (sigs Signatures) Aggregate() *Signature {
 	g1 := new(bn256.G1)
 
 	for _, sig := range sigs {
-		if sig.g1 != nil {
-			g1.Add(g1, sig.g1)
-		}
+		g1.Add(g1, sig.g1)
 	}
 
 	return &Signature{g1: g1}

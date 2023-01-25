@@ -16,10 +16,6 @@ type PublicKey struct {
 
 // Marshal marshal the key to bytes.
 func (p *PublicKey) Marshal() []byte {
-	if p.g2 == nil {
-		return nil
-	}
-
 	return p.g2.Marshal()
 }
 
@@ -88,14 +84,19 @@ func UnmarshalPublicKey(data []byte) (*PublicKey, error) {
 func UnmarshalPublicKeyFromBigInt(b [4]*big.Int) (*PublicKey, error) {
 	const size = 32
 
-	var pubKeyBuf [size * 4]byte
+	var pubKeyBuf []byte
 
-	copy(pubKeyBuf[:], common.PadLeftOrTrim(b[1].Bytes(), size))
-	copy(pubKeyBuf[size:], common.PadLeftOrTrim(b[0].Bytes(), size))
-	copy(pubKeyBuf[size*2:], common.PadLeftOrTrim(b[3].Bytes(), size))
-	copy(pubKeyBuf[size*3:], common.PadLeftOrTrim(b[2].Bytes(), size))
+	pt1 := common.PadLeftOrTrim(b[1].Bytes(), size)
+	pt2 := common.PadLeftOrTrim(b[0].Bytes(), size)
+	pt3 := common.PadLeftOrTrim(b[3].Bytes(), size)
+	pt4 := common.PadLeftOrTrim(b[2].Bytes(), size)
 
-	return UnmarshalPublicKey(pubKeyBuf[:])
+	pubKeyBuf = append(pubKeyBuf, pt1...)
+	pubKeyBuf = append(pubKeyBuf, pt2...)
+	pubKeyBuf = append(pubKeyBuf, pt3...)
+	pubKeyBuf = append(pubKeyBuf, pt4...)
+
+	return UnmarshalPublicKey(pubKeyBuf)
 }
 
 type PublicKeys []*PublicKey
@@ -105,9 +106,7 @@ func (pks PublicKeys) Aggregate() *PublicKey {
 	newp := new(bn256.G2)
 
 	for _, x := range pks {
-		if x.g2 != nil {
-			newp.Add(newp, x.g2)
-		}
+		newp.Add(newp, x.g2)
 	}
 
 	return &PublicKey{g2: newp}
