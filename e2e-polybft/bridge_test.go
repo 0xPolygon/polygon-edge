@@ -626,43 +626,40 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	// waiting two epochs, so that some rewards get accumulated
 	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
 
-	queryValidators := func(handler func(idx int, validatorInfo *validatorInfo)) {
+	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
 		for i, validatorAddr := range votingPowerChangeValidators {
 			// query validator info
-			validatorInfoRaw, err := sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
+			validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
 			require.NoError(t, err)
 
-			rewards := validatorInfoRaw["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
-			totalStake := validatorInfoRaw["totalStake"].(*big.Int)       //nolint:forcetypeassert
-
-			handler(i, &validatorInfo{address: validatorAddr, rewards: rewards, totalStake: totalStake})
+			handler(i, validatorInfo)
 		}
 	}
 
-	originalValidatorStorage := make(map[ethgo.Address]*validatorInfo, votingPowerChanges)
+	originalValidatorStorage := make(map[ethgo.Address]*polybft.ValidatorInfo, votingPowerChanges)
 
-	queryValidators(func(idx int, validator *validatorInfo) {
+	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
 		t.Logf("[Validator#%d] Voting power (original)=%d, rewards=%d\n",
-			idx+1, validator.totalStake, validator.rewards)
+			idx+1, validator.TotalStake, validator.WithdrawableRewards)
 
-		originalValidatorStorage[validator.address] = validator
+		originalValidatorStorage[validator.Address] = validator
 
 		// stake rewards
-		require.NoError(t, cluster.Servers[idx].Stake(validator.rewards.Uint64()))
+		require.NoError(t, cluster.Servers[idx].Stake(validator.WithdrawableRewards.Uint64()))
 	})
 
 	// wait a two more epochs, so that stake is registered and two more checkpoints are sent.
 	// Blocks are still produced, although voting power is slightly changed.
 	require.NoError(t, cluster.WaitForBlock(finalBlockNumber, 1*time.Minute))
 
-	queryValidators(func(idx int, validator *validatorInfo) {
-		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.totalStake)
+	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
+		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.TotalStake)
 
-		previousValidatorInfo := originalValidatorStorage[validator.address]
-		stakedAmount := new(big.Int).Add(previousValidatorInfo.rewards, previousValidatorInfo.totalStake)
+		previousValidatorInfo := originalValidatorStorage[validator.Address]
+		stakedAmount := new(big.Int).Add(previousValidatorInfo.WithdrawableRewards, previousValidatorInfo.TotalStake)
 
 		// assert that total stake has increased by staked amount
-		require.Equal(t, stakedAmount, validator.totalStake)
+		require.Equal(t, stakedAmount, validator.TotalStake)
 	})
 
 	l1Sender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
