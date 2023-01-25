@@ -135,7 +135,12 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 		amounts[i] = fmt.Sprintf("%d", 100)
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...), framework.WithEpochSize(30))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithPremine(premine[:]...),
+		framework.WithEpochSize(30),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
@@ -304,6 +309,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithPremine(accountAddress...),
 		framework.WithEpochSize(epochSize),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
 	)
 
 	defer cluster.Stop()
@@ -404,6 +410,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithPremine(accountAddress...),
 		framework.WithEpochSize(epochSize),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
 	)
 
 	defer cluster.Stop()
@@ -598,7 +605,9 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithEpochSize(5),
-		framework.WithEpochReward(1000))
+		framework.WithEpochReward(1000),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// load manifest file
