@@ -85,7 +85,9 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 	clusterSize := 5
 	bulkToDrop := 3
 
-	cluster := framework.NewTestCluster(t, clusterSize)
+	cluster := framework.NewTestCluster(t, clusterSize,
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// wait for cluster to start

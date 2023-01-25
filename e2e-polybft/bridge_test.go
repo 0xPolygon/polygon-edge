@@ -218,7 +218,11 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
 	// spin up a cluster with epoch size set to 5 blocks
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithEpochSize(5))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithEpochSize(5),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// initialize tx relayer used to query CheckpointManager smart contract
