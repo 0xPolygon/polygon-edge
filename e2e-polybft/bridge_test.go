@@ -321,7 +321,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	require.NoError(t, err)
 
 	// deploy L1ExitTest contract
-	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.L1ExitTestBytecode},
+	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.L1DummyStateReceiver.Bytecode},
 		rootchainHelper.GetRootchainAdminKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
@@ -421,7 +421,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	require.NoError(t, err)
 
 	// deploy L1ExitTest contract
-	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.L1ExitTestBytecode},
+	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.L1DummyStateReceiver.Bytecode},
 		rootchainHelper.GetRootchainAdminKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
