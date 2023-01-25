@@ -20,7 +20,10 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	sender, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(sender.Address())))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithPremine(types.Address(sender.Address())),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
@@ -86,7 +89,10 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	require.NoError(t, err)
 
 	// first account should have some matics premined
-	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(premine.Address())))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithPremine(types.Address(premine.Address())),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))

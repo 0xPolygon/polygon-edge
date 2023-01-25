@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
@@ -23,7 +25,9 @@ func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 10,
 		framework.WithValidatorSnapshot(validatorCount),
 		framework.WithNonValidators(nonValidatorCount),
-		framework.WithBootnodeCount(1))
+		framework.WithBootnodeCount(1),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	ctx := context.Background()

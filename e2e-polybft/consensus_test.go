@@ -19,7 +19,10 @@ import (
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 7,
-		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
+		framework.WithNonValidators(2),
+		framework.WithValidatorSnapshot(5),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	require.NoError(t, cluster.WaitForBlock(22, 1*time.Minute))
@@ -29,7 +32,10 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 	// one non-validator node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
 	cluster := framework.NewTestCluster(t, 7,
-		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
+		framework.WithNonValidators(2),
+		framework.WithValidatorSnapshot(5),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// wait for the start
@@ -52,7 +58,10 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 func TestE2E_Consensus_Sync(t *testing.T) {
 	// one node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, 6, framework.WithValidatorSnapshot(6))
+	cluster := framework.NewTestCluster(t, 6,
+		framework.WithValidatorSnapshot(6),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// wait for the start
@@ -113,7 +122,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster := framework.NewTestCluster(t, validatorSize,
 		framework.WithEpochSize(5),
 		framework.WithEpochReward(1000),
-		framework.WithPremineValidators(premineBalance))
+		framework.WithPremineValidators(premineBalance),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 	srv := cluster.Servers[0]
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
@@ -211,7 +222,9 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
 		framework.WithPremineValidators(premineBalance),
-		framework.WithEpochSize(5))
+		framework.WithEpochSize(5),
+		framework.WithBurntContract(0, types.ZeroAddress), // TODO: Deploy test contract
+	)
 	defer cluster.Stop()
 
 	// init delegator account
@@ -312,7 +325,9 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		framework.WithBridge(),
 		framework.WithEpochReward(10000),
 		framework.WithEpochSize(5),
-		framework.WithPremineValidators("10000000000000000000")) // 10 native tokens
+		framework.WithPremineValidators("10000000000000000000"), // 10 native tokens
+		framework.WithBurntContract(0, types.ZeroAddress),       // TODO: Deploy test contract
+	)
 	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
 	srv := cluster.Servers[0]
 
