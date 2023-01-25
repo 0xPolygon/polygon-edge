@@ -126,6 +126,7 @@ func CreateDirSafe(path string, perms fs.FileMode) error {
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
+
 	// create directory if it does not exist
 	if !DirectoryExists(path) {
 		if err := os.MkdirAll(path, perms); err != nil {
