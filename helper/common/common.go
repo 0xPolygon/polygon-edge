@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"math/big"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -68,14 +71,14 @@ func ToFixedFloat(num float64, precision int) float64 {
 }
 
 // SetupDataDir sets up the data directory and the corresponding sub-directories
-func SetupDataDir(dataDir string, paths []string) error {
-	if err := createDir(dataDir); err != nil {
+func SetupDataDir(dataDir string, paths []string, perms fs.FileMode) error {
+	if err := CreateDirSafe(dataDir, perms); err != nil {
 		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
-		if err := createDir(path); err != nil {
+		if err := CreateDirSafe(path, perms); err != nil {
 			return fmt.Errorf("failed to create path: (%s): %w", path, err)
 		}
 	}
@@ -99,20 +102,134 @@ func DirectoryExists(directoryPath string) bool {
 	return true
 }
 
-// createDir creates a file system directory if it doesn't exist
-func createDir(path string) error {
-	_, err := os.Stat(path)
+// Checks if the file at the specified path exists
+func FileExists(filePath string) bool {
+	// Grab the absolute filepath
+	pathAbs, err := filepath.Abs(filePath)
+	if err != nil {
+		return false
+	}
+
+	// Check if the file exists, and that it's actually a file if there is a hit
+	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && fileInfo.IsDir()) {
+		return false
+	}
+
+	return true
+}
+
+// Creates a directory at path and with perms level permissions.
+// If directory already exists, owner and permissions are verified.
+func CreateDirSafe(path string, perms fs.FileMode) error {
+	info, err := os.Stat(path)
+	// check if an error occurred other than path not exists
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	// create directory if it does not exist
+	if !DirectoryExists(path) {
+		if err := os.MkdirAll(path, perms); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// verify that existing directory's owner and permissions are safe
+	err = verifyFileAndTryUpdatePermissions(path, info, perms)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Creates a file at path and with perms level permissions.
+// If file already exists, owner and permissions are verified.
+// If shouldNotExist is true, an error is returned if file exists
+func CreateFileSafe(path string, data []byte, perms fs.FileMode, shouldNotExist bool) error {
+	info, err := os.Stat(path)
+	// check if an error occurred other than path not exists
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+	fileExists := FileExists(path)
+	if fileExists && shouldNotExist {
+		return fmt.Errorf("%s already initialized", path)
+	}
+
+	// create file if it does not exist
+	if !fileExists {
+		if err := os.WriteFile(path, data, perms); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// verify that existing file's owner and permissions are safe
+	err = verifyFileAndTryUpdatePermissions(path, info, perms)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Verifies the file using `verifyFileOwnerAndPermissions` function
+// and updates permissions if current user is the owner
+func verifyFileAndTryUpdatePermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) error {
+	err, isCurrUserOwner := verifyFileOwnerAndPermissions(path, info, expectedPerms)
+	if err != nil {
+		return err
+	}
+
+	// update permissions (just in case) if current user is the owner of the directory
+	if isCurrUserOwner {
+		err := os.Chmod(path, expectedPerms)
+		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+// Verifies that the file owner is the current user, or the file owner is in
+// the same group as current user and permissions are set correctly by the owner.
+// Returns an error if occurred, and a bool indicating whether the current user is the owner.
+func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) (error, bool) {
+	// get stats
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if stat == nil || !ok {
+		return fmt.Errorf("failed to get stats of %s", path), false
+	}
+
+	// get current user
+	currUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("failed to get current user"), false
+	}
+
+	// get user id of the owner
+	ownerUID := strconv.FormatUint(uint64(stat.Uid), 10)
+	if currUser.Uid == ownerUID {
+		return nil, true
+	}
+
+	// get group id of the owner
+	ownerGID := strconv.FormatUint(uint64(stat.Gid), 10)
+	if currUser.Gid != ownerGID {
+		return fmt.Errorf("file/directory created by a user from a different group: %s", path), false
+	}
+
+	// check if permissions are set correctly by the owner
+	if info.Mode() != expectedPerms {
+		return fmt.Errorf("permissions of the file/directory is set incorrectly by another user: %s", path), false
+	}
+
+	return nil, false
 }
 
 // JSONNumber is the number represented in decimal or hex in json

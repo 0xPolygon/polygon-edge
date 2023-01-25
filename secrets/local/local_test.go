@@ -77,7 +77,7 @@ func getLocalSecretsManager(t *testing.T) secrets.SecretsManager {
 		t.Fatalf("Unable to instantiate local secrets manager directories, %v", tempErr)
 	}
 
-	setupErr := common.SetupDataDir(workingDirectory, []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal})
+	setupErr := common.SetupDataDir(workingDirectory, []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}, 0770)
 	if setupErr != nil {
 		t.Fatalf("Unable to instantiate local secrets manager directories, %v", setupErr)
 	}

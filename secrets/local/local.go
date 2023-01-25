@@ -66,7 +66,7 @@ func (l *LocalSecretsManager) Setup() error {
 	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
 
 	// Set up the local directories
-	if err := common.SetupDataDir(l.path, subDirectories); err != nil {
+	if err := common.SetupDataDir(l.path, subDirectories, 0770); err != nil {
 		return err
 	}
 
