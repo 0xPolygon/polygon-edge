@@ -384,10 +384,12 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	getElem := func() *fastrlp.Value {
 		val := elems[0]
 		elems = elems[1:]
+
 		return val
 	}
 
 	var num int
+
 	switch t.Type {
 	case LegacyTx:
 		num = 9
