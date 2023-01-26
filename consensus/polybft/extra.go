@@ -144,11 +144,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 // ValidateBasic contains extra data basic set of validations
 func (i *Extra) ValidateBasic(parentExtra *Extra) error {
-	if err := i.Checkpoint.ValidateBasic(parentExtra.Checkpoint); err != nil {
-		return err
-	}
-
-	return nil
+	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
 // Validate contains extra data validation logic
