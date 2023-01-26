@@ -31,10 +31,6 @@ import (
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
-var (
-	stateSyncResultEvent = contractsapi.StateReceiver.Abi.Events["StateSyncResult"]
-)
-
 const (
 	manifestFileName = "manifest.json"
 )
@@ -50,15 +46,12 @@ func checkLogs(
 	require.Len(t, logs, expectedCount)
 
 	for _, log := range logs {
-		res, err := stateSyncResultEvent.ParseLog(log)
-		assert.NoError(t, err)
+		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
+		assert.NoError(t, stateSyncResultEvent.ParseLog(log))
 
-		t.Logf("Block Number=%d, Decoded Log=%v", log.BlockNumber, res)
+		t.Logf("Block Number=%d, Decoded Log=%+v", log.BlockNumber, stateSyncResultEvent)
 
-		status, ok := res["status"].(bool)
-		require.True(t, ok)
-
-		assert.True(t, status)
+		assert.True(t, stateSyncResultEvent.Status)
 	}
 }
 
@@ -98,7 +91,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are mined and there should be a success events
-	id := stateSyncResultEvent.ID()
+	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -190,7 +183,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
-	id := stateSyncResultEvent.ID()
+	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
