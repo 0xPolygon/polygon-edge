@@ -254,25 +254,17 @@ func (f *fsm) Validate(proposal []byte) error {
 	currentValidators := f.validators.Accounts()
 	nextValidators := f.validators.Accounts()
 
-	if f.isEndOfEpoch {
-		if err := f.blockBuilder.Reset(); err != nil {
-			return fmt.Errorf("failed to initialize block builder: %w", err)
-		}
-
-		// we need to write commit epoch transaction to intermediate state,
-		// in order to be able to query next validator set
-		if err := f.blockBuilder.WriteTx(block.Transactions[0]); err != nil {
-			return err
-		}
-
-		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
+	validateExtraData := func(transition *state.Transition) error {
+		nextValidators, err = f.getCurrentValidators(transition)
 		if err != nil {
 			return err
 		}
-	}
 
-	if err := currentExtra.Validate(parentExtra, currentValidators, nextValidators); err != nil {
-		return err
+		if err := currentExtra.Validate(parentExtra, currentValidators, nextValidators); err != nil {
+			return err
+		}
+
+		return nil
 	}
 
 	// TODO: Validate validator set delta?
@@ -306,7 +298,7 @@ func (f *fsm) Validate(proposal []byte) error {
 		}
 	}
 
-	stateBlock, err := f.backend.ProcessBlock(f.parent, &block)
+	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
 	if err != nil {
 		return err
 	}
