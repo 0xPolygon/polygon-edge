@@ -107,15 +107,31 @@ import (
 	}
 }
 
+func getInternalType(paramName string, paramAbiType *abi.Type) string {
+	internalType := paramAbiType.InternalType()
+	if internalType == "" {
+		internalType = strings.Title(paramName)
+	} else {
+		internalType = strings.TrimSuffix(internalType, "[]")      // remove [] if it's struct array
+		internalType = strings.TrimPrefix(internalType, "struct ") // remove struct prefix
+		// if struct is taken from an interface (ICheckpoint.Validator), remove interface
+		parts := strings.Split(internalType, ".")
+		if len(parts) > 1 {
+			internalType = parts[1]
+		}
+	}
+
+	return internalType
+}
+
 func genType(name string, obj *abi.Type, res *[]string) string {
 	if obj.Kind() != abi.KindTuple {
 		panic("BUG: Not expected")
 	}
 
-	name = strings.Title(name)
-
+	internalType := getInternalType(name, obj)
 	str := []string{
-		"type " + name + " struct {",
+		"type " + internalType + " struct {",
 	}
 
 	for _, tupleElem := range obj.TupleElems() {
@@ -128,10 +144,10 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 			typ = genNestedType(tupleElem.Name, elem, res)
 		} else if elem.Kind() == abi.KindSlice && elem.Elem().Kind() == abi.KindTuple {
 			// []Struct
-			typ = "[]" + genNestedType(tupleElem.Name, elem.Elem(), res)
+			typ = "[]" + genNestedType(getInternalType(tupleElem.Name, elem), elem.Elem(), res)
 		} else if elem.Kind() == abi.KindArray && elem.Elem().Kind() == abi.KindTuple {
 			// [n]Struct
-			typ = "[" + strconv.Itoa(elem.Size()) + "]" + genNestedType(tupleElem.Name, elem.Elem(), res)
+			typ = "[" + strconv.Itoa(elem.Size()) + "]" + genNestedType(getInternalType(tupleElem.Name, elem), elem.Elem(), res)
 		} else if elem.Kind() == abi.KindAddress {
 			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
 			// this only works for simple types and not for []address inputs. This is good enough since
@@ -161,14 +177,13 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 	str = append(str, "}")
 	*res = append(*res, strings.Join(str, "\n"))
 
-	return name
+	return internalType
 }
 
 func genNestedType(name string, obj *abi.Type, res *[]string) string {
-	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, strings.Title(name), obj.Format(true)))
-
 	result := genType(name, obj, res)
-	*res = append(*res, genAbiFuncsForNestedType(name))
+	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, result, obj.Format(true)))
+	*res = append(*res, genAbiFuncsForNestedType(result))
 
 	return "*" + result
 }

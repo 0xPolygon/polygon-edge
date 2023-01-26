@@ -20,7 +20,7 @@ func TestEncoding_Method(t *testing.T) {
 	cases := []method{
 		// empty commit
 		&Commit{
-			Commitment: &Commitment{
+			Commitment: &StateSyncCommitment{
 				StartID: big.NewInt(1),
 				EndID:   big.NewInt(1),
 				Root:    types.EmptyRootHash,
@@ -66,7 +66,7 @@ func TestEncoding_Method(t *testing.T) {
 func TestEncoding_Struct(t *testing.T) {
 	t.Parallel()
 
-	commitment := &Commitment{
+	commitment := &StateSyncCommitment{
 		StartID: big.NewInt(1),
 		EndID:   big.NewInt(10),
 		Root:    types.StringToHash("hash"),
@@ -75,7 +75,7 @@ func TestEncoding_Struct(t *testing.T) {
 	encoding, err := commitment.EncodeAbi()
 	require.NoError(t, err)
 
-	commitmentDecoded := &Commitment{}
+	commitmentDecoded := &StateSyncCommitment{}
 
 	require.NoError(t, commitmentDecoded.DecodeAbi(encoding))
 	require.Equal(t, commitment.StartID, commitmentDecoded.StartID)
