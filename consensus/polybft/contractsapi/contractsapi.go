@@ -238,3 +238,18 @@ func (s *SubmitFunction) EncodeAbi() ([]byte, error) {
 func (s *SubmitFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["submit"], buf, s)
 }
+
+type InitializeCheckpointManagerFunction struct {
+	NewBls          types.Address `abi:"newBls"`
+	NewBn256G2      types.Address `abi:"newBn256G2"`
+	NewDomain       types.Hash    `abi:"newDomain"`
+	NewValidatorSet []*Validator  `abi:"newValidatorSet"`
+}
+
+func (I *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
+	return CheckpointManager.Abi.Methods["initialize"].Encode(I)
+}
+
+func (I *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, I)
+}

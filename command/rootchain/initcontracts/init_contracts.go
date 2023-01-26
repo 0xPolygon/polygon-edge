@@ -268,14 +268,14 @@ func initializeCheckpointManager(
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
 
-	initCheckpointInput, err := contractsapi.CheckpointManager.Abi.Methods["initialize"].Encode(
-		[]interface{}{
-			manifest.RootchainConfig.BLSAddress,
-			manifest.RootchainConfig.BN256G2Address,
-			bls.GetDomain(),
-			validatorSet,
-		})
+	initialize := contractsapi.InitializeCheckpointManagerFunction{
+		NewBls:          manifest.RootchainConfig.BLSAddress,
+		NewBn256G2:      manifest.RootchainConfig.BN256G2Address,
+		NewDomain:       types.BytesToHash(bls.GetDomain()),
+		NewValidatorSet: validatorSet,
+	}
 
+	initCheckpointInput, err := initialize.EncodeAbi()
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
 	}

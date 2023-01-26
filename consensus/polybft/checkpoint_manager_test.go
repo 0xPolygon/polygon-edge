@@ -740,11 +740,14 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	assert.NoError(t, result.Err)
 	rcAddress := result.Address
 
-	init, err := rootchainArtifact.Abi.GetMethod("initialize").Encode([4]interface{}{
-		contracts.BLSContract,
-		bn256Addr,
-		bls.GetDomain(),
-		accSet.ToAPIBinding()})
+	initialize := contractsapi.InitializeCheckpointManagerFunction{
+		NewBls:          contracts.BLSContract,
+		NewBn256G2:      bn256Addr,
+		NewDomain:       types.BytesToHash(bls.GetDomain()),
+		NewValidatorSet: accSet.ToAPIBinding(),
+	}
+
+	init, err := initialize.EncodeAbi()
 	if err != nil {
 		t.Fatal(err)
 	}

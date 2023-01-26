@@ -23,6 +23,11 @@ const (
 	functionNameFormat     = "%sFunction"
 )
 
+type generatedData struct {
+	resultString []string
+	structs      []string
+}
+
 func main() {
 	cases := []struct {
 		contractName string
@@ -65,21 +70,22 @@ func main() {
 			gensc.CheckpointManager,
 			[]string{
 				"submit",
+				"initialize",
 			},
 			[]string{},
 		},
 	}
 
 	rr := render{}
-	res := []string{}
+	generatedData := &generatedData{}
 
 	for _, c := range cases {
 		for _, method := range c.functions {
-			res = append(res, rr.GenMethod(c.contractName, c.artifact.Abi.Methods[method]))
+			rr.GenMethod(generatedData, c.contractName, c.artifact.Abi.Methods[method])
 		}
 
 		for _, event := range c.events {
-			res = append(res, rr.GenEvent(c.contractName, c.artifact.Abi.Events[event]))
+			rr.GenEvent(generatedData, c.contractName, c.artifact.Abi.Events[event])
 		}
 	}
 
@@ -95,7 +101,7 @@ import (
 )
 
 `
-	str += strings.Join(res, "\n")
+	str += strings.Join(generatedData.resultString, "\n")
 
 	output, err := format.Source([]byte(str))
 	if err != nil {
@@ -125,12 +131,14 @@ func getInternalType(paramName string, paramAbiType *abi.Type) string {
 	return internalType
 }
 
-func genType(name string, obj *abi.Type, res *[]string) string {
+func genType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
 	if obj.Kind() != abi.KindTuple {
 		panic("BUG: Not expected")
 	}
 
 	internalType := getInternalType(name, obj)
+	generatedData.structs = append(generatedData.structs, internalType)
+
 	str := []string{
 		"type " + internalType + " struct {",
 	}
@@ -142,13 +150,14 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 
 		if elem.Kind() == abi.KindTuple {
 			// Struct
-			typ = genNestedType(tupleElem.Name, elem, res)
+			typ = genNestedType(generatedData, tupleElem.Name, elem, res)
 		} else if elem.Kind() == abi.KindSlice && elem.Elem().Kind() == abi.KindTuple {
 			// []Struct
-			typ = "[]" + genNestedType(getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			typ = "[]" + genNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
 		} else if elem.Kind() == abi.KindArray && elem.Elem().Kind() == abi.KindTuple {
 			// [n]Struct
-			typ = "[" + strconv.Itoa(elem.Size()) + "]" + genNestedType(getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			typ = "[" + strconv.Itoa(elem.Size()) + "]" +
+				genNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
 		} else if elem.Kind() == abi.KindAddress {
 			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
 			// this only works for simple types and not for []address inputs. This is good enough since
@@ -181,8 +190,16 @@ func genType(name string, obj *abi.Type, res *[]string) string {
 	return internalType
 }
 
-func genNestedType(name string, obj *abi.Type, res *[]string) string {
-	result := genType(name, obj, res)
+func genNestedType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
+	for _, s := range generatedData.structs {
+		if s == name {
+			// do not generate the same type again if it's already generated
+			// this happens when two functions use the same struct type as one of its parameters
+			return "*" + name
+		}
+	}
+
+	result := genType(generatedData, name, obj, res)
 	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, result, obj.Format(true)))
 	*res = append(*res, genAbiFuncsForNestedType(result))
 
@@ -212,11 +229,11 @@ func genAbiFuncsForNestedType(name string) string {
 type render struct {
 }
 
-func (r *render) GenEvent(contractName string, event *abi.Event) string {
+func (r *render) GenEvent(generatedData *generatedData, contractName string, event *abi.Event) {
 	name := fmt.Sprintf(eventNameFormat, event.Name)
 
 	res := []string{}
-	genType(name, event.Inputs, &res)
+	genType(generatedData, name, event.Inputs, &res)
 
 	// write encode/decode functions
 	tmplStr := `
@@ -236,14 +253,21 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 		"ContractName": contractName,
 	}
 
-	return renderTmpl(tmplStr, inputs)
+	generatedData.resultString = append(generatedData.resultString, renderTmpl(tmplStr, inputs))
 }
 
-func (r *render) GenMethod(contractName string, method *abi.Method) string {
-	methodName := fmt.Sprintf(functionNameFormat, method.Name)
+func (r *render) GenMethod(generatedData *generatedData, contractName string, method *abi.Method) {
+	methodName := method.Name
+	if methodName == "initialize" {
+		// most of the contracts have initialize function, which differ in params
+		// so make them unique somehow
+		methodName = strings.Title(methodName + contractName)
+	}
+
+	methodName = fmt.Sprintf(functionNameFormat, methodName)
 
 	res := []string{}
-	genType(methodName, method.Inputs, &res)
+	genType(generatedData, methodName, method.Inputs, &res)
 
 	// write encode/decode functions
 	tmplStr := `
@@ -279,7 +303,7 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 		"TName":        strings.Title(methodName),
 	}
 
-	return renderTmpl(tmplStr, inputs)
+	generatedData.resultString = append(generatedData.resultString, renderTmpl(tmplStr, inputs))
 }
 
 func renderTmpl(tmplStr string, inputs map[string]interface{}) string {
