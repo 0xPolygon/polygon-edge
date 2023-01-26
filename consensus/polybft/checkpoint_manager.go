@@ -21,10 +21,6 @@ var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
-
-	// submitCheckpointMethod is an ABI method object representation for
-	// submit checkpoint function on CheckpointManager contract
-	submitCheckpointMethod, _ = contractsapi.CheckpointManager.Abi.Methods["submit"]
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
 )
@@ -246,24 +242,24 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 		return nil, err
 	}
 
-	params := map[string]interface{}{
-		"chainId": new(big.Int).SetUint64(c.blockchain.GetChainID()),
-		"checkpointMetadata": map[string]interface{}{
-			"blockHash":               blockHash,
-			"blockRound":              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
-			"currentValidatorSetHash": extra.Checkpoint.CurrentValidatorsHash,
+	submit := &contractsapi.Submit{
+		ChainID: new(big.Int).SetUint64(c.blockchain.GetChainID()),
+		CheckpointMetadata: &contractsapi.CheckpointMetadata{
+			BlockHash:               blockHash,
+			BlockRound:              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
+			CurrentValidatorSetHash: extra.Checkpoint.CurrentValidatorsHash,
 		},
-		"checkpoint": map[string]interface{}{
-			"epoch":       new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
-			"blockNumber": new(big.Int).SetUint64(blockNumber),
-			"eventRoot":   extra.Checkpoint.EventRoot,
+		Checkpoint: &contractsapi.Checkpoint{
+			Epoch:       new(big.Int).SetUint64(extra.Checkpoint.EpochNumber),
+			BlockNumber: new(big.Int).SetUint64(blockNumber),
+			EventRoot:   extra.Checkpoint.EventRoot,
 		},
-		"signature":       encodedAggSigs,
-		"newValidatorSet": nextValidators.AsGenericMaps(),
-		"bitmap":          extra.Committed.Bitmap,
+		Signature:       encodedAggSigs,
+		Bitmap:          extra.Committed.Bitmap,
+		NewValidatorSet: nextValidators.ToAPIBinding(),
 	}
 
-	return submitCheckpointMethod.Encode(params)
+	return submit.EncodeAbi()
 }
 
 // isCheckpointBlock returns true for blocks in the middle of the epoch
