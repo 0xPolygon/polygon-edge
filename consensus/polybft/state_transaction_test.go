@@ -196,7 +196,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
 	cases := []contractsapi.StateTransactionInput{
-		&contractsapi.CommitEpoch{
+		&contractsapi.CommitEpochFunction{
 			ID: big.NewInt(1),
 			Epoch: &contractsapi.Epoch{
 				StartBlock: big.NewInt(1),

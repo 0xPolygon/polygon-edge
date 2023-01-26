@@ -101,7 +101,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		return nil, err
 	}
 
-	commit := &contractsapi.Commit{
+	commit := &contractsapi.CommitFunction{
 		Commitment: cm.Message,
 		Signature:  cm.AggSignature.AggregatedSignature,
 		Bitmap:     blsVerificationPart,
@@ -116,7 +116,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
-	commit := contractsapi.Commit{}
+	commit := contractsapi.CommitFunction{}
 
 	err := commit.DecodeAbi(txData)
 	if err != nil {

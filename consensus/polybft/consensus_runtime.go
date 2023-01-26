@@ -447,7 +447,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
-	epoch *epochMetadata) (*contractsapi.CommitEpoch, error) {
+	epoch *epochMetadata) (*contractsapi.CommitEpochFunction, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -519,7 +519,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
 		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
 	}
 
-	commitEpoch := &contractsapi.CommitEpoch{
+	commitEpoch := &contractsapi.CommitEpochFunction{
 		ID: big.NewInt(int64(epochID)),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: big.NewInt(int64(epoch.FirstBlockInEpoch)),

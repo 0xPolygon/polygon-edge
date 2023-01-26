@@ -53,7 +53,7 @@ type fsm struct {
 	epochNumber uint64
 
 	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
-	uptimeCounter *contractsapi.CommitEpoch
+	uptimeCounter *contractsapi.CommitEpochFunction
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool

@@ -12,7 +12,7 @@ type StateSyncProof struct {
 
 // EncodeAbi contains logic for encoding given ABI data
 func (ssp *StateSyncProof) EncodeAbi() ([]byte, error) {
-	execute := contractsapi.Execute{
+	execute := contractsapi.ExecuteFunction{
 		Proof: ssp.Proof,
 		Obj:   (*contractsapi.StateSync)(ssp.StateSync),
 	}
@@ -22,7 +22,7 @@ func (ssp *StateSyncProof) EncodeAbi() ([]byte, error) {
 
 // DecodeAbi contains logic for decoding given ABI data
 func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
-	execute := &contractsapi.Execute{}
+	execute := &contractsapi.ExecuteFunction{}
 
 	if err := execute.DecodeAbi(txData); err != nil {
 		return err

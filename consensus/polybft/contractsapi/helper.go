@@ -41,8 +41,8 @@ func (u *Uptime) AddValidatorUptime(address types.Address, count int64) {
 	})
 }
 
-var _ StateTransactionInput = &CommitEpoch{}
+var _ StateTransactionInput = &CommitEpochFunction{}
 
-func (c *CommitEpoch) Type() StateTransactionType {
+func (c *CommitEpochFunction) Type() StateTransactionType {
 	return "end-epoch"
 }
