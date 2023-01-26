@@ -131,7 +131,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 	if !ok {
 		return secrets.ErrSecretNotFound
 	}
-	
+
 	// Checks for existing secret
 	if _, err := os.Stat(secretPath); err == nil {
 		return fmt.Errorf(
