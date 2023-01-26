@@ -185,7 +185,14 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.NoError(t, err)
 
 	s.pendingCommitments = []*PendingCommitment{
-		{MerkleTree: tree, Commitment: &contractsapi.Commitment{Root: tree.Hash(), StartID: big.NewInt(0), EndID: big.NewInt(1)}},
+		{
+			MerkleTree: tree,
+			StateSyncCommitment: &contractsapi.StateSyncCommitment{
+				Root:    tree.Hash(),
+				StartID: big.NewInt(0),
+				EndID:   big.NewInt(1),
+			},
+		},
 	}
 
 	hash, err := s.pendingCommitments[0].Hash()
@@ -224,7 +231,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	require.Len(t, s.pendingCommitments, 1)
 
 	mockMsg := &CommitmentMessageSigned{
-		Message: &contractsapi.Commitment{
+		Message: &contractsapi.StateSyncCommitment{
 			StartID: s.pendingCommitments[0].StartID,
 			EndID:   s.pendingCommitments[0].EndID,
 		},
@@ -429,7 +436,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 	require.NoError(t, err)
 
 	commitment := &CommitmentMessageSigned{
-		Message: &contractsapi.Commitment{
+		Message: &contractsapi.StateSyncCommitment{
 			StartID: big.NewInt(fromIndex),
 			EndID:   big.NewInt(maxCommitmentSize),
 			Root:    tree.Hash(),

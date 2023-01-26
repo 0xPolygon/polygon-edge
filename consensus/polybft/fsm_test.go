@@ -1319,7 +1319,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	assert.NoError(t, err)
 
 	return &CommitmentMessageSigned{
-		Message:      commitment.Commitment,
+		Message:      commitment.StateSyncCommitment,
 		AggSignature: signature,
 	}
 }

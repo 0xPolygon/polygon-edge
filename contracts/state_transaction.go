@@ -14,7 +14,7 @@ type StateSyncProof struct {
 func (ssp *StateSyncProof) EncodeAbi() ([]byte, error) {
 	execute := contractsapi.Execute{
 		Proof: ssp.Proof,
-		Obj:   (*contractsapi.Obj)(ssp.StateSync),
+		Obj:   (*contractsapi.StateSync)(ssp.StateSync),
 	}
 
 	return execute.EncodeAbi()

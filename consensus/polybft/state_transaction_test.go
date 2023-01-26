@@ -16,7 +16,7 @@ import (
 
 func newTestCommitmentSigned(root types.Hash, startID, endID int64) *CommitmentMessageSigned {
 	return &CommitmentMessageSigned{
-		Message: &contractsapi.Commitment{
+		Message: &contractsapi.StateSyncCommitment{
 			StartID: big.NewInt(startID),
 			EndID:   big.NewInt(endID),
 			Root:    root,
@@ -67,7 +67,7 @@ func TestCommitmentMessage_ToRegisterCommitmentInputData(t *testing.T) {
 	const epoch, eventsCount = uint64(100), 11
 	pendingCommitment, _, _ := buildCommitmentAndStateSyncs(t, eventsCount, epoch, uint64(2))
 	expectedSignedCommitmentMsg := &CommitmentMessageSigned{
-		Message: pendingCommitment.Commitment,
+		Message: pendingCommitment.StateSyncCommitment,
 		AggSignature: Signature{
 			Bitmap:              []byte{5, 1},
 			AggregatedSignature: []byte{1, 1},
@@ -119,7 +119,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 func TestCommitmentMessage_VerifyProof_NoStateSyncsInCommitment(t *testing.T) {
 	t.Parallel()
 
-	commitment := &CommitmentMessageSigned{Message: &contractsapi.Commitment{StartID: big.NewInt(1), EndID: big.NewInt(10)}}
+	commitment := &CommitmentMessageSigned{Message: &contractsapi.StateSyncCommitment{StartID: big.NewInt(1), EndID: big.NewInt(10)}}
 	err := commitment.VerifyStateSyncProof(&contracts.StateSyncProof{})
 	assert.ErrorContains(t, err, "no state sync event")
 }
@@ -144,7 +144,7 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	}
 
 	commitment := &CommitmentMessageSigned{
-		Message: &contractsapi.Commitment{
+		Message: &contractsapi.StateSyncCommitment{
 			StartID: big.NewInt(fromIndex),
 			EndID:   big.NewInt(toIndex),
 			Root:    trie.Hash(),
@@ -163,7 +163,7 @@ func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
 	require.NoError(t, err)
 
 	commitmentSigned := &CommitmentMessageSigned{
-		Message: commitment.Commitment,
+		Message: commitment.StateSyncCommitment,
 		AggSignature: Signature{
 			AggregatedSignature: []byte{},
 			Bitmap:              []byte{},

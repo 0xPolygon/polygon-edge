@@ -20,7 +20,7 @@ const (
 
 // PendingCommitment holds merkle trie of bridge transactions accompanied by epoch number
 type PendingCommitment struct {
-	*contractsapi.Commitment
+	*contractsapi.StateSyncCommitment
 	MerkleTree *MerkleTree
 	Epoch      uint64
 }
@@ -35,7 +35,7 @@ func NewCommitment(epoch uint64, stateSyncEvents []*contractsapi.StateSyncedEven
 	return &PendingCommitment{
 		MerkleTree: tree,
 		Epoch:      epoch,
-		Commitment: &contractsapi.Commitment{
+		StateSyncCommitment: &contractsapi.StateSyncCommitment{
 			StartID: stateSyncEvents[0].ID,
 			EndID:   stateSyncEvents[len(stateSyncEvents)-1].ID,
 			Root:    tree.Hash(),
@@ -45,7 +45,7 @@ func NewCommitment(epoch uint64, stateSyncEvents []*contractsapi.StateSyncedEven
 
 // Hash calculates hash value for commitment object.
 func (cm *PendingCommitment) Hash() (types.Hash, error) {
-	data, err := cm.Commitment.EncodeAbi()
+	data, err := cm.StateSyncCommitment.EncodeAbi()
 	if err != nil {
 		return types.Hash{}, err
 	}
@@ -57,7 +57,7 @@ var _ contractsapi.StateTransactionInput = &CommitmentMessageSigned{}
 
 // CommitmentMessageSigned encapsulates commitment message with aggregated signatures
 type CommitmentMessageSigned struct {
-	Message      *contractsapi.Commitment
+	Message      *contractsapi.StateSyncCommitment
 	AggSignature Signature
 	PublicKeys   [][]byte
 }

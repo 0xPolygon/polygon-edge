@@ -620,7 +620,7 @@ func createTestCommitmentMessage(t *testing.T, fromIndex uint64) *CommitmentMess
 
 	require.NoError(t, err)
 
-	msg := &contractsapi.Commitment{
+	msg := &contractsapi.StateSyncCommitment{
 		Root:    tree.Hash(),
 		StartID: big.NewInt(int64(fromIndex)),
 		EndID:   big.NewInt(int64(fromIndex + maxCommitmentSize - 1)),

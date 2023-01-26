@@ -254,7 +254,7 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 		}
 
 		largestCommitment = &CommitmentMessageSigned{
-			Message:      commitment.Commitment,
+			Message:      commitment.StateSyncCommitment,
 			AggSignature: aggregatedSignature,
 			PublicKeys:   publicKeys,
 		}
@@ -420,7 +420,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.Sta
 }
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
-func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.Commitment) error {
+func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncCommitment) error {
 	from := commitmentMsg.StartID.Uint64()
 	to := commitmentMsg.EndID.Uint64()
 
