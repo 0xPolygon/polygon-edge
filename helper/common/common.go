@@ -147,7 +147,7 @@ func CreateDirSafe(path string, perms fs.FileMode) error {
 	}
 
 	// verify that existing directory's owner and permissions are safe
-	err = verifyFileAndTryUpdatePermissions(path, info, perms)
+	err = verifyFileOwnerAndPermissions(path, info, perms)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func CreateOrOverwriteFileSafe(path string, data []byte, perms fs.FileMode) erro
 
 	if FileExists(path) {
 		// verify that existing file's owner and permissions are safe
-		err = verifyFileAndTryUpdatePermissions(path, info, perms)
+		err := verifyFileOwnerAndPermissions(path, info, perms)
 		if err != nil {
 			return err
 		}
@@ -181,59 +181,40 @@ func CreateOrOverwriteFileSafe(path string, data []byte, perms fs.FileMode) erro
 	return nil
 }
 
-// Verifies the file using `verifyFileOwnerAndPermissions` function
-// and updates permissions if current user is the owner
-func verifyFileAndTryUpdatePermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) error {
-	err, isCurrUserOwner := verifyFileOwnerAndPermissions(path, info, expectedPerms)
-	if err != nil {
-		return err
-	}
-
-	// update permissions (just in case) if current user is the owner of the directory
-	if isCurrUserOwner {
-		err := os.Chmod(path, expectedPerms)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // Verifies that the file owner is the current user, or the file owner is in
 // the same group as current user and permissions are set correctly by the owner.
 // Returns an error if occurred, and a bool indicating whether the current user is the owner.
-func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) (error, bool) {
+func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) error {
 	// get stats
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if stat == nil || !ok {
-		return fmt.Errorf("failed to get stats of %s", path), false
+		return fmt.Errorf("failed to get stats of %s", path)
 	}
 
 	// get current user
 	currUser, err := user.Current()
 	if err != nil {
-		return fmt.Errorf("failed to get current user"), false
+		return fmt.Errorf("failed to get current user")
 	}
 
 	// get user id of the owner
 	ownerUID := strconv.FormatUint(uint64(stat.Uid), 10)
 	if currUser.Uid == ownerUID {
-		return nil, true
+		return nil
 	}
 
 	// get group id of the owner
 	ownerGID := strconv.FormatUint(uint64(stat.Gid), 10)
 	if currUser.Gid != ownerGID {
-		return fmt.Errorf("file/directory created by a user from a different group: %s", path), false
+		return fmt.Errorf("file/directory created by a user from a different group: %s", path)
 	}
 
 	// check if permissions are set correctly by the owner
 	if info.Mode() != expectedPerms {
-		return fmt.Errorf("permissions of the file/directory is set incorrectly by another user: %s", path), false
+		return fmt.Errorf("permissions of the file/directory is set incorrectly by another user: %s", path)
 	}
 
-	return nil, false
+	return nil
 }
 
 // JSONNumber is the number represented in decimal or hex in json
