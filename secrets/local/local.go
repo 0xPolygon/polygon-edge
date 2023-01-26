@@ -140,7 +140,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 		)
 	}
 	// Write the secret to disk
-	if err := common.CreateOrOverwriteFileSafe(secretPath, value, 0440); err != nil {
+	if err := common.SaveFileSafe(secretPath, value, 0440); err != nil {
 		return fmt.Errorf(
 			"unable to write secret to disk (%s), %w",
 			secretPath,

@@ -71,7 +71,7 @@ func generateConfig(config config.Config) error {
 		return fmt.Errorf("could not marshal config struct, %w", err)
 	}
 
-	if err := common.CreateOrOverwriteFileSafe(
+	if err := common.SaveFileSafe(
 		fmt.Sprintf("default-config.%s", paramFlagValues.FileType),
 		data,
 		0660); err != nil {

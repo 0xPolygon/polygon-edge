@@ -54,7 +54,7 @@ func writeDataStore(path string, obj interface{}) error {
 		return err
 	}
 
-	if err := common.CreateOrOverwriteFileSafe(path, data, 0660); err != nil {
+	if err := common.SaveFileSafe(path, data, 0660); err != nil {
 		return err
 	}
 
