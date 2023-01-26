@@ -247,6 +247,10 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
+	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
+		return err
+	}
+
 	currentValidators := f.validators.Accounts()
 	nextValidators := f.validators.Accounts()
 
@@ -265,10 +269,6 @@ func (f *fsm) Validate(proposal []byte) error {
 		if err != nil {
 			return err
 		}
-	}
-
-	if err := f.VerifyStateTransactions(block.Transactions); err != nil {
-		return err
 	}
 
 	if err := currentExtra.Validate(parentExtra, currentValidators, nextValidators); err != nil {
