@@ -191,7 +191,7 @@ func (m *Manifest) Save(manifestPath string) error {
 		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
 	}
 
-	if err := common.CreateFileSafe(filepath.Clean(manifestPath), data, 0660, false); err != nil {
+	if err := common.CreateOrOverwriteFileSafe(filepath.Clean(manifestPath), data, 0660, false); err != nil {
 		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
 	}
 

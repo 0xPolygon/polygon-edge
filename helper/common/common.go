@@ -158,7 +158,7 @@ func CreateDirSafe(path string, perms fs.FileMode) error {
 // Creates a file at path and with perms level permissions.
 // If file already exists, owner and permissions are verified.
 // If shouldNotExist is true, an error is returned if file exists
-func CreateFileSafe(path string, data []byte, perms fs.FileMode, shouldNotExist bool) error {
+func CreateOrOverwriteFileSafe(path string, data []byte, perms fs.FileMode, shouldNotExist bool) error {
 	info, err := os.Stat(path)
 	// check if an error occurred other than path not exists
 	if err != nil && !os.IsNotExist(err) {
@@ -170,18 +170,16 @@ func CreateFileSafe(path string, data []byte, perms fs.FileMode, shouldNotExist 
 		return fmt.Errorf("%s already initialized", path)
 	}
 
-	// create file if it does not exist
-	if !fileExists {
-		if err := os.WriteFile(path, data, perms); err != nil {
+	if fileExists {
+		// verify that existing file's owner and permissions are safe
+		err = verifyFileAndTryUpdatePermissions(path, info, perms)
+		if err != nil {
 			return err
 		}
-
-		return nil
 	}
 
-	// verify that existing file's owner and permissions are safe
-	err = verifyFileAndTryUpdatePermissions(path, info, perms)
-	if err != nil {
+	// create or overwrite the file
+	if err := os.WriteFile(path, data, perms); err != nil {
 		return err
 	}
 

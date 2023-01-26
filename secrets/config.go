@@ -22,7 +22,7 @@ type SecretsManagerConfig struct {
 func (c *SecretsManagerConfig) WriteConfig(path string) error {
 	jsonBytes, _ := json.MarshalIndent(c, "", " ")
 
-	return common.CreateFileSafe(path, jsonBytes, 0660, false)
+	return common.CreateOrOverwriteFileSafe(path, jsonBytes, 0660, false)
 }
 
 // ReadConfig reads the SecretsManagerConfig from the specified path
