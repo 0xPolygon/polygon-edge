@@ -59,5 +59,9 @@ test-e2e-polybft:
 .PHONY: compile-core-contracts
 compile-core-contracts:
 	cd core-contracts && npm install && npm run compile
-	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
+	$(MAKE) generate-smart-contract-bindings
 
+.PHONY: generate-smart-contract-bindings
+generate-smart-contract-bindings:
+	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
+	go run ./consensus/polybft/contractsapi/bindings-gen/main.go
