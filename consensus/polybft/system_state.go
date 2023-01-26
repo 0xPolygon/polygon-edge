@@ -14,6 +14,17 @@ import (
 	"github.com/umbracle/ethgo/contract"
 )
 
+// ValidatorInfo is data transfer object which holds validator information,
+// provided by smart contract
+type ValidatorInfo struct {
+	Address             ethgo.Address
+	Stake               *big.Int
+	TotalStake          *big.Int
+	Commission          *big.Int
+	WithdrawableRewards *big.Int
+	Active              bool
+}
+
 // SystemState is an interface to interact with the consensus system contracts in the chain
 type SystemState interface {
 	// GetValidatorSet retrieves current validator set from the smart contract
