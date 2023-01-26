@@ -388,15 +388,15 @@ func (e *Eth) GasPrice() (interface{}, error) {
 }
 
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) {
+func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, []*types.Log, error) {
 	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	transaction, err := DecodeTxn(arg, e.store)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
 	if transaction.Gas == 0 {
@@ -406,19 +406,19 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 	// The return value of the execution is saved in the transition (returnValue field)
 	result, err := e.store.ApplyTxn(header, transaction)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Check if an EVM revert happened
 	if result.Reverted() {
-		return nil, constructErrorFromRevert(result)
+		return nil, nil, constructErrorFromRevert(result)
 	}
 
 	if result.Failed() {
-		return nil, fmt.Errorf("unable to execute call: %w", result.Err)
+		return nil, nil, fmt.Errorf("unable to execute call: %w", result.Err)
 	}
 
-	return argBytesPtr(result.ReturnValue), nil
+	return argBytesPtr(result.ReturnValue), result.Logs, nil
 }
 
 // EstimateGas estimates the gas needed to execute a transaction

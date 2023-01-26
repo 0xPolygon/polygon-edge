@@ -304,7 +304,7 @@ func TestEth_Call(t *testing.T) {
 			Nonce:    argUintPtr(0),
 		}
 
-		res, err := eth.Call(contractCall, BlockNumberOrHash{})
+		res, _, err := eth.Call(contractCall, BlockNumberOrHash{})
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), store.ethCallError.Error())
@@ -328,7 +328,7 @@ func TestEth_Call(t *testing.T) {
 			Nonce:    argUintPtr(0),
 		}
 
-		res, err := eth.Call(contractCall, BlockNumberOrHash{})
+		res, _, err := eth.Call(contractCall, BlockNumberOrHash{})
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)

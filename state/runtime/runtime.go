@@ -105,6 +105,7 @@ type ExecutionResult struct {
 	GasLeft     uint64 // Total gas left as result of execution
 	GasUsed     uint64 // Total gas used as result of execution
 	Err         error  // Any error encountered during the execution, listed below
+	Logs        []*types.Log
 }
 
 func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }

@@ -493,6 +493,8 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
 
+	result.Logs = t.state.Logs()
+
 	return result, nil
 }
 
