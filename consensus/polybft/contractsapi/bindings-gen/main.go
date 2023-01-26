@@ -20,13 +20,14 @@ const (
 	contractVariableFormat = "%s = &%s{Artifact: %s}"
 	abiTypeNameFormat      = "var %sABIType = abi.MustNewType(\"%s\")"
 	eventNameFormat        = "%sEvent"
+	functionNameFormat     = "%sFunction"
 )
 
 func main() {
 	cases := []struct {
 		contractName string
 		artifact     *artifact.Artifact
-		methods      []string
+		functions    []string
 		events       []string
 	}{
 		{
@@ -73,7 +74,7 @@ func main() {
 	res := []string{}
 
 	for _, c := range cases {
-		for _, method := range c.methods {
+		for _, method := range c.functions {
 			res = append(res, rr.GenMethod(c.contractName, c.artifact.Abi.Methods[method]))
 		}
 
@@ -239,7 +240,7 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 }
 
 func (r *render) GenMethod(contractName string, method *abi.Method) string {
-	methodName := method.Name
+	methodName := fmt.Sprintf(functionNameFormat, method.Name)
 
 	res := []string{}
 	genType(methodName, method.Inputs, &res)
@@ -273,7 +274,7 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 		"Structs":      res,
 		"Type":         methodType,
 		"Sig":          string(methodName[0]),
-		"Name":         methodName,
+		"Name":         method.Name,
 		"ContractName": contractName,
 		"TName":        strings.Title(methodName),
 	}

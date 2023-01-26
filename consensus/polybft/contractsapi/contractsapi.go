@@ -25,17 +25,17 @@ func (S *StateSyncCommitment) DecodeAbi(buf []byte) error {
 	return decodeStruct(StateSyncCommitmentABIType, buf, &S)
 }
 
-type Commit struct {
+type CommitFunction struct {
 	Commitment *StateSyncCommitment `abi:"commitment"`
 	Signature  []byte               `abi:"signature"`
 	Bitmap     []byte               `abi:"bitmap"`
 }
 
-func (c *Commit) EncodeAbi() ([]byte, error) {
+func (c *CommitFunction) EncodeAbi() ([]byte, error) {
 	return StateReceiver.Abi.Methods["commit"].Encode(c)
 }
 
-func (c *Commit) DecodeAbi(buf []byte) error {
+func (c *CommitFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateReceiver.Abi.Methods["commit"], buf, c)
 }
 
@@ -56,16 +56,16 @@ func (S *StateSync) DecodeAbi(buf []byte) error {
 	return decodeStruct(StateSyncABIType, buf, &S)
 }
 
-type Execute struct {
+type ExecuteFunction struct {
 	Proof []types.Hash `abi:"proof"`
 	Obj   *StateSync   `abi:"obj"`
 }
 
-func (e *Execute) EncodeAbi() ([]byte, error) {
+func (e *ExecuteFunction) EncodeAbi() ([]byte, error) {
 	return StateReceiver.Abi.Methods["execute"].Encode(e)
 }
 
-func (e *Execute) DecodeAbi(buf []byte) error {
+func (e *ExecuteFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateReceiver.Abi.Methods["execute"], buf, e)
 }
 
@@ -136,30 +136,30 @@ func (U *Uptime) DecodeAbi(buf []byte) error {
 	return decodeStruct(UptimeABIType, buf, &U)
 }
 
-type CommitEpoch struct {
+type CommitEpochFunction struct {
 	ID     *big.Int `abi:"id"`
 	Epoch  *Epoch   `abi:"epoch"`
 	Uptime *Uptime  `abi:"uptime"`
 }
 
-func (c *CommitEpoch) EncodeAbi() ([]byte, error) {
+func (c *CommitEpochFunction) EncodeAbi() ([]byte, error) {
 	return ChildValidatorSet.Abi.Methods["commitEpoch"].Encode(c)
 }
 
-func (c *CommitEpoch) DecodeAbi(buf []byte) error {
+func (c *CommitEpochFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
 
-type SyncState struct {
+type SyncStateFunction struct {
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`
 }
 
-func (s *SyncState) EncodeAbi() ([]byte, error) {
+func (s *SyncStateFunction) EncodeAbi() ([]byte, error) {
 	return StateSender.Abi.Methods["syncState"].Encode(s)
 }
 
-func (s *SyncState) DecodeAbi(buf []byte) error {
+func (s *SyncStateFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateSender.Abi.Methods["syncState"], buf, s)
 }
 
@@ -222,7 +222,7 @@ func (V *Validator) DecodeAbi(buf []byte) error {
 	return decodeStruct(ValidatorABIType, buf, &V)
 }
 
-type Submit struct {
+type SubmitFunction struct {
 	ChainID            *big.Int            `abi:"chainId"`
 	CheckpointMetadata *CheckpointMetadata `abi:"checkpointMetadata"`
 	Checkpoint         *Checkpoint         `abi:"checkpoint"`
@@ -231,10 +231,10 @@ type Submit struct {
 	Bitmap             []byte              `abi:"bitmap"`
 }
 
-func (s *Submit) EncodeAbi() ([]byte, error) {
+func (s *SubmitFunction) EncodeAbi() ([]byte, error) {
 	return CheckpointManager.Abi.Methods["submit"].Encode(s)
 }
 
-func (s *Submit) DecodeAbi(buf []byte) error {
+func (s *SubmitFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["submit"], buf, s)
 }
