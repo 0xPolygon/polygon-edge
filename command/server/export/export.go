@@ -74,8 +74,7 @@ func generateConfig(config config.Config) error {
 	if err := common.CreateOrOverwriteFileSafe(
 		fmt.Sprintf("default-config.%s", paramFlagValues.FileType),
 		data,
-		0660,
-		false); err != nil {
+		0660); err != nil {
 		return fmt.Errorf("failed to create config file %w", err)
 	}
 
