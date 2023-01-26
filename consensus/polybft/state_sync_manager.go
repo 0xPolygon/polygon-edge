@@ -347,7 +347,6 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 		return err
 	}
 
-	s.logger.Info("Post epoch received", "NextCommittedIndex", nextCommittedIndex)
 	s.nextCommittedIndex = nextCommittedIndex
 
 	s.lock.Unlock()
@@ -367,10 +366,6 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 	if commitment == nil {
 		return nil
 	}
-
-	s.logger.Info("PostBlock received",
-		"From", commitment.Message.StartID.Uint64(),
-		"To", commitment.Message.EndID.Uint64())
 
 	if err := s.state.insertCommitmentMessage(commitment); err != nil {
 		return fmt.Errorf("insert commitment message error: %w", err)
