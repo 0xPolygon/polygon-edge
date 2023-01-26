@@ -88,6 +88,11 @@ func SetupDataDir(dataDir string, paths []string, perms fs.FileMode) error {
 
 // DirectoryExists checks if the directory at the specified path exists
 func DirectoryExists(directoryPath string) bool {
+	// Check if path is empty
+	if directoryPath == "" {
+		return false
+	}
+
 	// Grab the absolute filepath
 	pathAbs, err := filepath.Abs(directoryPath)
 	if err != nil {
@@ -104,6 +109,11 @@ func DirectoryExists(directoryPath string) bool {
 
 // Checks if the file at the specified path exists
 func FileExists(filePath string) bool {
+	// Check if path is empty
+	if filePath == "" {
+		return false
+	}
+
 	// Grab the absolute filepath
 	pathAbs, err := filepath.Abs(filePath)
 	if err != nil {
