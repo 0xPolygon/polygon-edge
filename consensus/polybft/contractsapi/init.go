@@ -19,8 +19,9 @@ var (
 	MRC20             *artifact.Artifact
 
 	//go:embed test-contracts/*
-	testContracts       embed.FS
-	TestL1StateReceiver *artifact.Artifact
+	testContracts          embed.FS
+	TestL1StateReceiver    *artifact.Artifact
+	TestWriteBlockMetadata *artifact.Artifact
 )
 
 func init() {
@@ -76,12 +77,22 @@ func init() {
 		panic(err)
 	}
 
-	testL1StateReceiverArtifact, err := testContracts.ReadFile("test-contracts/TestL1StateReceiver.json")
+	testL1StateReceiverRaw, err := testContracts.ReadFile("test-contracts/TestL1StateReceiver.json")
 	if err != nil {
 		panic(err)
 	}
 
-	TestL1StateReceiver, err = artifact.DecodeArtifact(testL1StateReceiverArtifact)
+	TestL1StateReceiver, err = artifact.DecodeArtifact(testL1StateReceiverRaw)
+	if err != nil {
+		panic(err)
+	}
+
+	testWriteBlockMetadataRaw, err := testContracts.ReadFile("test-contracts/TestWriteBlockMetadata.json")
+	if err != nil {
+		panic(err)
+	}
+
+	TestWriteBlockMetadata, err = artifact.DecodeArtifact(testWriteBlockMetadataRaw)
 	if err != nil {
 		panic(err)
 	}

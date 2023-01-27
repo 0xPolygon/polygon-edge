@@ -1,7 +1,7 @@
 {
     "_format": "hh-sol-artifact-1",
     "contractName": "TestL1StateReceiver",
-    "sourceName": "contracts/root/TestL1StateReceiver.sol",
+    "sourceName": "test-contracts/TestL1StateReceiver.sol",
     "abi": [
         {
             "inputs": [],

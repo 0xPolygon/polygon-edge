@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -162,11 +162,6 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 }
 
 func TestE2E_TxPool_TransactionWithHeaderInstuctions(t *testing.T) {
-	smJSON := "{\n  \"_format\": \"hh-sol-artifact-1\",\n  \"contractName\": \"Test\",\n  \"sourceName\": \"contracts/child/Test.sol\",\n  \"abi\": [\n    {\n      \"inputs\": [],\n      \"name\": \"coinbase\",\n      \"outputs\": [\n        {\n          \"internalType\": \"address\",\n          \"name\": \"\",\n          \"type\": \"address\"\n        }\n      ],\n      \"stateMutability\": \"view\",\n      \"type\": \"function\"\n    },\n    {\n      \"inputs\": [\n        {\n          \"internalType\": \"uint256\",\n          \"name\": \"\",\n          \"type\": \"uint256\"\n        }\n      ],\n      \"name\": \"data\",\n      \"outputs\": [\n        {\n          \"internalType\": \"uint256\",\n          \"name\": \"\",\n          \"type\": \"uint256\"\n        }\n      ],\n      \"stateMutability\": \"view\",\n      \"type\": \"function\"\n    },\n    {\n      \"inputs\": [],\n      \"name\": \"init\",\n      \"outputs\": [],\n      \"stateMutability\": \"nonpayable\",\n      \"type\": \"function\"\n    }\n  ],\n  \"bytecode\": \"0x608060405234801561001057600080fd5b50610187806100206000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c8063a6ae0aac14610046578063e1c7392a14610076578063f0ba8440146100f6575b600080fd5b600154610059906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100f46000805460018181018355828052447f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56392830155825480820184554390830155825480820184554290830155825480820184554590830155825480820190935546929091019190915580546001600160a01b03191641179055565b005b610109610104366004610138565b610117565b60405190815260200161006d565b6000818154811061012757600080fd5b600091825260209091200154905081565b60006020828403121561014a57600080fd5b503591905056fea26469706673582212207602674d664de555f28f6e6014c9c71da8bd936e8a3d4761348319b1d53ebbbb64736f6c63430008110033\",\n  \"deployedBytecode\": \"0x608060405234801561001057600080fd5b50600436106100415760003560e01c8063a6ae0aac14610046578063e1c7392a14610076578063f0ba8440146100f6575b600080fd5b600154610059906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100f46000805460018181018355828052447f290decd9548b62a8d60345a988386fc84ba6bc95484008f6362f93160ef3e56392830155825480820184554390830155825480820184554290830155825480820184554590830155825480820190935546929091019190915580546001600160a01b03191641179055565b005b610109610104366004610138565b610117565b60405190815260200161006d565b6000818154811061012757600080fd5b600091825260209091200154905081565b60006020828403121561014a57600080fd5b503591905056fea26469706673582212207602674d664de555f28f6e6014c9c71da8bd936e8a3d4761348319b1d53ebbbb64736f6c63430008110033\",\n  \"linkReferences\": {},\n  \"deployedLinkReferences\": {}\n}\n"
-
-	customArtifact, err := artifact.DecodeArtifact([]byte(smJSON))
-	require.NoError(t, err)
-
 	sidechainKey, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
@@ -180,11 +175,11 @@ func TestE2E_TxPool_TransactionWithHeaderInstuctions(t *testing.T) {
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
-	receipt, err := relayer.SendTransaction(&ethgo.Transaction{Input: customArtifact.Bytecode}, sidechainKey)
+	receipt, err := relayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestWriteBlockMetadata.Bytecode}, sidechainKey)
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	receipt, err = ABITransaction(relayer, sidechainKey, customArtifact, receipt.ContractAddress, "init", []interface{}{})
+	receipt, err = ABITransaction(relayer, sidechainKey, contractsapi.TestWriteBlockMetadata, receipt.ContractAddress, "init", []interface{}{})
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
