@@ -181,9 +181,9 @@ func SaveFileSafe(path string, data []byte, perms fs.FileMode) error {
 	return nil
 }
 
-// Verifies that the file owner is the current user, or the file owner is in
-// the same group as current user and permissions are set correctly by the owner.
-// Returns an error if occurred, and a bool indicating whether the current user is the owner.
+// Verifies that the file owner is the current user,
+// or the file owner is in the same group as current user
+// and permissions are set correctly by the owner.
 func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) error {
 	// get stats
 	stat, ok := info.Sys().(*syscall.Stat_t)
