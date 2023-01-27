@@ -706,7 +706,7 @@ func TestCommitEpoch(t *testing.T) {
 	}
 }
 
-func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *CommitEpoch {
+func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
 	t.Helper()
 
 	var startBlock uint64 = 0
@@ -714,20 +714,24 @@ func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, ep
 		startBlock = (epochID - 1) * epochSize
 	}
 
-	uptime := Uptime{EpochID: epochID}
+	uptime := &contractsapi.Uptime{
+		EpochID:     new(big.Int).SetUint64(epochID),
+		UptimeData:  []*contractsapi.UptimeData{},
+		TotalBlocks: new(big.Int).SetUint64(epochSize),
+	}
 
-	commitEpoch := &CommitEpoch{
-		EpochID: uptime.EpochID,
-		Epoch: Epoch{
-			StartBlock: startBlock + 1,
-			EndBlock:   epochSize * epochID,
+	commitEpoch := &contractsapi.CommitEpochFunction{
+		ID: uptime.EpochID,
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(startBlock + 1),
+			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
 	}
 
 	for i := range validatorSet {
-		uptime.addValidatorUptime(validatorSet[i].Address, epochSize)
+		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
 	}
 
 	return commitEpoch
