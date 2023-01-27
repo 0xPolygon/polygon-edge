@@ -1,53 +1,47 @@
 package bls
 
 import (
-	"errors"
 	"math/big"
 
-	"github.com/kilic/bn254"
+	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
+// PrivateKey holds private key for bls implementation
 type PrivateKey struct {
-	p *big.Int
+	s *big.Int
 }
 
 // PublicKey returns the public key from the PrivateKey
 func (p *PrivateKey) PublicKey() *PublicKey {
-	g2 := bn254.NewG2()
-	public := g2.New()
+	g2 := new(bn256.G2).ScalarMult(g2Point, p.s)
 
-	g2.MulScalar(public, g2.One(), p.p)
+	return &PublicKey{g2: g2}
+}
 
-	return &PublicKey{p: public}
+// Marshal marshals private key to byte slice
+func (p *PrivateKey) Marshal() ([]byte, error) {
+	return p.s.MarshalText()
 }
 
 // Sign generates a simple BLS signature of the given message
 func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
-	g := bn254.NewG1()
-
-	signature, err := g.HashToCurveFT(message, GetDomain())
+	point, err := hashToPoint(message, domain)
 	if err != nil {
 		return nil, err
 	}
 
-	g.MulScalar(signature, signature, p.p)
+	g1 := new(bn256.G1).ScalarMult(point, p.s)
 
-	return &Signature{signature}, nil
+	return &Signature{g1: g1}, nil
 }
 
-// MarshalJSON marshal the key to bytes.
-func (p *PrivateKey) MarshalJSON() ([]byte, error) {
-	if p.p == nil {
-		return nil, errors.New("cannot marshal empty private key")
+// UnmarshalPrivateKey unmarshals the private key from the given byte slice
+func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
+	s := new(big.Int)
+
+	if err := s.UnmarshalText(data); err != nil {
+		return nil, err
 	}
 
-	return p.p.MarshalJSON()
-}
-
-// UnmarshalPrivateKey reads the private key from the given byte array
-func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
-	p := new(big.Int)
-	err := p.UnmarshalJSON(data)
-
-	return &PrivateKey{p: p}, err
+	return &PrivateKey{s: s}, nil
 }

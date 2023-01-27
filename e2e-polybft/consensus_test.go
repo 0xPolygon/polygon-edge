@@ -139,7 +139,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		&e2eStateProvider{txRelayer: txRelayer})
 
 	// create new account
-	require.NoError(t, cluster.InitSecrets(newValidatorSecrets, 1))
+	_, err = cluster.InitSecrets(newValidatorSecrets, 1)
+	require.NoError(t, err)
 
 	// assert that account is created
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
@@ -193,9 +194,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert registered validator's stake
-	stake := newValidatorInfo["totalStake"].(*big.Int) //nolint:forcetypeassert
-	t.Logf("New validator stake=%s\n", stake.String())
-	require.Equal(t, newValidatorStake, stake)
+	t.Logf("New validator stake=%d\n", newValidatorInfo.TotalStake)
+	require.Equal(t, newValidatorStake, newValidatorInfo.TotalStake)
 
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
 	cluster.WaitForBlock(20, 2*time.Minute)
@@ -205,9 +205,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert registered validator's rewards
-	rewards := newValidatorInfo["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
-	t.Logf("New validator rewards=%s\n", rewards)
-	require.True(t, rewards.Cmp(big.NewInt(0)) > 0)
+	t.Logf("New validator rewards=%d\n", newValidatorInfo.WithdrawableRewards)
+	require.True(t, newValidatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
 }
 
 func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
@@ -230,7 +229,9 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	defer cluster.Stop()
 
 	// init delegator account
-	require.NoError(t, cluster.InitSecrets(delegatorSecrets, 1))
+	_, err = cluster.InitSecrets(delegatorSecrets, 1)
+	require.NoError(t, err)
+
 	srv := cluster.Servers[0]
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
@@ -350,11 +351,11 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait for one epoch to accumulate validator rewards
 	require.NoError(t, cluster.WaitForBlock(5, 20*time.Second))
 
-	validatorInfoRaw, err := sidechain.GetValidatorInfo(validatorAddr, txRelayer)
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	initialStake := validatorInfoRaw["totalStake"].(*big.Int) //nolint:forcetypeassert
-	t.Logf("Stake (before unstake)=%s\n", initialStake.String())
+	initialStake := validatorInfo.TotalStake
+	t.Logf("Stake (before unstake)=%d\n", initialStake)
 
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
 	require.NoError(t, srv.Unstake(initialStake.Uint64()))
@@ -368,12 +369,12 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// assert that validator isn't present in new validator set
 	require.Equal(t, 4, validatorSet.Len())
 
-	validatorInfoRaw, err = sidechain.GetValidatorInfo(validatorAddr, txRelayer)
+	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	reward := validatorInfoRaw["withdrawableRewards"].(*big.Int) //nolint:forcetypeassert
+	reward := validatorInfo.WithdrawableRewards
 	t.Logf("Rewards=%d\n", reward)
-	t.Logf("Stake (after unstake)=%d\n", validatorInfoRaw["totalStake"].(*big.Int)) //nolint:forcetypeassert
+	t.Logf("Stake (after unstake)=%d\n", validatorInfo.TotalStake)
 	require.Greater(t, reward.Uint64(), uint64(0))
 
 	oldValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
@@ -399,7 +400,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
 	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
-	rootchainValidators := []*validatorInfo{}
+	rootchainValidators := []*polybft.ValidatorInfo{}
 	err = cluster.Bridge.WaitUntil(time.Second, 10*time.Second, func() (bool, error) {
 		rootchainValidators, err = getRootchainValidators(l1Relayer, checkpointManagerAddr, rootchainSender)
 		if err != nil {
@@ -412,8 +413,8 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.Equal(t, 4, len(rootchainValidators))
 
 	for _, validator := range rootchainValidators {
-		if validator.address == validatorAddr {
-			t.Fatalf("not expected to find validator %v in the current validator set", validator.address)
+		if validator.Address == validatorAddr {
+			t.Fatalf("not expected to find validator %v in the current validator set", validator.Address)
 		}
 	}
 }

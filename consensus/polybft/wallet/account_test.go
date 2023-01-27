@@ -16,7 +16,7 @@ func TestAccount(t *testing.T) {
 
 	key := GenerateAccount()
 	pubKeyMarshalled := key.Bls.PublicKey().Marshal()
-	privKeyMarshalled, err := key.Bls.MarshalJSON()
+	privKeyMarshalled, err := key.Bls.Marshal()
 	require.NoError(t, err)
 
 	require.NoError(t, key.Save(secretsManager))
@@ -25,7 +25,7 @@ func TestAccount(t *testing.T) {
 	require.NoError(t, err)
 
 	pubKeyMarshalled1 := key1.Bls.PublicKey().Marshal()
-	privKeyMarshalled1, err := key1.Bls.MarshalJSON()
+	privKeyMarshalled1, err := key1.Bls.Marshal()
 	require.NoError(t, err)
 
 	assert.Equal(t, key.Ecdsa.Address(), key1.Ecdsa.Address())

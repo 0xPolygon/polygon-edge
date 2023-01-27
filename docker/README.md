@@ -30,7 +30,7 @@ or by running `docker-compose` manually.
 
 #### use `polybft` consensus
 * `cd core-contracts && npm install && npm run compile && cd -` - install `npm` dependencies and compile smart contracts
-* `go run ./consensus/polybft/contractsapi/gen/main.go` generate needed code
+* `go run ./consensus/polybft/contractsapi/artifacts-gen/main.go` generate needed code
 * `export EDGE_CONSENSUS=polybft` - set `polybft` consensus
 * `docker-compose -f ./docker/local/docker-compose.yml up -d --build` - deploy environment
 

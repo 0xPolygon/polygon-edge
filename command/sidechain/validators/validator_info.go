@@ -2,7 +2,6 @@ package validators
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -60,18 +59,18 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	validatorAddr := validatorAccount.Ecdsa.Address()
 
-	responseMap, err := sidechainHelper.GetValidatorInfo(validatorAddr, txRelayer)
+	validatorInfo, err := sidechainHelper.GetValidatorInfo(validatorAddr, txRelayer)
 	if err != nil {
 		return fmt.Errorf("failed to get validator info for %s: %w", validatorAddr, err)
 	}
 
 	outputter.WriteCommandResult(&validatorsInfoResult{
-		address:             validatorAccount.Ecdsa.Address().String(),
-		stake:               responseMap["stake"].(*big.Int).Uint64(),               //nolint:forcetypeassert
-		totalStake:          responseMap["totalStake"].(*big.Int).Uint64(),          //nolint:forcetypeassert
-		commission:          responseMap["commission"].(*big.Int).Uint64(),          //nolint:forcetypeassert
-		withdrawableRewards: responseMap["withdrawableRewards"].(*big.Int).Uint64(), //nolint:forcetypeassert
-		active:              responseMap["active"].(bool),                           //nolint:forcetypeassert
+		address:             validatorInfo.Address.String(),
+		stake:               validatorInfo.Stake.Uint64(),
+		totalStake:          validatorInfo.TotalStake.Uint64(),
+		commission:          validatorInfo.Commission.Uint64(),
+		withdrawableRewards: validatorInfo.WithdrawableRewards.Uint64(),
+		active:              validatorInfo.Active,
 	})
 
 	return nil
