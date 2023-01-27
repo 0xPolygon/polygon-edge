@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_PublicMarshal(t *testing.T) {
+func TestPublic_Marshal(t *testing.T) {
 	t.Parallel()
 
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
@@ -38,19 +38,23 @@ func TestPublic_UnmarshalPublicKeyFromBigInt(t *testing.T) {
 	require.Equal(t, pub, pub2)
 }
 
-func TestPublic_MarshalUnmarshalJSON(t *testing.T) {
+func TestPublic_MarshalUnmarshalText(t *testing.T) {
 	t.Parallel()
 
 	key, err := GenerateBlsKey()
 	require.NoError(t, err)
 
 	pubKey := key.PublicKey()
-	marshaledPubKey, err := pubKey.MarshalJSON()
+	marshaledPubKey, err := pubKey.MarshalText()
 	require.NoError(t, err)
 
 	newPubKey := new(PublicKey)
 
-	err = newPubKey.UnmarshalJSON(marshaledPubKey)
-	require.NoError(t, err)
+	require.NoError(t, newPubKey.UnmarshalText(marshaledPubKey))
 	require.Equal(t, pubKey, newPubKey)
+}
+
+func TestPublicKey_UnmarshalInfinityPoint(t *testing.T) {
+	_, err := UnmarshalPublicKey(make([]byte, 128))
+	require.Error(t, err, errInfinityPoint)
 }

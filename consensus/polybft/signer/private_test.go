@@ -7,14 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_PrivateMarshal(t *testing.T) {
+func TestPrivate_Marshal(t *testing.T) {
 	t.Parallel()
 
 	blsKey, err := GenerateBlsKey() // structure which holds private/public key pair
 	require.NoError(t, err)
 
 	// marshal public key
-	privateKeyMarshalled, err := blsKey.MarshalJSON()
+	privateKeyMarshalled, err := blsKey.Marshal()
 	require.NoError(t, err)
 	// recover private and public key
 	blsKeyUnmarshalled, err := UnmarshalPrivateKey(privateKeyMarshalled)

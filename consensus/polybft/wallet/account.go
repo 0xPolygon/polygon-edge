@@ -86,7 +86,7 @@ func (a *Account) Save(secretsManager secrets.SecretsManager) (err error) {
 	}
 
 	// get serialized bls private key
-	if blsRaw, err = a.Bls.MarshalJSON(); err != nil {
+	if blsRaw, err = a.Bls.Marshal(); err != nil {
 		return err
 	}
 
