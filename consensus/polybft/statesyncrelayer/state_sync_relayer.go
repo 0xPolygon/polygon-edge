@@ -2,12 +2,14 @@ package statesyncrelayer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"path"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
@@ -154,9 +156,9 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 }
 
 // queryStateSyncProof queries the state sync proof
-func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*contracts.StateSyncProof, error) {
+func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.Proof, error) {
 	// retrieve state sync proof
-	var stateSyncProof contracts.StateSyncProof
+	var stateSyncProof types.Proof
 
 	err := r.client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
 	if err != nil {
@@ -169,7 +171,17 @@ func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*contracts.S
 }
 
 // executeStateSync executes the state sync
-func (r *StateSyncRelayer) executeStateSync(stateSyncProof *contracts.StateSyncProof) error {
+func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
+	sse, ok := proof.Metadata["StateSync"].(*contractsapi.StateSyncedEvent)
+	if !ok {
+		return errors.New("could not get state sync event from proof")
+	}
+
+	stateSyncProof := &polybft.StateSyncProof{
+		Proof:     proof.Data,
+		StateSync: sse,
+	}
+
 	input, err := stateSyncProof.EncodeAbi()
 	if err != nil {
 		return err

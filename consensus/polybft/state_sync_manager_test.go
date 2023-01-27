@@ -388,8 +388,11 @@ func TestStateSyncManager_GetProofs(t *testing.T) {
 
 	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
 	require.NoError(t, err)
-	require.Equal(t, stateSyncID, proof.StateSync.ID.Uint64())
-	require.NotEmpty(t, proof.Proof)
+
+	stateSync, ok := (proof.Metadata["StateSync"]).(*contractsapi.StateSyncedEvent)
+	require.True(t, ok)
+	require.Equal(t, stateSyncID, stateSync.ID.Uint64())
+	require.NotEmpty(t, proof.Data)
 }
 
 func TestStateSyncManager_GetProofs_NoProof_NoCommitment(t *testing.T) {
@@ -453,10 +456,16 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 
 	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
 	require.NoError(t, err)
-	require.Equal(t, stateSyncID, proof.StateSync.ID.Uint64())
-	require.NotEmpty(t, proof.Proof)
 
-	require.NoError(t, commitment.VerifyStateSyncProof(proof))
+	stateSync, ok := (proof.Metadata["StateSync"]).(*contractsapi.StateSyncedEvent)
+	require.True(t, ok)
+	require.Equal(t, stateSyncID, stateSync.ID.Uint64())
+	require.NotEmpty(t, proof.Data)
+
+	require.NoError(t, commitment.VerifyStateSyncProof(&StateSyncProof{
+		Proof:     proof.Data,
+		StateSync: stateSync,
+	}))
 }
 
 type mockTopic struct {

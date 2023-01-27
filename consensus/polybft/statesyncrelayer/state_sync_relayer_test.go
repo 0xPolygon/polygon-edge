@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	stateSync "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -47,7 +48,7 @@ func Test_executeStateSync(t *testing.T) {
 		key:       key,
 	}
 
-	sp := &contracts.StateSyncProof{
+	sp := &stateSync.StateSyncProof{
 		Proof: []types.Hash{},
 		StateSync: &contractsapi.StateSyncedEvent{
 			ID:       big.NewInt(1),
@@ -68,7 +69,15 @@ func Test_executeStateSync(t *testing.T) {
 	}
 
 	txRelayer.On("SendTransaction", txn, key).Return(&ethgo.Receipt{}, nil)
-	r.executeStateSync(sp)
+
+	proof := &types.Proof{
+		Data: sp.Proof,
+		Metadata: map[string]interface{}{
+			"StateSync": sp.StateSync,
+		},
+	}
+
+	r.executeStateSync(proof)
 
 	txRelayer.AssertExpectations(t)
 }

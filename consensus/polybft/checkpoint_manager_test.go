@@ -398,15 +398,15 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
 		t.Parallel()
 		// verify generated proof on desired tree
-		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Proof, tree.Hash()))
+		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Data, tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
 		t.Parallel()
 
 		// copy and make proof invalid
-		invalidProof := make([]types.Hash, len(proof.Proof))
-		copy(invalidProof, proof.Proof)
+		invalidProof := make([]types.Hash, len(proof.Data))
+		copy(invalidProof, proof.Data)
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree

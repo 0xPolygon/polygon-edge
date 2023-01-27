@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -74,7 +73,7 @@ func (cm *CommitmentMessageSigned) Hash() (types.Hash, error) {
 
 // VerifyStateSyncProof validates given state sync proof
 // against merkle trie root hash contained in the CommitmentMessage
-func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *contracts.StateSyncProof) error {
+func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *StateSyncProof) error {
 	if stateSyncProof.StateSync == nil {
 		return errors.New("no state sync event")
 	}

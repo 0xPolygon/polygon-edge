@@ -11,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -533,12 +532,12 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (contracts.ExitProof, error) {
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
 	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
 }
 
 // GetStateSyncProof returns the proof for the state sync
-func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
+func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return c.stateSyncManager.GetStateSyncProof(stateSyncID)
 }
 

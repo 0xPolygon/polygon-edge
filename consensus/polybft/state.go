@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
@@ -531,7 +530,7 @@ func (s *State) getCommitmentMessage(toIndex uint64) (*CommitmentMessageSigned, 
 }
 
 // insertStateSyncProofs inserts the provided state sync proofs to db
-func (s *State) insertStateSyncProofs(stateSyncProof []*contracts.StateSyncProof) error {
+func (s *State) insertStateSyncProofs(stateSyncProof []*StateSyncProof) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(stateSyncProofsBucket)
 		for _, ssp := range stateSyncProof {
@@ -550,8 +549,8 @@ func (s *State) insertStateSyncProofs(stateSyncProof []*contracts.StateSyncProof
 }
 
 // getStateSyncProof gets state sync proof that are not executed
-func (s *State) getStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
-	var ssp *contracts.StateSyncProof
+func (s *State) getStateSyncProof(stateSyncID uint64) (*StateSyncProof, error) {
+	var ssp *StateSyncProof
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncID)); v != nil {
