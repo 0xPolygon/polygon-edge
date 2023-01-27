@@ -19,12 +19,12 @@ func createTestKey(t *testing.T) *wallet.Key {
 	return wallet.NewKey(wallet.GenerateAccount())
 }
 
-func createRandomTestKeys(t *testing.T, amount int) []*wallet.Key {
+func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
 	t.Helper()
 
-	result := make([]*wallet.Key, amount, amount)
+	result := make([]*wallet.Key, numberOfKeys, numberOfKeys)
 
-	for i := 0; i < amount; i++ {
+	for i := 0; i < numberOfKeys; i++ {
 		result[i] = wallet.NewKey(wallet.GenerateAccount())
 	}
 

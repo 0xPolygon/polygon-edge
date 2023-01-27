@@ -676,7 +676,7 @@ func TestCommitEpoch(t *testing.T) {
 		err = initContract(contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
 		require.NoError(t, err)
 
-		// connect validators and delegators
+		// delegate amounts to validators
 		for valAddress, delegators := range valid2deleg {
 			for _, delegator := range delegators {
 				encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["delegate"].Encode(
