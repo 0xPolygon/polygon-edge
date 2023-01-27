@@ -1,10 +1,13 @@
 package polybft
 
 import (
+	"encoding/hex"
 	"errors"
+	"math"
 	"math/big"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
@@ -580,6 +583,157 @@ func TestPerformExit(t *testing.T) {
 
 	lastCounter := getField(l1Cntract, contractsapi.L1ExitTestABI, "counter")
 	require.Equal(t, lastCounter[31], uint8(1))
+}
+
+func TestCommitEpoch(t *testing.T) {
+	// init validator sets
+	validatorSetSize := []int{5, 10, 50, 100, 150, 200}
+	// number of delegators per validator
+	delegPerVal := 100
+
+	intialBalance := uint64(5 * math.Pow(10, 18))  // 5 tokens
+	reward := uint64(math.Pow(10, 18))             // 1 token
+	delegateAmount := uint64(math.Pow(10, 18)) / 2 // 0.5 token
+
+	validatorSets := make([]*testValidators, len(validatorSetSize), len(validatorSetSize))
+
+	// create all validator sets which will be used in test
+	for i, size := range validatorSetSize {
+		aliasses := make([]string, size, size)
+		vps := make([]uint64, size, size)
+
+		for j := 0; j < size; j++ {
+			aliasses[j] = "v" + strconv.Itoa(j)
+			vps[j] = intialBalance
+		}
+
+		validatorSets[i] = newTestValidatorsWithAliases(aliasses, vps)
+	}
+
+	// iterate through the validator set and do the test for each of them
+	for _, currentValidators := range validatorSets {
+		accSet := currentValidators.getPublicIdentities()
+		valid2deleg := make(map[types.Address][]*wallet.Key, accSet.Len()) // delegators assigned to validators
+
+		// add contracts to genesis data
+		alloc := map[types.Address]*chain.GenesisAccount{
+			contracts.ValidatorSetContract: {
+				Code: contractsapi.ChildValidatorSet.DeployedBytecode,
+			},
+			contracts.BLSContract: {
+				Code: contractsapi.BLS.DeployedBytecode,
+			},
+		}
+
+		// validator data for polybft config
+		initValidators := make([]*Validator, accSet.Len())
+
+		for i, validator := range accSet {
+			// add validator to genesis data
+			alloc[validator.Address] = &chain.GenesisAccount{
+				Balance: validator.VotingPower,
+			}
+
+			// create validator data for polybft config
+			initValidators[i] = &Validator{
+				Address: validator.Address,
+				Balance: validator.VotingPower,
+				BlsKey:  hex.EncodeToString(validator.BlsKey.Marshal()),
+			}
+
+			// create delegators
+			delegWallets := createRandomTestKeys(t, delegPerVal)
+
+			// add delegators to genesis data
+			for j := 0; j < delegPerVal; j++ {
+				delegator := delegWallets[j]
+				alloc[types.Address(delegator.Address())] = &chain.GenesisAccount{
+					Balance: new(big.Int).SetUint64(intialBalance),
+				}
+			}
+
+			valid2deleg[validator.Address] = delegWallets
+		}
+
+		transition := newTestTransition(t, alloc)
+
+		polyBFTConfig := PolyBFTConfig{
+			InitialValidatorSet: initValidators,
+			BlockTime:           2 * time.Second,
+			EpochSize:           24 * 60 * 60 / 2,
+			SprintSize:          5,
+			EpochReward:         reward,
+			// use 1st account as governance address
+			Governance:       currentValidators.toValidatorSet().validators.GetAddresses()[0],
+			ValidatorSetAddr: contracts.ValidatorSetContract,
+		}
+
+		// get data for ChildValidatorSet initialization
+		initInput, err := getInitChildValidatorSetInput(polyBFTConfig)
+		require.NoError(t, err)
+
+		// init ChildValidatorSet
+		err = initContract(contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
+		require.NoError(t, err)
+
+		// delegate amounts to validators
+		for valAddress, delegators := range valid2deleg {
+			for _, delegator := range delegators {
+				encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["delegate"].Encode(
+					[]interface{}{valAddress, false})
+
+				require.NoError(t, err)
+
+				result := transition.Call2(types.Address(delegator.Address()), contracts.ValidatorSetContract, encoded, new(big.Int).SetUint64(delegateAmount), 1000000000000)
+				require.False(t, result.Failed())
+			}
+		}
+
+		// create input for commit epoch
+		commitEpoch := createCommitEpoch(t, 1, accSet, polyBFTConfig.EpochSize)
+		input, err := commitEpoch.EncodeAbi()
+		require.NoError(t, err)
+
+		// call commit epoch
+		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
+
+		t.Logf("Number of validators %d when we add %d of delegators, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
+
+		commitEpoch = createCommitEpoch(t, 2, accSet, polyBFTConfig.EpochSize)
+		input, err = commitEpoch.EncodeAbi()
+		require.NoError(t, err)
+
+		// call commit epoch
+		result = transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
+		t.Logf("Number of validators %d, Number of delegator %d, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
+	}
+}
+
+func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *CommitEpoch {
+	t.Helper()
+
+	var startBlock uint64 = 0
+	if epochID > 1 {
+		startBlock = (epochID - 1) * epochSize
+	}
+
+	uptime := Uptime{EpochID: epochID}
+
+	commitEpoch := &CommitEpoch{
+		EpochID: uptime.EpochID,
+		Epoch: Epoch{
+			StartBlock: startBlock + 1,
+			EndBlock:   epochSize * epochID,
+			EpochRoot:  types.Hash{},
+		},
+		Uptime: uptime,
+	}
+
+	for i := range validatorSet {
+		uptime.addValidatorUptime(validatorSet[i].Address, epochSize)
+	}
+
+	return commitEpoch
 }
 
 func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *artifact.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {

@@ -19,6 +19,18 @@ func createTestKey(t *testing.T) *wallet.Key {
 	return wallet.NewKey(wallet.GenerateAccount())
 }
 
+func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
+	t.Helper()
+
+	result := make([]*wallet.Key, numberOfKeys, numberOfKeys)
+
+	for i := 0; i < numberOfKeys; i++ {
+		result[i] = wallet.NewKey(wallet.GenerateAccount())
+	}
+
+	return result
+}
+
 func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) *Signature {
 	t.Helper()
 
