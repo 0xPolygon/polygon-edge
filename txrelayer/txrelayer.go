@@ -144,11 +144,6 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	return t.waitForReceipt(txnHash)
 }
 
-// GetNonce queries nonce for the provided account
-func (t *TxRelayerImpl) GetNonce(address ethgo.Address) (uint64, error) {
-	return t.client.Eth().GetNonce(address, ethgo.Pending)
-}
-
 func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 	count := uint(0)
 

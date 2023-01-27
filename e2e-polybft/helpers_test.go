@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -29,14 +30,8 @@ func (s *e2eStateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, 
 	return nil, errors.New("send txn is not supported")
 }
 
-type validatorInfo struct {
-	address    ethgo.Address
-	rewards    *big.Int
-	totalStake *big.Int
-}
-
 // getRootchainValidators queries rootchain validator set
-func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, sender ethgo.Address) ([]*validatorInfo, error) {
+func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, sender ethgo.Address) ([]*polybft.ValidatorInfo, error) {
 	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
 		checkpointManagerAddr, sender, "currentValidatorSetLength")
 	if err != nil {
@@ -49,7 +44,7 @@ func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, 
 	}
 
 	currentValidatorSetMethod := contractsapi.CheckpointManager.Abi.GetMethod("currentValidatorSet")
-	validators := make([]*validatorInfo, validatorsCount)
+	validators := make([]*polybft.ValidatorInfo, validatorsCount)
 
 	for i := 0; i < int(validatorsCount); i++ {
 		validatorRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
@@ -74,9 +69,9 @@ func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, 
 		}
 
 		//nolint:forcetypeassert
-		validators[i] = &validatorInfo{
-			address:    results["_address"].(ethgo.Address),
-			totalStake: results["votingPower"].(*big.Int),
+		validators[i] = &polybft.ValidatorInfo{
+			Address:    results["_address"].(ethgo.Address),
+			TotalStake: results["votingPower"].(*big.Int),
 		}
 	}
 

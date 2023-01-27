@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -42,7 +43,7 @@ func GetAccountFromDir(dir string) (*wallet.Account, error) {
 }
 
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address
-func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (map[string]interface{}, error) {
+func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
 	getValidatorMethod := contractsapi.ChildValidatorSet.Abi.GetMethod("getValidator")
 
 	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
@@ -76,7 +77,14 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 		return nil, fmt.Errorf("could not convert validator info result to a map")
 	}
 
-	return decodedValidatorInfoMap, nil
+	return &polybft.ValidatorInfo{
+		Address:             validatorAddr.Address(),
+		Stake:               decodedValidatorInfoMap["stake"].(*big.Int),               //nolint:forcetypeassert
+		TotalStake:          decodedValidatorInfoMap["totalStake"].(*big.Int),          //nolint:forcetypeassert
+		Commission:          decodedValidatorInfoMap["commission"].(*big.Int),          //nolint:forcetypeassert
+		WithdrawableRewards: decodedValidatorInfoMap["withdrawableRewards"].(*big.Int), //nolint:forcetypeassert
+		Active:              decodedValidatorInfoMap["active"].(bool),                  //nolint:forcetypeassert
+	}, nil
 }
 
 // GetDelegatorReward queries delegator reward for given validator and delegator addresses
