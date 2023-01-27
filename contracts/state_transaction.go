@@ -28,10 +28,8 @@ func (ssp *StateSyncProof) DecodeAbi(txData []byte) error {
 		return err
 	}
 
-	*ssp = StateSyncProof{
-		Proof:     execute.Proof,
-		StateSync: (*contractsapi.StateSyncedEvent)(execute.Obj),
-	}
+	ssp.Proof = execute.Proof
+	ssp.StateSync = (*contractsapi.StateSyncedEvent)(execute.Obj)
 
 	return nil
 }

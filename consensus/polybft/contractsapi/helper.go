@@ -31,10 +31,6 @@ func (sse *StateSyncedEvent) EncodeAbi() ([]byte, error) {
 // addValidatorUptime is an extension (helper) function on a generated Uptime type
 // that adds uptime data for given validator to Uptime struct
 func (u *Uptime) AddValidatorUptime(address types.Address, count int64) {
-	if u.UptimeData == nil {
-		u.UptimeData = []*UptimeData{}
-	}
-
 	u.UptimeData = append(u.UptimeData, &UptimeData{
 		Validator:    address,
 		SignedBlocks: big.NewInt(count),
