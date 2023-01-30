@@ -15,12 +15,9 @@ import (
 )
 
 const (
-	contractVariableName   = "%sContract"
-	contractStructName     = "%sContractImpl"
-	contractVariableFormat = "%s = &%s{Artifact: %s}"
-	abiTypeNameFormat      = "var %sABIType = abi.MustNewType(\"%s\")"
-	eventNameFormat        = "%sEvent"
-	functionNameFormat     = "%sFunction"
+	abiTypeNameFormat  = "var %sABIType = abi.MustNewType(\"%s\")"
+	eventNameFormat    = "%sEvent"
+	functionNameFormat = "%sFunction"
 )
 
 type generatedData struct {
