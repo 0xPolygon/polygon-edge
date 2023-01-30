@@ -137,7 +137,7 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 
 		for i := startID.Int64(); i <= endID.Int64(); i++ {
 			// query the state sync proof
-			stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", int(i)))
+			stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
 			if err != nil {
 				r.logger.Error("Failed to query state sync proof", "err", err)
 
