@@ -159,7 +159,7 @@ func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
 	t.Helper()
 
 	stateSyncEvents := generateStateSyncEvents(t, stateSyncsCount, startIdx)
-	commitment, err := NewCommitment(epoch, stateSyncEvents)
+	commitment, err := NewPendingCommitment(epoch, stateSyncEvents)
 	require.NoError(t, err)
 
 	commitmentSigned := &CommitmentMessageSigned{

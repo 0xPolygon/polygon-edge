@@ -246,10 +246,10 @@ type InitializeCheckpointManagerFunction struct {
 	NewValidatorSet []*Validator  `abi:"newValidatorSet"`
 }
 
-func (I *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
-	return CheckpointManager.Abi.Methods["initialize"].Encode(I)
+func (i *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
+	return CheckpointManager.Abi.Methods["initialize"].Encode(i)
 }
 
-func (I *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
-	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, I)
+func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }

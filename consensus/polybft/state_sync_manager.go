@@ -480,7 +480,7 @@ func (s *stateSyncManager) buildCommitment() error {
 		return nil
 	}
 
-	commitment, err := NewCommitment(epoch, stateSyncEvents)
+	commitment, err := NewPendingCommitment(epoch, stateSyncEvents)
 	if err != nil {
 		return err
 	}

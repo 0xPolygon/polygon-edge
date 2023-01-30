@@ -294,7 +294,7 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 	inputs := map[string]interface{}{
 		"Structs":      res,
 		"Type":         methodType,
-		"Sig":          string(methodName[0]),
+		"Sig":          strings.ToLower(string(methodName[0])),
 		"Name":         method.Name,
 		"ContractName": contractName,
 		"TName":        strings.Title(methodName),

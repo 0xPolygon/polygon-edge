@@ -1293,7 +1293,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 		bitmap.Set(uint64(i))
 	}
 
-	commitment, err := NewCommitment(1, stateSyncEvents)
+	commitment, err := NewPendingCommitment(1, stateSyncEvents)
 	require.NoError(t, err)
 
 	hash, err := commitment.Hash()

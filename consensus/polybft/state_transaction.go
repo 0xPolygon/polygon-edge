@@ -25,8 +25,8 @@ type PendingCommitment struct {
 	Epoch      uint64
 }
 
-// NewCommitment creates a new commitment object
-func NewCommitment(epoch uint64, stateSyncEvents []*contractsapi.StateSyncedEvent) (*PendingCommitment, error) {
+// NewPendingCommitment creates a new commitment object
+func NewPendingCommitment(epoch uint64, stateSyncEvents []*contractsapi.StateSyncedEvent) (*PendingCommitment, error) {
 	tree, err := createMerkleTree(stateSyncEvents)
 	if err != nil {
 		return nil, err
@@ -153,11 +153,6 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 	}
 
 	return nil
-}
-
-// Type returns type of state transaction input
-func (cm *CommitmentMessageSigned) Type() contractsapi.StateTransactionType {
-	return stTypeBridgeCommitment
 }
 
 func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, error) {

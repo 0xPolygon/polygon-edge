@@ -500,7 +500,7 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
 	}
 
 	uptime := &contractsapi.Uptime{
-		EpochID:     big.NewInt(int64(epochID)),
+		EpochID:     new(big.Int).SetUint64(epochID),
 		TotalBlocks: big.NewInt(totalBlocks),
 	}
 
@@ -520,10 +520,10 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
 	}
 
 	commitEpoch := &contractsapi.CommitEpochFunction{
-		ID: big.NewInt(int64(epochID)),
+		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
-			StartBlock: big.NewInt(int64(epoch.FirstBlockInEpoch)),
-			EndBlock:   big.NewInt(int64(currentBlock.Number + 1)),
+			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
+			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
