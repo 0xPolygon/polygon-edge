@@ -2,11 +2,17 @@ package contractsapi
 
 import (
 	"embed"
+	"path"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 )
 
+const (
+	testContractsDir = "test-contracts"
+)
+
 var (
+	// core-contracts smart contracts
 	CheckpointManager *artifact.Artifact
 	ExitHelper        *artifact.Artifact
 	L2StateSender     *artifact.Artifact
@@ -18,6 +24,7 @@ var (
 	ChildValidatorSet *artifact.Artifact
 	MRC20             *artifact.Artifact
 
+	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
 	TestL1StateReceiver    *artifact.Artifact
@@ -77,7 +84,7 @@ func init() {
 		panic(err)
 	}
 
-	testL1StateReceiverRaw, err := testContracts.ReadFile("test-contracts/TestL1StateReceiver.json")
+	testL1StateReceiverRaw, err := testContracts.ReadFile(path.Join(testContractsDir, "TestL1StateReceiver.json"))
 	if err != nil {
 		panic(err)
 	}
@@ -87,7 +94,7 @@ func init() {
 		panic(err)
 	}
 
-	testWriteBlockMetadataRaw, err := testContracts.ReadFile("test-contracts/TestWriteBlockMetadata.json")
+	testWriteBlockMetadataRaw, err := testContracts.ReadFile(path.Join(testContractsDir, "TestWriteBlockMetadata.json"))
 	if err != nil {
 		panic(err)
 	}
