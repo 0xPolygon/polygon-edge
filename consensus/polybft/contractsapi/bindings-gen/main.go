@@ -215,7 +215,7 @@ func genAbiFuncsForNestedType(name string) string {
 	title := strings.Title(name)
 
 	inputs := map[string]interface{}{
-		"Sig":   string(name[0]),
+		"Sig":   strings.ToLower(string(name[0])),
 		"Name":  title,
 		"TName": title,
 	}
