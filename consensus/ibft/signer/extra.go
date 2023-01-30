@@ -50,6 +50,10 @@ func parseRound(v *fastrlp.Value) (*uint64, error) {
 		return nil, err
 	}
 
+	if len(roundBytes) == 0 {
+		return nil, nil
+	}
+
 	if len(roundBytes) > 8 {
 		return nil, ErrRoundNumberOverflow
 	}
@@ -90,13 +94,15 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(i.CommittedSeals.MarshalRLPWith(ar))
 
 	// ParentCommittedSeal
-	if i.ParentCommittedSeals != nil {
+	if i.ParentCommittedSeals == nil {
+		vv.Set(ar.NewNullArray())
+	} else {
 		vv.Set(i.ParentCommittedSeals.MarshalRLPWith(ar))
-	} else if i.RoundNumber != nil {
-		vv.Set(ar.NewNull())
 	}
 
-	if i.RoundNumber != nil {
+	if i.RoundNumber == nil {
+		vv.Set(ar.NewNull())
+	} else {
 		vv.Set(ar.NewBytes(
 			toRoundBytes(*i.RoundNumber),
 		))
@@ -306,11 +312,13 @@ func packCommittedSealsAndRoundNumberIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
-			} else if roundNumber != nil {
-				newArrayValue.Set(ar.NewNull())
+			} else {
+				newArrayValue.Set(ar.NewNullArray())
 			}
 
-			if roundNumber != nil {
+			if roundNumber == nil {
+				newArrayValue.Set(ar.NewNull())
+			} else {
 				newArrayValue.Set(ar.NewBytes(
 					toRoundBytes(*roundNumber),
 				))
