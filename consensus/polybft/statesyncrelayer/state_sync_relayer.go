@@ -2,6 +2,7 @@ package statesyncrelayer
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -9,7 +10,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
@@ -172,17 +172,33 @@ func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.Proof
 
 // executeStateSync executes the state sync
 func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
-	sse, ok := proof.Metadata["StateSync"].(*contractsapi.StateSyncedEvent)
+	sseMap, ok := proof.Metadata["StateSync"].(map[string]interface{})
 	if !ok {
 		return errors.New("could not get state sync event from proof")
 	}
 
-	stateSyncProof := &polybft.StateSyncProof{
-		Proof:     proof.Data,
-		StateSync: sse,
+	var sse *contractsapi.StateSync
+
+	// since state sync event is a map in the jsonrpc response,
+	// to not have custom logic of converting the map to state sync event
+	// json encoding is used, since it manages to successfully unmarshal the
+	// event from the marshaled map
+	raw, err := json.Marshal(sseMap)
+	if err != nil {
+		return fmt.Errorf("marshal the state sync map from to byte array failed. Error: %w", err)
 	}
 
-	input, err := stateSyncProof.EncodeAbi()
+	err = json.Unmarshal(raw, &sse)
+	if err != nil {
+		return fmt.Errorf("unmarshal of state sync from map failed. Error: %w", err)
+	}
+
+	execute := &contractsapi.ExecuteFunction{
+		Proof: proof.Data,
+		Obj:   sse,
+	}
+
+	input, err := execute.EncodeAbi()
 	if err != nil {
 		return err
 	}
@@ -202,7 +218,7 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("state sync execution failed: %d", stateSyncProof.StateSync.ID)
+		return fmt.Errorf("state sync execution failed: %d", execute.Obj.ID)
 	}
 
 	return nil
