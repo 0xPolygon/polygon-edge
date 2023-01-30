@@ -124,6 +124,21 @@ func (v *ValidatorMetadata) String() string {
 // AccountSet is a type alias for slice of ValidatorMetadata instances
 type AccountSet []*ValidatorMetadata
 
+// Equals compares checks if two AccountSet instances are equal (ordering is important)
+func (as AccountSet) Equals(other AccountSet) bool {
+	if len(as) != len(other) {
+		return false
+	}
+
+	for i := range as {
+		if !as[i].Equals(other[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // fmt.Stringer implementation
 func (as AccountSet) String() string {
 	metadataString := make([]string, len(as))
