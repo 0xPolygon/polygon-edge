@@ -736,8 +736,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		p.signalPruning()
 
 		//	only accept transactions with expected nonce
-		if account := p.accounts.get(tx.From); account != nil &&
-			tx.Nonce > account.getNonce() {
+		if acc := p.accounts.get(tx.From); acc != nil &&
+			tx.Nonce > acc.getNonce() {
 			return ErrRejectFutureTx
 		}
 	}
@@ -773,10 +773,10 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	addr := req.tx.From
 
 	// fetch account
-	account := p.accounts.get(addr)
+	acc := p.accounts.get(addr)
 
 	// enqueue tx
-	if err := account.enqueue(tx); err != nil {
+	if err := acc.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
 
 		p.index.remove(tx)
@@ -790,7 +790,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
-	if tx.Nonce > account.getNonce() {
+	if tx.Nonce > acc.getNonce() {
 		// don't signal promotion for
 		// higher nonce txs
 		return

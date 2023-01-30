@@ -337,6 +337,11 @@ func (t *TestServer) GenerateGenesis() error {
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
 
+	// add base fee
+	if t.Config.BaseFee != 0 {
+		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
+	}
+
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 

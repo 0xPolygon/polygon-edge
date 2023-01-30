@@ -160,6 +160,7 @@ func TestBlock_Encoding(t *testing.T) {
 		MixHash:      types.Hash{0x7},
 		Nonce:        types.Nonce{10},
 		Hash:         types.Hash{0x8},
+		BaseFee:      15,
 	}
 
 	testBlock := func(name string) {

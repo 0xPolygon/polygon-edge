@@ -20,6 +20,7 @@ type TxContext struct {
 	ChainID    int64
 	Difficulty types.Hash
 	Tracer     tracer.Tracer
+	BaseFee    *big.Int
 }
 
 // StorageStatus is the status of the storage access

@@ -318,6 +318,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  p.extraData,
 			GasUsed:    command.DefaultGenesisGasUsed,
+			BaseFee:    command.DefaultGenesisBaseFee,
 		},
 		Params: &chain.Params{
 			ChainID: int(p.chainID),
