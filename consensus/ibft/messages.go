@@ -26,7 +26,7 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 ) *protoIBFT.Message {
 	proposedBlock := &protoIBFT.Proposal{
 		RawProposal: rawProposal,
-		Round:         view.Round,
+		Round:       view.Round,
 	}
 
 	// hash calculation begins
@@ -99,7 +99,7 @@ func (i *backendIBFT) BuildRoundChangeMessage(
 		From: i.ID(),
 		Type: protoIBFT.MessageType_ROUND_CHANGE,
 		Payload: &protoIBFT.Message_RoundChangeData{RoundChangeData: &protoIBFT.RoundChangeMessage{
-			LastPreparedProposal: proposal,
+			LastPreparedProposal:      proposal,
 			LatestPreparedCertificate: certificate,
 		}},
 	}
