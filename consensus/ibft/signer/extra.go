@@ -43,7 +43,6 @@ type Seals interface {
 }
 
 // parseRound parses RLP-encoded bytes into round
-// FYI, Extra has 8 bytes space for round in order to distinguish between null and 0
 func parseRound(v *fastrlp.Value) (*uint64, error) {
 	roundBytes, err := v.Bytes()
 	if err != nil {
@@ -64,6 +63,8 @@ func parseRound(v *fastrlp.Value) (*uint64, error) {
 }
 
 // toRoundBytes converts uint64 round to bytes
+// Round begins with zero and it can be nil for backward compatibility.
+// For that reason, Extra always has 8 bytes space for a round when the round has value.
 func toRoundBytes(round uint64) []byte {
 	roundBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(roundBytes, round)
