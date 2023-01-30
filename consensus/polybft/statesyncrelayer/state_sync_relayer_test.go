@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	stateSync "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -48,9 +47,9 @@ func Test_executeStateSync(t *testing.T) {
 		key:       key,
 	}
 
-	sp := &stateSync.StateSyncProof{
+	sp := &contractsapi.ExecuteFunction{
 		Proof: []types.Hash{},
-		StateSync: &contractsapi.StateSyncedEvent{
+		Obj: &contractsapi.StateSync{
 			ID:       big.NewInt(1),
 			Sender:   types.ZeroAddress,
 			Receiver: types.ZeroAddress,
@@ -73,7 +72,12 @@ func Test_executeStateSync(t *testing.T) {
 	proof := &types.Proof{
 		Data: sp.Proof,
 		Metadata: map[string]interface{}{
-			"StateSync": sp.StateSync,
+			"StateSync": map[string]interface{}{
+				"ID":       sp.Obj.ID,
+				"Sender":   sp.Obj.Sender,
+				"Receiver": sp.Obj.Receiver,
+				"Data":     sp.Obj.Data,
+			},
 		},
 	}
 

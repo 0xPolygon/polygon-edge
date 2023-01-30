@@ -462,10 +462,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 	require.Equal(t, stateSyncID, stateSync.ID.Uint64())
 	require.NotEmpty(t, proof.Data)
 
-	require.NoError(t, commitment.VerifyStateSyncProof(&StateSyncProof{
-		Proof:     proof.Data,
-		StateSync: stateSync,
-	}))
+	require.NoError(t, commitment.VerifyStateSyncProof(proof.Data, stateSync))
 }
 
 type mockTopic struct {

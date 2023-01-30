@@ -72,19 +72,20 @@ func (cm *CommitmentMessageSigned) Hash() (types.Hash, error) {
 }
 
 // VerifyStateSyncProof validates given state sync proof
-// against merkle trie root hash contained in the CommitmentMessage
-func (cm *CommitmentMessageSigned) VerifyStateSyncProof(stateSyncProof *StateSyncProof) error {
-	if stateSyncProof.StateSync == nil {
+// against merkle tree root hash contained in the CommitmentMessage
+func (cm *CommitmentMessageSigned) VerifyStateSyncProof(proof []types.Hash,
+	stateSync *contractsapi.StateSyncedEvent) error {
+	if stateSync == nil {
 		return errors.New("no state sync event")
 	}
 
-	hash, err := stateSyncProof.StateSync.EncodeAbi()
+	hash, err := stateSync.EncodeAbi()
 	if err != nil {
 		return err
 	}
 
-	return VerifyProof(stateSyncProof.StateSync.ID.Uint64()-cm.Message.StartID.Uint64(),
-		hash, stateSyncProof.Proof, cm.Message.Root)
+	return VerifyProof(stateSync.ID.Uint64()-cm.Message.StartID.Uint64(),
+		hash, proof, cm.Message.Root)
 }
 
 // ContainsStateSync checks if commitment contains given state sync event

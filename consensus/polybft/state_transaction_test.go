@@ -94,23 +94,24 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 
 	for i, stateSync := range stateSyncs {
 		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
-		stateSyncsProof := &StateSyncProof{
-			Proof:     proof,
-			StateSync: stateSync,
+		execute := &contractsapi.ExecuteFunction{
+			Proof: proof,
+			Obj:   (*contractsapi.StateSync)(stateSync),
 		}
 
-		inputData, err := stateSyncsProof.EncodeAbi()
+		inputData, err := execute.EncodeAbi()
 		require.NoError(t, err)
 
-		executionStateSync := &StateSyncProof{}
+		executionStateSync := &contractsapi.ExecuteFunction{}
 		require.NoError(t, executionStateSync.DecodeAbi(inputData))
-		require.Equal(t, stateSyncsProof.StateSync.ID.Uint64(), executionStateSync.StateSync.ID.Uint64())
-		require.Equal(t, stateSyncsProof.StateSync.Sender, executionStateSync.StateSync.Sender)
-		require.Equal(t, stateSyncsProof.StateSync.Receiver, executionStateSync.StateSync.Receiver)
-		require.Equal(t, stateSyncsProof.StateSync.Data, executionStateSync.StateSync.Data)
-		require.Equal(t, stateSyncsProof.Proof, executionStateSync.Proof)
+		require.Equal(t, stateSync.ID.Uint64(), executionStateSync.Obj.ID.Uint64())
+		require.Equal(t, stateSync.Sender, executionStateSync.Obj.Sender)
+		require.Equal(t, stateSync.Receiver, executionStateSync.Obj.Receiver)
+		require.Equal(t, stateSync.Data, executionStateSync.Obj.Data)
+		require.Equal(t, proof, executionStateSync.Proof)
 
-		err = commitmentSigned.VerifyStateSyncProof(executionStateSync)
+		err = commitmentSigned.VerifyStateSyncProof(executionStateSync.Proof,
+			(*contractsapi.StateSyncedEvent)(executionStateSync.Obj))
 		require.NoError(t, err)
 	}
 }
@@ -119,7 +120,7 @@ func TestCommitmentMessage_VerifyProof_NoStateSyncsInCommitment(t *testing.T) {
 	t.Parallel()
 
 	commitment := &CommitmentMessageSigned{Message: &contractsapi.StateSyncCommitment{StartID: big.NewInt(1), EndID: big.NewInt(10)}}
-	err := commitment.VerifyStateSyncProof(&StateSyncProof{})
+	err := commitment.VerifyStateSyncProof([]types.Hash{}, nil)
 	assert.ErrorContains(t, err, "no state sync event")
 }
 
@@ -132,25 +133,20 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	)
 
 	stateSyncs := generateStateSyncEvents(t, 5, 0)
-	trie, err := createMerkleTree(stateSyncs)
+	tree, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	proof := trie.GenerateProof(0, 0)
-
-	stateSyncProof := &StateSyncProof{
-		StateSync: stateSyncs[4],
-		Proof:     proof,
-	}
+	proof := tree.GenerateProof(0, 0)
 
 	commitment := &CommitmentMessageSigned{
 		Message: &contractsapi.StateSyncCommitment{
 			StartID: big.NewInt(fromIndex),
 			EndID:   big.NewInt(toIndex),
-			Root:    trie.Hash(),
+			Root:    tree.Hash(),
 		},
 	}
 
-	assert.ErrorContains(t, commitment.VerifyStateSyncProof(stateSyncProof), "not a member of merkle tree")
+	assert.ErrorContains(t, commitment.VerifyStateSyncProof(proof, stateSyncs[4]), "not a member of merkle tree")
 }
 
 func buildCommitmentAndStateSyncs(t *testing.T, stateSyncsCount int,
