@@ -4,7 +4,6 @@ package storage
 import (
 	"encoding/binary"
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -13,9 +12,6 @@ import (
 
 // Prefixes for the key-value store
 var (
-	// DIFFICULTY is the difficulty prefix
-	DIFFICULTY = []byte("d")
-
 	// HEADER is the header prefix
 	HEADER = []byte("h")
 
@@ -149,23 +145,6 @@ func (s *KeyValueStorage) ReadForks() ([]types.Hash, error) {
 	return *forks, err
 }
 
-// DIFFICULTY //
-
-// WriteTotalDifficulty writes the difficulty
-func (s *KeyValueStorage) WriteTotalDifficulty(hash types.Hash, diff *big.Int) error {
-	return s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
-}
-
-// ReadTotalDifficulty reads the difficulty
-func (s *KeyValueStorage) ReadTotalDifficulty(hash types.Hash) (*big.Int, bool) {
-	v, ok := s.get(DIFFICULTY, hash.Bytes())
-	if !ok {
-		return nil, false
-	}
-
-	return big.NewInt(0).SetBytes(v), true
-}
-
 // HEADER //
 
 // WriteHeader writes the header
@@ -182,7 +161,7 @@ func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, error) {
 }
 
 // WriteCanonicalHeader implements the storage interface
-func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
+func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header) error {
 	if err := s.WriteHeader(h); err != nil {
 		return err
 	}
@@ -196,10 +175,6 @@ func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) e
 	}
 
 	if err := s.WriteCanonicalHash(h.Number, h.Hash); err != nil {
-		return err
-	}
-
-	if err := s.WriteTotalDifficulty(h.Hash, diff); err != nil {
 		return err
 	}
 

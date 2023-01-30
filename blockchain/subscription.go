@@ -1,7 +1,6 @@
 package blockchain
 
 import (
-	"math/big"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -100,9 +99,6 @@ type Event struct {
 	// New part of the chain (or a fork)
 	NewChain []*types.Header
 
-	// Difficulty is the new difficulty created with this event
-	Difficulty *big.Int
-
 	// Type is the type of event
 	Type EventType
 
@@ -114,11 +110,6 @@ type Event struct {
 // Header returns the latest block header for the event
 func (e *Event) Header() *types.Header {
 	return e.NewChain[len(e.NewChain)-1]
-}
-
-// SetDifficulty sets the event difficulty
-func (e *Event) SetDifficulty(b *big.Int) {
-	e.Difficulty = new(big.Int).Set(b)
 }
 
 // AddNewHeader appends a header to the event's NewChain array

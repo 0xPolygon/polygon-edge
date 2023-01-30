@@ -28,9 +28,6 @@ func TestStorage(t *testing.T, m PlaceholderStorage) {
 		testCanonicalChain(t, m)
 	})
 	t.Run("", func(t *testing.T) {
-		testDifficulty(t, m)
-	})
-	t.Run("", func(t *testing.T) {
 		testHead(t, m)
 	})
 	t.Run("", func(t *testing.T) {
@@ -99,53 +96,6 @@ func testCanonicalChain(t *testing.T, m PlaceholderStorage) {
 
 		if !reflect.DeepEqual(data, hash) {
 			t.Fatal("not match")
-		}
-	}
-}
-
-func testDifficulty(t *testing.T, m PlaceholderStorage) {
-	t.Helper()
-
-	s, closeFn := m(t)
-	defer closeFn()
-
-	var cases = []struct {
-		Diff *big.Int
-	}{
-		{
-			Diff: big.NewInt(10),
-		},
-		{
-			Diff: big.NewInt(11),
-		},
-		{
-			Diff: big.NewInt(12),
-		},
-	}
-
-	for indx, cc := range cases {
-		h := &types.Header{
-			Number:    uint64(indx),
-			ExtraData: []byte{},
-		}
-
-		hash := h.Hash
-
-		if err := s.WriteHeader(h); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := s.WriteTotalDifficulty(hash, cc.Diff); err != nil {
-			t.Fatal(err)
-		}
-
-		diff, ok := s.ReadTotalDifficulty(hash)
-		if !ok {
-			t.Fatal("not found")
-		}
-
-		if !reflect.DeepEqual(cc.Diff, diff) {
-			t.Fatal("bad")
 		}
 	}
 }
@@ -405,9 +355,7 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 	}
 	h.ComputeHash()
 
-	diff := new(big.Int).SetUint64(100)
-
-	if err := s.WriteCanonicalHeader(h, diff); err != nil {
+	if err := s.WriteCanonicalHeader(h); err != nil {
 		t.Fatal(err)
 	}
 
@@ -460,7 +408,7 @@ type writeTotalDifficultyDelegate func(types.Hash, *big.Int) error
 type readTotalDifficultyDelegate func(types.Hash) (*big.Int, bool)
 type writeHeaderDelegate func(*types.Header) error
 type readHeaderDelegate func(types.Hash) (*types.Header, error)
-type writeCanonicalHeaderDelegate func(*types.Header, *big.Int) error
+type writeCanonicalHeaderDelegate func(*types.Header) error
 type writeBodyDelegate func(types.Hash, *types.Body) error
 type readBodyDelegate func(types.Hash) (*types.Body, error)
 type writeSnapshotDelegate func(types.Hash, []byte) error
@@ -642,9 +590,9 @@ func (m *MockStorage) HookReadHeader(fn readHeaderDelegate) {
 	m.readHeaderFn = fn
 }
 
-func (m *MockStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
+func (m *MockStorage) WriteCanonicalHeader(h *types.Header) error {
 	if m.writeCanonicalHeaderFn != nil {
-		return m.writeCanonicalHeaderFn(h, diff)
+		return m.writeCanonicalHeaderFn(h)
 	}
 
 	return nil
