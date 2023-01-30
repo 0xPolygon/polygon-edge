@@ -16,7 +16,7 @@ var (
 )
 
 type snapshotParams struct {
-	blockNumber int
+	blockNumber int64
 
 	snapshot *ibftOp.Snapshot
 }
