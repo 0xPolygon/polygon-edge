@@ -20,17 +20,17 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 }
 
 func (i *backendIBFT) BuildPrePrepareMessage(
-	ethereumBlock []byte,
+	rawProposal []byte,
 	certificate *protoIBFT.RoundChangeCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
-	proposedBlock := &protoIBFT.ProposedBlock{
-		EthereumBlock: ethereumBlock,
+	proposedBlock := &protoIBFT.Proposal{
+		RawProposal: rawProposal,
 		Round:         view.Round,
 	}
 
 	// hash calculation begins
-	proposalHash, err := i.calculateProposalHashFromBlockBytes(ethereumBlock, &view.Round)
+	proposalHash, err := i.calculateProposalHashFromBlockBytes(rawProposal, &view.Round)
 	if err != nil {
 		return nil
 	}
@@ -90,7 +90,7 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 }
 
 func (i *backendIBFT) BuildRoundChangeMessage(
-	proposal *protoIBFT.ProposedBlock,
+	proposal *protoIBFT.Proposal,
 	certificate *protoIBFT.PreparedCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
@@ -99,7 +99,7 @@ func (i *backendIBFT) BuildRoundChangeMessage(
 		From: i.ID(),
 		Type: protoIBFT.MessageType_ROUND_CHANGE,
 		Payload: &protoIBFT.Message_RoundChangeData{RoundChangeData: &protoIBFT.RoundChangeMessage{
-			LastPreparedProposedBlock: proposal,
+			LastPreparedProposal: proposal,
 			LatestPreparedCertificate: certificate,
 		}},
 	}

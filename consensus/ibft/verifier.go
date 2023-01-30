@@ -59,7 +59,7 @@ func (i *backendIBFT) calculateProposalHash(
 	), nil
 }
 
-func (i *backendIBFT) IsValidBlock(ethereumBlock []byte) bool {
+func (i *backendIBFT) IsValidProposal(rawProposal []byte) bool {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -67,7 +67,7 @@ func (i *backendIBFT) IsValidBlock(ethereumBlock []byte) bool {
 	)
 
 	// retrieve the newBlock proposal
-	if err := newBlock.UnmarshalRLP(ethereumBlock); err != nil {
+	if err := newBlock.UnmarshalRLP(rawProposal); err != nil {
 		i.logger.Error("IsValidProposal: fail to unmarshal block", "err", err)
 
 		return false
@@ -111,7 +111,7 @@ func (i *backendIBFT) IsValidBlock(ethereumBlock []byte) bool {
 	return true
 }
 
-func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
+func (i *backendIBFT) IsValidValidator(msg *protoIBFT.Message) bool {
 	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return false
@@ -182,8 +182,8 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 	return types.BytesToAddress(id) == nextProposer.Addr()
 }
 
-func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.ProposedBlock, hash []byte) bool {
-	proposalHash, err := i.calculateProposalHashFromBlockBytes(proposal.EthereumBlock, &proposal.Round)
+func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.Proposal, hash []byte) bool {
+	proposalHash, err := i.calculateProposalHashFromBlockBytes(proposal.RawProposal, &proposal.Round)
 	if err != nil {
 		return false
 	}

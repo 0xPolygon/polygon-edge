@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildEthereumBlock(blockNumber uint64) []byte {
+func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -41,13 +41,12 @@ func (i *backendIBFT) BuildEthereumBlock(blockNumber uint64) []byte {
 }
 
 // InsertProposal inserts a proposal of which the consensus has been got
-func (i *backendIBFT) InsertBlock(
-	ethereumBlock []byte,
-	round uint64,
+func (i *backendIBFT) InsertProposal(
+	proposal *proto.Proposal,
 	committedSeals []*messages.CommittedSeal,
 ) {
 	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(ethereumBlock); err != nil {
+	if err := newBlock.UnmarshalRLP(proposal.RawProposal); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
 
 		return
@@ -65,7 +64,7 @@ func (i *backendIBFT) InsertBlock(
 	copy(extraDataBackup, extraDataOriginal)
 
 	// Push the committed seals to the header
-	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, round, committedSealsMap)
+	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, proposal.Round, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
