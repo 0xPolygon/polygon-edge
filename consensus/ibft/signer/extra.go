@@ -23,7 +23,7 @@ var (
 
 	zeroBytes = make([]byte, 32)
 
-	ErrRoundNumberOverflow = errors.New("round number is out of range for 64bit")
+	errRoundNumberOverflow = errors.New("round number is out of range for 64bit")
 )
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
@@ -42,7 +42,7 @@ type Seals interface {
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
 }
 
-// parseRoundNumber parses RLP-encoded bytes into round
+// parseRound parses RLP-encoded bytes into round
 // FYI, Extra has 8 bytes space for round in order to distinguish between null and 0
 func parseRound(v *fastrlp.Value) (*uint64, error) {
 	roundBytes, err := v.Bytes()
@@ -50,12 +50,12 @@ func parseRound(v *fastrlp.Value) (*uint64, error) {
 		return nil, err
 	}
 
-	if len(roundBytes) == 0 {
-		return nil, nil
+	if len(roundBytes) > 8 {
+		return nil, errRoundNumberOverflow
 	}
 
-	if len(roundBytes) > 8 {
-		return nil, ErrRoundNumberOverflow
+	if len(roundBytes) == 0 {
+		return nil, nil
 	}
 
 	round := binary.BigEndian.Uint64(roundBytes)
