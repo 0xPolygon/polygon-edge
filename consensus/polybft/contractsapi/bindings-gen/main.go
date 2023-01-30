@@ -73,16 +73,15 @@ func main() {
 		},
 	}
 
-	rr := render{}
 	generatedData := &generatedData{}
 
 	for _, c := range cases {
 		for _, method := range c.functions {
-			rr.GenMethod(generatedData, c.contractName, c.artifact.Abi.Methods[method])
+			generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method])
 		}
 
 		for _, event := range c.events {
-			rr.GenEvent(generatedData, c.contractName, c.artifact.Abi.Events[event])
+			generateEvent(generatedData, c.contractName, c.artifact.Abi.Events[event])
 		}
 	}
 
@@ -128,7 +127,8 @@ func getInternalType(paramName string, paramAbiType *abi.Type) string {
 	return internalType
 }
 
-func genType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
+// generateType generates code for structs used in smart contract functions and events
+func generateType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
 	if obj.Kind() != abi.KindTuple {
 		panic("BUG: Not expected")
 	}
@@ -147,14 +147,14 @@ func genType(generatedData *generatedData, name string, obj *abi.Type, res *[]st
 
 		if elem.Kind() == abi.KindTuple {
 			// Struct
-			typ = genNestedType(generatedData, tupleElem.Name, elem, res)
+			typ = generateNestedType(generatedData, tupleElem.Name, elem, res)
 		} else if elem.Kind() == abi.KindSlice && elem.Elem().Kind() == abi.KindTuple {
 			// []Struct
-			typ = "[]" + genNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			typ = "[]" + generateNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
 		} else if elem.Kind() == abi.KindArray && elem.Elem().Kind() == abi.KindTuple {
 			// [n]Struct
 			typ = "[" + strconv.Itoa(elem.Size()) + "]" +
-				genNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+				generateNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
 		} else if elem.Kind() == abi.KindAddress {
 			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
 			// this only works for simple types and not for []address inputs. This is good enough since
@@ -187,7 +187,8 @@ func genType(generatedData *generatedData, name string, obj *abi.Type, res *[]st
 	return internalType
 }
 
-func genNestedType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
+// generateNestedType generates code for nested types found in smart contracts structs
+func generateNestedType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
 	for _, s := range generatedData.structs {
 		if s == name {
 			// do not generate the same type again if it's already generated
@@ -196,14 +197,15 @@ func genNestedType(generatedData *generatedData, name string, obj *abi.Type, res
 		}
 	}
 
-	result := genType(generatedData, name, obj, res)
+	result := generateType(generatedData, name, obj, res)
 	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, result, obj.Format(true)))
-	*res = append(*res, genAbiFuncsForNestedType(result))
+	*res = append(*res, generateAbiFuncsForNestedType(result))
 
 	return "*" + result
 }
 
-func genAbiFuncsForNestedType(name string) string {
+// generateAbiFuncsForNestedType generates necessary functions for nested types smart contracts interaction
+func generateAbiFuncsForNestedType(name string) string {
 	tmpl := `func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
 		return {{.Name}}ABIType.Encode({{.Sig}})
 	}
@@ -223,14 +225,12 @@ func genAbiFuncsForNestedType(name string) string {
 	return renderTmpl(tmpl, inputs)
 }
 
-type render struct {
-}
-
-func (r *render) GenEvent(generatedData *generatedData, contractName string, event *abi.Event) {
+// generateEvent generates code for smart contract events
+func generateEvent(generatedData *generatedData, contractName string, event *abi.Event) {
 	name := fmt.Sprintf(eventNameFormat, event.Name)
 
 	res := []string{}
-	genType(generatedData, name, event.Inputs, &res)
+	generateType(generatedData, name, event.Inputs, &res)
 
 	// write encode/decode functions
 	tmplStr := `
@@ -253,7 +253,8 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 	generatedData.resultString = append(generatedData.resultString, renderTmpl(tmplStr, inputs))
 }
 
-func (r *render) GenMethod(generatedData *generatedData, contractName string, method *abi.Method) {
+// generateFunction generates code for smart contract function and its parameters
+func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) {
 	methodName := method.Name
 	if methodName == "initialize" {
 		// most of the contracts have initialize function, which differ in params
@@ -264,7 +265,7 @@ func (r *render) GenMethod(generatedData *generatedData, contractName string, me
 	methodName = fmt.Sprintf(functionNameFormat, methodName)
 
 	res := []string{}
-	genType(generatedData, methodName, method.Inputs, &res)
+	generateType(generatedData, methodName, method.Inputs, &res)
 
 	// write encode/decode functions
 	tmplStr := `
