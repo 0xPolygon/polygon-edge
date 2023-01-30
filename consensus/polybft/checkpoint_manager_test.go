@@ -464,7 +464,7 @@ func TestPerformExit(t *testing.T) {
 			Code: contractsapi.BLS256.DeployedBytecode,
 		},
 		l1Cntract: {
-			Code: contractsapi.L1ExitDeployedBytecode,
+			Code: contractsapi.TestL1StateReceiver.DeployedBytecode,
 		},
 	}
 	transition := newTestTransition(t, alloc)
@@ -593,13 +593,13 @@ func TestPerformExit(t *testing.T) {
 	res = getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
 	require.Equal(t, int(res[31]), 1)
 
-	lastID := getField(l1Cntract, contractsapi.L1ExitTestABI, "id")
+	lastID := getField(l1Cntract, contractsapi.TestL1StateReceiver.Abi, "id")
 	require.Equal(t, lastID[31], uint8(1))
 
-	lastAddr := getField(l1Cntract, contractsapi.L1ExitTestABI, "addr")
+	lastAddr := getField(l1Cntract, contractsapi.TestL1StateReceiver.Abi, "addr")
 	require.Equal(t, exits[0].Sender[:], lastAddr[12:])
 
-	lastCounter := getField(l1Cntract, contractsapi.L1ExitTestABI, "counter")
+	lastCounter := getField(l1Cntract, contractsapi.TestL1StateReceiver.Abi, "counter")
 	require.Equal(t, lastCounter[31], uint8(1))
 }
 
