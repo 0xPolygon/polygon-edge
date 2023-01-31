@@ -2,16 +2,64 @@ package ibft
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Verifier impl for go-ibft
+// calculateProposalHashFromBlockBytes is a helper method to marshal ethereum block in bytes
+// and pass to calculateProposalHash
+func (i *backendIBFT) calculateProposalHashFromBlockBytes(
+	proposal []byte,
+	round *uint64,
+) (types.Hash, error) {
+	block := &types.Block{}
+	if err := block.UnmarshalRLP(proposal); err != nil {
+		return types.ZeroHash, err
+	}
 
-func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
+	signer, err := i.forkManager.GetSigner(block.Number())
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return i.calculateProposalHash(
+		signer,
+		block.Header,
+		round,
+	)
+}
+
+// calculateProposalHash is new hash calculation for proposal in go-ibft,
+// which includes round number block is finalized at
+func (i *backendIBFT) calculateProposalHash(
+	signer signer.Signer,
+	header *types.Header,
+	round *uint64,
+) (types.Hash, error) {
+	if round == nil {
+		// legacy hash calculation
+		return header.Hash, nil
+	}
+
+	roundBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(roundBytes, *round)
+
+	return types.BytesToHash(
+		crypto.Keccak256(
+			header.Hash.Bytes(),
+			roundBytes,
+		),
+	), nil
+}
+
+func (i *backendIBFT) IsValidProposal(rawProposal []byte) bool {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -19,8 +67,8 @@ func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	)
 
 	// retrieve the newBlock proposal
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("IsValidBlock: fail to unmarshal block", "err", err)
+	if err := newBlock.UnmarshalRLP(rawProposal); err != nil {
+		i.logger.Error("IsValidProposal: fail to unmarshal block", "err", err)
 
 		return false
 	}
@@ -63,7 +111,7 @@ func (i *backendIBFT) IsValidBlock(proposal []byte) bool {
 	return true
 }
 
-func (i *backendIBFT) IsValidSender(msg *protoIBFT.Message) bool {
+func (i *backendIBFT) IsValidValidator(msg *protoIBFT.Message) bool {
 	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return false
@@ -134,17 +182,13 @@ func (i *backendIBFT) IsProposer(id []byte, height, round uint64) bool {
 	return types.BytesToAddress(id) == nextProposer.Addr()
 }
 
-func (i *backendIBFT) IsValidProposalHash(proposal, hash []byte) bool {
-	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
-		i.logger.Error("unable to unmarshal proposal", "err", err)
-
+func (i *backendIBFT) IsValidProposalHash(proposal *protoIBFT.Proposal, hash []byte) bool {
+	proposalHash, err := i.calculateProposalHashFromBlockBytes(proposal.RawProposal, &proposal.Round)
+	if err != nil {
 		return false
 	}
 
-	blockHash := newBlock.Header.Hash.Bytes()
-
-	return bytes.Equal(blockHash, hash)
+	return bytes.Equal(proposalHash.Bytes(), hash)
 }
 
 func (i *backendIBFT) IsValidCommittedSeal(
