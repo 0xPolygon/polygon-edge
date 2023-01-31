@@ -147,12 +147,7 @@ func CreateDirSafe(path string, perms fs.FileMode) error {
 	}
 
 	// verify that existing directory's owner and permissions are safe
-	err = verifyFileOwnerAndPermissions(path, info, perms)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return verifyFileOwnerAndPermissions(path, info, perms)
 }
 
 // Creates a file at path and with perms level permissions.
@@ -167,18 +162,13 @@ func SaveFileSafe(path string, data []byte, perms fs.FileMode) error {
 
 	if FileExists(path) {
 		// verify that existing file's owner and permissions are safe
-		err := verifyFileOwnerAndPermissions(path, info, perms)
-		if err != nil {
+		if err := verifyFileOwnerAndPermissions(path, info, perms); err != nil {
 			return err
 		}
 	}
 
 	// create or overwrite the file
-	if err := os.WriteFile(path, data, perms); err != nil {
-		return err
-	}
-
-	return nil
+	return os.WriteFile(path, data, perms)
 }
 
 // Verifies that the file owner is the current user,
