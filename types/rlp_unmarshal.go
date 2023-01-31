@@ -219,8 +219,11 @@ func (h *Header) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 	h.SetNonce(nonce)
 
 	// basefee
-	if h.BaseFee, err = elems[15].GetUint64(); err != nil {
-		return err
+	// In order to be backward compatible, the len should be checked before accessing the element
+	if len(elems) > 15 {
+		if h.BaseFee, err = elems[15].GetUint64(); err != nil {
+			return err
+		}
 	}
 
 	// compute the hash after the decoding
