@@ -264,16 +264,13 @@ func (f *fsm) Validate(proposal []byte) error {
 	nextValidators := f.validators.Accounts()
 
 	validateExtraData := func(transition *state.Transition) error {
-		nextValidators, err = f.getCurrentValidators(transition)
-		if err != nil {
-			return err
+		if f.isEndOfEpoch {
+			if nextValidators, err = f.getCurrentValidators(transition); err != nil {
+				return err
+			}
 		}
 
-		if err := currentExtra.Validate(parentExtra, currentValidators, nextValidators); err != nil {
-			return err
-		}
-
-		return nil
+		return currentExtra.Validate(parentExtra, currentValidators, nextValidators)
 	}
 
 	// TODO: Validate validator set delta?
