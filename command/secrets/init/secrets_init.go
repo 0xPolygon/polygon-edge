@@ -84,6 +84,13 @@ func setFlags(cmd *cobra.Command) {
 		true,
 		"the flag indicating whether new BLS key is created",
 	)
+
+	cmd.Flags().BoolVar(
+		&basicParams.insecureLocalStore,
+		insecureLocalStore,
+		false,
+		"the flag indicating should the secrets stored on the local storage be encrypted",
+	)
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -131,11 +138,12 @@ func getParamsList() []initParams {
 	paramsList := make([]initParams, initNumber)
 	for i := 1; i <= initNumber; i++ {
 		paramsList[i-1] = initParams{
-			dataDir:          fmt.Sprintf("%s%d", basicParams.dataDir, i),
-			configPath:       basicParams.configPath,
-			generatesECDSA:   basicParams.generatesECDSA,
-			generatesBLS:     basicParams.generatesBLS,
-			generatesNetwork: basicParams.generatesNetwork,
+			dataDir:            fmt.Sprintf("%s%d", basicParams.dataDir, i),
+			configPath:         basicParams.configPath,
+			generatesECDSA:     basicParams.generatesECDSA,
+			generatesBLS:       basicParams.generatesBLS,
+			generatesNetwork:   basicParams.generatesNetwork,
+			insecureLocalStore: basicParams.insecureLocalStore,
 		}
 	}
 

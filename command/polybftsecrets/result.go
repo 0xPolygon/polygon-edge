@@ -27,6 +27,7 @@ type SecretsInitResult struct {
 	BLSPubkey  string        `json:"bls_pubkey"`
 	NodeID     string        `json:"node_id"`
 	PrivateKey string        `json:"private_key"`
+	Insecure   bool          `json:"insecure"`
 }
 
 func (r *SecretsInitResult) GetOutput() string {
@@ -54,6 +55,10 @@ func (r *SecretsInitResult) GetOutput() string {
 	}
 
 	vals = append(vals, fmt.Sprintf("Node ID|%s", r.NodeID))
+
+	if r.Insecure {
+		buffer.WriteString("\n[WARNING: INSECURE LOCAL SECRETS - SHOULD NOT BE RUN IN PRODUCTION]\n")
+	}
 
 	buffer.WriteString("\n[SECRETS INIT]\n")
 	buffer.WriteString(helper.FormatKV(vals))
