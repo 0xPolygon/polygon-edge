@@ -201,7 +201,7 @@ func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms 
 
 	// check if permissions are set correctly by the owner
 	if info.Mode() != expectedPerms {
-		return fmt.Errorf("permissions of the file/directory is set incorrectly by another user: %s", path)
+		return fmt.Errorf("permissions of the file/directory '%s' are set incorrectly by another user", path)
 	}
 
 	return nil
