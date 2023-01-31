@@ -1460,16 +1460,19 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	// If the parent block used more gas than its target, the baseFee should increase.
 	if parent.GasUsed > parentGasTarget {
 		gasUsedDelta := parent.GasUsed - parentGasTarget
-		y := parent.BaseFee * gasUsedDelta / parentGasTarget
-		baseFeeDelta := y / defaultBaseFeeChangeDenom
+		baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
 
 		return parent.BaseFee + common.Max(baseFeeDelta, 1)
 	}
 
 	// Otherwise, if the parent block used less gas than its target, the baseFee should decrease.
 	gasUsedDelta := parentGasTarget - parent.GasUsed
-	y := parent.BaseFee * gasUsedDelta / parentGasTarget
-	baseFeeDelta := y / defaultBaseFeeChangeDenom
+	baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
 
 	return common.Max(parent.BaseFee-baseFeeDelta, 0)
+}
+
+func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
+	y := baseFee * gasUsedDelta / parentGasTarget
+	return y / defaultBaseFeeChangeDenom
 }
