@@ -243,7 +243,6 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 	}
 
 	submit := &contractsapi.SubmitFunction{
-		ChainID: new(big.Int).SetUint64(c.blockchain.GetChainID()),
 		CheckpointMetadata: &contractsapi.CheckpointMetadata{
 			BlockHash:               blockHash,
 			BlockRound:              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),

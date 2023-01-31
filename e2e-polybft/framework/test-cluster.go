@@ -338,7 +338,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge-json-rpc", rootchainIP)
 		}
 
-		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+		validators, err := genesis.ReadValidatorsByPrefix(
+			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix, command.DefaultChainID)
 		require.NoError(t, err)
 
 		if cluster.Config.BootnodeCount > 0 {

@@ -269,6 +269,7 @@ func initializeCheckpointManager(
 	}
 
 	initialize := contractsapi.InitializeCheckpointManagerFunction{
+		ChainID_:        big.NewInt(manifest.ChainID),
 		NewBls:          manifest.RootchainConfig.BLSAddress,
 		NewBn256G2:      manifest.RootchainConfig.BN256G2Address,
 		NewDomain:       types.BytesToHash(bls.GetDomain()),

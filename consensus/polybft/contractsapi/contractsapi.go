@@ -150,6 +150,55 @@ func (c *CommitEpochFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
 
+type InitStruct struct {
+	EpochReward   *big.Int `abi:"epochReward"`
+	MinStake      *big.Int `abi:"minStake"`
+	MinDelegation *big.Int `abi:"minDelegation"`
+	EpochSize     *big.Int `abi:"epochSize"`
+}
+
+var InitStructABIType = abi.MustNewType("tuple(uint256 epochReward,uint256 minStake,uint256 minDelegation,uint256 epochSize)")
+
+func (i *InitStruct) EncodeAbi() ([]byte, error) {
+	return InitStructABIType.Encode(i)
+}
+
+func (i *InitStruct) DecodeAbi(buf []byte) error {
+	return decodeStruct(InitStructABIType, buf, &i)
+}
+
+type ValidatorInit struct {
+	Addr      types.Address `abi:"addr"`
+	Pubkey    [4]*big.Int   `abi:"pubkey"`
+	Signature [2]*big.Int   `abi:"signature"`
+	Stake     *big.Int      `abi:"stake"`
+}
+
+var ValidatorInitABIType = abi.MustNewType("tuple(address addr,uint256[4] pubkey,uint256[2] signature,uint256 stake)")
+
+func (v *ValidatorInit) EncodeAbi() ([]byte, error) {
+	return ValidatorInitABIType.Encode(v)
+}
+
+func (v *ValidatorInit) DecodeAbi(buf []byte) error {
+	return decodeStruct(ValidatorInitABIType, buf, &v)
+}
+
+type InitializeChildValidatorSetFunction struct {
+	Init       *InitStruct      `abi:"init"`
+	Validators []*ValidatorInit `abi:"validators"`
+	NewBls     types.Address    `abi:"newBls"`
+	Governance types.Address    `abi:"governance"`
+}
+
+func (i *InitializeChildValidatorSetFunction) EncodeAbi() ([]byte, error) {
+	return ChildValidatorSet.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildValidatorSetFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildValidatorSet.Abi.Methods["initialize"], buf, i)
+}
+
 type SyncStateFunction struct {
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`
@@ -223,7 +272,6 @@ func (v *Validator) DecodeAbi(buf []byte) error {
 }
 
 type SubmitFunction struct {
-	ChainID            *big.Int            `abi:"chainId"`
 	CheckpointMetadata *CheckpointMetadata `abi:"checkpointMetadata"`
 	Checkpoint         *Checkpoint         `abi:"checkpoint"`
 	Signature          [2]*big.Int         `abi:"signature"`
@@ -243,6 +291,7 @@ type InitializeCheckpointManagerFunction struct {
 	NewBls          types.Address `abi:"newBls"`
 	NewBn256G2      types.Address `abi:"newBn256G2"`
 	NewDomain       types.Hash    `abi:"newDomain"`
+	ChainID_        *big.Int      `abi:"chainId_"`
 	NewValidatorSet []*Validator  `abi:"newValidatorSet"`
 }
 

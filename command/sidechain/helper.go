@@ -44,32 +44,41 @@ func GetAccountFromDir(dir string) (*wallet.Account, error) {
 
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address
 func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	getValidatorMethod := contractsapi.ChildValidatorSet.Abi.GetMethod("getValidator")
+	callFn := func(funcName string) (map[string]interface{}, error) {
+		method := contractsapi.ChildValidatorSet.Abi.GetMethod(funcName)
 
-	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
+		encode, err := method.Encode([]interface{}{validatorAddr})
+		if err != nil {
+			return nil, err
+		}
+
+		response, err := txRelayer.Call(
+			ethgo.Address(contracts.SystemCaller), ethgo.Address(contracts.ValidatorSetContract), encode)
+		if err != nil {
+			return nil, err
+		}
+
+		byteResponse, err := hex.DecodeHex(response)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode hex response, %w", err)
+		}
+
+		decoded, err := method.Outputs.Decode(byteResponse)
+		if err != nil {
+			return nil, err
+		}
+
+		decodedOutputsMap, ok := decoded.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("could not convert decoded outputs to map")
+		}
+
+		return decodedOutputsMap, nil
+	}
+
+	decodedOutputsMap, err := callFn("getValidator")
 	if err != nil {
 		return nil, err
-	}
-
-	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		ethgo.Address(contracts.ValidatorSetContract), encode)
-	if err != nil {
-		return nil, err
-	}
-
-	byteResponse, err := hex.DecodeHex(response)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode hex response, %w", err)
-	}
-
-	decoded, err := getValidatorMethod.Outputs.Decode(byteResponse)
-	if err != nil {
-		return nil, err
-	}
-
-	decodedOutputsMap, ok := decoded.(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("could not convert decoded outputs to map")
 	}
 
 	decodedValidatorInfoMap, ok := decodedOutputsMap["0"].(map[string]interface{})
@@ -77,10 +86,15 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 		return nil, fmt.Errorf("could not convert validator info result to a map")
 	}
 
+	decodedTotalStakeOfMap, err := callFn("totalStakeOf")
+	if err != nil {
+		return nil, err
+	}
+
 	return &polybft.ValidatorInfo{
 		Address:             validatorAddr.Address(),
 		Stake:               decodedValidatorInfoMap["stake"].(*big.Int),               //nolint:forcetypeassert
-		TotalStake:          decodedValidatorInfoMap["totalStake"].(*big.Int),          //nolint:forcetypeassert
+		TotalStake:          decodedTotalStakeOfMap["0"].(*big.Int),                    //nolint:forcetypeassert
 		Commission:          decodedValidatorInfoMap["commission"].(*big.Int),          //nolint:forcetypeassert
 		WithdrawableRewards: decodedValidatorInfoMap["withdrawableRewards"].(*big.Int), //nolint:forcetypeassert
 		Active:              decodedValidatorInfoMap["active"].(bool),                  //nolint:forcetypeassert
