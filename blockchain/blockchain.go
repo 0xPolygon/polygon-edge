@@ -1474,5 +1474,6 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 
 func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 	y := baseFee * gasUsedDelta / parentGasTarget
+
 	return y / defaultBaseFeeChangeDenom
 }
