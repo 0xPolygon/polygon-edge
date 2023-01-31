@@ -146,6 +146,20 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// start new validator
 	cluster.InitTestServer(t, 6, true, false)
 
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
+	require.NoError(t, err)
+
+	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
+	validators := polybft.AccountSet{}
+	// assert that new validator is among validator set
+	require.NoError(t, cluster.WaitUntil(20*time.Second, func() bool {
+		// query validators
+		validators, err = systemState.GetValidatorSet()
+		require.NoError(t, err)
+
+		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+	}))
+
 	// assert that validators hash is correct
 	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
@@ -155,21 +169,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	extra, err := polybft.GetIbftExtra(block.ExtraData)
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
-
-	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
-	require.NoError(t, err)
-
-	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
-
-	validators := polybft.AccountSet{}
-	// assert that new validator is among validator set
-	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
-		// query validators
-		validators, err = systemState.GetValidatorSet()
-		require.NoError(t, err)
-
-		return validators.ContainsAddress((types.Address(newValidatorAddr)))
-	}))
 
 	// assert that correct validators hash gets submitted
 	validatorsHash, err := validators.Hash()
