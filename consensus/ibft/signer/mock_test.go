@@ -56,6 +56,7 @@ func (m *MockKeyManager) NewEmptyValidators() validators.Validators {
 func (m *MockKeyManager) NewEmptyCommittedSeals() Seals {
 	return m.NewEmptyCommittedSealsFunc()
 }
+
 func (m *MockKeyManager) SignProposerSeal(hash []byte) ([]byte, error) {
 	return m.SignProposerSealFunc(hash)
 }

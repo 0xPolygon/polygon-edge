@@ -3,10 +3,10 @@ package ibft
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -40,12 +40,13 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 	return block.MarshalRLP()
 }
 
-func (i *backendIBFT) InsertBlock(
-	proposal []byte,
+// InsertProposal inserts a proposal of which the consensus has been got
+func (i *backendIBFT) InsertProposal(
+	proposal *proto.Proposal,
 	committedSeals []*messages.CommittedSeal,
 ) {
 	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+	if err := newBlock.UnmarshalRLP(proposal.RawProposal); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
 
 		return
@@ -63,7 +64,7 @@ func (i *backendIBFT) InsertBlock(
 	copy(extraDataBackup, extraDataOriginal)
 
 	// Push the committed seals to the header
-	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
+	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, proposal.Round, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
@@ -138,7 +139,11 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
-func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
+func (i *backendIBFT) HasQuorum(
+	blockNumber uint64,
+	messages []*proto.Message,
+	msgType proto.MessageType,
+) bool {
 	validators, err := i.forkManager.GetValidators(blockNumber)
 	if err != nil {
 		i.logger.Error(
@@ -147,13 +152,21 @@ func (i *backendIBFT) Quorum(blockNumber uint64) uint64 {
 			"err", err,
 		)
 
-		// return Math.MaxInt32 to prevent overflow when casting to int in go-ibft package
-		return math.MaxInt32
+		return false
 	}
 
-	quorumFn := i.quorumSize(blockNumber)
+	quorum := i.quorumSize(blockNumber)(validators)
 
-	return uint64(quorumFn(validators))
+	switch msgType {
+	case proto.MessageType_PREPREPARE:
+		return len(messages) > 0
+	case proto.MessageType_PREPARE:
+		return len(messages) >= quorum-1
+	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
+		return len(messages) >= quorum
+	default:
+		return false
+	}
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
