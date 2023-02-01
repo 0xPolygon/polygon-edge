@@ -396,9 +396,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	switch t.Type {
 	case LegacyTx:
 		num = 9
-	case DynamicFeeTx:
-		num = 10
-	case StateTx:
+	case DynamicFeeTx, StateTx:
 		num = 10
 	default:
 		return fmt.Errorf("transaction type %d not found", t.Type)
