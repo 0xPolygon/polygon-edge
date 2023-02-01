@@ -443,7 +443,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 
 	checkpointHash, err := extra.Checkpoint.Hash(p.blockchain.GetChainID(), header.Number, header.Hash)
 	if err != nil {
-		return fmt.Errorf("failed to calculate sign hash: %w", err)
+		return fmt.Errorf("failed to calculate proposal hash: %w", err)
 	}
 
 	// TODO: Move signature validation logic to Extra
@@ -470,7 +470,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(p.blockchain.GetChainID(), parent.Number, parent.Hash)
 		if err != nil {
-			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
+			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 		}
 
 		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, p.logger); err != nil {

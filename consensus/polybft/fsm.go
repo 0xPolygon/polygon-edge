@@ -156,14 +156,16 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), f.Height(), stateBlock.Block.Hash())
-	if err != nil {
-		return nil, fmt.Errorf("failed to calculate sign hash: %w", err)
-	}
+	if f.logger.IsDebug() {
+		checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), f.Height(), stateBlock.Block.Hash())
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate proposal hash: %w", err)
+		}
 
-	f.logger.Debug("[FSM Build Proposal]",
-		"txs", len(stateBlock.Block.Transactions),
-		"hash", checkpointHash.String())
+		f.logger.Debug("[FSM Build Proposal]",
+			"txs", len(stateBlock.Block.Transactions),
+			"proposal hash", checkpointHash.String())
+	}
 
 	f.target = stateBlock
 
@@ -287,7 +289,7 @@ func (f *fsm) Validate(proposal []byte) error {
 
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
 		if err != nil {
-			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
+			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 		}
 
 		if err := currentExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
@@ -306,12 +308,14 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	checkpointHash, err := currentExtra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
-	if err != nil {
-		return fmt.Errorf("failed to calculate signed hash: %w", err)
-	}
+	if f.logger.IsDebug() {
+		checkpointHash, err := currentExtra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+		if err != nil {
+			return fmt.Errorf("failed to calculate proposal hash: %w", err)
+		}
 
-	f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "signed hash", checkpointHash)
+		f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "proposal hash", checkpointHash)
+	}
 
 	f.target = stateBlock
 

@@ -789,7 +789,7 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 
 	proposalHash, err := extra.Checkpoint.Hash(c.config.blockchain.GetChainID(), block.Number(), block.Hash())
 	if err != nil {
-		c.logger.Error("failed to calculate proposal hash for block %d: %w", block.Number(), err)
+		c.logger.Error("failed to calculate proposal hash", "block number", block.Number(), "error", err)
 
 		return nil
 	}
