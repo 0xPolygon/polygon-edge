@@ -10,11 +10,11 @@ import (
 )
 
 func TestIdentityHandshake(t *testing.T) {
-	defaultChainID := 100
+	defaultChainID := int64(100)
 
 	testTable := []struct {
 		name    string
-		chainID int
+		chainID int64
 	}{
 		{
 			"Successful handshake (same chain ID)",
@@ -53,7 +53,7 @@ func TestIdentityHandshake(t *testing.T) {
 				closeTestServers(t, servers)
 			})
 
-			chainIDs := []int{
+			chainIDs := []int64{
 				servers[0].config.Chain.Params.ChainID,
 				servers[1].config.Chain.Params.ChainID,
 			}
