@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"path"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -33,7 +34,7 @@ type StateSyncManager interface {
 	Init() error
 	Close()
 	Commitment() (*CommitmentMessageSigned, error)
-	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
+	GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
 }
@@ -48,7 +49,7 @@ func (n *dummyStateSyncManager) Close()                                        {
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
-func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
 	return nil, nil
 }
 
@@ -75,7 +76,7 @@ type stateSyncManager struct {
 
 	// per epoch fields
 	lock               sync.RWMutex
-	pendingCommitments []*Commitment
+	pendingCommitments []*PendingCommitment
 	validatorSet       ValidatorSet
 	epoch              uint64
 	nextCommittedIndex uint64
@@ -208,8 +209,9 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event, err := decodeStateSyncEvent(eventLog)
-	if err != nil {
+	event := &contractsapi.StateSyncedEvent{}
+
+	if err := event.ParseLog(eventLog); err != nil {
 		s.logger.Error("could not decode state sync event", "err", err)
 
 		return
@@ -242,8 +244,8 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 			if errors.Is(err, errQuorumNotReached) {
 				// a valid case, commitment has no quorum, we should not return an error
 				s.logger.Debug("can not submit a commitment, quorum not reached",
-					"from", commitment.FromIndex,
-					"to", commitment.ToIndex)
+					"from", commitment.StartID.Uint64(),
+					"to", commitment.EndID.Uint64())
 
 				continue
 			}
@@ -252,10 +254,7 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 		}
 
 		largestCommitment = &CommitmentMessageSigned{
-			Message: NewCommitmentMessage(
-				commitment.MerkleTree.Hash(),
-				commitment.FromIndex,
-				commitment.ToIndex),
+			Message:      commitment.StateSyncCommitment,
 			AggSignature: aggregatedSignature,
 			PublicKeys:   publicKeys,
 		}
@@ -268,7 +267,8 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 
 // getAggSignatureForCommitmentMessage checks if pending commitment has quorum,
 // and if it does, aggregates the signatures
-func (s *stateSyncManager) getAggSignatureForCommitmentMessage(commitment *Commitment) (Signature, [][]byte, error) {
+func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
+	commitment *PendingCommitment) (Signature, [][]byte, error) {
 	validatorSet := s.validatorSet
 
 	validatorAddrToIndex := make(map[string]int, validatorSet.Len())
@@ -378,7 +378,7 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	// update the nextCommittedIndex since a commitment was submitted
-	s.nextCommittedIndex = commitment.Message.ToIndex + 1
+	s.nextCommittedIndex = commitment.Message.EndID.Uint64() + 1
 	// commitment was submitted, so discard what we have in memory, so we can build a new one
 	s.pendingCommitments = nil
 
@@ -386,7 +386,7 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 }
 
 // GetStateSyncProof returns the proof for the state sync
-func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
 	proof, err := s.state.getStateSyncProof(stateSyncID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
@@ -415,14 +415,17 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*types.StateSy
 }
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
-func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
+func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncCommitment) error {
+	from := commitmentMsg.StartID.Uint64()
+	to := commitmentMsg.EndID.Uint64()
+
 	s.logger.Debug(
 		"[buildProofs] Building proofs for commitment...",
-		"fromIndex", commitmentMsg.FromIndex,
-		"toIndex", commitmentMsg.ToIndex,
+		"fromIndex", from,
+		"toIndex", to,
 	)
 
-	events, err := s.state.getStateSyncEventsForCommitment(commitmentMsg.FromIndex, commitmentMsg.ToIndex)
+	events, err := s.state.getStateSyncEventsForCommitment(from, to)
 	if err != nil {
 		return fmt.Errorf("failed to get state sync events for commitment to build proofs. Error: %w", err)
 	}
@@ -432,12 +435,12 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 		return err
 	}
 
-	stateSyncProofs := make([]*types.StateSyncProof, len(events))
+	stateSyncProofs := make([]*contracts.StateSyncProof, len(events))
 
 	for i, event := range events {
 		p := tree.GenerateProof(uint64(i), 0)
 
-		stateSyncProofs[i] = &types.StateSyncProof{
+		stateSyncProofs[i] = &contracts.StateSyncProof{
 			Proof:     p,
 			StateSync: event,
 		}
@@ -445,8 +448,8 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *CommitmentMessage) error {
 
 	s.logger.Debug(
 		"[buildProofs] Building proofs for commitment finished.",
-		"fromIndex", commitmentMsg.FromIndex,
-		"toIndex", commitmentMsg.ToIndex,
+		"fromIndex", from,
+		"toIndex", to,
 	)
 
 	return s.state.insertStateSyncProofs(stateSyncProofs)
@@ -472,12 +475,12 @@ func (s *stateSyncManager) buildCommitment() error {
 	}
 
 	if len(s.pendingCommitments) > 0 &&
-		s.pendingCommitments[len(s.pendingCommitments)-1].ToIndex >= stateSyncEvents[len(stateSyncEvents)-1].ID {
+		s.pendingCommitments[len(s.pendingCommitments)-1].StartID.Cmp(stateSyncEvents[len(stateSyncEvents)-1].ID) >= 0 {
 		// already built a commitment of this size which is pending to be submitted
 		return nil
 	}
 
-	commitment, err := NewCommitment(epoch, stateSyncEvents)
+	commitment, err := NewPendingCommitment(epoch, stateSyncEvents)
 	if err != nil {
 		return err
 	}
@@ -517,8 +520,8 @@ func (s *stateSyncManager) buildCommitment() error {
 
 	s.logger.Debug(
 		"[buildCommitment] Built commitment",
-		"from", commitment.FromIndex,
-		"to", commitment.ToIndex,
+		"from", commitment.StartID.Uint64(),
+		"to", commitment.EndID.Uint64(),
 	)
 
 	s.pendingCommitments = append(s.pendingCommitments, commitment)
@@ -539,41 +542,4 @@ func (s *stateSyncManager) multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
-}
-
-// newStateSyncEvent creates an instance of pending state sync event.
-func newStateSyncEvent(
-	id uint64,
-	sender ethgo.Address,
-	target ethgo.Address,
-	data []byte,
-) *types.StateSyncEvent {
-	return &types.StateSyncEvent{
-		ID:       id,
-		Sender:   sender,
-		Receiver: target,
-		Data:     data,
-	}
-}
-
-func decodeStateSyncEvent(log *ethgo.Log) (*types.StateSyncEvent, error) {
-	raw, err := stateTransferEventABI.ParseLog(log)
-	if err != nil {
-		return nil, err
-	}
-
-	eventGeneric, err := decodeEventData(raw, log,
-		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
-			return newStateSyncEvent(id.Uint64(), sender, receiver, data)
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	stateSyncEvent, ok := eventGeneric.(*types.StateSyncEvent)
-	if !ok {
-		return nil, errors.New("failed to convert event to StateSyncEvent instance")
-	}
-
-	return stateSyncEvent, nil
 }

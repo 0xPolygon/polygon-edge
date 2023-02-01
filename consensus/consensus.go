@@ -6,6 +6,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -81,8 +82,8 @@ type Factory func(*Params) (Consensus, error)
 // BridgeDataProvider is an interface providing bridge related functions
 type BridgeDataProvider interface {
 	// GenerateExit proof generates proof of exit for given exit event
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error)
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (contracts.ExitProof, error)
 
 	// GetStateSyncProof retrieves the StateSync proof
-	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
+	GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error)
 }

@@ -1,8 +1,10 @@
 package statesyncrelayer
 
 import (
+	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -45,14 +47,18 @@ func Test_executeStateSync(t *testing.T) {
 		key:       key,
 	}
 
-	sp := &types.StateSyncProof{
-		Proof:     []types.Hash{},
-		StateSync: &types.StateSyncEvent{},
+	sp := &contracts.StateSyncProof{
+		Proof: []types.Hash{},
+		StateSync: &contractsapi.StateSyncedEvent{
+			ID:       big.NewInt(1),
+			Sender:   types.ZeroAddress,
+			Receiver: types.ZeroAddress,
+			Data:     []byte{},
+		},
 	}
 
-	input, _ := types.ExecuteStateSyncABIMethod.Encode(
-		[2]interface{}{sp.Proof, sp.StateSync.ToMap()},
-	)
+	input, err := sp.EncodeAbi()
+	require.NoError(t, err)
 
 	txn := &ethgo.Transaction{
 		From:  key.Address(),

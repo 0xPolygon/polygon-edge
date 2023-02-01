@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -443,11 +446,12 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 
 // calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
 // and ending at the last block of previous epoch
-func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *epochMetadata) (*CommitEpoch, error) {
-	uptimeCounter := map[types.Address]uint64{}
+func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
+	epoch *epochMetadata) (*contractsapi.CommitEpochFunction, error) {
+	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
-	totalBlocks := uint64(0)
+	totalBlocks := int64(0)
 
 	getSealersForBlock := func(blockExtra *Extra, validators AccountSet) error {
 		signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
@@ -495,9 +499,9 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 		}
 	}
 
-	uptime := Uptime{
-		EpochID:     epochID,
-		TotalBlocks: totalBlocks,
+	uptime := &contractsapi.Uptime{
+		EpochID:     new(big.Int).SetUint64(epochID),
+		TotalBlocks: big.NewInt(totalBlocks),
 	}
 
 	// include the data in the uptime counter in a deterministic way
@@ -512,14 +516,14 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 	})
 
 	for _, addr := range addrSet {
-		uptime.addValidatorUptime(addr, uptimeCounter[addr])
+		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
 	}
 
-	commitEpoch := &CommitEpoch{
-		EpochID: epoch.Number,
-		Epoch: Epoch{
-			StartBlock: epoch.FirstBlockInEpoch,
-			EndBlock:   currentBlock.Number + 1,
+	commitEpoch := &contractsapi.CommitEpochFunction{
+		ID: new(big.Int).SetUint64(epochID),
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
+			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
@@ -529,12 +533,12 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header, epoch *ep
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
+func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (contracts.ExitProof, error) {
 	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
 }
 
 // GetStateSyncProof returns the proof for the state sync
-func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
 	return c.stateSyncManager.GetStateSyncProof(stateSyncID)
 }
 

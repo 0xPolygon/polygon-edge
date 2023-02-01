@@ -31,10 +31,6 @@ import (
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
-var (
-	stateSyncResultEvent = contractsapi.StateReceiver.Abi.Events["StateSyncResult"]
-)
-
 const (
 	manifestFileName = "manifest.json"
 )
@@ -50,15 +46,12 @@ func checkLogs(
 	require.Len(t, logs, expectedCount)
 
 	for _, log := range logs {
-		res, err := stateSyncResultEvent.ParseLog(log)
-		assert.NoError(t, err)
+		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
+		assert.NoError(t, stateSyncResultEvent.ParseLog(log))
 
-		t.Logf("Block Number=%d, Decoded Log=%v", log.BlockNumber, res)
+		t.Logf("Block Number=%d, Decoded Log=%+v", log.BlockNumber, stateSyncResultEvent)
 
-		status, ok := res["status"].(bool)
-		require.True(t, ok)
-
-		assert.True(t, status)
+		assert.True(t, stateSyncResultEvent.Status)
 	}
 }
 
@@ -98,7 +91,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are mined and there should be a success events
-	id := stateSyncResultEvent.ID()
+	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -190,7 +183,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
-	id := stateSyncResultEvent.ID()
+	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -359,7 +352,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		fail++
 	}
 
-	var proof types.ExitProof
+	var proof contracts.ExitProof
 
 	for i := 0; i < userNumber; i++ {
 		exitID := uint64(i + 1) // because exit events start from ID = 1
@@ -470,7 +463,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		}
 	}
 
-	var proof types.ExitProof
+	var proof contracts.ExitProof
 
 	for i := 0; i < roundNumber; i++ {
 		for j := 0; j < userNumber; j++ {
@@ -483,7 +476,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 }
 
-func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
+func isExitEventProcessed(sidechainKey *ethgow.Key, proof contracts.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
@@ -523,7 +516,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.ExitProof, check
 	return parserRes == uint64(1), nil
 }
 
-func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.ExitProof, error) {
+func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (contracts.ExitProof, error) {
 	query := struct {
 		Jsonrpc string   `json:"jsonrpc"`
 		Method  string   `json:"method"`
@@ -538,26 +531,26 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 
 	d, err := json.Marshal(query)
 	if err != nil {
-		return types.ExitProof{}, err
+		return contracts.ExitProof{}, err
 	}
 
 	resp, err := http.Post(rpcAddress, "application/json", bytes.NewReader(d))
 	if err != nil {
-		return types.ExitProof{}, err
+		return contracts.ExitProof{}, err
 	}
 
 	s, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return types.ExitProof{}, err
+		return contracts.ExitProof{}, err
 	}
 
 	rspProof := struct {
-		Result types.ExitProof `json:"result"`
+		Result contracts.ExitProof `json:"result"`
 	}{}
 
 	err = json.Unmarshal(s, &rspProof)
 	if err != nil {
-		return types.ExitProof{}, err
+		return contracts.ExitProof{}, err
 	}
 
 	return rspProof.Result, nil

@@ -5,6 +5,8 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -172,21 +174,24 @@ func (m *mockStore) GetCapacity() (uint64, uint64) {
 	return 0, 0
 }
 
-func (m *mockStore) GenerateExitProof(exitID, epoch, checkpointNumber uint64) (types.ExitProof, error) {
+func (m *mockStore) GenerateExitProof(exitID, epoch, checkpointNumber uint64) (contracts.ExitProof, error) {
 	hash := types.BytesToHash([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	return types.ExitProof{[]types.Hash{hash}, 1}, nil
+	return contracts.ExitProof{
+		Proof:     []types.Hash{hash},
+		LeafIndex: 1,
+	}, nil
 }
 
 func (m *mockStore) GetPeers() int {
 	return 20
 }
 
-func (m *mockStore) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (m *mockStore) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
 	hash := types.BytesToHash([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	ssp := &types.StateSyncProof{
+	ssp := &contracts.StateSyncProof{
 		Proof:     []types.Hash{hash},
-		StateSync: &types.StateSyncEvent{},
+		StateSync: &contractsapi.StateSyncedEvent{},
 	}
 
 	return ssp, nil

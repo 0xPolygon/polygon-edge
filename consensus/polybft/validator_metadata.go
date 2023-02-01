@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 
@@ -224,7 +225,7 @@ func (as AccountSet) Copy() AccountSet {
 
 // Hash returns hash value of the AccountSet
 func (as AccountSet) Hash() (types.Hash, error) {
-	abiEncoded, err := accountSetABIType.Encode([]interface{}{as.AsGenericMaps()})
+	abiEncoded, err := accountSetABIType.Encode([]interface{}{as.ToAPIBinding()})
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -232,18 +233,18 @@ func (as AccountSet) Hash() (types.Hash, error) {
 	return types.BytesToHash(crypto.Keccak256(abiEncoded)), nil
 }
 
-// AsGenericMaps convert AccountSet object to slice of maps, where each key denotes field name mapped to a value
-func (as AccountSet) AsGenericMaps() []map[string]interface{} {
-	accountSetMaps := make([]map[string]interface{}, len(as))
+// ToAPIBinding converts AccountSet to slice of contract api stubs to be encoded
+func (as AccountSet) ToAPIBinding() []*contractsapi.Validator {
+	apiBinding := make([]*contractsapi.Validator, len(as))
 	for i, v := range as {
-		accountSetMaps[i] = map[string]interface{}{
-			"_address":    v.Address,
-			"blsKey":      v.BlsKey.ToBigInt(),
-			"votingPower": new(big.Int).Set(v.VotingPower),
+		apiBinding[i] = &contractsapi.Validator{
+			Address:     v.Address,
+			BlsKey:      v.BlsKey.ToBigInt(),
+			VotingPower: new(big.Int).Set(v.VotingPower),
 		}
 	}
 
-	return accountSetMaps
+	return apiBinding
 }
 
 // GetValidatorMetadata tries to retrieve validator account metadata by given address from the account set.

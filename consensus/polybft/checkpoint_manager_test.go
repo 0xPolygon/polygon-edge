@@ -171,34 +171,13 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
-	decodedCheckpointData, err := submitCheckpointMethod.Inputs.Decode(checkpointDataEncoded[4:])
-	require.NoError(t, err)
+	submit := &contractsapi.SubmitFunction{}
+	require.NoError(t, submit.DecodeAbi(checkpointDataEncoded))
 
-	submitCheckpointInputData, ok := decodedCheckpointData.(map[string]interface{})
-	require.True(t, ok)
-
-	checkpointData, ok := submitCheckpointInputData["checkpoint"].(map[string]interface{})
-	require.True(t, ok)
-
-	checkpointMetadata, ok := submitCheckpointInputData["checkpointMetadata"].(map[string]interface{})
-	require.True(t, ok)
-
-	eventRoot, ok := checkpointData["eventRoot"].([types.HashLength]byte)
-	require.True(t, ok)
-
-	blockRound, ok := checkpointMetadata["blockRound"].(*big.Int)
-	require.True(t, ok)
-
-	epochNumber, ok := checkpointData["epoch"].(*big.Int)
-	require.True(t, ok)
-
-	blockNumber, ok := checkpointData["blockNumber"].(*big.Int)
-	require.True(t, ok)
-
-	require.Equal(t, new(big.Int).SetUint64(checkpoint.EpochNumber), epochNumber)
-	require.Equal(t, new(big.Int).SetUint64(header.Number), blockNumber)
-	require.Equal(t, checkpoint.EventRoot, types.BytesToHash(eventRoot[:]))
-	require.Equal(t, new(big.Int).SetUint64(checkpoint.BlockRound), blockRound)
+	require.Equal(t, new(big.Int).SetUint64(checkpoint.EpochNumber), submit.Checkpoint.Epoch)
+	require.Equal(t, new(big.Int).SetUint64(header.Number), submit.Checkpoint.BlockNumber)
+	require.Equal(t, checkpoint.EventRoot, submit.Checkpoint.EventRoot)
+	require.Equal(t, new(big.Int).SetUint64(checkpoint.BlockRound), submit.CheckpointMetadata.BlockRound)
 }
 
 func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
@@ -727,7 +706,7 @@ func TestCommitEpoch(t *testing.T) {
 	}
 }
 
-func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *CommitEpoch {
+func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
 	t.Helper()
 
 	var startBlock uint64 = 0
@@ -735,20 +714,24 @@ func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, ep
 		startBlock = (epochID - 1) * epochSize
 	}
 
-	uptime := Uptime{EpochID: epochID}
+	uptime := &contractsapi.Uptime{
+		EpochID:     new(big.Int).SetUint64(epochID),
+		UptimeData:  []*contractsapi.UptimeData{},
+		TotalBlocks: new(big.Int).SetUint64(epochSize),
+	}
 
-	commitEpoch := &CommitEpoch{
-		EpochID: uptime.EpochID,
-		Epoch: Epoch{
-			StartBlock: startBlock + 1,
-			EndBlock:   epochSize * epochID,
+	commitEpoch := &contractsapi.CommitEpochFunction{
+		ID: uptime.EpochID,
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(startBlock + 1),
+			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
 			EpochRoot:  types.Hash{},
 		},
 		Uptime: uptime,
 	}
 
 	for i := range validatorSet {
-		uptime.addValidatorUptime(validatorSet[i].Address, epochSize)
+		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
 	}
 
 	return commitEpoch
@@ -761,11 +744,14 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	assert.NoError(t, result.Err)
 	rcAddress := result.Address
 
-	init, err := rootchainArtifact.Abi.GetMethod("initialize").Encode([4]interface{}{
-		contracts.BLSContract,
-		bn256Addr,
-		bls.GetDomain(),
-		accSet.AsGenericMaps()})
+	initialize := contractsapi.InitializeCheckpointManagerFunction{
+		NewBls:          contracts.BLSContract,
+		NewBn256G2:      bn256Addr,
+		NewDomain:       types.BytesToHash(bls.GetDomain()),
+		NewValidatorSet: accSet.ToAPIBinding(),
+	}
+
+	init, err := initialize.EncodeAbi()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -841,19 +827,10 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 	t.Helper()
 
-	decoded, err := submitCheckpointMethod.Inputs.Decode(input[4:])
-	require.NoError(t, err)
+	submit := &contractsapi.SubmitFunction{}
+	require.NoError(t, submit.DecodeAbi(input))
 
-	submitCheckpointInputData, ok := decoded.(map[string]interface{})
-	require.True(t, ok, "failed to type assert submitCheckpoint inputs")
-
-	checkpointData, ok := submitCheckpointInputData["checkpoint"].(map[string]interface{})
-	require.True(t, ok, "failed to type assert checkpoint tuple from submitCheckpoint inputs")
-
-	blockNumber, ok := checkpointData["blockNumber"].(*big.Int)
-	require.True(t, ok, "failed to extract block number from submit checkpoint inputs")
-
-	return blockNumber.Uint64()
+	return submit.Checkpoint.BlockNumber.Uint64()
 }
 
 func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
