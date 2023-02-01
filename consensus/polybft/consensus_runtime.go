@@ -577,8 +577,8 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
 }
 
-func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
-	if err := c.fsm.Validate(proposal); err != nil {
+func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {
+	if err := c.fsm.Validate(rawProposal); err != nil {
 		c.logger.Error("failed to validate proposal", "error", err)
 
 		return false
@@ -587,7 +587,7 @@ func (c *consensusRuntime) IsValidBlock(proposal []byte) bool {
 	return true
 }
 
-func (c *consensusRuntime) IsValidSender(msg *proto.Message) bool {
+func (c *consensusRuntime) IsValidValidator(msg *proto.Message) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -622,15 +622,15 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 	return bytes.Equal(id, nextProposer[:])
 }
 
-func (c *consensusRuntime) IsValidProposalHash(proposal, hash []byte) bool {
-	if len(proposal) == 0 {
+func (c *consensusRuntime) IsValidProposalHash(proposal *proto.Proposal, hash []byte) bool {
+	if len(proposal.RawProposal) == 0 {
 		c.logger.Error("proposal hash is not valid because proposal is empty")
 
 		return false
 	}
 
 	block := types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
+	if err := block.UnmarshalRLP(proposal.RawProposal); err != nil {
 		c.logger.Error("unable to unmarshal proposal", "error", err)
 
 		return false
@@ -664,19 +664,19 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 	return true
 }
 
-func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
+func (c *consensusRuntime) BuildProposal(height uint64) []byte {
 	sharedData, err := c.getGuardedData()
 
-	if sharedData.lastBuiltBlock.Number+1 != view.Height {
+	if sharedData.lastBuiltBlock.Number+1 != height {
 		c.logger.Error("unable to build block, due to lack of parent block",
-			"last", sharedData.lastBuiltBlock.Number, "num", view.Height)
+			"last", sharedData.lastBuiltBlock.Number, "num", height)
 
 		return nil
 	}
 
-	proposal, err := c.fsm.BuildProposal(view.Round)
+	proposal, err := c.fsm.BuildProposal(0)
 	if err != nil {
-		c.logger.Info("Unable to create proposal", "blockNumber", view.Height, "error", err)
+		c.logger.Info("Unable to create proposal", "blockNumber", height, "error", err)
 
 		return nil
 	}
@@ -684,11 +684,11 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 	return proposal
 }
 
-// InsertBlock inserts a proposal with the specified committed seals
-func (c *consensusRuntime) InsertBlock(proposal []byte, committedSeals []*messages.CommittedSeal) {
+// InsertProposal inserts a proposal with the specified committed seals
+func (c *consensusRuntime) InsertProposal(proposal *proto.Proposal, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
 
-	fullBlock, err := fsm.Insert(proposal, committedSeals)
+	fullBlock, err := fsm.Insert(proposal.RawProposal, committedSeals)
 	if err != nil {
 		c.logger.Error("cannot insert proposal", "error", err)
 
@@ -704,10 +704,7 @@ func (c *consensusRuntime) ID() []byte {
 }
 
 // HasQuorum returns true if quorum is reached for the given blockNumber
-func (c *consensusRuntime) HasQuorum(
-	blockNumber uint64,
-	messages []*proto.Message,
-	msgType proto.MessageType,
+func (c *consensusRuntime) HasQuorum(height uint64, messages []*proto.Message, msgType proto.MessageType,
 ) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
@@ -736,7 +733,7 @@ func (c *consensusRuntime) HasQuorum(
 			return false
 		}
 
-		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, blockNumber)
+		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, height)
 		if err != nil {
 			c.logger.Warn("HasQuorum has been called but proposer is not set", "error", err)
 
@@ -761,18 +758,18 @@ func (c *consensusRuntime) HasQuorum(
 
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
 func (c *consensusRuntime) BuildPrePrepareMessage(
-	proposal []byte,
+	rawProposal []byte,
 	certificate *proto.RoundChangeCertificate,
 	view *proto.View,
 ) *proto.Message {
-	if len(proposal) == 0 {
+	if len(rawProposal) == 0 {
 		c.logger.Error("can not build pre-prepare message, since proposal is empty")
 
 		return nil
 	}
 
 	block := types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
+	if err := block.UnmarshalRLP(rawProposal); err != nil {
 		c.logger.Error(fmt.Sprintf("cannot unmarshal RLP: %s", err))
 
 		return nil
@@ -790,6 +787,11 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		c.logger.Error("failed to calculate proposal hash for block %d: %w", block.Number(), err)
 
 		return nil
+	}
+
+	proposal := &proto.Proposal{
+		RawProposal: rawProposal,
+		Round:       view.Round,
 	}
 
 	msg := proto.Message{
@@ -871,7 +873,7 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.V
 
 // BuildRoundChangeMessage builds a ROUND_CHANGE message based on the passed in proposal
 func (c *consensusRuntime) BuildRoundChangeMessage(
-	proposal []byte,
+	proposal *proto.Proposal,
 	certificate *proto.PreparedCertificate,
 	view *proto.View,
 ) *proto.Message {
@@ -879,10 +881,11 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 		View: view,
 		From: c.ID(),
 		Type: proto.MessageType_ROUND_CHANGE,
-		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
-			LastPreparedProposedBlock: proposal,
-			LatestPreparedCertificate: certificate,
-		}},
+		Payload: &proto.Message_RoundChangeData{
+			RoundChangeData: &proto.RoundChangeMessage{
+				LatestPreparedCertificate: certificate,
+				LastPreparedProposal:      proposal,
+			}},
 	}
 
 	signedMsg, err := c.config.Key.SignEcdsaMessage(&msg)

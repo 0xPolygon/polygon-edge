@@ -138,6 +138,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	extra.Checkpoint = &CheckpointData{
+		// TODO: @Stefan-Ethernal how to set round,
+		// since BuildProposal signature has changed to include only height (but not round)
 		BlockRound:            currentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
@@ -456,7 +458,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 		Bitmap:              bitmap,
 	}
 
-	// Write extar data to header
+	// Write extra data to header
 	newBlock.Block.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 
 	if err := f.backend.CommitBlock(newBlock); err != nil {
