@@ -178,6 +178,11 @@ func TestBlock_Encoding(t *testing.T) {
 		testBlock("testsuite/block-empty.json")
 	})
 
+	t.Run("block with no base fee", func(t *testing.T) {
+		b.BaseFee = 0
+		testBlock("testsuite/block-with-no-basefee.json")
+	})
+
 	t.Run("block with transaction hashes", func(t *testing.T) {
 		b.Transactions = []transactionOrHash{
 			transactionHash{0x8},
