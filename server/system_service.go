@@ -31,7 +31,7 @@ func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto
 	header := s.server.blockchain.Header()
 
 	status := &proto.ServerStatus{
-		Network: int64(s.server.chain.Params.ChainID),
+		Network: s.server.chain.Params.ChainID,
 		Current: &proto.ServerStatus_Block{
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
