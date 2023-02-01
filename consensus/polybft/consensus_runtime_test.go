@@ -788,7 +788,7 @@ func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	require.Nil(t, runtime.BuildProposal(5))
+	require.Nil(t, runtime.BuildProposal(&proto.View{Round: 5}))
 }
 
 func TestConsensusRuntime_ID(t *testing.T) {

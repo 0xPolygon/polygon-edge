@@ -664,7 +664,7 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 	return true
 }
 
-func (c *consensusRuntime) BuildProposal(height uint64) []byte {
+func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 	sharedData, err := c.getGuardedData()
 	if err != nil {
 		c.logger.Error("unable to build proposal", "error", err)
@@ -672,16 +672,16 @@ func (c *consensusRuntime) BuildProposal(height uint64) []byte {
 		return nil
 	}
 
-	if sharedData.lastBuiltBlock.Number+1 != height {
+	if sharedData.lastBuiltBlock.Number+1 != view.Height {
 		c.logger.Error("unable to build proposal, due to lack of parent block",
-			"last", sharedData.lastBuiltBlock.Number, "num", height)
+			"parent height", sharedData.lastBuiltBlock.Number, "current height", view.Height)
 
 		return nil
 	}
 
-	proposal, err := c.fsm.BuildProposal(0)
+	proposal, err := c.fsm.BuildProposal(view.Round)
 	if err != nil {
-		c.logger.Error("unable to build proposal", "blockNumber", height, "error", err)
+		c.logger.Error("unable to build proposal", "blockNumber", view, "error", err)
 
 		return nil
 	}

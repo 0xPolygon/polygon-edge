@@ -138,8 +138,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	extra.Checkpoint = &CheckpointData{
-		// TODO: @Stefan-Ethernal how to set round,
-		// since BuildProposal signature has changed to include only height (but not round)
 		BlockRound:            currentRound,
 		EpochNumber:           f.epochNumber,
 		CurrentValidatorsHash: currentValidatorsHash,
