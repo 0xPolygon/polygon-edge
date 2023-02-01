@@ -406,6 +406,8 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	}
 
 	if f.isEndOfEpoch && !uptimeTransactionExists {
+		// this is a check if uptime transaction is not in the list of transactions at all
+		// but it should be
 		return errUptimeTxDoesNotExist
 	}
 
