@@ -57,7 +57,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	config := e.config.Forks.At(0)
 
 	env := runtime.TxContext{
-		ChainID: int64(e.config.ChainID),
+		ChainID: e.config.ChainID,
 	}
 
 	transition := &Transition{
@@ -169,7 +169,7 @@ func (e *Executor) BeginTxn(
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		GasLimit:   int64(header.GasLimit),
-		ChainID:    int64(e.config.ChainID),
+		ChainID:    e.config.ChainID,
 	}
 
 	txn := &Transition{
