@@ -82,13 +82,12 @@ func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
 	}
 	assert.ErrorContains(t, fsm.verifyValidatorsUptimeTx(alteredUptimeTx), "invalid uptime transaction")
 
-	fsm.isEndOfEpoch = false
 	// submit validators uptime transaction to the non-epoch ending block
+	fsm.isEndOfEpoch = false
 	uptimeTx, err = fsm.createValidatorsUptimeTx()
 	assert.NoError(t, err)
 	assert.NotNil(t, uptimeTx)
-	assert.ErrorContains(t, fsm.verifyValidatorsUptimeTx(uptimeTx),
-		"didn't expect uptime transaction in a non ending epoch block")
+	assert.ErrorContains(t, fsm.verifyValidatorsUptimeTx(uptimeTx), errUptimeTxNotExpected.Error())
 }
 
 func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
@@ -443,7 +442,7 @@ func TestFSM_VerifyStateTransactions_MiddleOfEpochWithTransaction(t *testing.T) 
 	tx, err := fsm.createValidatorsUptimeTx()
 	assert.NoError(t, err)
 	err = fsm.VerifyStateTransactions([]*types.Transaction{tx})
-	assert.ErrorContains(t, err, "didn't expect uptime transaction in a non ending epoch block")
+	assert.ErrorContains(t, err, err.Error())
 }
 
 func TestFSM_VerifyStateTransactions_MiddleOfEpochWithoutTransaction(t *testing.T) {

@@ -29,6 +29,7 @@ type blockBuilder interface {
 
 var (
 	errUptimeTxDoesNotExist = errors.New("uptime transaction is not found in the epoch ending block")
+	errUptimeTxNotExpected  = errors.New("didn't expect uptime transaction in a non ending epoch block")
 )
 
 type fsm struct {
@@ -520,7 +521,7 @@ func (f *fsm) verifyValidatorsUptimeTx(blockUptimeTx *types.Transaction) error {
 		return nil
 	}
 
-	return errors.New("didn't expect uptime transaction in a non ending epoch block")
+	return errUptimeTxNotExpected
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
