@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	dataDirFlag        = "data-dir"
-	configFlag         = "config"
-	ecdsaFlag          = "ecdsa"
-	blsFlag            = "bls"
-	networkFlag        = "network"
-	numFlag            = "num"
-	insecureLocalStore = "insecure"
+	dataDirFlag            = "data-dir"
+	configFlag             = "config"
+	ecdsaFlag              = "ecdsa"
+	blsFlag                = "bls"
+	networkFlag            = "network"
+	numFlag                = "num"
+	insecureLocalStoreFlag = "insecure"
 )
 
 var (
