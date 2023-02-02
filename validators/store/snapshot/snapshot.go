@@ -520,7 +520,7 @@ func (s *SnapshotValidatorStore) removeLowerSnapshots(
 	currentHeight uint64,
 ) {
 	// remove in-memory snapshots from two epochs before this one
-	lowerEpoch := int(currentHeight/s.epochSize) - 2
+	lowerEpoch := int64(currentHeight/s.epochSize) - 2
 	if lowerEpoch > 0 {
 		purgeBlock := uint64(lowerEpoch) * s.epochSize
 		s.store.deleteLower(purgeBlock)

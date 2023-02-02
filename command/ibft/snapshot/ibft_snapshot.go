@@ -19,7 +19,7 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().IntVar(
+	cmd.Flags().Int64Var(
 		&params.blockNumber,
 		numberFlag,
 		-1,

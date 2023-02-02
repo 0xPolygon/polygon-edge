@@ -9,7 +9,7 @@ import (
 // Params are all the set of params for the chain
 type Params struct {
 	Forks          *Forks                 `json:"forks"`
-	ChainID        int                    `json:"chainID"`
+	ChainID        int64                  `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`

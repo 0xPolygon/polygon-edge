@@ -146,7 +146,7 @@ func (e *Executor) BeginTxn(
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		GasLimit:   int64(header.GasLimit),
-		ChainID:    int64(e.config.ChainID),
+		ChainID:    e.config.ChainID,
 	}
 
 	txn := &Transition{
