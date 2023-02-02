@@ -564,6 +564,7 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 		"polybft-secrets",
 		"--data-dir", path.Join(c.Config.TmpDir, prefix),
 		"--num", strconv.Itoa(count),
+		"--insecure",
 	}
 	stdOut := c.Config.GetStdout("polybft-secrets", &b)
 

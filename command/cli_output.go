@@ -20,7 +20,8 @@ func (cli *cliOutput) WriteOutput() {
 	if cli.errorOutput != nil {
 		_, _ = fmt.Fprintln(os.Stderr, cli.getErrorOutput())
 
-		return
+		// return proper error exit code for cli error output
+		os.Exit(1)
 	}
 
 	_, _ = fmt.Fprintln(os.Stdout, cli.getCommandOutput())

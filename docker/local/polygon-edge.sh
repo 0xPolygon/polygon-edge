@@ -19,7 +19,7 @@ case "$1" in
       case "$2" in 
          "ibft")
               echo "Generating secrets..."
-              secrets=$("$POLYGON_EDGE_BIN" secrets init --num 4 --data-dir /data/data- --json)
+              secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"
               echo "Generating IBFT Genesis file..."
               cd /data && /polygon-edge/polygon-edge genesis  $CHAIN_CUSTOM_OPTIONS \
@@ -32,7 +32,7 @@ case "$1" in
               ;;
           "polybft")
               echo "Generating PolyBFT secrets..."
-              secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --num 4 --data-dir /data/data- --json)
+              secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"
 
               echo "Generating manifest..."
