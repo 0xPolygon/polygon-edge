@@ -50,6 +50,7 @@ type TestServerConfig struct {
 	EpochSize               uint64                   // The epoch size in blocks for the IBFT layer
 	BlockGasLimit           uint64                   // Block gas limit
 	BlockGasTarget          uint64                   // Gas target for new blocks
+	BaseFee                 uint64                   // Initial base fee
 	ShowsLog                bool                     // Flag specifying if logs are shown
 	Name                    string                   // Name of the server
 	SaveLogs                bool                     // Flag specifying if logs are saved
@@ -116,6 +117,11 @@ func (t *TestServerConfig) PremineValidatorBalance(balance *big.Int) {
 // SetBlockGasTarget sets the gas target for the test server
 func (t *TestServerConfig) SetBlockGasTarget(target uint64) {
 	t.BlockGasTarget = target
+}
+
+// SetBaseFee sets the given base fee for the test server
+func (t *TestServerConfig) SetBaseFee(baseFee uint64) {
+	t.BaseFee = baseFee
 }
 
 // SetConsensus callback sets consensus

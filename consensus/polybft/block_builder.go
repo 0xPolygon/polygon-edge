@@ -34,6 +34,9 @@ type BlockBuilderParams struct {
 
 	// txPoolInterface implementation
 	TxPool txPoolInterface
+
+	// BaseFee is the base fee
+	BaseFee uint64
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
@@ -81,6 +84,7 @@ func (b *BlockBuilder) Reset() error {
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
 		GasLimit:     b.params.GasLimit,
+		BaseFee:      b.params.BaseFee,
 		Timestamp:    uint64(headerTime.Unix()),
 	}
 

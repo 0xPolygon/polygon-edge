@@ -168,6 +168,7 @@ func (e *Executor) BeginTxn(
 		Timestamp:  int64(header.Timestamp),
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		BaseFee:    new(big.Int).SetUint64(header.BaseFee),
 		GasLimit:   int64(header.GasLimit),
 		ChainID:    int64(e.config.ChainID),
 	}
@@ -238,16 +239,18 @@ func (t *Transition) Receipts() []*types.Receipt {
 var emptyFrom = types.Address{}
 
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
+	var err error
 
-	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
+	if txn.From == emptyFrom &&
+		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
 		// Decrypt the from address
-		from, err := signer.Sender(txn)
+		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
+
+		// Decrypt the from address
+		txn.From, err = signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
-
-		txn.From = from
 	}
 
 	receipt := &types.Receipt{
@@ -272,7 +275,8 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 func (t *Transition) Write(txn *types.Transaction) error {
 	var err error
 
-	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
+	if txn.From == emptyFrom &&
+		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 

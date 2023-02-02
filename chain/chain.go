@@ -12,12 +12,16 @@ import (
 	"github.com/hashicorp/go-multierror"
 )
 
-var (
+const (
+	// GenesisBaseFee is the initial base fee for EIP-1559 blocks.
+	// Using 1 billion by default
+	GenesisBaseFee = 1_000_000_000
+
 	// GenesisGasLimit is the default gas limit of the Genesis block.
 	GenesisGasLimit uint64 = 4712388
 
 	// GenesisDifficulty is the default difficulty of the Genesis block.
-	GenesisDifficulty = big.NewInt(131072)
+	GenesisDifficulty uint64 = 131072
 )
 
 // Chain is the blockchain chain configuration
@@ -40,6 +44,7 @@ type Genesis struct {
 	Mixhash    types.Hash                        `json:"mixHash"`
 	Coinbase   types.Address                     `json:"coinbase"`
 	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
+	BaseFee    uint64                            `json:"baseFee"`
 
 	// Override
 	StateRoot types.Hash
@@ -81,7 +86,11 @@ func (g *Genesis) GenesisHeader() *types.Header {
 	}
 
 	if g.Difficulty == 0 {
-		head.Difficulty = GenesisDifficulty.Uint64()
+		head.Difficulty = GenesisDifficulty
+	}
+
+	if g.BaseFee == 0 {
+		head.BaseFee = GenesisBaseFee
 	}
 
 	return head
@@ -109,6 +118,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		Number     *string                     `json:"number,omitempty"`
 		GasUsed    *string                     `json:"gasUsed,omitempty"`
 		ParentHash types.Hash                  `json:"parentHash"`
+		BaseFee    *string                     `json:"baseFee"`
 	}
 
 	var enc Genesis
@@ -135,6 +145,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	enc.Number = types.EncodeUint64(g.Number)
 	enc.GasUsed = types.EncodeUint64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
+	enc.BaseFee = types.EncodeUint64(g.BaseFee)
 
 	return json.Marshal(&enc)
 }
@@ -153,6 +164,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		Number     *string                    `json:"number"`
 		GasUsed    *string                    `json:"gasUsed"`
 		ParentHash *types.Hash                `json:"parentHash"`
+		BaseFee    *string                    `json:"baseFee"`
 	}
 
 	var dec Genesis
@@ -226,6 +238,11 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 
 	if dec.ParentHash != nil {
 		g.ParentHash = *dec.ParentHash
+	}
+
+	g.BaseFee, subErr = types.ParseUint64orHex(dec.BaseFee)
+	if subErr != nil {
+		parseError("baseFee", subErr)
 	}
 
 	return err

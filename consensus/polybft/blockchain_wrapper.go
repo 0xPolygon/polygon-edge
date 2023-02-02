@@ -94,7 +94,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 
 	// apply transactions from block
 	for _, tx := range block.Transactions {
-		if err := transition.Write(tx); err != nil {
+		if err = transition.Write(tx); err != nil {
 			return nil, fmt.Errorf("process block tx error, tx = %v, err = %w", tx.Hash, err)
 		}
 	}
@@ -146,7 +146,8 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(
 	parent *types.Header, coinbase types.Address,
-	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error) {
+	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger,
+) (blockBuilder, error) {
 	gasLimit, err := p.blockchain.CalculateGasLimit(parent.Number + 1)
 	if err != nil {
 		return nil, err
@@ -158,6 +159,7 @@ func (p *blockchainWrapper) NewBlockBuilder(
 		Coinbase:  coinbase,
 		Executor:  p.executor,
 		GasLimit:  gasLimit,
+		BaseFee:   p.blockchain.CalculateBaseFee(parent),
 		TxPool:    txPool,
 		Logger:    logger,
 	}), nil

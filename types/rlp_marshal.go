@@ -5,7 +5,7 @@ import (
 )
 
 const (
-	RLPSingleByteUpperLimit = 0x7f
+	RLPSingleByteUpperLimit = 0x8f
 )
 
 type RLPMarshaler interface {
@@ -90,6 +90,9 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
 	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
 	vv.Set(arena.NewCopyBytes(h.Nonce[:]))
+
+	// TODO: Figure out how to deal with nonLondon-enabled chains
+	vv.Set(arena.NewUint(h.BaseFee))
 
 	return vv
 }

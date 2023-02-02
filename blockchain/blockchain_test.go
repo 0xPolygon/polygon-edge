@@ -1335,3 +1335,50 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 		assert.ErrorIs(t, err, errUnableToExecute)
 	})
 }
+
+func TestBlockchain_CalculateBaseFee(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		blockNumber     uint64
+		parentBaseFee   uint64
+		parentGasLimit  uint64
+		parentGasUsed   uint64
+		expectedBaseFee uint64
+	}{
+		{6, chain.GenesisBaseFee, 20000000, 10000000, chain.GenesisBaseFee}, // usage == target
+		{6, chain.GenesisBaseFee, 20000000, 9000000, 987500000},             // usage below target
+		{6, chain.GenesisBaseFee, 20000000, 11000000, 1012500000},           // usage above target
+		{6, chain.GenesisBaseFee, 20000000, 20000000, 1125000000},           // usage full
+		{6, chain.GenesisBaseFee, 20000000, 0, 875000000},                   // usage 0
+	}
+
+	for i, test := range tests {
+		test := test
+
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
+
+			fork := chain.Fork(5)
+			blockchain := Blockchain{
+				config: &chain.Chain{
+					Params: &chain.Params{
+						Forks: &chain.Forks{
+							London: &fork,
+						},
+					},
+				},
+			}
+
+			parent := &types.Header{
+				Number:   test.blockNumber,
+				GasLimit: test.parentGasLimit,
+				GasUsed:  test.parentGasUsed,
+				BaseFee:  test.parentBaseFee,
+			}
+
+			got := blockchain.CalculateBaseFee(parent)
+			assert.Equal(t, test.expectedBaseFee, got, fmt.Sprintf("expected %d, got %d", test.expectedBaseFee, got))
+		})
+	}
+}
