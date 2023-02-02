@@ -6,6 +6,8 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -14,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -161,16 +162,25 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
+	burnContract := types.ZeroAddress
+	if forkConfig.London {
+		burnContract, err = e.config.CalculateBurntContract(header.Number)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	newTxn := NewTxn(auxSnap2)
 
 	txCtx := runtime.TxContext{
-		Coinbase:   coinbaseReceiver,
-		Timestamp:  int64(header.Timestamp),
-		Number:     int64(header.Number),
-		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
-		BaseFee:    new(big.Int).SetUint64(header.BaseFee),
-		GasLimit:   int64(header.GasLimit),
-		ChainID:    int64(e.config.ChainID),
+		Coinbase:     coinbaseReceiver,
+		Timestamp:    int64(header.Timestamp),
+		Number:       int64(header.Number),
+		Difficulty:   types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		BaseFee:      new(big.Int).SetUint64(header.BaseFee),
+		GasLimit:     int64(header.GasLimit),
+		ChainID:      int64(e.config.ChainID),
+		BurnContract: burnContract,
 	}
 
 	txn := &Transition{

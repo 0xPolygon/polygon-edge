@@ -1,9 +1,17 @@
 package chain
 
 import (
+	"errors"
 	"math/big"
+	"sort"
+	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	// ErrBurntContractAddressMissing is the error when a contract address is not provided
+	ErrBurntContractAddressMissing = errors.New("burnt contract address missing")
 )
 
 // Params are all the set of params for the chain
@@ -13,6 +21,34 @@ type Params struct {
 	Engine         map[string]interface{} `json:"engine"`
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
+
+	// Governance contract where the token will be sent to and burnt in london fork
+	BurntContract map[string]string `json:"burntContract"`
+}
+
+// CalculateBurntContract calculates burn contract address for the given block number
+func (p *Params) CalculateBurntContract(number uint64) (types.Address, error) {
+	keys := make([]string, 0, len(p.BurntContract))
+	for k := range p.BurntContract {
+		keys = append(keys, k)
+	}
+
+	if len(keys) == 0 {
+		return types.ZeroAddress, ErrBurntContractAddressMissing
+	}
+
+	sort.Strings(keys)
+
+	for i := 0; i < len(keys)-1; i++ {
+		valUint, _ := strconv.ParseUint(keys[i], 10, 64)
+		valUintNext, _ := strconv.ParseUint(keys[i+1], 10, 64)
+
+		if number > valUint && number < valUintNext {
+			return types.StringToAddress(p.BurntContract[keys[i]]), nil
+		}
+	}
+
+	return types.StringToAddress(p.BurntContract[keys[len(keys)-1]]), nil
 }
 
 func (p *Params) GetEngine() string {
