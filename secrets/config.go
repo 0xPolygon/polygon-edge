@@ -3,6 +3,8 @@ package secrets
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 // SecretsManagerConfig is the configuration that gets
@@ -20,7 +22,7 @@ type SecretsManagerConfig struct {
 func (c *SecretsManagerConfig) WriteConfig(path string) error {
 	jsonBytes, _ := json.MarshalIndent(c, "", " ")
 
-	return os.WriteFile(path, jsonBytes, os.ModePerm)
+	return common.SaveFileSafe(path, jsonBytes, 0660)
 }
 
 // ReadConfig reads the SecretsManagerConfig from the specified path

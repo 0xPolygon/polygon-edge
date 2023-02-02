@@ -373,7 +373,7 @@ func GenerateTestLibp2pKey(t *testing.T) (crypto.PrivKey, string) {
 	assert.NoError(t, err)
 
 	// Instantiate the correct folder structure
-	setupErr := common.SetupDataDir(dir, []string{"libp2p"})
+	setupErr := common.SetupDataDir(dir, []string{"libp2p"}, 0770)
 	if setupErr != nil {
 		t.Fatalf("unable to generate libp2p folder structure, %v", setupErr)
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -239,7 +238,7 @@ func WriteGenesisConfigToDisk(genesisConfig *chain.Chain, genesisPath string) er
 		return fmt.Errorf("failed to generate genesis: %w", err)
 	}
 
-	if err := os.WriteFile(genesisPath, data, os.ModePerm); err != nil {
+	if err := common.SaveFileSafe(genesisPath, data, 0660); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
 
