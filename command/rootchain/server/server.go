@@ -23,6 +23,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const (
@@ -133,7 +134,7 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 	}
 
 	// target directory for the chain
-	if err = os.MkdirAll(params.dataDir, 0700); err != nil {
+	if err = common.CreateDirSafe(params.dataDir, 0700); err != nil {
 		return err
 	}
 

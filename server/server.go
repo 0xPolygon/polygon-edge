@@ -143,7 +143,7 @@ func NewServer(config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 

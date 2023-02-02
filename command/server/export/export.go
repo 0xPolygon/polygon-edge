@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -71,11 +71,11 @@ func generateConfig(config config.Config) error {
 		return fmt.Errorf("could not marshal config struct, %w", err)
 	}
 
-	if err := os.WriteFile(
+	if err := common.SaveFileSafe(
 		fmt.Sprintf("default-config.%s", paramFlagValues.FileType),
 		data,
-		os.ModePerm); err != nil {
-		return errors.New("could not create and write config file")
+		0660); err != nil {
+		return fmt.Errorf("failed to create config file %w", err)
 	}
 
 	return nil
