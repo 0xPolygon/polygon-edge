@@ -101,22 +101,22 @@ func TestMStore(t *testing.T) {
 	assert.Len(t, s.memory, 1024+32)
 }
 
-type mockHostForInstrustions struct {
+type mockHostForInstructions struct {
 	mockHost
 	nonce       uint64
 	code        []byte
 	callxResult *runtime.ExecutionResult
 }
 
-func (m *mockHostForInstrustions) GetNonce(types.Address) uint64 {
+func (m *mockHostForInstructions) GetNonce(types.Address) uint64 {
 	return m.nonce
 }
 
-func (m *mockHostForInstrustions) Callx(*runtime.Contract, runtime.Host) *runtime.ExecutionResult {
+func (m *mockHostForInstructions) Callx(*runtime.Contract, runtime.Host) *runtime.ExecutionResult {
 	return m.callxResult
 }
 
-func (m *mockHostForInstrustions) GetCode(addr types.Address) []byte {
+func (m *mockHostForInstructions) GetCode(addr types.Address) []byte {
 	return m.code
 }
 
@@ -145,7 +145,7 @@ func TestCreate(t *testing.T) {
 		config      *chain.ForksInTime
 		initState   *state
 		resultState *state
-		mockHost    *mockHostForInstrustions
+		mockHost    *mockHostForInstructions
 	}{
 		{
 			name: "should succeed in case of CREATE",
@@ -179,7 +179,7 @@ func TestCreate(t *testing.T) {
 					byte(REVERT),
 				},
 			},
-			mockHost: &mockHostForInstrustions{
+			mockHost: &mockHostForInstructions{
 				nonce: 0,
 				callxResult: &runtime.ExecutionResult{
 					GasLeft: 500,
@@ -223,7 +223,7 @@ func TestCreate(t *testing.T) {
 				stop: true,
 				err:  errWriteProtection,
 			},
-			mockHost: &mockHostForInstrustions{},
+			mockHost: &mockHostForInstructions{},
 		},
 		{
 			name:     "should throw errOpCodeNotFound when op is CREATE2 and config.Constantinople is disabled",
@@ -261,7 +261,7 @@ func TestCreate(t *testing.T) {
 				stop: true,
 				err:  errOpCodeNotFound,
 			},
-			mockHost: &mockHostForInstrustions{},
+			mockHost: &mockHostForInstructions{},
 		},
 		{
 			name: "should set zero address if op is CREATE and contract call throws ErrCodeStoreOutOfGas",
@@ -303,7 +303,7 @@ func TestCreate(t *testing.T) {
 				stop: false,
 				err:  nil,
 			},
-			mockHost: &mockHostForInstrustions{
+			mockHost: &mockHostForInstructions{
 				nonce: 0,
 				callxResult: &runtime.ExecutionResult{
 					GasLeft: 1000,
@@ -351,7 +351,7 @@ func TestCreate(t *testing.T) {
 				stop: false,
 				err:  nil,
 			},
-			mockHost: &mockHostForInstrustions{
+			mockHost: &mockHostForInstructions{
 				nonce: 0,
 				callxResult: &runtime.ExecutionResult{
 					GasLeft: 1000,
@@ -429,7 +429,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 				},
 				sp:   0,
 				stop: true,
-				err:  errGasUintOverflow,
+				err:  errReturnDataOutOfBounds,
 			},
 		},
 		{
@@ -454,7 +454,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 				sp:     0,
 				memory: make([]byte, 1),
 				stop:   true,
-				err:    errGasUintOverflow,
+				err:    errReturnDataOutOfBounds,
 			},
 		},
 		{
@@ -477,7 +477,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 				},
 				sp:   0,
 				stop: true,
-				err:  errGasUintOverflow,
+				err:  errReturnDataOutOfBounds,
 			},
 		},
 		{
@@ -618,7 +618,7 @@ func Test_opCall(t *testing.T) {
 		config      *chain.ForksInTime
 		initState   *state
 		resultState *state
-		mockHost    *mockHostForInstrustions
+		mockHost    *mockHostForInstructions
 	}{
 		{
 			// this test case also verifies that code does not panic when the outSize is 0 and outOffset > len(memory)
@@ -646,7 +646,7 @@ func Test_opCall(t *testing.T) {
 				stop:   false,
 				err:    nil,
 			},
-			mockHost: &mockHostForInstrustions{
+			mockHost: &mockHostForInstructions{
 				callxResult: &runtime.ExecutionResult{
 					ReturnValue: []byte{0x03},
 				},

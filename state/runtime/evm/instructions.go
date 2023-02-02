@@ -813,18 +813,19 @@ func opReturnDataCopy(c *state) {
 	dataOffset := c.pop()
 	length := c.pop()
 
+	if !dataOffset.IsUint64() {
+		c.exit(errReturnDataOutOfBounds)
+
+		return
+	}
+
 	// if length is 0, return immediately since no need for the data copying nor memory allocation
 	if length.Sign() == 0 || !c.allocateMemory(memOffset, length) {
 		return
 	}
 
-	if !dataOffset.IsUint64() {
-		c.exit(errGasUintOverflow)
-
-		return
-	}
-
-	if ulength := length.Uint64(); !c.consumeGas(((ulength + 31) / 32) * copyGas) {
+	ulength := length.Uint64()
+	if !c.consumeGas(((ulength + 31) / 32) * copyGas) {
 		return
 	}
 
@@ -843,15 +844,7 @@ func opReturnDataCopy(c *state) {
 	}
 
 	data := c.returnData[dataOffset.Uint64():dataEndIndex]
-	// this should not happen because the memory is allocated considering both memOffset and data length and
-	// in the case of length==0 the fn returns immediately, not reaching this point
-	if uint64(len(c.memory)) < memOffset.Uint64()+uint64(len(data)) {
-		c.exit(errReturnDataOutOfBounds)
-
-		return
-	}
-
-	copy(c.memory[memOffset.Uint64():], data)
+	copy(c.memory[memOffset.Uint64():memOffset.Uint64()+ulength], data)
 }
 
 func opCodeCopy(c *state) {
@@ -1182,7 +1175,7 @@ func opCall(op OpCode) instruction {
 		}
 
 		if result.Succeeded() || result.Reverted() {
-			if len(result.ReturnValue) != 0 && offset+size <= uint64(len(c.memory)) {
+			if len(result.ReturnValue) != 0 && size > 0 {
 				copy(c.memory[offset:offset+size], result.ReturnValue)
 			}
 		}
