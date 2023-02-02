@@ -481,7 +481,28 @@ func TestFSM_VerifyStateTransactions_CommitmentTransactionAndSprintIsFalse(t *te
 	require.NoError(t, err)
 
 	tx := createStateTransactionWithData(contracts.StateReceiverContract, encodedCommitment)
-	assert.ErrorContains(t, fsm.VerifyStateTransactions([]*types.Transaction{tx}), "found commitment in block which should not contain it")
+	assert.ErrorContains(t, fsm.VerifyStateTransactions([]*types.Transaction{tx}),
+		"found commitment tx in block which should not contain it")
+}
+
+func TestFSM_VerifyStateTransactions_EndOfEpochMoreThanOneUptimeTx(t *testing.T) {
+	t.Parallel()
+
+	txs := make([]*types.Transaction, 2)
+	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
+
+	uptimeTxOne, err := fsm.createValidatorsUptimeTx()
+	require.NoError(t, err)
+
+	txs[0] = uptimeTxOne
+
+	uptimeTwo := createTestUptimeCounter(t, nil, 100)
+	input, err := uptimeTwo.EncodeAbi()
+	require.NoError(t, err)
+
+	txs[1] = createStateTransactionWithData(types.ZeroAddress, input)
+
+	assert.ErrorIs(t, fsm.VerifyStateTransactions(txs), errUptimeTxOnlyOneUptimeExpected)
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
@@ -1159,7 +1180,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	txns = append(txns,
 		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
 	err = f.VerifyStateTransactions(txns)
-	require.ErrorContains(t, err, "only one commitment is allowed per block")
+	require.ErrorContains(t, err, "only one commitment tx is allowed per block")
 }
 
 func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {

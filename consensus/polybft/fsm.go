@@ -28,8 +28,9 @@ type blockBuilder interface {
 }
 
 var (
-	errUptimeTxDoesNotExist = errors.New("uptime transaction is not found in the epoch ending block")
-	errUptimeTxNotExpected  = errors.New("didn't expect uptime transaction in a non ending epoch block")
+	errUptimeTxDoesNotExist          = errors.New("uptime transaction is not found in the epoch ending block")
+	errUptimeTxNotExpected           = errors.New("didn't expect uptime transaction in a non epoch ending block")
+	errUptimeTxOnlyOneUptimeExpected = errors.New("only one uptime transaction is allowed in epoch ending block")
 )
 
 type fsm struct {
@@ -365,11 +366,11 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if !f.isEndOfSprint {
-				return fmt.Errorf("found commitment in block which should not contain it: tx = %v", tx.Hash)
+				return fmt.Errorf("found commitment tx in block which should not contain it: tx = %v", tx.Hash)
 			}
 
 			if commitmentMessageSignedExists {
-				return fmt.Errorf("only one commitment is allowed per block: %v", tx.Hash)
+				return fmt.Errorf("only one commitment tx is allowed per block: %v", tx.Hash)
 			}
 
 			commitmentMessageSignedExists = true
@@ -398,6 +399,13 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
 		case *contractsapi.CommitEpochFunction:
+			if uptimeTransactionExists {
+				// if we already validated uptime transaction,
+				//that means someone added two or more uptime tx to block,
+				// which is not allowed
+				return errUptimeTxOnlyOneUptimeExpected
+			}
+
 			uptimeTransactionExists = true
 
 			if err := f.verifyValidatorsUptimeTx(tx); err != nil {
