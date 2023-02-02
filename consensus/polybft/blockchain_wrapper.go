@@ -86,7 +86,6 @@ func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
 func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block,
 	callback func(*state.Transition) error) (*types.FullBlock, error) {
-	// TODO: Call validate block in polybft
 	header := block.Header.Copy()
 
 	transition, err := p.executor.BeginTxn(parent.StateRoot, header, types.BytesToAddress(header.Miner))

@@ -652,7 +652,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.True(t, runtime.IsValidSender(msg))
+	assert.True(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 
 	// sender not in current epoch validators
@@ -663,7 +663,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.False(t, runtime.IsValidSender(msg))
+	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 
 	// signature does not come from sender
@@ -674,7 +674,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.False(t, runtime.IsValidSender(msg))
+	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 
 	// invalid signature
@@ -684,7 +684,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		Signature: []byte{1, 2},
 	}
 
-	assert.False(t, runtime.IsValidSender(msg))
+	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 }
 
@@ -713,7 +713,7 @@ func TestConsensusRuntime_IsValidProposalHash(t *testing.T) {
 		config: &runtimeConfig{blockchain: new(blockchainMock)},
 	}
 
-	require.True(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+	require.True(t, runtime.IsValidProposalHash(&proto.Proposal{RawProposal: block.MarshalRLP()}, proposalHash.Bytes()))
 }
 
 func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) {
@@ -745,7 +745,7 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) 
 		config: &runtimeConfig{blockchain: new(blockchainMock)},
 	}
 
-	require.False(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+	require.False(t, runtime.IsValidProposalHash(&proto.Proposal{RawProposal: block.MarshalRLP()}, proposalHash.Bytes()))
 }
 
 func TestConsensusRuntime_IsValidProposalHash_InvalidExtra(t *testing.T) {
@@ -774,7 +774,7 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidExtra(t *testing.T) {
 		config: &runtimeConfig{blockchain: new(blockchainMock)},
 	}
 
-	require.False(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+	require.False(t, runtime.IsValidProposalHash(&proto.Proposal{RawProposal: block.MarshalRLP()}, proposalHash.Bytes()))
 }
 
 func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
@@ -788,7 +788,7 @@ func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	require.Nil(t, runtime.BuildProposal(&proto.View{Height: 5, Round: 1}))
+	require.Nil(t, runtime.BuildProposal(&proto.View{Round: 5}))
 }
 
 func TestConsensusRuntime_ID(t *testing.T) {
@@ -929,7 +929,7 @@ func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {
 	t.Parallel()
 
 	key := createTestKey(t)
-	view, proposal, certificate := &proto.View{}, []byte{1}, &proto.PreparedCertificate{}
+	view, rawProposal, certificate := &proto.View{}, []byte{1}, &proto.PreparedCertificate{}
 
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
@@ -937,13 +937,18 @@ func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {
 		},
 	}
 
+	proposal := &proto.Proposal{
+		RawProposal: rawProposal,
+		Round:       view.Round,
+	}
+
 	expected := proto.Message{
 		View: view,
 		From: key.Address().Bytes(),
 		Type: proto.MessageType_ROUND_CHANGE,
 		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
-			LastPreparedProposedBlock: proposal,
 			LatestPreparedCertificate: certificate,
+			LastPreparedProposal:      proposal,
 		}},
 	}
 
@@ -999,7 +1004,7 @@ func TestConsensusRuntime_IsValidProposalHash_EmptyProposal(t *testing.T) {
 
 	runtime := &consensusRuntime{logger: hclog.NewNullLogger()}
 
-	assert.False(t, runtime.IsValidProposalHash(nil, []byte("hash")))
+	assert.False(t, runtime.IsValidProposalHash(&proto.Proposal{}, []byte("hash")))
 }
 
 func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {

@@ -3,11 +3,10 @@ package ibft
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
-	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -15,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildProposal(view *protoIBFT.View) []byte {
+func (i *backendIBFT) BuildProposal(view *proto.View) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
@@ -41,12 +40,13 @@ func (i *backendIBFT) BuildProposal(view *protoIBFT.View) []byte {
 	return block.MarshalRLP()
 }
 
-func (i *backendIBFT) InsertBlock(
-	proposal []byte,
+// InsertProposal inserts a proposal of which the consensus has been got
+func (i *backendIBFT) InsertProposal(
+	proposal *proto.Proposal,
 	committedSeals []*messages.CommittedSeal,
 ) {
 	newBlock := &types.Block{}
-	if err := newBlock.UnmarshalRLP(proposal); err != nil {
+	if err := newBlock.UnmarshalRLP(proposal.RawProposal); err != nil {
 		i.logger.Error("cannot unmarshal proposal", "err", err)
 
 		return
@@ -64,7 +64,7 @@ func (i *backendIBFT) InsertBlock(
 	copy(extraDataBackup, extraDataOriginal)
 
 	// Push the committed seals to the header
-	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, committedSealsMap)
+	header, err := i.currentSigner.WriteCommittedSeals(newBlock.Header, proposal.Round, committedSealsMap)
 	if err != nil {
 		i.logger.Error("cannot write committed seals", "err", err)
 
@@ -135,7 +135,15 @@ func (i *backendIBFT) ID() []byte {
 	return i.currentSigner.Address().Bytes()
 }
 
-func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
+func (i *backendIBFT) MaximumFaultyNodes() uint64 {
+	return uint64(CalcMaxFaultyNodes(i.currentValidators))
+}
+
+func (i *backendIBFT) HasQuorum(
+	blockNumber uint64,
+	messages []*proto.Message,
+	msgType proto.MessageType,
+) bool {
 	validators, err := i.forkManager.GetValidators(blockNumber)
 	if err != nil {
 		i.logger.Error(
@@ -144,38 +152,26 @@ func (i *backendIBFT) quorum(blockNumber uint64) uint64 {
 			"err", err,
 		)
 
-		// return Math.MaxInt32 to prevent overflow when casting to int in go-ibft package
-		return math.MaxInt32
+		return false
 	}
 
-	quorumFn := i.quorumSize(blockNumber)
-
-	return uint64(quorumFn(validators))
-}
-
-// HasQuorum returns true if quorum is reached for the given blockNumber
-func (i *backendIBFT) HasQuorum(
-	blockNumber uint64,
-	messages []*protoIBFT.Message,
-	msgType protoIBFT.MessageType,
-) bool {
-	quorum := i.quorum(blockNumber)
+	quorum := i.quorumSize(blockNumber)(validators)
 
 	switch msgType {
-	case protoIBFT.MessageType_PREPREPARE:
-		return len(messages) >= 1
-	case protoIBFT.MessageType_PREPARE:
+	case proto.MessageType_PREPREPARE:
+		return len(messages) > 0
+	case proto.MessageType_PREPARE:
 		// two cases -> first message is MessageType_PREPREPARE, and other -> MessageType_PREPREPARE is not included
-		if len(messages) > 0 && messages[0].Type == protoIBFT.MessageType_PREPREPARE {
-			return len(messages) >= int(quorum)
+		if len(messages) > 0 && messages[0].Type == proto.MessageType_PREPREPARE {
+			return len(messages) >= quorum
 		}
 
-		return len(messages) >= int(quorum)-1
-	case protoIBFT.MessageType_ROUND_CHANGE, protoIBFT.MessageType_COMMIT:
-		return len(messages) >= int(quorum)
+		return len(messages) >= quorum-1
+	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
+		return len(messages) >= quorum
+	default:
+		return false
 	}
-
-	return false
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -183,7 +184,7 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), block.Number(), block.Hash())
 	require.NoError(t, err)
 
-	msg := runtime.BuildPrePrepareMessage(proposal, nil, nil)
+	msg := runtime.BuildPrePrepareMessage(proposal, nil, &proto.View{})
 	require.Equal(t, checkpointHash.Bytes(), msg.GetPreprepareData().ProposalHash)
 
 	mBlockBuilder.AssertExpectations(t)
@@ -265,7 +266,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	checkpointHash, err := checkpoint.Hash(fsm.backend.GetChainID(), block.Number(), block.Hash())
 	require.NoError(t, err)
 
-	msg := runtime.BuildPrePrepareMessage(proposal, nil, nil)
+	msg := runtime.BuildPrePrepareMessage(proposal, nil, &proto.View{})
 	require.Equal(t, checkpointHash.Bytes(), msg.GetPreprepareData().ProposalHash)
 
 	mBlockBuilder.AssertExpectations(t)

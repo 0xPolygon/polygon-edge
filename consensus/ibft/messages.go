@@ -4,7 +4,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
@@ -21,16 +20,20 @@ func (i *backendIBFT) signMessage(msg *protoIBFT.Message) *protoIBFT.Message {
 }
 
 func (i *backendIBFT) BuildPrePrepareMessage(
-	proposal []byte,
+	rawProposal []byte,
 	certificate *protoIBFT.RoundChangeCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(proposal); err != nil {
-		return nil
+	proposedBlock := &protoIBFT.Proposal{
+		RawProposal: rawProposal,
+		Round:       view.Round,
 	}
 
-	proposalHash := block.Hash().Bytes()
+	// hash calculation begins
+	proposalHash, err := i.calculateProposalHashFromBlockBytes(rawProposal, &view.Round)
+	if err != nil {
+		return nil
+	}
 
 	msg := &protoIBFT.Message{
 		View: view,
@@ -38,8 +41,8 @@ func (i *backendIBFT) BuildPrePrepareMessage(
 		Type: protoIBFT.MessageType_PREPREPARE,
 		Payload: &protoIBFT.Message_PreprepareData{
 			PreprepareData: &protoIBFT.PrePrepareMessage{
-				Proposal:     proposal,
-				ProposalHash: proposalHash,
+				Proposal:     proposedBlock,
+				ProposalHash: proposalHash.Bytes(),
 				Certificate:  certificate,
 			},
 		},
@@ -87,7 +90,7 @@ func (i *backendIBFT) BuildCommitMessage(proposalHash []byte, view *protoIBFT.Vi
 }
 
 func (i *backendIBFT) BuildRoundChangeMessage(
-	proposal []byte,
+	proposal *protoIBFT.Proposal,
 	certificate *protoIBFT.PreparedCertificate,
 	view *protoIBFT.View,
 ) *protoIBFT.Message {
@@ -96,7 +99,7 @@ func (i *backendIBFT) BuildRoundChangeMessage(
 		From: i.ID(),
 		Type: protoIBFT.MessageType_ROUND_CHANGE,
 		Payload: &protoIBFT.Message_RoundChangeData{RoundChangeData: &protoIBFT.RoundChangeMessage{
-			LastPreparedProposedBlock: proposal,
+			LastPreparedProposal:      proposal,
 			LatestPreparedCertificate: certificate,
 		}},
 	}
