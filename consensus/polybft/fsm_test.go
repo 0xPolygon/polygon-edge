@@ -948,7 +948,7 @@ func TestFSM_Height(t *testing.T) {
 	assert.Equal(t, parentNumber+1, fsm.Height())
 }
 
-func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
+func TestFSM_DecodeCommitmentStateTxs(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -961,25 +961,42 @@ func TestFSM_StateTransactionsEndOfSprint(t *testing.T) {
 
 	f := &fsm{
 		config:                       &PolyBFTConfig{},
-		isEndOfEpoch:                 true,
-		isEndOfSprint:                true,
 		proposerCommitmentToRegister: signedCommitment,
 		uptimeCounter:                createTestUptimeCounter(t, nil, 10),
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	txs := f.stateTransactions()
-
-	for i, tx := range txs {
+	for i, tx := range f.stateTransactions() {
 		decodedData, err := decodeStateTransaction(tx.Input)
 		require.NoError(t, err)
 
-		switch stateTxData := decodedData.(type) {
-		case *CommitmentMessageSigned:
-			require.Equal(t, 0, i, "failed for tx number %d", i)
-			require.Equal(t, signedCommitment, stateTxData, "failed for tx number %d", i)
-		}
+		decodedCommitmentMsg, ok := decodedData.(*CommitmentMessageSigned)
+		require.True(t, ok)
+		require.Equal(t, 0, i, "failed for tx number %d", i)
+		require.Equal(t, signedCommitment, decodedCommitmentMsg, "failed for tx number %d", i)
 	}
+}
+
+func TestFSM_DecodeCommitEpochStateTx(t *testing.T) {
+	t.Parallel()
+
+	commitEpoch := createTestUptimeCounter(t, nil, 10)
+	input, err := commitEpoch.EncodeAbi()
+	require.NoError(t, err)
+	require.NotNil(t, input)
+
+	tx := createStateTransactionWithData(contracts.ValidatorSetContract, input)
+	decodedInputData, err := decodeStateTransaction(tx.Input)
+	require.NoError(t, err)
+
+	decodedCommitEpoch, ok := decodedInputData.(*contractsapi.CommitEpochFunction)
+	require.True(t, ok)
+	require.True(t, commitEpoch.ID.Cmp(decodedCommitEpoch.ID) == 0)
+	require.NotNil(t, decodedCommitEpoch.Epoch)
+	require.True(t, commitEpoch.Epoch.StartBlock.Cmp(decodedCommitEpoch.Epoch.StartBlock) == 0)
+	require.True(t, commitEpoch.Epoch.EndBlock.Cmp(decodedCommitEpoch.Epoch.EndBlock) == 0)
+	require.NotNil(t, decodedCommitEpoch.Uptime)
+	require.True(t, commitEpoch.Uptime.TotalBlocks.Cmp(decodedCommitEpoch.Uptime.TotalBlocks) == 0)
 }
 
 func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing.T) {
