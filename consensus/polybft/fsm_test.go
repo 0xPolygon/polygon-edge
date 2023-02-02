@@ -406,6 +406,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 	blockBuilderMock.On("WriteTx", mock.Anything).Return(error(nil)).Once()
 	blockBuilderMock.On("GetState").Return(transition).Once()
 	blockBuilderMock.On("Reset").Return(error(nil)).Once()
+	blockBuilderMock.On("Fill").Once()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetValidatorSet").Return(nil, errors.New("failed to get validators set")).Once()
@@ -430,7 +431,6 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 	assert.Nil(t, proposal)
 
 	blockBuilderMock.AssertNotCalled(t, "Build")
-	blockBuilderMock.AssertNotCalled(t, "Fill")
 	blockBuilderMock.AssertExpectations(t)
 	systemStateMock.AssertExpectations(t)
 	blockChainMock.AssertExpectations(t)
