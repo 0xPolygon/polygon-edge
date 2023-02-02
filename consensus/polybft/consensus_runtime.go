@@ -709,8 +709,10 @@ func (c *consensusRuntime) ID() []byte {
 }
 
 // HasQuorum returns true if quorum is reached for the given blockNumber
-func (c *consensusRuntime) HasQuorum(height uint64, messages []*proto.Message, msgType proto.MessageType,
-) bool {
+func (c *consensusRuntime) HasQuorum(
+	height uint64,
+	messages []*proto.Message,
+	msgType proto.MessageType) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	// extract the addresses of all the signers of the messages
@@ -888,8 +890,8 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 		Type: proto.MessageType_ROUND_CHANGE,
 		Payload: &proto.Message_RoundChangeData{
 			RoundChangeData: &proto.RoundChangeMessage{
-				LatestPreparedCertificate: certificate,
 				LastPreparedProposal:      proposal,
+				LatestPreparedCertificate: certificate,
 			}},
 	}
 
