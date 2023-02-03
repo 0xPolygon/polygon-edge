@@ -13,11 +13,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -1710,6 +1713,44 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
 			ErrSmartContractRestricted,
+		)
+	})
+
+	t.Run("Input larger then the MaxInitCodeSize", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.EIP158 = true
+
+		input := make([]byte, state.SpuriousDragonMaxCodeSize+1)
+		_, err := rand.Read(input)
+		require.NoError(t, err)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+		tx.Input = input
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			runtime.ErrMaxCodeSizeExceeded,
+		)
+	})
+
+	t.Run("Input the same as MaxInitCodeSize", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.EIP158 = true
+
+		input := make([]byte, state.SpuriousDragonMaxCodeSize)
+		_, err := rand.Read(input)
+		require.NoError(t, err)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+		tx.Input = input
+
+		assert.NoError(t,
+			pool.validateTx(signTx(tx)),
+			runtime.ErrMaxCodeSizeExceeded,
 		)
 	})
 }

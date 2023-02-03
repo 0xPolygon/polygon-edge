@@ -196,6 +196,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
+	args = append(args, "--insecure")
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir

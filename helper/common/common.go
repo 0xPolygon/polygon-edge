@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math"
+	"math/big"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -67,14 +71,14 @@ func ToFixedFloat(num float64, precision int) float64 {
 }
 
 // SetupDataDir sets up the data directory and the corresponding sub-directories
-func SetupDataDir(dataDir string, paths []string) error {
-	if err := createDir(dataDir); err != nil {
+func SetupDataDir(dataDir string, paths []string, perms fs.FileMode) error {
+	if err := CreateDirSafe(dataDir, perms); err != nil {
 		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
-		if err := createDir(path); err != nil {
+		if err := CreateDirSafe(path, perms); err != nil {
 			return fmt.Errorf("failed to create path: (%s): %w", path, err)
 		}
 	}
@@ -84,6 +88,11 @@ func SetupDataDir(dataDir string, paths []string) error {
 
 // DirectoryExists checks if the directory at the specified path exists
 func DirectoryExists(directoryPath string) bool {
+	// Check if path is empty
+	if directoryPath == "" {
+		return false
+	}
+
 	// Grab the absolute filepath
 	pathAbs, err := filepath.Abs(directoryPath)
 	if err != nil {
@@ -98,17 +107,101 @@ func DirectoryExists(directoryPath string) bool {
 	return true
 }
 
-// createDir creates a file system directory if it doesn't exist
-func createDir(path string) error {
-	_, err := os.Stat(path)
+// Checks if the file at the specified path exists
+func FileExists(filePath string) bool {
+	// Check if path is empty
+	if filePath == "" {
+		return false
+	}
+
+	// Grab the absolute filepath
+	pathAbs, err := filepath.Abs(filePath)
+	if err != nil {
+		return false
+	}
+
+	// Check if the file exists, and that it's actually a file if there is a hit
+	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && fileInfo.IsDir()) {
+		return false
+	}
+
+	return true
+}
+
+// Creates a directory at path and with perms level permissions.
+// If directory already exists, owner and permissions are verified.
+func CreateDirSafe(path string, perms fs.FileMode) error {
+	info, err := os.Stat(path)
+	// check if an error occurred other than path not exists
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(path, os.ModePerm); err != nil {
+	// create directory if it does not exist
+	if !DirectoryExists(path) {
+		if err := os.MkdirAll(path, perms); err != nil {
 			return err
 		}
+
+		return nil
+	}
+
+	// verify that existing directory's owner and permissions are safe
+	return verifyFileOwnerAndPermissions(path, info, perms)
+}
+
+// Creates a file at path and with perms level permissions.
+// If file already exists, owner and permissions are
+// verified, and the file is overwritten.
+func SaveFileSafe(path string, data []byte, perms fs.FileMode) error {
+	info, err := os.Stat(path)
+	// check if an error occurred other than path not exists
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if FileExists(path) {
+		// verify that existing file's owner and permissions are safe
+		if err := verifyFileOwnerAndPermissions(path, info, perms); err != nil {
+			return err
+		}
+	}
+
+	// create or overwrite the file
+	return os.WriteFile(path, data, perms)
+}
+
+// Verifies that the file owner is the current user,
+// or the file owner is in the same group as current user
+// and permissions are set correctly by the owner.
+func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) error {
+	// get stats
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if stat == nil || !ok {
+		return fmt.Errorf("failed to get stats of %s", path)
+	}
+
+	// get current user
+	currUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("failed to get current user")
+	}
+
+	// get user id of the owner
+	ownerUID := strconv.FormatUint(uint64(stat.Uid), 10)
+	if currUser.Uid == ownerUID {
+		return nil
+	}
+
+	// get group id of the owner
+	ownerGID := strconv.FormatUint(uint64(stat.Gid), 10)
+	if currUser.Gid != ownerGID {
+		return fmt.Errorf("file/directory created by a user from a different group: %s", path)
+	}
+
+	// check if permissions are set correctly by the owner
+	if info.Mode() != expectedPerms {
+		return fmt.Errorf("permissions of the file/directory '%s' are set incorrectly by another user", path)
 	}
 
 	return nil
@@ -173,4 +266,25 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 	copy(tmp[size-l:], bb)
 
 	return tmp
+}
+
+// ExtendByteSlice extends given byte slice by needLength parameter and trims it
+func ExtendByteSlice(b []byte, needLength int) []byte {
+	b = b[:cap(b)]
+
+	if n := needLength - len(b); n > 0 {
+		b = append(b, make([]byte, n)...)
+	}
+
+	return b[:needLength]
+}
+
+// BigIntDivCeil performs integer division and rounds given result to next bigger integer number
+// It is calculated using this formula result = (a + b - 1) / b
+func BigIntDivCeil(a, b *big.Int) *big.Int {
+	result := new(big.Int)
+
+	return result.Add(a, b).
+		Sub(result, big.NewInt(1)).
+		Div(result, b)
 }

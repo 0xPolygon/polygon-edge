@@ -61,6 +61,8 @@ func (p *serverParams) initRawParams() error {
 	p.initPeerLimits()
 	p.initLogFileLocation()
 
+	p.relayer = p.rawConfig.Relayer
+
 	return p.initAddresses()
 }
 

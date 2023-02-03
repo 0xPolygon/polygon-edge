@@ -39,7 +39,6 @@ func ParseUint256orHex(val *string) (*big.Int, error) {
 	}
 
 	b, ok := new(big.Int).SetString(str, base)
-
 	if !ok {
 		return nil, fmt.Errorf("could not parse")
 	}

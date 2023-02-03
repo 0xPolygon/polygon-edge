@@ -105,8 +105,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	paramsList := newParamsList(basicParams, initNumber)
-	results := make(Results, len(paramsList))
+	paramsList := getParamsList()
+	results := make(command.Results, len(paramsList))
 
 	for i, params := range paramsList {
 		if err := params.initSecrets(); err != nil {
@@ -128,21 +128,22 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter.SetCommandResult(results)
 }
 
-// newParamsList creates a list of initParams with num elements.
+// getParamsList creates a list of initParams with num elements.
 // This function basically copies the given initParams but updating dataDir by applying an index.
-func newParamsList(params initParams, num int) []initParams {
-	if num == 1 {
-		return []initParams{params}
+func getParamsList() []initParams {
+	if initNumber == 1 {
+		return []initParams{basicParams}
 	}
 
-	paramsList := make([]initParams, num)
-	for i := 1; i <= num; i++ {
+	paramsList := make([]initParams, initNumber)
+	for i := 1; i <= initNumber; i++ {
 		paramsList[i-1] = initParams{
-			dataDir:            fmt.Sprintf("%s%d", params.dataDir, i),
-			generatesECDSA:     params.generatesECDSA,
-			generatesBLS:       params.generatesBLS,
-			generatesNetwork:   params.generatesNetwork,
-			insecureLocalStore: params.insecureLocalStore,
+			dataDir:            fmt.Sprintf("%s%d", basicParams.dataDir, i),
+			configPath:         basicParams.configPath,
+			generatesECDSA:     basicParams.generatesECDSA,
+			generatesBLS:       basicParams.generatesBLS,
+			generatesNetwork:   basicParams.generatesNetwork,
+			insecureLocalStore: basicParams.insecureLocalStore,
 		}
 	}
 

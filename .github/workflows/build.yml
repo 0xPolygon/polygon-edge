@@ -3,6 +3,9 @@ name: Build
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE:
+        required: true
 
 jobs:
   go_build:
@@ -11,6 +14,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
+
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:

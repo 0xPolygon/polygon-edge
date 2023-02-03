@@ -24,9 +24,11 @@ type Blockchain interface {
 	// GetBlockByNumber returns block by number
 	GetBlockByNumber(uint64, bool) (*types.Block, bool)
 	// VerifyFinalizedBlock verifies finalized block
-	VerifyFinalizedBlock(*types.Block) error
+	VerifyFinalizedBlock(block *types.Block) (*types.FullBlock, error)
 	// WriteBlock writes a given block to chain
 	WriteBlock(*types.Block, string) error
+	// WriteFullBlock writes a given block to chain and saves its receipts to cache
+	WriteFullBlock(*types.FullBlock, string) error
 }
 
 type Network interface {
@@ -63,7 +65,7 @@ type Syncer interface {
 	// HasSyncPeer returns whether syncer has the peer syncer can sync with
 	HasSyncPeer() bool
 	// Sync starts routine to sync blocks
-	Sync(func(*types.Block) bool) error
+	Sync(func(*types.FullBlock) bool) error
 }
 
 type Progression interface {
