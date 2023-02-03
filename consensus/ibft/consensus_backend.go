@@ -14,13 +14,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
+func (i *backendIBFT) BuildProposal(view *proto.View) []byte {
 	var (
 		latestHeader      = i.blockchain.Header()
 		latestBlockNumber = latestHeader.Number
 	)
 
-	if latestBlockNumber+1 != blockNumber {
+	if latestBlockNumber+1 != view.Height {
 		i.logger.Error(
 			"unable to build block, due to lack of parent block",
 			"num",
@@ -32,7 +32,7 @@ func (i *backendIBFT) BuildProposal(blockNumber uint64) []byte {
 
 	block, err := i.buildBlock(latestHeader)
 	if err != nil {
-		i.logger.Error("cannot build block", "num", blockNumber, "err", err)
+		i.logger.Error("cannot build block", "num", view.Height, "err", err)
 
 		return nil
 	}
@@ -161,6 +161,11 @@ func (i *backendIBFT) HasQuorum(
 	case proto.MessageType_PREPREPARE:
 		return len(messages) > 0
 	case proto.MessageType_PREPARE:
+		// two cases -> first message is MessageType_PREPREPARE, and other -> MessageType_PREPREPARE is not included
+		if len(messages) > 0 && messages[0].Type == proto.MessageType_PREPREPARE {
+			return len(messages) >= quorum
+		}
+
 		return len(messages) >= quorum-1
 	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
 		return len(messages) >= quorum

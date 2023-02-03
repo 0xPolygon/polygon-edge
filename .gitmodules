@@ -1,3 +1,9 @@
 [submodule "tests/tests"]
 	path = tests/tests
-	url = https://github.com/ethereum/tests.git 
+	url = https://github.com/ethereum/tests.git
+	shallow = true
+[submodule "core-contracts"]
+	path = core-contracts
+	url = https://github.com/0xPolygon/core-contracts
+	shallow = true
+	branch = feat-polybft-release

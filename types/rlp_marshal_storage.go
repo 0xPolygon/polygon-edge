@@ -9,17 +9,17 @@ type RLPStoreMarshaler interface {
 }
 
 func (b *Body) MarshalRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(b.MarshalRLPWith, dst)
+	return MarshalRLPTo(b.marshalRLPWith, dst)
 }
 
-func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+func (b *Body) marshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv := ar.NewArray()
 	if len(b.Transactions) == 0 {
 		vv.Set(ar.NewNullArray())
 	} else {
 		v0 := ar.NewArray()
 		for _, tx := range b.Transactions {
-			v0.Set(tx.MarshalStoreRLPWith(ar))
+			v0.Set(tx.marshalStoreRLPWith(ar))
 		}
 		vv.Set(v0)
 	}
@@ -38,11 +38,16 @@ func (b *Body) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (t *Transaction) MarshalStoreRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(t.MarshalStoreRLPWith, dst)
+	return MarshalRLPTo(t.marshalStoreRLPWith, dst)
 }
 
-func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+func (t *Transaction) marshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
+
+	if t.Type != LegacyTx {
+		vv.Set(a.NewBytes([]byte{byte(t.Type)}))
+	}
+
 	// consensus part
 	vv.Set(t.MarshalRLPWith(a))
 	// context part
@@ -52,25 +57,30 @@ func (t *Transaction) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 }
 
 func (r Receipts) MarshalStoreRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(r.MarshalStoreRLPWith, dst)
+	return MarshalRLPTo(r.marshalStoreRLPWith, dst)
 }
 
-func (r *Receipts) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+func (r *Receipts) marshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
 	for _, rr := range *r {
-		vv.Set(rr.MarshalStoreRLPWith(a))
+		vv.Set(rr.marshalStoreRLPWith(a))
 	}
 
 	return vv
 }
 
 func (r *Receipt) MarshalStoreRLPTo(dst []byte) []byte {
-	return MarshalRLPTo(r.MarshalStoreRLPWith, dst)
+	return MarshalRLPTo(r.marshalStoreRLPWith, dst)
 }
 
-func (r *Receipt) MarshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
+func (r *Receipt) marshalStoreRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	// use the hash part
 	vv := a.NewArray()
+
+	if !r.IsLegacyTx() {
+		vv.Set(a.NewBytes([]byte{byte(r.TransactionType)}))
+	}
+
 	vv.Set(r.MarshalRLPWith(a))
 
 	if r.ContractAddress == nil {

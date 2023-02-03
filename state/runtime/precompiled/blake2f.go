@@ -6,6 +6,8 @@ import (
 	"math/bits"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type blake2f struct {
@@ -20,7 +22,7 @@ func (e *blake2f) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return uint64(binary.BigEndian.Uint32(input[0:4]))
 }
 
-func (e *blake2f) run(input []byte) ([]byte, error) {
+func (e *blake2f) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	// validate input
 	if len(input) != 213 {
 		return nil, fmt.Errorf("bad length")

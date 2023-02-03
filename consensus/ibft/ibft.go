@@ -208,16 +208,16 @@ func (i *backendIBFT) Initialize() error {
 
 // sync runs the syncer in the background to receive blocks from advanced peers
 func (i *backendIBFT) startSyncing() {
-	callInsertBlockHook := func(block *types.Block) bool {
-		if err := i.currentHooks.PostInsertBlock(block); err != nil {
-			i.logger.Error("failed to call PostInsertBlock", "height", block.Header.Number, "error", err)
+	callInsertBlockHook := func(fullBlock *types.FullBlock) bool {
+		if err := i.currentHooks.PostInsertBlock(fullBlock.Block); err != nil {
+			i.logger.Error("failed to call PostInsertBlock", "height", fullBlock.Block.Header.Number, "error", err)
 		}
 
-		if err := i.updateCurrentModules(block.Number() + 1); err != nil {
-			i.logger.Error("failed to update sub modules", "height", block.Number()+1, "err", err)
+		if err := i.updateCurrentModules(fullBlock.Block.Number() + 1); err != nil {
+			i.logger.Error("failed to update sub modules", "height", fullBlock.Block.Number()+1, "err", err)
 		}
 
-		i.txpool.ResetWithHeaders(block.Header)
+		i.txpool.ResetWithHeaders(fullBlock.Block.Header)
 
 		return false
 	}
@@ -545,6 +545,11 @@ func (i *backendIBFT) SetHeaderHash() {
 
 		return hash
 	}
+}
+
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
+	return nil
 }
 
 // updateCurrentModules updates Signer, Hooks, and Validators

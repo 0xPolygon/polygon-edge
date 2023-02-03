@@ -34,6 +34,7 @@ type endpoints struct {
 	Web3   *Web3
 	Net    *Net
 	TxPool *TxPool
+	Bridge *Bridge
 	Debug  *Debug
 }
 
@@ -96,6 +97,9 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
 	d.endpoints.TxPool = &TxPool{
 		store,
 	}
+	d.endpoints.Bridge = &Bridge{
+		store,
+	}
 	d.endpoints.Debug = &Debug{
 		store,
 	}
@@ -104,6 +108,7 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
 	d.registerService("net", d.endpoints.Net)
 	d.registerService("web3", d.endpoints.Web3)
 	d.registerService("txpool", d.endpoints.TxPool)
+	d.registerService("bridge", d.endpoints.Bridge)
 	d.registerService("debug", d.endpoints.Debug)
 }
 

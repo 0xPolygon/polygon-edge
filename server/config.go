@@ -41,6 +41,8 @@ type Config struct {
 	JSONLogFormat bool
 
 	LogFilePath string
+
+	Relayer bool
 }
 
 // Telemetry holds the config details for metric services

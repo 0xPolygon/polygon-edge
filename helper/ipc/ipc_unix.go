@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 // Dial dials an IPC path
@@ -22,7 +24,7 @@ func DialTimeout(path string, timeout time.Duration) (net.Conn, error) {
 
 // Listen listens an IPC path
 func Listen(path string) (net.Listener, error) {
-	if err := os.MkdirAll(filepath.Dir(path), 0751); err != nil {
+	if err := common.CreateDirSafe(filepath.Dir(path), 0751); err != nil {
 		return nil, err
 	}
 

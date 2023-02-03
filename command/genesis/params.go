@@ -3,6 +3,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -10,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -23,6 +25,7 @@ const (
 	premineFlag       = "premine"
 	chainIDFlag       = "chain-id"
 	epochSizeFlag     = "epoch-size"
+	epochRewardFlag   = "epoch-reward"
 	blockGasLimitFlag = "block-gas-limit"
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
@@ -55,8 +58,9 @@ type genesisParams struct {
 
 	ibftValidatorsRaw []string
 
-	chainID       uint64
-	epochSize     uint64
+	chainID   uint64
+	epochSize uint64
+
 	blockGasLimit uint64
 	isPos         bool
 
@@ -72,6 +76,15 @@ type genesisParams struct {
 	consensusEngineConfig map[string]interface{}
 
 	genesisConfig *chain.Chain
+
+	// PolyBFT
+	manifestPath           string
+	smartContractsRootPath string
+	validatorSetSize       int
+	sprintSize             uint64
+	blockTime              time.Duration
+	bridgeJSONRPCAddr      string
+	epochReward            uint64
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -93,7 +106,7 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	// Check that the epoch size is correct
-	if p.epochSize < 2 && server.ConsensusType(p.consensusRaw) == server.IBFTConsensus {
+	if p.epochSize < 2 && (p.isIBFTConsensus() || p.isPolyBFTConsensus()) {
 		// Epoch size must be greater than 1, so new transactions have a chance to be added to a block.
 		// Otherwise, every block would be an endblock (meaning it will not have any transactions).
 		// Check is placed here to avoid additional parsing if epochSize < 2
@@ -112,6 +125,10 @@ func (p *genesisParams) isIBFTConsensus() bool {
 	return server.ConsensusType(p.consensusRaw) == server.IBFTConsensus
 }
 
+func (p *genesisParams) isPolyBFTConsensus() bool {
+	return server.ConsensusType(p.consensusRaw) == server.PolyBFTConsensus
+}
+
 func (p *genesisParams) areValidatorsSetManually() bool {
 	return len(p.ibftValidatorsRaw) != 0
 }
@@ -121,13 +138,21 @@ func (p *genesisParams) areValidatorsSetByPrefix() bool {
 }
 
 func (p *genesisParams) getRequiredFlags() []string {
-	return []string{
-		command.BootnodeFlag,
+	if p.isIBFTConsensus() {
+		return []string{
+			command.BootnodeFlag,
+		}
 	}
+
+	return []string{}
 }
 
 func (p *genesisParams) initRawParams() error {
 	p.consensus = server.ConsensusType(p.consensusRaw)
+
+	if p.consensus == server.PolyBFTConsensus {
+		return nil
+	}
 
 	if err := p.initIBFTValidatorType(); err != nil {
 		return err
@@ -312,8 +337,15 @@ func (p *genesisParams) initGenesisConfig() error {
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
 
-	if err := fillPremineMap(chainConfig.Genesis.Alloc, p.premine); err != nil {
-		return err
+	for _, premineRaw := range p.premine {
+		premineInfo, err := parsePremineInfo(premineRaw)
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
+			Balance: premineInfo.balance,
+		}
 	}
 
 	p.genesisConfig = chainConfig
@@ -343,6 +375,6 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 
 func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
-		Message: fmt.Sprintf("Genesis written to %s\n", p.genesisPath),
+		Message: fmt.Sprintf("%s\nGenesis written to %s\n", polybft.DisclaimerMessage, p.genesisPath),
 	}
 }
