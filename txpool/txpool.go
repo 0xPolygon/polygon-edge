@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/armon/go-metrics"
@@ -604,8 +605,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !p.deploymentWhitelist.allowed(tx.From) {
-		return ErrSmartContractRestricted
+	if tx.IsContractCreation() {
+		if !p.deploymentWhitelist.allowed(tx.From) {
+			return ErrSmartContractRestricted
+		}
+
+		if p.forks.EIP158 && len(tx.Input) > state.SpuriousDragonMaxCodeSize {
+			return runtime.ErrMaxCodeSizeExceeded
+		}
 	}
 
 	// Reject underpriced transactions
