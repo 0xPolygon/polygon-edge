@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -37,6 +38,7 @@ type syncPeerClient struct {
 
 	shouldEmitBlocks bool // flag for emitting blocks in the topic
 	closeCh          chan struct{}
+	closed           *atomic.Bool
 }
 
 func NewSyncPeerClient(
@@ -53,11 +55,15 @@ func NewSyncPeerClient(
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 		shouldEmitBlocks:       true,
 		closeCh:                make(chan struct{}),
+		closed:                 new(atomic.Bool),
 	}
 }
 
 // Start processes for SyncPeerClient
 func (m *syncPeerClient) Start() error {
+	// Mark client active.
+	m.closed.Store(false)
+
 	go m.startNewBlockProcess()
 	go m.startPeerEventProcess()
 
@@ -70,6 +76,11 @@ func (m *syncPeerClient) Start() error {
 
 // Close terminates running processes for SyncPeerClient
 func (m *syncPeerClient) Close() {
+	if m.closed.Swap(true) {
+		// Already closed.
+		return
+	}
+
 	if m.topic != nil {
 		m.topic.Close()
 	}
@@ -196,6 +207,11 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 			m.logger.Debug("received status from non-connected peer, ignore", "id", from)
 		}
 
+		return
+	}
+
+	if m.closed.Load() {
+		m.logger.Debug("received status from peer after client was closed, ignoring", "id", from)
 		return
 	}
 

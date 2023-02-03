@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 	"reflect"
-	"sync"
+	"sync/atomic"
 
 	"github.com/hashicorp/go-hclog"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -21,10 +21,10 @@ const (
 type Topic struct {
 	logger hclog.Logger
 
-	topic     *pubsub.Topic
-	typ       reflect.Type
-	closeCh   chan struct{}
-	closeOnce *sync.Once
+	topic   *pubsub.Topic
+	typ     reflect.Type
+	closeCh chan struct{}
+	closed  *atomic.Bool
 }
 
 func (t *Topic) createObj() proto.Message {
@@ -37,14 +37,17 @@ func (t *Topic) createObj() proto.Message {
 }
 
 func (t *Topic) Close() {
-	t.closeOnce.Do(func() {
-		if t.topic != nil {
-			t.topic.Close()
-			t.topic = nil
-		}
+	if t.closed.Swap(true) {
+		// Already closed.
+		return
+	}
 
-		close(t.closeCh)
-	})
+	if t.topic != nil {
+		t.topic.Close()
+		t.topic = nil
+	}
+
+	close(t.closeCh)
 }
 
 func (t *Topic) Publish(obj proto.Message) error {
@@ -61,6 +64,9 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 	if err != nil {
 		return err
 	}
+
+	// Mark topic active.
+	t.closed.Swap(false)
 
 	go t.readLoop(sub, handler)
 
@@ -108,11 +114,11 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 	}
 
 	tt := &Topic{
-		logger:    s.logger.Named(protoID),
-		topic:     topic,
-		typ:       reflect.TypeOf(obj).Elem(),
-		closeCh:   make(chan struct{}),
-		closeOnce: &sync.Once{},
+		logger:  s.logger.Named(protoID),
+		topic:   topic,
+		typ:     reflect.TypeOf(obj).Elem(),
+		closeCh: make(chan struct{}),
+		closed:  new(atomic.Bool),
 	}
 
 	return tt, nil
