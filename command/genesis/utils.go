@@ -88,17 +88,17 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	return &premineInfo{address: address, balance: amount}, nil
 }
 
-// parseBurntContractInfo parses provided burnt contract information and returns burnt contract block and address
-func parseBurntContractInfo(burntContractInfoRaw string) (*big.Int, types.Address, error) {
+// parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
+func parseBurnContractInfo(burnContractInfoRaw string) (*big.Int, types.Address, error) {
 	block := new(big.Int)
 	address := types.ZeroAddress
 
-	delimiterIdx := strings.Index(burntContractInfoRaw, ":")
+	delimiterIdx := strings.Index(burnContractInfoRaw, ":")
 	if delimiterIdx == -1 {
 		return nil, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>")
 	}
 
-	blockRaw := burntContractInfoRaw[:delimiterIdx]
+	blockRaw := burnContractInfoRaw[:delimiterIdx]
 
 	// <block>:<address>
 	var err error
@@ -106,7 +106,7 @@ func parseBurntContractInfo(burntContractInfoRaw string) (*big.Int, types.Addres
 		return nil, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
 	}
 
-	address = types.StringToAddress(burntContractInfoRaw[delimiterIdx+1:])
+	address = types.StringToAddress(burnContractInfoRaw[delimiterIdx+1:])
 
 	return block, address, nil
 }

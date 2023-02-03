@@ -57,24 +57,24 @@ func TestParamsForksInTime(t *testing.T) {
 	expect("eip150", ff.EIP150, false)
 }
 
-func TestParams_CalculateBurntContract(t *testing.T) {
+func TestParams_CalculateBurnContract(t *testing.T) {
 	tests := []struct {
-		name          string
-		burntContract map[string]string
-		block         uint64
-		want          types.Address
-		wantErr       bool
+		name         string
+		burnContract map[string]string
+		block        uint64
+		want         types.Address
+		wantErr      bool
 	}{
 		{
-			name:          "no addresses in the list",
-			burntContract: map[string]string{},
-			block:         10,
-			want:          types.ZeroAddress,
-			wantErr:       true,
+			name:         "no addresses in the list",
+			burnContract: map[string]string{},
+			block:        10,
+			want:         types.ZeroAddress,
+			wantErr:      true,
 		},
 		{
 			name: "last address is used",
-			burntContract: map[string]string{
+			burnContract: map[string]string{
 				"15": "0x8888f1f195afa192cfee860698584c030f4c9db1",
 			},
 			block:   10,
@@ -83,7 +83,7 @@ func TestParams_CalculateBurntContract(t *testing.T) {
 		},
 		{
 			name: "first address is used",
-			burntContract: map[string]string{
+			burnContract: map[string]string{
 				"5":  "0x8888f1f195afa192cfee860698584c030f4c9db2",
 				"15": "0x8888f1f195afa192cfee860698584c030f4c9db1",
 			},
@@ -94,20 +94,24 @@ func TestParams_CalculateBurntContract(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
+
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			p := &Params{
-				BurntContract: tt.burntContract,
+				BurnContract: tt.burnContract,
 			}
 
-			got, err := p.CalculateBurntContract(tt.block)
+			got, err := p.CalculateBurnContract(tt.block)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("CalculateBurntContract() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CalculateBurnContract() error = %v, wantErr %v", err, tt.wantErr)
 
 				return
 			}
 
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CalculateBurntContract() got = %v, want %v", got, tt.want)
+				t.Errorf("CalculateBurnContract() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

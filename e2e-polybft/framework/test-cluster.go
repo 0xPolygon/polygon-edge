@@ -77,7 +77,7 @@ type TestClusterConfig struct {
 	LogsDir           string
 	TmpDir            string
 	BlockGasLimit     uint64
-	BurntContracts    map[uint64]types.Address
+	BurnContracts     map[uint64]types.Address
 	ContractsDir      string
 	ValidatorPrefix   string
 	Binary            string
@@ -218,13 +218,13 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurntContract(block uint64, address types.Address) ClusterOption {
+func WithBurnContract(block uint64, address types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
-		if h.BurntContracts == nil {
-			h.BurntContracts = map[uint64]types.Address{}
+		if h.BurnContracts == nil {
+			h.BurnContracts = map[uint64]types.Address{}
 		}
 
-		h.BurntContracts[block] = address
+		h.BurnContracts[block] = address
 	}
 }
 
@@ -348,9 +348,9 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge-json-rpc", rootchainIP)
 		}
 
-		if len(cluster.Config.BurntContracts) != 0 {
-			for block, addr := range cluster.Config.BurntContracts {
-				args = append(args, "--burnt-contract", fmt.Sprintf("%d:%s", block, addr))
+		if len(cluster.Config.BurnContracts) != 0 {
+			for block, addr := range cluster.Config.BurnContracts {
+				args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
 			}
 		}
 

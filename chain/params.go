@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	// ErrBurntContractAddressMissing is the error when a contract address is not provided
-	ErrBurntContractAddressMissing = errors.New("burnt contract address missing")
+	// ErrBurnContractAddressMissing is the error when a contract address is not provided
+	ErrBurnContractAddressMissing = errors.New("burn contract address missing")
 )
 
 // Params are all the set of params for the chain
@@ -22,19 +22,19 @@ type Params struct {
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
-	// Governance contract where the token will be sent to and burnt in london fork
-	BurntContract map[string]string `json:"burntContract"`
+	// Governance contract where the token will be sent to and burn in london fork
+	BurnContract map[string]string `json:"burnContract"`
 }
 
-// CalculateBurntContract calculates burn contract address for the given block number
-func (p *Params) CalculateBurntContract(block uint64) (types.Address, error) {
-	keys := make([]string, 0, len(p.BurntContract))
-	for k := range p.BurntContract {
+// CalculateBurnContract calculates burn contract address for the given block number
+func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
+	keys := make([]string, 0, len(p.BurnContract))
+	for k := range p.BurnContract {
 		keys = append(keys, k)
 	}
 
 	if len(keys) == 0 {
-		return types.ZeroAddress, ErrBurntContractAddressMissing
+		return types.ZeroAddress, ErrBurnContractAddressMissing
 	}
 
 	sort.Strings(keys)
@@ -44,11 +44,11 @@ func (p *Params) CalculateBurntContract(block uint64) (types.Address, error) {
 		valUintNext, _ := strconv.ParseUint(keys[i+1], 10, 64)
 
 		if block > valUint && block < valUintNext {
-			return types.StringToAddress(p.BurntContract[keys[i]]), nil
+			return types.StringToAddress(p.BurnContract[keys[i]]), nil
 		}
 	}
 
-	return types.StringToAddress(p.BurntContract[keys[len(keys)-1]]), nil
+	return types.StringToAddress(p.BurnContract[keys[len(keys)-1]]), nil
 }
 
 func (p *Params) GetEngine() string {

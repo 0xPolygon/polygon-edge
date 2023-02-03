@@ -162,9 +162,9 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
-	burntContract := types.ZeroAddress
+	burnContract := types.ZeroAddress
 	if forkConfig.London {
-		burntContract, err = e.config.CalculateBurntContract(header.Number)
+		burnContract, err = e.config.CalculateBurnContract(header.Number)
 		if err != nil {
 			return nil, err
 		}
@@ -173,14 +173,14 @@ func (e *Executor) BeginTxn(
 	newTxn := NewTxn(auxSnap2)
 
 	txCtx := runtime.TxContext{
-		Coinbase:      coinbaseReceiver,
-		Timestamp:     int64(header.Timestamp),
-		Number:        int64(header.Number),
-		Difficulty:    types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
-		BaseFee:       new(big.Int).SetUint64(header.BaseFee),
-		GasLimit:      int64(header.GasLimit),
-		ChainID:       int64(e.config.ChainID),
-		BurntContract: burntContract,
+		Coinbase:     coinbaseReceiver,
+		Timestamp:    int64(header.Timestamp),
+		Number:       int64(header.Number),
+		Difficulty:   types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
+		BaseFee:      new(big.Int).SetUint64(header.BaseFee),
+		GasLimit:     int64(header.GasLimit),
+		ChainID:      int64(e.config.ChainID),
+		BurnContract: burnContract,
 	}
 
 	txn := &Transition{

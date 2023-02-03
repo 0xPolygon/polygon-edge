@@ -62,7 +62,7 @@ type TestServerConfig struct {
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
 	PredeployParams         *PredeployParams
-	BurntContracts          map[uint64]types.Address
+	BurnContracts           map[uint64]types.Address
 }
 
 func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
@@ -125,13 +125,13 @@ func (t *TestServerConfig) SetBaseFee(baseFee uint64) {
 	t.BaseFee = baseFee
 }
 
-// SetBurntContract sets the given burnt contract for the test server
-func (t *TestServerConfig) SetBurntContract(block uint64, address types.Address) {
-	if t.BurntContracts == nil {
-		t.BurntContracts = map[uint64]types.Address{}
+// SetBurnContract sets the given burn contract for the test server
+func (t *TestServerConfig) SetBurnContract(block uint64, address types.Address) {
+	if t.BurnContracts == nil {
+		t.BurnContracts = map[uint64]types.Address{}
 	}
 
-	t.BurntContracts[block] = address
+	t.BurnContracts[block] = address
 }
 
 // SetConsensus callback sets consensus

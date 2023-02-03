@@ -83,7 +83,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BurntContract: map[string]string{},
+			BurnContract: map[string]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -123,13 +123,13 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		}
 	}
 
-	for _, premine := range p.burntContracts {
-		block, addr, err := parseBurntContractInfo(premine)
+	for _, premine := range p.burnContracts {
+		block, addr, err := parseBurnContractInfo(premine)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Params.BurntContract[block.String()] = addr.String()
+		chainConfig.Params.BurnContract[block.String()] = addr.String()
 	}
 
 	// premine accounts

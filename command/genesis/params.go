@@ -27,7 +27,7 @@ const (
 	epochSizeFlag     = "epoch-size"
 	epochRewardFlag   = "epoch-reward"
 	blockGasLimitFlag = "block-gas-limit"
-	burntContractFlag = "burnt-contract"
+	burnContractFlag  = "burn-contract"
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
@@ -65,7 +65,7 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	burntContracts []string
+	burnContracts []string
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -324,21 +324,21 @@ func (p *genesisParams) initGenesisConfig() error {
 			BaseFee:    command.DefaultGenesisBaseFee,
 		},
 		Params: &chain.Params{
-			ChainID:       int(p.chainID),
-			Forks:         chain.AllForksEnabled,
-			Engine:        p.consensusEngineConfig,
-			BurntContract: map[string]string{},
+			ChainID:      int(p.chainID),
+			Forks:        chain.AllForksEnabled,
+			Engine:       p.consensusEngineConfig,
+			BurnContract: map[string]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
 
-	for _, burntContract := range p.burntContracts {
-		block, address, err := parseBurntContractInfo(burntContract)
+	for _, burnContract := range p.burnContracts {
+		block, address, err := parseBurnContractInfo(burnContract)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Params.BurntContract[block.String()] = address.String()
+		chainConfig.Params.BurnContract[block.String()] = address.String()
 	}
 
 	// Predeploy staking smart contract if needed
