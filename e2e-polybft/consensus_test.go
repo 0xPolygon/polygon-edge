@@ -226,12 +226,14 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	// wait for consensus to start
 	cluster.WaitForBlock(1, 10*time.Second)
 
+	// extract delegator's secrets
 	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
 	delegatorAcc, err := sidechain.GetAccountFromDir(delegatorSecretsPath)
 	require.NoError(t, err)
 
 	delegatorAddr := delegatorAcc.Ecdsa.Address()
 
+	// extract validator's secrets
 	validatorSecretsPath := path.Join(cluster.Config.TmpDir, validatorSecrets)
 
 	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecretsPath)
@@ -248,6 +250,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
+	// getDelegatorInfo queries delegator's balance and its rewards
 	getDelegatorInfo := func() (balance *big.Int, reward *big.Int) {
 		currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
@@ -263,6 +266,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		return
 	}
 
+	// assert that delegator received fund amount from validator
 	delegatorBalance, _ := getDelegatorInfo()
 	require.Equal(t, fundAmount, delegatorBalance)
 
