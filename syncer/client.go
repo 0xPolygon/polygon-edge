@@ -251,7 +251,7 @@ func (m *syncPeerClient) startPeerEventProcess() {
 			return
 
 		case e := <-peerEventCh:
-			if e.Type == event.PeerConnected || e.Type == event.PeerDisconnected {
+			if e != nil && (e.Type == event.PeerConnected || e.Type == event.PeerDisconnected) {
 				m.peerConnectionUpdateCh <- e
 			}
 		}
