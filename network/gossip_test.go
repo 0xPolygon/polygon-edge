@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,4 +107,16 @@ func TestSimpleGossip(t *testing.T) {
 			}
 		}
 	}
+}
+
+func Test_RepeatedClose(t *testing.T) {
+	topic := &Topic{
+		closeCh:   make(chan struct{}),
+		closeOnce: &sync.Once{},
+	}
+
+	// Call Close() twice to ensure that underlying logic (e.g. channel close) is
+	// only executed once.
+	topic.Close()
+	topic.Close()
 }

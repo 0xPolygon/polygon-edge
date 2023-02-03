@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"reflect"
+	"sync"
 
 	"github.com/hashicorp/go-hclog"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -20,9 +21,10 @@ const (
 type Topic struct {
 	logger hclog.Logger
 
-	topic   *pubsub.Topic
-	typ     reflect.Type
-	closeCh chan struct{}
+	topic     *pubsub.Topic
+	typ       reflect.Type
+	closeCh   chan struct{}
+	closeOnce *sync.Once
 }
 
 func (t *Topic) createObj() proto.Message {
@@ -35,12 +37,14 @@ func (t *Topic) createObj() proto.Message {
 }
 
 func (t *Topic) Close() {
-	if t.topic != nil {
-		t.topic.Close()
-		t.topic = nil
-	}
+	t.closeOnce.Do(func() {
+		if t.topic != nil {
+			t.topic.Close()
+			t.topic = nil
+		}
 
-	close(t.closeCh)
+		close(t.closeCh)
+	})
 }
 
 func (t *Topic) Publish(obj proto.Message) error {
@@ -104,10 +108,11 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 	}
 
 	tt := &Topic{
-		logger:  s.logger.Named(protoID),
-		topic:   topic,
-		typ:     reflect.TypeOf(obj).Elem(),
-		closeCh: make(chan struct{}),
+		logger:    s.logger.Named(protoID),
+		topic:     topic,
+		typ:       reflect.TypeOf(obj).Elem(),
+		closeCh:   make(chan struct{}),
+		closeOnce: &sync.Once{},
 	}
 
 	return tt, nil
