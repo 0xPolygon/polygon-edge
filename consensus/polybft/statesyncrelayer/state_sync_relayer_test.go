@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -27,7 +26,7 @@ func (t *txRelayerMock) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *txRelayerMock) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	args := t.Called(txn, key)
 
-	return &ethgo.Receipt{}, args.Error(1)
+	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
 func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
@@ -47,28 +46,22 @@ func Test_executeStateSync(t *testing.T) {
 		key:       key,
 	}
 
-	sp := &contracts.StateSyncProof{
-		Proof: []types.Hash{},
-		StateSync: &contractsapi.StateSyncedEvent{
-			ID:       big.NewInt(1),
-			Sender:   types.ZeroAddress,
-			Receiver: types.ZeroAddress,
-			Data:     []byte{},
+	txRelayer.On("SendTransaction", mock.Anything, mock.Anything).
+		Return(&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Once()
+
+	proof := &types.Proof{
+		Data: []types.Hash{},
+		Metadata: map[string]interface{}{
+			"StateSync": map[string]interface{}{
+				"ID":       big.NewInt(1),
+				"Sender":   types.ZeroAddress,
+				"Receiver": types.ZeroAddress,
+				"Data":     []byte{},
+			},
 		},
 	}
 
-	input, err := sp.EncodeAbi()
-	require.NoError(t, err)
-
-	txn := &ethgo.Transaction{
-		From:  key.Address(),
-		To:    (*ethgo.Address)(&contracts.StateReceiverContract),
-		Input: input,
-		Gas:   types.StateTransactionGasLimit,
-	}
-
-	txRelayer.On("SendTransaction", txn, key).Return(&ethgo.Receipt{}, nil)
-	r.executeStateSync(sp)
+	require.NoError(t, r.executeStateSync(proof))
 
 	txRelayer.AssertExpectations(t)
 }

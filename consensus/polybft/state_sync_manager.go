@@ -14,7 +14,6 @@ import (
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -29,12 +28,17 @@ const (
 	minCommitmentSize = 2
 )
 
+type StateSyncProof struct {
+	Proof     []types.Hash
+	StateSync *contractsapi.StateSyncedEvent
+}
+
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
 	Init() error
 	Close()
 	Commitment() (*CommitmentMessageSigned, error)
-	GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error)
+	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
 }
@@ -49,8 +53,8 @@ func (n *dummyStateSyncManager) Close()                                        {
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
-func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
-	return nil, nil
+func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
+	return types.Proof{}, nil
 }
 
 // stateSyncConfig holds the configuration data of state sync manager
@@ -386,32 +390,37 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 }
 
 // GetStateSyncProof returns the proof for the state sync
-func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error) {
-	proof, err := s.state.getStateSyncProof(stateSyncID)
+func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
+	stateSyncProof, err := s.state.getStateSyncProof(stateSyncID)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
+		return types.Proof{}, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
 	}
 
-	if proof == nil {
+	if stateSyncProof == nil {
 		// check if we might've missed a commitment. if it is so, we didn't build proofs for it while syncing
 		// if we are all synced up, commitment will be saved through PostBlock, but we wont have proofs,
 		// so we will build them now and save them to db so that we have proofs for missed commitment
 		commitment, err := s.state.getCommitmentForStateSync(stateSyncID)
 		if err != nil {
-			return nil, fmt.Errorf("cannot find commitment for StateSync id %d: %w", stateSyncID, err)
+			return types.Proof{}, fmt.Errorf("cannot find commitment for StateSync id %d: %w", stateSyncID, err)
 		}
 
 		if err := s.buildProofs(commitment.Message); err != nil {
-			return nil, fmt.Errorf("cannot build proofs for commitment for StateSync id %d: %w", stateSyncID, err)
+			return types.Proof{}, fmt.Errorf("cannot build proofs for commitment for StateSync id %d: %w", stateSyncID, err)
 		}
 
-		proof, err = s.state.getStateSyncProof(stateSyncID)
+		stateSyncProof, err = s.state.getStateSyncProof(stateSyncID)
 		if err != nil {
-			return nil, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
+			return types.Proof{}, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
 		}
 	}
 
-	return proof, nil
+	return types.Proof{
+		Data: stateSyncProof.Proof,
+		Metadata: map[string]interface{}{
+			"StateSync": stateSyncProof.StateSync,
+		},
+	}, nil
 }
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
@@ -435,12 +444,12 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 		return err
 	}
 
-	stateSyncProofs := make([]*contracts.StateSyncProof, len(events))
+	stateSyncProofs := make([]*StateSyncProof, len(events))
 
 	for i, event := range events {
 		p := tree.GenerateProof(uint64(i), 0)
 
-		stateSyncProofs[i] = &contracts.StateSyncProof{
+		stateSyncProofs[i] = &StateSyncProof{
 			Proof:     p,
 			StateSync: event,
 		}

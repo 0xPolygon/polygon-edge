@@ -1,13 +1,13 @@
 package jsonrpc
 
 import (
-	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // bridgeStore interface provides access to the methods needed by bridge endpoint
 type bridgeStore interface {
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (contracts.ExitProof, error)
-	GetStateSyncProof(stateSyncID uint64) (*contracts.StateSyncProof, error)
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error)
+	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 }
 
 // Bridge is the bridge jsonrpc endpoint

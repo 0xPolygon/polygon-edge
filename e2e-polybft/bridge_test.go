@@ -352,7 +352,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		fail++
 	}
 
-	var proof contracts.ExitProof
+	var proof types.Proof
 
 	for i := 0; i < userNumber; i++ {
 		exitID := uint64(i + 1) // because exit events start from ID = 1
@@ -364,6 +364,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		require.True(t, isProcessed)
 	}
 }
+
 func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	const (
 		userNumber      = 6
@@ -463,7 +464,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		}
 	}
 
-	var proof contracts.ExitProof
+	var proof types.Proof
 
 	for i := 0; i < roundNumber; i++ {
 		for j := 0; j < userNumber; j++ {
@@ -476,7 +477,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 }
 
-func isExitEventProcessed(sidechainKey *ethgow.Key, proof contracts.ExitProof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
+func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
@@ -487,12 +488,17 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof contracts.ExitProof, c
 		return false, err
 	}
 
+	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
+	if !ok {
+		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
+	}
+
 	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
 		"exit",
 		big.NewInt(int64(checkpointBlock)),
-		proof.LeafIndex,
+		uint64(leafIndex),
 		proofExitEventEncoded,
-		proof.Proof,
+		proof.Data,
 	)
 
 	if err != nil {
@@ -516,7 +522,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof contracts.ExitProof, c
 	return parserRes == uint64(1), nil
 }
 
-func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (contracts.ExitProof, error) {
+func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
 	query := struct {
 		Jsonrpc string   `json:"jsonrpc"`
 		Method  string   `json:"method"`
@@ -531,26 +537,26 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (con
 
 	d, err := json.Marshal(query)
 	if err != nil {
-		return contracts.ExitProof{}, err
+		return types.Proof{}, err
 	}
 
 	resp, err := http.Post(rpcAddress, "application/json", bytes.NewReader(d))
 	if err != nil {
-		return contracts.ExitProof{}, err
+		return types.Proof{}, err
 	}
 
 	s, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return contracts.ExitProof{}, err
+		return types.Proof{}, err
 	}
 
 	rspProof := struct {
-		Result contracts.ExitProof `json:"result"`
+		Result types.Proof `json:"result"`
 	}{}
 
 	err = json.Unmarshal(s, &rspProof)
 	if err != nil {
-		return contracts.ExitProof{}, err
+		return types.Proof{}, err
 	}
 
 	return rspProof.Result, nil

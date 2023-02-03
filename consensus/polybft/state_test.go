@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -587,10 +586,10 @@ func insertTestCommitments(t *testing.T, state *State, numberOfCommitments uint6
 func insertTestStateSyncProofs(t *testing.T, state *State, numberOfProofs int64) {
 	t.Helper()
 
-	ssProofs := make([]*contracts.StateSyncProof, numberOfProofs)
+	ssProofs := make([]*StateSyncProof, numberOfProofs)
 
 	for i := int64(0); i < numberOfProofs; i++ {
-		proofs := &contracts.StateSyncProof{
+		proofs := &StateSyncProof{
 			Proof:     []types.Hash{types.BytesToHash(generateRandomBytes(t))},
 			StateSync: createTestStateSync(i),
 		}
