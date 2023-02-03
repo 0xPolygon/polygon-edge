@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/invoker"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -1130,7 +1131,7 @@ func opCall(op OpCode) instruction {
 		var callType runtime.CallType
 
 		switch op {
-		case CALL:
+		case CALL, AUTHCALL:
 			callType = runtime.Call
 
 		case CALLCODE:
@@ -1189,9 +1190,15 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	addr, _ := c.popAddr()
 
 	var value *big.Int
-	if op == CALL || op == CALLCODE {
+	if op == CALL || op == CALLCODE || op == AUTHCALL {
 		value = c.pop()
 	}
+
+	var extValue *big.Int
+	if op == AUTHCALL {
+		extValue = c.pop() // todo: propagate the extValue
+	}
+	_ = extValue // ignore for now
 
 	// input range
 	inOffset := c.pop()
@@ -1270,10 +1277,15 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 
 	parent := c
 
+	fromAddr := parent.msg.Address
+	if op == AUTHCALL {
+		fromAddr = *c.authorized
+	}
+
 	contract := runtime.NewContractCall(
 		c.msg.Depth+1,
 		parent.msg.Origin,
-		parent.msg.Address,
+		fromAddr,
 		addr,
 		value,
 		gas,
@@ -1399,6 +1411,38 @@ func opHalt(op OpCode) instruction {
 			c.Halt()
 		}
 	}
+}
+
+func opAuth(c *state) {
+
+	c.authorized = nil
+
+	commit := c.pop()
+	v := c.pop()
+	r := c.pop()
+	s := c.pop()
+
+	if !crypto.ValidateSignatureValues(byte(v.Uint64()), r, s) {
+		c.exit(errors.New("invalid signature values"))
+		return
+	}
+
+	is := invoker.InvokerSignature{
+		R: r,
+		S: s,
+		V: v.Int64() == 1,
+	}
+
+	signAddr := is.Recover(commit.Bytes(), c.msg.CodeAddress)
+
+	c.authorized = &signAddr
+
+	c.ret = make([]byte, 12)
+	c.ret = append(c.ret, signAddr.Bytes()...)
+
+	c.push1().SetBytes(signAddr.Bytes())
+
+	return
 }
 
 var (
