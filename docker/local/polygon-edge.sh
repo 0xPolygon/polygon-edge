@@ -18,6 +18,9 @@ case "$1" in
    "init")
       case "$2" in 
          "ibft")
+         if [ -f "$GENESIS_PATH" ]; then
+              echo "Secrets have already been generated."
+          else
               echo "Generating secrets..."
               secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"

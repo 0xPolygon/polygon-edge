@@ -87,7 +87,7 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(
 		&basicParams.insecureLocalStore,
-		insecureLocalStore,
+		insecureLocalStoreFlag,
 		false,
 		"the flag indicating should the secrets stored on the local storage be encrypted",
 	)
