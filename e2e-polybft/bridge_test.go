@@ -490,7 +490,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpoin
 
 	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
 	if !ok {
-		return false, errors.New("could not get leaf index from exit event proof")
+		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
 	}
 
 	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
