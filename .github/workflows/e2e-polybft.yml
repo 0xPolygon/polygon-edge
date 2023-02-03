@@ -1,12 +1,6 @@
 ---
 name: PolyBFT E2E tests
-on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - main
-      - develop
-  pull_request:
-
+on:  [push, pull_request]
 jobs:
   build:
     runs-on: ubuntu-latest
