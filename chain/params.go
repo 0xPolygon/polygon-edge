@@ -27,7 +27,7 @@ type Params struct {
 }
 
 // CalculateBurntContract calculates burn contract address for the given block number
-func (p *Params) CalculateBurntContract(number uint64) (types.Address, error) {
+func (p *Params) CalculateBurntContract(block uint64) (types.Address, error) {
 	keys := make([]string, 0, len(p.BurntContract))
 	for k := range p.BurntContract {
 		keys = append(keys, k)
@@ -43,7 +43,7 @@ func (p *Params) CalculateBurntContract(number uint64) (types.Address, error) {
 		valUint, _ := strconv.ParseUint(keys[i], 10, 64)
 		valUintNext, _ := strconv.ParseUint(keys[i+1], 10, 64)
 
-		if number > valUint && number < valUintNext {
+		if block > valUint && block < valUintNext {
 			return types.StringToAddress(p.BurntContract[keys[i]]), nil
 		}
 	}
