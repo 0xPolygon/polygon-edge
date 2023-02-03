@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -87,7 +88,7 @@ func TestEIP155Signer_Sender(t *testing.T) {
 				GasPrice: big.NewInt(0),
 			}
 
-			signer := NewEIP155Signer(testCase.chainID.Uint64())
+			signer := NewEIP155Signer(chain.AllForksEnabled.At(0), testCase.chainID.Uint64())
 
 			signedTx, signErr := signer.SignTx(txn, key)
 			if signErr != nil {
@@ -120,7 +121,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 			GasPrice: big.NewInt(0),
 		}
 
-		signer := NewEIP155Signer(chainIDTop)
+		signer := NewEIP155Signer(chain.AllForksEnabled.At(0), chainIDTop)
 
 		signedTx, signErr := signer.SignTx(txn, key)
 		if signErr != nil {
@@ -128,7 +129,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 		}
 
 		for _, chainIDBottom := range chainIDS {
-			signerBottom := NewEIP155Signer(chainIDBottom)
+			signerBottom := NewEIP155Signer(chain.AllForksEnabled.At(0), chainIDBottom)
 
 			recoveredSender, recoverErr := signerBottom.Sender(signedTx)
 			if chainIDTop == chainIDBottom {

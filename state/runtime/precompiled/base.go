@@ -33,7 +33,7 @@ func (e *ecrecover) run(input []byte) ([]byte, error) {
 	r := big.NewInt(0).SetBytes(input[64:96])
 	s := big.NewInt(0).SetBytes(input[96:128])
 
-	if !crypto.ValidateSignatureValues(v, r, s) {
+	if !crypto.ValidateSignatureValues(v, r, s, false) {
 		return nil, nil
 	}
 

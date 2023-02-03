@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"bytes"
 	goCrypto "crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -20,16 +19,13 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-var (
-	big1 = big.NewInt(1)
-)
-
 // S256 is the secp256k1 elliptic curve
 var S256 = btcec.S256()
 
 var (
-	secp256k1N = hex.MustDecodeHex("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
-	one        = []byte{0x01}
+	secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+	secp256k1NHalf = new(big.Int).Div(secp256k1N, big.NewInt(2))
+	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
 )
@@ -45,43 +41,30 @@ var (
 	errInvalidSignature = errors.New("invalid signature")
 )
 
-func trimLeftZeros(b []byte) []byte {
-	i := 0
-	for i = range b {
-		if b[i] != 0 {
-			break
-		}
-	}
-
-	return b[i:]
-}
-
 // ValidateSignatureValues checks if the signature values are correct
-func ValidateSignatureValues(v byte, r, s *big.Int) bool {
-	// TODO: ECDSA malleability
+func ValidateSignatureValues(v byte, r, s *big.Int, isHomestead bool) bool {
+	// r & s must not be nil
 	if r == nil || s == nil {
 		return false
 	}
 
+	// r & s must be positive integer
+	if r.Cmp(one) < 0 || s.Cmp(one) < 0 {
+		return false
+	}
+
+	// v must be 0 or 1
 	if v > 1 {
 		return false
 	}
 
-	rr := r.Bytes()
-	rr = trimLeftZeros(rr)
-
-	if bytes.Compare(rr, secp256k1N) >= 0 || bytes.Compare(rr, one) < 0 {
+	// From Homestead, s must be less than secp256k1n/2
+	if isHomestead && s.Cmp(secp256k1NHalf) > 0 {
 		return false
 	}
 
-	ss := s.Bytes()
-	ss = trimLeftZeros(ss)
-
-	if bytes.Compare(ss, secp256k1N) >= 0 || bytes.Compare(ss, one) < 0 {
-		return false
-	}
-
-	return true
+	// In Frontier, r & s must be less than secp256k1n
+	return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1N) < 0
 }
 
 var addressPool fastrlp.ArenaPool

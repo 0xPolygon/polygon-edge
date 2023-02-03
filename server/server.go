@@ -191,7 +191,7 @@ func NewServer(config *Config) (*Server, error) {
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
 
 	// blockchain object
 	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)

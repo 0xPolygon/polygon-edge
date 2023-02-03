@@ -112,7 +112,7 @@ type result struct {
 func TestAddTxErrors(t *testing.T) {
 	t.Parallel()
 
-	poolSigner := crypto.NewEIP155Signer(100)
+	poolSigner := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -509,7 +509,7 @@ func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
 
 	key, sender := tests.GenerateKeyAndAddr(t)
-	signer := crypto.NewEIP155Signer(uint64(100))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(100))
 	tx := newTx(types.ZeroAddress, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
@@ -1651,9 +1651,9 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 func TestPermissionSmartContractDeployment(t *testing.T) {
 	t.Parallel()
 
-	signer := crypto.NewEIP155Signer(uint64(100))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(100))
 
-	poolSigner := crypto.NewEIP155Signer(100)
+	poolSigner := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -1767,7 +1767,7 @@ func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Trans
 	return signedTx
 }
 
-var signerEIP155 = crypto.NewEIP155Signer(100)
+var signerEIP155 = crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 func TestResetAccounts_Promoted(t *testing.T) {
 	t.Parallel()

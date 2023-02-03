@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"math/big"
 	"os"
 	"strconv"
@@ -116,49 +117,220 @@ func TestCreate2(t *testing.T) {
 }
 
 func TestValidateSignatureValues(t *testing.T) {
-	one := big.NewInt(1)
-	zero := big.NewInt(0)
-	secp256k1N, _ := new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+	t.Parallel()
 
-	limit := secp256k1N
-	limitMinus1 := new(big.Int).Sub(secp256k1N, big1)
+	var (
+		zero     = big.NewInt(0)
+		one      = big.NewInt(1)
+		two      = big.NewInt(2)
+		minusOne = big.NewInt(-1)
+
+		limit       = secp256k1N
+		limitMinus1 = new(big.Int).Sub(secp256k1N, one)
+		halfLimit   = new(big.Int).Div(secp256k1N, two)
+		doubleLimit = new(big.Int).Mul(secp256k1N, two)
+
+		// smaller than secp256k1N but bytes.Compare returns it's bigger
+		smallValue, _ = new(big.Int).SetString("fffffffffffffffffffffffffffffffebadd", 16)
+	)
+
+	// make sure smallValue is less than secp256k1N by big.Int.Compare
+	assert.Equal(
+		t,
+		limit.Cmp(smallValue),
+		1,
+		"small value must be less than secp256k1N",
+	)
+
+	// make sure smallValue is greater than secp256k1N by bytes.Compare
+	assert.Equal(
+		t,
+		bytes.Compare(smallValue.Bytes(), limit.Bytes()),
+		1,
+		"small value must be greater than secp256k1N by lexicographical comparison",
+	)
 
 	cases := []struct {
 		homestead bool
+		name      string
 		v         byte
 		r         *big.Int
 		s         *big.Int
 		res       bool
 	}{
 		// correct v, r, s
-		{v: 0, r: one, s: one, res: true},
-		{v: 1, r: one, s: one, res: true},
+		{
+			name:      "should be valid if v is 0 and r & s are in range",
+			homestead: true, v: 0, r: one, s: one, res: true,
+		},
+		{
+			name:      "should be valid if v is 1 and r & s are in range",
+			homestead: true, v: 1, r: one, s: one, res: true,
+		},
 		// incorrect v, correct r, s.
-		{v: 2, r: one, s: one, res: false},
-		{v: 3, r: one, s: one, res: false},
+		{
+			name:      "should be invalid if v is out of range",
+			homestead: true, v: 2, r: one, s: one, res: false,
+		},
 		// incorrect v, incorrect/correct r, s.
-		{v: 2, r: zero, s: zero, res: false},
-		{v: 2, r: zero, s: one, res: false},
-		{v: 2, r: one, s: zero, res: false},
-		{v: 2, r: one, s: one, res: false},
+		{
+			name:      "should be invalid if v & r & s are out of range",
+			homestead: true, v: 2, r: zero, s: zero, res: false,
+		},
+		{
+			name:      "should be invalid if v & r are out of range",
+			homestead: true, v: 2, r: zero, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if v & s are out of range",
+			homestead: true, v: 2, r: one, s: zero, res: false,
+		},
 		// correct v, incorrent r, s
-		{v: 0, r: zero, s: zero, res: false},
-		{v: 0, r: zero, s: one, res: false},
-		{v: 0, r: one, s: zero, res: false},
-		{v: 1, r: zero, s: zero, res: false},
-		{v: 1, r: zero, s: one, res: false},
-		{v: 1, r: one, s: zero, res: false},
-		// incorrect r, s max limit
-		{v: 0, r: limit, s: limit, res: false},
-		{v: 0, r: limit, s: limitMinus1, res: false},
-		{v: 0, r: limitMinus1, s: limit, res: false},
-		// correct v, r, s max limit
-		{v: 0, r: limitMinus1, s: limitMinus1, res: true},
+		{
+			name:      "should be invalid if r & s are nil",
+			homestead: true, v: 0, r: nil, s: nil, res: false,
+		},
+		{
+			name:      "should be invalid if r is nil",
+			homestead: true, v: 0, r: nil, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if s is nil",
+			homestead: true, v: 0, r: one, s: nil, res: false,
+		},
+		{
+			name:      "should be invalid if r & s are negative",
+			homestead: true, v: 0, r: minusOne, s: minusOne, res: false,
+		},
+		{
+			name:      "should be invalid if r is negative",
+			homestead: true, v: 0, r: minusOne, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if s is negative",
+			homestead: true, v: 0, r: one, s: minusOne, res: false,
+		},
+		{
+			name:      "should be invalid if r & s are out of range",
+			homestead: true, v: 0, r: zero, s: zero, res: false,
+		},
+		{
+			name:      "should be invalid if r is out of range (v = 0)",
+			homestead: true, v: 0, r: zero, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if s is out of range (v = 0)",
+			homestead: true, v: 0, r: one, s: zero, res: false,
+		},
+		{
+			name:      "should be invalid if r & s are out of range (v = 1)",
+			homestead: true, v: 1, r: zero, s: zero, res: false,
+		},
+		{
+			name:      "should be invalid if r is out of range (v = 1)",
+			homestead: true, v: 1, r: zero, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if s is out of range (v = 1)",
+			homestead: true, v: 1, r: one, s: zero, res: false,
+		},
+		// incorrect r, s max limit (Frontier)
+		{
+			name:      "should be invalid if r & s equal to secp256k1N in Frontier",
+			homestead: false, v: 0, r: limit, s: limit, res: false,
+		},
+		{
+			name:      "should be invalid if r equals to secp256k1N in Frontier",
+			homestead: false, v: 0, r: limit, s: limitMinus1, res: false,
+		},
+		{
+			name:      "should be invalid if s equals to secp256k1N in Frontier",
+			homestead: false, v: 0, r: limitMinus1, s: limit, res: false,
+		},
+		// incorrect r, s max limit (Homestead)
+		{
+			name:      "should be invalid if r & s equal to secp256k1N in Homestead",
+			homestead: true, v: 0, r: limit, s: limit, res: false,
+		},
+		{
+			name:      "should be invalid if r equals to secp256k1N in Homestead",
+			homestead: true, v: 0, r: limit, s: limitMinus1, res: false,
+		},
+		{
+			name:      "should be invalid if s equals to secp256k1N in Homestead",
+			homestead: true, v: 0, r: limitMinus1, s: limit, res: false,
+		},
+		// frontier v, r, s max limit (Frontier)
+		{
+			name:      "should be valid if r & s equal to secp256k1N - 1 in Frontier",
+			homestead: false, v: 0, r: limitMinus1, s: limitMinus1, res: true,
+		},
+		// incorrect v, r, s max limit (Homestead)
+		{
+			name:      "should be invalid if r & s equal to secp256k1N - 1 in Homestead",
+			homestead: true, v: 0, r: limitMinus1, s: limitMinus1, res: false,
+		},
+		// correct v, r, s max limit (Homestead)
+		{
+			name:      "should be valid if r equals to secp256k1N - 1 and s equals to secp256k1N/2",
+			homestead: true, v: 0, r: limitMinus1, s: halfLimit, res: true,
+		},
+		// edge cases
+		// Previously ValidateSignatureValues uses bytes.Compare to compare r and s with upper limit
+		// but bytes.Compare compares them lexicographically then it causes strange judgment
+		// e.g.
+		//   0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141
+		// > 0x01fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141 (double value)
+		{
+			name:      "should be invalid if r & s equal to 2 * secp256k1N in Frontier",
+			homestead: false, v: 0, r: doubleLimit, s: doubleLimit, res: false,
+		},
+		{
+			name:      "should be invalid if r equals to 2 * secp256k1N in Frontier",
+			homestead: false, v: 0, r: doubleLimit, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if s equals to 2 * secp256k1N in Frontier",
+			homestead: false, v: 0, r: one, s: doubleLimit, res: false,
+		},
+		{
+			name:      "should be invalid if r equals to 2 * secp256k1N and s equal to secp256k1N",
+			homestead: true, v: 0, r: doubleLimit, s: limit, res: false,
+		},
+		{
+			name:      "should be invalid if r equals to 2 * secp256k1N in Frontier",
+			homestead: true, v: 0, r: doubleLimit, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if s equals to secp256k1N in Frontier",
+			homestead: true, v: 0, r: one, s: limit, res: false,
+		},
+		{
+			name:      "should be valid if r & s equal to small value",
+			homestead: false, v: 0, r: smallValue, s: smallValue, res: true,
+		},
+		{
+			name:      "should be valid if r equals to smallValue in Frontier",
+			homestead: false, v: 0, r: smallValue, s: one, res: true,
+		},
+		{
+			name:      "should be valid if s equals to smallValue in Frontier",
+			homestead: false, v: 0, r: one, s: smallValue, res: true,
+		},
 	}
 
 	for _, c := range cases {
-		found := ValidateSignatureValues(c.v, c.r, c.s)
-		assert.Equal(t, found, c.res)
+		c := c
+
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(
+				t,
+				c.res,
+				ValidateSignatureValues(c.v, c.r, c.s, c.homestead),
+			)
+		})
 	}
 }
 

@@ -32,15 +32,16 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	var signer TxSigner
 
 	if forks.EIP155 {
-		signer = &EIP155Signer{chainID: chainID}
+		signer = &EIP155Signer{chainID: chainID, isHomestead: forks.Homestead}
 	} else {
-		signer = &FrontierSigner{}
+		signer = &FrontierSigner{forks.Homestead}
 	}
 
 	return signer
 }
 
 type FrontierSigner struct {
+	isHomestead bool
 }
 
 var signerPool fastrlp.ArenaPool
@@ -97,7 +98,7 @@ func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))
+	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()), f.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -142,12 +143,13 @@ func (f *FrontierSigner) CalculateV(parity byte) []byte {
 }
 
 // NewEIP155Signer returns a new EIP155Signer object
-func NewEIP155Signer(chainID uint64) *EIP155Signer {
-	return &EIP155Signer{chainID: chainID}
+func NewEIP155Signer(forks chain.ForksInTime, chainID uint64) *EIP155Signer {
+	return &EIP155Signer{chainID: chainID, isHomestead: forks.Homestead}
 }
 
 type EIP155Signer struct {
-	chainID uint64
+	chainID     uint64
+	isHomestead bool
 }
 
 // Hash is a wrapper function that calls calcTxHash with the EIP155Signer's chainID
@@ -179,7 +181,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
+	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()), e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -228,8 +230,8 @@ func (e *EIP155Signer) CalculateV(parity byte) []byte {
 }
 
 // encodeSignature generates a signature value based on the R, S and V value
-func encodeSignature(R, S *big.Int, V byte) ([]byte, error) {
-	if !ValidateSignatureValues(V, R, S) {
+func encodeSignature(R, S *big.Int, V byte, isHomestead bool) ([]byte, error) {
+	if !ValidateSignatureValues(V, R, S, isHomestead) {
 		return nil, fmt.Errorf("invalid txn signature")
 	}
 
