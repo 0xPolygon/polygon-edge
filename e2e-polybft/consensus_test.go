@@ -201,6 +201,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		validatorSecrets = "test-chain-1"
 		delegatorSecrets = "test-chain-6"
 		premineBalance   = "0x1B1AE4D6E2EF500000" // 500 native tokens (so that we have enough funds to fund delegator)
+		epochSize        = 5
 	)
 
 	fundAmountRaw := "0xD8D726B7177A80000" // 250 native tokens
@@ -210,7 +211,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
 		framework.WithPremineValidators(premineBalance),
-		framework.WithEpochSize(5))
+		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
 	// init delegator account
@@ -222,9 +223,11 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
+	// wait for consensus to start
 	cluster.WaitForBlock(1, 10*time.Second)
 
-	delegatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, delegatorSecrets))
+	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
+	delegatorAcc, err := sidechain.GetAccountFromDir(delegatorSecretsPath)
 	require.NoError(t, err)
 
 	delegatorAddr := delegatorAcc.Ecdsa.Address()
@@ -245,67 +248,62 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	getDelegatorInfo := func(blockNum uint64) (balance *big.Int, reward *big.Int) {
-		var err error
+	getDelegatorInfo := func() (balance *big.Int, reward *big.Int) {
+		currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
+
 		balance, err = srv.JSONRPC().Eth().GetBalance(delegatorAddr, ethgo.Latest)
 		require.NoError(t, err)
-		t.Logf("Delegator balance (block %d)=%s\n", blockNum, balance)
+		t.Logf("Delegator balance (block %d)=%s\n", currentBlockNum, balance)
 
 		reward, err = sidechain.GetDelegatorReward(validatorAddr, delegatorAddr, txRelayer)
 		require.NoError(t, err)
-		t.Logf("Delegator reward (block %d)=%s\n", blockNum, reward)
+		t.Logf("Delegator reward (block %d)=%s\n", currentBlockNum, reward)
 
 		return
 	}
 
-	currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
-	require.NoError(t, err)
-
-	delegatorBalance, _ := getDelegatorInfo(currentBlockNum)
+	delegatorBalance, _ := getDelegatorInfo()
 	require.Equal(t, fundAmount, delegatorBalance)
 
 	// delegate 1 native token
 	delegationAmount := uint64(1e18)
-	require.NoError(t, srv.Delegate(delegationAmount, validatorSecretsPath, validatorAddr))
+	require.NoError(t, srv.Delegate(delegationAmount, delegatorSecretsPath, validatorAddr))
 
 	// wait for 2 epochs to accumulate delegator rewards
-	cluster.WaitForBlock(10, 1*time.Minute)
+	currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlockNum+2*epochSize, 1*time.Minute)
 
 	// query delegator rewards
-	_, delegatorReward := getDelegatorInfo(10)
-	// there should be at least 80 weis delegator rewards accumulated
-	// (80 weis per epoch is accumulated if validator signs only single block in entire epoch)
-	require.Greater(t, delegatorReward.Uint64(), uint64(80))
+	_, delegatorReward := getDelegatorInfo()
+	// if validator signed at leased 1 block per epoch, this will be the minimal reward for the delegator
+	require.Greater(t, delegatorReward.Uint64(), uint64(16))
 
 	// undelegate rewards
-	require.NoError(t, srv.Undelegate(delegationAmount, validatorSecretsPath, validatorAddr))
+	require.NoError(t, srv.Undelegate(delegationAmount, delegatorSecretsPath, validatorAddr))
 	t.Logf("Rewards are undelegated\n")
 
+	// wait for one epoch to be able to withdraw undelegated funds
 	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
-	getDelegatorInfo(currentBlockNum)
+	require.NoError(t, cluster.WaitForBlock(currentBlockNum+epochSize, time.Minute))
 
-	// wait for one epoch to be able to withdraw undelegated funds
-	require.NoError(t, cluster.WaitForBlock(15, time.Minute))
+	balanceBeforeWithdraw, _ := getDelegatorInfo()
 
 	// withdraw available rewards
-	require.NoError(t, srv.Withdraw(validatorSecretsPath, delegatorAddr))
+	require.NoError(t, srv.Withdraw(delegatorSecretsPath, delegatorAddr))
 	t.Logf("Funds are withdrawn\n")
 
-	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
-	require.NoError(t, err)
-	getDelegatorInfo(currentBlockNum)
-
 	// wait for single epoch to process withdrawal
-	cluster.WaitForBlock(20, time.Minute)
-
 	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlockNum+epochSize, time.Minute)
 
 	// assert that delegator doesn't receive any rewards
-	_, delegatorReward = getDelegatorInfo(currentBlockNum)
-	// TODO: Check (for some reason delegator still gets rewards although it withdraws entire delegation amount)
-	require.True(t, delegatorReward.Cmp(big.NewInt(0)) > 0)
+	delegatorBalance, delegatorReward = getDelegatorInfo()
+	require.True(t, delegatorReward.Cmp(big.NewInt(0)) == 0)
+	require.True(t, balanceBeforeWithdraw.Cmp(delegatorBalance) == -1)
 }
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
