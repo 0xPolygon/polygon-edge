@@ -42,7 +42,7 @@ func setFlags(cmd *cobra.Command) {
 		"the directory for the Polygon Edge genesis data",
 	)
 
-	cmd.Flags().Int64Var(
+	cmd.Flags().Uint64Var(
 		&params.chainID,
 		chainIDFlag,
 		command.DefaultChainID,
@@ -207,7 +207,7 @@ func setFlags(cmd *cobra.Command) {
 // with running partners
 func setLegacyFlags(cmd *cobra.Command) {
 	// Legacy chainid flag
-	cmd.Flags().Int64Var(
+	cmd.Flags().Uint64Var(
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,

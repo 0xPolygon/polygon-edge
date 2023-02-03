@@ -58,7 +58,7 @@ type genesisParams struct {
 
 	ibftValidatorsRaw []string
 
-	chainID   int64
+	chainID   uint64
 	epochSize uint64
 
 	blockGasLimit uint64
@@ -320,7 +320,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID: p.chainID,
+			ChainID: int64(p.chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine:  p.consensusEngineConfig,
 		},
