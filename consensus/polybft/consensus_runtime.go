@@ -20,9 +20,9 @@ import (
 )
 
 const (
-	maxCommitmentSize  = 10
-	stateFileName      = "consensusState.db"
-	uptimeLookbackSize = 2 // number of blocks to calculate uptime from the previous epoch
+	maxCommitmentSize       = 10
+	stateFileName           = "consensusState.db"
+	commitEpochLookbackSize = 2 // number of blocks to calculate commit epoch info from the previous epoch
 )
 
 var (
@@ -351,9 +351,9 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfEpoch {
-		ff.uptimeCounter, err = c.calculateUptime(parent, epoch)
+		ff.commitEpochInput, err = c.calculateCommitEpochInput(parent, epoch)
 		if err != nil {
-			return fmt.Errorf("cannot calculate uptime: %w", err)
+			return fmt.Errorf("cannot calculate commit epoch info: %w", err)
 		}
 	}
 
@@ -443,9 +443,10 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	}, nil
 }
 
-// calculateUptime calculates uptime for blocks starting from the last built block in current epoch,
-// and ending at the last block of previous epoch
-func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
+// calculateCommitEpochInput calculates commit epoch input data for blocks starting from the last built block
+// in the current epoch, and ending at the last block of previous epoch
+func (c *consensusRuntime) calculateCommitEpochInput(
+	currentBlock *types.Header,
 	epoch *epochMetadata) (*contractsapi.CommitEpochFunction, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
@@ -483,8 +484,8 @@ func (c *consensusRuntime) calculateUptime(currentBlock *types.Header,
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
 	// since we can not calculate uptime for the last block in epoch (because of parent signatures)
-	if blockHeader.Number > uptimeLookbackSize {
-		for i := 0; i < uptimeLookbackSize; i++ {
+	if blockHeader.Number > commitEpochLookbackSize {
+		for i := 0; i < commitEpochLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
 				return nil, err

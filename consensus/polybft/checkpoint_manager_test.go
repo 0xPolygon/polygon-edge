@@ -687,7 +687,7 @@ func TestCommitEpoch(t *testing.T) {
 		}
 
 		// create input for commit epoch
-		commitEpoch := createCommitEpoch(t, 1, accSet, polyBFTConfig.EpochSize)
+		commitEpoch := createCommitEpochData(t, 1, accSet, polyBFTConfig.EpochSize)
 		input, err := commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
@@ -696,7 +696,7 @@ func TestCommitEpoch(t *testing.T) {
 
 		t.Logf("Number of validators %d when we add %d of delegators, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
 
-		commitEpoch = createCommitEpoch(t, 2, accSet, polyBFTConfig.EpochSize)
+		commitEpoch = createCommitEpochData(t, 2, accSet, polyBFTConfig.EpochSize)
 		input, err = commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
@@ -706,7 +706,7 @@ func TestCommitEpoch(t *testing.T) {
 	}
 }
 
-func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
+func createCommitEpochData(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
 	t.Helper()
 
 	var startBlock uint64 = 0
