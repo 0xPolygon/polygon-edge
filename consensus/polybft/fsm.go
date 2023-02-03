@@ -27,6 +27,12 @@ type blockBuilder interface {
 	Receipts() []*types.Receipt
 }
 
+var (
+	errUptimeTxDoesNotExist          = errors.New("uptime transaction is not found in the epoch ending block")
+	errUptimeTxNotExpected           = errors.New("didn't expect uptime transaction in a non epoch ending block")
+	errUptimeTxOnlyOneUptimeExpected = errors.New("only one uptime transaction is allowed in epoch ending block")
+)
+
 type fsm struct {
 	// PolyBFT consensus protocol configuration
 	config *PolyBFTConfig
@@ -346,37 +352,29 @@ func (f *fsm) ValidateSender(msg *proto.Message) error {
 }
 
 func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
-	if f.isEndOfEpoch {
-		err := f.verifyValidatorsUptimeTx(transactions)
-		if err != nil {
-			return err
-		}
-
-		if len(transactions) > 0 {
-			transactions = transactions[1:]
-		}
-	}
-
-	commitmentMessageSignedExists := false
+	var (
+		commitmentMessageSignedExists bool
+		uptimeTransactionExists       bool
+	)
 
 	for _, tx := range transactions {
 		if tx.Type != types.StateTx {
 			continue
 		}
 
-		if !f.isEndOfSprint {
-			return fmt.Errorf("state transaction in block which should not contain it: tx = %v", tx.Hash)
-		}
-
 		decodedStateTx, err := decodeStateTransaction(tx.Input) // used to be Data
 		if err != nil {
-			return fmt.Errorf("state transaction error while decoding: tx = %v, err = %w", tx.Hash, err)
+			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
+			if !f.isEndOfSprint {
+				return fmt.Errorf("found commitment tx in block which should not contain it: tx = %v", tx.Hash)
+			}
+
 			if commitmentMessageSignedExists {
-				return fmt.Errorf("only one commitment is allowed per block: %v", tx.Hash)
+				return fmt.Errorf("only one commitment tx is allowed per block: %v", tx.Hash)
 			}
 
 			commitmentMessageSignedExists = true
@@ -404,7 +402,26 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
+		case *contractsapi.CommitEpochFunction:
+			if uptimeTransactionExists {
+				// if we already validated uptime transaction,
+				//that means someone added two or more uptime tx to block,
+				// which is not allowed
+				return errUptimeTxOnlyOneUptimeExpected
+			}
+
+			uptimeTransactionExists = true
+
+			if err := f.verifyValidatorsUptimeTx(tx); err != nil {
+				return fmt.Errorf("error while verifying uptime transaction. error: %w", err)
+			}
 		}
+	}
+
+	if f.isEndOfEpoch && !uptimeTransactionExists {
+		// this is a check if uptime transaction is not in the list of transactions at all
+		// but it should be
+		return errUptimeTxDoesNotExist
 	}
 
 	return nil
@@ -498,20 +515,11 @@ func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (Account
 }
 
 // verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
-func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error {
-	var blockUptimeTx *types.Transaction
-	if len(transactions) > 0 {
-		blockUptimeTx = transactions[0]
-	}
-
-	createdUptimeTx, err := f.createValidatorsUptimeTx()
-	if err != nil {
-		return err
-	}
-
+func (f *fsm) verifyValidatorsUptimeTx(blockUptimeTx *types.Transaction) error {
 	if f.isEndOfEpoch {
-		if blockUptimeTx == nil {
-			return errors.New("uptime transaction is not found in the epoch ending block")
+		createdUptimeTx, err := f.createValidatorsUptimeTx()
+		if err != nil {
+			return err
 		}
 
 		if blockUptimeTx.Hash != createdUptimeTx.Hash {
@@ -521,13 +529,11 @@ func (f *fsm) verifyValidatorsUptimeTx(transactions []*types.Transaction) error 
 				createdUptimeTx.Hash,
 			)
 		}
-	} else {
-		if blockUptimeTx != nil && blockUptimeTx.Hash == createdUptimeTx.Hash {
-			return errors.New("didn't expect uptime transaction in the middle of an epoch")
-		}
+
+		return nil
 	}
 
-	return nil
+	return errUptimeTxNotExpected
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
