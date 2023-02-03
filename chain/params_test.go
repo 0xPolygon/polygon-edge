@@ -98,11 +98,14 @@ func TestParams_CalculateBurntContract(t *testing.T) {
 			p := &Params{
 				BurntContract: tt.burntContract,
 			}
+
 			got, err := p.CalculateBurntContract(tt.block)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CalculateBurntContract() error = %v, wantErr %v", err, tt.wantErr)
+
 				return
 			}
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CalculateBurntContract() got = %v, want %v", got, tt.want)
 			}
