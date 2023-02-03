@@ -58,6 +58,8 @@ func TestParamsForksInTime(t *testing.T) {
 }
 
 func TestParams_CalculateBurnContract(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		burnContract map[string]string
