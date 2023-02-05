@@ -56,16 +56,17 @@
         - name: Checkout code
           uses: actions/checkout@v3
         
-        - name: Install xk6
-          run: go install go.k6.io/xk6/cmd/xk6@latest
-  
         - uses: datadog/agent-github-action@v1.3
           with:
             api_key: ${{ secrets.DD_API_KEY }}
         
+        - name: Install xk6
+          run: |
+            go install go.k6.io/xk6/cmd/xk6@latest
+            xk6 build --with github.com/distribworks/xk6-ethereum@latest
+        
         - name: Run scenario
           run: |
-            xk6 build --with github.com/distribworks/xk6-ethereum@latest
             ./k6 run --out statsd scenarios/simple.js -i 500
           env:
             K6_STATSD_ENABLE_TAGS: true
