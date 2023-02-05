@@ -41,7 +41,7 @@
           required: true
         DD_API_KEY:
           required: true
-        PANDORAS_TARGET:
+        RPC_URL:
           required: true
   
   jobs:
@@ -69,5 +69,5 @@
             ./k6 run --out statsd scenarios/simple.js -i 500
           env:
             K6_STATSD_ENABLE_TAGS: true
-            RPC_URL: ${{ secrets.PANDORAS_TARGET }}
+            RPC_URL: ${{ secrets.RPC_URL }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
