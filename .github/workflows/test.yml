@@ -10,12 +10,6 @@ on:  # yamllint disable-line rule:truthy
         required: true
       SONAR_HOST_URL:
         required: true
-      DD_API_KEY:
-        required: true
-      SLACK_PERFORMANCE_WEBHOOK_URL:
-        required: true
-      PANDORAS_TARGET:
-        required: true
 
 jobs:
   go_test:
@@ -60,15 +54,3 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-  loadtest:
-    uses: ./.github/workflows/loadtest.yml
-    name: Load Test
-    secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
-    with:
-      runner: devnet
-      environment: devnet
-      scenario: simple

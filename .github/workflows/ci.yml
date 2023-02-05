@@ -19,6 +19,15 @@ jobs:
       GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  
+  loadtest:
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test
+    secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
+      RPC_URL: ${{ secrets.PANDORAS_TARGET }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+    with:
+      runner: devnet
+      environment: devnet
+      scenario: simple
