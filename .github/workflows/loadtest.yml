@@ -1,0 +1,73 @@
+---
+  name: Load Test
+  on:  # yamllint disable-line rule:truthy
+    workflow_dispatch:
+      inputs:
+        runner:
+          description: The runner to execute on
+          default: 'ubuntu-latest'
+          type: choice
+          options:
+            - ubuntu-latest
+            - devnet
+            - testnet
+        environment:
+          description: The environment to run against
+          required: false
+          type: environment
+        scenario:
+          default: 'simple'
+          description: The scenario to run
+          type: choice
+          options:
+            - simple
+            - multiple
+    workflow_call:
+      inputs:
+        environment:
+          description: The environment to run against
+          type: string
+          required: true
+        runner:
+          required: true
+          type: string
+          description: The runner label to use
+        scenario:
+          required: true
+          description: The mode for the stress test
+          type: string
+      secrets:
+        SLACK_PERFORMANCE_WEBHOOK_URL:
+          required: true
+        DD_API_KEY:
+          required: true
+        PANDORAS_TARGET:
+          required: true
+  
+  jobs:
+    run_k6:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Install Go
+          uses: actions/setup-go@v3
+          with:
+            go-version: 1.18.x
+  
+        - name: Checkout code
+          uses: actions/checkout@v3
+        
+        - name: Install xk6
+          run: go install github.com/grafana/xk6/cmd/xk6@latest
+  
+        - uses: datadog/agent-github-action@v1.3
+          with:
+            api_key: ${{ secrets.DD_API_KEY }
+        
+        - name: Run scenario
+          run: |
+            xk6 build --with github.com/distribworks/xk6-ethereum@latest
+            ./k6 run --out statsd scenarios/simple.js -i 500
+          env:
+            K6_STATSD_ENABLE_TAGS: true
+            RPC_URL: ${{ secrets.PANDORAS_TARGET }}
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}

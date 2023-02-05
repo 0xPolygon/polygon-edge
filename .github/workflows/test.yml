@@ -54,3 +54,15 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  loadtest:
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
+      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+    with:
+      runner: devnet
+      environment: devnet
+      scenario: simple
