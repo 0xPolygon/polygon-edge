@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type precompiledTest struct {
@@ -20,7 +21,7 @@ func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			h, _ := hex.DecodeString(c.Input)
-			found, err := p.run(h)
+			found, err := p.run(h, types.ZeroAddress, nil)
 
 			assert.NoError(t, err)
 			assert.Equal(t, c.Expected, hex.EncodeToString(found))

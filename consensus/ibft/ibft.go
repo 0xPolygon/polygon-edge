@@ -208,16 +208,16 @@ func (i *backendIBFT) Initialize() error {
 
 // sync runs the syncer in the background to receive blocks from advanced peers
 func (i *backendIBFT) startSyncing() {
-	callInsertBlockHook := func(block *types.Block) bool {
-		if err := i.currentHooks.PostInsertBlock(block); err != nil {
-			i.logger.Error("failed to call PostInsertBlock", "height", block.Header.Number, "error", err)
+	callInsertBlockHook := func(fullBlock *types.FullBlock) bool {
+		if err := i.currentHooks.PostInsertBlock(fullBlock.Block); err != nil {
+			i.logger.Error("failed to call PostInsertBlock", "height", fullBlock.Block.Header.Number, "error", err)
 		}
 
-		if err := i.updateCurrentModules(block.Number() + 1); err != nil {
-			i.logger.Error("failed to update sub modules", "height", block.Number()+1, "err", err)
+		if err := i.updateCurrentModules(fullBlock.Block.Number() + 1); err != nil {
+			i.logger.Error("failed to update sub modules", "height", fullBlock.Block.Number()+1, "err", err)
 		}
 
-		i.txpool.ResetWithHeaders(block.Header)
+		i.txpool.ResetWithHeaders(fullBlock.Block.Header)
 
 		return false
 	}
@@ -428,10 +428,25 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 		return err
 	}
 
+	extra, err := headerSigner.GetIBFTExtra(header)
+	if err != nil {
+		return err
+	}
+
+	hashForCommittedSeal, err := i.calculateProposalHash(
+		headerSigner,
+		header,
+		extra.RoundNumber,
+	)
+	if err != nil {
+		return err
+	}
+
 	// verify the Committed Seals
 	// CommittedSeals exists only in the finalized header
 	if err := headerSigner.VerifyCommittedSeals(
-		header,
+		hashForCommittedSeal,
+		extra.CommittedSeals,
 		validators,
 		i.quorumSize(header.Number)(validators),
 	); err != nil {
@@ -532,6 +547,11 @@ func (i *backendIBFT) SetHeaderHash() {
 	}
 }
 
+// GetBridgeProvider returns an instance of BridgeDataProvider
+func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
+	return nil
+}
+
 // updateCurrentModules updates Signer, Hooks, and Validators
 // that are used at specified height
 // by fetching from ForkManager
@@ -573,7 +593,25 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 		i.forkManager,
 		parent.Number,
 	)
+	if err != nil {
+		return err
+	}
 
+	parentHeader, ok := i.blockchain.GetHeaderByHash(parent.Hash)
+	if !ok {
+		return fmt.Errorf("header %s not found", parent.Hash)
+	}
+
+	parentExtra, err := parentSigner.GetIBFTExtra(parentHeader)
+	if err != nil {
+		return err
+	}
+
+	parentHash, err := i.calculateProposalHash(
+		parentSigner,
+		parentHeader,
+		parentExtra.RoundNumber,
+	)
 	if err != nil {
 		return err
 	}
@@ -581,7 +619,7 @@ func (i *backendIBFT) verifyParentCommittedSeals(
 	// if shouldVerifyParentCommittedSeals is false, skip the verification
 	// when header doesn't have Parent Committed Seals (Backward Compatibility)
 	return parentSigner.VerifyParentCommittedSeals(
-		parent,
+		parentHash,
 		header,
 		parentValidators,
 		i.quorumSize(parent.Number)(parentValidators),

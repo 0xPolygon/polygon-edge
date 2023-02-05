@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -328,19 +329,10 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 		}
 
 		// resize the memory
-		c.memory = extendByteSlice(c.memory, int(w*32))
+		c.memory = common.ExtendByteSlice(c.memory, int(w*32))
 	}
 
 	return true
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-
-	return b[:needLen]
 }
 
 func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {

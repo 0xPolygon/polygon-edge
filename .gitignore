@@ -1,5 +1,6 @@
 peers.json
 genesis.json
+manifest.json
 secretsManagerConfig.json
 *-packr.go
 config*.json
@@ -7,6 +8,7 @@ config*.json
 bin/
 
 test-chain*
+test-rootchain*
 polygon-edge-chain*
 .idea
 
@@ -21,8 +23,10 @@ main
 
 # exclude build folder
 artifacts
+node_modules
 
 # Log files
 *.log
 
 vendor/
+coverage.out

@@ -22,6 +22,8 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
     name: Build
+    secrets:
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   test:
     uses: ./.github/workflows/test.yml
@@ -30,6 +32,7 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   container_image_build:
     name: Build/Push Container Image

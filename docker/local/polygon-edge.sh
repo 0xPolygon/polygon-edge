@@ -2,36 +2,58 @@
 
 set -e
 
-POLYGON_EDGE_BIN=/polygon-edge/polygon-edge
-GENESIS_PATH=/data/genesis.json
+POLYGON_EDGE_BIN=./polygon-edge
+CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
+--block-gas-limit 10000000
+--epoch-size 10
+--chain-id 51001
+--name polygon-edge-docker
+--premine 0x228466F2C715CbEC05dEAbfAc040ce3619d7CF0B:0xD3C21BCECCEDA1000000
+--premine 0xca48694ebcB2548dF5030372BE4dAad694ef174e:0xD3C21BCECCEDA1000000
+EOL
+)
 
 case "$1" in
 
    "init")
-      if [ -f "$GENESIS_PATH" ]; then
-          echo "Secrets have already been generated."
-      else
-          echo "Generating secrets..."
-          secrets=$("$POLYGON_EDGE_BIN" secrets init --num 4 --data-dir /data/data- --json)
-          echo "Secrets have been successfully generated"
+      case "$2" in 
+         "ibft")
+         if [ -f "$GENESIS_PATH" ]; then
+              echo "Secrets have already been generated."
+          else
+              echo "Generating secrets..."
+              secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
+              echo "Secrets have been successfully generated"
+              echo "Generating IBFT Genesis file..."
+              cd /data && /polygon-edge/polygon-edge genesis  $CHAIN_CUSTOM_OPTIONS \
+                --dir genesis.json \
+                --consensus ibft \
+                --ibft-validators-prefix-path data- \
+                --validator-set-size=4 \
+                --bootnode /dns4/node-1/tcp/1478/p2p/$(echo $secrets | jq -r '.[0] | .node_id') \
+                --bootnode /dns4/node-2/tcp/1478/p2p/$(echo $secrets | jq -r '.[1] | .node_id') \
+              ;;
+          "polybft")
+              echo "Generating PolyBFT secrets..."
+              secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num 4 --data-dir /data/data- --json)
+              echo "Secrets have been successfully generated"
 
-          echo "Generating genesis file..."
-          cd /data && "$POLYGON_EDGE_BIN" genesis \
-            --dir "$GENESIS_PATH" \
-            --consensus ibft \
-            --ibft-validators-prefix-path data- \
-            --bootnode /dns4/node-1/tcp/1478/p2p/$(echo $secrets | jq -r '.[0] | .node_id') \
-            --bootnode /dns4/node-2/tcp/1478/p2p/$(echo $secrets | jq -r '.[1] | .node_id')
-          echo "Genesis file has been successfully generated"
-      fi
+              echo "Generating manifest..."
+              "$POLYGON_EDGE_BIN" manifest --path /data/manifest.json --validators-path /data --validators-prefix data-
+
+              echo "Generating PolyBFT Genesis file..."
+              "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
+                --dir /data/genesis.json \
+                --consensus polybft \
+                --manifest /data/manifest.json \
+                --validator-set-size=4 \
+                --bootnode /dns4/node-1/tcp/1478/p2p/$(echo $secrets | jq -r '.[0] | .node_id') \
+                --bootnode /dns4/node-2/tcp/1478/p2p/$(echo $secrets | jq -r '.[1] | .node_id')
+              ;;
+      esac
       ;;
 
    *)
-      until [ -f "$GENESIS_PATH" ]
-      do
-          echo "Waiting 1s for genesis file $GENESIS_PATH to be created by init container..."
-          sleep 1
-      done
       echo "Executing polygon-edge..."
       exec "$POLYGON_EDGE_BIN" "$@"
       ;;

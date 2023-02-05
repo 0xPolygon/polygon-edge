@@ -5,6 +5,8 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
@@ -20,7 +22,7 @@ func (b *bn256Add) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return 500
 }
 
-func (b *bn256Add) run(input []byte) ([]byte, error) {
+func (b *bn256Add) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	var val []byte
 
 	b1 := new(bn256.G1)
@@ -54,7 +56,7 @@ func (b *bn256Mul) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return 40000
 }
 
-func (b *bn256Mul) run(input []byte) ([]byte, error) {
+func (b *bn256Mul) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	var v []byte
 
 	b0 := new(bn256.G1)
@@ -73,15 +75,6 @@ func (b *bn256Mul) run(input []byte) ([]byte, error) {
 	return c.Marshal(), nil
 }
 
-var (
-	falseBytes = make([]byte, 32)
-	trueBytes  = make([]byte, 32)
-)
-
-func init() {
-	trueBytes[31] = 1
-}
-
 type bn256Pairing struct {
 	p *Precompiled
 }
@@ -95,9 +88,9 @@ func (b *bn256Pairing) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return baseGas + pointGas*uint64(len(input)/192)
 }
 
-func (b *bn256Pairing) run(input []byte) ([]byte, error) {
+func (b *bn256Pairing) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	if len(input) == 0 {
-		return trueBytes, nil
+		return abiBoolTrue, nil
 	}
 
 	if len(input)%192 != 0 {
@@ -129,8 +122,8 @@ func (b *bn256Pairing) run(input []byte) ([]byte, error) {
 	}
 
 	if bn256.PairingCheck(ar, br) {
-		return trueBytes, nil
+		return abiBoolTrue, nil
 	}
 
-	return falseBytes, nil
+	return abiBoolFalse, nil
 }

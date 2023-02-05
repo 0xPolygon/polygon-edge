@@ -54,6 +54,11 @@ issues:
         - gosec
         - unparam
         - lll
+    - path: gen_sc_data\.go
+      linters:
+        - wsl
+        - lll
+        - stylecheck
   include:
     - EXC0012 # Exported (.+) should have comment( \(or a comment on this block\))? or be unexported
     - EXC0013 # Package comment should be of the form "(.+)...

@@ -1,13 +1,24 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"fmt"
+	"io/ioutil"
+	"math/big"
 	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/secrets/helper"
+	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -31,6 +42,11 @@ func (g *GenesisGenError) GetType() string {
 	return g.errorType
 }
 
+type premineInfo struct {
+	address types.Address
+	balance *big.Int
+}
+
 // verifyGenesisExistence checks if the genesis file at the specified path is present
 func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	_, err := os.Stat(genesisPath)
@@ -51,33 +67,114 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	return nil
 }
 
-// fillPremineMap fills the premine map for the genesis.json file with passed in balances and accounts
-func fillPremineMap(
-	premineMap map[types.Address]*chain.GenesisAccount,
-	premine []string,
-) error {
-	for _, prem := range premine {
-		var addr types.Address
+// parsePremineInfo parses provided premine information and returns premine address and premine balance
+func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
+	address := types.ZeroAddress
+	val := command.DefaultPremineBalance
 
-		val := command.DefaultPremineBalance
-
-		if indx := strings.Index(prem, ":"); indx != -1 {
-			// <addr>:<balance>
-			addr, val = types.StringToAddress(prem[:indx]), prem[indx+1:]
-		} else {
-			// <addr>
-			addr = types.StringToAddress(prem)
-		}
-
-		amount, err := types.ParseUint256orHex(&val)
-		if err != nil {
-			return fmt.Errorf("failed to parse amount %s: %w", val, err)
-		}
-
-		premineMap[addr] = &chain.GenesisAccount{
-			Balance: amount,
-		}
+	if delimiterIdx := strings.Index(premineInfoRaw, ":"); delimiterIdx != -1 {
+		// <addr>:<balance>
+		address, val = types.StringToAddress(premineInfoRaw[:delimiterIdx]), premineInfoRaw[delimiterIdx+1:]
+	} else {
+		// <addr>
+		address = types.StringToAddress(premineInfoRaw)
 	}
 
-	return nil
+	amount, err := types.ParseUint256orHex(&val)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
+	}
+
+	return &premineInfo{address: address, balance: amount}, nil
+}
+
+// GetValidatorKeyFiles returns file names which has validator secrets
+func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
+	if rootDir == "" {
+		rootDir = "."
+	}
+
+	files, err := ioutil.ReadDir(rootDir)
+	if err != nil {
+		return nil, err
+	}
+
+	matchedFiles := 0
+	fileNames := make([]string, len(files))
+
+	for _, file := range files {
+		fileName := file.Name()
+		if file.IsDir() && strings.HasPrefix(fileName, filePrefix) {
+			fileNames[matchedFiles] = fileName
+			matchedFiles++
+		}
+	}
+	// reslice to remove empty entries
+	fileNames = fileNames[:matchedFiles]
+
+	// we must sort files by number after the prefix not by name string
+	sort.Slice(fileNames, func(i, j int) bool {
+		first := strings.TrimPrefix(fileNames[i], filePrefix)
+		second := strings.TrimPrefix(fileNames[j], filePrefix)
+		num1, _ := strconv.Atoi(strings.TrimLeft(first, "-"))
+		num2, _ := strconv.Atoi(strings.TrimLeft(second, "-"))
+
+		return num1 < num2
+	})
+
+	return fileNames, nil
+}
+
+// ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
+func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
+	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
+	if err != nil {
+		return nil, err
+	}
+
+	validators := make([]*polybft.Validator, len(validatorKeyFiles))
+
+	for i, file := range validatorKeyFiles {
+		path := filepath.Join(dir, file)
+
+		account, nodeID, err := getSecrets(path)
+		if err != nil {
+			return nil, err
+		}
+
+		validator := &polybft.Validator{
+			Address: types.Address(account.Ecdsa.Address()),
+			BlsKey:  hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			NodeID:  nodeID,
+		}
+		validators[i] = validator
+	}
+
+	return validators, nil
+}
+
+func getSecrets(directory string) (*wallet.Account, string, error) {
+	baseConfig := &secrets.SecretsManagerParams{
+		Logger: hclog.NewNullLogger(),
+		Extra: map[string]interface{}{
+			secrets.Path: directory,
+		},
+	}
+
+	localManager, err := local.SecretsManagerFactory(nil, baseConfig)
+	if err != nil {
+		return nil, "", fmt.Errorf("unable to instantiate local secrets manager, %w", err)
+	}
+
+	nodeID, err := helper.LoadNodeID(localManager)
+	if err != nil {
+		return nil, "", err
+	}
+
+	account, err := wallet.NewAccountFromSecret(localManager)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return account, nodeID, nil
 }
