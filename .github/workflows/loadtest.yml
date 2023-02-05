@@ -57,7 +57,7 @@
           uses: actions/checkout@v3
         
         - name: Install xk6
-          run: go install github.com/grafana/xk6/cmd/xk6@latest
+          run: go install go.k6.io/xk6/cmd/xk6@latest
   
         - uses: datadog/agent-github-action@v1.3
           with:
