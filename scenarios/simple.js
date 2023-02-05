@@ -1,9 +1,9 @@
 import eth from 'k6/x/ethereum';
 import './slack.js';
 
-var rpc_url = __ENV.RCP_URL
+let rpc_url = __ENV.RCP_URL
 if (rpc_url == undefined) {
-  rpc_url = "http://localhost:10002"
+  rpc_url = "https://rpc.us-east-1.deph.testing.psdk.io/"
 }
 
 const client = new eth.Client({
