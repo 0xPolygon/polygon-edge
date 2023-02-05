@@ -10,6 +10,12 @@ on:  # yamllint disable-line rule:truthy
         required: true
       SONAR_HOST_URL:
         required: true
+      DD_API_KEY:
+        required: true
+      SLACK_PERFORMANCE_WEBHOOK_URL:
+        required: true
+      PANDORAS_TARGET:
+        required: true
 
 jobs:
   go_test:
