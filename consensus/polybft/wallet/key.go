@@ -44,7 +44,7 @@ func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
 		return nil, fmt.Errorf("cannot marshal message: %w", err)
 	}
 
-	if msg.Signature, err = k.raw.Ecdsa.Sign(raw); err != nil {
+	if msg.Signature, err = k.raw.Ecdsa.Sign(crypto.Keccak256(raw)); err != nil {
 		return nil, fmt.Errorf("cannot create message signature: %w", err)
 	}
 
@@ -52,8 +52,8 @@ func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
 }
 
 // RecoverAddressFromSignature recovers signer address from the given digest and signature
-func RecoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, msg)
+func RecoverAddressFromSignature(sig, digest []byte) (types.Address, error) {
+	pub, err := crypto.RecoverPubkey(sig, digest)
 	if err != nil {
 		return types.Address{}, fmt.Errorf("cannot recover address from signature: %w", err)
 	}

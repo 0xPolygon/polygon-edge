@@ -13,6 +13,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
@@ -336,7 +337,7 @@ func (f *fsm) ValidateSender(msg *proto.Message) error {
 		return err
 	}
 
-	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
+	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, crypto.Keccak256(msgNoSig))
 	if err != nil {
 		return fmt.Errorf("failed to recover address from signature: %w", err)
 	}

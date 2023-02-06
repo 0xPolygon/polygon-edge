@@ -5,11 +5,14 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_RecoverAddressFromSignature(t *testing.T) {
+	t.Parallel()
+
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
 		key := NewKey(account)
 		msgNoSig := &proto.Message{
@@ -24,13 +27,15 @@ func Test_RecoverAddressFromSignature(t *testing.T) {
 		payload, err := msgNoSig.PayloadNoSig()
 		require.NoError(t, err)
 
-		address, err := RecoverAddressFromSignature(msg.Signature, payload)
+		address, err := RecoverAddressFromSignature(msg.Signature, crypto.Keccak256(payload))
 		require.NoError(t, err)
 		assert.Equal(t, key.Address().Bytes(), address.Bytes())
 	}
 }
 
 func Test_Sign(t *testing.T) {
+	t.Parallel()
+
 	msg := []byte("some message")
 
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount()} {
@@ -47,6 +52,8 @@ func Test_Sign(t *testing.T) {
 }
 
 func Test_String(t *testing.T) {
+	t.Parallel()
+
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
 		key := NewKey(account)
 		assert.Equal(t, key.Address().String(), key.String())

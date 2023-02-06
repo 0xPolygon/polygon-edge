@@ -608,13 +608,13 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
 }
 
-func TestConsensusRuntime_IsValidSender(t *testing.T) {
+func TestConsensusRuntime_IsValidValidator(t *testing.T) {
 	t.Parallel()
 
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
 
 	extra := &Extra{}
-	lastBuildBlock := &types.Header{
+	block := &types.Header{
 		Number:    0,
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
@@ -627,19 +627,18 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 	config := &runtimeConfig{
 		Key:           validatorAccounts.getValidator("B").Key(),
 		blockchain:    blockchainMock,
-		PolyBFTConfig: &PolyBFTConfig{EpochSize: 10, SprintSize: 5},
+		PolyBFTConfig: &PolyBFTConfig{SprintSize: 5},
 	}
 	runtime := &consensusRuntime{
 		state:          state,
 		config:         config,
-		lastBuiltBlock: lastBuildBlock,
+		lastBuiltBlock: block,
 		epoch: &epochMetadata{
 			Number:     1,
 			Validators: validatorAccounts.getPublicIdentities()[:len(validatorAccounts.validators)-1],
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		stateSyncManager:   &dummyStateSyncManager{},
 		checkpointManager:  &dummyCheckpointManager{},
 	}
 
@@ -660,7 +659,6 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 	msg, err = sender.Key().SignEcdsaMessage(&proto.Message{
 		From: sender.Address().Bytes(),
 	})
-
 	require.NoError(t, err)
 
 	assert.False(t, runtime.IsValidValidator(msg))
@@ -686,6 +684,37 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
+
+	// modified message after signing
+	proposalHash := []byte{2, 4, 6, 8, 10}
+	signature, err := sender.Key().Sign(proposalHash)
+	assert.NoError(t, err)
+
+	msg = &proto.Message{
+		View: &proto.View{},
+		From: sender.Address().Bytes(),
+		Type: proto.MessageType_COMMIT,
+		Payload: &proto.Message_CommitData{
+			CommitData: &proto.CommitMessage{
+				ProposalHash:  proposalHash,
+				CommittedSeal: signature,
+			},
+		},
+	}
+	// sign the message
+	msg, err = sender.Key().SignEcdsaMessage(msg)
+	assert.NoError(t, err)
+	// signature verification works
+	assert.True(t, runtime.IsValidValidator(msg))
+
+	// modified message
+	msg.Payload = &proto.Message_CommitData{
+		CommitData: &proto.CommitMessage{
+			ProposalHash:  []byte{1, 3, 5, 7, 9}, // modification
+			CommittedSeal: signature,
+		},
+	}
+	assert.False(t, runtime.IsValidValidator(msg))
 }
 
 func TestConsensusRuntime_IsValidProposalHash(t *testing.T) {
