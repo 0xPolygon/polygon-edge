@@ -583,6 +583,8 @@ func TestPerformExit(t *testing.T) {
 }
 
 func TestCommitEpoch(t *testing.T) {
+	t.Parallel()
+
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100, 150, 200}
 	// number of delegators per validator
@@ -687,7 +689,7 @@ func TestCommitEpoch(t *testing.T) {
 		}
 
 		// create input for commit epoch
-		commitEpoch := createCommitEpoch(t, 1, accSet, polyBFTConfig.EpochSize)
+		commitEpoch := createTestCommitEpochInput(t, 1, accSet, polyBFTConfig.EpochSize)
 		input, err := commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
@@ -696,7 +698,7 @@ func TestCommitEpoch(t *testing.T) {
 
 		t.Logf("Number of validators %d when we add %d of delegators, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
 
-		commitEpoch = createCommitEpoch(t, 2, accSet, polyBFTConfig.EpochSize)
+		commitEpoch = createTestCommitEpochInput(t, 2, accSet, polyBFTConfig.EpochSize)
 		input, err = commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
@@ -704,37 +706,6 @@ func TestCommitEpoch(t *testing.T) {
 		result = transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
 		t.Logf("Number of validators %d, Number of delegator %d, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
 	}
-}
-
-func createCommitEpoch(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
-	t.Helper()
-
-	var startBlock uint64 = 0
-	if epochID > 1 {
-		startBlock = (epochID - 1) * epochSize
-	}
-
-	uptime := &contractsapi.Uptime{
-		EpochID:     new(big.Int).SetUint64(epochID),
-		UptimeData:  []*contractsapi.UptimeData{},
-		TotalBlocks: new(big.Int).SetUint64(epochSize),
-	}
-
-	commitEpoch := &contractsapi.CommitEpochFunction{
-		ID: uptime.EpochID,
-		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(startBlock + 1),
-			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
-			EpochRoot:  types.Hash{},
-		},
-		Uptime: uptime,
-	}
-
-	for i := range validatorSet {
-		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
-	}
-
-	return commitEpoch
 }
 
 func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *artifact.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {

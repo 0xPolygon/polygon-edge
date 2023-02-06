@@ -58,40 +58,40 @@ func TestFSM_ValidateHeader(t *testing.T) {
 	require.NoError(t, validateHeaderFields(parent, header))
 }
 
-func TestFSM_verifyValidatorsUptimeTx(t *testing.T) {
+func TestFSM_verifyCommitEpochTx(t *testing.T) {
 	t.Parallel()
 
 	fsm := &fsm{
-		config:        &PolyBFTConfig{ValidatorSetAddr: contracts.ValidatorSetContract},
-		isEndOfEpoch:  true,
-		uptimeCounter: createTestUptimeCounter(t, nil, 10),
+		config:           &PolyBFTConfig{ValidatorSetAddr: contracts.ValidatorSetContract},
+		isEndOfEpoch:     true,
+		commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10),
 	}
 
-	// include uptime transaction to the epoch ending block
-	uptimeTx, err := fsm.createValidatorsUptimeTx()
+	// include commit epoch transaction to the epoch ending block
+	commitEpochTx, err := fsm.createCommitEpochTx()
 	assert.NoError(t, err)
-	assert.NotNil(t, uptimeTx)
+	assert.NotNil(t, commitEpochTx)
 
-	assert.NoError(t, fsm.verifyValidatorsUptimeTx(uptimeTx))
+	assert.NoError(t, fsm.verifyCommitEpochTx(commitEpochTx))
 
-	// submit tampered validators uptime transaction to the epoch ending block
-	alteredUptimeTx := &types.Transaction{
+	// submit tampered commit epoch transaction to the epoch ending block
+	alteredCommitEpochTx := &types.Transaction{
 		To:    &fsm.config.ValidatorSetAddr,
 		Input: []byte{},
 		Gas:   0,
 		Type:  types.StateTx,
 	}
-	assert.ErrorContains(t, fsm.verifyValidatorsUptimeTx(alteredUptimeTx), "invalid uptime transaction")
+	assert.ErrorContains(t, fsm.verifyCommitEpochTx(alteredCommitEpochTx), "invalid commit epoch transaction")
 
-	// submit validators uptime transaction to the non-epoch ending block
+	// submit validators commit epoch transaction to the non-epoch ending block
 	fsm.isEndOfEpoch = false
-	uptimeTx, err = fsm.createValidatorsUptimeTx()
+	commitEpochTx, err = fsm.createCommitEpochTx()
 	assert.NoError(t, err)
-	assert.NotNil(t, uptimeTx)
-	assert.ErrorContains(t, fsm.verifyValidatorsUptimeTx(uptimeTx), errUptimeTxNotExpected.Error())
+	assert.NotNil(t, commitEpochTx)
+	assert.ErrorContains(t, fsm.verifyCommitEpochTx(commitEpochTx), errCommitEpochTxNotExpected.Error())
 }
 
-func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
+func TestFSM_BuildProposal_WithoutCommitEpochTxGood(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -156,7 +156,7 @@ func TestFSM_BuildProposal_WithoutUptimeTxGood(t *testing.T) {
 	mBlockBuilder.AssertExpectations(t)
 }
 
-func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
+func TestFSM_BuildProposal_WithCommitEpochTxGood(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -201,7 +201,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: blockChainMock,
 		isEndOfEpoch:      true,
 		validators:        validators.toValidatorSet(),
-		uptimeCounter:     createTestUptimeCounter(t, nil, 10),
+		commitEpochInput:  createTestCommitEpochInput(t, 0, nil, 10),
 		exitEventRootHash: eventRoot,
 		logger:            hclog.NewNullLogger(),
 	}
@@ -240,7 +240,7 @@ func TestFSM_BuildProposal_WithUptimeTxGood(t *testing.T) {
 	blockChainMock.AssertExpectations(t)
 }
 
-func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) {
+func TestFSM_BuildProposal_EpochEndingBlock_FailedToApplyStateTx(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -264,12 +264,12 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToCommitStateTx(t *testing.T) 
 	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		isEndOfEpoch:      true,
 		validators:        validatorSet,
-		uptimeCounter:     createTestUptimeCounter(t, nil, 10),
+		commitEpochInput:  createTestCommitEpochInput(t, 0, nil, 10),
 		exitEventRootHash: types.ZeroHash,
 	}
 
 	_, err := fsm.BuildProposal(0)
-	assert.ErrorContains(t, err, "failed to commit validators uptime transaction")
+	assert.ErrorContains(t, err, "failed to apply commit epoch transaction")
 	mBlockBuilder.AssertExpectations(t)
 }
 
@@ -314,7 +314,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 		backend:           blockChainMock,
 		isEndOfEpoch:      true,
 		validators:        validatorSet,
-		uptimeCounter:     createTestUptimeCounter(t, validators, 10),
+		commitEpochInput:  createTestCommitEpochInput(t, 0, validators, 10),
 		exitEventRootHash: types.ZeroHash,
 		logger:            hclog.NewNullLogger(),
 	}
@@ -421,7 +421,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 		backend:           blockChainMock,
 		isEndOfEpoch:      true,
 		validators:        testValidators.toValidatorSet(),
-		uptimeCounter:     createTestUptimeCounter(t, allAccounts, 10),
+		commitEpochInput:  createTestCommitEpochInput(t, 0, allAccounts, 10),
 		exitEventRootHash: types.ZeroHash,
 	}
 
@@ -439,8 +439,8 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 func TestFSM_VerifyStateTransactions_MiddleOfEpochWithTransaction(t *testing.T) {
 	t.Parallel()
 
-	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
-	tx, err := fsm.createValidatorsUptimeTx()
+	fsm := &fsm{config: &PolyBFTConfig{}, commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10)}
+	tx, err := fsm.createCommitEpochTx()
 	assert.NoError(t, err)
 	err = fsm.VerifyStateTransactions([]*types.Transaction{tx})
 	assert.ErrorContains(t, err, err.Error())
@@ -449,7 +449,7 @@ func TestFSM_VerifyStateTransactions_MiddleOfEpochWithTransaction(t *testing.T) 
 func TestFSM_VerifyStateTransactions_MiddleOfEpochWithoutTransaction(t *testing.T) {
 	t.Parallel()
 
-	fsm := &fsm{config: &PolyBFTConfig{}, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
+	fsm := &fsm{config: &PolyBFTConfig{}, commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10)}
 	err := fsm.VerifyStateTransactions([]*types.Transaction{})
 	assert.NoError(t, err)
 }
@@ -457,20 +457,20 @@ func TestFSM_VerifyStateTransactions_MiddleOfEpochWithoutTransaction(t *testing.
 func TestFSM_VerifyStateTransactions_EndOfEpochWithoutTransaction(t *testing.T) {
 	t.Parallel()
 
-	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
+	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10)}
 	assert.EqualError(t, fsm.VerifyStateTransactions([]*types.Transaction{}),
-		"uptime transaction is not found in the epoch ending block")
+		"commit epoch transaction is not found in the epoch ending block")
 }
 
-func TestFSM_VerifyStateTransactions_EndOfEpochWrongValidatorsUptimeTx(t *testing.T) {
+func TestFSM_VerifyStateTransactions_EndOfEpochWrongCommitEpochTx(t *testing.T) {
 	t.Parallel()
 
-	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
-	uptimeCounter, err := createTestUptimeCounter(t, nil, 5).EncodeAbi()
+	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10)}
+	commitEpochInput, err := createTestCommitEpochInput(t, 0, nil, 5).EncodeAbi()
 	require.NoError(t, err)
 
-	commitEpochTx := createStateTransactionWithData(contracts.ValidatorSetContract, uptimeCounter)
-	assert.ErrorContains(t, fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx}), "invalid uptime transaction")
+	commitEpochTx := createStateTransactionWithData(contracts.ValidatorSetContract, commitEpochInput)
+	assert.ErrorContains(t, fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx}), "invalid commit epoch transaction")
 }
 
 func TestFSM_VerifyStateTransactions_CommitmentTransactionAndSprintIsFalse(t *testing.T) {
@@ -486,24 +486,24 @@ func TestFSM_VerifyStateTransactions_CommitmentTransactionAndSprintIsFalse(t *te
 		"found commitment tx in block which should not contain it")
 }
 
-func TestFSM_VerifyStateTransactions_EndOfEpochMoreThanOneUptimeTx(t *testing.T) {
+func TestFSM_VerifyStateTransactions_EndOfEpochMoreThanOneCommitEpochTx(t *testing.T) {
 	t.Parallel()
 
 	txs := make([]*types.Transaction, 2)
-	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, uptimeCounter: createTestUptimeCounter(t, nil, 10)}
+	fsm := &fsm{config: &PolyBFTConfig{}, isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10)}
 
-	uptimeTxOne, err := fsm.createValidatorsUptimeTx()
+	commitEpochTxOne, err := fsm.createCommitEpochTx()
 	require.NoError(t, err)
 
-	txs[0] = uptimeTxOne
+	txs[0] = commitEpochTxOne
 
-	uptimeTwo := createTestUptimeCounter(t, nil, 100)
-	input, err := uptimeTwo.EncodeAbi()
+	commitEpochTxTwo := createTestCommitEpochInput(t, 0, nil, 100)
+	input, err := commitEpochTxTwo.EncodeAbi()
 	require.NoError(t, err)
 
 	txs[1] = createStateTransactionWithData(types.ZeroAddress, input)
 
-	assert.ErrorIs(t, fsm.VerifyStateTransactions(txs), errUptimeTxOnlyOneUptimeExpected)
+	assert.ErrorIs(t, fsm.VerifyStateTransactions(txs), errCommitEpochTxSingleExpected)
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
@@ -514,17 +514,17 @@ func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 	validatorSet := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 
 	fsm := &fsm{
-		config:        &PolyBFTConfig{},
-		isEndOfEpoch:  true,
-		isEndOfSprint: true,
-		validators:    validatorSet,
-		uptimeCounter: createTestUptimeCounter(t, nil, 10),
-		logger:        hclog.NewNullLogger(),
+		config:           &PolyBFTConfig{},
+		isEndOfEpoch:     true,
+		isEndOfSprint:    true,
+		validators:       validatorSet,
+		commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10),
+		logger:           hclog.NewNullLogger(),
 	}
 	txs := fsm.stateTransactions()
 
-	// add validators uptime tx to the end of transactions list
-	tx, err := fsm.createValidatorsUptimeTx()
+	// add commit epoch tx to the end of transactions list
+	tx, err := fsm.createCommitEpochTx()
 	assert.NoError(t, err)
 
 	txs = append([]*types.Transaction{tx}, txs...)
@@ -551,14 +551,14 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 		isEndOfSprint:                true,
 		validators:                   validatorSet,
 		proposerCommitmentToRegister: commitment,
-		uptimeCounter:                createTestUptimeCounter(t, nil, 10),
+		commitEpochInput:             createTestCommitEpochInput(t, 0, nil, 10),
 		logger:                       hclog.NewNullLogger(),
 	}
 
 	txs := fsm.stateTransactions()
 
-	// add validators uptime tx to the end of transactions list
-	tx, err := fsm.createValidatorsUptimeTx()
+	// add commit epoch tx to the end of transactions list
+	tx, err := fsm.createCommitEpochTx()
 	assert.NoError(t, err)
 
 	txs = append([]*types.Transaction{tx}, txs...)
@@ -592,14 +592,14 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 		isEndOfSprint:                true,
 		validators:                   validatorSet,
 		proposerCommitmentToRegister: commitment,
-		uptimeCounter:                createTestUptimeCounter(t, nil, 10),
+		commitEpochInput:             createTestCommitEpochInput(t, 0, nil, 10),
 		logger:                       hclog.NewNullLogger(),
 	}
 
 	txs := fsm.stateTransactions()
 
-	// add validators uptime tx to the end of transactions list
-	tx, err := fsm.createValidatorsUptimeTx()
+	// add commit epoch tx to the end of transactions list
+	tx, err := fsm.createCommitEpochTx()
 	assert.NoError(t, err)
 
 	txs = append([]*types.Transaction{tx}, txs...)
@@ -984,7 +984,7 @@ func TestFSM_DecodeCommitmentStateTxs(t *testing.T) {
 	f := &fsm{
 		config:                       &PolyBFTConfig{},
 		proposerCommitmentToRegister: signedCommitment,
-		uptimeCounter:                createTestUptimeCounter(t, nil, 10),
+		commitEpochInput:             createTestCommitEpochInput(t, 0, nil, 10),
 		logger:                       hclog.NewNullLogger(),
 	}
 
@@ -1002,7 +1002,7 @@ func TestFSM_DecodeCommitmentStateTxs(t *testing.T) {
 func TestFSM_DecodeCommitEpochStateTx(t *testing.T) {
 	t.Parallel()
 
-	commitEpoch := createTestUptimeCounter(t, nil, 10)
+	commitEpoch := createTestCommitEpochInput(t, 0, nil, 10)
 	input, err := commitEpoch.EncodeAbi()
 	require.NoError(t, err)
 	require.NotNil(t, input)
@@ -1324,39 +1324,6 @@ func newBlockBuilderMock(stateBlock *types.FullBlock) *blockBuilderMock {
 	mBlockBuilder.On("Reset", mock.Anything).Return(error(nil)).Once()
 
 	return mBlockBuilder
-}
-
-func createTestUptimeCounter(t *testing.T, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
-	t.Helper()
-
-	if validatorSet == nil {
-		validatorSet = newTestValidators(5).getPublicIdentities()
-	}
-
-	uptime := &contractsapi.Uptime{EpochID: big.NewInt(0), TotalBlocks: big.NewInt(int64(epochSize))}
-	commitEpoch := &contractsapi.CommitEpochFunction{
-		ID: big.NewInt(0),
-		Epoch: &contractsapi.Epoch{
-			StartBlock: big.NewInt(1),
-			EndBlock:   big.NewInt(int64(epochSize + 1)),
-			EpochRoot:  types.Hash{},
-		},
-		Uptime: uptime,
-	}
-	indexToStart := 0
-
-	for i := uint64(0); i < epochSize; i++ {
-		validatorIndex := indexToStart
-		for j := 0; j < validatorSet.Len()-1; j++ {
-			validatorIndex = validatorIndex % validatorSet.Len()
-			uptime.AddValidatorUptime(validatorSet[validatorIndex].Address, 1)
-			validatorIndex++
-		}
-
-		indexToStart = (indexToStart + 1) % validatorSet.Len()
-	}
-
-	return commitEpoch
 }
 
 func createTestExtraObject(allAccounts,

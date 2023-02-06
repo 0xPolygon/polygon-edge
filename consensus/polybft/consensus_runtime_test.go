@@ -371,7 +371,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
+func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -427,8 +427,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, fsm.isEndOfEpoch)
-	assert.NotNil(t, fsm.uptimeCounter)
-	assert.NotEmpty(t, fsm.uptimeCounter)
+	assert.NotNil(t, fsm.commitEpochInput)
+	assert.NotEmpty(t, fsm.commitEpochInput)
 
 	blockchainMock.AssertExpectations(t)
 }
@@ -537,7 +537,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
+func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -580,12 +580,12 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	uptime, err := consensusRuntime.calculateUptime(lastBuiltBlock, consensusRuntime.epoch)
+	commitEpochInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock, consensusRuntime.epoch)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, uptime)
-	assert.Equal(t, uint64(epoch), uptime.ID.Uint64())
-	assert.Equal(t, uint64(epochStartBlock), uptime.Epoch.StartBlock.Uint64())
-	assert.Equal(t, uint64(epochEndBlock), uptime.Epoch.EndBlock.Uint64())
+	assert.NotEmpty(t, commitEpochInput)
+	assert.Equal(t, uint64(epoch), commitEpochInput.ID.Uint64())
+	assert.Equal(t, uint64(epochStartBlock), commitEpochInput.Epoch.StartBlock.Uint64())
+	assert.Equal(t, uint64(epochEndBlock), commitEpochInput.Epoch.EndBlock.Uint64())
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
