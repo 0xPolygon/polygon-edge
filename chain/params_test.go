@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -117,14 +119,11 @@ func TestParams_CalculateBurnContract(t *testing.T) {
 			}
 
 			got, err := p.CalculateBurnContract(tt.block)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("CalculateBurnContract() error = %v, wantErr %v", err, tt.wantErr)
-
-				return
-			}
-
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CalculateBurnContract() got = %v, want %v", got, tt.want)
+			if tt.wantErr {
+				require.Error(t, err, "CalculateBurnContract() error = %v, wantErr %v", err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, got, "CalculateBurnContract() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

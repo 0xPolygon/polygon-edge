@@ -123,8 +123,8 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		}
 	}
 
-	for _, premine := range p.burnContracts {
-		block, addr, err := parseBurnContractInfo(premine)
+	for _, burnContract := range p.burnContracts {
+		block, addr, err := parseBurnContractInfo(burnContract)
 		if err != nil {
 			return err
 		}
