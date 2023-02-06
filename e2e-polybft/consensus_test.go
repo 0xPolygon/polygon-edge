@@ -141,7 +141,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, srv.RegisterValidator(newValidatorSecrets, newValidatorBalanceRaw, newValidatorStakeRaw))
 
 	// wait for an end of epoch so that stake gets finalized
-	cluster.WaitForBlock(5, 1*time.Minute)
+	currentBlock, err := srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlock+5, 1*time.Minute)
 
 	// start new validator
 	cluster.InitTestServer(t, 6, true, false)
@@ -184,7 +186,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, newValidatorStake, newValidatorInfo.TotalStake)
 
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
-	cluster.WaitForBlock(20, 2*time.Minute)
+	currentBlock, err = srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlock+15, 2*time.Minute)
 
 	// query registered validator
 	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
