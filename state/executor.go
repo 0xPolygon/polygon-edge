@@ -404,38 +404,6 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	return nil
 }
 
-// checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
-// Basically, makes sure gas tip cap and gas fee cap are good.
-func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
-	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
-		return nil
-	}
-
-	if l := msg.GasFeeCap.BitLen(); l > 256 {
-		return fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", ErrFeeCapVeryHigh,
-			msg.From.String(), l)
-	}
-
-	if l := msg.GasTipCap.BitLen(); l > 256 {
-		return fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", ErrTipVeryHigh,
-			msg.From.String(), l)
-	}
-
-	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
-		return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ErrTipAboveFeeCap,
-			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
-	}
-
-	// This will panic if baseFee is nil, but basefee presence is verified
-	// as part of header validation.
-	if msg.GasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
-		return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), msg.GasFeeCap, t.ctx.BaseFee)
-	}
-
-	return nil
-}
-
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
 	nonce := t.state.GetNonce(msg.From)
 
@@ -946,6 +914,38 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	return cost, nil
 }
 
+// checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
+// Basically, makes sure gas tip cap and gas fee cap are good.
+func checkDynamicFees(msg *types.Transaction, baseFee *big.Int) error {
+	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
+		return nil
+	}
+
+	if l := msg.GasFeeCap.BitLen(); l > 256 {
+		return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
+			msg.From.String(), l)
+	}
+
+	if l := msg.GasTipCap.BitLen(); l > 256 {
+		return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
+			msg.From.String(), l)
+	}
+
+	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+		return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
+			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+	}
+
+	// This will panic if baseFee is nil, but basefee presence is verified
+	// as part of header validation.
+	if msg.GasFeeCap.Cmp(baseFee) < 0 {
+		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
+			msg.From.String(), msg.GasFeeCap, baseFee)
+	}
+
+	return nil
+}
+
 // checkAndProcessDynamicFeeTx - first check if this message satisfies all consensus rules before
 // applying the message. The rules include these clauses:
 // 1. the nonce of the message caller is correct
@@ -957,7 +957,7 @@ func checkAndProcessDynamicFeeTx(msg *types.Transaction, t *Transition) error {
 	}
 
 	// 2. make sure EIP-1559-related fields are correct
-	if err := t.checkDynamicFees(msg); err != nil {
+	if err := checkDynamicFees(msg, t.ctx.BaseFee); err != nil {
 		return NewTransitionApplicationError(err, true)
 	}
 
