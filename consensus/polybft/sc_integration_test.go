@@ -188,9 +188,11 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	t.Parallel()
 
 	// init validator sets
-	validatorSetSize := []int{5, 10, 50, 100, 150, 200}
+	// (cannot run test case with more than 100 validators at the moment,
+	// because active validator set is capped to 100 on smart contract side)
+	validatorSetSize := []int{5, 10, 50, 100}
 	// number of delegators per validator
-	delegPerVal := 100
+	delegatorsPerValidator := 100
 
 	intialBalance := uint64(5 * math.Pow(10, 18))  // 5 tokens
 	reward := uint64(math.Pow(10, 18))             // 1 token
@@ -200,15 +202,15 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 	// create all validator sets which will be used in test
 	for i, size := range validatorSetSize {
-		aliasses := make([]string, size, size)
+		aliases := make([]string, size, size)
 		vps := make([]uint64, size, size)
 
 		for j := 0; j < size; j++ {
-			aliasses[j] = "v" + strconv.Itoa(j)
+			aliases[j] = "v" + strconv.Itoa(j)
 			vps[j] = intialBalance
 		}
 
-		validatorSets[i] = newTestValidatorsWithAliases(aliasses, vps)
+		validatorSets[i] = newTestValidatorsWithAliases(aliases, vps)
 	}
 
 	// iterate through the validator set and do the test for each of them
@@ -243,17 +245,17 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			}
 
 			// create delegators
-			delegWallets := createRandomTestKeys(t, delegPerVal)
+			delegatorAccs := createRandomTestKeys(t, delegatorsPerValidator)
 
 			// add delegators to genesis data
-			for j := 0; j < delegPerVal; j++ {
-				delegator := delegWallets[j]
+			for j := 0; j < delegatorsPerValidator; j++ {
+				delegator := delegatorAccs[j]
 				alloc[types.Address(delegator.Address())] = &chain.GenesisAccount{
 					Balance: new(big.Int).SetUint64(intialBalance),
 				}
 			}
 
-			valid2deleg[validator.Address] = delegWallets
+			valid2deleg[validator.Address] = delegatorAccs
 		}
 
 		transition := newTestTransition(t, alloc)
@@ -296,7 +298,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		// call commit epoch
 		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
-		t.Logf("Number of validators %d when we add %d of delegators, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
+		require.NoError(t, result.Err)
+		t.Logf("Number of validators %d when we add %d of delegators, Gas used %+v\n", accSet.Len(), accSet.Len()*delegatorsPerValidator, result.GasUsed)
 
 		commitEpoch = createTestCommitEpochInput(t, 2, accSet, polyBFTConfig.EpochSize)
 		input, err = commitEpoch.EncodeAbi()
@@ -304,7 +307,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		// call commit epoch
 		result = transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
-		t.Logf("Number of validators %d, Number of delegator %d, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
+		require.NoError(t, result.Err)
+		t.Logf("Number of validators %d, Number of delegator %d, Gas used %+v\n", accSet.Len(), accSet.Len()*delegatorsPerValidator, result.GasUsed)
 	}
 }
 
