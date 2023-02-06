@@ -93,6 +93,17 @@ func TestParams_CalculateBurnContract(t *testing.T) {
 			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db2"),
 			wantErr: false,
 		},
+		{
+			name: "same block as key",
+			burnContract: map[string]string{
+				"5":  "0x8888f1f195afa192cfee860698584c030f4c9db2",
+				"10": "0x8888f1f195afa192cfee860698584c030f4c9db1",
+				"15": "0x8888f1f195afa192cfee860698584c030f4c9db0",
+			},
+			block:   10,
+			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db1"),
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
