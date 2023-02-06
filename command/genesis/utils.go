@@ -93,20 +93,20 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*big.Int, types.Address,
 	block := new(big.Int)
 	address := types.ZeroAddress
 
-	delimiterIdx := strings.Index(burnContractInfoRaw, ":")
-	if delimiterIdx == -1 {
+	// <block>:<address>
+	burnContractParts := strings.Split(burnContractInfoRaw, ":")
+	if len(burnContractParts) != 2 {
 		return nil, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>")
 	}
 
-	blockRaw := burnContractInfoRaw[:delimiterIdx]
+	blockRaw := burnContractParts[0]
 
-	// <block>:<address>
 	var err error
 	if block, err = types.ParseUint256orHex(&blockRaw); err != nil {
 		return nil, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
 	}
 
-	address = types.StringToAddress(burnContractInfoRaw[delimiterIdx+1:])
+	address = types.StringToAddress(burnContractParts[1])
 
 	return block, address, nil
 }
