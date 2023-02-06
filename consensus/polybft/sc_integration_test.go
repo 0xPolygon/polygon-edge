@@ -23,7 +23,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-func TestPerformExit(t *testing.T) {
+func TestIntegratoin_PerformExit(t *testing.T) {
 	t.Parallel()
 
 	//create validator set
@@ -184,7 +184,7 @@ func TestPerformExit(t *testing.T) {
 	require.Equal(t, lastCounter[31], uint8(1))
 }
 
-func TestCommitEpoch(t *testing.T) {
+func TestIntegration_CommitEpoch(t *testing.T) {
 	t.Parallel()
 
 	// init validator sets
@@ -282,7 +282,6 @@ func TestCommitEpoch(t *testing.T) {
 			for _, delegator := range delegators {
 				encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["delegate"].Encode(
 					[]interface{}{valAddress, false})
-
 				require.NoError(t, err)
 
 				result := transition.Call2(types.Address(delegator.Address()), contracts.ValidatorSetContract, encoded, new(big.Int).SetUint64(delegateAmount), 1000000000000)
@@ -297,7 +296,6 @@ func TestCommitEpoch(t *testing.T) {
 
 		// call commit epoch
 		result := transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
-
 		t.Logf("Number of validators %d when we add %d of delegators, Gas used %+v\n", accSet.Len(), accSet.Len()*delegPerVal, result.GasUsed)
 
 		commitEpoch = createTestCommitEpochInput(t, 2, accSet, polyBFTConfig.EpochSize)
