@@ -2,6 +2,7 @@ package chain
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
@@ -28,27 +29,31 @@ type Params struct {
 
 // CalculateBurnContract calculates burn contract address for the given block number
 func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
-	keys := make([]string, 0, len(p.BurnContract))
+	blocks := make([]uint64, 0, len(p.BurnContract))
 	for k := range p.BurnContract {
-		keys = append(keys, k)
+		startBlock, err := strconv.ParseUint(k, 10, 64)
+		if err != nil {
+			return types.ZeroAddress, fmt.Errorf("failed to parse %s block: %w", k, err)
+		}
+
+		blocks = append(blocks, startBlock)
 	}
 
-	if len(keys) == 0 {
+	if len(blocks) == 0 {
 		return types.ZeroAddress, ErrBurnContractAddressMissing
 	}
 
-	sort.Strings(keys)
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i] < blocks[j]
+	})
 
-	for i := 0; i < len(keys)-1; i++ {
-		valUint, _ := strconv.ParseUint(keys[i], 10, 64)
-		valUintNext, _ := strconv.ParseUint(keys[i+1], 10, 64)
-
-		if block > valUint && block < valUintNext {
-			return types.StringToAddress(p.BurnContract[keys[i]]), nil
+	for i := 0; i < len(blocks)-1; i++ {
+		if block >= blocks[i] && block < blocks[i+1] {
+			return types.StringToAddress(p.BurnContract[fmt.Sprintf("%d", blocks[i])]), nil
 		}
 	}
 
-	return types.StringToAddress(p.BurnContract[keys[len(keys)-1]]), nil
+	return types.StringToAddress(p.BurnContract[fmt.Sprintf("%d", blocks[len(blocks)-1])]), nil
 }
 
 func (p *Params) GetEngine() string {
