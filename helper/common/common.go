@@ -41,6 +41,24 @@ func Max(a, b uint64) uint64 {
 	return b
 }
 
+// BigMax returns the largest of x or y.
+func BigMax(x, y *big.Int) *big.Int {
+	if x.Cmp(y) < 0 {
+		return y
+	}
+
+	return x
+}
+
+// BigMin returns the smallest of x or y.
+func BigMin(x, y *big.Int) *big.Int {
+	if x.Cmp(y) > 0 {
+		return y
+	}
+
+	return x
+}
+
 func ConvertUnmarshalledInt(x interface{}) (int64, error) {
 	switch tx := x.(type) {
 	case float64:
@@ -59,12 +77,6 @@ func ConvertUnmarshalledInt(x interface{}) (int64, error) {
 
 func roundFloat(num float64) int64 {
 	return int64(num + math.Copysign(0.5, num))
-}
-
-func ToFixedFloat(num float64, precision int) float64 {
-	output := math.Pow(10, float64(precision))
-
-	return float64(roundFloat(num*output)) / output
 }
 
 // SetupDataDir sets up the data directory and the corresponding sub-directories
