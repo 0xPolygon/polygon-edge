@@ -114,7 +114,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	if f.config.IsBridgeEnabled() {
 		for _, tx := range f.stateTransactions() {
 			if err := f.blockBuilder.WriteTx(tx); err != nil {
-				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
+				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
 			}
 		}
 	}
@@ -138,17 +138,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 	}
-
-	if f.config.IsBridgeEnabled() {
-		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.WriteTx(tx); err != nil {
-				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
-			}
-		}
-	}
-
-	// fill the block with transactions
-	f.blockBuilder.Fill()
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
 	if err != nil {

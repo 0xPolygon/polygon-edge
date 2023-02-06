@@ -458,19 +458,20 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	endCh := make(chan struct{})
-	defer close(endCh)
+	endCh, waitCh := make(chan struct{}), make(chan struct{})
 
 	// delegate tokens to validator in the loop to be sure that the stake of validator will be changed at end of epoch block
 	go func() {
 		for {
 			delegationAmount := uint64(1e18)
 
-			err := cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
+			cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
 			require.NoError(t, err)
 
 			select {
 			case <-endCh:
+				close(waitCh)
+
 				return
 			case <-time.After(blockTime / 2):
 			}
@@ -478,4 +479,7 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 	}()
 
 	require.NoError(t, cluster.WaitForBlock(6, 30*time.Second))
+
+	close(endCh)
+	<-waitCh
 }
