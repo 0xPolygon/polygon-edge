@@ -101,7 +101,7 @@ func TestParams_CalculateBurnContract(t *testing.T) {
 				"15": "0x8888f1f195afa192cfee860698584c030f4c9db0",
 			},
 			block:   10,
-			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db1"),
+			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db2"),
 			wantErr: false,
 		},
 	}
