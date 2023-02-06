@@ -27,6 +27,7 @@ jobs:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       RPC_URL: "https://rpc.us-east-1.deph.testing.psdk.io/"
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
     with:
       runner: devnet
       environment: devnet

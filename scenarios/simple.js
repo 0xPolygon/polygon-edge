@@ -8,10 +8,7 @@ if (rpc_url == undefined) {
 
 const client = new eth.Client({
     url: rpc_url,
-    // You can also specify a private key here
-    // privateKey: 'private key of your account',
-    // or a mnemonic
-    // mnemonic: 'my mnemonic'
+    mnemonic: __ENV.PANDORAS_NEMONIC
 });
 
 // You can use an existing premined account

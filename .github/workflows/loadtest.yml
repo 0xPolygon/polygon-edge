@@ -43,6 +43,9 @@
           required: true
         RPC_URL:
           required: true
+        PANDORAS_MNEMONIC:
+          required: true
+
   
   jobs:
     run_k6:
@@ -72,3 +75,4 @@
             K6_STATSD_ENABLE_TAGS: true
             RPC_URL: ${{ secrets.RPC_URL }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+            PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
