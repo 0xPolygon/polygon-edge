@@ -342,6 +342,13 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
 	}
 
+	// add burn contracts
+	if len(t.Config.BurnContracts) != 0 {
+		for block, addr := range t.Config.BurnContracts {
+			args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
+		}
+	}
+
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
 

@@ -77,6 +77,7 @@ type TestClusterConfig struct {
 	LogsDir           string
 	TmpDir            string
 	BlockGasLimit     uint64
+	BurnContracts     map[uint64]types.Address
 	ContractsDir      string
 	ValidatorPrefix   string
 	Binary            string
@@ -217,6 +218,16 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
+func WithBurnContract(block uint64, address types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		if h.BurnContracts == nil {
+			h.BurnContracts = map[uint64]types.Address{}
+		}
+
+		h.BurnContracts[block] = address
+	}
+}
+
 func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.PropertyBaseTests = propertyBaseTests
@@ -335,6 +346,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			rootchainIP, err := helper.ReadRootchainIP()
 			require.NoError(t, err)
 			args = append(args, "--bridge-json-rpc", rootchainIP)
+		}
+
+		if len(cluster.Config.BurnContracts) != 0 {
+			for block, addr := range cluster.Config.BurnContracts {
+				args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
+			}
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
