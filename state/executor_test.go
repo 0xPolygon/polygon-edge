@@ -28,6 +28,7 @@ func Test_checkDynamicFees(t *testing.T) {
 			},
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				assert.NoError(t, err, i)
+
 				return false
 			},
 		},
@@ -40,6 +41,7 @@ func Test_checkDynamicFees(t *testing.T) {
 			},
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				assert.NoError(t, err, i)
+
 				return false
 			},
 		},
@@ -54,6 +56,7 @@ func Test_checkDynamicFees(t *testing.T) {
 				expectedError := fmt.Sprintf("max fee per gas less than block base fee: "+
 					"address %s, GasFeeCap: 10, BaseFee: 20", types.ZeroAddress)
 				assert.EqualError(t, err, expectedError, i)
+
 				return true
 			},
 		},
@@ -68,6 +71,7 @@ func Test_checkDynamicFees(t *testing.T) {
 				expectedError := fmt.Sprintf("max priority fee per gas higher than max fee per gas: "+
 					"address %s, GasTipCap: 15, GasFeeCap: 10", types.ZeroAddress)
 				assert.EqualError(t, err, expectedError, i)
+
 				return true
 			},
 		},
