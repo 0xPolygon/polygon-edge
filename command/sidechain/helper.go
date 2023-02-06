@@ -90,7 +90,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 // GetDelegatorReward queries delegator reward for given validator and delegator addresses
 func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address,
 	txRelayer txrelayer.TxRelayer) (*big.Int, error) {
-	input, err := contractsapi.ChildValidatorSet.Abi.Methods["getValidatorReward"].Encode(
+	input, err := contractsapi.ChildValidatorSet.Abi.Methods["getDelegatorReward"].Encode(
 		[]interface{}{validatorAddr, delegatorAddr})
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode input parameters for getDelegatorReward fn: %w", err)
