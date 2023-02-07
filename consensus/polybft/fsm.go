@@ -109,7 +109,22 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		if err := f.blockBuilder.WriteTx(tx); err != nil {
 			return nil, fmt.Errorf("failed to apply commit epoch transaction: %w", err)
 		}
+	}
 
+	if f.config.IsBridgeEnabled() {
+		for _, tx := range f.stateTransactions() {
+			if err := f.blockBuilder.WriteTx(tx); err != nil {
+				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
+			}
+		}
+	}
+
+	// fill the block with transactions
+	f.blockBuilder.Fill()
+
+	// update extra validators if needed, but only after all transactions has been written
+	// each transaction can update state and therefore change validators stake for example
+	if f.isEndOfEpoch {
 		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
 		if err != nil {
 			return nil, err
@@ -123,17 +138,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 	}
-
-	if f.config.IsBridgeEnabled() {
-		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.WriteTx(tx); err != nil {
-				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
-			}
-		}
-	}
-
-	// fill the block with transactions
-	f.blockBuilder.Fill()
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
 	if err != nil {
