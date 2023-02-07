@@ -141,10 +141,26 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, srv.RegisterValidator(newValidatorSecrets, newValidatorBalanceRaw, newValidatorStakeRaw))
 
 	// wait for an end of epoch so that stake gets finalized
-	cluster.WaitForBlock(5, 1*time.Minute)
+	currentBlock, err := srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlock+5, 1*time.Minute)
 
 	// start new validator
 	cluster.InitTestServer(t, 6, true, false)
+
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
+	require.NoError(t, err)
+
+	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
+	validators := polybft.AccountSet{}
+	// assert that new validator is among validator set
+	require.NoError(t, cluster.WaitUntil(20*time.Second, func() bool {
+		// query validators
+		validators, err = systemState.GetValidatorSet()
+		require.NoError(t, err)
+
+		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+	}))
 
 	// assert that validators hash is correct
 	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
@@ -155,21 +171,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	extra, err := polybft.GetIbftExtra(block.ExtraData)
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
-
-	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
-	require.NoError(t, err)
-
-	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
-
-	validators := polybft.AccountSet{}
-	// assert that new validator is among validator set
-	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
-		// query validators
-		validators, err = systemState.GetValidatorSet()
-		require.NoError(t, err)
-
-		return validators.ContainsAddress((types.Address(newValidatorAddr)))
-	}))
 
 	// assert that correct validators hash gets submitted
 	validatorsHash, err := validators.Hash()
@@ -185,7 +186,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, newValidatorStake, newValidatorInfo.TotalStake)
 
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
-	cluster.WaitForBlock(20, 2*time.Minute)
+	currentBlock, err = srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlock+15, 2*time.Minute)
 
 	// query registered validator
 	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)

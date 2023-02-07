@@ -149,11 +149,7 @@ func (i *Extra) ValidateBasic(parentExtra *Extra) error {
 
 // Validate contains extra data validation logic
 func (i *Extra) Validate(parentExtra *Extra, currentValidators AccountSet, nextValidators AccountSet) error {
-	if err := i.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators); err != nil {
-		return err
-	}
-
-	return nil
+	return i.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
