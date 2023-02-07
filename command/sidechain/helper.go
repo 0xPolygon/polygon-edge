@@ -44,15 +44,15 @@ func GetAccountFromDir(dir string) (*wallet.Account, error) {
 
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address
 func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	method := contractsapi.ChildValidatorSet.Abi.GetMethod("getValidator")
+	getValidatorMethod := contractsapi.ChildValidatorSet.Abi.GetMethod("getValidator")
 
-	encode, err := method.Encode([]interface{}{validatorAddr})
+	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := txRelayer.Call(
-		ethgo.Address(contracts.SystemCaller), ethgo.Address(contracts.ValidatorSetContract), encode)
+	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
+		ethgo.Address(contracts.ValidatorSetContract), encode)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 		return nil, fmt.Errorf("unable to decode hex response, %w", err)
 	}
 
-	decoded, err := method.Outputs.Decode(byteResponse)
+	decoded, err := getValidatorMethod.Outputs.Decode(byteResponse)
 	if err != nil {
 		return nil, err
 	}

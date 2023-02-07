@@ -29,12 +29,14 @@ func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
+// SignWithDomain signs message with bls and use bls.DomainCheckpointManager domain for mapping message to G1
 func (k *Key) Sign(hash []byte) ([]byte, error) {
-	return k.SignWithDomain(hash, bls.DomainValidatorSet)
+	return k.SignWithDomain(hash, bls.DomainCheckpointManager)
 }
 
-func (k *Key) SignWithDomain(hash, domain []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(hash, domain)
+// SignWithDomain signs message with bls and use provided domain for mapping message to G1
+func (k *Key) SignWithDomain(msg, domain []byte) ([]byte, error) {
+	s, err := k.raw.Bls.Sign(msg, domain)
 	if err != nil {
 		return nil, err
 	}
