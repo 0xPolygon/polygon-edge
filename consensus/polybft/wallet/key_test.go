@@ -5,7 +5,6 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +26,7 @@ func Test_RecoverAddressFromSignature(t *testing.T) {
 		payload, err := msgNoSig.PayloadNoSig()
 		require.NoError(t, err)
 
-		address, err := RecoverAddressFromSignature(msg.Signature, crypto.Keccak256(payload))
+		address, err := RecoverAddressFromSignature(msg.Signature, payload)
 		require.NoError(t, err)
 		assert.Equal(t, key.Address().Bytes(), address.Bytes())
 	}
