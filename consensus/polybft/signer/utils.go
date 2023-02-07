@@ -33,7 +33,7 @@ func CreateRandomBlsKeys(total int) ([]*PrivateKey, error) {
 
 // MarshalMessageToBigInt marshalls message into two big ints
 // first we must convert message bytes to point and than for each coordinate we create big int
-func MarshalMessageToBigInt(message []byte) ([2]*big.Int, error) {
+func MarshalMessageToBigInt(message, domain []byte) ([2]*big.Int, error) {
 	point, err := hashToPoint(message, domain)
 	if err != nil {
 		return [2]*big.Int{}, err

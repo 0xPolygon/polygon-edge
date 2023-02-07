@@ -398,7 +398,7 @@ func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash
 		return err
 	}
 
-	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
+	if !aggs.VerifyAggregated(blsPublicKeys, hash[:], bls.DomainCheckpointManager) {
 		return fmt.Errorf("could not verify aggregated signature")
 	}
 

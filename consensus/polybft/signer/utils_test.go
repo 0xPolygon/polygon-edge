@@ -16,15 +16,15 @@ func Test_SingleSign(t *testing.T) {
 	require.NoError(t, err)
 
 	// Sign valid message
-	signature, err := blsKey.Sign(validTestMsg)
+	signature, err := blsKey.Sign(validTestMsg, DomainValidatorSet)
 	require.NoError(t, err)
 
-	isOk := signature.Verify(blsKey.PublicKey(), validTestMsg)
+	isOk := signature.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet)
 	assert.True(t, isOk)
 
 	// Verify if invalid message is signed with correct private key. Only use public key for the verification
 	// this should fail => isOk = false
-	isOk = signature.Verify(blsKey.PublicKey(), invalidTestMsg)
+	isOk = signature.Verify(blsKey.PublicKey(), invalidTestMsg, DomainValidatorSet)
 	assert.False(t, isOk)
 }
 
@@ -48,7 +48,7 @@ func Test_AggregatedSign(t *testing.T) {
 
 	// test all signatures at once
 	for i := 0; i < len(keys); i++ {
-		sign, err := keys[i].Sign(validTestMsg)
+		sign, err := keys[i].Sign(validTestMsg, DomainValidatorSet)
 		require.NoError(t, err)
 
 		signatures = append(signatures, sign)
@@ -56,10 +56,13 @@ func Test_AggregatedSign(t *testing.T) {
 		// verify correctness of AggregateSignature
 		aggSig := signatures.Aggregate()
 
-		isOk = aggSig.VerifyAggregated(pubKeys[:i+1], validTestMsg)
+		isOk = aggSig.VerifyAggregated(pubKeys[:i+1], validTestMsg, DomainValidatorSet)
 		assert.True(t, isOk)
 
-		isOk = aggSig.VerifyAggregated(pubKeys[:i+1], invalidTestMsg)
+		isOk = aggSig.VerifyAggregated(pubKeys[:i+1], invalidTestMsg, DomainValidatorSet)
+		assert.False(t, isOk)
+
+		isOk = aggSig.VerifyAggregated(pubKeys[:i+1], validTestMsg, DomainCheckpointManager)
 		assert.False(t, isOk)
 	}
 }

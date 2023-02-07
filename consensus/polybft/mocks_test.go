@@ -429,7 +429,7 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 }
 
 func (v *testValidator) mustSign(hash []byte) *bls.Signature {
-	signature, err := v.account.Bls.Sign(hash)
+	signature, err := v.account.Bls.Sign(hash, bls.DomainCheckpointManager)
 	if err != nil {
 		panic(fmt.Sprintf("BUG: failed to sign: %v", err))
 	}

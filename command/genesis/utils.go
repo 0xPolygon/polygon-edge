@@ -13,6 +13,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -142,7 +143,8 @@ func ReadValidatorsByPrefix(dir, prefix string, chainID int64) ([]*polybft.Valid
 			return nil, err
 		}
 
-		signature, err := polybft.MakeKoskSignature(account.Bls, types.Address(account.Ecdsa.Address()), chainID)
+		signature, err := polybft.MakeKoskSignature(
+			account.Bls, types.Address(account.Ecdsa.Address()), chainID, bls.DomainValidatorSet)
 		if err != nil {
 			return nil, err
 		}

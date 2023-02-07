@@ -276,7 +276,7 @@ func Test_MakeKoskSignature(t *testing.T) {
 
 	address := types.BytesToAddress((pk.PublicKey().Marshal())[:20])
 
-	signature, err := MakeKoskSignature(pk, address, 10)
+	signature, err := MakeKoskSignature(pk, address, 10, bls.DomainValidatorSet)
 	require.NoError(t, err)
 
 	signatureBytes, err := signature.Marshal()
@@ -284,7 +284,7 @@ func Test_MakeKoskSignature(t *testing.T) {
 
 	assert.Equal(t, expected, hex.EncodeToString(signatureBytes))
 
-	signature, err = MakeKoskSignature(pk, address, 100)
+	signature, err = MakeKoskSignature(pk, address, 100, bls.DomainValidatorSet)
 	require.NoError(t, err)
 
 	signatureBytes, err = signature.Marshal()

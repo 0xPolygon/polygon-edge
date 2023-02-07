@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -28,8 +29,12 @@ func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-func (k *Key) Sign(b []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(b)
+func (k *Key) Sign(hash []byte) ([]byte, error) {
+	return k.SignWithDomain(hash, bls.DomainValidatorSet)
+}
+
+func (k *Key) SignWithDomain(hash, domain []byte) ([]byte, error) {
+	s, err := k.raw.Bls.Sign(hash, domain)
 	if err != nil {
 		return nil, err
 	}

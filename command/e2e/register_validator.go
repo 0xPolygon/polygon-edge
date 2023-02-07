@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -488,7 +489,8 @@ func registerValidator(sender *txnSender, account *wallet.Account, chainID int64
 		return &asyncTxnImpl{err: errors.New("failed to create register ABI function")}
 	}
 
-	signature, err := polybft.MakeKoskSignature(account.Bls, types.Address(sender.account.Ecdsa.Address()), chainID)
+	signature, err := polybft.MakeKoskSignature(
+		account.Bls, types.Address(sender.account.Ecdsa.Address()), chainID, bls.DomainValidatorSet)
 	if err != nil {
 		return &asyncTxnImpl{err: err}
 	}

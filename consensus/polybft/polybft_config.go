@@ -240,7 +240,8 @@ func (m *Manifest) Save(manifestPath string) error {
 }
 
 // MakeKoskSignature creates KOSK signature which prevents rogue attack
-func MakeKoskSignature(privateKey *bls.PrivateKey, address types.Address, chainID int64) (*bls.Signature, error) {
+func MakeKoskSignature(
+	privateKey *bls.PrivateKey, address types.Address, chainID int64, domain []byte) (*bls.Signature, error) {
 	message, err := abi.Encode(
 		[]interface{}{address, big.NewInt(chainID)},
 		abi.MustNewType("tuple(address, uint256)"))
@@ -249,5 +250,5 @@ func MakeKoskSignature(privateKey *bls.PrivateKey, address types.Address, chainI
 	}
 
 	// abi.Encode adds 12 zero bytes before actual address bytes
-	return privateKey.Sign(message[12:])
+	return privateKey.Sign(message[12:], domain)
 }
