@@ -290,7 +290,6 @@ func (s *SubmitFunction) DecodeAbi(buf []byte) error {
 type InitializeCheckpointManagerFunction struct {
 	NewBls          types.Address `abi:"newBls"`
 	NewBn256G2      types.Address `abi:"newBn256G2"`
-	NewDomain       types.Hash    `abi:"newDomain"`
 	ChainID_        *big.Int      `abi:"chainId_"`
 	NewValidatorSet []*Validator  `abi:"newValidatorSet"`
 }
