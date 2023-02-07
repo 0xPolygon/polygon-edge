@@ -135,7 +135,7 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 
 		r.logger.Info("Commit", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
-		for i := startID.Int64(); i <= endID.Int64(); i++ {
+		for i := startID.Uint64(); i <= endID.Uint64(); i++ {
 			// query the state sync proof
 			stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
 			if err != nil {

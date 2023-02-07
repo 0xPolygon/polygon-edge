@@ -2,17 +2,17 @@ package evm
 
 import "github.com/0xPolygon/polygon-edge/helper/common"
 
-const bitmapSize = uint(8)
+const bitmapSize = uint64(8)
 
 type bitmap struct {
 	buf []byte
 }
 
-func (b *bitmap) isSet(i uint) bool {
+func (b *bitmap) isSet(i uint64) bool {
 	return b.buf[i/bitmapSize]&(1<<(i%bitmapSize)) != 0
 }
 
-func (b *bitmap) set(i uint) {
+func (b *bitmap) set(i uint64) {
 	b.buf[i/bitmapSize] |= 1 << (i % bitmapSize)
 }
 
@@ -25,15 +25,15 @@ func (b *bitmap) reset() {
 }
 
 func (b *bitmap) setCode(code []byte) {
-	codeSize := uint(len(code))
+	codeSize := uint64(len(code))
 	b.buf = common.ExtendByteSlice(b.buf, int(codeSize/bitmapSize+1))
 
-	for i := uint(0); i < codeSize; {
+	for i := uint64(0); i < codeSize; {
 		c := code[i]
 
 		if isPushOp(c) {
 			// push op
-			i += uint(c - 0x60 + 2)
+			i += uint64(c - 0x60 + 2)
 		} else {
 			if c == 0x5B {
 				// jumpdest
