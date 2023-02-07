@@ -51,7 +51,7 @@ type KeccakState interface {
 }
 
 // ValidateSignatureValues checks if the signature values are correct
-func ValidateSignatureValues(v byte, r, s *big.Int, isHomestead bool) bool {
+func ValidateSignatureValues(v, r, s *big.Int, isHomestead bool) bool {
 	// r & s must not be nil
 	if r == nil || s == nil {
 		return false
@@ -63,7 +63,7 @@ func ValidateSignatureValues(v byte, r, s *big.Int, isHomestead bool) bool {
 	}
 
 	// v must be 0 or 1
-	if v > 1 {
+	if v.Cmp(big.NewInt(1)) == 1 || v.Cmp(big.NewInt(0)) == -1 {
 		return false
 	}
 
