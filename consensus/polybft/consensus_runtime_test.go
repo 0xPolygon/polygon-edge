@@ -608,112 +608,131 @@ func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T
 		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
 }
 
-func TestConsensusRuntime_IsValidValidator(t *testing.T) {
+func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
+	t.Parallel()
+
+	setupFn := func(t *testing.T) (*consensusRuntime, *testValidators) {
+		t.Helper()
+
+		validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+		epoch := &epochMetadata{
+			Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
+		}
+		runtime := &consensusRuntime{
+			epoch:  epoch,
+			logger: hclog.NewNullLogger(),
+			fsm:    &fsm{validators: NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
+		}
+
+		return runtime, validatorAccounts
+	}
+
+	cases := []struct {
+		name          string
+		signerAlias   string
+		senderAlias   string
+		isValidSender bool
+	}{
+		{
+			name:          "Valid sender",
+			signerAlias:   "A",
+			senderAlias:   "A",
+			isValidSender: true,
+		},
+		{
+			name:          "Sender not amongst current validators",
+			signerAlias:   "F",
+			senderAlias:   "F",
+			isValidSender: false,
+		},
+		{
+			name:          "Sender and signer accounts mismatch",
+			signerAlias:   "A",
+			senderAlias:   "B",
+			isValidSender: false,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			runtime, validatorAccounts := setupFn(t)
+			signer := validatorAccounts.getValidator(c.signerAlias)
+			sender := validatorAccounts.getValidator(c.senderAlias)
+			msg, err := signer.Key().SignEcdsaMessage(&proto.Message{From: sender.Address().Bytes()})
+
+			require.NoError(t, err)
+			require.Equal(t, c.isValidSender, runtime.IsValidValidator(msg))
+		})
+	}
+}
+
+func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 	t.Parallel()
 
 	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
-
-	extra := &Extra{}
-	block := &types.Header{
-		Number:    0,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
-	}
-
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-
-	state := newTestState(t)
-	snapshot := NewProposerSnapshot(0, nil)
-	config := &runtimeConfig{
-		Key:           validatorAccounts.getValidator("B").Key(),
-		blockchain:    blockchainMock,
-		PolyBFTConfig: &PolyBFTConfig{SprintSize: 5},
+	epoch := &epochMetadata{
+		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 	}
 	runtime := &consensusRuntime{
-		state:          state,
-		config:         config,
-		lastBuiltBlock: block,
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: validatorAccounts.getPublicIdentities()[:len(validatorAccounts.validators)-1],
-		},
-		logger:             hclog.NewNullLogger(),
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		checkpointManager:  &dummyCheckpointManager{},
+		epoch:  epoch,
+		logger: hclog.NewNullLogger(),
+		fsm:    &fsm{validators: NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
 	}
 
-	require.NoError(t, runtime.FSM())
-
+	// provide invalid signature
 	sender := validatorAccounts.getValidator("A")
-	msg, err := sender.Key().SignEcdsaMessage(&proto.Message{
-		From: sender.Address().Bytes(),
-	})
-
-	require.NoError(t, err)
-
-	assert.True(t, runtime.IsValidValidator(msg))
-	blockchainMock.AssertExpectations(t)
-
-	// sender not in current epoch validators
-	sender = validatorAccounts.getValidator("F")
-	msg, err = sender.Key().SignEcdsaMessage(&proto.Message{
-		From: sender.Address().Bytes(),
-	})
-	require.NoError(t, err)
-
-	assert.False(t, runtime.IsValidValidator(msg))
-	blockchainMock.AssertExpectations(t)
-
-	// signature does not come from sender
-	sender = validatorAccounts.getValidator("A")
-	msg, err = sender.Key().SignEcdsaMessage(&proto.Message{
-		From: validatorAccounts.getValidator("B").Address().Bytes(),
-	})
-
-	require.NoError(t, err)
-
-	assert.False(t, runtime.IsValidValidator(msg))
-	blockchainMock.AssertExpectations(t)
-
-	// invalid signature
-	sender = validatorAccounts.getValidator("A")
-	msg = &proto.Message{
+	msg := &proto.Message{
 		From:      sender.Address().Bytes(),
-		Signature: []byte{1, 2},
+		Signature: []byte{1, 2, 3, 4, 5},
 	}
+	require.False(t, runtime.IsValidValidator(msg))
+}
 
-	assert.False(t, runtime.IsValidValidator(msg))
-	blockchainMock.AssertExpectations(t)
+func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
+	t.Parallel()
 
-	// modified message after signing
+	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	epoch := &epochMetadata{
+		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
+	}
+	runtime := &consensusRuntime{
+		epoch:  epoch,
+		logger: hclog.NewNullLogger(),
+		fsm:    &fsm{validators: NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
+	}
+	sender := validatorAccounts.getValidator("A")
 	proposalHash := []byte{2, 4, 6, 8, 10}
-	signature, err := sender.Key().Sign(proposalHash)
-	assert.NoError(t, err)
+	proposalSignature, err := sender.Key().Sign(proposalHash)
+	require.NoError(t, err)
 
-	msg = &proto.Message{
+	msg := &proto.Message{
 		View: &proto.View{},
 		From: sender.Address().Bytes(),
 		Type: proto.MessageType_COMMIT,
 		Payload: &proto.Message_CommitData{
 			CommitData: &proto.CommitMessage{
 				ProposalHash:  proposalHash,
-				CommittedSeal: signature,
+				CommittedSeal: proposalSignature,
 			},
 		},
 	}
-	// sign the message
+	// sign the message itself
 	msg, err = sender.Key().SignEcdsaMessage(msg)
 	assert.NoError(t, err)
 	// signature verification works
 	assert.True(t, runtime.IsValidValidator(msg))
 
-	// modified message
+	// modify message without signing it again
 	msg.Payload = &proto.Message_CommitData{
 		CommitData: &proto.CommitMessage{
 			ProposalHash:  []byte{1, 3, 5, 7, 9}, // modification
-			CommittedSeal: signature,
+			CommittedSeal: proposalSignature,
 		},
 	}
+	// signature isn't valid, because message was tampered
 	assert.False(t, runtime.IsValidValidator(msg))
 }
 
