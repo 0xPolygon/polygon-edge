@@ -21,7 +21,7 @@ func Test_RecoverAddressFromSignature(t *testing.T) {
 			Payload: &proto.Message_CommitData{},
 		}
 
-		msg, err := key.SignEcdsaMessage(msgNoSig)
+		msg, err := key.SignIBFTMessage(msgNoSig)
 		require.NoError(t, err)
 
 		payload, err := msgNoSig.PayloadNoSig()

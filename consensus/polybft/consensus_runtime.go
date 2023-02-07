@@ -814,7 +814,7 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		},
 	}
 
-	message, err := c.config.Key.SignEcdsaMessage(&msg)
+	message, err := c.config.Key.SignIBFTMessage(&msg)
 	if err != nil {
 		c.logger.Error("Cannot sign message", "error", err)
 
@@ -837,7 +837,7 @@ func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.
 		},
 	}
 
-	message, err := c.config.Key.SignEcdsaMessage(&msg)
+	message, err := c.config.Key.SignIBFTMessage(&msg)
 	if err != nil {
 		c.logger.Error("Cannot sign message.", "error", err)
 
@@ -868,7 +868,7 @@ func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.V
 		},
 	}
 
-	message, err := c.config.Key.SignEcdsaMessage(&msg)
+	message, err := c.config.Key.SignIBFTMessage(&msg)
 	if err != nil {
 		c.logger.Error("Cannot sign message", "Error", err)
 
@@ -895,7 +895,7 @@ func (c *consensusRuntime) BuildRoundChangeMessage(
 			}},
 	}
 
-	signedMsg, err := c.config.Key.SignEcdsaMessage(&msg)
+	signedMsg, err := c.config.Key.SignIBFTMessage(&msg)
 	if err != nil {
 		c.logger.Error("Cannot sign message", "Error", err)
 

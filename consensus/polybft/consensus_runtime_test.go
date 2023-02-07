@@ -661,7 +661,7 @@ func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 			runtime, validatorAccounts := setupFn(t)
 			signer := validatorAccounts.getValidator(c.signerAlias)
 			sender := validatorAccounts.getValidator(c.senderAlias)
-			msg, err := signer.Key().SignEcdsaMessage(&proto.Message{From: sender.Address().Bytes()})
+			msg, err := signer.Key().SignIBFTMessage(&proto.Message{From: sender.Address().Bytes()})
 
 			require.NoError(t, err)
 			require.Equal(t, c.isValidSender, runtime.IsValidValidator(msg))
@@ -720,7 +720,7 @@ func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 		},
 	}
 	// sign the message itself
-	msg, err = sender.Key().SignEcdsaMessage(msg)
+	msg, err = sender.Key().SignIBFTMessage(msg)
 	assert.NoError(t, err)
 	// signature verification works
 	assert.True(t, runtime.IsValidValidator(msg))
@@ -1000,7 +1000,7 @@ func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {
 		}},
 	}
 
-	signedMsg, err := key.SignEcdsaMessage(&expected)
+	signedMsg, err := key.SignIBFTMessage(&expected)
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildRoundChangeMessage(proposal, certificate, view))
@@ -1033,7 +1033,7 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 		},
 	}
 
-	signedMsg, err := key.SignEcdsaMessage(&expected)
+	signedMsg, err := key.SignIBFTMessage(&expected)
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildCommitMessage(proposalHash, view))
@@ -1078,7 +1078,7 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 		},
 	}
 
-	signedMsg, err := key.SignEcdsaMessage(&expected)
+	signedMsg, err := key.SignIBFTMessage(&expected)
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
