@@ -80,7 +80,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Params: &chain.Params{
-			ChainID: int(p.chainID),
+			ChainID: int64(p.chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
