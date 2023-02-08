@@ -60,6 +60,7 @@ export function sendSlackMessage(data) {
     },
   };
   const slackRes = http.post(url, payload, params);
+  console.log(slackRes.body);
 }
 
 export function handleSummary(data) {
