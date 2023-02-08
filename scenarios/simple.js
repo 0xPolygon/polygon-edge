@@ -3,12 +3,12 @@ import './slack.js';
 
 let rpc_url = __ENV.RCP_URL
 if (rpc_url == undefined) {
-  rpc_url = "https://rpc.us-east-1.deph.testing.psdk.io/"
+  rpc_url = "http://localhost:10002"
 }
 
 const client = new eth.Client({
     url: rpc_url,
-    mnemonic: __ENV.PANDORAS_NEMONIC
+    mnemonic: __ENV.LOADTEST_MNEMONIC
 });
 
 // You can use an existing premined account
