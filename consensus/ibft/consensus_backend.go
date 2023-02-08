@@ -2,8 +2,11 @@ package ibft
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
@@ -184,7 +187,21 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	_, _, root := transition.Commit()
+	_, trace, root := transition.Commit()
+
+	// write the trace
+	{
+		raw, err := json.Marshal(trace)
+		if err != nil {
+			panic(err)
+		}
+
+		if err := ioutil.WriteFile(
+			filepath.Join(i.config.Path, fmt.Sprintf("trace_%d", header.Number))+".json", raw, 0600); err != nil {
+			panic(err)
+		}
+	}
+
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 
