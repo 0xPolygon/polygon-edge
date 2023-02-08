@@ -74,7 +74,9 @@ func (s *sidecar) run() {
 			panic(err)
 		}
 
-		fmt.Println(trace.Trace)
+		fmt.Println("-----")
+		fmt.Println(trace.AccountTrace)
+		fmt.Println(trace.StorageTrace)
 
 		select {
 		case <-time.After(500 * time.Millisecond):

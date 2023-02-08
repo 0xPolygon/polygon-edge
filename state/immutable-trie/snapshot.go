@@ -10,12 +10,28 @@ import (
 )
 
 type Snapshot struct {
-	state  *State
-	trie   *Trie
-	tracer *tracer
+	state *State
+	trie  *Trie
+
+	// tracers is the list of tracers executed, one for each trie
+	tracers []*tracer
+
+	// trace is the object that holds the traces
+	trace *types.Trace
 }
 
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+
+func (s *Snapshot) createTracer(isAccountTrie bool) *tracer {
+	if s.tracers == nil {
+		s.tracers = []*tracer{}
+	}
+
+	tr := &tracer{isAccountTrie: isAccountTrie, trace: s.trace}
+	s.tracers = append(s.tracers, tr)
+
+	return tr
+}
 
 func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.Hash) types.Hash {
 	var (
@@ -32,7 +48,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 		}
 	}
 
-	trie.tracer = s.tracer
+	trie.tracer = s.createTracer(false)
 
 	key := crypto.Keccak256(rawkey.Bytes())
 
@@ -58,7 +74,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 
 func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 	key := crypto.Keccak256(addr.Bytes())
-	s.trie.tracer = s.tracer
+	s.trie.tracer = s.createTracer(true)
 
 	data, ok := s.trie.Get(key)
 	if !ok {
@@ -80,19 +96,24 @@ func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
 func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, *types.Trace, []byte) {
 	trie, root := s.trie.Commit(objs)
 
-	s.tracer.Proof()
+	for _, t := range s.tracers {
+		t.Proof()
+	}
 
-	return &Snapshot{trie: trie, state: s.state}, &types.Trace{Trace: s.tracer.Traces()}, root
+	return &Snapshot{trie: trie, state: s.state}, s.trace, root
 }
 
 type tracer struct {
+	// isAccountTrie represents whether the trace is in an
+	// acount or storage trie
+	isAccountTrie bool
+
+	// nodes is the list of nodes from the partial merkle trie
+	// accessed during the trace
 	nodes []Node
 
-	traces map[string]string
-}
-
-func (t *tracer) Traces() map[string]string {
-	return t.traces
+	// trace is the reference object to dump the traces
+	trace *types.Trace
 }
 
 func (t *tracer) Trace(n Node) {
@@ -120,12 +141,23 @@ func (t *tracer) Proof() {
 }
 
 func (t *tracer) Put(k, v []byte) {
-	if t.traces == nil {
-		t.traces = map[string]string{}
-	}
-
 	kStr := hex.EncodeToString(k)
-	if _, ok := t.traces[kStr]; !ok {
-		t.traces[kStr] = hex.EncodeToString(v)
+
+	if t.isAccountTrie {
+		if t.trace.AccountTrie == nil {
+			t.trace.AccountTrie = map[string]string{}
+		}
+
+		if _, ok := t.trace.AccountTrie[kStr]; !ok {
+			t.trace.AccountTrie[kStr] = hex.EncodeToString(v)
+		}
+	} else {
+		if t.trace.StorageTrie == nil {
+			t.trace.StorageTrie = map[string]string{}
+		}
+
+		if _, ok := t.trace.StorageTrie[kStr]; !ok {
+			t.trace.StorageTrie[kStr] = hex.EncodeToString(v)
+		}
 	}
 }

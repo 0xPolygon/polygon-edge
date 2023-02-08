@@ -26,21 +26,19 @@ type systemService struct {
 func (s *systemService) GetTrace(ctx context.Context, req *proto.GetTraceRequest) (*proto.GetTraceResponse, error) {
 	path := filepath.Join(s.server.config.DataDir, "consensus")
 
-	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf("trace_%d", req.Number)))
+	data, err := ioutil.ReadFile(filepath.Join(path, fmt.Sprintf("trace_%d", req.Number)) + ".json")
 	if err != nil {
 		return nil, err
 	}
 
-	var traceData struct {
-		Trace map[string]string `json:"trace"`
-	}
-
-	if err := json.Unmarshal(data, &traceData); err != nil {
+	var trace *types.Trace
+	if err := json.Unmarshal(data, &trace); err != nil {
 		return nil, err
 	}
 
 	resp := &proto.GetTraceResponse{
-		Trace: traceData.Trace,
+		AccountTrace: trace.AccountTrie,
+		StorageTrace: trace.StorageTrie,
 	}
 
 	return resp, nil

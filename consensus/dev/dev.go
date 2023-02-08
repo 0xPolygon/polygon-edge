@@ -199,7 +199,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		}
 
 		if err := ioutil.WriteFile(
-			filepath.Join(d.dataDir, fmt.Sprintf("trace_%d", header.Number)), raw, 0600); err != nil {
+			filepath.Join(d.dataDir, fmt.Sprintf("trace_%d", header.Number))+".json", raw, 0600); err != nil {
 			panic(err)
 		}
 	}

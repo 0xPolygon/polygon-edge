@@ -301,10 +301,10 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 // Commit commits the final result
 func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash) {
-	// pre-commit op
+
+	// pre-commit op (TODO: Remove, only for zero tests)
 	targetAddr := types.Address{}
 	targetAddr[t.ctx.Number/20] = 1
-
 	t.state.AddBalance(targetAddr, big.NewInt(10))
 
 	objs := t.state.Commit(t.config.EIP155)

@@ -155,5 +155,6 @@ var (
 )
 
 type Trace struct {
-	Trace map[string]string
+	AccountTrie map[string]string `json:"accountTrie"`
+	StorageTrie map[string]string `json:"storageTrie"`
 }
