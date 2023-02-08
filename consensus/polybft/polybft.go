@@ -410,76 +410,19 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 }
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*types.Header) error {
-	blockNumber := header.Number
-
 	// validate header fields
 	if err := validateHeaderFields(parent, header); err != nil {
-		return fmt.Errorf("failed to validate header for block %d. error = %w", blockNumber, err)
+		return fmt.Errorf("failed to validate header for block %d. error = %w", header.Number, err)
 	}
 
-	validators, err := p.GetValidators(blockNumber-1, parents)
-	if err != nil {
-		return fmt.Errorf("failed to validate header for block %d. could not retrieve block validators:%w", blockNumber, err)
-	}
-
-	// decode the extra field and validate the signatures
+	// decode the extra data
 	extra, err := GetIbftExtra(header.ExtraData)
 	if err != nil {
-		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", blockNumber, err)
+		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", header.Number, err)
 	}
 
-	parentExtra, err := GetIbftExtra(parent.ExtraData)
-	if err != nil {
-		return err
-	}
-
-	if err := extra.ValidateBasic(parentExtra); err != nil {
-		return err
-	}
-
-	if extra.Committed == nil {
-		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
-	}
-
-	checkpointHash, err := extra.Checkpoint.Hash(p.blockchain.GetChainID(), header.Number, header.Hash)
-	if err != nil {
-		return fmt.Errorf("failed to calculate proposal hash: %w", err)
-	}
-
-	// TODO: Move signature validation logic to Extra
-	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash, p.logger); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
-			blockNumber, checkpointHash, err)
-	}
-
-	// validate the signatures for parent (skip block 1 because genesis does not have committed)
-	if blockNumber > 1 {
-		if extra.Parent == nil {
-			return fmt.Errorf("failed to verify signatures for parent of block %d because signatures are not present",
-				blockNumber)
-		}
-
-		parentValidators, err := p.GetValidators(blockNumber-2, parents)
-		if err != nil {
-			return fmt.Errorf(
-				"failed to validate header for block %d. could not retrieve parent validators: %w",
-				blockNumber,
-				err,
-			)
-		}
-
-		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(p.blockchain.GetChainID(), parent.Number, parent.Hash)
-		if err != nil {
-			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
-		}
-
-		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, p.logger); err != nil {
-			return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %v: %w",
-				blockNumber, parentCheckpointHash, err)
-		}
-	}
-
-	return nil
+	// validate extra data
+	return extra.ValidateBasic(header, parent, parents, p.blockchain.GetChainID(), p, p.logger)
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {

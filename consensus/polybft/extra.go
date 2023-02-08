@@ -143,13 +143,74 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // ValidateBasic contains extra data basic set of validations
-func (i *Extra) ValidateBasic(parentExtra *Extra) error {
+func (i *Extra) ValidateBasic(header *types.Header, parent *types.Header, parents []*types.Header,
+	chainID uint64, consensusBackend polybftBackend, logger hclog.Logger) error {
+	blockNumber := header.Number
+	if i.Committed == nil {
+		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
+	}
+
+	parentExtra, err := GetIbftExtra(parent.ExtraData)
+	if err != nil {
+		return err
+	}
+
+	checkpointHash, err := i.Checkpoint.Hash(chainID, header.Number, header.Hash)
+	if err != nil {
+		return fmt.Errorf("failed to calculate proposal hash: %w", err)
+	}
+
+	validators, err := consensusBackend.GetValidators(blockNumber-1, parents)
+	if err != nil {
+		return fmt.Errorf("failed to validate header for block %d. could not retrieve block validators:%w", blockNumber, err)
+	}
+
+	if err := i.Committed.VerifyCommittedFields(validators, checkpointHash, logger); err != nil {
+		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
+			blockNumber, checkpointHash, err)
+	}
+
+	// validate the signatures for parent (skip block 1 because genesis does not have committed)
+	if err := i.ValidateParentSignatures(blockNumber, consensusBackend, parents,
+		parent, parentExtra, chainID, logger); err != nil {
+		return err
+	}
+
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
-// Validate contains extra data validation logic
-func (i *Extra) Validate(parentExtra *Extra, currentValidators AccountSet, nextValidators AccountSet) error {
-	return i.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
+// ValidateParentSignatures validates signatures for parent block
+func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
+	parent *types.Header, parentExtra *Extra, chainID uint64, logger hclog.Logger) error {
+	if blockNumber <= 1 {
+		return nil
+	}
+
+	if i.Parent == nil {
+		return fmt.Errorf("failed to verify signatures for parent of block %d because signatures are not present",
+			blockNumber)
+	}
+
+	parentValidators, err := consensusBackend.GetValidators(blockNumber-2, parents)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to validate header for block %d. could not retrieve parent validators: %w",
+			blockNumber,
+			err,
+		)
+	}
+
+	parentCheckpointHash, err := parentExtra.Checkpoint.Hash(chainID, parent.Number, parent.Hash)
+	if err != nil {
+		return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
+	}
+
+	if err := i.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, logger); err != nil {
+		return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %s: %w",
+			blockNumber, parentCheckpointHash, err)
+	}
+
+	return nil
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
