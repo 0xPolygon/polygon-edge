@@ -527,11 +527,14 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		t.ctx.Tracer.TxEnd(result.GasLeft)
 	}
 
-	// refund the sender
+	// Refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice)
 	t.state.AddBalance(msg.From, remaining)
 
-	// define effective tip based on tx type
+	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
+	// Define effective tip based on tx type.
+	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
+	// Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
 	effectiveTip := msg.GasPrice
 	if t.config.London && msg.Type != types.StateTx {
 		effectiveTip = common.BigMin(
@@ -540,11 +543,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		)
 	}
 
-	// Pay the coinbase
+	// Pay the coinbase fee as a miner reward using the calculated effective tip.
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), effectiveTip)
 	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
-	// Burn some amount if the london hardfork is applied
+	// Burn some amount if the london hardfork is applied.
+	// Basically, burn amount is just transferred to the current burn contract.
 	if t.config.London && msg.Type != types.StateTx {
 		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
 		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
