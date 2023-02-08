@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
@@ -423,6 +424,22 @@ var (
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
+
+	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
+	// transaction with a tip higher than the total fee cap.
+	ErrTipAboveFeeCap = errors.New("max priority fee per gas higher than max fee per gas")
+
+	// ErrTipVeryHigh is a sanity error to avoid extremely big numbers specified
+	// in the tip field.
+	ErrTipVeryHigh = errors.New("max priority fee per gas higher than 2^256-1")
+
+	// ErrFeeCapVeryHigh is a sanity error to avoid extremely big numbers specified
+	// in the fee cap field.
+	ErrFeeCapVeryHigh = errors.New("max fee per gas higher than 2^256-1")
+
+	// ErrFeeCapTooLow is returned if the transaction fee cap is less than the
+	// the base fee of the block.
+	ErrFeeCapTooLow = errors.New("max fee per gas less than block base fee")
 )
 
 type TransitionApplicationError struct {
@@ -452,18 +469,22 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	if msg.Type == types.StateTx {
-		if err := checkAndProcessStateTx(msg, t); err != nil {
-			return nil, err
-		}
+	var err error
+
+	if msg.Type == types.DynamicFeeTx {
+		err = checkAndProcessDynamicFeeTx(msg, t)
+	} else if msg.Type == types.LegacyTx {
+		err = checkAndProcessLegacyTx(msg, t)
 	} else {
-		if err := checkAndProcessLegacyTx(msg, t); err != nil {
-			return nil, err
-		}
+		err = checkAndProcessStateTx(msg, t)
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	// the amount of gas required is available in the block
-	if err := t.subGasPool(msg.Gas); err != nil {
+	if err = t.subGasPool(msg.Gas); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
@@ -506,13 +527,32 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		t.ctx.Tracer.TxEnd(result.GasLeft)
 	}
 
-	// refund the sender
+	// Refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice)
 	t.state.AddBalance(msg.From, remaining)
 
-	// pay the coinbase
-	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
+	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
+	// Define effective tip based on tx type.
+	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
+	// Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
+	effectiveTip := msg.GasPrice
+	if t.config.London && msg.Type != types.StateTx {
+		effectiveTip = common.BigMin(
+			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
+			new(big.Int).Set(msg.GasTipCap),
+		)
+	}
+
+	// Pay the coinbase fee as a miner reward using the calculated effective tip.
+	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), effectiveTip)
 	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
+
+	// Burn some amount if the london hardfork is applied.
+	// Basically, burn amount is just transferred to the current burn contract.
+	if t.config.London && msg.Type != types.StateTx {
+		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
+		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
+	}
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
@@ -876,6 +916,56 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	}
 
 	return cost, nil
+}
+
+// checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
+// Basically, makes sure gas tip cap and gas fee cap are good.
+func checkDynamicFees(msg *types.Transaction, baseFee *big.Int) error {
+	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
+		return nil
+	}
+
+	if l := msg.GasFeeCap.BitLen(); l > 256 {
+		return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
+			msg.From.String(), l)
+	}
+
+	if l := msg.GasTipCap.BitLen(); l > 256 {
+		return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
+			msg.From.String(), l)
+	}
+
+	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+		return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
+			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+	}
+
+	// This will panic if baseFee is nil, but basefee presence is verified
+	// as part of header validation.
+	if msg.GasFeeCap.Cmp(baseFee) < 0 {
+		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
+			msg.From.String(), msg.GasFeeCap, baseFee)
+	}
+
+	return nil
+}
+
+// checkAndProcessDynamicFeeTx - first check if this message satisfies all consensus rules before
+// applying the message. The rules include these clauses:
+// 1. the nonce of the message caller is correct
+// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+func checkAndProcessDynamicFeeTx(msg *types.Transaction, t *Transition) error {
+	// 1. do legacy tx checks
+	if err := checkAndProcessLegacyTx(msg, t); err != nil {
+		return err
+	}
+
+	// 2. make sure EIP-1559-related fields are correct
+	if err := checkDynamicFees(msg, t.ctx.BaseFee); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	return nil
 }
 
 // checkAndProcessLegacyTx - first check if this message satisfies all consensus rules before
