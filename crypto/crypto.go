@@ -26,6 +26,7 @@ var S256 = btcec.S256()
 var (
 	secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
 	secp256k1NHalf = new(big.Int).Div(secp256k1N, big.NewInt(2))
+	zero           = big.NewInt(0)
 	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
@@ -63,7 +64,7 @@ func ValidateSignatureValues(v, r, s *big.Int, isHomestead bool) bool {
 	}
 
 	// v must be 0 or 1
-	if v.Cmp(big.NewInt(1)) == 1 || v.Cmp(big.NewInt(0)) == -1 {
+	if v.Cmp(zero) == -1 || v.Cmp(one) == 1 {
 		return false
 	}
 
