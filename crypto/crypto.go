@@ -78,12 +78,12 @@ func ValidateSignatureValues(v byte, r, s *big.Int, isHomestead bool) bool {
 		return false
 	}
 
-	// From Homestead, s must be less than secp256k1n/2
-	if isHomestead && s.Cmp(secp256k1NHalf) > 0 {
-		return false
+	// From Homestead, s must be less or equal than secp256k1n/2
+	if isHomestead {
+		return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1NHalf) <= 0
 	}
 
-	// In Frontier, r & s must be less than secp256k1n
+	// In Frontier, r and s must be less than secp256k1n
 	return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1N) < 0
 }
 
