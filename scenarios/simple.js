@@ -1,10 +1,10 @@
 import eth from 'k6/x/ethereum';
 import './slack.js';
 
-const rpc_url = __ENV.RCP_URL
-// if (rpc_url == undefined) {
-//   rpc_url = "http://localhost:10002"
-// }
+const rpc_url = __ENV.RPC_URL
+if (rpc_url == undefined) {
+  rpc_url = "http://localhost:10002"
+}
 
 const client = new eth.Client({
     url: rpc_url,
