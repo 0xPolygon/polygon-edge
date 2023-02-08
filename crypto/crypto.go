@@ -50,17 +50,6 @@ type KeccakState interface {
 	Read([]byte) (int, error)
 }
 
-func trimLeftZeros(b []byte) []byte {
-	i := 0
-	for i = range b {
-		if b[i] != 0 {
-			break
-		}
-	}
-
-	return b[i:]
-}
-
 // ValidateSignatureValues checks if the signature values are correct
 func ValidateSignatureValues(v byte, r, s *big.Int, isHomestead bool) bool {
 	// r & s must not be nil
