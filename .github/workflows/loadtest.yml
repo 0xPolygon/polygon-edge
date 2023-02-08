@@ -49,6 +49,7 @@
   
   jobs:
     run_k6:
+      environment: ${{ inputs.environment }}
       runs-on: ubuntu-latest
       steps:
         - name: Install Go
