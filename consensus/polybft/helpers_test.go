@@ -53,6 +53,41 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
+func createTestCommitEpochInput(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
+	t.Helper()
+
+	if validatorSet == nil {
+		validatorSet = newTestValidators(5).getPublicIdentities()
+	}
+
+	var startBlock uint64 = 0
+	if epochID > 1 {
+		startBlock = (epochID - 1) * epochSize
+	}
+
+	uptime := &contractsapi.Uptime{
+		EpochID:     new(big.Int).SetUint64(epochID),
+		UptimeData:  []*contractsapi.UptimeData{},
+		TotalBlocks: new(big.Int).SetUint64(epochSize),
+	}
+
+	commitEpoch := &contractsapi.CommitEpochFunction{
+		ID: uptime.EpochID,
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(startBlock + 1),
+			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
+			EpochRoot:  types.Hash{},
+		},
+		Uptime: uptime,
+	}
+
+	for i := range validatorSet {
+		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
+	}
+
+	return commitEpoch
+}
+
 func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contractsapi.StateSyncedEvent {
 	t.Helper()
 
