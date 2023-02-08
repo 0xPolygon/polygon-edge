@@ -141,10 +141,26 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, srv.RegisterValidator(newValidatorSecrets, newValidatorBalanceRaw, newValidatorStakeRaw))
 
 	// wait for an end of epoch so that stake gets finalized
-	cluster.WaitForBlock(5, 1*time.Minute)
+	currentBlock, err := srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlock+5, 1*time.Minute)
 
 	// start new validator
 	cluster.InitTestServer(t, 6, true, false)
+
+	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
+	require.NoError(t, err)
+
+	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
+	validators := polybft.AccountSet{}
+	// assert that new validator is among validator set
+	require.NoError(t, cluster.WaitUntil(20*time.Second, func() bool {
+		// query validators
+		validators, err = systemState.GetValidatorSet()
+		require.NoError(t, err)
+
+		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+	}))
 
 	// assert that validators hash is correct
 	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
@@ -155,21 +171,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	extra, err := polybft.GetIbftExtra(block.ExtraData)
 	require.NoError(t, err)
 	require.NotNil(t, extra.Checkpoint)
-
-	newValidatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, newValidatorSecrets))
-	require.NoError(t, err)
-
-	newValidatorAddr := newValidatorAcc.Ecdsa.Address()
-
-	validators := polybft.AccountSet{}
-	// assert that new validator is among validator set
-	require.NoError(t, cluster.WaitUntil(10*time.Second, func() bool {
-		// query validators
-		validators, err = systemState.GetValidatorSet()
-		require.NoError(t, err)
-
-		return validators.ContainsAddress((types.Address(newValidatorAddr)))
-	}))
 
 	// assert that correct validators hash gets submitted
 	validatorsHash, err := validators.Hash()
@@ -185,7 +186,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, newValidatorStake, newValidatorInfo.TotalStake)
 
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
-	cluster.WaitForBlock(20, 2*time.Minute)
+	currentBlock, err = srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlock+15, 2*time.Minute)
 
 	// query registered validator
 	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
@@ -201,6 +204,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		validatorSecrets = "test-chain-1"
 		delegatorSecrets = "test-chain-6"
 		premineBalance   = "0x1B1AE4D6E2EF500000" // 500 native tokens (so that we have enough funds to fund delegator)
+		epochSize        = 5
 	)
 
 	fundAmountRaw := "0xD8D726B7177A80000" // 250 native tokens
@@ -210,7 +214,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
 		framework.WithPremineValidators(premineBalance),
-		framework.WithEpochSize(5))
+		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
 	// init delegator account
@@ -222,13 +226,17 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
+	// wait for consensus to start
 	cluster.WaitForBlock(1, 10*time.Second)
 
-	delegatorAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, delegatorSecrets))
+	// extract delegator's secrets
+	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
+	delegatorAcc, err := sidechain.GetAccountFromDir(delegatorSecretsPath)
 	require.NoError(t, err)
 
 	delegatorAddr := delegatorAcc.Ecdsa.Address()
 
+	// extract validator's secrets
 	validatorSecretsPath := path.Join(cluster.Config.TmpDir, validatorSecrets)
 
 	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecretsPath)
@@ -245,67 +253,64 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	getDelegatorInfo := func(blockNum uint64) (balance *big.Int, reward *big.Int) {
-		var err error
+	// getDelegatorInfo queries delegator's balance and its rewards
+	getDelegatorInfo := func() (balance *big.Int, reward *big.Int) {
+		currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
+
 		balance, err = srv.JSONRPC().Eth().GetBalance(delegatorAddr, ethgo.Latest)
 		require.NoError(t, err)
-		t.Logf("Delegator balance (block %d)=%s\n", blockNum, balance)
+		t.Logf("Delegator balance (block %d)=%s\n", currentBlockNum, balance)
 
 		reward, err = sidechain.GetDelegatorReward(validatorAddr, delegatorAddr, txRelayer)
 		require.NoError(t, err)
-		t.Logf("Delegator reward (block %d)=%s\n", blockNum, reward)
+		t.Logf("Delegator reward (block %d)=%s\n", currentBlockNum, reward)
 
 		return
 	}
 
-	currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
-	require.NoError(t, err)
-
-	delegatorBalance, _ := getDelegatorInfo(currentBlockNum)
+	// assert that delegator received fund amount from validator
+	delegatorBalance, _ := getDelegatorInfo()
 	require.Equal(t, fundAmount, delegatorBalance)
 
 	// delegate 1 native token
 	delegationAmount := uint64(1e18)
-	require.NoError(t, srv.Delegate(delegationAmount, validatorSecretsPath, validatorAddr))
+	require.NoError(t, srv.Delegate(delegationAmount, delegatorSecretsPath, validatorAddr))
 
 	// wait for 2 epochs to accumulate delegator rewards
-	cluster.WaitForBlock(10, 1*time.Minute)
+	currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
+	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlockNum+2*epochSize, 1*time.Minute)
 
 	// query delegator rewards
-	_, delegatorReward := getDelegatorInfo(10)
-	// there should be at least 80 weis delegator rewards accumulated
-	// (80 weis per epoch is accumulated if validator signs only single block in entire epoch)
-	require.Greater(t, delegatorReward.Uint64(), uint64(80))
+	_, delegatorReward := getDelegatorInfo()
+	// if validator signed at leased 1 block per epoch, this will be the minimal reward for the delegator
+	require.Greater(t, delegatorReward.Uint64(), uint64(16))
 
 	// undelegate rewards
-	require.NoError(t, srv.Undelegate(delegationAmount, validatorSecretsPath, validatorAddr))
+	require.NoError(t, srv.Undelegate(delegationAmount, delegatorSecretsPath, validatorAddr))
 	t.Logf("Rewards are undelegated\n")
 
+	// wait for one epoch to be able to withdraw undelegated funds
 	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
-	getDelegatorInfo(currentBlockNum)
+	require.NoError(t, cluster.WaitForBlock(currentBlockNum+epochSize, time.Minute))
 
-	// wait for one epoch to be able to withdraw undelegated funds
-	require.NoError(t, cluster.WaitForBlock(15, time.Minute))
+	balanceBeforeWithdraw, _ := getDelegatorInfo()
 
 	// withdraw available rewards
-	require.NoError(t, srv.Withdraw(validatorSecretsPath, delegatorAddr))
+	require.NoError(t, srv.Withdraw(delegatorSecretsPath, delegatorAddr))
 	t.Logf("Funds are withdrawn\n")
 
-	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
-	require.NoError(t, err)
-	getDelegatorInfo(currentBlockNum)
-
 	// wait for single epoch to process withdrawal
-	cluster.WaitForBlock(20, time.Minute)
-
 	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
+	cluster.WaitForBlock(currentBlockNum+epochSize, time.Minute)
 
 	// assert that delegator doesn't receive any rewards
-	_, delegatorReward = getDelegatorInfo(currentBlockNum)
-	// TODO: Check (for some reason delegator still gets rewards although it withdraws entire delegation amount)
-	require.True(t, delegatorReward.Cmp(big.NewInt(0)) > 0)
+	delegatorBalance, delegatorReward = getDelegatorInfo()
+	require.True(t, delegatorReward.Cmp(big.NewInt(0)) == 0)
+	require.True(t, balanceBeforeWithdraw.Cmp(delegatorBalance) == -1)
 }
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
@@ -400,4 +405,84 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 			t.Fatalf("not expected to find validator %v in the current validator set", validator.Address)
 		}
 	}
+}
+
+func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *testing.T) {
+	const (
+		validatorSecrets = "test-chain-1"
+		delegatorSecrets = "test-chain-delegator"
+		premineBalance   = "0x1B1AE4D6E2EF500000" // 500 native tokens (so that we have enough funds to fund delegator)
+		epochSize        = 5
+		validatorCount   = 4
+		blockTime        = 2 * time.Second
+	)
+
+	cluster := framework.NewTestCluster(t, validatorCount,
+		framework.WithEpochReward(100000),
+		framework.WithPremineValidators(premineBalance),
+		framework.WithEpochSize(epochSize))
+	defer cluster.Stop()
+
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// init delegator account
+	_, err = cluster.InitSecrets(delegatorSecrets, 1)
+	require.NoError(t, err)
+
+	// wait for consensus to start
+	require.NoError(t, cluster.WaitForBlock(2, 20*time.Second))
+
+	// extract delegator's secrets
+	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
+	delegatorAcc, err := sidechain.GetAccountFromDir(delegatorSecretsPath)
+	require.NoError(t, err)
+
+	delegatorAddr := delegatorAcc.Ecdsa.Address()
+
+	// extract validator's secrets
+	validatorSecretsPath := path.Join(cluster.Config.TmpDir, validatorSecrets)
+
+	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecretsPath)
+	require.NoError(t, err)
+
+	validatorAddr := validatorAcc.Ecdsa.Address()
+
+	fundAmountRaw := "0xD8D726B7177A80000" // 250 native tokens
+	fundAmount, err := types.ParseUint256orHex(&fundAmountRaw)
+	require.NoError(t, err)
+
+	// fund delegator
+	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
+		From:  validatorAddr,
+		To:    &delegatorAddr,
+		Value: fundAmount,
+	}, validatorAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
+
+	endCh, waitCh := make(chan struct{}), make(chan struct{})
+
+	// delegate tokens to validator in the loop to be sure that the stake of validator will be changed at end of epoch block
+	go func() {
+		for {
+			delegationAmount := uint64(1e18)
+
+			cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
+			require.NoError(t, err)
+
+			select {
+			case <-endCh:
+				close(waitCh)
+
+				return
+			case <-time.After(blockTime / 2):
+			}
+		}
+	}()
+
+	require.NoError(t, cluster.WaitForBlock(6, 30*time.Second))
+
+	close(endCh)
+	<-waitCh
 }

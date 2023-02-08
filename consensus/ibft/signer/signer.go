@@ -42,16 +42,22 @@ type Signer interface {
 	VerifyCommittedSeal(validators.Validators, types.Address, []byte, []byte) error
 
 	// CommittedSeals
-	WriteCommittedSeals(*types.Header, map[types.Address][]byte) (*types.Header, error)
-	VerifyCommittedSeals(
+	WriteCommittedSeals(
 		header *types.Header,
+		roundNumber uint64,
+		sealMap map[types.Address][]byte,
+	) (*types.Header, error)
+	VerifyCommittedSeals(
+		hash types.Hash,
+		committedSeals Seals,
 		validators validators.Validators,
 		quorumSize int,
 	) error
 
 	// ParentCommittedSeals
 	VerifyParentCommittedSeals(
-		parent, header *types.Header,
+		parentHash types.Hash,
+		header *types.Header,
 		parentValidators validators.Validators,
 		quorum int,
 		mustExist bool,
@@ -63,6 +69,7 @@ type Signer interface {
 
 	// Hash of Header
 	CalculateHeaderHash(*types.Header) (types.Hash, error)
+	FilterHeaderForHash(*types.Header) (*types.Header, error)
 }
 
 // SignerImpl is an implementation that meets Signer
@@ -194,6 +201,7 @@ func (s *SignerImpl) VerifyCommittedSeal(
 // WriteCommittedSeals builds and writes CommittedSeals into IBFT Extra of the header
 func (s *SignerImpl) WriteCommittedSeals(
 	header *types.Header,
+	roundNumber uint64,
 	sealMap map[types.Address][]byte,
 ) (*types.Header, error) {
 	if len(sealMap) == 0 {
@@ -210,9 +218,10 @@ func (s *SignerImpl) WriteCommittedSeals(
 		return nil, err
 	}
 
-	header.ExtraData = packCommittedSealsIntoExtra(
+	header.ExtraData = packCommittedSealsAndRoundNumberIntoExtra(
 		header.ExtraData,
 		committedSeal,
+		&roundNumber,
 	)
 
 	return header, nil
@@ -220,26 +229,17 @@ func (s *SignerImpl) WriteCommittedSeals(
 
 // VerifyCommittedSeals verifies CommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyCommittedSeals(
-	header *types.Header,
+	hash types.Hash,
+	committedSeals Seals,
 	validators validators.Validators,
 	quorumSize int,
 ) error {
-	extra, err := s.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
-
-	hash, err := s.CalculateHeaderHash(header)
-	if err != nil {
-		return err
-	}
-
 	rawMsg := crypto.Keccak256(
-		wrapCommitHash(hash[:]),
+		wrapCommitHash(hash.Bytes()),
 	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
-		extra.CommittedSeals,
+		committedSeals,
 		rawMsg,
 		validators,
 	)
@@ -256,7 +256,8 @@ func (s *SignerImpl) VerifyCommittedSeals(
 
 // VerifyParentCommittedSeals verifies ParentCommittedSeals in IBFT Extra of the header
 func (s *SignerImpl) VerifyParentCommittedSeals(
-	parent, header *types.Header,
+	parentHash types.Hash,
+	header *types.Header,
 	parentValidators validators.Validators,
 	quorum int,
 	mustExist bool,
@@ -278,7 +279,7 @@ func (s *SignerImpl) VerifyParentCommittedSeals(
 	}
 
 	rawMsg := crypto.Keccak256(
-		wrapCommitHash(parent.Hash.Bytes()),
+		wrapCommitHash(parentHash[:]),
 	)
 
 	numSeals, err := s.keyManager.VerifyCommittedSeals(
@@ -323,7 +324,7 @@ func (s *SignerImpl) initIbftExtra(
 
 // CalculateHeaderHash calculates header hash for IBFT Extra
 func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
-	filteredHeader, err := s.filterHeaderForHash(header)
+	filteredHeader, err := s.FilterHeaderForHash(header)
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -360,7 +361,7 @@ func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Seals, error
 
 // filterHeaderForHash removes unnecessary fields from IBFT Extra of the header
 // for hash calculation
-func (s *SignerImpl) filterHeaderForHash(header *types.Header) (*types.Header, error) {
+func (s *SignerImpl) FilterHeaderForHash(header *types.Header) (*types.Header, error) {
 	clone := header.Copy()
 
 	extra, err := s.GetIBFTExtra(header)

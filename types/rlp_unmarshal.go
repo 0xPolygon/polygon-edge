@@ -432,7 +432,6 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 	}
-
 	// gas
 	if t.Gas, err = getElem().GetUint64(); err != nil {
 		return err

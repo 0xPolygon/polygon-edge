@@ -371,7 +371,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
+func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -427,8 +427,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildUptime(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.True(t, fsm.isEndOfEpoch)
-	assert.NotNil(t, fsm.uptimeCounter)
-	assert.NotEmpty(t, fsm.uptimeCounter)
+	assert.NotNil(t, fsm.commitEpochInput)
+	assert.NotEmpty(t, fsm.commitEpochInput)
 
 	blockchainMock.AssertExpectations(t)
 }
@@ -537,7 +537,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	blockchainMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
+func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -580,12 +580,12 @@ func TestConsensusRuntime_calculateUptime_SecondEpoch(t *testing.T) {
 		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	uptime, err := consensusRuntime.calculateUptime(lastBuiltBlock, consensusRuntime.epoch)
+	commitEpochInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock, consensusRuntime.epoch)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, uptime)
-	assert.Equal(t, uint64(epoch), uptime.EpochID)
-	assert.Equal(t, uint64(epochStartBlock), uptime.Epoch.StartBlock)
-	assert.Equal(t, uint64(epochEndBlock), uptime.Epoch.EndBlock)
+	assert.NotEmpty(t, commitEpochInput)
+	assert.Equal(t, uint64(epoch), commitEpochInput.ID.Uint64())
+	assert.Equal(t, uint64(epochStartBlock), commitEpochInput.Epoch.StartBlock.Uint64())
+	assert.Equal(t, uint64(epochEndBlock), commitEpochInput.Epoch.EndBlock.Uint64())
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
@@ -652,7 +652,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.True(t, runtime.IsValidSender(msg))
+	assert.True(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 
 	// sender not in current epoch validators
@@ -663,7 +663,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.False(t, runtime.IsValidSender(msg))
+	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 
 	// signature does not come from sender
@@ -674,7 +674,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 
 	require.NoError(t, err)
 
-	assert.False(t, runtime.IsValidSender(msg))
+	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 
 	// invalid signature
@@ -684,7 +684,7 @@ func TestConsensusRuntime_IsValidSender(t *testing.T) {
 		Signature: []byte{1, 2},
 	}
 
-	assert.False(t, runtime.IsValidSender(msg))
+	assert.False(t, runtime.IsValidValidator(msg))
 	blockchainMock.AssertExpectations(t)
 }
 
@@ -713,7 +713,7 @@ func TestConsensusRuntime_IsValidProposalHash(t *testing.T) {
 		config: &runtimeConfig{blockchain: new(blockchainMock)},
 	}
 
-	require.True(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+	require.True(t, runtime.IsValidProposalHash(&proto.Proposal{RawProposal: block.MarshalRLP()}, proposalHash.Bytes()))
 }
 
 func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) {
@@ -745,7 +745,7 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) 
 		config: &runtimeConfig{blockchain: new(blockchainMock)},
 	}
 
-	require.False(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+	require.False(t, runtime.IsValidProposalHash(&proto.Proposal{RawProposal: block.MarshalRLP()}, proposalHash.Bytes()))
 }
 
 func TestConsensusRuntime_IsValidProposalHash_InvalidExtra(t *testing.T) {
@@ -774,7 +774,7 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidExtra(t *testing.T) {
 		config: &runtimeConfig{blockchain: new(blockchainMock)},
 	}
 
-	require.False(t, runtime.IsValidProposalHash(block.MarshalRLP(), proposalHash.Bytes()))
+	require.False(t, runtime.IsValidProposalHash(&proto.Proposal{RawProposal: block.MarshalRLP()}, proposalHash.Bytes()))
 }
 
 func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
@@ -788,7 +788,7 @@ func TestConsensusRuntime_BuildProposal_InvalidParent(t *testing.T) {
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 	}
 
-	require.Nil(t, runtime.BuildProposal(&proto.View{Height: 5, Round: 1}))
+	require.Nil(t, runtime.BuildProposal(&proto.View{Round: 5}))
 }
 
 func TestConsensusRuntime_ID(t *testing.T) {
@@ -929,7 +929,7 @@ func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {
 	t.Parallel()
 
 	key := createTestKey(t)
-	view, proposal, certificate := &proto.View{}, []byte{1}, &proto.PreparedCertificate{}
+	view, rawProposal, certificate := &proto.View{}, []byte{1}, &proto.PreparedCertificate{}
 
 	runtime := &consensusRuntime{
 		config: &runtimeConfig{
@@ -937,13 +937,18 @@ func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {
 		},
 	}
 
+	proposal := &proto.Proposal{
+		RawProposal: rawProposal,
+		Round:       view.Round,
+	}
+
 	expected := proto.Message{
 		View: view,
 		From: key.Address().Bytes(),
 		Type: proto.MessageType_ROUND_CHANGE,
 		Payload: &proto.Message_RoundChangeData{RoundChangeData: &proto.RoundChangeMessage{
-			LastPreparedProposedBlock: proposal,
 			LatestPreparedCertificate: certificate,
+			LastPreparedProposal:      proposal,
 		}},
 	}
 
@@ -999,7 +1004,7 @@ func TestConsensusRuntime_IsValidProposalHash_EmptyProposal(t *testing.T) {
 
 	runtime := &consensusRuntime{logger: hclog.NewNullLogger()}
 
-	assert.False(t, runtime.IsValidProposalHash(nil, []byte("hash")))
+	assert.False(t, runtime.IsValidProposalHash(&proto.Proposal{}, []byte("hash")))
 }
 
 func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {

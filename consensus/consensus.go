@@ -81,8 +81,8 @@ type Factory func(*Params) (Consensus, error)
 // BridgeDataProvider is an interface providing bridge related functions
 type BridgeDataProvider interface {
 	// GenerateExit proof generates proof of exit for given exit event
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.ExitProof, error)
+	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error)
 
 	// GetStateSyncProof retrieves the StateSync proof
-	GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error)
+	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 }

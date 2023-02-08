@@ -156,3 +156,8 @@ func (h Hash) MarshalText() ([]byte, error) {
 func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
+
+type Proof struct {
+	Data     []Hash // the proof himself
+	Metadata map[string]interface{}
+}

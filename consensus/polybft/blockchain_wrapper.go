@@ -38,7 +38,8 @@ type blockchainBackend interface {
 		txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
-	ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error)
+	ProcessBlock(parent *types.Header, block *types.Block,
+		callback func(*state.Transition) error) (*types.FullBlock, error)
 
 	// GetStateProviderForBlock returns a reference to make queries to the state at 'block'.
 	GetStateProviderForBlock(block *types.Header) (contract.Provider, error)
@@ -83,8 +84,8 @@ func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
-func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
-	// TODO: Call validate block in polybft
+func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block,
+	callback func(*state.Transition) error) (*types.FullBlock, error) {
 	header := block.Header.Copy()
 
 	transition, err := p.executor.BeginTxn(parent.StateRoot, header, types.BytesToAddress(header.Miner))
@@ -96,6 +97,12 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	for _, tx := range block.Transactions {
 		if err = transition.Write(tx); err != nil {
 			return nil, fmt.Errorf("process block tx error, tx = %v, err = %w", tx.Hash, err)
+		}
+	}
+
+	if callback != nil {
+		if err := callback(transition); err != nil {
+			return nil, err
 		}
 	}
 
@@ -146,8 +153,7 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(
 	parent *types.Header, coinbase types.Address,
-	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger,
-) (blockBuilder, error) {
+	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error) {
 	gasLimit, err := p.blockchain.CalculateGasLimit(parent.Number + 1)
 	if err != nil {
 		return nil, err

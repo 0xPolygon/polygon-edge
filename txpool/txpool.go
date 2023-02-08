@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/armon/go-metrics"
@@ -63,7 +64,6 @@ type txOrigin int
 const (
 	local  txOrigin = iota // json-RPC/gRPC endpoints
 	gossip                 // gossip protocol
-	reorg                  // legacy code
 )
 
 func (o txOrigin) String() (s string) {
@@ -72,8 +72,6 @@ func (o txOrigin) String() (s string) {
 		s = "local"
 	case gossip:
 		s = "gossip"
-	case reorg:
-		s = "reorg"
 	}
 
 	return
@@ -509,33 +507,16 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 // ResetWithHeaders processes the transactions from the new
 // headers to sync the pool with the new state.
 func (p *TxPool) ResetWithHeaders(headers ...*types.Header) {
-	e := &blockchain.Event{
-		NewChain: headers,
-	}
-
 	// process the txs in the event
 	// to make sure the pool is up-to-date
-	p.processEvent(e)
+	p.processEvent(&blockchain.Event{
+		NewChain: headers,
+	})
 }
 
 // processEvent collects the latest nonces for each account containted
 // in the received event. Resets all known accounts with the new nonce.
 func (p *TxPool) processEvent(event *blockchain.Event) {
-	oldTxs := make(map[types.Hash]*types.Transaction)
-
-	// Legacy reorg logic //
-	for _, header := range event.OldChain {
-		// transactions to be returned to the pool
-		block, ok := p.store.GetBlockByHash(header.Hash, true)
-		if !ok {
-			continue
-		}
-
-		for _, tx := range block.Transactions {
-			oldTxs[tx.Hash] = tx
-		}
-	}
-
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := p.store.Header().StateRoot
 	stateNonces := make(map[types.Address]uint64)
@@ -578,17 +559,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 			// update the result map
 			stateNonces[addr] = latestNonce
-
-			// Legacy reorg logic //
-			// Update the addTxns in case of reorgs
-			delete(oldTxs, tx.Hash)
-		}
-	}
-
-	// Legacy reorg logic //
-	for _, tx := range oldTxs {
-		if err := p.addTx(reorg, tx); err != nil {
-			p.logger.Error("add tx", "err", err)
 		}
 	}
 
@@ -635,8 +605,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !p.deploymentWhitelist.allowed(tx.From) {
-		return ErrSmartContractRestricted
+	if tx.IsContractCreation() {
+		if !p.deploymentWhitelist.allowed(tx.From) {
+			return ErrSmartContractRestricted
+		}
+
+		if p.forks.EIP158 && len(tx.Input) > state.SpuriousDragonMaxCodeSize {
+			return runtime.ErrMaxCodeSizeExceeded
+		}
 	}
 
 	// Reject underpriced transactions

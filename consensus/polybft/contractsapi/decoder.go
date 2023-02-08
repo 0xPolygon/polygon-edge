@@ -24,7 +24,7 @@ func decodeEvent(event *abi.Event, log *ethgo.Log, out interface{}) error {
 
 func decodeMethod(method *abi.Method, input []byte, out interface{}) error {
 	if len(input) < abiMethodIDLength {
-		return fmt.Errorf("invalid bundle data, len = %d", len(input))
+		return fmt.Errorf("invalid method data, len = %d", len(input))
 	}
 
 	sig := method.ID()
@@ -42,7 +42,7 @@ func decodeMethod(method *abi.Method, input []byte, out interface{}) error {
 
 func decodeStruct(t *abi.Type, input []byte, out interface{}) error {
 	if len(input) < abiMethodIDLength {
-		return fmt.Errorf("invalid commitment data, len = %d", len(input))
+		return fmt.Errorf("invalid struct data, len = %d", len(input))
 	}
 
 	val, err := abi.Decode(t, input)

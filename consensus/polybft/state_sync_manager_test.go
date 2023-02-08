@@ -2,11 +2,13 @@ package polybft
 
 import (
 	"fmt"
+	"math/big"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -63,8 +65,8 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 
 	require.NoError(t, s.buildCommitment())
 	require.Len(t, s.pendingCommitments, 1)
-	require.Equal(t, uint64(0), s.pendingCommitments[0].FromIndex)
-	require.Equal(t, uint64(4), s.pendingCommitments[0].ToIndex)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(4), s.pendingCommitments[0].EndID.Uint64())
 	require.Equal(t, uint64(0), s.pendingCommitments[0].Epoch)
 
 	// add the next 5 state syncs, at that point, so that it generates a larger commitment
@@ -74,8 +76,8 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 
 	require.NoError(t, s.buildCommitment())
 	require.Len(t, s.pendingCommitments, 2)
-	require.Equal(t, uint64(0), s.pendingCommitments[1].FromIndex)
-	require.Equal(t, uint64(9), s.pendingCommitments[1].ToIndex)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
+	require.Equal(t, uint64(9), s.pendingCommitments[1].EndID.Uint64())
 	require.Equal(t, uint64(0), s.pendingCommitments[1].Epoch)
 
 	// the message was sent
@@ -182,8 +184,15 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	tree, err := NewMerkleTree([][]byte{{0x1}})
 	require.NoError(t, err)
 
-	s.pendingCommitments = []*Commitment{
-		{MerkleTree: tree},
+	s.pendingCommitments = []*PendingCommitment{
+		{
+			MerkleTree: tree,
+			StateSyncCommitment: &contractsapi.StateSyncCommitment{
+				Root:    tree.Hash(),
+				StartID: big.NewInt(0),
+				EndID:   big.NewInt(1),
+			},
+		},
 	}
 
 	hash, err := s.pendingCommitments[0].Hash()
@@ -222,9 +231,9 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	require.Len(t, s.pendingCommitments, 1)
 
 	mockMsg := &CommitmentMessageSigned{
-		Message: &CommitmentMessage{
-			FromIndex: s.pendingCommitments[0].FromIndex,
-			ToIndex:   s.pendingCommitments[0].ToIndex,
+		Message: &contractsapi.StateSyncCommitment{
+			StartID: s.pendingCommitments[0].StartID,
+			EndID:   s.pendingCommitments[0].EndID,
 		},
 	}
 
@@ -242,6 +251,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	}
 
 	require.NoError(t, s.PostBlock(req))
+	require.Equal(t, mockMsg.Message.EndID.Uint64()+1, s.nextCommittedIndex)
 
 	for i := uint64(0); i < 10; i++ {
 		proof, err := s.state.getStateSyncProof(i)
@@ -296,8 +306,8 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	s.AddLog(goodLog2)
 
 	require.Len(t, s.pendingCommitments, 1)
-	require.Equal(t, uint64(0), s.pendingCommitments[0].FromIndex)
-	require.Equal(t, uint64(1), s.pendingCommitments[0].ToIndex)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(1), s.pendingCommitments[0].EndID.Uint64())
 
 	// add two more logs to have larger commitments
 	goodLog3 := goodLog.Copy()
@@ -309,8 +319,8 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	s.AddLog(goodLog4)
 
 	require.Len(t, s.pendingCommitments, 3)
-	require.Equal(t, uint64(0), s.pendingCommitments[2].FromIndex)
-	require.Equal(t, uint64(3), s.pendingCommitments[2].ToIndex)
+	require.Equal(t, uint64(0), s.pendingCommitments[2].StartID.Uint64())
+	require.Equal(t, uint64(3), s.pendingCommitments[2].EndID.Uint64())
 }
 
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
@@ -378,8 +388,11 @@ func TestStateSyncManager_GetProofs(t *testing.T) {
 
 	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
 	require.NoError(t, err)
-	require.Equal(t, stateSyncID, proof.StateSync.ID)
-	require.NotEmpty(t, proof.Proof)
+
+	stateSync, ok := (proof.Metadata["StateSync"]).(*contractsapi.StateSyncedEvent)
+	require.True(t, ok)
+	require.Equal(t, stateSyncID, stateSync.ID.Uint64())
+	require.NotEmpty(t, proof.Data)
 }
 
 func TestStateSyncManager_GetProofs_NoProof_NoCommitment(t *testing.T) {
@@ -416,8 +429,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 
 	const (
 		stateSyncID = uint64(5)
-		fromIndex   = uint64(1)
-		epoch       = uint64(1)
+		fromIndex   = 1
 	)
 
 	state := newTestState(t)
@@ -426,22 +438,31 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 	tree, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	commitment := &CommitmentMessage{FromIndex: fromIndex, ToIndex: maxCommitmentSize, Epoch: epoch, MerkleRootHash: tree.Hash()}
+	commitment := &CommitmentMessageSigned{
+		Message: &contractsapi.StateSyncCommitment{
+			StartID: big.NewInt(fromIndex),
+			EndID:   big.NewInt(maxCommitmentSize),
+			Root:    tree.Hash(),
+		},
+	}
 
 	for _, sse := range stateSyncs {
 		require.NoError(t, state.insertStateSyncEvent(sse))
 	}
 
-	require.NoError(t, state.insertCommitmentMessage(&CommitmentMessageSigned{Message: commitment}))
+	require.NoError(t, state.insertCommitmentMessage(commitment))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 
 	proof, err := stateSyncManager.GetStateSyncProof(stateSyncID)
 	require.NoError(t, err)
-	require.Equal(t, stateSyncID, proof.StateSync.ID)
-	require.NotEmpty(t, proof.Proof)
 
-	require.NoError(t, commitment.VerifyStateSyncProof(proof))
+	stateSync, ok := (proof.Metadata["StateSync"]).(*contractsapi.StateSyncedEvent)
+	require.True(t, ok)
+	require.Equal(t, stateSyncID, stateSync.ID.Uint64())
+	require.NotEmpty(t, proof.Data)
+
+	require.NoError(t, commitment.VerifyStateSyncProof(proof.Data, stateSync))
 }
 
 type mockTopic struct {

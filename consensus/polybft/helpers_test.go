@@ -3,14 +3,15 @@ package polybft
 import (
 	"crypto/rand"
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 func createTestKey(t *testing.T) *wallet.Key {
@@ -52,14 +53,49 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
-func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*types.StateSyncEvent {
+func createTestCommitEpochInput(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
 	t.Helper()
 
-	stateSyncEvents := make([]*types.StateSyncEvent, eventsCount)
+	if validatorSet == nil {
+		validatorSet = newTestValidators(5).getPublicIdentities()
+	}
+
+	var startBlock uint64 = 0
+	if epochID > 1 {
+		startBlock = (epochID - 1) * epochSize
+	}
+
+	uptime := &contractsapi.Uptime{
+		EpochID:     new(big.Int).SetUint64(epochID),
+		UptimeData:  []*contractsapi.UptimeData{},
+		TotalBlocks: new(big.Int).SetUint64(epochSize),
+	}
+
+	commitEpoch := &contractsapi.CommitEpochFunction{
+		ID: uptime.EpochID,
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(startBlock + 1),
+			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
+			EpochRoot:  types.Hash{},
+		},
+		Uptime: uptime,
+	}
+
+	for i := range validatorSet {
+		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
+	}
+
+	return commitEpoch
+}
+
+func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contractsapi.StateSyncedEvent {
+	t.Helper()
+
+	stateSyncEvents := make([]*contractsapi.StateSyncedEvent, eventsCount)
 	for i := 0; i < eventsCount; i++ {
-		stateSyncEvents[i] = &types.StateSyncEvent{
-			ID:     startIdx + uint64(i),
-			Sender: ethgo.Address(types.StringToAddress(fmt.Sprintf("0x5%d", i))),
+		stateSyncEvents[i] = &contractsapi.StateSyncedEvent{
+			ID:     big.NewInt(int64(startIdx + uint64(i))),
+			Sender: types.StringToAddress(fmt.Sprintf("0x5%d", i)),
 			Data:   generateRandomBytes(t),
 		}
 	}

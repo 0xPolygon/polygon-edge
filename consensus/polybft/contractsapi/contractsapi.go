@@ -17,12 +17,12 @@ type StateSyncCommitment struct {
 
 var StateSyncCommitmentABIType = abi.MustNewType("tuple(uint256 startId,uint256 endId,bytes32 root)")
 
-func (S *StateSyncCommitment) EncodeAbi() ([]byte, error) {
-	return StateSyncCommitmentABIType.Encode(S)
+func (s *StateSyncCommitment) EncodeAbi() ([]byte, error) {
+	return StateSyncCommitmentABIType.Encode(s)
 }
 
-func (S *StateSyncCommitment) DecodeAbi(buf []byte) error {
-	return decodeStruct(StateSyncCommitmentABIType, buf, &S)
+func (s *StateSyncCommitment) DecodeAbi(buf []byte) error {
+	return decodeStruct(StateSyncCommitmentABIType, buf, &s)
 }
 
 type CommitFunction struct {
@@ -48,12 +48,12 @@ type StateSync struct {
 
 var StateSyncABIType = abi.MustNewType("tuple(uint256 id,address sender,address receiver,bytes data)")
 
-func (S *StateSync) EncodeAbi() ([]byte, error) {
-	return StateSyncABIType.Encode(S)
+func (s *StateSync) EncodeAbi() ([]byte, error) {
+	return StateSyncABIType.Encode(s)
 }
 
-func (S *StateSync) DecodeAbi(buf []byte) error {
-	return decodeStruct(StateSyncABIType, buf, &S)
+func (s *StateSync) DecodeAbi(buf []byte) error {
+	return decodeStruct(StateSyncABIType, buf, &s)
 }
 
 type ExecuteFunction struct {
@@ -97,12 +97,12 @@ type Epoch struct {
 
 var EpochABIType = abi.MustNewType("tuple(uint256 startBlock,uint256 endBlock,bytes32 epochRoot)")
 
-func (E *Epoch) EncodeAbi() ([]byte, error) {
-	return EpochABIType.Encode(E)
+func (e *Epoch) EncodeAbi() ([]byte, error) {
+	return EpochABIType.Encode(e)
 }
 
-func (E *Epoch) DecodeAbi(buf []byte) error {
-	return decodeStruct(EpochABIType, buf, &E)
+func (e *Epoch) DecodeAbi(buf []byte) error {
+	return decodeStruct(EpochABIType, buf, &e)
 }
 
 type UptimeData struct {
@@ -112,12 +112,12 @@ type UptimeData struct {
 
 var UptimeDataABIType = abi.MustNewType("tuple(address validator,uint256 signedBlocks)")
 
-func (U *UptimeData) EncodeAbi() ([]byte, error) {
-	return UptimeDataABIType.Encode(U)
+func (u *UptimeData) EncodeAbi() ([]byte, error) {
+	return UptimeDataABIType.Encode(u)
 }
 
-func (U *UptimeData) DecodeAbi(buf []byte) error {
-	return decodeStruct(UptimeDataABIType, buf, &U)
+func (u *UptimeData) DecodeAbi(buf []byte) error {
+	return decodeStruct(UptimeDataABIType, buf, &u)
 }
 
 type Uptime struct {
@@ -128,12 +128,12 @@ type Uptime struct {
 
 var UptimeABIType = abi.MustNewType("tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks)")
 
-func (U *Uptime) EncodeAbi() ([]byte, error) {
-	return UptimeABIType.Encode(U)
+func (u *Uptime) EncodeAbi() ([]byte, error) {
+	return UptimeABIType.Encode(u)
 }
 
-func (U *Uptime) DecodeAbi(buf []byte) error {
-	return decodeStruct(UptimeABIType, buf, &U)
+func (u *Uptime) DecodeAbi(buf []byte) error {
+	return decodeStruct(UptimeABIType, buf, &u)
 }
 
 type CommitEpochFunction struct {
@@ -182,12 +182,12 @@ type CheckpointMetadata struct {
 
 var CheckpointMetadataABIType = abi.MustNewType("tuple(bytes32 blockHash,uint256 blockRound,bytes32 currentValidatorSetHash)")
 
-func (C *CheckpointMetadata) EncodeAbi() ([]byte, error) {
-	return CheckpointMetadataABIType.Encode(C)
+func (c *CheckpointMetadata) EncodeAbi() ([]byte, error) {
+	return CheckpointMetadataABIType.Encode(c)
 }
 
-func (C *CheckpointMetadata) DecodeAbi(buf []byte) error {
-	return decodeStruct(CheckpointMetadataABIType, buf, &C)
+func (c *CheckpointMetadata) DecodeAbi(buf []byte) error {
+	return decodeStruct(CheckpointMetadataABIType, buf, &c)
 }
 
 type Checkpoint struct {
@@ -198,12 +198,12 @@ type Checkpoint struct {
 
 var CheckpointABIType = abi.MustNewType("tuple(uint256 epoch,uint256 blockNumber,bytes32 eventRoot)")
 
-func (C *Checkpoint) EncodeAbi() ([]byte, error) {
-	return CheckpointABIType.Encode(C)
+func (c *Checkpoint) EncodeAbi() ([]byte, error) {
+	return CheckpointABIType.Encode(c)
 }
 
-func (C *Checkpoint) DecodeAbi(buf []byte) error {
-	return decodeStruct(CheckpointABIType, buf, &C)
+func (c *Checkpoint) DecodeAbi(buf []byte) error {
+	return decodeStruct(CheckpointABIType, buf, &c)
 }
 
 type Validator struct {
@@ -214,12 +214,12 @@ type Validator struct {
 
 var ValidatorABIType = abi.MustNewType("tuple(address _address,uint256[4] blsKey,uint256 votingPower)")
 
-func (V *Validator) EncodeAbi() ([]byte, error) {
-	return ValidatorABIType.Encode(V)
+func (v *Validator) EncodeAbi() ([]byte, error) {
+	return ValidatorABIType.Encode(v)
 }
 
-func (V *Validator) DecodeAbi(buf []byte) error {
-	return decodeStruct(ValidatorABIType, buf, &V)
+func (v *Validator) DecodeAbi(buf []byte) error {
+	return decodeStruct(ValidatorABIType, buf, &v)
 }
 
 type SubmitFunction struct {
@@ -237,4 +237,19 @@ func (s *SubmitFunction) EncodeAbi() ([]byte, error) {
 
 func (s *SubmitFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["submit"], buf, s)
+}
+
+type InitializeCheckpointManagerFunction struct {
+	NewBls          types.Address `abi:"newBls"`
+	NewBn256G2      types.Address `abi:"newBn256G2"`
+	NewDomain       types.Hash    `abi:"newDomain"`
+	NewValidatorSet []*Validator  `abi:"newValidatorSet"`
+}
+
+func (i *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
+	return CheckpointManager.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }

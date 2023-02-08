@@ -263,19 +263,19 @@ func initializeCheckpointManager(
 	txRelayer txrelayer.TxRelayer,
 	rootchainAdminKey ethgo.Key,
 	manifest *polybft.Manifest) error {
-	validatorSetMap, err := validatorSetToABISlice(manifest.GenesisValidators)
+	validatorSet, err := validatorSetToABISlice(manifest.GenesisValidators)
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
 
-	initCheckpointInput, err := contractsapi.CheckpointManager.Abi.Methods["initialize"].Encode(
-		[]interface{}{
-			manifest.RootchainConfig.BLSAddress,
-			manifest.RootchainConfig.BN256G2Address,
-			bls.GetDomain(),
-			validatorSetMap,
-		})
+	initialize := contractsapi.InitializeCheckpointManagerFunction{
+		NewBls:          manifest.RootchainConfig.BLSAddress,
+		NewBn256G2:      manifest.RootchainConfig.BN256G2Address,
+		NewDomain:       types.BytesToHash(bls.GetDomain()),
+		NewValidatorSet: validatorSet,
+	}
 
+	initCheckpointInput, err := initialize.EncodeAbi()
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
 	}
@@ -325,7 +325,7 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 
 // validatorSetToABISlice converts given validators to generic map
 // which is used for ABI encoding validator set being sent to the rootchain contract
-func validatorSetToABISlice(validators []*polybft.Validator) ([]map[string]interface{}, error) {
+func validatorSetToABISlice(validators []*polybft.Validator) ([]*contractsapi.Validator, error) {
 	genesisValidators := make([]*polybft.Validator, len(validators))
 	copy(genesisValidators, validators)
 	sort.Slice(genesisValidators, func(i, j int) bool {
@@ -347,5 +347,5 @@ func validatorSetToABISlice(validators []*polybft.Validator) ([]map[string]inter
 		}
 	}
 
-	return accSet.AsGenericMaps(), nil
+	return accSet.ToAPIBinding(), nil
 }

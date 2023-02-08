@@ -2,6 +2,8 @@ package statesyncrelayer
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -154,9 +156,9 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 }
 
 // queryStateSyncProof queries the state sync proof
-func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.StateSyncProof, error) {
+func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.Proof, error) {
 	// retrieve state sync proof
-	var stateSyncProof types.StateSyncProof
+	var stateSyncProof types.Proof
 
 	err := r.client.Call("bridge_getStateSyncProof", &stateSyncProof, stateSyncID)
 	if err != nil {
@@ -169,8 +171,34 @@ func (r *StateSyncRelayer) queryStateSyncProof(stateSyncID string) (*types.State
 }
 
 // executeStateSync executes the state sync
-func (r *StateSyncRelayer) executeStateSync(stateSyncProof *types.StateSyncProof) error {
-	input, err := stateSyncProof.EncodeAbi()
+func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
+	sseMap, ok := proof.Metadata["StateSync"].(map[string]interface{})
+	if !ok {
+		return errors.New("could not get state sync event from proof")
+	}
+
+	var sse *contractsapi.StateSync
+
+	// since state sync event is a map in the jsonrpc response,
+	// to not have custom logic of converting the map to state sync event
+	// json encoding is used, since it manages to successfully unmarshal the
+	// event from the marshaled map
+	raw, err := json.Marshal(sseMap)
+	if err != nil {
+		return fmt.Errorf("marshal the state sync map from to byte array failed. Error: %w", err)
+	}
+
+	err = json.Unmarshal(raw, &sse)
+	if err != nil {
+		return fmt.Errorf("unmarshal of state sync from map failed. Error: %w", err)
+	}
+
+	execute := &contractsapi.ExecuteFunction{
+		Proof: proof.Data,
+		Obj:   sse,
+	}
+
+	input, err := execute.EncodeAbi()
 	if err != nil {
 		return err
 	}
@@ -190,7 +218,7 @@ func (r *StateSyncRelayer) executeStateSync(stateSyncProof *types.StateSyncProof
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("state sync execution failed: %d", stateSyncProof.StateSync.ID)
+		return fmt.Errorf("state sync execution failed: %d", execute.Obj.ID)
 	}
 
 	return nil

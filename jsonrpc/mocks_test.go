@@ -172,21 +172,26 @@ func (m *mockStore) GetCapacity() (uint64, uint64) {
 	return 0, 0
 }
 
-func (m *mockStore) GenerateExitProof(exitID, epoch, checkpointNumber uint64) (types.ExitProof, error) {
+func (m *mockStore) GenerateExitProof(exitID, epoch, checkpointNumber uint64) (types.Proof, error) {
 	hash := types.BytesToHash([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
 
-	return types.ExitProof{[]types.Hash{hash}, 1}, nil
+	return types.Proof{
+		Data: []types.Hash{hash},
+		Metadata: map[string]interface{}{
+			"LeafIndex": 1111111111111,
+		},
+	}, nil
 }
 
 func (m *mockStore) GetPeers() int {
 	return 20
 }
 
-func (m *mockStore) GetStateSyncProof(stateSyncID uint64) (*types.StateSyncProof, error) {
+func (m *mockStore) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	hash := types.BytesToHash([]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
-	ssp := &types.StateSyncProof{
-		Proof:     []types.Hash{hash},
-		StateSync: &types.StateSyncEvent{},
+	ssp := types.Proof{
+		Data:     []types.Hash{hash},
+		Metadata: map[string]interface{}{},
 	}
 
 	return ssp, nil

@@ -1,6 +1,8 @@
 package signer
 
 import (
+	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -20,6 +22,8 @@ var (
 	IstanbulExtraSeal = 65
 
 	zeroBytes = make([]byte, 32)
+
+	errRoundNumberOverflow = errors.New("round number is out of range for 64bit")
 )
 
 // IstanbulExtra defines the structure of the extra field for Istanbul
@@ -28,6 +32,7 @@ type IstanbulExtra struct {
 	ProposerSeal         []byte
 	CommittedSeals       Seals
 	ParentCommittedSeals Seals
+	RoundNumber          *uint64
 }
 
 type Seals interface {
@@ -35,6 +40,36 @@ type Seals interface {
 	Num() int
 	MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value
 	UnmarshalRLPFrom(*fastrlp.Parser, *fastrlp.Value) error
+}
+
+// parseRound parses RLP-encoded bytes into round
+func parseRound(v *fastrlp.Value) (*uint64, error) {
+	roundBytes, err := v.Bytes()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(roundBytes) > 8 {
+		return nil, errRoundNumberOverflow
+	}
+
+	if len(roundBytes) == 0 {
+		return nil, nil
+	}
+
+	round := binary.BigEndian.Uint64(roundBytes)
+
+	return &round, nil
+}
+
+// toRoundBytes converts uint64 round to bytes
+// Round begins with zero and it can be nil for backward compatibility.
+// For that reason, Extra always has 8 bytes space for a round when the round has value.
+func toRoundBytes(round uint64) []byte {
+	roundBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(roundBytes, round)
+
+	return roundBytes
 }
 
 // MarshalRLPTo defines the marshal function wrapper for IstanbulExtra
@@ -60,8 +95,18 @@ func (i *IstanbulExtra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(i.CommittedSeals.MarshalRLPWith(ar))
 
 	// ParentCommittedSeal
-	if i.ParentCommittedSeals != nil {
+	if i.ParentCommittedSeals == nil {
+		vv.Set(ar.NewNullArray())
+	} else {
 		vv.Set(i.ParentCommittedSeals.MarshalRLPWith(ar))
+	}
+
+	if i.RoundNumber == nil {
+		vv.Set(ar.NewNull())
+	} else {
+		vv.Set(ar.NewBytes(
+			toRoundBytes(*i.RoundNumber),
+		))
 	}
 
 	return vv
@@ -105,6 +150,16 @@ func (i *IstanbulExtra) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) er
 		}
 	}
 
+	// Round
+	if len(elems) >= 5 {
+		roundNumber, err := parseRound(elems[4])
+		if err != nil {
+			return err
+		}
+
+		i.RoundNumber = roundNumber
+	}
+
 	return nil
 }
 
@@ -127,6 +182,16 @@ func (i *IstanbulExtra) unmarshalRLPFromForParentCS(p *fastrlp.Parser, v *fastrl
 		if err := i.ParentCommittedSeals.UnmarshalRLPFrom(p, elems[3]); err != nil {
 			return err
 		}
+	}
+
+	// Round
+	if len(elems) >= 5 {
+		roundNumber, err := parseRound(elems[4])
+		if err != nil {
+			return err
+		}
+
+		i.RoundNumber = roundNumber
 	}
 
 	return nil
@@ -213,15 +278,21 @@ func packProposerSealIntoExtra(
 				newArrayValue.Set(oldValues[3])
 			}
 
+			// Round
+			if len(oldValues) >= 5 {
+				newArrayValue.Set(oldValues[4])
+			}
+
 			return nil
 		},
 	)
 }
 
-// packCommittedSealsIntoExtra updates only CommittedSeal field in Extra
-func packCommittedSealsIntoExtra(
+// packCommittedSealsAndRoundNumberIntoExtra updates only CommittedSeal field in Extra
+func packCommittedSealsAndRoundNumberIntoExtra(
 	extraBytes []byte,
 	committedSeal Seals,
+	roundNumber *uint64,
 ) []byte {
 	return packFieldsIntoExtra(
 		extraBytes,
@@ -242,6 +313,16 @@ func packCommittedSealsIntoExtra(
 			// ParentCommittedSeal
 			if len(oldValues) >= 4 {
 				newArrayValue.Set(oldValues[3])
+			} else {
+				newArrayValue.Set(ar.NewNullArray())
+			}
+
+			if roundNumber == nil {
+				newArrayValue.Set(ar.NewNull())
+			} else {
+				newArrayValue.Set(ar.NewBytes(
+					toRoundBytes(*roundNumber),
+				))
 			}
 
 			return nil

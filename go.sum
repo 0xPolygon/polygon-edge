@@ -48,8 +48,8 @@ dmitri.shuralyov.com/state v0.0.0-20180228185332-28bcc343414c/go.mod h1:0PRwlb0D
 filippo.io/edwards25519 v1.0.0-rc.1 h1:m0VOOB23frXZvAOK44usCgLWvtsxIoMCTBGJZlpmGfU=
 filippo.io/edwards25519 v1.0.0-rc.1/go.mod h1:N1IkdkCkiLB6tki+MYJoSx2JTY9NUlxZE7eHn5EwJns=
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
-github.com/0xPolygon/go-ibft v0.1.1-0.20221128092443-8b1e3f20c4c3 h1:q5TnFEnzDwaSOZGVkOhBzCkpHFY2zhCjYLkQuRCFR9c=
-github.com/0xPolygon/go-ibft v0.1.1-0.20221128092443-8b1e3f20c4c3/go.mod h1:uJ9EHbl+8StbRhvKgfxDextK32FlVNOiBnRPlAgrQK8=
+github.com/0xPolygon/go-ibft v0.3.0 h1:4j8yaRgArErnZy1alQUHOSStD/ogAoEWVRn/CG0JlvI=
+github.com/0xPolygon/go-ibft v0.3.0/go.mod h1:mJGwdcGvLdg9obtnzBqx1aAzuhzvGeWav5AiUWN7F3Q=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 h1:UQHMgLO+TxOElx5B5HZ4hJQsoJ/PvUvKRhJHDQXO8P8=
 github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
@@ -739,16 +739,10 @@ github.com/tj/go-spin v1.1.0/go.mod h1:Mg1mzmePZm4dva8Qz60H2lHwmJ2loum4VIrLgVnKw
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2nyfOP8=
 github.com/tyler-smith/go-bip39 v1.1.0/go.mod h1:gUYDtqQw1JS3ZJ8UWVcGTGqqr6YIN3CWg+kkNaLt55U=
-github.com/umbracle/ethgo v0.1.4-0.20221121083653-944f5f94c7d2 h1:ns9iYmdnoxChGWPiQnK9CkdZe3OBPat0VsSFqBB1v5A=
-github.com/umbracle/ethgo v0.1.4-0.20221121083653-944f5f94c7d2/go.mod h1:8QIHEG/YfGnW4I5AND2Znl9W0LU3tXR9IGqgmSieiGo=
-github.com/umbracle/ethgo v0.1.4-0.20230126074632-7658a308fc94 h1:NwU7YMxJ9i75aZM+OvdPgCxfrdULMZbH1JndLfY1520=
-github.com/umbracle/ethgo v0.1.4-0.20230126074632-7658a308fc94/go.mod h1:8QIHEG/YfGnW4I5AND2Znl9W0LU3tXR9IGqgmSieiGo=
 github.com/umbracle/ethgo v0.1.4-0.20230126112511-6a4d02533af6 h1:WqlyYNdrBECgDwDIEMxa4mLUSH/FfPdAuOnniUqNpJs=
 github.com/umbracle/ethgo v0.1.4-0.20230126112511-6a4d02533af6/go.mod h1:8QIHEG/YfGnW4I5AND2Znl9W0LU3tXR9IGqgmSieiGo=
 github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 h1:10Nbw6cACsnQm7r34zlpJky+IzxVLRk6MKTS2d3Vp0E=
 github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
-github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b h1:t3nz9xXkLZJz+ZlTGFT3ixsCGO5AHx1Yift2EAfjnnc=
-github.com/umbracle/go-eth-bn256 v0.0.0-20190607160430-b36caf4e0f6b/go.mod h1:B2zj4f3YmUPeyCNSlAEgOf6tuGzeYKvIxAZzwy9PxPA=
 github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b h1:5/xofhZiOG0I9DQXqDSPxqYObk6QI7mBGMJI+ngyIgc=
 github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b/go.mod h1:H8SeC2PWEciymT92Mt07Qcfjr2FMEuCz/V+KPtPTy+U=
 github.com/urfave/cli v1.22.2/go.mod h1:Gos4lmkARVdJ6EkW0WaNv/tZAAMe9V7XWyB60NtXRu0=
@@ -1002,7 +996,6 @@ golang.org/x/sys v0.0.0-20220412211240-33da011f77ad/go.mod h1:oPkhp1MJrh7nUepCBc
 golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220704084225-05e143d24a9e/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
-golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab h1:2QkjZIsXupsJbJIdSjjUOgWK3aEtzyuh2mPt3l/CkeU=
 golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.4.0 h1:Zr2JFtRQNX3BCZ8YtxRE9hNJYC8J6I1MVbMg6owUp18=
 golang.org/x/sys v0.4.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=

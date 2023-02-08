@@ -4,7 +4,6 @@ package polybft
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -186,7 +186,7 @@ func (p *Polybft) Initialize() error {
 	// initialize polybft consensus data directory
 	p.dataDir = filepath.Join(p.config.Config.Path, "polybft")
 	// create the data dir if not exists
-	if err = os.MkdirAll(p.dataDir, 0750); err != nil {
+	if err = common.CreateDirSafe(p.dataDir, 0750); err != nil {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
@@ -298,7 +298,7 @@ func (p *Polybft) startConsensusProtocol() {
 			case ev := <-eventCh:
 				// The blockchain notification system can eventually deliver
 				// stale block notifications. These should be ignored
-				if ev.Source == "syncer" && ev.NewChain[0].Number > p.blockchain.CurrentHeader().Number {
+				if ev.Source == "syncer" && ev.NewChain[0].Number >= p.blockchain.CurrentHeader().Number {
 					syncerBlockCh <- struct{}{}
 				}
 			}
@@ -428,15 +428,25 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", blockNumber, err)
 	}
 
+	parentExtra, err := GetIbftExtra(parent.ExtraData)
+	if err != nil {
+		return err
+	}
+
+	if err := extra.ValidateBasic(parentExtra); err != nil {
+		return err
+	}
+
 	if extra.Committed == nil {
 		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
 	}
 
 	checkpointHash, err := extra.Checkpoint.Hash(p.blockchain.GetChainID(), header.Number, header.Hash)
 	if err != nil {
-		return fmt.Errorf("failed to calculate sign hash: %w", err)
+		return fmt.Errorf("failed to calculate proposal hash: %w", err)
 	}
 
+	// TODO: Move signature validation logic to Extra
 	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash, p.logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
 			blockNumber, checkpointHash, err)
@@ -458,14 +468,9 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			)
 		}
 
-		parentExtra, err := GetIbftExtra(parent.ExtraData)
-		if err != nil {
-			return err
-		}
-
 		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(p.blockchain.GetChainID(), parent.Number, parent.Hash)
 		if err != nil {
-			return fmt.Errorf("failed to calculate parent block sign hash: %w", err)
+			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 		}
 
 		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, p.logger); err != nil {
