@@ -142,17 +142,13 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// ValidateBasic contains extra data basic set of validations
-func (i *Extra) ValidateBasic(header *types.Header, parent *types.Header, parents []*types.Header,
+// ValidateFinalizedHeader contains extra data validations for finalized headers
+func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Header, parents []*types.Header,
 	chainID uint64, consensusBackend polybftBackend, logger hclog.Logger) error {
+	// validate committed signatures
 	blockNumber := header.Number
 	if i.Committed == nil {
 		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
-	}
-
-	parentExtra, err := GetIbftExtra(parent.ExtraData)
-	if err != nil {
-		return err
 	}
 
 	checkpointHash, err := i.Checkpoint.Hash(chainID, header.Number, header.Hash)
@@ -170,7 +166,12 @@ func (i *Extra) ValidateBasic(header *types.Header, parent *types.Header, parent
 			blockNumber, checkpointHash, err)
 	}
 
-	// validate the signatures for parent (skip block 1 because genesis does not have committed)
+	parentExtra, err := GetIbftExtra(parent.ExtraData)
+	if err != nil {
+		return err
+	}
+
+	// validate parent signatures
 	if err := i.ValidateParentSignatures(blockNumber, consensusBackend, parents,
 		parent, parentExtra, chainID, logger); err != nil {
 		return err
@@ -182,6 +183,7 @@ func (i *Extra) ValidateBasic(header *types.Header, parent *types.Header, parent
 // ValidateParentSignatures validates signatures for parent block
 func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
 	parent *types.Header, parentExtra *Extra, chainID uint64, logger hclog.Logger) error {
+	// skip block 1 because genesis does not have committed signatures
 	if blockNumber <= 1 {
 		return nil
 	}

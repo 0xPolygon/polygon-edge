@@ -422,7 +422,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	// validate extra data
-	return extra.ValidateBasic(header, parent, parents, p.blockchain.GetChainID(), p, p.logger)
+	return extra.ValidateFinalizedHeader(header, parent, parents, p.blockchain.GetChainID(), p, p.logger)
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
