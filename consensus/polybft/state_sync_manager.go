@@ -501,7 +501,7 @@ func (s *stateSyncManager) buildCommitment() error {
 
 	hashBytes := hash.Bytes()
 
-	signature, err := s.config.key.SignWithDomain(hashBytes, bls.DomainCheckpointManager)
+	signature, err := s.config.key.Sign(hashBytes)
 	if err != nil {
 		return fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}

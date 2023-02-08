@@ -29,14 +29,9 @@ func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-// SignWithDomain signs message with bls and use bls.DomainCheckpointManager domain for mapping message to G1
+// Sign signs message with bls by using bls.DomainCheckpointManager domain to map hash to G1
 func (k *Key) Sign(hash []byte) ([]byte, error) {
-	return k.SignWithDomain(hash, bls.DomainCheckpointManager)
-}
-
-// SignWithDomain signs message with bls and use provided domain for mapping message to G1
-func (k *Key) SignWithDomain(msg, domain []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(msg, domain)
+	s, err := k.raw.Bls.Sign(hash, bls.DomainCheckpointManager)
 	if err != nil {
 		return nil, err
 	}

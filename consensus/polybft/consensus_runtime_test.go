@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -971,7 +970,7 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 		},
 	}
 
-	committedSeal, err := key.SignWithDomain(proposalHash, bls.DomainCheckpointManager)
+	committedSeal, err := key.Sign(proposalHash)
 	require.NoError(t, err)
 
 	expected := proto.Message{

@@ -35,7 +35,7 @@ func Test_Sign(t *testing.T) {
 
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount()} {
 		key := NewKey(account)
-		ser, err := key.SignWithDomain(msg, bls.DomainCheckpointManager)
+		ser, err := key.Sign(msg)
 
 		require.NoError(t, err)
 
