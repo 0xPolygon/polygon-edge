@@ -222,7 +222,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 }
 
-func TestSignature_VerifyCommittedFields(t *testing.T) {
+func TestSignature_Verify(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Valid signatures", func(t *testing.T) {
@@ -254,7 +254,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.VerifyCommittedFields(validatorsMetadata, msgHash, hclog.NewNullLogger())
+			err = s.Verify(validatorsMetadata, msgHash, hclog.NewNullLogger())
 			signers[val.Address()] = struct{}{}
 
 			if !validatorSet.HasQuorum(signers) {
@@ -275,7 +275,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 		bmp.Set(uint64(validatorSet.Len() + 1))
 		s := &Signature{Bitmap: bmp}
 
-		err := s.VerifyCommittedFields(validatorSet, types.Hash{0x1}, hclog.NewNullLogger())
+		err := s.Verify(validatorSet, types.Hash{0x1}, hclog.NewNullLogger())
 		require.Error(t, err)
 	})
 }
@@ -312,7 +312,7 @@ func TestSignature_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 }
 
-func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
+func TestSignature_VerifyRandom(t *testing.T) {
 	t.Parallel()
 
 	numValidators := 100
@@ -343,7 +343,7 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 		Bitmap:              bitmap,
 	}
 
-	err = s.VerifyCommittedFields(vals.getPublicIdentities(), msgHash, hclog.NewNullLogger())
+	err = s.Verify(vals.getPublicIdentities(), msgHash, hclog.NewNullLogger())
 	assert.NoError(t, err)
 }
 

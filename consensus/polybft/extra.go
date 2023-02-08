@@ -161,7 +161,7 @@ func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Head
 		return fmt.Errorf("failed to validate header for block %d. could not retrieve block validators:%w", blockNumber, err)
 	}
 
-	if err := i.Committed.VerifyCommittedFields(validators, checkpointHash, logger); err != nil {
+	if err := i.Committed.Verify(validators, checkpointHash, logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
 			blockNumber, checkpointHash, err)
 	}
@@ -207,7 +207,7 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 		return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 	}
 
-	if err := i.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, logger); err != nil {
+	if err := i.Parent.Verify(parentValidators, parentCheckpointHash, logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %s: %w",
 			blockNumber, parentCheckpointHash, err)
 	}
@@ -438,8 +438,8 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// VerifyCommittedFields is checking for consensus proof in the header
-func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash, logger hclog.Logger) error {
+// Verify is checking for consensus proof in the header
+func (s *Signature) Verify(validators AccountSet, hash types.Hash, logger hclog.Logger) error {
 	signers, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
