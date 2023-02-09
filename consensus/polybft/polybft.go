@@ -448,7 +448,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	// TODO: Move signature validation logic to Extra
-	if err := extra.Committed.VerifyCommittedFields(validators, checkpointHash, p.logger); err != nil {
+	if err := extra.Committed.Verify(validators, checkpointHash, bls.DomainCheckpointManager, p.logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
 			blockNumber, checkpointHash, err)
 	}
@@ -474,7 +474,8 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 		}
 
-		if err := extra.Parent.VerifyCommittedFields(parentValidators, parentCheckpointHash, p.logger); err != nil {
+		if err := extra.Parent.Verify(
+			parentValidators, parentCheckpointHash, bls.DomainCheckpointManager, p.logger); err != nil {
 			return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %v: %w",
 				blockNumber, parentCheckpointHash, err)
 		}

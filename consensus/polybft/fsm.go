@@ -299,7 +299,8 @@ func (f *fsm) Validate(proposal []byte) error {
 			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 		}
 
-		if err := currentExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
+		if err := currentExtra.Parent.Verify(
+			validators, parentCheckpointHash, bls.DomainCheckpointManager, f.logger); err != nil {
 			return fmt.Errorf(
 				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
 				f.parent.Number,

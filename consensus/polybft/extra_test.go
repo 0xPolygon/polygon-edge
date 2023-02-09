@@ -254,7 +254,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.VerifyCommittedFields(validatorsMetadata, msgHash, hclog.NewNullLogger())
+			err = s.Verify(validatorsMetadata, msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
 			signers[val.Address()] = struct{}{}
 
 			if !validatorSet.HasQuorum(signers) {
@@ -275,7 +275,7 @@ func TestSignature_VerifyCommittedFields(t *testing.T) {
 		bmp.Set(uint64(validatorSet.Len() + 1))
 		s := &Signature{Bitmap: bmp}
 
-		err := s.VerifyCommittedFields(validatorSet, types.Hash{0x1}, hclog.NewNullLogger())
+		err := s.Verify(validatorSet, types.Hash{0x1}, bls.DomainCheckpointManager, hclog.NewNullLogger())
 		require.Error(t, err)
 	})
 }
@@ -343,7 +343,7 @@ func TestExtra_VerifyCommittedFieldsRandom(t *testing.T) {
 		Bitmap:              bitmap,
 	}
 
-	err = s.VerifyCommittedFields(vals.getPublicIdentities(), msgHash, hclog.NewNullLogger())
+	err = s.Verify(vals.getPublicIdentities(), msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
 	assert.NoError(t, err)
 }
 

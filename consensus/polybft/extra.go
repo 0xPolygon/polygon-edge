@@ -375,8 +375,8 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// VerifyCommittedFields is checking for consensus proof in the header
-func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash, logger hclog.Logger) error {
+// Verify is used to verify aggregated signature based on current validator set, message hash and domain
+func (s *Signature) Verify(validators AccountSet, hash types.Hash, domain []byte, logger hclog.Logger) error {
 	signers, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
@@ -398,7 +398,7 @@ func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash
 		return err
 	}
 
-	if !aggs.VerifyAggregated(blsPublicKeys, hash[:], bls.DomainCheckpointManager) {
+	if !aggs.VerifyAggregated(blsPublicKeys, hash[:], domain) {
 		return fmt.Errorf("could not verify aggregated signature")
 	}
 

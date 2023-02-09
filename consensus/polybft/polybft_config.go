@@ -93,7 +93,7 @@ type validatorRaw struct {
 	NodeID       string        `json:"nodeId"`
 }
 
-func (v *Validator) MakeKoskSignature(chainID int64) error {
+func (v *Validator) InitKoskSignature(chainID int64) error {
 	signature, err := MakeKoskSignature(v.BlsPrivateKey, v.Address, chainID, bls.DomainValidatorSet)
 	if err != nil {
 		return err
