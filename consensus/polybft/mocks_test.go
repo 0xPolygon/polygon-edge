@@ -510,6 +510,10 @@ func (tp *txPoolMock) SetSealing(v bool) {
 	tp.Called(v)
 }
 
+func (tp *txPoolMock) SetBaseFee(baseFee uint64) {
+	tp.Called(baseFee)
+}
+
 func (tp *txPoolMock) ResetWithHeaders(values ...*types.Header) {
 	tp.Called(values)
 }

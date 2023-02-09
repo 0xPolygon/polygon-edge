@@ -171,6 +171,10 @@ type TxPool struct {
 	// and should therefore gossip transactions
 	sealing uint32
 
+	// baseFee is the base fee of the current head.
+	// This is needed to sort transactions by price
+	baseFee uint64
+
 	// Event manager for txpool events
 	eventManager *eventManager
 
@@ -345,6 +349,11 @@ func (p *TxPool) SetSealing(sealing bool) {
 // sealing returns the current set sealing flag
 func (p *TxPool) getSealing() bool {
 	return atomic.LoadUint32(&p.sealing) == 1
+}
+
+// SetBaseFee sets the given base fee
+func (p *TxPool) SetBaseFee(baseFee uint64) {
+	atomic.StoreUint64(&p.baseFee, baseFee)
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)

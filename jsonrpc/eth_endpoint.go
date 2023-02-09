@@ -25,6 +25,9 @@ type ethTxPoolStore interface {
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
+
+	// GetBaseFee returns the current base fee
+	GetBaseFee() uint64
 }
 
 type Account struct {
@@ -166,6 +169,8 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 	if err := tx.UnmarshalRLP(buf); err != nil {
 		return nil, err
 	}
+
+	tx = fillTxFees(tx, new(big.Int).SetUint64(e.store.GetBaseFee()))
 
 	tx.ComputeHash()
 
