@@ -77,11 +77,12 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 
 // Validator represents public information about validator accounts which are the part of genesis
 type Validator struct {
-	Address      types.Address
-	BlsKey       string
-	BlsSignature string
-	Balance      *big.Int
-	NodeID       string
+	Address       types.Address
+	BlsPrivateKey *bls.PrivateKey
+	BlsKey        string
+	BlsSignature  string
+	Balance       *big.Int
+	NodeID        string
 }
 
 type validatorRaw struct {
@@ -90,6 +91,22 @@ type validatorRaw struct {
 	BlsSignature string        `json:"blsSignature"`
 	Balance      *string       `json:"balance"`
 	NodeID       string        `json:"nodeId"`
+}
+
+func (v *Validator) MakeKoskSignature(chainID int64) error {
+	signature, err := MakeKoskSignature(v.BlsPrivateKey, v.Address, chainID, bls.DomainValidatorSet)
+	if err != nil {
+		return err
+	}
+
+	signatureBytes, err := signature.Marshal()
+	if err != nil {
+		return err
+	}
+
+	v.BlsSignature = hex.EncodeToString(signatureBytes)
+
+	return nil
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {

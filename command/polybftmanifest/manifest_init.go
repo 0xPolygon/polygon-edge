@@ -193,12 +193,16 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 		validatorsPath = path.Dir(p.manifestPath)
 	}
 
-	validators, err := genesis.ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath, p.chainID)
+	validators, err := genesis.ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, v := range validators {
+		if err = v.MakeKoskSignature(p.chainID); err != nil {
+			return nil, err
+		}
+
 		v.Balance = balance
 	}
 
