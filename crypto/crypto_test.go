@@ -153,7 +153,7 @@ func TestValidateSignatureValues(t *testing.T) {
 	cases := []struct {
 		homestead bool
 		name      string
-		v         byte
+		v         *big.Int
 		r         *big.Int
 		s         *big.Int
 		res       bool
@@ -161,119 +161,127 @@ func TestValidateSignatureValues(t *testing.T) {
 		// correct v, r, s
 		{
 			name:      "should be valid if v is 0 and r & s are in range",
-			homestead: true, v: 0, r: one, s: one, res: true,
+			homestead: true, v: zero, r: one, s: one, res: true,
 		},
 		{
 			name:      "should be valid if v is 1 and r & s are in range",
-			homestead: true, v: 1, r: one, s: one, res: true,
+			homestead: true, v: one, r: one, s: one, res: true,
 		},
 		// incorrect v, correct r, s.
 		{
 			name:      "should be invalid if v is out of range",
-			homestead: true, v: 2, r: one, s: one, res: false,
+			homestead: true, v: two, r: one, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if v is out of range",
+			homestead: true, v: big.NewInt(-10), r: one, s: one, res: false,
+		},
+		{
+			name:      "should be invalid if v is out of range",
+			homestead: true, v: big.NewInt(10), r: one, s: one, res: false,
 		},
 		// incorrect v, incorrect/correct r, s.
 		{
 			name:      "should be invalid if v & r & s are out of range",
-			homestead: true, v: 2, r: zero, s: zero, res: false,
+			homestead: true, v: two, r: zero, s: zero, res: false,
 		},
 		{
 			name:      "should be invalid if v & r are out of range",
-			homestead: true, v: 2, r: zero, s: one, res: false,
+			homestead: true, v: two, r: zero, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if v & s are out of range",
-			homestead: true, v: 2, r: one, s: zero, res: false,
+			homestead: true, v: two, r: one, s: zero, res: false,
 		},
 		// correct v, incorrent r, s
 		{
 			name:      "should be invalid if r & s are nil",
-			homestead: true, v: 0, r: nil, s: nil, res: false,
+			homestead: true, v: zero, r: nil, s: nil, res: false,
 		},
 		{
 			name:      "should be invalid if r is nil",
-			homestead: true, v: 0, r: nil, s: one, res: false,
+			homestead: true, v: zero, r: nil, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if s is nil",
-			homestead: true, v: 0, r: one, s: nil, res: false,
+			homestead: true, v: zero, r: one, s: nil, res: false,
 		},
 		{
 			name:      "should be invalid if r & s are negative",
-			homestead: true, v: 0, r: minusOne, s: minusOne, res: false,
+			homestead: true, v: zero, r: minusOne, s: minusOne, res: false,
 		},
 		{
 			name:      "should be invalid if r is negative",
-			homestead: true, v: 0, r: minusOne, s: one, res: false,
+			homestead: true, v: zero, r: minusOne, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if s is negative",
-			homestead: true, v: 0, r: one, s: minusOne, res: false,
+			homestead: true, v: zero, r: one, s: minusOne, res: false,
 		},
 		{
 			name:      "should be invalid if r & s are out of range",
-			homestead: true, v: 0, r: zero, s: zero, res: false,
+			homestead: true, v: zero, r: zero, s: zero, res: false,
 		},
 		{
 			name:      "should be invalid if r is out of range (v = 0)",
-			homestead: true, v: 0, r: zero, s: one, res: false,
+			homestead: true, v: zero, r: zero, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if s is out of range (v = 0)",
-			homestead: true, v: 0, r: one, s: zero, res: false,
+			homestead: true, v: zero, r: one, s: zero, res: false,
 		},
 		{
 			name:      "should be invalid if r & s are out of range (v = 1)",
-			homestead: true, v: 1, r: zero, s: zero, res: false,
+			homestead: true, v: one, r: zero, s: zero, res: false,
 		},
 		{
 			name:      "should be invalid if r is out of range (v = 1)",
-			homestead: true, v: 1, r: zero, s: one, res: false,
+			homestead: true, v: one, r: zero, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if s is out of range (v = 1)",
-			homestead: true, v: 1, r: one, s: zero, res: false,
+			homestead: true, v: one, r: one, s: zero, res: false,
 		},
 		// incorrect r, s max limit (Frontier)
 		{
 			name:      "should be invalid if r & s equal to secp256k1N in Frontier",
-			homestead: false, v: 0, r: limit, s: limit, res: false,
+			homestead: false, v: zero, r: limit, s: limit, res: false,
 		},
 		{
 			name:      "should be invalid if r equals to secp256k1N in Frontier",
-			homestead: false, v: 0, r: limit, s: limitMinus1, res: false,
+			homestead: false, v: zero, r: limit, s: limitMinus1, res: false,
 		},
 		{
 			name:      "should be invalid if s equals to secp256k1N in Frontier",
-			homestead: false, v: 0, r: limitMinus1, s: limit, res: false,
+			homestead: false, v: zero, r: limitMinus1, s: limit, res: false,
 		},
 		// incorrect r, s max limit (Homestead)
 		{
 			name:      "should be invalid if r & s equal to secp256k1N in Homestead",
-			homestead: true, v: 0, r: limit, s: limit, res: false,
+			homestead: true, v: zero, r: limit, s: limit, res: false,
 		},
 		{
 			name:      "should be invalid if r equals to secp256k1N in Homestead",
-			homestead: true, v: 0, r: limit, s: limitMinus1, res: false,
+			homestead: true, v: zero, r: limit, s: limitMinus1, res: false,
 		},
 		{
 			name:      "should be invalid if s equals to secp256k1N in Homestead",
-			homestead: true, v: 0, r: limitMinus1, s: limit, res: false,
+			homestead: true, v: zero, r: limitMinus1, s: limit, res: false,
 		},
 		// frontier v, r, s max limit (Frontier)
 		{
 			name:      "should be valid if r & s equal to secp256k1N - 1 in Frontier",
-			homestead: false, v: 0, r: limitMinus1, s: limitMinus1, res: true,
+			homestead: false, v: zero, r: limitMinus1, s: limitMinus1, res: true,
 		},
 		// incorrect v, r, s max limit (Homestead)
 		{
 			name:      "should be invalid if r & s equal to secp256k1N - 1 in Homestead",
-			homestead: true, v: 0, r: limitMinus1, s: limitMinus1, res: false,
+			homestead: true, v: zero, r: limitMinus1, s: limitMinus1, res: false,
 		},
 		// correct v, r, s max limit (Homestead)
 		{
 			name:      "should be valid if r equals to secp256k1N - 1 and s equals to secp256k1N/2",
-			homestead: true, v: 0, r: limitMinus1, s: halfLimit, res: true,
+			homestead: true, v: zero, r: limitMinus1, s: halfLimit, res: true,
 		},
 		// edge cases
 		// Previously ValidateSignatureValues uses bytes.Compare to compare r and s with upper limit
@@ -283,39 +291,39 @@ func TestValidateSignatureValues(t *testing.T) {
 		// > 0x01fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141 (double value)
 		{
 			name:      "should be invalid if r & s equal to 2 * secp256k1N in Frontier",
-			homestead: false, v: 0, r: doubleLimit, s: doubleLimit, res: false,
+			homestead: false, v: zero, r: doubleLimit, s: doubleLimit, res: false,
 		},
 		{
 			name:      "should be invalid if r equals to 2 * secp256k1N in Frontier",
-			homestead: false, v: 0, r: doubleLimit, s: one, res: false,
+			homestead: false, v: zero, r: doubleLimit, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if s equals to 2 * secp256k1N in Frontier",
-			homestead: false, v: 0, r: one, s: doubleLimit, res: false,
+			homestead: false, v: zero, r: one, s: doubleLimit, res: false,
 		},
 		{
 			name:      "should be invalid if r equals to 2 * secp256k1N and s equal to secp256k1N",
-			homestead: true, v: 0, r: doubleLimit, s: limit, res: false,
+			homestead: true, v: zero, r: doubleLimit, s: limit, res: false,
 		},
 		{
 			name:      "should be invalid if r equals to 2 * secp256k1N in Frontier",
-			homestead: true, v: 0, r: doubleLimit, s: one, res: false,
+			homestead: true, v: zero, r: doubleLimit, s: one, res: false,
 		},
 		{
 			name:      "should be invalid if s equals to secp256k1N in Frontier",
-			homestead: true, v: 0, r: one, s: limit, res: false,
+			homestead: true, v: zero, r: one, s: limit, res: false,
 		},
 		{
 			name:      "should be valid if r & s equal to small value",
-			homestead: false, v: 0, r: smallValue, s: smallValue, res: true,
+			homestead: false, v: zero, r: smallValue, s: smallValue, res: true,
 		},
 		{
 			name:      "should be valid if r equals to smallValue in Frontier",
-			homestead: false, v: 0, r: smallValue, s: one, res: true,
+			homestead: false, v: zero, r: smallValue, s: one, res: true,
 		},
 		{
 			name:      "should be valid if s equals to smallValue in Frontier",
-			homestead: false, v: 0, r: one, s: smallValue, res: true,
+			homestead: false, v: zero, r: one, s: smallValue, res: true,
 		},
 	}
 

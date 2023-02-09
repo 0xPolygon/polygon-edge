@@ -98,7 +98,7 @@ func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()), f.isHomestead)
+	sig, err := encodeSignature(tx.R, tx.S, refV, f.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -181,7 +181,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()), e.isHomestead)
+	sig, err := encodeSignature(tx.R, tx.S, bigV, e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -230,7 +230,7 @@ func (e *EIP155Signer) CalculateV(parity byte) []byte {
 }
 
 // encodeSignature generates a signature value based on the R, S and V value
-func encodeSignature(R, S *big.Int, V byte, isHomestead bool) ([]byte, error) {
+func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 	if !ValidateSignatureValues(V, R, S, isHomestead) {
 		return nil, fmt.Errorf("invalid txn signature")
 	}
@@ -238,7 +238,7 @@ func encodeSignature(R, S *big.Int, V byte, isHomestead bool) ([]byte, error) {
 	sig := make([]byte, 65)
 	copy(sig[32-len(R.Bytes()):32], R.Bytes())
 	copy(sig[64-len(S.Bytes()):64], S.Bytes())
-	sig[64] = V
+	sig[64] = byte(V.Int64()) // here is safe to convert it since ValidateSignatureValues will validate the v value
 
 	return sig, nil
 }
