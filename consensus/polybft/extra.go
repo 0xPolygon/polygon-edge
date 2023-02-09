@@ -151,6 +151,10 @@ func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Head
 		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
 	}
 
+	if i.Checkpoint == nil {
+		return fmt.Errorf("failed to verify signatures for block %d, because checkpoint data are not present", blockNumber)
+	}
+
 	checkpointHash, err := i.Checkpoint.Hash(chainID, header.Number, header.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to calculate proposal hash: %w", err)

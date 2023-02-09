@@ -262,6 +262,14 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
+	if extra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for block %d is missing", block.Number())
+	}
+
+	if parentExtra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for parent block %d is missing", f.parent.Number)
+	}
+
 	if err := extra.ValidateParentSignatures(block.Number(), f.polybftBackend, nil, f.parent, parentExtra,
 		f.backend.GetChainID(), f.logger); err != nil {
 		return err
@@ -279,14 +287,6 @@ func (f *fsm) Validate(proposal []byte) error {
 			if nextValidators, err = f.getCurrentValidators(transition); err != nil {
 				return err
 			}
-		}
-
-		if extra.Checkpoint == nil {
-			return fmt.Errorf("checkpoint data for block %d is missing", block.Number())
-		}
-
-		if parentExtra.Checkpoint == nil {
-			return fmt.Errorf("checkpoint data for parent block %d is missing", f.parent.Number)
 		}
 
 		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
