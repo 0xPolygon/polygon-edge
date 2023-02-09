@@ -195,6 +195,8 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 }
 
 func TestPolybft_Close(t *testing.T) {
+	t.Parallel()
+
 	syncer := &syncerMock{}
 	syncer.On("Close", mock.Anything).Return(error(nil)).Once()
 
@@ -227,6 +229,8 @@ func TestPolybft_Close(t *testing.T) {
 }
 
 func TestPolybft_GetSyncProgression(t *testing.T) {
+	t.Parallel()
+
 	result := &progress.Progression{}
 
 	syncer := &syncerMock{}
@@ -240,6 +244,8 @@ func TestPolybft_GetSyncProgression(t *testing.T) {
 }
 
 func Test_Factory(t *testing.T) {
+	t.Parallel()
+
 	const epochSize = uint64(141)
 
 	txPool := &txpool.TxPool{}
@@ -268,13 +274,15 @@ func Test_Factory(t *testing.T) {
 }
 
 func Test_MakeKoskSignature(t *testing.T) {
+	t.Parallel()
+
 	expected := "127cfb8e2512b447056f33b91fca6cb2a7039e8b330edc4e5e5287f1c58bba5206373a97c9f09db144c8db5681c39e013ee6039ebbe36e0448e9f704f2d326c0"
 	bytes, _ := hex.DecodeString("3139343634393730313533353434353137333331343333303931343932303731313035313730303336303738373134363131303435323837383335373237343933383834303135343336383231")
 
 	pk, err := bls.UnmarshalPrivateKey(bytes)
 	require.NoError(t, err)
 
-	address := types.BytesToAddress((pk.PublicKey().Marshal())[:20])
+	address := types.BytesToAddress((pk.PublicKey().Marshal())[:types.AddressLength])
 
 	signature, err := MakeKoskSignature(pk, address, 10, bls.DomainValidatorSet)
 	require.NoError(t, err)
