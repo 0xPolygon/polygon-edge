@@ -42,3 +42,10 @@ export default function (data) {
   // });
   data.nonce = data.nonce + 1;
 }
+
+export function handleSummary(data) {
+  sendSlackMessage(data);
+  return {
+    'stdout': textSummary(data, { indent: ' ', enableColors: true }), // Show the text summary to stdout...
+  };
+}
