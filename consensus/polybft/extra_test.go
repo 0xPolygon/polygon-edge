@@ -2,6 +2,8 @@ package polybft
 
 import (
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"math/big"
 	mrand "math/rand"
 	"testing"
@@ -13,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/fastrlp"
 )
@@ -220,6 +223,70 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		extra := &Extra{}
 		require.Error(t, extra.UnmarshalRLPWith(extraMarshalled))
 	})
+}
+
+func TestExtra_ValidateFinalizedHeader_UnhappyPath(t *testing.T) {
+	t.Parallel()
+
+	const (
+		headerNum = 10
+		chainID   = uint64(20)
+	)
+
+	header := &types.Header{
+		Number: headerNum,
+		Hash:   types.BytesToHash(generateRandomBytes(t)),
+	}
+	parent := &types.Header{
+		Number: headerNum - 1,
+		Hash:   types.BytesToHash(generateRandomBytes(t)),
+	}
+
+	validators := newTestValidators(6)
+
+	polyBackendMock := new(polybftBackendMock)
+	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(nil, errors.New("validators not found"))
+
+	// missing Committed field
+	extra := &Extra{}
+	err := extra.ValidateFinalizedHeader(header, parent, nil, chainID, nil, hclog.NewNullLogger())
+	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for block %d, because signatures are not present", headerNum))
+
+	// missing Checkpoint field
+	noQuorumSignature := createSignature(t, validators.getPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")))
+	extra = &Extra{Committed: noQuorumSignature}
+	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for block %d, because checkpoint data are not present", headerNum))
+
+	// failed to retrieve validators from snapshot
+	checkpoint := &CheckpointData{
+		EpochNumber: 10,
+		BlockRound:  2,
+		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
+	}
+	extra = &Extra{Committed: noQuorumSignature, Checkpoint: checkpoint}
+	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	require.ErrorContains(t, err,
+		fmt.Sprintf("failed to validate header for block %d. could not retrieve block validators:validators not found", headerNum))
+
+	// failed to verify signatures (quorum not reached)
+	polyBackendMock = new(polybftBackendMock)
+	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities())
+
+	checkpointHash, err := checkpoint.Hash(chainID, headerNum, header.Hash)
+	require.NoError(t, err)
+
+	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	require.ErrorContains(t, err,
+		fmt.Sprintf("failed to verify signatures for block %d (proposal hash %s): quorum not reached", headerNum, checkpointHash))
+
+	// incorrect parent extra size
+	validSignature := createSignature(t, validators.getPrivateIdentities(), checkpointHash)
+	extra = &Extra{Committed: validSignature, Checkpoint: checkpoint}
+	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	t.Logf(err.Error())
+	require.ErrorContains(t, err,
+		fmt.Sprintf("failed to verify signatures for block %d: wrong extra size: 0", headerNum))
 }
 
 func TestSignature_Verify(t *testing.T) {
@@ -779,4 +846,32 @@ func TestCheckpointData_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCheckpointData_Copy(t *testing.T) {
+	t.Parallel()
+
+	validatorAccs := newTestValidators(5)
+	currentValidatorsHash, err := validatorAccs.getPublicIdentities("0", "1", "2").Hash()
+	require.NoError(t, err)
+
+	nextValidatorsHash, err := validatorAccs.getPublicIdentities("1", "3", "4").Hash()
+	require.NoError(t, err)
+
+	eventRoot := generateRandomBytes(t)
+	original := &CheckpointData{
+		BlockRound:            1,
+		EpochNumber:           5,
+		CurrentValidatorsHash: currentValidatorsHash,
+		NextValidatorsHash:    nextValidatorsHash,
+		EventRoot:             types.BytesToHash(eventRoot),
+	}
+
+	copied := original.Copy()
+	require.Equal(t, original, copied)
+	require.NotSame(t, original, copied)
+
+	// alter arbitrary field on copied instance
+	copied.BlockRound = 10
+	require.NotEqual(t, original.BlockRound, copied.BlockRound)
 }

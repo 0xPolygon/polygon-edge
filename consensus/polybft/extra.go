@@ -148,7 +148,7 @@ func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Head
 	// validate committed signatures
 	blockNumber := header.Number
 	if i.Committed == nil {
-		return fmt.Errorf("failed to verify signatures for block %d because signatures are not present", blockNumber)
+		return fmt.Errorf("failed to verify signatures for block %d, because signatures are not present", blockNumber)
 	}
 
 	if i.Checkpoint == nil {
@@ -172,7 +172,7 @@ func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Head
 
 	parentExtra, err := GetIbftExtra(parent.ExtraData)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to verify signatures for block %d: %w", blockNumber, err)
 	}
 
 	// validate parent signatures
