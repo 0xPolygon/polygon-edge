@@ -93,8 +93,8 @@ type validatorRaw struct {
 	NodeID       string        `json:"nodeId"`
 }
 
-func (v *Validator) InitKoskSignature(chainID int64) error {
-	signature, err := MakeKoskSignature(v.BlsPrivateKey, v.Address, chainID, bls.DomainValidatorSet)
+func (v *Validator) InitKOSKSignature(chainID int64) error {
+	signature, err := MakeKOSKSignature(v.BlsPrivateKey, v.Address, chainID, bls.DomainValidatorSet)
 	if err != nil {
 		return err
 	}
@@ -256,8 +256,8 @@ func (m *Manifest) Save(manifestPath string) error {
 	return nil
 }
 
-// MakeKoskSignature creates KOSK signature which prevents rogue attack
-func MakeKoskSignature(
+// MakeKOSKSignature creates KOSK signature which prevents rogue attack
+func MakeKOSKSignature(
 	privateKey *bls.PrivateKey, address types.Address, chainID int64, domain []byte) (*bls.Signature, error) {
 	message, err := abi.Encode(
 		[]interface{}{address, big.NewInt(chainID)},

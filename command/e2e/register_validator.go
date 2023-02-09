@@ -489,7 +489,7 @@ func registerValidator(sender *txnSender, account *wallet.Account, chainID int64
 		return &asyncTxnImpl{err: errors.New("failed to create register ABI function")}
 	}
 
-	signature, err := polybft.MakeKoskSignature(
+	signature, err := polybft.MakeKOSKSignature(
 		account.Bls, types.Address(sender.account.Ecdsa.Address()), chainID, bls.DomainValidatorSet)
 	if err != nil {
 		return &asyncTxnImpl{err: err}

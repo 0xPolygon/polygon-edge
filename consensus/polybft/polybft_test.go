@@ -273,7 +273,7 @@ func Test_Factory(t *testing.T) {
 	assert.Equal(t, params, polybft.config)
 }
 
-func Test_MakeKoskSignature(t *testing.T) {
+func Test_MakeKOSKSignature(t *testing.T) {
 	t.Parallel()
 
 	expected := "127cfb8e2512b447056f33b91fca6cb2a7039e8b330edc4e5e5287f1c58bba5206373a97c9f09db144c8db5681c39e013ee6039ebbe36e0448e9f704f2d326c0"
@@ -284,7 +284,7 @@ func Test_MakeKoskSignature(t *testing.T) {
 
 	address := types.BytesToAddress((pk.PublicKey().Marshal())[:types.AddressLength])
 
-	signature, err := MakeKoskSignature(pk, address, 10, bls.DomainValidatorSet)
+	signature, err := MakeKOSKSignature(pk, address, 10, bls.DomainValidatorSet)
 	require.NoError(t, err)
 
 	signatureBytes, err := signature.Marshal()
@@ -292,7 +292,7 @@ func Test_MakeKoskSignature(t *testing.T) {
 
 	assert.Equal(t, expected, hex.EncodeToString(signatureBytes))
 
-	signature, err = MakeKoskSignature(pk, address, 100, bls.DomainValidatorSet)
+	signature, err = MakeKOSKSignature(pk, address, 100, bls.DomainValidatorSet)
 	require.NoError(t, err)
 
 	signatureBytes, err = signature.Marshal()

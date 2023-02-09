@@ -238,7 +238,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Balance: validator.VotingPower,
 			}
 
-			signature, err := MakeKoskSignature(accSetPrivateKeys[i].Bls, validator.Address, 0, bls.DomainValidatorSet)
+			signature, err := MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address, 0, bls.DomainValidatorSet)
 			require.NoError(t, err)
 
 			signatureBytes, err := signature.Marshal()

@@ -199,7 +199,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		if err = v.InitKoskSignature(p.chainID); err != nil {
+		if err = v.InitKOSKSignature(p.chainID); err != nil {
 			return nil, err
 		}
 
