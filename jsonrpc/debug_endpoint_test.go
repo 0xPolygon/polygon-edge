@@ -23,6 +23,7 @@ type debugEndpointMockStore struct {
 	traceCallFn         func(*types.Transaction, *types.Header, tracer.Tracer) (interface{}, error)
 	getNonceFn          func(types.Address) uint64
 	getAccountFn        func(types.Hash, types.Address) (*Account, error)
+	getBaseFeeFn        func() uint64
 }
 
 func (s *debugEndpointMockStore) Header() *types.Header {
@@ -63,6 +64,10 @@ func (s *debugEndpointMockStore) GetNonce(acc types.Address) uint64 {
 
 func (s *debugEndpointMockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
 	return s.getAccountFn(root, addr)
+}
+
+func (s *debugEndpointMockStore) GetBaseFee() uint64 {
+	return s.getBaseFeeFn()
 }
 
 func TestDebugTraceConfigDecode(t *testing.T) {
