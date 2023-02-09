@@ -166,7 +166,7 @@ func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Head
 	}
 
 	if err := i.Committed.Verify(validators, checkpointHash, logger); err != nil {
-		return fmt.Errorf("failed to verify signatures for block %d. Signed hash %v: %w",
+		return fmt.Errorf("failed to verify signatures for block %d (proposal hash %s): %w",
 			blockNumber, checkpointHash, err)
 	}
 
@@ -212,7 +212,7 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 	}
 
 	if err := i.Parent.Verify(parentValidators, parentCheckpointHash, logger); err != nil {
-		return fmt.Errorf("failed to verify signatures for parent of block %d. Signed hash: %s: %w",
+		return fmt.Errorf("failed to verify signatures for parent of block %d (proposal hash: %s): %w",
 			blockNumber, parentCheckpointHash, err)
 	}
 
