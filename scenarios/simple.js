@@ -1,9 +1,9 @@
 import eth from 'k6/x/ethereum';
-import './slack.js';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
-const rpc_url = __ENV.RPC_URL
+let rpc_url = __ENV.RPC_URL
 if (rpc_url == undefined) {
-  rpc_url = "http://localhost:10002"
+  rpc_url = "https://rpc.us-east-1.deph.testing.psdk.io/"
 }
 
 const client = new eth.Client({
@@ -44,8 +44,8 @@ export default function (data) {
 }
 
 export function handleSummary(data) {
-  sendSlackMessage(data);
   return {
     'stdout': textSummary(data, { indent: ' ', enableColors: true }), // Show the text summary to stdout...
+    'summary.json': JSON.stringify(data),
   };
 }

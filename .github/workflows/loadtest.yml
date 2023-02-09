@@ -69,11 +69,72 @@
             go install go.k6.io/xk6/cmd/xk6@latest
             xk6 build --with github.com/distribworks/xk6-ethereum@latest
         
-        - name: Run scenario
+        - name: Install JQ
+          run: |
+            mkdir -p $HOME/.local/bin
+            curl -sLo $HOME/.local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x $HOME/.local/bin/jq
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+        - id: k6
+          name: Run scenario
           run: |
             ./k6 run --out statsd scenarios/simple.js -i 500
+            echo "tps=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.max')" >> $GITHUB_OUTPUT
           env:
             K6_STATSD_ENABLE_TAGS: true
             RPC_URL: ${{ secrets.RPC_URL }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
             LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+        
+        - name: Notify Slack
+          uses: slackapi/slack-github-action@v1.23.0
+          env:
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+            SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          with:
+            payload: |
+              {
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "Pandora's Box Results"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "Approximate TPS: `${{ steps.k6.outputs.tps }}`"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "Total Transactions Sent: `500`"
+                    }
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "context",
+                    "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Environment: `${{ inputs.environment }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "JSON-RPC Endpoint: ${{ secrets.RPC_URL }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                        }
+                      ]
+                    }
+                  ]
+                }
