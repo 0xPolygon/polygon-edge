@@ -118,7 +118,7 @@ func TestFSM_BuildProposal_WithoutCommitEpochTxGood(t *testing.T) {
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		config: &runtimeConfig{
-			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
 			blockchain: blockchainMock,
 		},
 	}
@@ -193,7 +193,7 @@ func TestFSM_BuildProposal_WithCommitEpochTxGood(t *testing.T) {
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		config: &runtimeConfig{
-			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
 			blockchain: blockChainMock,
 		},
 	}

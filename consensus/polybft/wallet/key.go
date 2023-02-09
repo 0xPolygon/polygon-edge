@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -12,12 +11,14 @@ import (
 )
 
 type Key struct {
-	raw *Account
+	raw    *Account
+	domain []byte
 }
 
-func NewKey(raw *Account) *Key {
+func NewKey(raw *Account, domain []byte) *Key {
 	return &Key{
-		raw: raw,
+		raw:    raw,
+		domain: domain,
 	}
 }
 
@@ -29,9 +30,9 @@ func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-// Sign signs message with bls by using bls.DomainCheckpointManager domain to map hash to G1
+// Sign signs message with bls
 func (k *Key) Sign(hash []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(hash, bls.DomainCheckpointManager)
+	s, err := k.raw.Bls.Sign(hash, k.domain)
 	if err != nil {
 		return nil, err
 	}

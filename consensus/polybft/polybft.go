@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -159,7 +160,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// set key
-	p.key = wallet.NewKey(account)
+	p.key = wallet.NewKey(account, bls.DomainCheckpointManager)
 
 	// create and set syncer
 	p.syncer = syncer.NewSyncer(

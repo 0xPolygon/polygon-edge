@@ -17,7 +17,7 @@ import (
 func createTestKey(t *testing.T) *wallet.Key {
 	t.Helper()
 
-	return wallet.NewKey(wallet.GenerateAccount())
+	return wallet.NewKey(wallet.GenerateAccount(), bls.DomainCheckpointManager)
 }
 
 func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
@@ -26,7 +26,7 @@ func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
 	result := make([]*wallet.Key, numberOfKeys, numberOfKeys)
 
 	for i := 0; i < numberOfKeys; i++ {
-		result[i] = wallet.NewKey(wallet.GenerateAccount())
+		result[i] = wallet.NewKey(wallet.GenerateAccount(), bls.DomainCheckpointManager)
 	}
 
 	return result

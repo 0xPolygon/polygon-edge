@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -462,7 +463,7 @@ func (s *Server) setupRelayer() error {
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
 		s.logger.Named("relayer"),
-		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
 	)
 
 	// start relayer

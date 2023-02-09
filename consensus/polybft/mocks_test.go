@@ -407,7 +407,7 @@ func (v *testValidator) Address() types.Address {
 }
 
 func (v *testValidator) Key() *wallet.Key {
-	return wallet.NewKey(v.account)
+	return wallet.NewKey(v.account, bls.DomainCheckpointManager)
 }
 
 func (v *testValidator) paramsValidator() *Validator {
