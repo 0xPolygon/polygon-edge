@@ -41,6 +41,7 @@ type txPoolInterface interface {
 	Drop(*types.Transaction)
 	Demote(*types.Transaction)
 	SetSealing(bool)
+	SetBaseFee(uint64)
 	ResetWithHeaders(...*types.Header)
 }
 

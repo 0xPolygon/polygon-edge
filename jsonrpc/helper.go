@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
+
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -100,8 +102,7 @@ func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*ty
 }
 
 type blockGetter interface {
-	Header() *types.Header
-	GetHeaderByNumber(uint64) (*types.Header, bool)
+	headerGetter
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
@@ -130,14 +131,14 @@ func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, store blockGetter) (*
 	return block.Header, nil
 }
 
-type nonceGetter interface {
-	Header() *types.Header
-	GetHeaderByNumber(uint64) (*types.Header, bool)
+type dataGetter interface {
+	headerGetter
 	GetNonce(types.Address) uint64
+	GetBaseFee() uint64
 	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 }
 
-func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) (uint64, error) {
+func GetNextNonce(address types.Address, number BlockNumber, store dataGetter) (uint64, error) {
 	if number == PendingBlockNumber {
 		// Grab the latest pending nonce from the TxPool
 		//
@@ -167,7 +168,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
+func DecodeTxn(arg *txnArgs, store dataGetter) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
@@ -231,7 +232,59 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		txn.To = arg.To
 	}
 
+	txn = fillTxFees(txn, new(big.Int).SetUint64(store.GetBaseFee()))
+
 	txn.ComputeHash()
 
 	return txn, nil
+}
+
+// fillTxFees fills fee-related fields depending on the provided input.
+// Basically, there must be either gas price OR gas fee cap and gas tip cap provided.
+//
+// Here is the logic:
+//   - use gas price for gas tip cap and gas fee cap if base fee is nil;
+//   - otherwise, if base fee is not provided:
+//   - use gas price for gas tip cap and gas fee cap if gas price is not nil;
+//   - otherwise, if base tip cap and base fee cap are provided:
+//   - gas price should be min(gasFeeCap, gasTipCap * baseFee);
+func fillTxFees(tx *types.Transaction, baseFee *big.Int) *types.Transaction {
+	if baseFee == nil {
+		// If there's no basefee, then it must be a non-1559 execution
+		if tx.GasPrice == nil {
+			tx.GasPrice = new(big.Int)
+		}
+
+		tx.GasFeeCap = new(big.Int).Set(tx.GasPrice)
+		tx.GasTipCap = new(big.Int).Set(tx.GasPrice)
+
+		return tx
+	}
+
+	// A basefee is provided, necessitating 1559-type execution
+	if tx.GasPrice != nil {
+		// User specified the legacy gas field, convert to 1559 gas typing
+		tx.GasFeeCap = new(big.Int).Set(tx.GasPrice)
+		tx.GasTipCap = new(big.Int).Set(tx.GasPrice)
+
+		return tx
+	}
+
+	// User specified 1559 gas feilds (or none), use those
+	if tx.GasFeeCap == nil {
+		tx.GasFeeCap = new(big.Int)
+	}
+
+	if tx.GasTipCap == nil {
+		tx.GasTipCap = new(big.Int)
+	}
+
+	// Backfill the legacy gasPrice for EVM execution, unless we're all zeroes
+	tx.GasPrice = new(big.Int)
+
+	if tx.GasFeeCap.BitLen() > 0 || tx.GasTipCap.BitLen() > 0 {
+		tx.GasPrice = common.BigMin(new(big.Int).Add(tx.GasTipCap, baseFee), tx.GasFeeCap)
+	}
+
+	return tx
 }

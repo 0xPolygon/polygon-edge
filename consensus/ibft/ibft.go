@@ -50,6 +50,7 @@ type txPoolInterface interface {
 	Demote(tx *types.Transaction)
 	ResetWithHeaders(headers ...*types.Header)
 	SetSealing(bool)
+	SetBaseFee(uint64)
 }
 
 type forkManagerInterface interface {
