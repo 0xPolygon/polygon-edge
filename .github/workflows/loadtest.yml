@@ -110,11 +110,7 @@
                     "type": "section",
                     "text": {
                       "type": "mrkdwn",
-                      "text": |
-                        Approximate TPS: `${{ steps.k6.outputs.tps }}`
-                        Transactions: `${{ steps.k6.outputs.iterations }}`
-                        Block Number: `${{ steps.k6.outputs.block }}`
-                        Time to Mine: `${{ steps.k6.outputs.ttm }}`
+                      "text": "*Approximate TPS*: `${{ steps.k6.outputs.tps }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`"
                     }
                   },
                   {
