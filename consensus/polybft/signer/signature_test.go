@@ -26,7 +26,7 @@ func Test_VerifySignature(t *testing.T) {
 	assert.False(t, signature.Verify(blsKey.PublicKey(), invalidTestMsg))
 }
 
-func Test_VerifySignature_InvalidMessage(t *testing.T) {
+func Test_VerifySignature_NegativeCases(t *testing.T) {
 	t.Parallel()
 
 	validTestMsg := testGenRandomBytes(t, 32)
@@ -35,31 +35,41 @@ func Test_VerifySignature_InvalidMessage(t *testing.T) {
 	signature, err := blsKey.Sign(validTestMsg)
 	require.NoError(t, err)
 
-	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+	require.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
 
-	for i := 0; i < len(validTestMsg); i++ {
-		b := validTestMsg[i]
-		validTestMsg[i] = b + 1
+	t.Run("Wrong public key", func(t *testing.T) {
+		t.Parallel()
 
-		assert.False(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
-		validTestMsg[i] = b
-	}
-}
+		publicKey := blsKey.PublicKey()
+		publicKey.g2.Add(publicKey.g2, publicKey.g2)
 
-func Test_VerifySignature_InvalidSignature(t *testing.T) {
-	t.Parallel()
+		require.False(t, signature.Verify(publicKey, validTestMsg))
+	})
 
-	validTestMsg := testGenRandomBytes(t, 32)
+	t.Run("Tampered message", func(t *testing.T) {
+		t.Parallel()
 
-	blsKey, _ := GenerateBlsKey()
-	signature, err := blsKey.Sign(validTestMsg)
-	require.NoError(t, err)
+		msgCopy := make([]byte, len(validTestMsg))
+		copy(msgCopy, validTestMsg)
 
-	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+		for i := 0; i < len(msgCopy); i++ {
+			b := msgCopy[i]
+			msgCopy[i] = b + 1
 
-	signature.g1.Add(signature.g1, signature.g1) // change signature
+			require.False(t, signature.Verify(blsKey.PublicKey(), msgCopy))
+			msgCopy[i] = b
+		}
+	})
 
-	assert.False(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+	t.Run("Tampered signature", func(t *testing.T) {
+		t.Parallel()
+
+		sigCopy := signature
+		for i := 0; i < len(validTestMsg); i++ {
+			sigCopy.g1.Add(sigCopy.g1, sigCopy.g1) // change signature
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+		}
+	})
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
