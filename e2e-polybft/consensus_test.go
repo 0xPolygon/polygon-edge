@@ -144,8 +144,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// register new validator
 	require.NoError(t, srv.RegisterValidator(newValidatorSecrets, newValidatorBalanceRaw, newValidatorStakeRaw))
 
-	// start new validator
-	cluster.InitTestServer(t, 6, true, false)
+	go func() {
+		// start new validator
+		cluster.InitTestServer(t, 6, true, false)
+	}()
 
 	validators := polybft.AccountSet{}
 	// assert that new validator is among validator set
