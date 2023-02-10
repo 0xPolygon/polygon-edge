@@ -2,11 +2,13 @@ package bls
 
 import (
 	"crypto/rand"
-	"math/big"
+	mRand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
 const (
@@ -30,9 +32,15 @@ func Test_VerifySignature(t *testing.T) {
 func Test_VerifySignature_NegativeCases(t *testing.T) {
 	t.Parallel()
 
-	validTestMsg := testGenRandomBytes(t, 32)
+	// Get a random integer between 1 and 1000
+	mRand.Seed(time.Now().UnixNano())
+	messageSize := mRand.Intn(1000) + 1
 
-	blsKey, _ := GenerateBlsKey()
+	validTestMsg := testGenRandomBytes(t, messageSize)
+
+	blsKey, err := GenerateBlsKey()
+	require.NoError(t, err)
+
 	signature, err := blsKey.Sign(validTestMsg)
 	require.NoError(t, err)
 
@@ -41,10 +49,18 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 	t.Run("Wrong public key", func(t *testing.T) {
 		t.Parallel()
 
-		publicKey := blsKey.PublicKey()
-		publicKey.g2.Add(publicKey.g2, publicKey.g2)
+		for i := 0; i < 100; i++ {
+			x, randomG2, err := bn256.RandomG2(rand.Reader)
+			require.NoError(t, err)
 
-		require.False(t, signature.Verify(publicKey, validTestMsg))
+			publicKey := blsKey.PublicKey()
+			publicKey.g2.Add(publicKey.g2, randomG2) // change public key g2 point
+			require.False(t, signature.Verify(publicKey, validTestMsg))
+
+			publicKey = blsKey.PublicKey()
+			publicKey.g2.ScalarMult(publicKey.g2, x) // change public key g2 point
+			require.False(t, signature.Verify(publicKey, validTestMsg))
+		}
 	})
 
 	t.Run("Tampered message", func(t *testing.T) {
@@ -65,13 +81,18 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 	t.Run("Tampered signature", func(t *testing.T) {
 		t.Parallel()
 
-		sigCopy := signature
-		sigCopy.g1.Add(sigCopy.g1, sigCopy.g1) // change signature
-		require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+		for i := 0; i < 100; i++ {
+			x, randomG1, err := bn256.RandomG1(rand.Reader)
+			require.NoError(t, err)
 
-		sigCopy = signature
-		sigCopy.g1.ScalarMult(sigCopy.g1, big.NewInt(2)) // change signature
-		require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+			sigCopy := signature
+			sigCopy.g1.Add(sigCopy.g1, randomG1) // change signature
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+
+			sigCopy = signature
+			sigCopy.g1.ScalarMult(sigCopy.g1, x) // change signature
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+		}
 	})
 }
 
