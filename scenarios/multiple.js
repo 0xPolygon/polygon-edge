@@ -1,6 +1,7 @@
 import eth from 'k6/x/ethereum';
 import exec from 'k6/execution';
 import { fundTestAccounts } from './helpers/init.js';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
 export const options = {
   setupTimeout: '220s',
@@ -56,4 +57,11 @@ export default function (data) {
   // client.waitForTransactionReceipt(txh).then((receipt) => {
   //   console.log("tx block hash => " + receipt.block_hash);
   // });
+}
+
+export function handleSummary(data) {
+  return {
+    'stdout': textSummary(data, { indent: ' ', enableColors: true }), // Show the text summary to stdout...
+    'summary.json': JSON.stringify(data),
+  };
 }
