@@ -1,6 +1,6 @@
 import eth from 'k6/x/ethereum';
 import exec from 'k6/execution';
-import { fundTestAccounts } from '../helpers/init.js';
+import { fundTestAccounts } from './helpers/init.js';
 
 export const options = {
   setupTimeout: '220s',
