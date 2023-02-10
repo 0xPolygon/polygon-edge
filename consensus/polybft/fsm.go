@@ -289,6 +289,10 @@ func (f *fsm) Validate(proposal []byte) error {
 			}
 		}
 
+		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
+			return err
+		}
+
 		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
 	}
 
