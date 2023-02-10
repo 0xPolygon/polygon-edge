@@ -5,7 +5,7 @@ import wallet from 'k6/x/ethereum/wallet';
 export function fundTestAccounts(root_address, url, priv_key) {
     const client = new eth.Client({ 
         url: url,
-        privateKey: priv_key,
+        mnemonic: priv_key,
     });
     var accounts = [];
     var nonce = client.getNonce(root_address);
