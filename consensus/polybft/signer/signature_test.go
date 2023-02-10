@@ -26,6 +26,42 @@ func Test_VerifySignature(t *testing.T) {
 	assert.False(t, signature.Verify(blsKey.PublicKey(), invalidTestMsg))
 }
 
+func Test_VerifySignature_InvalidMessage(t *testing.T) {
+	t.Parallel()
+
+	validTestMsg := testGenRandomBytes(t, 32)
+
+	blsKey, _ := GenerateBlsKey()
+	signature, err := blsKey.Sign(validTestMsg)
+	require.NoError(t, err)
+
+	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+
+	for i := 0; i < len(validTestMsg); i++ {
+		b := validTestMsg[i]
+		validTestMsg[i] = b + 1
+
+		assert.False(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+		validTestMsg[i] = b
+	}
+}
+
+func Test_VerifySignature_InvalidSignature(t *testing.T) {
+	t.Parallel()
+
+	validTestMsg := testGenRandomBytes(t, 32)
+
+	blsKey, _ := GenerateBlsKey()
+	signature, err := blsKey.Sign(validTestMsg)
+	require.NoError(t, err)
+
+	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+
+	signature.g1.Add(signature.g1, signature.g1) // change signature
+
+	assert.False(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+}
+
 func Test_AggregatedSignatureSimple(t *testing.T) {
 	t.Parallel()
 
