@@ -2,6 +2,7 @@ package bls
 
 import (
 	"crypto/rand"
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -65,10 +66,12 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 		t.Parallel()
 
 		sigCopy := signature
-		for i := 0; i < len(validTestMsg); i++ {
-			sigCopy.g1.Add(sigCopy.g1, sigCopy.g1) // change signature
-			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
-		}
+		sigCopy.g1.Add(sigCopy.g1, sigCopy.g1) // change signature
+		require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+
+		sigCopy = signature
+		sigCopy.g1.ScalarMult(sigCopy.g1, big.NewInt(2)) // change signature
+		require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
 	})
 }
 
