@@ -289,6 +289,57 @@ func TestExtra_ValidateFinalizedHeader_UnhappyPath(t *testing.T) {
 		fmt.Sprintf("failed to verify signatures for block %d: wrong extra size: 0", headerNum))
 }
 
+func TestExtra_ValidateParentSignatures(t *testing.T) {
+	t.Parallel()
+
+	const (
+		chainID   = 15
+		headerNum = 23
+	)
+
+	polyBackendMock := new(polybftBackendMock)
+	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(nil, errors.New("no validators"))
+
+	// validation is skipped for blocks 0 and 1
+	extra := &Extra{}
+	err := extra.ValidateParentSignatures(1, polyBackendMock, nil, nil, nil, chainID, hclog.NewNullLogger())
+	require.NoError(t, err)
+
+	// parent signatures not present
+	err = extra.ValidateParentSignatures(headerNum, polyBackendMock, nil, nil, nil, chainID, hclog.NewNullLogger())
+	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for parent of block %d because signatures are not present", headerNum))
+
+	// validators not found
+	validators := newTestValidators(5)
+	incorrectHash := types.BytesToHash([]byte("Hello World"))
+	invalidSig := createSignature(t, validators.getPrivateIdentities(), incorrectHash)
+	extra = &Extra{Parent: invalidSig}
+	err = extra.ValidateParentSignatures(headerNum, polyBackendMock, nil, nil, nil, chainID, hclog.NewNullLogger())
+	require.ErrorContains(t, err,
+		fmt.Sprintf("failed to validate header for block %d. could not retrieve parent validators: no validators", headerNum))
+
+	// incorrect hash is signed
+	polyBackendMock = new(polybftBackendMock)
+	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities())
+
+	parent := &types.Header{Number: headerNum - 1, Hash: types.BytesToHash(generateRandomBytes(t))}
+	parentCheckpoint := &CheckpointData{EpochNumber: 3, BlockRound: 5}
+	parentExtra := &Extra{Checkpoint: parentCheckpoint}
+
+	parentCheckpointHash, err := parentCheckpoint.Hash(chainID, parent.Number, parent.Hash)
+	require.NoError(t, err)
+
+	err = extra.ValidateParentSignatures(headerNum, polyBackendMock, nil, parent, parentExtra, chainID, hclog.NewNullLogger())
+	require.ErrorContains(t, err,
+		fmt.Sprintf("failed to verify signatures for parent of block %d (proposal hash: %s): could not verify aggregated signature", headerNum, parentCheckpointHash))
+
+	// valid signature provided
+	validSig := createSignature(t, validators.getPrivateIdentities(), parentCheckpointHash)
+	extra = &Extra{Parent: validSig}
+	err = extra.ValidateParentSignatures(headerNum, polyBackendMock, nil, parent, parentExtra, chainID, hclog.NewNullLogger())
+	require.NoError(t, err)
+}
+
 func TestSignature_Verify(t *testing.T) {
 	t.Parallel()
 
