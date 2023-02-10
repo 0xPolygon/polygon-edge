@@ -78,7 +78,7 @@
         - id: k6
           name: Run scenario
           run: |
-            ./k6 run --out statsd scenarios/simple.js -i 500
+            ./k6 run --out statsd scenarios/multiple.js
             echo "tps=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.max')" >> $GITHUB_OUTPUT
           env:
             K6_STATSD_ENABLE_TAGS: true
@@ -92,6 +92,7 @@
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
             SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
           with:
+            channel-id: C04PHMM0VCG
             payload: |
               {
                 "blocks": [
