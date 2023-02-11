@@ -111,7 +111,7 @@
                     "type": "section",
                     "text": {
                       "type": "mrkdwn",
-                      "text": "*Approximate TPS*: `${{ steps.k6.outputs.tps }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`\n*Gas Used*: `${{ steps.k6.outputs.gas }}`"
+                      "text": "*Average TPS*: `${{ steps.k6.outputs.tps }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`\n*Gas Used*: `${{ steps.k6.outputs.gas }}`"
                     }
                   },
                   {
