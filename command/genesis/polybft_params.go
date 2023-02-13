@@ -75,6 +75,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		Bridge:            bridge,
 		ValidatorSetAddr:  contracts.ValidatorSetContract,
 		StateReceiverAddr: contracts.StateReceiverContract,
+		InitialTrieRoot:   types.StringToHash(p.initialStateRoot),
 	}
 
 	chainConfig := &chain.Chain{

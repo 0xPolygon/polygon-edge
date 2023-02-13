@@ -85,6 +85,9 @@ type genesisParams struct {
 	blockTime              time.Duration
 	bridgeJSONRPCAddr      string
 	epochReward            uint64
+
+	initialStateRoot string
+	initialTrie      string
 }
 
 func (p *genesisParams) validateFlags() error {

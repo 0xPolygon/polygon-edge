@@ -84,7 +84,10 @@ func newTestTransition(
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash := ex.WriteGenesis(nil)
+	rootHash, err := ex.WriteGenesis(nil, types.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {

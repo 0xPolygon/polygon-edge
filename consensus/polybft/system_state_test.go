@@ -193,7 +193,10 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash := ex.WriteGenesis(alloc)
+	rootHash, err := ex.WriteGenesis(alloc, types.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {

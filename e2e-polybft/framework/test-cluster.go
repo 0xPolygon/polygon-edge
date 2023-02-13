@@ -87,6 +87,9 @@ type TestClusterConfig struct {
 	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
+	InitialTrieDB    string
+	InitialStateRoot types.Hash
+
 	logsDirOnce sync.Once
 }
 
