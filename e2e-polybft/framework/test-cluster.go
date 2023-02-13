@@ -197,6 +197,13 @@ func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	}
 }
 
+func WithGenesisState(databasePath string, stateRoot types.Hash) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.InitialTrieDB = databasePath
+		h.InitialStateRoot = stateRoot
+	}
+}
+
 func WithBootnodeCount(cnt int) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BootnodeCount = cnt

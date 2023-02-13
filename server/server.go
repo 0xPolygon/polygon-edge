@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"time"
 
+	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -32,7 +34,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
+	hclog "github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"
@@ -77,11 +79,6 @@ type Server struct {
 
 	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
 	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
-}
-
-var dirPaths = []string{
-	"blockchain",
-	"trie",
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -142,6 +139,11 @@ func NewServer(config *Config) (*Server, error) {
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
+	var dirPaths = []string{
+		"blockchain",
+		"trie",
+	}
+
 	// Generate all the paths in the dataDir
 	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
@@ -199,8 +201,37 @@ func NewServer(config *Config) (*Server, error) {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
 
+	var genesisRoot types.Hash
+	//todo handle non-first blocks
+	if ConsensusType(engineName) == PolyBFTConsensus {
+		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
+		if err != nil {
+			return nil, err
+		}
+
+		if polyBFTConfig.InitialTrieRoot != types.ZeroHash {
+			checkedInitialTrieRoot, err := itrie.HashChecker1(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
+			if err != nil {
+				return nil, fmt.Errorf("error on state root verification %w", err)
+			}
+
+			if checkedInitialTrieRoot != polyBFTConfig.InitialTrieRoot {
+				return nil, errors.New("invalid initial state root")
+			}
+
+			logger.Warn("Initial state root checked and correct")
+
+			genesisRoot, err = m.executor.WriteGenesis(config.Chain.Genesis.Alloc, polyBFTConfig.InitialTrieRoot)
+		}
+	} else {
+		genesisRoot, err = m.executor.WriteGenesis(config.Chain.Genesis.Alloc, types.ZeroHash)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer
