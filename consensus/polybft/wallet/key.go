@@ -20,40 +20,44 @@ func NewKey(raw *Account) *Key {
 	}
 }
 
+// String returns hex encoded ECDSA address
 func (k *Key) String() string {
 	return k.raw.Ecdsa.Address().String()
 }
 
+// Address returns ECDSA address
 func (k *Key) Address() ethgo.Address {
 	return k.raw.Ecdsa.Address()
 }
 
-func (k *Key) Sign(b []byte) ([]byte, error) {
-	s, err := k.raw.Bls.Sign(b)
+// Sign signs the provided digest with BLS key
+func (k *Key) Sign(digest []byte) ([]byte, error) {
+	signature, err := k.raw.Bls.Sign(digest)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.Marshal()
+	return signature.Marshal()
 }
 
-// SignEcdsaMessage signs the proto message with ecdsa
-func (k *Key) SignEcdsaMessage(msg *proto.Message) (*proto.Message, error) {
-	raw, err := protobuf.Marshal(msg)
+// SignIBFTMessage signs the IBFT consensus message with ECDSA key
+func (k *Key) SignIBFTMessage(msg *proto.Message) (*proto.Message, error) {
+	msgRaw, err := protobuf.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal message: %w", err)
 	}
 
-	if msg.Signature, err = k.raw.Ecdsa.Sign(raw); err != nil {
+	if msg.Signature, err = k.raw.Ecdsa.Sign(crypto.Keccak256(msgRaw)); err != nil {
 		return nil, fmt.Errorf("cannot create message signature: %w", err)
 	}
 
 	return msg, nil
 }
 
-// RecoverAddressFromSignature recovers signer address from the given digest and signature
-func RecoverAddressFromSignature(sig, msg []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, msg)
+// RecoverAddressFromSignature calculates keccak256 hash of provided rawContent
+// and recovers signer address from given signature and hash
+func RecoverAddressFromSignature(sig, rawContent []byte) (types.Address, error) {
+	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(rawContent))
 	if err != nil {
 		return types.Address{}, fmt.Errorf("cannot recover address from signature: %w", err)
 	}
