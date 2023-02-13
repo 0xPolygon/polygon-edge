@@ -56,6 +56,9 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
+	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
+	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
+	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
 )
 
 // indicates origin of a transaction
@@ -625,8 +628,30 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Reject underpriced transactions
-	if tx.IsUnderpriced(p.priceLimit) {
-		return ErrUnderpriced
+	if p.GetBaseFee() > 0 || tx.GasFeeCap.BitLen() > 0 || tx.GasTipCap.BitLen() > 0 {
+		// Check EIP-1559-related fields and make sure they are correct
+
+		if l := tx.GasFeeCap.BitLen(); l > 256 {
+			return ErrFeeCapVeryHigh
+		}
+
+		if l := tx.GasTipCap.BitLen(); l > 256 {
+			return ErrTipVeryHigh
+		}
+
+		if tx.GasFeeCap.Cmp(tx.GasTipCap) < 0 {
+			return ErrTipAboveFeeCap
+		}
+
+		if baseFee := new(big.Int).SetUint64(p.GetBaseFee()); tx.GasFeeCap.Cmp(baseFee) < 0 {
+			return ErrUnderpriced
+		}
+	} else {
+		// Legacy approach to check if the given tx is not underpriced
+
+		if tx.GasPrice.Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+			return ErrUnderpriced
+		}
 	}
 
 	// Grab the state root for the latest block
