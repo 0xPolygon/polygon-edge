@@ -67,7 +67,7 @@
         - name: Install xk6
           run: |
             go install go.k6.io/xk6/cmd/xk6@latest
-            xk6 build --with github.com/distribworks/xk6-ethereum@latest
+            xk6 build --with github.com/distribworks/xk6-ethereum@70535b43d659e7aa63eb7ce5efad619795dfad66
         
         - name: Install JQ
           run: |
