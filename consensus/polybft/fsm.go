@@ -305,8 +305,6 @@ func (f *fsm) Validate(proposal []byte) error {
 		f.logger.Trace("[FSM Validate]", "Block", block.Number(), "parent validators", validators)
 	}
 
-	// TODO: Validate validator set delta?
-
 	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
 	if err != nil {
 		return err
