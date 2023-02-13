@@ -225,7 +225,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 }
 
-func TestExtra_ValidateFinalizedHeader_UnhappyPath(t *testing.T) {
+func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -249,13 +249,12 @@ func TestExtra_ValidateFinalizedHeader_UnhappyPath(t *testing.T) {
 
 	// missing Committed field
 	extra := &Extra{}
-	err := extra.ValidateFinalizedHeader(header, parent, nil, chainID, nil, hclog.NewNullLogger())
+	err := extra.ValidateFinalizedData(header, parent, nil, chainID, nil, hclog.NewNullLogger())
 	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for block %d, because signatures are not present", headerNum))
 
 	// missing Checkpoint field
-	noQuorumSignature := createSignature(t, validators.getPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")))
-	extra = &Extra{Committed: noQuorumSignature}
-	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	extra = &Extra{Committed: &Signature{}}
+	err = extra.ValidateFinalizedData(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
 	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for block %d, because checkpoint data are not present", headerNum))
 
 	// failed to retrieve validators from snapshot
@@ -264,8 +263,8 @@ func TestExtra_ValidateFinalizedHeader_UnhappyPath(t *testing.T) {
 		BlockRound:  2,
 		EventRoot:   types.BytesToHash(generateRandomBytes(t)),
 	}
-	extra = &Extra{Committed: noQuorumSignature, Checkpoint: checkpoint}
-	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	extra = &Extra{Committed: &Signature{}, Checkpoint: checkpoint}
+	err = extra.ValidateFinalizedData(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to validate header for block %d. could not retrieve block validators:validators not found", headerNum))
 
@@ -273,18 +272,19 @@ func TestExtra_ValidateFinalizedHeader_UnhappyPath(t *testing.T) {
 	polyBackendMock = new(polybftBackendMock)
 	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities())
 
+	noQuorumSignature := createSignature(t, validators.getPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")))
+	extra = &Extra{Committed: noQuorumSignature, Checkpoint: checkpoint}
 	checkpointHash, err := checkpoint.Hash(chainID, headerNum, header.Hash)
 	require.NoError(t, err)
 
-	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
+	err = extra.ValidateFinalizedData(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to verify signatures for block %d (proposal hash %s): quorum not reached", headerNum, checkpointHash))
 
 	// incorrect parent extra size
 	validSignature := createSignature(t, validators.getPrivateIdentities(), checkpointHash)
 	extra = &Extra{Committed: validSignature, Checkpoint: checkpoint}
-	err = extra.ValidateFinalizedHeader(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
-	t.Logf(err.Error())
+	err = extra.ValidateFinalizedData(header, parent, nil, chainID, polyBackendMock, hclog.NewNullLogger())
 	require.ErrorContains(t, err,
 		fmt.Sprintf("failed to verify signatures for block %d: wrong extra size: 0", headerNum))
 }

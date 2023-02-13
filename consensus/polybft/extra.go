@@ -142,8 +142,8 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// ValidateFinalizedHeader contains extra data validations for finalized headers
-func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Header, parents []*types.Header,
+// ValidateFinalizedData contains extra data validations for finalized headers
+func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header, parents []*types.Header,
 	chainID uint64, consensusBackend polybftBackend, logger hclog.Logger) error {
 	// validate committed signatures
 	blockNumber := header.Number
@@ -155,6 +155,7 @@ func (i *Extra) ValidateFinalizedHeader(header *types.Header, parent *types.Head
 		return fmt.Errorf("failed to verify signatures for block %d, because checkpoint data are not present", blockNumber)
 	}
 
+	// validate current block signatures
 	checkpointHash, err := i.Checkpoint.Hash(chainID, header.Number, header.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to calculate proposal hash: %w", err)
@@ -612,6 +613,7 @@ func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
 }
 
 // Validate encapsulates validation logic for checkpoint data
+// (with regards to current and next epoch validators)
 func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 	currentValidators AccountSet, nextValidators AccountSet) error {
 	if err := c.ValidateBasic(parentCheckpoint); err != nil {
