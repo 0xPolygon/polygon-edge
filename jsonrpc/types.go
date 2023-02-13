@@ -17,8 +17,8 @@ type transactionOrHash interface {
 type transaction struct {
 	Nonce       argUint64      `json:"nonce"`
 	GasPrice    argBig         `json:"gasPrice"`
-	GasTipCap   argBig         `json:"gasTipCap"`
-	GasFeeCap   argBig         `json:"gasFeeCap"`
+	GasTipCap   argBig         `json:"gasTipCap,omitempty"`
+	GasFeeCap   argBig         `json:"gasFeeCap,omitempty"`
 	Gas         argUint64      `json:"gas"`
 	To          *types.Address `json:"to"`
 	Value       argBig         `json:"value"`

@@ -6,7 +6,6 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -231,7 +230,7 @@ func DecodeTxn(arg *txnArgs, store dataGetter) (*types.Transaction, error) {
 		txn.To = arg.To
 	}
 
-	txn = fillTxFees(txn, new(big.Int).SetUint64(store.GetBaseFee()))
+	txn = fillTxFees(txn, store.GetBaseFee())
 
 	txn.ComputeHash()
 
@@ -247,8 +246,8 @@ func DecodeTxn(arg *txnArgs, store dataGetter) (*types.Transaction, error) {
 //   - use gas price for gas tip cap and gas fee cap if gas price is not nil;
 //   - otherwise, if base tip cap and base fee cap are provided:
 //   - gas price should be min(gasFeeCap, gasTipCap * baseFee);
-func fillTxFees(tx *types.Transaction, baseFee *big.Int) *types.Transaction {
-	if baseFee == nil {
+func fillTxFees(tx *types.Transaction, baseFee uint64) *types.Transaction {
+	if baseFee == 0 {
 		// If there's no basefee, then it must be a non-1559 execution
 		if tx.GasPrice == nil {
 			tx.GasPrice = new(big.Int)
@@ -282,7 +281,13 @@ func fillTxFees(tx *types.Transaction, baseFee *big.Int) *types.Transaction {
 	tx.GasPrice = new(big.Int)
 
 	if tx.GasFeeCap.BitLen() > 0 || tx.GasTipCap.BitLen() > 0 {
-		tx.GasPrice = common.BigMin(new(big.Int).Add(tx.GasTipCap, baseFee), tx.GasFeeCap)
+		tx.GasPrice = common.BigMin(
+			new(big.Int).Add(
+				tx.GasTipCap,
+				new(big.Int).SetUint64(baseFee),
+			),
+			tx.GasFeeCap,
+		)
 	}
 
 	return tx

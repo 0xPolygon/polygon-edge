@@ -207,7 +207,14 @@ func NewServer(config *Config) (*Server, error) {
 	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(
+		logger,
+		m.config.DataDir,
+		config.Chain,
+		nil,
+		m.executor,
+		signer,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -295,6 +302,17 @@ func NewServer(config *Config) (*Server, error) {
 		if err := m.setupRelayer(); err != nil {
 			return nil, err
 		}
+	}
+
+	// Calculate and set the latest base fee value
+	{
+		baseFee := m.chain.Genesis.BaseFee
+
+		if header := m.blockchain.Header(); header != nil {
+			baseFee = m.blockchain.CalculateBaseFee(header)
+		}
+
+		m.txpool.SetBaseFee(baseFee)
 	}
 
 	m.txpool.Start()

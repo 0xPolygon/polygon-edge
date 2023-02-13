@@ -71,6 +71,7 @@ func (g *Genesis) GenesisHeader() *types.Header {
 		ExtraData:    g.ExtraData,
 		GasLimit:     g.GasLimit,
 		GasUsed:      g.GasUsed,
+		BaseFee:      g.BaseFee,
 		Difficulty:   g.Difficulty,
 		MixHash:      g.Mixhash,
 		Miner:        g.Coinbase.Bytes(),
@@ -129,6 +130,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 
 	enc.GasLimit = types.EncodeUint64(g.GasLimit)
 	enc.Difficulty = types.EncodeUint64(g.Difficulty)
+	enc.BaseFee = types.EncodeUint64(g.BaseFee)
 
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
@@ -145,7 +147,6 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	enc.Number = types.EncodeUint64(g.Number)
 	enc.GasUsed = types.EncodeUint64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
-	enc.BaseFee = types.EncodeUint64(g.BaseFee)
 
 	return json.Marshal(&enc)
 }
@@ -211,6 +212,11 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		parseError("difficulty", subErr)
 	}
 
+	g.BaseFee, subErr = types.ParseUint64orHex(dec.BaseFee)
+	if subErr != nil {
+		parseError("baseFee", subErr)
+	}
+
 	if dec.Mixhash != nil {
 		g.Mixhash = *dec.Mixhash
 	}
@@ -238,11 +244,6 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 
 	if dec.ParentHash != nil {
 		g.ParentHash = *dec.ParentHash
-	}
-
-	g.BaseFee, subErr = types.ParseUint64orHex(dec.BaseFee)
-	if subErr != nil {
-		parseError("baseFee", subErr)
 	}
 
 	return err
