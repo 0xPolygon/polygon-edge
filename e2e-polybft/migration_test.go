@@ -81,12 +81,11 @@ func TestMigration(t *testing.T) {
 		Gas:      1000000,
 		Input:    contractsapi.TestWriteBlockMetadata.Bytecode,
 	}, userKey)
+	require.NoError(t, err)
+	require.NotNil(t, receipt)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	deployedContractBalance := receipt.ContractAddress
-
-	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
-	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	initReceipt, err := ABITransaction(relayer, userKey, contractsapi.TestWriteBlockMetadata, receipt.ContractAddress, "init")
 	if err != nil {
