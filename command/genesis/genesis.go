@@ -199,6 +199,14 @@ func setFlags(cmd *cobra.Command) {
 			"reward size for block sealing",
 		)
 
+		//Regenesis flag that allows to start from non-empty database
+		cmd.Flags().StringVar(
+			&params.initialStateRoot,
+			"trieroot",
+			"",
+			"path to trie root from corresponding triedb",
+		)
+
 		cmd.Flags().Lookup(bridgeFlag).NoOptDefVal = "http://127.0.0.1:8545"
 	}
 }

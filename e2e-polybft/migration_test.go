@@ -23,9 +23,6 @@ import (
 
 // Add `-run TestMigration` to Makefile `test-e2e-polybft` command to run this test
 func TestMigration(t *testing.T) {
-	os.Setenv("EDGE_BINARY", "/Users/boris/GolandProjects/polygon-edge/polygon-edge")
-	os.Setenv("E2E_TESTS", "true")
-	os.Setenv("E2E_LOGS", "true")
 	userKey, _ := wallet.GenerateKey()
 	userAddr := userKey.Address()
 	userKey2, _ := wallet.GenerateKey()
@@ -51,6 +48,7 @@ func TestMigration(t *testing.T) {
 		ethgo.Latest,
 	)
 	assert.NoError(t, err)
+
 	if balanceReceiver.Uint64() != 0 {
 		t.Fatal("balanceReceiver is not 0")
 	}
@@ -94,6 +92,7 @@ func TestMigration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	require.Equal(t, uint64(types.ReceiptSuccess), initReceipt.Status)
 
 	// Fetch the balances after sending
@@ -115,7 +114,6 @@ func TestMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Log(block.Number)
 	stateRoot := block.StateRoot
 
 	path := srvs[0].Config.RootDir
@@ -149,10 +147,8 @@ func TestMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Log("get addr")
 	acc1, err := exSnapshot.GetAccount(types.Address(userAddr))
 	require.NoError(t, err)
-	t.Log(acc1)
 	assert.Equal(t, balanceSender, acc1.Balance)
 
 	rootNode, _, err := itrie.GetNode(stateRoot.Bytes(), stateStorage)
@@ -162,7 +158,6 @@ func TestMigration(t *testing.T) {
 
 	oldTrie := itrie.NewTrieWithRoot(rootNode)
 
-	t.Log("Get old trie")
 	oldAddr1Node, ok := oldTrie.Get(crypto.Keccak256(userAddr.Bytes()), stateStorage)
 	require.True(t, ok)
 
@@ -216,8 +211,6 @@ func TestMigration(t *testing.T) {
 
 	assert.Equal(t, balanceSender, senderBalanceAfterMigration)
 	assert.Equal(t, balanceReceiver, receiverBalanceAfterMigration)
-	t.Log(senderBalanceAfterMigration, receiverBalanceAfterMigration)
-	t.Log(balanceSender, balanceReceiver)
 
 	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
 
@@ -226,8 +219,6 @@ func TestMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Log(deployedCode)
-	t.Log(*types.EncodeBytes(contractsapi.TestWriteBlockMetadata.DeployedBytecode))
 	require.Equal(t, deployedCode, *types.EncodeBytes(contractsapi.TestWriteBlockMetadata.DeployedBytecode))
 }
 
