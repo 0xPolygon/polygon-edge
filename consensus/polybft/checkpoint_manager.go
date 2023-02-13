@@ -351,7 +351,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
-	proof, err := tree.GenerateProofForLeaf(e, 0)
+	proof, err := tree.GenerateProof(e)
 	if err != nil {
 		return types.Proof{}, err
 	}
