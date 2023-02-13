@@ -142,14 +142,82 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// ValidateBasic contains extra data basic set of validations
-func (i *Extra) ValidateBasic(parentExtra *Extra) error {
+// ValidateFinalizedData contains extra data validations for finalized headers
+func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header, parents []*types.Header,
+	chainID uint64, consensusBackend polybftBackend, logger hclog.Logger) error {
+	// validate committed signatures
+	blockNumber := header.Number
+	if i.Committed == nil {
+		return fmt.Errorf("failed to verify signatures for block %d, because signatures are not present", blockNumber)
+	}
+
+	if i.Checkpoint == nil {
+		return fmt.Errorf("failed to verify signatures for block %d, because checkpoint data are not present", blockNumber)
+	}
+
+	// validate current block signatures
+	checkpointHash, err := i.Checkpoint.Hash(chainID, header.Number, header.Hash)
+	if err != nil {
+		return fmt.Errorf("failed to calculate proposal hash: %w", err)
+	}
+
+	validators, err := consensusBackend.GetValidators(blockNumber-1, parents)
+	if err != nil {
+		return fmt.Errorf("failed to validate header for block %d. could not retrieve block validators:%w", blockNumber, err)
+	}
+
+	if err := i.Committed.Verify(validators, checkpointHash, logger); err != nil {
+		return fmt.Errorf("failed to verify signatures for block %d (proposal hash %s): %w",
+			blockNumber, checkpointHash, err)
+	}
+
+	parentExtra, err := GetIbftExtra(parent.ExtraData)
+	if err != nil {
+		return fmt.Errorf("failed to verify signatures for block %d: %w", blockNumber, err)
+	}
+
+	// validate parent signatures
+	if err := i.ValidateParentSignatures(blockNumber, consensusBackend, parents,
+		parent, parentExtra, chainID, logger); err != nil {
+		return err
+	}
+
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
-// Validate contains extra data validation logic
-func (i *Extra) Validate(parentExtra *Extra, currentValidators AccountSet, nextValidators AccountSet) error {
-	return i.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
+// ValidateParentSignatures validates signatures for parent block
+func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
+	parent *types.Header, parentExtra *Extra, chainID uint64, logger hclog.Logger) error {
+	// skip block 1 because genesis does not have committed signatures
+	if blockNumber <= 1 {
+		return nil
+	}
+
+	if i.Parent == nil {
+		return fmt.Errorf("failed to verify signatures for parent of block %d because signatures are not present",
+			blockNumber)
+	}
+
+	parentValidators, err := consensusBackend.GetValidators(blockNumber-2, parents)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to validate header for block %d. could not retrieve parent validators: %w",
+			blockNumber,
+			err,
+		)
+	}
+
+	parentCheckpointHash, err := parentExtra.Checkpoint.Hash(chainID, parent.Number, parent.Hash)
+	if err != nil {
+		return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
+	}
+
+	if err := i.Parent.Verify(parentValidators, parentCheckpointHash, logger); err != nil {
+		return fmt.Errorf("failed to verify signatures for parent of block %d (proposal hash: %s): %w",
+			blockNumber, parentCheckpointHash, err)
+	}
+
+	return nil
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
@@ -375,8 +443,8 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// VerifyCommittedFields is checking for consensus proof in the header
-func (s *Signature) VerifyCommittedFields(validators AccountSet, hash types.Hash, logger hclog.Logger) error {
+// Verify is checking for consensus proof in the header
+func (s *Signature) Verify(validators AccountSet, hash types.Hash, logger hclog.Logger) error {
 	signers, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
@@ -545,6 +613,7 @@ func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
 }
 
 // Validate encapsulates validation logic for checkpoint data
+// (with regards to current and next epoch validators)
 func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 	currentValidators AccountSet, nextValidators AccountSet) error {
 	if err := c.ValidateBasic(parentCheckpoint); err != nil {
