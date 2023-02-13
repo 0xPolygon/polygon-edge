@@ -19,11 +19,13 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
-	"golang.org/x/crypto/sha3"
 )
 
 // Add `-run TestMigration` to Makefile `test-e2e-polybft` command to run this test
 func TestMigration(t *testing.T) {
+	os.Setenv("EDGE_BINARY", "/Users/boris/GolandProjects/polygon-edge/polygon-edge")
+	os.Setenv("E2E_TESTS", "true")
+	os.Setenv("E2E_LOGS", "true")
 	userKey, _ := wallet.GenerateKey()
 	userAddr := userKey.Address()
 	userKey2, _ := wallet.GenerateKey()
@@ -49,10 +51,9 @@ func TestMigration(t *testing.T) {
 		ethgo.Latest,
 	)
 	assert.NoError(t, err)
-
-	// Set the preSend balances
-	previousSenderBalance := balanceSender
-	previousReceiverBalance := balanceReceiver
+	if balanceReceiver.Uint64() != 0 {
+		t.Fatal("balanceReceiver is not 0")
+	}
 
 	block, err := rpcClient.Eth().GetBlockByNumber(ethgo.Latest, true)
 	if err != nil {
@@ -64,12 +65,14 @@ func TestMigration(t *testing.T) {
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(rpcClient))
 	require.NoError(t, err)
 
+	//send transaction to user2
+	sendAmount := ethgo.Gwei(10000)
 	receipt, err := relayer.SendTransaction(&ethgo.Transaction{
 		From:     userAddr,
 		To:       &userAddr2,
 		GasPrice: 1048576,
 		Gas:      1000000,
-		Value:    ethgo.Gwei(10000),
+		Value:    sendAmount,
 	}, userKey)
 	assert.NoError(t, err)
 	assert.NotNil(t, receipt)
@@ -85,6 +88,13 @@ func TestMigration(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, receipt)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
+
+	initReceipt, err := ABITransaction(relayer, userKey, contractsapi.TestWriteBlockMetadata, receipt.ContractAddress, "init")
+	if err != nil {
+		t.Fatal(err)
+	}
+	require.Equal(t, uint64(types.ReceiptSuccess), initReceipt.Status)
 
 	// Fetch the balances after sending
 	balanceSender, err = rpcClient.Eth().GetBalance(
@@ -92,24 +102,13 @@ func TestMigration(t *testing.T) {
 		ethgo.Latest,
 	)
 	assert.NoError(t, err)
-	assert.NotEqual(t, previousSenderBalance, balanceSender)
 
 	balanceReceiver, err = rpcClient.Eth().GetBalance(
 		userAddr2,
 		ethgo.Latest,
 	)
 	assert.NoError(t, err)
-	assert.NotEqual(t, previousReceiverBalance, balanceReceiver)
-
-	t.Log(previousSenderBalance, balanceSender)
-	t.Log(previousReceiverBalance, balanceReceiver)
-
-	initReceipt, err := ABITransaction(relayer, userKey, contractsapi.TestWriteBlockMetadata, receipt.ContractAddress, "init")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log(initReceipt.Status)
+	assert.Equal(t, sendAmount, balanceReceiver)
 
 	block, err = rpcClient.Eth().GetBlockByNumber(ethgo.Latest, true)
 	if err != nil {
@@ -166,11 +165,9 @@ func TestMigration(t *testing.T) {
 	t.Log("Get old trie")
 	oldAddr1Node, ok := oldTrie.Get(crypto.Keccak256(userAddr.Bytes()), stateStorage)
 	require.True(t, ok)
-	t.Log(oldAddr1Node)
 
 	oldAddr2Node, ok := oldTrie.Get(crypto.Keccak256(userAddr2.Bytes()), stateStorage)
 	require.True(t, ok)
-	t.Log(oldAddr2Node)
 
 	err = itrie.CopyTrie1(stateRoot.Bytes(), stateStorage, stateStorageNew, nil)
 	if err != nil {
@@ -178,36 +175,25 @@ func TestMigration(t *testing.T) {
 	}
 
 	newTrie := itrie.NewTrieWithRoot(rootNode)
-
-	newStateRoot, err := newTrie.Txn(stateStorageNew).Hash()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	t.Log("Get new trie")
 	newAddr1Node, ok := newTrie.Get(crypto.Keccak256(userAddr.Bytes()), stateStorageNew)
 	require.True(t, ok)
-	t.Log(newAddr1Node)
 	assert.Equal(t, oldAddr1Node, newAddr1Node)
 
 	newAddr2Node, ok := newTrie.Get(crypto.Keccak256(userAddr2.Bytes()), stateStorageNew)
 	require.True(t, ok)
-	t.Log(newAddr2Node)
 	assert.Equal(t, oldAddr2Node, newAddr2Node)
 
-	stateRoot3, err := itrie.HashChecker1(stateRoot.Bytes(), stateStorageNew)
+	checkedStateRoot, err := itrie.HashChecker1(stateRoot.Bytes(), stateStorageNew)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	require.Equal(t, checkedStateRoot, types.Hash(block.StateRoot))
 
 	err = db2.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	t.Log(types.BytesToHash(newStateRoot).String())
-	t.Log(stateRoot.String())
-	t.Log(stateRoot3.String())
 
 	cluster := frameworkpolybft.NewTestCluster(t, 7,
 		frameworkpolybft.WithNonValidators(2),
@@ -276,10 +262,3 @@ func PrintDB(t *testing.T, db *leveldb.DB) {
 
 
 */
-
-func hashit(k []byte) []byte {
-	h := sha3.NewLegacyKeccak256()
-	h.Write(k)
-
-	return h.Sum(nil)
-}

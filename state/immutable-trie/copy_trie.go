@@ -69,7 +69,7 @@ func CopyTrie(node Node, storage Storage, newStorage Storage, agg []byte) error 
 		}
 
 		var account state.Account
-
+		//todo handle bytes32 state values
 		if err := account.UnmarshalRlp(n.buf); err != nil {
 			fmt.Println("cant parse", err, len(n.buf), hex.EncodeToString(encodeCompact(agg)))
 		} else {
