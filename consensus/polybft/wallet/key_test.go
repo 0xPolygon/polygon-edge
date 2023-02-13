@@ -10,6 +10,8 @@ import (
 )
 
 func Test_RecoverAddressFromSignature(t *testing.T) {
+	t.Parallel()
+
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
 		key := NewKey(account, bls.DomainCheckpointManager)
 		msgNoSig := &proto.Message{
@@ -18,7 +20,7 @@ func Test_RecoverAddressFromSignature(t *testing.T) {
 			Payload: &proto.Message_CommitData{},
 		}
 
-		msg, err := key.SignEcdsaMessage(msgNoSig)
+		msg, err := key.SignIBFTMessage(msgNoSig)
 		require.NoError(t, err)
 
 		payload, err := msgNoSig.PayloadNoSig()
@@ -31,6 +33,8 @@ func Test_RecoverAddressFromSignature(t *testing.T) {
 }
 
 func Test_Sign(t *testing.T) {
+	t.Parallel()
+
 	msg := []byte("some message")
 
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount()} {
@@ -47,6 +51,8 @@ func Test_Sign(t *testing.T) {
 }
 
 func Test_String(t *testing.T) {
+	t.Parallel()
+
 	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
 		key := NewKey(account, bls.DomainCheckpointManager)
 		assert.Equal(t, key.Address().String(), key.String())

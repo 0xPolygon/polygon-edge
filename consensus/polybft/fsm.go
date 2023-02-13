@@ -252,13 +252,26 @@ func (f *fsm) Validate(proposal []byte) error {
 		)
 	}
 
-	currentExtra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
 		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
 	parentExtra, err := GetIbftExtra(f.parent.ExtraData)
 	if err != nil {
+		return err
+	}
+
+	if extra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for block %d is missing", block.Number())
+	}
+
+	if parentExtra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for parent block %d is missing", f.parent.Number)
+	}
+
+	if err := extra.ValidateParentSignatures(block.Number(), f.polybftBackend, nil, f.parent, parentExtra,
+		f.backend.GetChainID(), bls.DomainCheckpointManager, f.logger); err != nil {
 		return err
 	}
 
@@ -276,40 +289,19 @@ func (f *fsm) Validate(proposal []byte) error {
 			}
 		}
 
-		return currentExtra.Validate(parentExtra, currentValidators, nextValidators)
+		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
+	}
+
+	if f.logger.IsTrace() && block.Number() > 1 {
+		validators, err := f.polybftBackend.GetValidators(block.Number()-2, nil)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve validators:%w", err)
+		}
+
+		f.logger.Trace("[FSM Validate]", "Block", block.Number(), "parent validators", validators)
 	}
 
 	// TODO: Validate validator set delta?
-
-	// TODO: Move signature validation logic to Extra
-	blockNumber := block.Number()
-	if blockNumber > 1 {
-		// verify parent signature
-		// We skip block 0 (genesis) and block 1 (parent is genesis)
-		// since those blocks do not include any parent information with signatures
-		validators, err := f.polybftBackend.GetValidators(blockNumber-2, nil)
-		if err != nil {
-			return fmt.Errorf("cannot get validators:%w", err)
-		}
-
-		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-
-		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
-		if err != nil {
-			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
-		}
-
-		if err := currentExtra.Parent.Verify(
-			validators, parentCheckpointHash, bls.DomainCheckpointManager, f.logger); err != nil {
-			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
-				f.parent.Number,
-				parentCheckpointHash,
-				blockNumber,
-				err,
-			)
-		}
-	}
 
 	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
 	if err != nil {
@@ -317,7 +309,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	if f.logger.IsDebug() {
-		checkpointHash, err := currentExtra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+		checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 		if err != nil {
 			return fmt.Errorf("failed to calculate proposal hash: %w", err)
 		}
