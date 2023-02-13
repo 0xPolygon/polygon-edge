@@ -85,11 +85,18 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 			x, randomG1, err := bn256.RandomG1(rand.Reader)
 			require.NoError(t, err)
 
-			sigCopy := signature
+			raw, err := signature.Marshal()
+			require.NoError(t, err)
+
+			sigCopy, err := UnmarshalSignature(raw)
+			require.NoError(t, err)
+
 			sigCopy.g1.Add(sigCopy.g1, randomG1) // change signature
 			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
 
-			sigCopy = signature
+			sigCopy, err = UnmarshalSignature(raw)
+			require.NoError(t, err)
+
 			sigCopy.g1.ScalarMult(sigCopy.g1, x) // change signature
 			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
 		}
