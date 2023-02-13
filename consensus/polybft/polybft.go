@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -159,7 +160,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// set key
-	p.key = wallet.NewKey(account)
+	p.key = wallet.NewKey(account, bls.DomainCheckpointManager)
 
 	// create and set syncer
 	p.syncer = syncer.NewSyncer(
@@ -422,7 +423,8 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	// validate extra data
-	return extra.ValidateFinalizedData(header, parent, parents, p.blockchain.GetChainID(), p, p.logger)
+	return extra.ValidateFinalizedData(
+		header, parent, parents, p.blockchain.GetChainID(), p, bls.DomainCheckpointManager, p.logger)
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {

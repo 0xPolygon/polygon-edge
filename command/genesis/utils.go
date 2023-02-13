@@ -142,12 +142,12 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 			return nil, err
 		}
 
-		validator := &polybft.Validator{
-			Address: types.Address(account.Ecdsa.Address()),
-			BlsKey:  hex.EncodeToString(account.Bls.PublicKey().Marshal()),
-			NodeID:  nodeID,
+		validators[i] = &polybft.Validator{
+			Address:       types.Address(account.Ecdsa.Address()),
+			BlsPrivateKey: account.Bls,
+			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			NodeID:        nodeID,
 		}
-		validators[i] = validator
 	}
 
 	return validators, nil

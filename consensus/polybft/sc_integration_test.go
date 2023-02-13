@@ -216,6 +216,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// iterate through the validator set and do the test for each of them
 	for _, currentValidators := range validatorSets {
 		accSet := currentValidators.getPublicIdentities()
+		accSetPrivateKeys := currentValidators.getPrivateIdentities()
 		valid2deleg := make(map[types.Address][]*wallet.Key, accSet.Len()) // delegators assigned to validators
 
 		// add contracts to genesis data
@@ -237,11 +238,18 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Balance: validator.VotingPower,
 			}
 
+			signature, err := MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address, 0, bls.DomainValidatorSet)
+			require.NoError(t, err)
+
+			signatureBytes, err := signature.Marshal()
+			require.NoError(t, err)
+
 			// create validator data for polybft config
 			initValidators[i] = &Validator{
-				Address: validator.Address,
-				Balance: validator.VotingPower,
-				BlsKey:  hex.EncodeToString(validator.BlsKey.Marshal()),
+				Address:      validator.Address,
+				Balance:      validator.VotingPower,
+				BlsKey:       hex.EncodeToString(validator.BlsKey.Marshal()),
+				BlsSignature: hex.EncodeToString(signatureBytes),
 			}
 
 			// create delegators
@@ -322,8 +330,8 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	initialize := contractsapi.InitializeCheckpointManagerFunction{
 		NewBls:          contracts.BLSContract,
 		NewBn256G2:      bn256Addr,
-		NewDomain:       types.BytesToHash(bls.GetDomain()),
 		NewValidatorSet: accSet.ToAPIBinding(),
+		ChainID_:        big.NewInt(0),
 	}
 
 	init, err := initialize.EncodeAbi()
@@ -335,12 +343,6 @@ func deployRootchainContract(t *testing.T, transition *state.Transition, rootcha
 	require.True(t, result.Succeeded())
 	require.False(t, result.Failed())
 	require.NoError(t, result.Err)
-
-	getDomain, err := rootchainArtifact.Abi.GetMethod("domain").Encode([]interface{}{})
-	require.NoError(t, err)
-
-	result = transition.Call2(sender, rcAddress, getDomain, big.NewInt(0), 1000000000)
-	require.Equal(t, result.ReturnValue, bls.GetDomain())
 
 	return rcAddress
 }

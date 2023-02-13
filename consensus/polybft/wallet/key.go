@@ -11,12 +11,14 @@ import (
 )
 
 type Key struct {
-	raw *Account
+	raw    *Account
+	domain []byte
 }
 
-func NewKey(raw *Account) *Key {
+func NewKey(raw *Account, domain []byte) *Key {
 	return &Key{
-		raw: raw,
+		raw:    raw,
+		domain: domain,
 	}
 }
 
@@ -32,7 +34,7 @@ func (k *Key) Address() ethgo.Address {
 
 // Sign signs the provided digest with BLS key
 func (k *Key) Sign(digest []byte) ([]byte, error) {
-	signature, err := k.raw.Bls.Sign(digest)
+	signature, err := k.raw.Bls.Sign(digest, k.domain)
 	if err != nil {
 		return nil, err
 	}

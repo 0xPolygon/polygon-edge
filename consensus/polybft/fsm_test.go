@@ -118,7 +118,7 @@ func TestFSM_BuildProposal_WithoutCommitEpochTxGood(t *testing.T) {
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		config: &runtimeConfig{
-			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
 			blockchain: blockchainMock,
 		},
 	}
@@ -193,7 +193,7 @@ func TestFSM_BuildProposal_WithCommitEpochTxGood(t *testing.T) {
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		config: &runtimeConfig{
-			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
 			blockchain: blockChainMock,
 		},
 	}
@@ -882,7 +882,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 	var commitedSeals []*messages.CommittedSeal
 
 	for i := 0; i < signaturesCount; i++ {
-		sign, err := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes())
+		sign, err := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes(), bls.DomainValidatorSet)
 		assert.NoError(t, err)
 		sigRaw, err := sign.Marshal()
 		assert.NoError(t, err)
@@ -1295,7 +1295,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	var signatures bls.Signatures
 
 	for _, a := range accounts {
-		signature, err := a.Bls.Sign(hash.Bytes())
+		signature, err := a.Bls.Sign(hash.Bytes(), bls.DomainValidatorSet)
 		assert.NoError(t, err)
 
 		signatures = append(signatures, signature)
