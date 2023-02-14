@@ -7,19 +7,21 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
-	boltdbStore "github.com/umbracle/ethgo/tracker/store/boltdb"
 )
+
+const DefaultFinalizedThreshold = uint64(0)
 
 type eventSubscription interface {
 	AddLog(log *ethgo.Log)
 }
 
 type EventTracker struct {
-	dbPath       string
-	rpcEndpoint  string
-	contractAddr ethgo.Address
-	subscriber   eventSubscription
-	logger       hcf.Logger
+	dbPath             string
+	rpcEndpoint        string
+	contractAddr       ethgo.Address
+	subscriber         eventSubscription
+	logger             hcf.Logger
+	finalizedThreshold uint64 // after how many blocks we consider block is finalized
 }
 
 func NewEventTracker(
@@ -27,14 +29,16 @@ func NewEventTracker(
 	rpcEndpoint string,
 	contractAddr ethgo.Address,
 	subscriber eventSubscription,
+	finalizedThreshold uint64,
 	logger hcf.Logger,
 ) *EventTracker {
 	return &EventTracker{
-		dbPath:       dbPath,
-		rpcEndpoint:  rpcEndpoint,
-		contractAddr: contractAddr,
-		subscriber:   subscriber,
-		logger:       logger.Named("event_tracker"),
+		dbPath:             dbPath,
+		rpcEndpoint:        rpcEndpoint,
+		contractAddr:       contractAddr,
+		subscriber:         subscriber,
+		finalizedThreshold: finalizedThreshold,
+		logger:             logger.Named("event_tracker"),
 	}
 }
 
@@ -44,8 +48,9 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
-	store, err := boltdbStore.New(e.dbPath)
+	notifierCh := make(chan []*ethgo.Log)
 
+	store, err := NewEventTrackerStore(e.dbPath, e.finalizedThreshold, notifierCh, e.logger)
 	if err != nil {
 		return err
 	}
@@ -56,7 +61,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		tracker.WithBatchSize(10),
 		tracker.WithStore(store),
 		tracker.WithFilter(&tracker.FilterConfig{
-			Async: false,
+			Async: true,
 			Address: []ethgo.Address{
 				e.contractAddr,
 			},
@@ -76,14 +81,12 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				close(notifierCh) // close notifier channel after everything is finished
+
 				return
 
-			case evnt := <-tt.EventCh:
-				if len(evnt.Removed) != 0 {
-					panic("this will not happen anymore after tracker v2")
-				}
-
-				for _, log := range evnt.Added {
+			case evnt := <-notifierCh:
+				for _, log := range evnt {
 					e.subscriber.AddLog(log)
 				}
 

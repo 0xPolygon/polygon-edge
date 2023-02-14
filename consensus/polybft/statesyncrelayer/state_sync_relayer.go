@@ -87,6 +87,7 @@ func (r *StateSyncRelayer) Start() error {
 		r.rpcEndpoint,
 		r.stateReceiverAddr,
 		r,
+		tracker.DefaultFinalizedThreshold,
 		r.logger,
 	)
 

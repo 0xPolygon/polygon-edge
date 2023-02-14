@@ -130,6 +130,7 @@ func (s *stateSyncManager) initTracker() error {
 		s.config.jsonrpcAddr,
 		ethgo.Address(s.config.stateSenderAddr),
 		s,
+		tracker.DefaultFinalizedThreshold,
 		s.logger)
 
 	go func() {
