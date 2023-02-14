@@ -3,12 +3,8 @@ package polybft
 import (
 	"encoding/binary"
 	"encoding/json"
-	"errors"
-	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
@@ -17,25 +13,6 @@ import (
 
 /*
 The client has a boltDB backed state store. The schema as of looks as follows:
-
-state sync events/
-|--> stateSyncEvent.Id -> *StateSyncEvent (json marshalled)
-
-commitments/
-|--> commitment.Message.ToIndex -> *CommitmentMessageSigned (json marshalled)
-
-stateSyncProofs/
-|--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
-
-epochs/
-|--> epochNumber
-	|--> hash -> []*MessageSignatures (json marshalled)
-
-validatorSnapshots/
-|--> epochNumber -> *AccountSet (json marshalled)
-
-exit events/
-|--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
 
 proposer snapshot/
 |--> staticKey - only current one snapshot is preserved -> *ProposerSnapshot (json marshalled)
@@ -51,80 +28,6 @@ var (
 	// (there will always be one object in bucket)
 	proposerSnapshotKey = []byte("proposerSnapshotKey")
 )
-
-func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
-	if !exitEventABI.Match(log) {
-		// valid case, not an exit event
-		return nil, nil
-	}
-
-	raw, err := exitEventABI.Inputs.ParseLog(log)
-	if err != nil {
-		return nil, err
-	}
-
-	eventGeneric, err := decodeEventData(raw, log,
-		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
-			return &ExitEvent{ID: id.Uint64(),
-				Sender:      sender,
-				Receiver:    receiver,
-				Data:        data,
-				EpochNumber: epoch,
-				BlockNumber: block}
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	exitEvent, ok := eventGeneric.(*ExitEvent)
-	if !ok {
-		return nil, errors.New("failed to convert event to ExitEvent instance")
-	}
-
-	return exitEvent, err
-}
-
-// decodeEventData decodes provided map of event metadata and
-// creates a generic instance which is returned by eventCreator callback
-func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
-	eventCreator func(*big.Int, ethgo.Address, ethgo.Address, []byte) interface{}) (interface{}, error) {
-	id, ok := eventDataMap["id"].(*big.Int)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
-	}
-
-	sender, ok := eventDataMap["sender"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
-	}
-
-	receiver, ok := eventDataMap["receiver"].(ethgo.Address)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode receiver field of log: %+v", log)
-	}
-
-	data, ok := eventDataMap["data"].([]byte)
-	if !ok {
-		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
-	}
-
-	return eventCreator(id, sender, receiver, data), nil
-}
-
-// convertLog converts types.Log to ethgo.Log
-func convertLog(log *types.Log) *ethgo.Log {
-	l := &ethgo.Log{
-		Address: ethgo.Address(log.Address),
-		Data:    log.Data,
-		Topics:  make([]ethgo.Hash, len(log.Topics)),
-	}
-
-	for i, topic := range log.Topics {
-		l.Topics[i] = ethgo.Hash(topic)
-	}
-
-	return l
-}
 
 // ExitEvent is an event emitted by Exit contract
 type ExitEvent struct {
@@ -162,23 +65,7 @@ type TransportMessage struct {
 	EpochNumber uint64
 }
 
-func (t *TransportMessage) ToSignature() *MessageSignature {
-	return &MessageSignature{
-		Signature: t.Signature,
-		From:      t.NodeID,
-	}
-}
-
 var (
-
-	// bucket to store state sync proofs
-	stateSyncProofsBucket = []byte("stateSyncProofs")
-	// bucket to store epochs and all its nested buckets (message votes and message pool events)
-	epochsBucket = []byte("epochs")
-	// bucket to store message votes (signatures)
-	messageVotesBucket = []byte("votes")
-	// bucket to store validator snapshots
-	validatorSnapshotsBucket = []byte("validatorSnapshots")
 	// bucket to store proposer calculator snapshot
 	proposerCalcSnapshotBucket = []byte("proposerCalculatorSnapshot")
 	// array of all parent buckets
@@ -197,6 +84,7 @@ type State struct {
 	EpochStore      *EpochStore
 }
 
+// newState creates new instance of State
 func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
@@ -296,8 +184,4 @@ func itob(v uint64) []byte {
 	binary.BigEndian.PutUint64(b, v)
 
 	return b
-}
-
-func itou(v []byte) uint64 {
-	return binary.BigEndian.Uint64(v)
 }

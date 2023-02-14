@@ -3,9 +3,13 @@ package polybft
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -24,6 +28,8 @@ func (e *exitEventNotFoundError) Error() string {
 }
 
 /*
+Bolt DB schema:
+
 exit events/
 |--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
 */
@@ -127,4 +133,81 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 	})
 
 	return events, err
+}
+
+// decodeExitEvent tries to decode exit event from the provided log
+func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
+	if !exitEventABI.Match(log) {
+		// valid case, not an exit event
+		return nil, nil
+	}
+
+	raw, err := exitEventABI.Inputs.ParseLog(log)
+	if err != nil {
+		return nil, err
+	}
+
+	eventGeneric, err := decodeEventData(raw, log,
+		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
+			return &ExitEvent{
+				ID:          id.Uint64(),
+				Sender:      sender,
+				Receiver:    receiver,
+				Data:        data,
+				EpochNumber: epoch,
+				BlockNumber: block,
+			}
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	exitEvent, ok := eventGeneric.(*ExitEvent)
+	if !ok {
+		return nil, errors.New("failed to convert event to ExitEvent instance")
+	}
+
+	return exitEvent, err
+}
+
+// decodeEventData decodes provided map of event metadata and
+// creates a generic instance which is returned by eventCreator callback
+func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
+	eventCreator func(*big.Int, ethgo.Address, ethgo.Address, []byte) interface{}) (interface{}, error) {
+	id, ok := eventDataMap["id"].(*big.Int)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode id field of log: %+v", log)
+	}
+
+	sender, ok := eventDataMap["sender"].(ethgo.Address)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode sender field of log: %+v", log)
+	}
+
+	receiver, ok := eventDataMap["receiver"].(ethgo.Address)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode receiver field of log: %+v", log)
+	}
+
+	data, ok := eventDataMap["data"].([]byte)
+	if !ok {
+		return nil, fmt.Errorf("failed to decode data field of log: %+v", log)
+	}
+
+	return eventCreator(id, sender, receiver, data), nil
+}
+
+// convertLog converts types.Log to ethgo.Log
+func convertLog(log *types.Log) *ethgo.Log {
+	l := &ethgo.Log{
+		Address: ethgo.Address(log.Address),
+		Data:    log.Data,
+		Topics:  make([]ethgo.Hash, len(log.Topics)),
+	}
+
+	for i, topic := range log.Topics {
+		l.Topics[i] = ethgo.Hash(topic)
+	}
+
+	return l
 }

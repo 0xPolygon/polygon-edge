@@ -14,6 +14,10 @@ var (
 	syncStateEventsBucket = []byte("stateSyncEvents")
 	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
+	// bucket to store state sync proofs
+	stateSyncProofsBucket = []byte("stateSyncProofs")
+	// bucket to store message votes (signatures)
+	messageVotesBucket = []byte("votes")
 
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
@@ -24,14 +28,16 @@ var (
 )
 
 /*
+Bolt DB schema:
+
 state sync events/
 |--> stateSyncEvent.Id -> *StateSyncEvent (json marshalled)
 
 commitments/
 |--> commitment.Message.ToIndex -> *CommitmentMessageSigned (json marshalled)
 
-bundles/
-|--> bundle.StateSyncs[0].Id -> *BundleProof (json marshalled)
+stateSyncProofs/
+|--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
 */
 
 type StateSyncStore struct {

@@ -17,7 +17,17 @@ const (
 	numberOfSnapshotsToLeaveInDB = 20
 )
 
+var (
+	// bucket to store epochs and all its nested buckets (message votes and message pool events)
+	epochsBucket = []byte("epochs")
+
+	// bucket to store validator snapshots
+	validatorSnapshotsBucket = []byte("validatorSnapshots")
+)
+
 /*
+Bolt DB schema:
+
 epochs/
 |--> epochNumber
 	|--> hash -> []*MessageSignatures (json marshalled)
