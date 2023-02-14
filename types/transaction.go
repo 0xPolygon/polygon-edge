@@ -124,9 +124,6 @@ func (t *Transaction) Cost() *big.Int {
 		(t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0) {
 		total = total.SetUint64(t.Gas)
 		total = total.Mul(total, t.GasFeeCap)
-		total.Add(total, t.Value)
-
-		return total
 	} else {
 		total = total.Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
 	}
