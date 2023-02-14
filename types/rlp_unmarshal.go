@@ -411,6 +411,8 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	p.Hash(t.Hash[:0], v)
 
 	// Skipping Chain ID field since we don't support it (yet)
+	// This is needed to be compatible with other EVM chains and have the same format.
+	// Since we don't have a chain ID, just skip it here.
 	if t.Type == DynamicFeeTx {
 		_ = getElem()
 	}
@@ -466,7 +468,9 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	// Skipping Access List field since we don't support it
+	// Skipping Access List field since we don't support it.
+	// This is needed to be compatible with other EVM chains and have the same format.
+	// Since we don't have access list, just skip it here.
 	if t.Type == DynamicFeeTx {
 		_ = getElem()
 	}
