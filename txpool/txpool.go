@@ -630,11 +630,11 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Reject underpriced transactions
 	if p.GetBaseFee() > 0 || tx.GasFeeCap.BitLen() > 0 || tx.GasTipCap.BitLen() > 0 {
 		// Check EIP-1559-related fields and make sure they are correct
-		if l := tx.GasFeeCap.BitLen(); l > 256 {
+		if tx.GasFeeCap.BitLen() > 256 {
 			return ErrFeeCapVeryHigh
 		}
 
-		if l := tx.GasTipCap.BitLen(); l > 256 {
+		if tx.GasTipCap.BitLen() > 256 {
 			return ErrTipVeryHigh
 		}
 
@@ -642,7 +642,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrTipAboveFeeCap
 		}
 
-		if baseFee := new(big.Int).SetUint64(p.GetBaseFee()); tx.GasFeeCap.Cmp(baseFee) < 0 {
+		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
 			return ErrUnderpriced
 		}
 	} else {
