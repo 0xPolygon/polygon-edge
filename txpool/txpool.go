@@ -630,7 +630,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Reject underpriced transactions
 	if p.GetBaseFee() > 0 || tx.GasFeeCap.BitLen() > 0 || tx.GasTipCap.BitLen() > 0 {
 		// Check EIP-1559-related fields and make sure they are correct
-
 		if l := tx.GasFeeCap.BitLen(); l > 256 {
 			return ErrFeeCapVeryHigh
 		}
@@ -648,7 +647,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	} else {
 		// Legacy approach to check if the given tx is not underpriced
-
 		if tx.GasPrice.Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
 			return ErrUnderpriced
 		}
