@@ -1,8 +1,6 @@
 package polybft
 
 import (
-	"encoding/json"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
@@ -10,22 +8,11 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-/*
-The client has a boltDB backed state store. The schema as of looks as follows:
-
-proposer snapshot/
-|--> staticKey - only current one snapshot is preserved -> *ProposerSnapshot (json marshalled)
-*/
-
 var (
 	// ABI
 	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
 	exitEventABI          = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
 	ExitEventABIType      = exitEventABI.Inputs
-
-	// proposerSnapshotKey is a static key which is used to save latest proposer snapshot.
-	// (there will always be one object in bucket)
-	proposerSnapshotKey = []byte("proposerSnapshotKey")
 )
 
 // ExitEvent is an event emitted by Exit contract
@@ -65,11 +52,9 @@ type TransportMessage struct {
 }
 
 var (
-	// bucket to store proposer calculator snapshot
-	proposerCalcSnapshotBucket = []byte("proposerCalculatorSnapshot")
 	// array of all parent buckets
 	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, stateSyncProofsBucket,
-		epochsBucket, validatorSnapshotsBucket, proposerCalcSnapshotBucket}
+		epochsBucket, validatorSnapshotsBucket, proposerSnapshotBucket}
 )
 
 // State represents a persistence layer which persists consensus data off-chain
@@ -78,9 +63,10 @@ type State struct {
 	logger hclog.Logger
 	close  chan struct{}
 
-	StateSyncStore  *StateSyncStore
-	CheckpointStore *CheckpointStore
-	EpochStore      *EpochStore
+	StateSyncStore        *StateSyncStore
+	CheckpointStore       *CheckpointStore
+	EpochStore            *EpochStore
+	ProposerSnapshotStore *ProposerSnapshotStore
 }
 
 // newState creates new instance of State
@@ -95,12 +81,13 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 	}
 
 	state := &State{
-		db:              db,
-		logger:          logger.Named("state"),
-		close:           closeCh,
-		StateSyncStore:  &StateSyncStore{db: db},
-		CheckpointStore: &CheckpointStore{db: db},
-		EpochStore:      &EpochStore{db: db},
+		db:                    db,
+		logger:                logger.Named("state"),
+		close:                 closeCh,
+		StateSyncStore:        &StateSyncStore{db: db},
+		CheckpointStore:       &CheckpointStore{db: db},
+		EpochStore:            &EpochStore{db: db},
+		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
 	}
 
 	return state, nil
@@ -148,32 +135,4 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	}
 
 	return stats
-}
-
-// getProposerSnapshot gets latest proposer snapshot
-func (s *State) getProposerSnapshot() (*ProposerSnapshot, error) {
-	var snapshot *ProposerSnapshot
-
-	err := s.db.View(func(tx *bolt.Tx) error {
-		value := tx.Bucket(proposerCalcSnapshotBucket).Get(proposerSnapshotKey)
-		if value == nil {
-			return nil
-		}
-
-		return json.Unmarshal(value, &snapshot)
-	})
-
-	return snapshot, err
-}
-
-// writeProposerSnapshot writes proposer snapshot
-func (s *State) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
-	raw, err := json.Marshal(snapshot)
-	if err != nil {
-		return err
-	}
-
-	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(proposerCalcSnapshotBucket).Put(proposerSnapshotKey, raw)
-	})
 }

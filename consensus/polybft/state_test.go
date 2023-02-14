@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/require"
 )
 
 func newTestState(t *testing.T) *State {
@@ -33,26 +32,4 @@ func newTestState(t *testing.T) *State {
 	})
 
 	return state
-}
-
-func TestState_getProposerSnapshot_writeProposerSnapshot(t *testing.T) {
-	t.Parallel()
-
-	const (
-		height = uint64(100)
-		round  = uint64(5)
-	)
-
-	state := newTestState(t)
-
-	snap, err := state.getProposerSnapshot()
-	require.NoError(t, err)
-	require.Nil(t, snap)
-
-	newSnapshot := &ProposerSnapshot{Height: height, Round: round}
-	require.NoError(t, state.writeProposerSnapshot(newSnapshot))
-
-	snap, err = state.getProposerSnapshot()
-	require.NoError(t, err)
-	require.Equal(t, newSnapshot, snap)
 }
