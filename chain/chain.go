@@ -14,7 +14,7 @@ import (
 
 const (
 	// GenesisBaseFee is the initial base fee for EIP-1559 blocks.
-	// Using 1 billion by default
+	// Using 1 gwei by default
 	GenesisBaseFee = 1_000_000_000
 
 	// GenesisGasLimit is the default gas limit of the Genesis block.

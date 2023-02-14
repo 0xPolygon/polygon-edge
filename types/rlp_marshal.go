@@ -204,8 +204,8 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	if t.Type == DynamicFeeTx {
 		// Add EIP-1559 related fields.
 		// For non-dynamic-fee-tx gas price is used.
-		vv.Set(arena.NewBigInt(t.GasFeeCap))
 		vv.Set(arena.NewBigInt(t.GasTipCap))
+		vv.Set(arena.NewBigInt(t.GasFeeCap))
 	} else {
 		vv.Set(arena.NewBigInt(t.GasPrice))
 	}

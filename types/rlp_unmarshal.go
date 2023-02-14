@@ -423,15 +423,15 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	if t.Type == DynamicFeeTx {
-		// gasFeeCap
-		t.GasFeeCap = new(big.Int)
-		if err = getElem().GetBigInt(t.GasFeeCap); err != nil {
-			return err
-		}
-
 		// gasTipCap
 		t.GasTipCap = new(big.Int)
 		if err = getElem().GetBigInt(t.GasTipCap); err != nil {
+			return err
+		}
+
+		// gasFeeCap
+		t.GasFeeCap = new(big.Int)
+		if err = getElem().GetBigInt(t.GasFeeCap); err != nil {
 			return err
 		}
 	} else {
