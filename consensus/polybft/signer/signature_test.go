@@ -42,10 +42,10 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 	blsKey, err := GenerateBlsKey()
 	require.NoError(t, err)
 
-	signature, err := blsKey.Sign(validTestMsg)
+	signature, err := blsKey.Sign(validTestMsg, DomainValidatorSet)
 	require.NoError(t, err)
 
-	require.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+	require.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet))
 
 	t.Run("Wrong public key", func(t *testing.T) {
 		t.Parallel()
@@ -56,11 +56,11 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 
 			publicKey := blsKey.PublicKey()
 			publicKey.g2.Add(publicKey.g2, randomG2) // change public key g2 point
-			require.False(t, signature.Verify(publicKey, validTestMsg))
+			require.False(t, signature.Verify(publicKey, validTestMsg, DomainValidatorSet))
 
 			publicKey = blsKey.PublicKey()
 			publicKey.g2.ScalarMult(publicKey.g2, x) // change public key g2 point
-			require.False(t, signature.Verify(publicKey, validTestMsg))
+			require.False(t, signature.Verify(publicKey, validTestMsg, DomainValidatorSet))
 		}
 	})
 
@@ -74,7 +74,7 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 			b := msgCopy[i]
 			msgCopy[i] = b + 1
 
-			require.False(t, signature.Verify(blsKey.PublicKey(), msgCopy))
+			require.False(t, signature.Verify(blsKey.PublicKey(), msgCopy, DomainValidatorSet))
 			msgCopy[i] = b
 		}
 	})
@@ -93,13 +93,13 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 			require.NoError(t, err)
 
 			sigCopy.g1.Add(sigCopy.g1, randomG1) // change signature
-			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet))
 
 			sigCopy, err = UnmarshalSignature(raw)
 			require.NoError(t, err)
 
 			sigCopy.g1.ScalarMult(sigCopy.g1, x) // change signature
-			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet))
 		}
 	})
 }
