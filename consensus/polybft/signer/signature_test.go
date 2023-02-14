@@ -2,10 +2,13 @@ package bls
 
 import (
 	"crypto/rand"
+	mRand "math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	bn256 "github.com/umbracle/go-eth-bn256"
 )
 
 const (
@@ -25,6 +28,80 @@ func Test_VerifySignature(t *testing.T) {
 	assert.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet))
 	assert.False(t, signature.Verify(blsKey.PublicKey(), invalidTestMsg, DomainValidatorSet))
 	assert.False(t, signature.Verify(blsKey.PublicKey(), validTestMsg, DomainCheckpointManager))
+}
+
+func Test_VerifySignature_NegativeCases(t *testing.T) {
+	t.Parallel()
+
+	// Get a random integer between 1 and 1000
+	mRand.Seed(time.Now().UnixNano())
+	messageSize := mRand.Intn(1000) + 1
+
+	validTestMsg := testGenRandomBytes(t, messageSize)
+
+	blsKey, err := GenerateBlsKey()
+	require.NoError(t, err)
+
+	signature, err := blsKey.Sign(validTestMsg)
+	require.NoError(t, err)
+
+	require.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg))
+
+	t.Run("Wrong public key", func(t *testing.T) {
+		t.Parallel()
+
+		for i := 0; i < 100; i++ {
+			x, randomG2, err := bn256.RandomG2(rand.Reader)
+			require.NoError(t, err)
+
+			publicKey := blsKey.PublicKey()
+			publicKey.g2.Add(publicKey.g2, randomG2) // change public key g2 point
+			require.False(t, signature.Verify(publicKey, validTestMsg))
+
+			publicKey = blsKey.PublicKey()
+			publicKey.g2.ScalarMult(publicKey.g2, x) // change public key g2 point
+			require.False(t, signature.Verify(publicKey, validTestMsg))
+		}
+	})
+
+	t.Run("Tampered message", func(t *testing.T) {
+		t.Parallel()
+
+		msgCopy := make([]byte, len(validTestMsg))
+		copy(msgCopy, validTestMsg)
+
+		for i := 0; i < len(msgCopy); i++ {
+			b := msgCopy[i]
+			msgCopy[i] = b + 1
+
+			require.False(t, signature.Verify(blsKey.PublicKey(), msgCopy))
+			msgCopy[i] = b
+		}
+	})
+
+	t.Run("Tampered signature", func(t *testing.T) {
+		t.Parallel()
+
+		for i := 0; i < 100; i++ {
+			x, randomG1, err := bn256.RandomG1(rand.Reader)
+			require.NoError(t, err)
+
+			raw, err := signature.Marshal()
+			require.NoError(t, err)
+
+			sigCopy, err := UnmarshalSignature(raw)
+			require.NoError(t, err)
+
+			sigCopy.g1.Add(sigCopy.g1, randomG1) // change signature
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+
+			sigCopy, err = UnmarshalSignature(raw)
+			require.NoError(t, err)
+
+			sigCopy.g1.ScalarMult(sigCopy.g1, x) // change signature
+			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg))
+		}
+	})
 }
 
 func Test_AggregatedSignatureSimple(t *testing.T) {
