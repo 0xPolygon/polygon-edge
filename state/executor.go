@@ -1,7 +1,6 @@
 package state
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -394,11 +393,10 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
 	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
 
-	// Apply EIP-1559 tx fee calculation logic
+	// Apply EIP-1559 tx cost calculation logic
 	if msg.GasFeeCap.BitLen() > 0 {
 		upfrontGasCost = new(big.Int).SetUint64(msg.Gas)
 		upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, msg.GasFeeCap)
-		upfrontGasCost.Add(upfrontGasCost, msg.Value)
 	}
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
@@ -431,7 +429,6 @@ var (
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
-	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
 )
 
 type TransitionApplicationError struct {
@@ -515,11 +512,6 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxEnd(result.GasLeft)
-	}
-
-	if msg.Type != types.StateTx {
-		msgRaw, _ := json.MarshalIndent(msg, "", "  ")
-		fmt.Println(string(msgRaw))
 	}
 
 	// Refund the sender

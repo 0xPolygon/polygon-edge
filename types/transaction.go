@@ -118,7 +118,19 @@ func (t *Transaction) Copy() *Transaction {
 
 // Cost returns gas * gasPrice + value
 func (t *Transaction) Cost() *big.Int {
-	total := new(big.Int).Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
+	total := new(big.Int)
+
+	if (t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0) ||
+		(t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0) {
+		total = total.SetUint64(t.Gas)
+		total = total.Mul(total, t.GasFeeCap)
+		total.Add(total, t.Value)
+
+		return total
+	} else {
+		total = total.Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
+	}
+
 	total.Add(total, t.Value)
 
 	return total
@@ -142,8 +154,4 @@ func (t *Transaction) Size() uint64 {
 
 func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 	return t.Gas > blockGasLimit
-}
-
-func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
-	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
 }
