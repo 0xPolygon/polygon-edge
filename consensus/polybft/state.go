@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"encoding/binary"
 	"encoding/json"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -177,11 +176,4 @@ func (s *State) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(proposerCalcSnapshotBucket).Put(proposerSnapshotKey, raw)
 	})
-}
-
-func itob(v uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, v)
-
-	return b
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -54,7 +55,7 @@ func (s *StateSyncStore) insertStateSyncEvent(event *contractsapi.StateSyncedEve
 
 		bucket := tx.Bucket(syncStateEventsBucket)
 
-		return bucket.Put(itob(event.ID.Uint64()), raw)
+		return bucket.Put(common.EncodeUint64ToBytes(event.ID.Uint64()), raw)
 	})
 }
 
@@ -88,7 +89,7 @@ func (s *StateSyncStore) getStateSyncEventsForCommitment(
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(syncStateEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
-			v := bucket.Get(itob(i))
+			v := bucket.Get(common.EncodeUint64ToBytes(i))
 			if v == nil {
 				return errNotEnoughStateSyncs
 			}
@@ -114,7 +115,7 @@ func (s *StateSyncStore) getCommitmentForStateSync(stateSyncID uint64) (*Commitm
 	err := s.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(commitmentsBucket).Cursor()
 
-		k, v := c.Seek(itob(stateSyncID))
+		k, v := c.Seek(common.EncodeUint64ToBytes(stateSyncID))
 		if k == nil {
 			return errNoCommitmentForStateSync
 		}
@@ -141,7 +142,8 @@ func (s *StateSyncStore) insertCommitmentMessage(commitment *CommitmentMessageSi
 			return err
 		}
 
-		if err := tx.Bucket(commitmentsBucket).Put(itob(commitment.Message.EndID.Uint64()), raw); err != nil {
+		if err := tx.Bucket(commitmentsBucket).Put(
+			common.EncodeUint64ToBytes(commitment.Message.EndID.Uint64()), raw); err != nil {
 			return err
 		}
 
@@ -154,7 +156,7 @@ func (s *StateSyncStore) getCommitmentMessage(toIndex uint64) (*CommitmentMessag
 	var commitment *CommitmentMessageSigned
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		raw := tx.Bucket(commitmentsBucket).Get(itob(toIndex))
+		raw := tx.Bucket(commitmentsBucket).Get(common.EncodeUint64ToBytes(toIndex))
 		if raw == nil {
 			return nil
 		}
@@ -282,7 +284,7 @@ func (s *StateSyncStore) insertStateSyncProofs(stateSyncProof []*StateSyncProof)
 				return err
 			}
 
-			if err := bucket.Put(itob(ssp.StateSync.ID.Uint64()), raw); err != nil {
+			if err := bucket.Put(common.EncodeUint64ToBytes(ssp.StateSync.ID.Uint64()), raw); err != nil {
 				return err
 			}
 		}
@@ -296,7 +298,7 @@ func (s *StateSyncStore) getStateSyncProof(stateSyncID uint64) (*StateSyncProof,
 	var ssp *StateSyncProof
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		if v := tx.Bucket(stateSyncProofsBucket).Get(itob(stateSyncID)); v != nil {
+		if v := tx.Bucket(stateSyncProofsBucket).Get(common.EncodeUint64ToBytes(stateSyncID)); v != nil {
 			if err := json.Unmarshal(v, &ssp); err != nil {
 				return err
 			}

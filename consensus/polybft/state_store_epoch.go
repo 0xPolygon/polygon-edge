@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -48,7 +49,7 @@ func (s *EpochStore) insertValidatorSnapshot(validatorSnapshot *validatorSnapsho
 			return err
 		}
 
-		return tx.Bucket(validatorSnapshotsBucket).Put(itob(validatorSnapshot.Epoch), raw)
+		return tx.Bucket(validatorSnapshotsBucket).Put(common.EncodeUint64ToBytes(validatorSnapshot.Epoch), raw)
 	})
 }
 
@@ -57,7 +58,7 @@ func (s *EpochStore) getValidatorSnapshot(epoch uint64) (*validatorSnapshot, err
 	var validatorSnapshot *validatorSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		v := tx.Bucket(validatorSnapshotsBucket).Get(itob(epoch))
+		v := tx.Bucket(validatorSnapshotsBucket).Get(common.EncodeUint64ToBytes(epoch))
 		if v != nil {
 			return json.Unmarshal(v, &validatorSnapshot)
 		}
@@ -91,7 +92,7 @@ func (s *EpochStore) getLastSnapshot() (*validatorSnapshot, error) {
 // insertEpoch inserts a new epoch to db with its meta data
 func (s *EpochStore) insertEpoch(epoch uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		epochBucket, err := tx.Bucket(epochsBucket).CreateBucketIfNotExists(itob(epoch))
+		epochBucket, err := tx.Bucket(epochsBucket).CreateBucketIfNotExists(common.EncodeUint64ToBytes(epoch))
 		if err != nil {
 			return err
 		}
@@ -112,7 +113,7 @@ func (s *EpochStore) isEpochInserted(epoch uint64) bool {
 
 // getEpochBucket returns bucket from db associated with given epoch
 func getEpochBucket(tx *bolt.Tx, epoch uint64) (*bolt.Bucket, error) {
-	epochBucket := tx.Bucket(epochsBucket).Bucket(itob(epoch))
+	epochBucket := tx.Bucket(epochsBucket).Bucket(common.EncodeUint64ToBytes(epoch))
 	if epochBucket == nil {
 		return nil, fmt.Errorf("could not find bucket for epoch: %v", epoch)
 	}
@@ -142,7 +143,7 @@ func (s *EpochStore) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 		keys := make([][]byte, 0)
 		values := make([][]byte, 0)
 		for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ { // exclude the last inserted we already appended
-			key := itob(epoch)
+			key := common.EncodeUint64ToBytes(epoch)
 			value := bucket.Get(key)
 			if value == nil {
 				continue

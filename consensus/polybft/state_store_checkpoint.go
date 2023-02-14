@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
@@ -63,8 +64,8 @@ func insertExitEventToBucket(bucket *bolt.Bucket, exitEvent *ExitEvent) error {
 		return err
 	}
 
-	return bucket.Put(bytes.Join([][]byte{itob(exitEvent.EpochNumber),
-		itob(exitEvent.ID), itob(exitEvent.BlockNumber)}, nil), raw)
+	return bucket.Put(bytes.Join([][]byte{common.EncodeUint64ToBytes(exitEvent.EpochNumber),
+		common.EncodeUint64ToBytes(exitEvent.ID), common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
@@ -74,7 +75,7 @@ func (s *CheckpointStore) getExitEvent(exitEventID, epoch uint64) (*ExitEvent, e
 	err := s.db.View(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(exitEventsBucket)
 
-		key := bytes.Join([][]byte{itob(epoch), itob(exitEventID)}, nil)
+		key := bytes.Join([][]byte{common.EncodeUint64ToBytes(epoch), common.EncodeUint64ToBytes(exitEventID)}, nil)
 		k, v := bucket.Cursor().Seek(key)
 
 		if bytes.HasPrefix(k, key) == false || v == nil {
@@ -111,7 +112,7 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(exitEventsBucket).Cursor()
-		prefix := itob(epoch)
+		prefix := common.EncodeUint64ToBytes(epoch)
 
 		for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
 			var event *ExitEvent
