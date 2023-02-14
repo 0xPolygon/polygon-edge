@@ -98,7 +98,6 @@
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
             SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
           with:
-            channel-id: C04PHMM0VCG
             payload: |
               {
                 "blocks": [
@@ -106,7 +105,7 @@
                     "type": "header",
                     "text": {
                       "type": "plain_text",
-                      "text": "Pandora's Box Results"
+                      "text": "K6 Loadtest Results"
                     }
                   },
                   {
