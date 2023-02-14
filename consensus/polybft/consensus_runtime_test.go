@@ -14,7 +14,6 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -591,23 +590,6 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T) {
-	t.Parallel()
-
-	epoch := &epochMetadata{Validators: newTestValidators(5).getPublicIdentities()}
-	nonValidatorAccount := createTestKey(t)
-	hash := crypto.Keccak256Hash(generateRandomBytes(t)).Bytes()
-	// Sign content by non validator account
-	signature, err := nonValidatorAccount.Sign(hash)
-	require.NoError(t, err)
-
-	vote := &MessageSignature{
-		From:      nonValidatorAccount.String(),
-		Signature: signature}
-	assert.ErrorContains(t, validateVote(vote, epoch),
-		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
-}
-
 func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 	t.Parallel()
 
@@ -1082,17 +1064,6 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
-}
-
-func createTestTransportMessage(hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
-	signature, _ := key.Sign(hash)
-
-	return &TransportMessage{
-		Hash:        hash,
-		Signature:   signature,
-		NodeID:      key.String(),
-		EpochNumber: epochNumber,
-	}
 }
 
 func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {

@@ -941,20 +941,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	return firstBlockInEpoch, nil
 }
 
-// validateVote validates if the senders address is in active validator set
-func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
-	// get senders address
-	senderAddress := types.StringToAddress(vote.From)
-	if !epoch.Validators.ContainsAddress(senderAddress) {
-		return fmt.Errorf(
-			"message is received from sender %s, which is not in current validator set",
-			vote.From,
-		)
-	}
-
-	return nil
-}
-
 // createExitTree creates an exit event merkle tree from provided exit events
 func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 	numOfEvents := len(exitEvents)
