@@ -396,8 +396,10 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	switch t.Type {
 	case LegacyTx:
 		num = 9
-	case DynamicFeeTx, StateTx:
+	case StateTx:
 		num = 10
+	case DynamicFeeTx:
+		num = 12
 	default:
 		return fmt.Errorf("transaction type %d not found", t.Type)
 	}
@@ -407,6 +409,11 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	p.Hash(t.Hash[:0], v)
+
+	// Skipping Chain ID field since we don't support it (yet)
+	if t.Type == DynamicFeeTx {
+		_ = getElem()
+	}
 
 	// nonce
 	if t.Nonce, err = getElem().GetUint64(); err != nil {
@@ -432,6 +439,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 	}
+
 	// gas
 	if t.Gas, err = getElem().GetUint64(); err != nil {
 		return err
@@ -456,6 +464,11 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	// input
 	if t.Input, err = getElem().GetBytes(t.Input[:0]); err != nil {
 		return err
+	}
+
+	// Skipping Access List field since we don't support it
+	if t.Type == DynamicFeeTx {
+		_ = getElem()
 	}
 
 	// V

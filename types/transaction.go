@@ -20,7 +20,7 @@ type TxType byte
 const (
 	LegacyTx     TxType = 0x0
 	StateTx      TxType = 0x7f
-	DynamicFeeTx TxType = 0x8f
+	DynamicFeeTx TxType = 0x02
 )
 
 func txTypeFromByte(b byte) (TxType, error) {

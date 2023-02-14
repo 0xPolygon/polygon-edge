@@ -1,11 +1,13 @@
 package types
 
 import (
+	"math/big"
+
 	"github.com/umbracle/fastrlp"
 )
 
 const (
-	RLPSingleByteUpperLimit = 0x8f
+	RLPSingleByteUpperLimit = 0x7f
 )
 
 type RLPMarshaler interface {
@@ -191,6 +193,11 @@ func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
 func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
+	// Specify zero chain ID as per spec
+	if t.Type == DynamicFeeTx {
+		vv.Set(arena.NewBigInt(big.NewInt(0)))
+	}
+
 	vv.Set(arena.NewUint(t.Nonce))
 
 	if t.Type == DynamicFeeTx {
@@ -213,6 +220,11 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(arena.NewBigInt(t.Value))
 	vv.Set(arena.NewCopyBytes(t.Input))
+
+	// Specify access list as per spec
+	if t.Type == DynamicFeeTx {
+		vv.Set(arena.NewArray())
+	}
 
 	// signature values
 	vv.Set(arena.NewBigInt(t.V))
