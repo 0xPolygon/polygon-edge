@@ -120,10 +120,8 @@ func (t *Transaction) Copy() *Transaction {
 func (t *Transaction) Cost() *big.Int {
 	total := new(big.Int)
 
-	if (t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0) ||
-		(t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0) {
-		total = total.SetUint64(t.Gas)
-		total = total.Mul(total, t.GasFeeCap)
+	if t.GasFeeCap != nil || t.GasFeeCap.BitLen() > 0 {
+		total = total.Mul(t.GasFeeCap, new(big.Int).SetUint64(t.Gas))
 	} else {
 		total = total.Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
 	}
