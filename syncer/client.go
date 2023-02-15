@@ -38,7 +38,7 @@ type syncPeerClient struct {
 
 	shouldEmitBlocks bool // flag for emitting blocks in the topic
 	closeCh          chan struct{}
-	closed           *atomic.Bool
+	closed           *uint64 // ACTIVE == 0, CLOSED == non-zero.
 }
 
 func NewSyncPeerClient(
@@ -55,14 +55,14 @@ func NewSyncPeerClient(
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 		shouldEmitBlocks:       true,
 		closeCh:                make(chan struct{}),
-		closed:                 new(atomic.Bool),
+		closed:                 new(uint64),
 	}
 }
 
 // Start processes for SyncPeerClient
 func (m *syncPeerClient) Start() error {
 	// Mark client active.
-	m.closed.Store(false)
+	atomic.StoreUint64(m.closed, 0)
 
 	go m.startNewBlockProcess()
 	go m.startPeerEventProcess()
@@ -76,7 +76,7 @@ func (m *syncPeerClient) Start() error {
 
 // Close terminates running processes for SyncPeerClient
 func (m *syncPeerClient) Close() {
-	if m.closed.Swap(true) {
+	if atomic.SwapUint64(m.closed, 1) > 0 {
 		// Already closed.
 		return
 	}
@@ -210,7 +210,7 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 		return
 	}
 
-	if m.closed.Load() {
+	if atomic.LoadUint64(m.closed) > 0 {
 		m.logger.Debug("received status from peer after client was closed, ignoring", "id", from)
 		return
 	}
