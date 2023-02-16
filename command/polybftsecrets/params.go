@@ -235,7 +235,7 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 			return nil, err
 		}
 
-		res.BLSSignature = types.BytesToHash(sb).String()
+		res.BLSSignature = hex.EncodeToString(sb)
 
 		if ip.printPrivateKey {
 			pk, err := account.Ecdsa.MarshallPrivateKey()
