@@ -23,6 +23,7 @@ const (
 	networkFlag    = "network"
 	numFlag        = "num"
 	outputFlag     = "output"
+	chainIDFlag    = "chain-id"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -55,6 +56,8 @@ type initParams struct {
 	insecureLocalStore bool
 
 	output bool
+
+	chainID int64
 }
 
 func (ip *initParams) validateFlags() error {
@@ -133,6 +136,13 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		false,
 		"the flag indicating to output existing secrets",
 	)
+
+	cmd.Flags().Int64Var(
+		&ip.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
+	)
 }
 
 func (ip *initParams) Execute() (Results, error) {
@@ -210,7 +220,12 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
 
-		s, err := polybft.MakeKOSKSignature(account.Bls, types.Address(account.Ecdsa.Address()), 10, bls.DomainValidatorSet)
+		s, err := polybft.MakeKOSKSignature(
+			account.Bls,
+			types.Address(account.Ecdsa.Address()),
+			ip.chainID,
+			bls.DomainValidatorSet,
+		)
 		if err != nil {
 			return nil, err
 		}
