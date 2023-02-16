@@ -215,6 +215,13 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 			}
 
 			res.PrivateKey = hex.EncodeToString(pk)
+
+			blspk, err := account.Bls.Marshal()
+			if err != nil {
+				return nil, err
+			}
+
+			res.BLSPrivateKey = hex.EncodeToString(blspk)
 		}
 	}
 
