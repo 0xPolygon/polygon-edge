@@ -65,13 +65,13 @@ func (f *FrontierSigner) SignTx(
 
 	tx.R = new(big.Int).SetBytes(sig[:32])
 	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(f.CalculateV(sig[64]))
+	tx.V = new(big.Int).SetBytes(f.calculateV(sig[64]))
 
 	return tx, nil
 }
 
-// CalculateV returns the V value for transactions pre EIP155
-func (f *FrontierSigner) CalculateV(parity byte) []byte {
+// calculateV returns the V value for transactions pre EIP155
+func (f *FrontierSigner) calculateV(parity byte) []byte {
 	reference := big.NewInt(int64(parity))
 	reference.Add(reference, big27)
 

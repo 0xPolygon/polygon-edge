@@ -77,13 +77,13 @@ func (e *EIP155Signer) SignTx(
 
 	tx.R = new(big.Int).SetBytes(sig[:32])
 	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(e.CalculateV(sig[64]))
+	tx.V = new(big.Int).SetBytes(e.calculateV(sig[64]))
 
 	return tx, nil
 }
 
-// CalculateV returns the V value for transaction signatures. Based on EIP155
-func (e *EIP155Signer) CalculateV(parity byte) []byte {
+// calculateV returns the V value for transaction signatures. Based on EIP155
+func (e *EIP155Signer) calculateV(parity byte) []byte {
 	reference := big.NewInt(int64(parity))
 	reference.Add(reference, big35)
 

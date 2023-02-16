@@ -3,18 +3,21 @@ package crypto
 import (
 	"crypto/ecdsa"
 	"math/big"
-	"math/bits"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type LondonSigner struct {
-	chainID uint64
+	chainID        uint64
+	fallbackSigner TxSigner
 }
 
 // NewLondonSigner returns a new LondonSigner object
-func NewLondonSigner(chainID uint64) *LondonSigner {
-	return &LondonSigner{chainID: chainID}
+func NewLondonSigner(chainID uint64, fallbackSigner TxSigner) *LondonSigner {
+	return &LondonSigner{
+		chainID:        chainID,
+		fallbackSigner: fallbackSigner,
+	}
 }
 
 // Hash is a wrapper function that calls calcTxHash with the LondonSigner's fields
@@ -24,29 +27,11 @@ func (e *LondonSigner) Hash(tx *types.Transaction) types.Hash {
 
 // Sender returns the transaction sender
 func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	protected := true
-
-	// Check if v value conforms to an earlier standard (before EIP155)
-	bigV := big.NewInt(0)
-	if tx.V != nil {
-		bigV.SetBytes(tx.V.Bytes())
+	if tx.Type != types.DynamicFeeTx {
+		return e.fallbackSigner.Sender(tx)
 	}
 
-	if vv := bigV.Uint64(); bits.Len(uint(vv)) <= 8 {
-		protected = vv != 27 && vv != 28
-	}
-
-	if !protected {
-		return (&FrontierSigner{}).Sender(tx)
-	}
-
-	// Reverse the V calculation to find the original V in the range [0, 1]
-	// v = CHAIN_ID * 2 + 35 + {0, 1}
-	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
-	bigV.Sub(bigV, mulOperand)
-	bigV.Sub(bigV, big35)
-
-	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
+	sig, err := encodeSignature(tx.R, tx.S, byte(tx.V.Int64()))
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -66,6 +51,10 @@ func (e *LondonSigner) SignTx(
 	tx *types.Transaction,
 	privateKey *ecdsa.PrivateKey,
 ) (*types.Transaction, error) {
+	if tx.Type != types.DynamicFeeTx {
+		return e.fallbackSigner.SignTx(tx, privateKey)
+	}
+
 	tx = tx.Copy()
 
 	h := e.Hash(tx)
@@ -77,19 +66,12 @@ func (e *LondonSigner) SignTx(
 
 	tx.R = new(big.Int).SetBytes(sig[:32])
 	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(e.CalculateV(sig[64]))
+	tx.V = new(big.Int).SetBytes(e.calculateV(sig[64]))
 
 	return tx, nil
 }
 
-// CalculateV returns the V value for transaction signatures. Based on EIP155
-func (e *LondonSigner) CalculateV(parity byte) []byte {
-	reference := big.NewInt(int64(parity))
-	reference.Add(reference, big35)
-
-	mulOperand := big.NewInt(0).Mul(big.NewInt(int64(e.chainID)), big.NewInt(2))
-
-	reference.Add(reference, mulOperand)
-
-	return reference.Bytes()
+// calculateV returns the V value for transaction signatures. Based on EIP155
+func (e *LondonSigner) calculateV(parity byte) []byte {
+	return big.NewInt(int64(parity)).Bytes()
 }

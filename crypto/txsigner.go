@@ -26,21 +26,20 @@ type TxSigner interface {
 
 	// SignTx signs a transaction
 	SignTx(tx *types.Transaction, priv *ecdsa.PrivateKey) (*types.Transaction, error)
-
-	// CalculateV calculates the V value based on the type of signer used
-	CalculateV(parity byte) []byte
 }
 
 // NewSigner creates a new signer object (EIP155 or FrontierSigner)
 func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	var signer TxSigner
 
-	if forks.London {
-		signer = NewLondonSigner(chainID)
-	} else if forks.EIP155 {
+	if forks.EIP155 {
 		signer = NewEIP155Signer(chainID)
 	} else {
 		signer = NewFrontierSigner()
+	}
+
+	if forks.London {
+		return NewLondonSigner(chainID, signer)
 	}
 
 	return signer
@@ -66,16 +65,20 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	isDynamicFeeTx := tx.Type == types.DynamicFeeTx
 
 	v := a.NewArray()
+
 	if isDynamicFeeTx {
 		v.Set(a.NewUint(chainID))
 	}
+
 	v.Set(a.NewUint(tx.Nonce))
+
 	if isDynamicFeeTx {
 		v.Set(a.NewBigInt(tx.GasTipCap))
 		v.Set(a.NewBigInt(tx.GasFeeCap))
 	} else {
 		v.Set(a.NewBigInt(tx.GasPrice))
 	}
+
 	v.Set(a.NewUint(tx.Gas))
 
 	if tx.To == nil {
@@ -85,16 +88,26 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	}
 
 	v.Set(a.NewBigInt(tx.Value))
+
 	v.Set(a.NewCopyBytes(tx.Input))
 
-	// EIP155
-	if chainID != 0 && !isDynamicFeeTx {
-		v.Set(a.NewUint(chainID))
-		v.Set(a.NewUint(0))
-		v.Set(a.NewUint(0))
+	if isDynamicFeeTx {
+		v.Set(a.NewArray())
+	} else {
+		// EIP155
+		if chainID != 0 {
+			v.Set(a.NewUint(chainID))
+			v.Set(a.NewUint(0))
+			v.Set(a.NewUint(0))
+		}
 	}
 
-	hash := keccak.Keccak256Rlp(nil, v)
+	var hash []byte
+	if isDynamicFeeTx {
+		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type)}, nil, v)
+	} else {
+		hash = keccak.Keccak256Rlp(nil, v)
+	}
 
 	signerPool.Put(a)
 
