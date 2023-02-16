@@ -113,6 +113,8 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			return err
 		}
 
+		bTxn.PrefillFees(b.Header.BaseFee)
+
 		bTxn = bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)

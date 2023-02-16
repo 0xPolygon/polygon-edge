@@ -142,6 +142,52 @@ func (t *Transaction) Cost() *big.Int {
 	return total
 }
 
+func (t *Transaction) PrefillFees(baseFee uint64) {
+	if baseFee == 0 {
+		// If there's no basefee, then it must be a non-1559 execution
+		if t.GasPrice == nil {
+			t.GasPrice = new(big.Int)
+		}
+
+		t.GasFeeCap = new(big.Int).Set(t.GasPrice)
+		t.GasTipCap = new(big.Int).Set(t.GasPrice)
+
+		return
+	}
+
+	// A basefee is provided, necessitating 1559-type execution
+	if t.GasPrice != nil {
+		// User specified the legacy gas field, convert to 1559 gas typing
+		t.GasFeeCap = new(big.Int).Set(t.GasPrice)
+		t.GasTipCap = new(big.Int).Set(t.GasPrice)
+
+		return
+	}
+
+	// User specified 1559 gas feilds (or none), use those
+	if t.GasFeeCap == nil {
+		t.GasFeeCap = new(big.Int)
+	}
+
+	if t.GasTipCap == nil {
+		t.GasTipCap = new(big.Int)
+	}
+
+	// Backfill the legacy gasPrice for EVM execution, unless we're all zeroes
+	t.GasPrice = new(big.Int)
+
+	if t.GasFeeCap.BitLen() > 0 || t.GasTipCap.BitLen() > 0 {
+		t.GasPrice = new(big.Int).Add(
+			t.GasTipCap,
+			new(big.Int).SetUint64(baseFee),
+		)
+
+		if t.GasPrice.Cmp(t.GasFeeCap) > 0 {
+			t.GasPrice = new(big.Int).Set(t.GasFeeCap)
+		}
+	}
+}
+
 func (t *Transaction) Size() uint64 {
 	if size := t.size.Load(); size != nil {
 		sizeVal, ok := size.(uint64)
