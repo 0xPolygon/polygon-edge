@@ -91,10 +91,6 @@ func (a *Account) String() string {
 	return fmt.Sprintf("%d %s", a.Nonce, a.Balance.String())
 }
 
-func (a *Account) DetailedString() string {
-	return fmt.Sprintf("%d %s %v %v", a.Nonce, a.Balance.String(), a.Root, types.BytesToHash(a.CodeHash))
-}
-
 func (a *Account) Copy() *Account {
 	aa := new(Account)
 
