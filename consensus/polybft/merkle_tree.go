@@ -195,16 +195,8 @@ func VerifyProofUsing(index uint64, leaf []byte, proof []types.Hash, root types.
 		return fmt.Errorf("empty leaf")
 	}
 
-	if len(proof) == 0 {
-		// case when tree has only one item
-		if index != 0 {
-			return fmt.Errorf("invalid leaf index for tree with one item. index: %v", index)
-		}
-	} else {
-		// case when tree has more than one item
-		if int(index) > int(math.Pow(2, float64(len(proof)))) {
-			return fmt.Errorf("invalid leaf index %v", index)
-		}
+	if int(index) >= int(math.Pow(2, float64(len(proof)))) {
+		return fmt.Errorf("invalid leaf index %v", index)
 	}
 
 	computedHash := getProofHash(index, leaf, proof, hasher)
