@@ -3,8 +3,8 @@ package helper
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/umbracle/ethgo/abi"
 )
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
@@ -149,7 +150,7 @@ func InitValidatorBLSSignature(
 	}
 
 	// Generate the signature
-	s, err := polybft.MakeKOSKSignature(
+	s, err := MakeKOSKSignature(
 		account.Bls,
 		types.Address(account.Ecdsa.Address()),
 		chainID,
@@ -284,4 +285,18 @@ func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secre
 	}
 
 	return secretsManager, nil
+}
+
+// MakeKOSKSignature creates KOSK signature which prevents rogue attack
+func MakeKOSKSignature(
+	privateKey *bls.PrivateKey, address types.Address, chainID int64, domain []byte) (*bls.Signature, error) {
+	message, err := abi.Encode(
+		[]interface{}{address, big.NewInt(chainID)},
+		abi.MustNewType("tuple(address, uint256)"))
+	if err != nil {
+		return nil, err
+	}
+
+	// abi.Encode adds 12 zero bytes before actual address bytes
+	return privateKey.Sign(message[12:], domain)
 }

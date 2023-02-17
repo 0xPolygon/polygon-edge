@@ -6,8 +6,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -227,22 +225,12 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
 
-		s, err := polybft.MakeKOSKSignature(
-			account.Bls,
-			types.Address(account.Ecdsa.Address()),
-			ip.chainID,
-			bls.DomainValidatorSet,
-		)
+		s, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
 		if err != nil {
 			return nil, err
 		}
 
-		sb, err := s.Marshal()
-		if err != nil {
-			return nil, err
-		}
-
-		res.BLSSignature = hex.EncodeToString(sb)
+		res.BLSSignature = hex.EncodeToString(s)
 
 		if ip.printPrivateKey {
 			pk, err := account.Ecdsa.MarshallPrivateKey()

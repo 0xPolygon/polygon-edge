@@ -14,7 +14,6 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo/abi"
 )
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
@@ -238,18 +237,4 @@ func (m *Manifest) Save(manifestPath string) error {
 	}
 
 	return nil
-}
-
-// MakeKOSKSignature creates KOSK signature which prevents rogue attack
-func MakeKOSKSignature(
-	privateKey *bls.PrivateKey, address types.Address, chainID int64, domain []byte) (*bls.Signature, error) {
-	message, err := abi.Encode(
-		[]interface{}{address, big.NewInt(chainID)},
-		abi.MustNewType("tuple(address, uint256)"))
-	if err != nil {
-		return nil, err
-	}
-
-	// abi.Encode adds 12 zero bytes before actual address bytes
-	return privateKey.Sign(message[12:], domain)
 }
