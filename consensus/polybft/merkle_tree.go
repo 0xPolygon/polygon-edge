@@ -33,7 +33,6 @@ import (
 
 var (
 	errLeafNotFound = errors.New("leaf not found")
-	leafNodeDomain  = []byte("leafNodeDomain")
 	leftNodeDomain  = []byte("leftNodeDomain")
 	rightNodeDomain = []byte("rightNodeDomain")
 )
@@ -54,7 +53,7 @@ func newMerkleNode(left, right *MerkleNode, data []byte, hasher hash.Hash) *Merk
 	var dataToHash []byte
 	if left == nil && right == nil {
 		// it's a leaf node
-		dataToHash = append(leafNodeDomain, data...)
+		dataToHash = data
 	} else {
 		// it's an inner node
 		dataToHash = append(leftNodeDomain, left.hash...)
@@ -208,7 +207,6 @@ func VerifyProofUsing(index uint64, leaf []byte, proof []types.Hash, root types.
 }
 
 func getProofHash(index uint64, leaf []byte, proof []types.Hash, hasher hash.Hash) []byte {
-	hasher.Write(leafNodeDomain)
 	hasher.Write(leaf)
 	computedHash := hasher.Sum(nil)
 
