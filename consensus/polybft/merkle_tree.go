@@ -34,7 +34,8 @@ import (
 var (
 	errLeafNotFound = errors.New("leaf not found")
 	leafNodeDomain  = []byte("leafNodeDomain")
-	innerNodeDomain = []byte("innerNodesDomain")
+	leftNodeDomain  = []byte("leftNodeDomain")
+	rightNodeDomain = []byte("rightNodeDomain")
 )
 
 // MerkleNode represents a single node in merkle tree
@@ -56,7 +57,8 @@ func newMerkleNode(left, right *MerkleNode, data []byte, hasher hash.Hash) *Merk
 		dataToHash = append(leafNodeDomain, data...)
 	} else {
 		// it's an inner node
-		dataToHash = append(left.hash, innerNodeDomain...)
+		dataToHash = append(leftNodeDomain, left.hash...)
+		dataToHash = append(dataToHash, rightNodeDomain...)
 		dataToHash = append(dataToHash, right.hash...)
 	}
 
@@ -222,12 +224,14 @@ func getProofHash(index uint64, leaf []byte, proof []types.Hash, hasher hash.Has
 		hasher.Reset()
 
 		if index%2 == 0 {
+			hasher.Write(leftNodeDomain)
 			hasher.Write(computedHash)
-			hasher.Write(innerNodeDomain)
+			hasher.Write(rightNodeDomain)
 			hasher.Write(proof[i].Bytes())
 		} else {
+			hasher.Write(leftNodeDomain)
 			hasher.Write(proof[i].Bytes())
-			hasher.Write(innerNodeDomain)
+			hasher.Write(rightNodeDomain)
 			hasher.Write(computedHash)
 		}
 
