@@ -918,7 +918,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 		proposal := builtBlock.Block.MarshalRLP()
 		_, err := fsm.Insert(proposal, seals)
 
-		require.ErrorContains(t, err, "validated proposal is either nil")
+		require.ErrorIs(t, err, errProposalDontMatch)
 	})
 
 	t.Run("Insert with target block hash not match", func(t *testing.T) {
@@ -930,7 +930,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 		fsm.target.Block.Header.Hash = types.BytesToHash(generateRandomBytes(t))
 		_, err := fsm.Insert(proposal, seals)
 
-		require.ErrorContains(t, err, "does not match the received one")
+		require.ErrorIs(t, err, errProposalDontMatch)
 	})
 }
 

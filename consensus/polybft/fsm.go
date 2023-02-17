@@ -31,6 +31,8 @@ var (
 	errCommitEpochTxDoesNotExist   = errors.New("commit epoch transaction is not found in the epoch ending block")
 	errCommitEpochTxNotExpected    = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
+	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
+		"is either nil or it does not match the received one")
 )
 
 type fsm struct {
@@ -436,8 +438,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 
 	if newBlock == nil || newBlock.Block.Hash() != proposedBlock.Hash() {
 		// if this is the case, we will let syncer insert the block
-		return nil, errors.New("failed to insert proposal, because the validated proposal is either nil 
-		or it does not match the received one")
+		return nil, errProposalDontMatch
 	}
 
 	// In this function we should try to return little to no errors since
