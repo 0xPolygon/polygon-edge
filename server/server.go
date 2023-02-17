@@ -531,6 +531,12 @@ func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error
 		return nil, err
 	}
 
+	fmt.Printf("In server.go GetCode, root %v, addr %v, account %v\n", root, addr, account.DetailedString())
+
+	// from state/state.go
+	var emptyCodeHash = crypto.Keccak256(nil)
+	fmt.Printf("emptyCodeHash %v\n", types.BytesToHash(emptyCodeHash))
+
 	code, ok := j.state.GetCode(types.BytesToHash(account.CodeHash))
 	if !ok {
 		return nil, fmt.Errorf("unable to fetch code")

@@ -152,6 +152,9 @@ var (
 
 	// EmptyUncleHash is the root when there are no uncles
 	EmptyUncleHash = StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+
+	// EmptyUncleHash is the root where there is no code
+	EmptyCodeHash = StringToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 )
 
 type Proof struct {
