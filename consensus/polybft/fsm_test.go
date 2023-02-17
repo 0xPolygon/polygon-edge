@@ -849,59 +849,89 @@ func TestFSM_Insert_Good(t *testing.T) {
 		signaturesCount   = 3
 	)
 
-	validators := newTestValidators(accountCount)
-	allAccounts := validators.getPrivateIdentities()
-	validatorsMetadata := validators.getPublicIdentities()
+	setupFn := func() (*fsm, []*messages.CommittedSeal, *types.FullBlock, *blockchainMock) {
+		validators := newTestValidators(accountCount)
+		allAccounts := validators.getPrivateIdentities()
+		validatorsMetadata := validators.getPublicIdentities()
 
-	extraParent := createTestExtra(validatorsMetadata, AccountSet{}, len(allAccounts)-1, signaturesCount, signaturesCount)
-	parent := &types.Header{Number: parentBlockNumber, ExtraData: extraParent}
-	extraBlock := createTestExtra(validatorsMetadata, AccountSet{}, len(allAccounts)-1, signaturesCount, signaturesCount)
-	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
-		Header: &types.Header{Number: parentBlockNumber + 1, ParentHash: parent.Hash, ExtraData: extraBlock},
+		extraParent := createTestExtra(validatorsMetadata, AccountSet{}, len(allAccounts)-1, signaturesCount, signaturesCount)
+		parent := &types.Header{Number: parentBlockNumber, ExtraData: extraParent}
+		extraBlock := createTestExtra(validatorsMetadata, AccountSet{}, len(allAccounts)-1, signaturesCount, signaturesCount)
+		block := consensus.BuildBlock(
+			consensus.BuildBlockParams{
+				Header: &types.Header{Number: parentBlockNumber + 1, ParentHash: parent.Hash, ExtraData: extraBlock},
+			})
+
+		builtBlock := &types.FullBlock{Block: block}
+
+		builderMock := newBlockBuilderMock(builtBlock)
+		chainMock := &blockchainMock{}
+		chainMock.On("CommitBlock", mock.Anything).Return(error(nil)).Once()
+		chainMock.On("ProcessBlock", mock.Anything, mock.Anything, mock.Anything).
+			Return(builtBlock, error(nil)).
+			Maybe()
+
+		f := &fsm{
+			parent:       parent,
+			blockBuilder: builderMock,
+			config:       &PolyBFTConfig{},
+			target:       builtBlock,
+			backend:      chainMock,
+			validators:   NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger()),
+			logger:       hclog.NewNullLogger(),
+		}
+
+		seals := make([]*messages.CommittedSeal, signaturesCount)
+
+		for i := 0; i < signaturesCount; i++ {
+			sign, err := allAccounts[i].Bls.Sign(builtBlock.Block.Hash().Bytes(), bls.DomainValidatorSet)
+			require.NoError(t, err)
+			sigRaw, err := sign.Marshal()
+			require.NoError(t, err)
+
+			seals[i] = &messages.CommittedSeal{
+				Signer:    validatorsMetadata[i].Address.Bytes(),
+				Signature: sigRaw,
+			}
+		}
+
+		return f, seals, builtBlock, chainMock
+	}
+
+	t.Run("Insert with target block defined", func(t *testing.T) {
+		t.Parallel()
+
+		fsm, seals, builtBlock, chainMock := setupFn()
+		proposal := builtBlock.Block.MarshalRLP()
+		fullBlock, err := fsm.Insert(proposal, seals)
+
+		require.NoError(t, err)
+		require.Equal(t, parentBlockNumber+1, fullBlock.Block.Number())
+		chainMock.AssertExpectations(t)
 	})
 
-	buildBlock := &types.FullBlock{Block: finalBlock}
-	mBlockBuilder := newBlockBuilderMock(buildBlock)
-	mBackendMock := &blockchainMock{}
-	mBackendMock.On("CommitBlock", mock.MatchedBy(func(i interface{}) bool {
-		stateBlock, ok := i.(*types.FullBlock)
-		require.True(t, ok)
+	t.Run("Insert with target block undefined", func(t *testing.T) {
+		t.Parallel()
 
-		return stateBlock.Block.Number() == buildBlock.Block.Number() && stateBlock.Block.Hash() == buildBlock.Block.Hash()
-	})).Return(error(nil)).Once()
+		fsm, seals, builtBlock, _ := setupFn()
+		fsm.target = nil
+		proposal := builtBlock.Block.MarshalRLP()
+		_, err := fsm.Insert(proposal, seals)
 
-	validatorSet := NewValidatorSet(validatorsMetadata[0:len(validatorsMetadata)-1], hclog.NewNullLogger())
+		require.ErrorIs(t, err, errProposalDontMatch)
+	})
 
-	fsm := &fsm{parent: parent,
-		blockBuilder: mBlockBuilder,
-		config:       &PolyBFTConfig{},
-		backend:      mBackendMock,
-		validators:   validatorSet,
-	}
+	t.Run("Insert with target block hash not match", func(t *testing.T) {
+		t.Parallel()
 
-	var commitedSeals []*messages.CommittedSeal
+		fsm, seals, builtBlock, _ := setupFn()
+		proposal := builtBlock.Block.MarshalRLP()
+		fsm.target = builtBlock
+		fsm.target.Block.Header.Hash = types.BytesToHash(generateRandomBytes(t))
+		_, err := fsm.Insert(proposal, seals)
 
-	for i := 0; i < signaturesCount; i++ {
-		sign, err := allAccounts[i].Bls.Sign(buildBlock.Block.Hash().Bytes(), bls.DomainValidatorSet)
-		assert.NoError(t, err)
-		sigRaw, err := sign.Marshal()
-		assert.NoError(t, err)
-
-		commitedSeals = append(commitedSeals, &messages.CommittedSeal{
-			Signer:    validatorsMetadata[i].Address.Bytes(),
-			Signature: sigRaw,
-		})
-	}
-
-	proposal := buildBlock.Block.MarshalRLP()
-
-	fsm.target = buildBlock
-
-	fullBlock, err := fsm.Insert(proposal, commitedSeals)
-
-	require.NoError(t, err)
-	mBackendMock.AssertExpectations(t)
-	assert.Equal(t, parentBlockNumber+1, fullBlock.Block.Number())
+		require.ErrorIs(t, err, errProposalDontMatch)
+	})
 }
 
 func TestFSM_Insert_InvalidNode(t *testing.T) {

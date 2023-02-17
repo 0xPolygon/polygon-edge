@@ -31,6 +31,8 @@ var (
 	errCommitEpochTxDoesNotExist   = errors.New("commit epoch transaction is not found in the epoch ending block")
 	errCommitEpochTxNotExpected    = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
+	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
+		"is either nil or it does not match the received one")
 )
 
 type fsm struct {
@@ -429,10 +431,23 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.FullBlock, error) {
 	newBlock := f.target
 
+	var proposedBlock types.Block
+	if err := proposedBlock.UnmarshalRLP(proposal); err != nil {
+		return nil, fmt.Errorf("failed to insert proposal, block unmarshaling failed: %w", err)
+	}
+
+	if newBlock == nil || newBlock.Block.Hash() != proposedBlock.Hash() {
+		// if this is the case, we will let syncer insert the block
+		return nil, errProposalDontMatch
+	}
+
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	extra, err := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert proposal, due to not being able to extract extra data: %w", err)
+	}
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
