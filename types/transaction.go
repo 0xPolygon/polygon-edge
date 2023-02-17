@@ -142,6 +142,67 @@ func (t *Transaction) Cost() *big.Int {
 	return total
 }
 
+// PrefillFees fills fee-related fields depending on the provided input.
+// Basically, there must be either gas price OR gas fee cap and gas tip cap provided.
+//
+// Here is the logic:
+//   - use gas price for gas tip cap and gas fee cap if base fee is nil;
+//   - otherwise, if base fee is not provided:
+//   - use gas price for gas tip cap and gas fee cap if gas price is not nil;
+//   - otherwise, if base tip cap and base fee cap are provided:
+//   - gas price should be min(gasFeeCap, gasTipCap * baseFee);
+func (t *Transaction) PrefillFees(baseFee uint64) {
+	// Do nothing if fees are there
+	if t.GasPrice != nil && t.GasTipCap != nil && t.GasFeeCap != nil &&
+		t.GasPrice.BitLen() > 0 && t.GasTipCap.BitLen() > 0 && t.GasFeeCap.BitLen() > 0 {
+		return
+	}
+
+	if baseFee == 0 {
+		// If there's no basefee, then it must be a non-1559 execution
+		if t.GasPrice == nil {
+			t.GasPrice = new(big.Int)
+		}
+
+		t.GasFeeCap = new(big.Int).Set(t.GasPrice)
+		t.GasTipCap = new(big.Int).Set(t.GasPrice)
+
+		return
+	}
+
+	// A basefee is provided, necessitating 1559-type execution
+	if t.GasPrice != nil {
+		// User specified the legacy gas field, convert to 1559 gas typing
+		t.GasFeeCap = new(big.Int).Set(t.GasPrice)
+		t.GasTipCap = new(big.Int).Set(t.GasPrice)
+
+		return
+	}
+
+	// User specified 1559 gas feilds (or none), use those
+	if t.GasFeeCap == nil {
+		t.GasFeeCap = new(big.Int)
+	}
+
+	if t.GasTipCap == nil {
+		t.GasTipCap = new(big.Int)
+	}
+
+	// Backfill the legacy gasPrice for EVM execution, unless we're all zeroes
+	t.GasPrice = new(big.Int)
+
+	if t.GasFeeCap.BitLen() > 0 || t.GasTipCap.BitLen() > 0 {
+		t.GasPrice = new(big.Int).Add(
+			t.GasTipCap,
+			new(big.Int).SetUint64(baseFee),
+		)
+
+		if t.GasPrice.Cmp(t.GasFeeCap) > 0 {
+			t.GasPrice = new(big.Int).Set(t.GasFeeCap)
+		}
+	}
+}
+
 func (t *Transaction) Size() uint64 {
 	if size := t.size.Load(); size != nil {
 		sizeVal, ok := size.(uint64)

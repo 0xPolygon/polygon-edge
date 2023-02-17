@@ -170,7 +170,7 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 		return nil, err
 	}
 
-	tx = fillTxFees(tx, e.store.GetBaseFee())
+	tx.PrefillFees(e.store.GetBaseFee())
 
 	tx.ComputeHash()
 
