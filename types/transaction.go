@@ -95,6 +95,16 @@ func (t *Transaction) Copy() *Transaction {
 		tt.GasPrice.Set(t.GasPrice)
 	}
 
+	tt.GasTipCap = new(big.Int)
+	if t.GasTipCap != nil {
+		tt.GasTipCap.Set(t.GasTipCap)
+	}
+
+	tt.GasFeeCap = new(big.Int)
+	if t.GasFeeCap != nil {
+		tt.GasFeeCap.Set(t.GasFeeCap)
+	}
+
 	tt.Value = new(big.Int)
 	if t.Value != nil {
 		tt.Value.Set(t.Value)
