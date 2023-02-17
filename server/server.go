@@ -203,8 +203,12 @@ func NewServer(config *Config) (*Server, error) {
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+	// use the london signer with eip-155 as a fallback one
+	// TODO: Determine crypto signer based on the latest head
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(m.config.Chain.Params.ChainID),
+		crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID)),
+	)
 
 	// blockchain object
 	m.blockchain, err = blockchain.NewBlockchain(
