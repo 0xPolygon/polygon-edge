@@ -174,11 +174,11 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 	chainConfig.Genesis = &chain.Genesis{
 		GasLimit:   p.blockGasLimit,
 		Difficulty: 0,
-		BaseFee:    chain.GenesisBaseFee,
 		Alloc:      allocs,
 		ExtraData:  genesisExtraData,
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
+		BaseFee:    chain.GenesisBaseFee,
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)

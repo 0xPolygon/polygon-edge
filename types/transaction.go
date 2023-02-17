@@ -118,15 +118,16 @@ func (t *Transaction) Copy() *Transaction {
 
 // Cost returns gas * gasPrice + value
 func (t *Transaction) Cost() *big.Int {
-	total := new(big.Int)
+	var factor *big.Int
 
 	if t.GasFeeCap != nil || t.GasFeeCap.BitLen() > 0 {
-		total = total.Mul(t.GasFeeCap, new(big.Int).SetUint64(t.Gas))
+		factor = new(big.Int).Set(t.GasFeeCap)
 	} else {
-		total = total.Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
+		factor = new(big.Int).Set(t.GasPrice)
 	}
 
-	total.Add(total, t.Value)
+	total := new(big.Int).Mul(factor, new(big.Int).SetUint64(t.Gas))
+	total = total.Add(total, t.Value)
 
 	return total
 }
