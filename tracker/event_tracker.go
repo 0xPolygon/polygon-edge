@@ -9,8 +9,6 @@ import (
 	"github.com/umbracle/ethgo/tracker"
 )
 
-const DefaultFinalizedThreshold = uint64(0)
-
 type eventSubscription interface {
 	AddLog(log *ethgo.Log)
 }
@@ -55,7 +53,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
-	e.logger.Info("Start tracking events", "contract address", e.contractAddr)
+	e.logger.Info("Start tracking events", "threshold", e.finalizedThreshold, "contract address", e.contractAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),

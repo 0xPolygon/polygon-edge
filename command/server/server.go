@@ -228,6 +228,13 @@ func setFlags(cmd *cobra.Command) {
 		"start the state sync relayer service (PolyBFT only)",
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.BlockFinalizedThreshold,
+		blockFinalizedThresholdFlag,
+		defaultConfig.BlockFinalizedThreshold,
+		"after how many blocks we consider block is finalized",
+	)
+
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)

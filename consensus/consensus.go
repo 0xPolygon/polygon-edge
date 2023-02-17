@@ -73,6 +73,8 @@ type Params struct {
 	Logger         hclog.Logger
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
+
+	BlockFinalizedThreshold uint64
 }
 
 // Factory is the factory function to create a discovery consensus

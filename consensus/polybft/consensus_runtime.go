@@ -68,14 +68,15 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig  *PolyBFTConfig
-	DataDir        string
-	Key            *wallet.Key
-	State          *State
-	blockchain     blockchainBackend
-	polybftBackend polybftBackend
-	txPool         txPoolInterface
-	bridgeTopic    topic
+	PolyBFTConfig           *PolyBFTConfig
+	DataDir                 string
+	Key                     *wallet.Key
+	State                   *State
+	blockchain              blockchainBackend
+	polybftBackend          polybftBackend
+	txPool                  txPoolInterface
+	bridgeTopic             topic
+	blockFinalizedThreshold uint64
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -159,12 +160,13 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 			logger,
 			c.config.State,
 			&stateSyncConfig{
-				key:               c.config.Key,
-				stateSenderAddr:   c.config.PolyBFTConfig.Bridge.BridgeAddr,
-				jsonrpcAddr:       c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:           c.config.DataDir,
-				topic:             c.config.bridgeTopic,
-				maxCommitmentSize: maxCommitmentSize,
+				key:                     c.config.Key,
+				stateSenderAddr:         c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				jsonrpcAddr:             c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:                 c.config.DataDir,
+				topic:                   c.config.bridgeTopic,
+				maxCommitmentSize:       maxCommitmentSize,
+				blockFinalizedThreshold: c.config.blockFinalizedThreshold,
 			},
 		)
 

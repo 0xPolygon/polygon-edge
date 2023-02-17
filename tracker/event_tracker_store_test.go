@@ -29,5 +29,7 @@ func setupDB(t *testing.T) (store.Store, func()) {
 }
 
 func TestBoltDBStore(t *testing.T) {
+	t.Parallel()
+
 	store.TestStore(t, setupDB)
 }
