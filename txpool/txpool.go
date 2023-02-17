@@ -735,6 +735,9 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		"hash", tx.Hash.String(),
 	)
 
+	// Just to make sure fees are filled
+	tx.PrefillFees(p.GetBaseFee())
+
 	// validate incoming tx
 	if err := p.validateTx(tx); err != nil {
 		return err
