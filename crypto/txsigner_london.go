@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+// LondonSigner implements signer for EIP-1559
 type LondonSigner struct {
 	chainID        uint64
 	fallbackSigner TxSigner
@@ -27,6 +28,7 @@ func (e *LondonSigner) Hash(tx *types.Transaction) types.Hash {
 
 // Sender returns the transaction sender
 func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
+	// Apply fallback signer for non-dynamic-fee-txs
 	if tx.Type != types.DynamicFeeTx {
 		return e.fallbackSigner.Sender(tx)
 	}
@@ -47,19 +49,17 @@ func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
 }
 
 // SignTx signs the transaction using the passed in private key
-func (e *LondonSigner) SignTx(
-	tx *types.Transaction,
-	privateKey *ecdsa.PrivateKey,
-) (*types.Transaction, error) {
+func (e *LondonSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*types.Transaction, error) {
+	// Apply fallback signer for non-dynamic-fee-txs
 	if tx.Type != types.DynamicFeeTx {
-		return e.fallbackSigner.SignTx(tx, privateKey)
+		return e.fallbackSigner.SignTx(tx, pk)
 	}
 
 	tx = tx.Copy()
 
 	h := e.Hash(tx)
 
-	sig, err := Sign(privateKey, h[:])
+	sig, err := Sign(pk, h[:])
 	if err != nil {
 		return nil, err
 	}

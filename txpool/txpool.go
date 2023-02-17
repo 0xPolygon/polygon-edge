@@ -738,6 +738,9 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		"hash", tx.Hash.String(),
 	)
 
+	// Just to make sure fees are filled
+	tx.PrefillFees(p.GetBaseFee())
+
 	// validate incoming tx
 	if err := p.validateTx(tx); err != nil {
 		return err
@@ -859,8 +862,6 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 
 		return
 	}
-
-	tx.PrefillFees(p.GetBaseFee())
 
 	// add tx
 	if err := p.addTx(gossip, tx); err != nil {

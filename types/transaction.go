@@ -142,7 +142,22 @@ func (t *Transaction) Cost() *big.Int {
 	return total
 }
 
+// PrefillFees fills fee-related fields depending on the provided input.
+// Basically, there must be either gas price OR gas fee cap and gas tip cap provided.
+//
+// Here is the logic:
+//   - use gas price for gas tip cap and gas fee cap if base fee is nil;
+//   - otherwise, if base fee is not provided:
+//   - use gas price for gas tip cap and gas fee cap if gas price is not nil;
+//   - otherwise, if base tip cap and base fee cap are provided:
+//   - gas price should be min(gasFeeCap, gasTipCap * baseFee);
 func (t *Transaction) PrefillFees(baseFee uint64) {
+	// Do nothing if fees are there
+	if t.GasPrice != nil && t.GasTipCap != nil && t.GasFeeCap != nil &&
+		t.GasPrice.BitLen() > 0 && t.GasTipCap.BitLen() > 0 && t.GasFeeCap.BitLen() > 0 {
+		return
+	}
+
 	if baseFee == 0 {
 		// If there's no basefee, then it must be a non-1559 execution
 		if t.GasPrice == nil {
