@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -139,6 +142,39 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 	return libp2pKey, keyErr
 }
 
+func InitValidatorBLSSignature(
+	secretsManager secrets.SecretsManager, account *wallet.Account, chainID int64) ([]byte, error) {
+	if secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
+		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSSignature)
+	}
+
+	// Generate the signature
+	s, err := polybft.MakeKOSKSignature(
+		account.Bls,
+		types.Address(account.Ecdsa.Address()),
+		chainID,
+		bls.DomainValidatorSet,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	sb, err := s.Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	// Write the signature to the secrets manager storage
+	if setErr := secretsManager.SetSecret(
+		secrets.ValidatorBLSSignature,
+		[]byte(hex.EncodeToString(sb)),
+	); setErr != nil {
+		return nil, setErr
+	}
+
+	return sb, err
+}
+
 // LoadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
 func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address, error) {
 	if !secretsManager.HasSecret(secrets.ValidatorKey) {
@@ -204,6 +240,17 @@ func LoadNodeID(secretsManager secrets.SecretsManager) (string, error) {
 	}
 
 	return nodeID.String(), nil
+}
+
+// LoadBLSSignature loads BLS Signature from SecretsManager and returns it
+func LoadBLSSignature(secretsManager secrets.SecretsManager) (string, error) {
+	if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
+		return "", nil
+	}
+
+	s, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
+
+	return string(s), err
 }
 
 // InitCloudSecretsManager returns the cloud secrets manager from the provided config

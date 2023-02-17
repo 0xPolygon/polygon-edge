@@ -21,7 +21,6 @@ const (
 	validatorsFlag        = "validators"
 	validatorsPathFlag    = "validators-path"
 	validatorsPrefixFlag  = "validators-prefix"
-	chainIDFlag           = "chain-id"
 
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultManifestPath        = "./manifest.json"
@@ -75,13 +74,6 @@ func setFlags(cmd *cobra.Command) {
 		"folder prefix names for polybft validator keys",
 	)
 
-	cmd.Flags().Int64Var(
-		&params.chainID,
-		chainIDFlag,
-		command.DefaultChainID,
-		"the ID of the chain",
-	)
-
 	cmd.Flags().StringArrayVar(
 		&params.validators,
 		validatorsFlag,
@@ -111,7 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	manifest := &polybft.Manifest{GenesisValidators: validators, ChainID: params.chainID}
+	manifest := &polybft.Manifest{GenesisValidators: validators}
 	if err = manifest.Save(params.manifestPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save manifest file '%s': %w", params.manifestPath, err))
 
@@ -127,7 +119,6 @@ type manifestInitParams struct {
 	validatorsPrefixPath string
 	premineValidators    string
 	validators           []string
-	chainID              int64
 }
 
 func (p *manifestInitParams) validateFlags() error {
@@ -199,10 +190,6 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		if err = v.InitKOSKSignature(p.chainID); err != nil {
-			return nil, err
-		}
-
 		v.Balance = balance
 	}
 

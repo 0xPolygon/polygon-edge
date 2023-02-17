@@ -198,7 +198,14 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) error {
 			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorBLSKey)
 		}
 
-		return wallet.GenerateAccount().Save(secretsManager)
+		a := wallet.GenerateAccount()
+		if err := a.Save(secretsManager); err != nil {
+			return err
+		}
+
+		if _, err := helper.InitValidatorBLSSignature(secretsManager, a, ip.chainID); err != nil {
+			return err
+		}
 	}
 
 	return nil

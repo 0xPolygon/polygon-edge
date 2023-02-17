@@ -93,22 +93,6 @@ type validatorRaw struct {
 	NodeID       string        `json:"nodeId"`
 }
 
-func (v *Validator) InitKOSKSignature(chainID int64) error {
-	signature, err := MakeKOSKSignature(v.BlsPrivateKey, v.Address, chainID, bls.DomainValidatorSet)
-	if err != nil {
-		return err
-	}
-
-	signatureBytes, err := signature.Marshal()
-	if err != nil {
-		return err
-	}
-
-	v.BlsSignature = hex.EncodeToString(signatureBytes)
-
-	return nil
-}
-
 func (v *Validator) MarshalJSON() ([]byte, error) {
 	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
