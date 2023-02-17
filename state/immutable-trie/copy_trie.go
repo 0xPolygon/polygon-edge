@@ -36,7 +36,7 @@ func getCustomNode(hash []byte, storage Storage) (Node, []byte, error) {
 	return n, data, err
 }
 
-func CopyTrie1(nodeHash []byte, storage Storage, newStorage Storage, agg []byte) error {
+func CopyTrie(nodeHash []byte, storage Storage, newStorage Storage, agg []byte, isStorage bool) error {
 	node, data, err := getCustomNode(nodeHash, storage)
 	if err != nil {
 		return err
@@ -44,10 +44,10 @@ func CopyTrie1(nodeHash []byte, storage Storage, newStorage Storage, agg []byte)
 
 	newStorage.Put(nodeHash, data)
 
-	return CopyTrie(node, storage, newStorage, agg)
+	return copyTrie(node, storage, newStorage, agg, isStorage)
 }
 
-func CopyTrie(node Node, storage Storage, newStorage Storage, agg []byte) error {
+func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStorage bool) error {
 	switch n := node.(type) {
 	case nil:
 		return nil
@@ -57,7 +57,7 @@ func CopyTrie(node Node, storage Storage, newStorage Storage, agg []byte) error 
 				continue
 			}
 
-			err := CopyTrie(n.children[i], storage, newStorage, append(agg, uint8(i)))
+			err := copyTrie(n.children[i], storage, newStorage, append(agg, uint8(i)), isStorage)
 			if err != nil {
 				return err
 			}
@@ -65,29 +65,30 @@ func CopyTrie(node Node, storage Storage, newStorage Storage, agg []byte) error 
 
 	case *ValueNode:
 		if n.hash {
-			return CopyTrie1(n.buf, storage, newStorage, agg)
+			return CopyTrie(n.buf, storage, newStorage, agg, isStorage)
 		}
 
-		var account state.Account
-		//todo handle bytes32 state values
-		if err := account.UnmarshalRlp(n.buf); err != nil {
-			fmt.Println("cant parse", err, len(n.buf), hex.EncodeToString(encodeCompact(agg)))
-		} else {
-			if account.CodeHash != nil {
-				code, ok := storage.GetCode(types.BytesToHash(account.CodeHash))
-				if !ok {
-					fmt.Println("------------------------Code is empty-------------")
+		if !isStorage {
+			var account state.Account
+			if err := account.UnmarshalRlp(n.buf); err != nil {
+				fmt.Println("cant parse", err, len(n.buf), hex.EncodeToString(encodeCompact(agg)))
+			} else {
+				if account.CodeHash != nil {
+					code, ok := storage.GetCode(types.BytesToHash(account.CodeHash))
+					if !ok {
+						fmt.Println("------------------------Code is empty-------------")
+					}
+					newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
 				}
-				newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
-			}
 
-			if account.Root != types.EmptyRootHash {
-				return CopyTrie1(account.Root[:], storage, newStorage, nil)
+				if account.Root != types.EmptyRootHash {
+					return CopyTrie(account.Root[:], storage, newStorage, nil, true)
+				}
 			}
 		}
 
 	case *ShortNode:
-		err := CopyTrie(n.child, storage, newStorage, append(agg, n.key...))
+		err := copyTrie(n.child, storage, newStorage, append(agg, n.key...), isStorage)
 		if err != nil {
 			return err
 		}
@@ -96,7 +97,7 @@ func CopyTrie(node Node, storage Storage, newStorage Storage, agg []byte) error 
 	return nil
 }
 
-func HashChecker1(stateRoot []byte, storage Storage) (types.Hash, error) {
+func HashChecker(stateRoot []byte, storage Storage) (types.Hash, error) {
 	node, _, err := GetNode(stateRoot, storage)
 
 	h, ok := hasherPool.Get().(*hasher)
@@ -106,9 +107,13 @@ func HashChecker1(stateRoot []byte, storage Storage) (types.Hash, error) {
 
 	arena, _ := h.AcquireArena()
 
-	val, err := HashChecker(node, h, arena, 0, storage)
+	val, err := hashChecker(node, h, arena, 0, storage)
 	if err != nil {
 		return types.Hash{}, err
+	}
+
+	if val == nil {
+		return emptyStateHash, nil
 	}
 
 	h.ReleaseArenas(0)
@@ -117,7 +122,7 @@ func HashChecker1(stateRoot []byte, storage Storage) (types.Hash, error) {
 	return types.BytesToHash(val.Raw()), nil
 }
 
-func HashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage) (*fastrlp.Value, error) {
+func hashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage) (*fastrlp.Value, error) {
 	var val *fastrlp.Value
 
 	var aa *fastrlp.Arena
@@ -125,6 +130,8 @@ func HashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage)
 	var idx int
 
 	switch n := node.(type) {
+	case nil:
+		return nil, nil
 	case *ValueNode:
 		if n.hash {
 			nd, _, err := GetNode(n.buf, storage)
@@ -132,13 +139,13 @@ func HashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage)
 				return nil, err
 			}
 
-			return HashChecker(nd, h, a, d, storage)
+			return hashChecker(nd, h, a, d, storage)
 		}
 
 		return a.NewCopyBytes(n.buf), nil
 
 	case *ShortNode:
-		child, err := HashChecker(n.child, h, a, d+1, storage)
+		child, err := hashChecker(n.child, h, a, d+1, storage)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +163,7 @@ func HashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage)
 			if i == nil {
 				val.Set(a.NewNull())
 			} else {
-				v, err := HashChecker(i, h, aa, d+1, storage)
+				v, err := hashChecker(i, h, aa, d+1, storage)
 				if err != nil {
 					return nil, err
 				}
@@ -168,7 +175,7 @@ func HashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage)
 		if n.value == nil {
 			val.Set(a.NewNull())
 		} else {
-			v, err := HashChecker(n.value, h, a, d+1, storage)
+			v, err := hashChecker(n.value, h, a, d+1, storage)
 			if err != nil {
 				return nil, err
 			}

@@ -163,7 +163,7 @@ func TestMigration(t *testing.T) {
 	oldAddr2Node, ok := oldTrie.Get(crypto.Keccak256(userAddr2.Bytes()), stateStorage)
 	require.True(t, ok)
 
-	err = itrie.CopyTrie1(stateRoot.Bytes(), stateStorage, stateStorageNew, nil)
+	err = itrie.CopyTrie(stateRoot.Bytes(), stateStorage, stateStorageNew, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ func TestMigration(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, oldAddr2Node, newAddr2Node)
 
-	checkedStateRoot, err := itrie.HashChecker1(stateRoot.Bytes(), stateStorageNew)
+	checkedStateRoot, err := itrie.HashChecker(stateRoot.Bytes(), stateStorageNew)
 	if err != nil {
 		t.Fatal(err)
 	}

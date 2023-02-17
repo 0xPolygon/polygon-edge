@@ -210,7 +210,7 @@ func NewServer(config *Config) (*Server, error) {
 		}
 
 		if polyBFTConfig.InitialTrieRoot != types.ZeroHash {
-			checkedInitialTrieRoot, err := itrie.HashChecker1(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
+			checkedInitialTrieRoot, err := itrie.HashChecker(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
 			if err != nil {
 				return nil, fmt.Errorf("error on state root verification %w", err)
 			}
