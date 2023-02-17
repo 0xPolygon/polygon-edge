@@ -23,11 +23,12 @@ func (r Results) GetOutput() string {
 }
 
 type SecretsInitResult struct {
-	Address    types.Address `json:"address"`
-	BLSPubkey  string        `json:"bls_pubkey"`
-	NodeID     string        `json:"node_id"`
-	PrivateKey string        `json:"private_key"`
-	Insecure   bool          `json:"insecure"`
+	Address       types.Address `json:"address"`
+	BLSPubkey     string        `json:"bls_pubkey"`
+	NodeID        string        `json:"node_id"`
+	PrivateKey    string        `json:"private_key"`
+	BLSPrivateKey string        `json:"bls_private_key"`
+	Insecure      bool          `json:"insecure"`
 }
 
 func (r *SecretsInitResult) GetOutput() string {
@@ -44,6 +45,13 @@ func (r *SecretsInitResult) GetOutput() string {
 		vals = append(
 			vals,
 			fmt.Sprintf("Private key|%s", r.PrivateKey),
+		)
+	}
+
+	if r.BLSPrivateKey != "" {
+		vals = append(
+			vals,
+			fmt.Sprintf("BLS Private key|%s", r.BLSPrivateKey),
 		)
 	}
 

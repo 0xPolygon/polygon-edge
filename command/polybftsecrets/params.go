@@ -20,6 +20,7 @@ const (
 	privateKeyFlag = "private"
 	networkFlag    = "network"
 	numFlag        = "num"
+	outputFlag     = "output"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -50,6 +51,8 @@ type initParams struct {
 	numberOfSecrets int
 
 	insecureLocalStore bool
+
+	output bool
 }
 
 func (ip *initParams) validateFlags() error {
@@ -121,6 +124,13 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		false,
 		"the flag indicating should the secrets stored on the local storage be encrypted",
 	)
+
+	cmd.Flags().BoolVar(
+		&ip.output,
+		outputFlag,
+		false,
+		"the flag indicating to output existing secrets",
+	)
 }
 
 func (ip *initParams) Execute() (Results, error) {
@@ -142,9 +152,11 @@ func (ip *initParams) Execute() (Results, error) {
 			return results, err
 		}
 
-		err = ip.initKeys(secretManager)
-		if err != nil {
-			return results, err
+		if !ip.output {
+			err = ip.initKeys(secretManager)
+			if err != nil {
+				return results, err
+			}
 		}
 
 		res, err := ip.getResult(secretManager)
@@ -203,6 +215,13 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 			}
 
 			res.PrivateKey = hex.EncodeToString(pk)
+
+			blspk, err := account.Bls.Marshal()
+			if err != nil {
+				return nil, err
+			}
+
+			res.BLSPrivateKey = hex.EncodeToString(blspk)
 		}
 	}
 
