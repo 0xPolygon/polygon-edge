@@ -435,14 +435,9 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	if newBlock == nil || newBlock.Block.Hash() != proposedBlock.Hash() {
-		f.logger.Warn("insert block: cached block is either undefined or hashes don't match. Executing retrieved proposal...")
-		// execute block
-		finalBlock, err := f.backend.ProcessBlock(f.parent, &proposedBlock, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to execute block %d: %w", proposedBlock.Number(), err)
-		}
-
-		newBlock = finalBlock
+		// if this is the case, we will let syncer insert the block
+		return nil, errors.New(`failed to insert proposal, because the validated proposal is either nil 
+		or it does not match the received one`)
 	}
 
 	// In this function we should try to return little to no errors since

@@ -913,14 +913,24 @@ func TestFSM_Insert_Good(t *testing.T) {
 	t.Run("Insert with target block undefined", func(t *testing.T) {
 		t.Parallel()
 
-		fsm, seals, builtBlock, chainMock := setupFn()
+		fsm, seals, builtBlock, _ := setupFn()
 		fsm.target = nil
 		proposal := builtBlock.Block.MarshalRLP()
-		fullBlock, err := fsm.Insert(proposal, seals)
+		_, err := fsm.Insert(proposal, seals)
 
-		require.NoError(t, err)
-		require.Equal(t, parentBlockNumber+1, fullBlock.Block.Number())
-		chainMock.AssertExpectations(t)
+		require.ErrorContains(t, err, "validated proposal is either nil")
+	})
+
+	t.Run("Insert with target block hash not match", func(t *testing.T) {
+		t.Parallel()
+
+		fsm, seals, builtBlock, _ := setupFn()
+		proposal := builtBlock.Block.MarshalRLP()
+		fsm.target = builtBlock
+		fsm.target.Block.Header.Hash = types.BytesToHash(generateRandomBytes(t))
+		_, err := fsm.Insert(proposal, seals)
+
+		require.ErrorContains(t, err, "does not match the received one")
 	})
 }
 
