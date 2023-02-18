@@ -7,8 +7,12 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -69,6 +73,13 @@ func setFlags(cmd *cobra.Command) {
 		"stake represents amount which is going to be staked by the new validator account",
 	)
 
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
+	)
+
 	helper.RegisterJSONRPCFlag(cmd)
 }
 
@@ -127,7 +138,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		{
 			name: "register",
 			action: func() asyncTxn {
-				return registerValidator(newValidatorSender, newValidatorAccount)
+				return registerValidator(newValidatorSender, newValidatorAccount, params.chainID)
 			},
 			postHook: func(receipt *ethgo.Receipt) error {
 				if receipt.Status != uint64(types.ReceiptSuccess) {
@@ -347,7 +358,11 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	signer := crypto.NewEIP155Signer(chainID.Uint64())
+	signer := crypto.NewEIP155Signer(
+		chain.AllForksEnabled.At(0),
+		chainID.Uint64(),
+	)
+
 	signedTxn, err := signer.SignTx(txn, privateKey)
 
 	if err != nil {
@@ -469,12 +484,13 @@ func fund(sender *txnSender, addr types.Address) asyncTxn {
 	return sender.sendTransaction(txn)
 }
 
-func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
+func registerValidator(sender *txnSender, account *wallet.Account, chainID int64) asyncTxn {
 	if registerFn == nil {
 		return &asyncTxnImpl{err: errors.New("failed to create register ABI function")}
 	}
 
-	signature, err := account.Bls.Sign([]byte(contracts.PolyBFTRegisterMessage))
+	signature, err := polybft.MakeKOSKSignature(
+		account.Bls, types.Address(sender.account.Ecdsa.Address()), chainID, bls.DomainValidatorSet)
 	if err != nil {
 		return &asyncTxnImpl{err: err}
 	}

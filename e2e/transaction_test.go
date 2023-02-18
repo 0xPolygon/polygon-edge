@@ -14,6 +14,7 @@ import (
 
 	"github.com/umbracle/ethgo"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
@@ -277,7 +278,7 @@ func generateStressTestTx(
 	t.Helper()
 
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
 	if !ok {

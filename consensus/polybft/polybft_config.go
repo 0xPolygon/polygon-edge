@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo/abi"
 )
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
@@ -75,21 +77,40 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 
 // Validator represents public information about validator accounts which are the part of genesis
 type Validator struct {
-	Address types.Address
-	BlsKey  string
-	Balance *big.Int
-	NodeID  string
+	Address       types.Address
+	BlsPrivateKey *bls.PrivateKey
+	BlsKey        string
+	BlsSignature  string
+	Balance       *big.Int
+	NodeID        string
 }
 
 type validatorRaw struct {
-	Address types.Address `json:"address"`
-	BlsKey  string        `json:"blsKey"`
-	Balance *string       `json:"balance"`
-	NodeID  string        `json:"nodeId"`
+	Address      types.Address `json:"address"`
+	BlsKey       string        `json:"blsKey"`
+	BlsSignature string        `json:"blsSignature"`
+	Balance      *string       `json:"balance"`
+	NodeID       string        `json:"nodeId"`
+}
+
+func (v *Validator) InitKOSKSignature(chainID int64) error {
+	signature, err := MakeKOSKSignature(v.BlsPrivateKey, v.Address, chainID, bls.DomainValidatorSet)
+	if err != nil {
+		return err
+	}
+
+	signatureBytes, err := signature.Marshal()
+	if err != nil {
+		return err
+	}
+
+	v.BlsSignature = hex.EncodeToString(signatureBytes)
+
+	return nil
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 
 	return json.Marshal(raw)
@@ -106,6 +127,7 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
+	v.BlsSignature = raw.BlsSignature
 	v.NodeID = raw.NodeID
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
@@ -124,6 +146,41 @@ func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
 	}
 
 	return bls.UnmarshalPublicKey(decoded)
+}
+
+// UnmarshalBLSSignature unmarshals the hex encoded BLS signature
+func (v *Validator) UnmarshalBLSSignature() (*bls.Signature, error) {
+	decoded, err := hex.DecodeString(v.BlsSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	return bls.UnmarshalSignature(decoded)
+}
+
+// ToValidatorInitAPIBinding converts Validator to instance of contractsapi.ValidatorInit
+func (v Validator) ToValidatorInitAPIBinding() (*contractsapi.ValidatorInit, error) {
+	blsSignature, err := v.UnmarshalBLSSignature()
+	if err != nil {
+		return nil, err
+	}
+
+	signBigInts, err := blsSignature.ToBigInt()
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := v.UnmarshalBLSPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return &contractsapi.ValidatorInit{
+		Addr:      v.Address,
+		Pubkey:    pubKey.ToBigInt(),
+		Signature: signBigInts,
+		Stake:     new(big.Int).Set(v.Balance),
+	}, nil
 }
 
 // ToValidatorMetadata creates ValidatorMetadata instance
@@ -166,6 +223,7 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 type Manifest struct {
 	GenesisValidators []*Validator     `json:"validators"`
 	RootchainConfig   *RootchainConfig `json:"rootchain"`
+	ChainID           int64            `json:"chainID"`
 }
 
 // LoadManifest deserializes Manifest instance
@@ -196,4 +254,18 @@ func (m *Manifest) Save(manifestPath string) error {
 	}
 
 	return nil
+}
+
+// MakeKOSKSignature creates KOSK signature which prevents rogue attack
+func MakeKOSKSignature(
+	privateKey *bls.PrivateKey, address types.Address, chainID int64, domain []byte) (*bls.Signature, error) {
+	message, err := abi.Encode(
+		[]interface{}{address, big.NewInt(chainID)},
+		abi.MustNewType("tuple(address, uint256)"))
+	if err != nil {
+		return nil, err
+	}
+
+	// abi.Encode adds 12 zero bytes before actual address bytes
+	return privateKey.Sign(message[12:], domain)
 }
