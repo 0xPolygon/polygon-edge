@@ -59,14 +59,12 @@ func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Pro
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr   types.Address
-	jsonrpcAddr       string
-	dataDir           string
-	topic             topic
-	key               *wallet.Key
-	maxCommitmentSize uint64
-
-	// after how many blocks we consider block is finalized
+	stateSenderAddr    types.Address
+	jsonrpcAddr        string
+	dataDir            string
+	topic              topic
+	key                *wallet.Key
+	maxCommitmentSize  uint64
 	blockFinalityDepth uint64
 }
 

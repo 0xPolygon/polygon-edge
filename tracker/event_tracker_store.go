@@ -23,7 +23,7 @@ var (
 // EventTrackerStore is a tracker store implementation.
 type EventTrackerStore struct {
 	conn          *bolt.DB
-	finalityDepth uint64 // after how many blocks we consider block is finalized
+	finalityDepth uint64
 	notifierCh    chan<- []*ethgo.Log
 	logger        hcf.Logger
 }
@@ -152,7 +152,7 @@ type Entry struct {
 	conn                *bolt.DB
 	bucketLogs          []byte
 	bucketNextToProcess []byte
-	finalityDepth       uint64 // after how many blocks we consider block is finalized
+	finalityDepth       uint64
 	notifierCh          chan<- []*ethgo.Log
 	logger              hcf.Logger
 }

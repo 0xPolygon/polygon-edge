@@ -47,9 +47,6 @@ const (
 
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
-
-	// after how many blocks we consider block is finalized
-	defaultBlockFinalityDepth = 0
 )
 
 var startTime int64

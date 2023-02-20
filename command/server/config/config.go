@@ -79,7 +79,7 @@ const (
 	// requests with fromBlock/toBlock values (e.g. eth_getLogs)
 	DefaultJSONRPCBlockRangeLimit uint64 = 1000
 
-	// after how many blocks we consider block is finalized, default value
+	// DefaultBlockFinalityDepth minimal number of child blocks required for the parent block to be considered final
 	DefaultBlockFinalityDepth uint64 = 100
 )
 

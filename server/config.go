@@ -44,7 +44,6 @@ type Config struct {
 
 	Relayer bool
 
-	// after how many blocks we consider block is finalized
 	BlockFinalityDepth uint64
 }
 

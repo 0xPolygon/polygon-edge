@@ -19,7 +19,7 @@ type EventTracker struct {
 	contractAddr  ethgo.Address
 	subscriber    eventSubscription
 	logger        hcf.Logger
-	finalityDepth uint64 // after how many blocks we consider block is finalized
+	finalityDepth uint64 // minimal number of child blocks required for the parent block to be considered final
 }
 
 func NewEventTracker(

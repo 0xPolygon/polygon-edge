@@ -124,7 +124,7 @@ func (t *TestServer) Start() {
 		"--grpc-address", fmt.Sprintf("localhost:%d", config.GRPCPort),
 		// enable jsonrpc
 		"--jsonrpc", fmt.Sprintf(":%d", config.JSONRPCPort),
-		// after how many blocks we consider block is finalized
+		// minimal number of child blocks required for the parent block to be considered final
 		"--block_finality_depth", strconv.FormatUint(config.BlockFinalityDepth, 10),
 	}
 

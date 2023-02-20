@@ -232,7 +232,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.BlockFinalityDepth,
 		blockFinalityDepthFlag,
 		defaultConfig.BlockFinalityDepth,
-		"after how many blocks we consider block is finalized",
+		"minimal number of child blocks required for the parent block to be considered final",
 	)
 
 	setLegacyFlags(cmd)
