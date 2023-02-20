@@ -17,16 +17,16 @@ import (
 )
 
 type TestServerConfig struct {
-	Name                    string
-	JSONRPCPort             int64
-	GRPCPort                int64
-	P2PPort                 int64
-	Seal                    bool
-	DataDir                 string
-	Chain                   string
-	LogLevel                string
-	Relayer                 bool
-	BlockFinalizedThreshold uint64
+	Name               string
+	JSONRPCPort        int64
+	GRPCPort           int64
+	P2PPort            int64
+	Seal               bool
+	DataDir            string
+	Chain              string
+	LogLevel           string
+	Relayer            bool
+	BlockFinalityDepth uint64
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -125,7 +125,7 @@ func (t *TestServer) Start() {
 		// enable jsonrpc
 		"--jsonrpc", fmt.Sprintf(":%d", config.JSONRPCPort),
 		// after how many blocks we consider block is finalized
-		"--block-finalized-threshold", strconv.FormatUint(config.BlockFinalizedThreshold, 10),
+		"--block_finality_depth", strconv.FormatUint(config.BlockFinalityDepth, 10),
 	}
 
 	if len(config.LogLevel) > 0 {

@@ -67,7 +67,7 @@ type stateSyncConfig struct {
 	maxCommitmentSize uint64
 
 	// after how many blocks we consider block is finalized
-	blockFinalizedThreshold uint64
+	blockFinalityDepth uint64
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -133,7 +133,7 @@ func (s *stateSyncManager) initTracker() error {
 		s.config.jsonrpcAddr,
 		ethgo.Address(s.config.stateSenderAddr),
 		s,
-		s.config.blockFinalizedThreshold,
+		s.config.blockFinalityDepth,
 		s.logger)
 
 	go func() {

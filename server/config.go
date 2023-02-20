@@ -45,7 +45,7 @@ type Config struct {
 	Relayer bool
 
 	// after how many blocks we consider block is finalized
-	BlockFinalizedThreshold uint64
+	BlockFinalityDepth uint64
 }
 
 // Telemetry holds the config details for metric services

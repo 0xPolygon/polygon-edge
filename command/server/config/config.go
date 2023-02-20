@@ -32,8 +32,8 @@ type Config struct {
 	JSONRPCBlockRangeLimit   uint64     `json:"json_rpc_block_range_limit" yaml:"json_rpc_block_range_limit"`
 	JSONLogFormat            bool       `json:"json_log_format" yaml:"json_log_format"`
 
-	Relayer                 bool   `json:"relayer" yaml:"relayer"`
-	BlockFinalizedThreshold uint64 `json:"block_finalized_threshold" yaml:"block_finalized_threshold"`
+	Relayer            bool   `json:"relayer" yaml:"relayer"`
+	BlockFinalityDepth uint64 `json:"block_finality_depth" yaml:"block_finality_depth"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -80,7 +80,7 @@ const (
 	DefaultJSONRPCBlockRangeLimit uint64 = 1000
 
 	// after how many blocks we consider block is finalized, default value
-	DefaultBlockFinalizedThreshold uint64 = 100
+	DefaultBlockFinalityDepth uint64 = 100
 )
 
 // DefaultConfig returns the default server configuration
@@ -118,7 +118,7 @@ func DefaultConfig() *Config {
 		JSONRPCBatchRequestLimit: DefaultJSONRPCBatchRequestLimit,
 		JSONRPCBlockRangeLimit:   DefaultJSONRPCBlockRangeLimit,
 		Relayer:                  false,
-		BlockFinalizedThreshold:  DefaultBlockFinalizedThreshold,
+		BlockFinalityDepth:       DefaultBlockFinalityDepth,
 	}
 }
 

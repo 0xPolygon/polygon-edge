@@ -229,9 +229,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
-		&params.rawConfig.BlockFinalizedThreshold,
-		blockFinalizedThresholdFlag,
-		defaultConfig.BlockFinalizedThreshold,
+		&params.rawConfig.BlockFinalityDepth,
+		blockFinalityDepthFlag,
+		defaultConfig.BlockFinalityDepth,
 		"after how many blocks we consider block is finalized",
 	)
 

@@ -39,8 +39,8 @@ const (
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
 
-	relayerFlag                 = "relayer"
-	blockFinalizedThresholdFlag = "block-finalized-threshold"
+	relayerFlag            = "relayer"
+	blockFinalityDepthFlag = "block_finality_depth"
 )
 
 // Flags that are deprecated, but need to be preserved for
@@ -184,7 +184,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,
 
-		Relayer:                 p.relayer,
-		BlockFinalizedThreshold: p.rawConfig.BlockFinalizedThreshold,
+		Relayer:            p.relayer,
+		BlockFinalityDepth: p.rawConfig.BlockFinalityDepth,
 	}
 }

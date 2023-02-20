@@ -22,10 +22,10 @@ var (
 
 // EventTrackerStore is a tracker store implementation.
 type EventTrackerStore struct {
-	conn               *bolt.DB
-	finalizedThreshold uint64 // after how many blocks we consider block is finalized
-	notifierCh         chan<- []*ethgo.Log
-	logger             hcf.Logger
+	conn          *bolt.DB
+	finalityDepth uint64 // after how many blocks we consider block is finalized
+	notifierCh    chan<- []*ethgo.Log
+	logger        hcf.Logger
 }
 
 // NewEventTrackerStore creates a new EventTrackerStore
@@ -40,10 +40,10 @@ func NewEventTrackerStore(
 	}
 
 	store := &EventTrackerStore{
-		conn:               db,
-		finalizedThreshold: finalizedTrashhold,
-		notifierCh:         notifierCh,
-		logger:             logger,
+		conn:          db,
+		finalityDepth: finalizedTrashhold,
+		notifierCh:    notifierCh,
+		logger:        logger,
 	}
 
 	if err := store.setupDB(); err != nil {
@@ -134,7 +134,7 @@ func (b *EventTrackerStore) GetEntry(hash string) (store.Entry, error) {
 			conn:                b.conn,
 			bucketLogs:          logsBucketName,
 			bucketNextToProcess: nextToProcessBucketName,
-			finalizedThreshold:  b.finalizedThreshold,
+			finalityDepth:       b.finalityDepth,
 			notifierCh:          b.notifierCh,
 			logger:              b.logger,
 		}
@@ -152,7 +152,7 @@ type Entry struct {
 	conn                *bolt.DB
 	bucketLogs          []byte
 	bucketNextToProcess []byte
-	finalizedThreshold  uint64 // after how many blocks we consider block is finalized
+	finalityDepth       uint64 // after how many blocks we consider block is finalized
 	notifierCh          chan<- []*ethgo.Log
 	logger              hcf.Logger
 }
@@ -213,7 +213,7 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 
 	lastBlockNumber = logs[len(logs)-1].BlockNumber
 
-	notifyLogs, lastProcessedIdx, err := e.getFinalizedLogs(lastBlockNumber - e.finalizedThreshold)
+	notifyLogs, lastProcessedIdx, err := e.getFinalizedLogs(lastBlockNumber - e.finalityDepth)
 	if err != nil {
 		return err
 	}

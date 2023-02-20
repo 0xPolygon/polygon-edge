@@ -49,7 +49,7 @@ const (
 	defaultValidatorPrefix = "test-chain-"
 
 	// after how many blocks we consider block is finalized
-	defaultBlockFinalizedThreshold = 0
+	defaultBlockFinalityDepth = 0
 )
 
 var startTime int64
@@ -90,7 +90,7 @@ type TestClusterConfig struct {
 	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
-	BlockFinalizedThreshold uint64
+	BlockFinalityDepth uint64
 
 	logsDirOnce sync.Once
 }
@@ -229,9 +229,9 @@ func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
 	}
 }
 
-func WithBlockFinalizedThreshold(blockFinalizedThreshold uint64) ClusterOption {
+func WithBlockFinalityDepth(blockFinalityDepth uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.BlockFinalizedThreshold = blockFinalizedThreshold
+		h.BlockFinalityDepth = blockFinalityDepth
 	}
 }
 
@@ -400,7 +400,7 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
 		config.Relayer = relayer
-		config.BlockFinalizedThreshold = c.Config.BlockFinalizedThreshold // 0 by default
+		config.BlockFinalityDepth = c.Config.BlockFinalityDepth
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

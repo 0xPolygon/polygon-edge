@@ -57,8 +57,8 @@ func checkLogs(
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	const (
-		num                     = 10
-		blockFinalizedThreshold = 4
+		num                = 10
+		blockFinalityDepth = 4
 	)
 
 	var (
@@ -75,7 +75,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(), framework.WithPremine(premine[:]...), framework.WithBlockFinalizedThreshold(blockFinalizedThreshold))
+		framework.WithBridge(), framework.WithPremine(premine[:]...), framework.WithBlockFinalityDepth(blockFinalityDepth))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
@@ -91,7 +91,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 		),
 	)
 
-	require.NoError(t, cluster.WaitForBlock(2+blockFinalizedThreshold*2, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(2+blockFinalityDepth*2, 2*time.Minute))
 
 	// send again to trigger previous transactions
 	require.NoError(

@@ -42,7 +42,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	t.Parallel()
 
 	const (
-		finalizedThreshold = 2
+		blockFinalityDepth = 2
 		eventsPerStep      = 8
 	)
 
@@ -67,7 +67,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	require.NoError(t, err)
 
 	// prefill with eventsPerStep + finalizedTrashhold events
-	for i := 0; i < eventsPerStep+finalizedThreshold; i++ {
+	for i := 0; i < eventsPerStep+blockFinalityDepth; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
@@ -76,12 +76,12 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	sub := &mockEventSubscriber{}
 
 	tracker := &EventTracker{
-		logger:             hclog.NewNullLogger(),
-		subscriber:         sub,
-		dbPath:             path.Join(tmpDir, "test.db"),
-		rpcEndpoint:        server.HTTPAddr(),
-		contractAddr:       addr,
-		finalizedThreshold: finalizedThreshold,
+		logger:        hclog.NewNullLogger(),
+		subscriber:    sub,
+		dbPath:        path.Join(tmpDir, "test.db"),
+		rpcEndpoint:   server.HTTPAddr(),
+		contractAddr:  addr,
+		finalityDepth: blockFinalityDepth,
 	}
 
 	err = tracker.Start(context.Background())
