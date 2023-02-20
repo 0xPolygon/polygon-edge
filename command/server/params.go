@@ -40,7 +40,7 @@ const (
 	logFileLocationFlag          = "log-to"
 
 	relayerFlag            = "relayer"
-	blockFinalityDepthFlag = "block_finality_depth"
+	blockFinalityDepthFlag = "block-finality-depth"
 )
 
 // Flags that are deprecated, but need to be preserved for

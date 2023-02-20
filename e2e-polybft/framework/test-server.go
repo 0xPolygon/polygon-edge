@@ -125,7 +125,7 @@ func (t *TestServer) Start() {
 		// enable jsonrpc
 		"--jsonrpc", fmt.Sprintf(":%d", config.JSONRPCPort),
 		// minimal number of child blocks required for the parent block to be considered final
-		"--block_finality_depth", strconv.FormatUint(config.BlockFinalityDepth, 10),
+		"--block-finality-depth", strconv.FormatUint(config.BlockFinalityDepth, 10),
 	}
 
 	if len(config.LogLevel) > 0 {
