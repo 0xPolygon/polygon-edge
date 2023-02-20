@@ -163,7 +163,7 @@ func (ip *initParams) Execute() (Results, error) {
 		}
 
 		if !ip.output {
-			err = ip.initKeys(secretManager)
+			_, err = ip.initKeys(secretManager)
 			if err != nil {
 				return results, err
 			}
@@ -180,33 +180,47 @@ func (ip *initParams) Execute() (Results, error) {
 	return results, nil
 }
 
-func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) error {
+func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string, error) {
+	var generated []string
+
 	if ip.generatesNetwork {
-		if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
-			return err
+		if !secretsManager.HasSecret(secrets.NetworkKey) {
+			if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
+				return generated, fmt.Errorf("error initializing network-key: %w", err)
+			}
+
+			generated = append(generated, secrets.NetworkKey)
 		}
 	}
 
 	if ip.generatesAccount {
-		if secretsManager.HasSecret(secrets.ValidatorKey) {
-			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorKey)
+		var a *wallet.Account
+		var err error
+
+		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+			a = wallet.GenerateAccount()
+			if err = a.Save(secretsManager); err != nil {
+				return generated, fmt.Errorf("error saving account: %w", err)
+			}
+
+			generated = append(generated, secrets.ValidatorKey, secrets.ValidatorBLSKey)
+		} else {
+			a, err = wallet.NewAccountFromSecret(secretsManager)
+			if err != nil {
+				return generated, fmt.Errorf("error loading account: %w", err)
+			}
 		}
 
-		if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorBLSKey)
-		}
+		if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
+			if _, err = helper.InitValidatorBLSSignature(secretsManager, a, ip.chainID); err != nil {
+				return generated, fmt.Errorf("%w: error initializing validator-bls-signature", err)
+			}
 
-		a := wallet.GenerateAccount()
-		if err := a.Save(secretsManager); err != nil {
-			return err
-		}
-
-		if _, err := helper.InitValidatorBLSSignature(secretsManager, a, ip.chainID); err != nil {
-			return err
+			generated = append(generated, secrets.ValidatorBLSSignature)
 		}
 	}
 
-	return nil
+	return generated, nil
 }
 
 // getResult gets keys from secret manager and return result to display
