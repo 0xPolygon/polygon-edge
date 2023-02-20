@@ -194,7 +194,9 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	// Specify zero chain ID as per spec.
-	// This is needed to be compatible with other EVM chains and have the same format.
+	// This is needed to have the same format as other EVM chains do.
+	// There is no chain ID in the TX object, so it is always 0 here just to be compatible.
+	// Check Transaction1559Payload there https://eips.ethereum.org/EIPS/eip-1559#specification
 	if t.Type == DynamicFeeTx {
 		vv.Set(arena.NewBigInt(big.NewInt(0)))
 	}
@@ -223,7 +225,9 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(t.Input))
 
 	// Specify access list as per spec.
-	// This is needed to be compatible with other EVM chains and have the same format.
+	// This is needed to have the same format as other EVM chains do.
+	// There is no access list feature here, so it is always empty just to be compatible.
+	// Check Transaction1559Payload there https://eips.ethereum.org/EIPS/eip-1559#specification
 	if t.Type == DynamicFeeTx {
 		vv.Set(arena.NewArray())
 	}

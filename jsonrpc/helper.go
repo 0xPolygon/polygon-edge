@@ -225,6 +225,7 @@ func DecodeTxn(arg *txnArgs, store dataGetter) (*types.Transaction, error) {
 		Input:     input,
 		Nonce:     uint64(*arg.Nonce),
 	}
+
 	if arg.To != nil {
 		txn.To = arg.To
 	}
