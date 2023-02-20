@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -17,6 +18,9 @@ import (
 var (
 	// bucket to store exit contract events
 	exitEventsBucket = []byte("exitEvent")
+
+	exitEventABI     = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
+	ExitEventABIType = exitEventABI.Inputs
 )
 
 type exitEventNotFoundError struct {
@@ -36,6 +40,15 @@ exit events/
 */
 type CheckpointStore struct {
 	db *bolt.DB
+}
+
+// initialize creates necessary buckets in DB if they don't already exist
+func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
+	if _, err := tx.CreateBucketIfNotExists(exitEventsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventsBucket), err)
+	}
+
+	return nil
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db

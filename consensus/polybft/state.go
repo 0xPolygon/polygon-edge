@@ -1,18 +1,12 @@
 package polybft
 
 import (
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"fmt"
+
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/umbracle/ethgo"
-)
-
-var (
-	// ABI
-	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
-	exitEventABI          = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
-	ExitEventABIType      = exitEventABI.Inputs
 )
 
 // ExitEvent is an event emitted by Exit contract
@@ -51,17 +45,10 @@ type TransportMessage struct {
 	EpochNumber uint64
 }
 
-var (
-	// array of all parent buckets
-	parentBuckets = [][]byte{syncStateEventsBucket, exitEventsBucket, commitmentsBucket, stateSyncProofsBucket,
-		epochsBucket, validatorSnapshotsBucket, proposerSnapshotBucket}
-)
-
 // State represents a persistence layer which persists consensus data off-chain
 type State struct {
-	db     *bolt.DB
-	logger hclog.Logger
-	close  chan struct{}
+	db    *bolt.DB
+	close chan struct{}
 
 	StateSyncStore        *StateSyncStore
 	CheckpointStore       *CheckpointStore
@@ -76,13 +63,8 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 		return nil, err
 	}
 
-	if err = initMainDBBuckets(db); err != nil {
-		return nil, err
-	}
-
-	state := &State{
+	s := &State{
 		db:                    db,
-		logger:                logger.Named("state"),
 		close:                 closeCh,
 		StateSyncStore:        &StateSyncStore{db: db},
 		CheckpointStore:       &CheckpointStore{db: db},
@@ -90,17 +72,28 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
 	}
 
-	return state, nil
+	if err = s.initStorages(); err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
-// initMainDBBuckets creates predefined buckets in bolt database if they don't exist already.
-func initMainDBBuckets(db *bolt.DB) error {
+// initStorages initializes data storages
+func (s *State) initStorages() error {
 	// init the buckets
-	err := db.Update(func(tx *bolt.Tx) error {
-		for _, bucket := range parentBuckets {
-			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
-				return err
-			}
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		if err := s.StateSyncStore.initialize(tx); err != nil {
+			return err
+		}
+		if err := s.CheckpointStore.initialize(tx); err != nil {
+			return err
+		}
+		if err := s.EpochStore.initialize(tx); err != nil {
+			return err
+		}
+		if err := s.ProposerSnapshotStore.initialize(tx); err != nil {
+			return err
 		}
 
 		return nil
@@ -109,21 +102,11 @@ func initMainDBBuckets(db *bolt.DB) error {
 	return err
 }
 
-// epochsDBStats returns stats of epochs bucket in db
-func (s *State) epochsDBStats() *bolt.BucketStats {
-	return s.bucketStats(epochsBucket)
-}
-
-// validatorSnapshotsDBStats returns stats of validators snapshot bucket in db
-func (s *State) validatorSnapshotsDBStats() *bolt.BucketStats {
-	return s.bucketStats(validatorSnapshotsBucket)
-}
-
 // bucketStats returns stats for the given bucket in db
-func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
+func bucketStats(bucketName []byte, db *bolt.DB) (*bolt.BucketStats, error) {
 	var stats *bolt.BucketStats
 
-	err := s.db.View(func(tx *bolt.Tx) error {
+	err := db.View(func(tx *bolt.Tx) error {
 		s := tx.Bucket(bucketName).Stats()
 		stats = &s
 
@@ -131,8 +114,8 @@ func (s *State) bucketStats(bucketName []byte) *bolt.BucketStats {
 	})
 
 	if err != nil {
-		s.logger.Error("Cannot check bucket stats", "Bucket name", string(bucketName), "Error", err)
+		return nil, fmt.Errorf("cannot check bucket stats. Bucket name=%s: %w", string(bucketName), err)
 	}
 
-	return stats
+	return stats, nil
 }

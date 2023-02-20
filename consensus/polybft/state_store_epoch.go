@@ -41,6 +41,19 @@ type EpochStore struct {
 	db *bolt.DB
 }
 
+// initialize creates necessary buckets in DB if they don't already exist
+func (s *EpochStore) initialize(tx *bolt.Tx) error {
+	if _, err := tx.CreateBucketIfNotExists(epochsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(epochsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(validatorSnapshotsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(validatorSnapshotsBucket), err)
+	}
+
+	return nil
+}
+
 // insertValidatorSnapshot inserts a validator snapshot for the given block to its bucket in db
 func (s *EpochStore) insertValidatorSnapshot(validatorSnapshot *validatorSnapshot) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -193,4 +206,14 @@ func (s *EpochStore) removeAllValidatorSnapshots() error {
 
 		return nil
 	})
+}
+
+// epochsDBStats returns stats of epochs bucket in db
+func (s *EpochStore) epochsDBStats() (*bolt.BucketStats, error) {
+	return bucketStats(epochsBucket, s.db)
+}
+
+// validatorSnapshotsDBStats returns stats of validators snapshot bucket in db
+func (s *EpochStore) validatorSnapshotsDBStats() (*bolt.BucketStats, error) {
+	return bucketStats(validatorSnapshotsBucket, s.db)
 }

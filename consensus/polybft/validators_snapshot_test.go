@@ -165,8 +165,11 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 		require.Equal(snapshot, currentSnapshot.Snapshot, fmt.Sprintf("snapshots for epoch %d are not equal", currentEpoch))
 	}
 
+	stats, err := cache.state.EpochStore.validatorSnapshotsDBStats()
+	require.NoError(err)
+
 	// assertions for remaining snapshots in database
-	require.Equal(cache.state.validatorSnapshotsDBStats().KeyN, numberOfSnapshotsToLeaveInDB)
+	require.Equal(stats.KeyN, numberOfSnapshotsToLeaveInDB)
 
 	currentEpoch = maxEpoch
 

@@ -12,7 +12,7 @@ import (
 
 var (
 	// bucket to store rootchain bridge events
-	syncStateEventsBucket = []byte("stateSyncEvents")
+	stateSyncEventsBucket = []byte("stateSyncEvents")
 	// bucket to store commitments
 	commitmentsBucket = []byte("commitments")
 	// bucket to store state sync proofs
@@ -26,6 +26,8 @@ var (
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
 	// errNoCommitmentForStateSync error message
 	errNoCommitmentForStateSync = errors.New("no commitment found for given state sync event")
+
+	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
 )
 
 /*
@@ -45,6 +47,27 @@ type StateSyncStore struct {
 	db *bolt.DB
 }
 
+// initialize creates necessary buckets in DB if they don't already exist
+func (s *StateSyncStore) initialize(tx *bolt.Tx) error {
+	if _, err := tx.CreateBucketIfNotExists(stateSyncEventsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncEventsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(commitmentsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(commitmentsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(stateSyncProofsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncProofsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(messageVotesBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(messageVotesBucket), err)
+	}
+
+	return nil
+}
+
 // insertStateSyncEvent inserts a new state sync event to state event bucket in db
 func (s *StateSyncStore) insertStateSyncEvent(event *contractsapi.StateSyncedEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
@@ -53,7 +76,7 @@ func (s *StateSyncStore) insertStateSyncEvent(event *contractsapi.StateSyncedEve
 			return err
 		}
 
-		bucket := tx.Bucket(syncStateEventsBucket)
+		bucket := tx.Bucket(stateSyncEventsBucket)
 
 		return bucket.Put(common.EncodeUint64ToBytes(event.ID.Uint64()), raw)
 	})
@@ -64,7 +87,7 @@ func (s *StateSyncStore) list() ([]*contractsapi.StateSyncedEvent, error) {
 	events := []*contractsapi.StateSyncedEvent{}
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		return tx.Bucket(syncStateEventsBucket).ForEach(func(k, v []byte) error {
+		return tx.Bucket(stateSyncEventsBucket).ForEach(func(k, v []byte) error {
 			var event *contractsapi.StateSyncedEvent
 			if err := json.Unmarshal(v, &event); err != nil {
 				return err
@@ -87,7 +110,7 @@ func (s *StateSyncStore) getStateSyncEventsForCommitment(
 	var events []*contractsapi.StateSyncedEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(syncStateEventsBucket)
+		bucket := tx.Bucket(stateSyncEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(common.EncodeUint64ToBytes(i))
 			if v == nil {

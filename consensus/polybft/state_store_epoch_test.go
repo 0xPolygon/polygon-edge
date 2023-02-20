@@ -81,7 +81,8 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	assert.NoError(t, state.EpochStore.cleanValidatorSnapshotsFromDB(epoch))
 
 	// test that last (numberOfSnapshotsToLeaveInDb) of snapshots are left in db after cleanup
-	validatorSnapshotsBucketStats := state.validatorSnapshotsDBStats()
+	validatorSnapshotsBucketStats, err := state.EpochStore.validatorSnapshotsDBStats()
+	require.NoError(t, err)
 
 	assert.Equal(t, numberOfSnapshotsToLeaveInDB, validatorSnapshotsBucketStats.KeyN)
 
@@ -142,15 +143,20 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 		})
 	}
 
+	stats, err := state.EpochStore.epochsDBStats()
+	require.NoError(t, err)
+
 	// BucketN returns number of all buckets inside root bucket (including nested buckets) + the root itself
 	// Since we inserted 500 epochs we expect to have 1000 buckets inside epochs root bucket
 	// (500 buckets for epochs + each epoch has 1 nested bucket for message votes)
-	assert.Equal(t, 1000, state.epochsDBStats().BucketN-1)
+	assert.Equal(t, 1000, stats.BucketN-1)
 
-	err := state.EpochStore.cleanEpochsFromDB()
-	assert.NoError(t, err)
+	assert.NoError(t, state.EpochStore.cleanEpochsFromDB())
 
-	assert.Equal(t, 0, state.epochsDBStats().BucketN-1)
+	stats, err = state.EpochStore.epochsDBStats()
+	require.NoError(t, err)
+
+	assert.Equal(t, 0, stats.BucketN-1)
 
 	// there should be no votes for given epoch since we cleaned the db
 	votes, _ := state.StateSyncStore.getMessageVotes(1, hash1)
@@ -167,7 +173,10 @@ func TestState_Insert_And_Cleanup(t *testing.T) {
 		})
 	}
 
-	assert.Equal(t, 1000, state.epochsDBStats().BucketN-1)
+	stats, err = state.EpochStore.epochsDBStats()
+	require.NoError(t, err)
+
+	assert.Equal(t, 1000, stats.BucketN-1)
 
 	votes, _ = state.StateSyncStore.getMessageVotes(1000, hash1)
 	assert.Equal(t, 1, len(votes))

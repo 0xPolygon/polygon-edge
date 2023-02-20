@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"encoding/json"
+	"fmt"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -22,6 +23,15 @@ var (
 
 type ProposerSnapshotStore struct {
 	db *bolt.DB
+}
+
+// initialize creates necessary buckets in DB if they don't already exist
+func (s *ProposerSnapshotStore) initialize(tx *bolt.Tx) error {
+	if _, err := tx.CreateBucketIfNotExists(proposerSnapshotBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(validatorSnapshotsBucket), err)
+	}
+
+	return nil
 }
 
 // getProposerSnapshot gets latest proposer snapshot
