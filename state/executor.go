@@ -389,9 +389,18 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	// deduct the upfront max gas cost
-	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
-	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
+	upfrontGasCost := new(big.Int).SetUint64(msg.Gas)
+
+	factor := new(big.Int)
+	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
+		// Apply EIP-1559 tx cost calculation factor
+		factor = factor.Set(msg.GasFeeCap)
+	} else {
+		// Apply legacy tx cost calculation factor
+		factor = factor.Set(msg.GasPrice)
+	}
+
+	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, factor)
 
 	// Apply EIP-1559 tx cost calculation logic
 	if msg.GasFeeCap.BitLen() > 0 {
