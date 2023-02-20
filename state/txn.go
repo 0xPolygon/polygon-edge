@@ -121,7 +121,7 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 		object = &StateObject{
 			Account: &Account{
 				Balance:  big.NewInt(0),
-				CodeHash: emptyCodeHash,
+				CodeHash: types.EmptyCodeHash.Bytes(),
 				Root:     emptyStateHash,
 			},
 		}
@@ -510,7 +510,7 @@ func newStateObject(txn *Txn) *StateObject {
 	return &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
-			CodeHash: emptyCodeHash,
+			CodeHash: types.EmptyCodeHash.Bytes(),
 			Root:     emptyStateHash,
 		},
 	}
@@ -520,7 +520,7 @@ func (txn *Txn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
-			CodeHash: emptyCodeHash,
+			CodeHash: types.EmptyCodeHash.Bytes(),
 			Root:     emptyStateHash,
 		},
 	}
