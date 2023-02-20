@@ -389,9 +389,18 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	// deduct the upfront max gas cost
-	upfrontGasCost := new(big.Int).Set(msg.GasPrice)
-	upfrontGasCost.Mul(upfrontGasCost, new(big.Int).SetUint64(msg.Gas))
+	upfrontGasCost := new(big.Int).SetUint64(msg.Gas)
+
+	factor := new(big.Int)
+	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
+		// Apply EIP-1559 tx cost calculation factor
+		factor = factor.Set(msg.GasFeeCap)
+	} else {
+		// Apply legacy tx cost calculation factor
+		factor = factor.Set(msg.GasPrice)
+	}
+
+	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, factor)
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
@@ -414,6 +423,38 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 	return nil
 }
 
+// checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
+// Basically, makes sure gas tip cap and gas fee cap are good.
+func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
+	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
+		return nil
+	}
+
+	if l := msg.GasFeeCap.BitLen(); l > 256 {
+		return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
+			msg.From.String(), l)
+	}
+
+	if l := msg.GasTipCap.BitLen(); l > 256 {
+		return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
+			msg.From.String(), l)
+	}
+
+	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+		return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
+			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+	}
+
+	// This will panic if baseFee is nil, but basefee presence is verified
+	// as part of header validation.
+	if msg.GasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
+		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
+			msg.From.String(), msg.GasFeeCap, t.ctx.BaseFee)
+	}
+
+	return nil
+}
+
 // errors that can originate in the consensus rules checks of the apply method below
 // surfacing of these errors reject the transaction thus not including it in the block
 
@@ -423,7 +464,6 @@ var (
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
 	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
-	ErrNotEnoughFunds        = fmt.Errorf("not enough funds for transfer with given value")
 
 	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
 	// transaction with a tip higher than the total fee cap.
@@ -471,12 +511,10 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	var err error
 
-	if msg.Type == types.DynamicFeeTx {
-		err = checkAndProcessDynamicFeeTx(msg, t)
-	} else if msg.Type == types.LegacyTx {
-		err = checkAndProcessLegacyTx(msg, t)
+	if msg.Type == types.StateTx {
+		err = checkAndProcessStateTx(msg)
 	} else {
-		err = checkAndProcessStateTx(msg, t)
+		err = checkAndProcessTx(msg, t)
 	}
 
 	if err != nil {
@@ -918,67 +956,22 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	return cost, nil
 }
 
-// checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
-// Basically, makes sure gas tip cap and gas fee cap are good.
-func checkDynamicFees(msg *types.Transaction, baseFee *big.Int) error {
-	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
-		return nil
-	}
-
-	if l := msg.GasFeeCap.BitLen(); l > 256 {
-		return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
-			msg.From.String(), l)
-	}
-
-	if l := msg.GasTipCap.BitLen(); l > 256 {
-		return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
-			msg.From.String(), l)
-	}
-
-	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
-		return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
-			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
-	}
-
-	// This will panic if baseFee is nil, but basefee presence is verified
-	// as part of header validation.
-	if msg.GasFeeCap.Cmp(baseFee) < 0 {
-		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), msg.GasFeeCap, baseFee)
-	}
-
-	return nil
-}
-
-// checkAndProcessDynamicFeeTx - first check if this message satisfies all consensus rules before
+// checkAndProcessTx - first check if this message satisfies all consensus rules before
 // applying the message. The rules include these clauses:
 // 1. the nonce of the message caller is correct
-// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-func checkAndProcessDynamicFeeTx(msg *types.Transaction, t *Transition) error {
-	// 1. do legacy tx checks
-	if err := checkAndProcessLegacyTx(msg, t); err != nil {
-		return err
-	}
-
-	// 2. make sure EIP-1559-related fields are correct
-	if err := checkDynamicFees(msg, t.ctx.BaseFee); err != nil {
-		return NewTransitionApplicationError(err, true)
-	}
-
-	return nil
-}
-
-// checkAndProcessLegacyTx - first check if this message satisfies all consensus rules before
-// applying the message. The rules include these clauses:
-// 1. the nonce of the message caller is correct
-// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-func checkAndProcessLegacyTx(msg *types.Transaction, t *Transition) error {
+// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice * val) or fee(gasfeecap * gasprice * val)
+func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 	// 1. the nonce of the message caller is correct
 	if err := t.nonceCheck(msg); err != nil {
 		return NewTransitionApplicationError(err, true)
 	}
 
-	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+	// 2. check dynamic fees of the transaction
+	if err := t.checkDynamicFees(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	// 2. caller has enough balance to cover transaction
 	if err := t.subGasLimitPrice(msg); err != nil {
 		return NewTransitionApplicationError(err, true)
 	}
@@ -986,7 +979,7 @@ func checkAndProcessLegacyTx(msg *types.Transaction, t *Transition) error {
 	return nil
 }
 
-func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
+func checkAndProcessStateTx(msg *types.Transaction) error {
 	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
 		return NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),

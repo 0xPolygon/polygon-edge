@@ -7,10 +7,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func Test_checkDynamicFees(t *testing.T) {
+func Test_Transition_checkDynamicFees(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -83,8 +84,14 @@ func Test_checkDynamicFees(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := checkDynamicFees(tt.tx, tt.baseFee)
-			tt.wantErr(t, err, fmt.Sprintf("checkDynamicFees(%v, %v)", tt.tx, tt.baseFee))
+			tr := &Transition{
+				ctx: runtime.TxContext{
+					BaseFee: tt.baseFee,
+				},
+			}
+
+			err := tr.checkDynamicFees(tt.tx)
+			tt.wantErr(t, err, fmt.Sprintf("checkDynamicFees(%v)", tt.tx))
 		})
 	}
 }
