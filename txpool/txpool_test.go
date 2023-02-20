@@ -1753,6 +1753,51 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 			runtime.ErrMaxCodeSizeExceeded,
 		)
 	})
+
+	t.Run("transaction with eip-1559 fields can pass", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.GasFeeCap = big.NewInt(1100)
+		tx.GasTipCap = big.NewInt(10)
+
+		assert.NoError(t, pool.validateTx(signTx(tx)))
+	})
+
+	t.Run("gas fee cap less than base fee", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.GasFeeCap = big.NewInt(100)
+		tx.GasTipCap = big.NewInt(10)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrUnderpriced,
+		)
+	})
+
+	t.Run("gas fee cap less than tip cap", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.GasFeeCap = big.NewInt(10000)
+		tx.GasTipCap = big.NewInt(100000)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrTipAboveFeeCap,
+		)
+	})
 }
 
 /* "Integrated" tests */
