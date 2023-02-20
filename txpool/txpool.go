@@ -395,6 +395,9 @@ func (p *TxPool) Prepare(baseFee uint64) {
 	for _, tx := range primaries {
 		p.executables.push(tx)
 	}
+
+	// set base fee
+	atomic.StoreUint64(&p.baseFee, baseFee)
 }
 
 // Peek returns the best-price selected
