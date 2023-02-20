@@ -4,13 +4,17 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"os"
+	"path"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -126,4 +130,29 @@ func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
 	}
 
 	return blockNumber/epochSize + 1
+}
+
+// newTestState creates new instance of state used by tests.
+func newTestState(t *testing.T) *State {
+	t.Helper()
+
+	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339Nano))
+	err := os.Mkdir(dir, 0777)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	return state
 }

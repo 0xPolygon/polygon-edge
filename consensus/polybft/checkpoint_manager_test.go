@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -307,7 +308,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.IsEpochEndingBlock = false
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -320,7 +321,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.IsEpochEndingBlock = true
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -341,12 +342,12 @@ func TestCheckpointManager_BuildEventRoot(t *testing.T) {
 	state := newTestState(t)
 	checkpointManager := &checkpointManager{state: state}
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
 
 	t.Run("Get exit event root hash", func(t *testing.T) {
 		t.Parallel()
 
-		tree, err := NewMerkleTree(encodedEvents)
+		tree, err := createExitTree(encodedEvents)
 		require.NoError(t, err)
 
 		hash, err := checkpointManager.BuildEventRoot(1)
@@ -372,11 +373,10 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	)
 
 	state := newTestState(t)
-	checkpointManager := &checkpointManager{
-		state: state,
-	}
+	checkpointManager := &checkpointManager{state: state}
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := encodeExitEvents(t, exitEvents)
 	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
 
 	// manually create merkle tree for a desired checkpoint to verify the generated proof
@@ -463,7 +463,7 @@ func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 
 	topics := make([]types.Hash, 4)
 	topics[0] = types.Hash(exitEventABI.ID())
-	topics[1] = types.BytesToHash(itob(exitEventID))
+	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
 	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
 	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
 	someType := abi.MustNewType("tuple(string firstName, string lastName)")

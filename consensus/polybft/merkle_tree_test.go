@@ -3,6 +3,7 @@ package polybft
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +15,7 @@ func TestMerkleTree_VerifyProofs(t *testing.T) {
 	verifyProof := func(numOfItems uint64) {
 		data := make([][]byte, numOfItems)
 		for i := uint64(0); i < numOfItems; i++ {
-			data[i] = itob(i)
+			data[i] = common.EncodeUint64ToBytes(i)
 		}
 
 		tree, err := NewMerkleTree(data)
@@ -41,7 +42,7 @@ func TestMerkleTree_VerifyProof_InvalidProof(t *testing.T) {
 	data := make([][]byte, dataLen)
 
 	for i := uint64(0); i < dataLen; i++ {
-		data[i] = itob(i)
+		data[i] = common.EncodeUint64ToBytes(i)
 	}
 
 	tree, err := NewMerkleTree(data)

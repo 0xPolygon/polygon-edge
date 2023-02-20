@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -287,4 +288,12 @@ func BigIntDivCeil(a, b *big.Int) *big.Int {
 	return result.Add(a, b).
 		Sub(result, big.NewInt(1)).
 		Div(result, b)
+}
+
+// EncodeUint64ToBytes encodes provided uint64 to big endian byte slice
+func EncodeUint64ToBytes(value uint64) []byte {
+	result := make([]byte, 8)
+	binary.BigEndian.PutUint64(result, value)
+
+	return result
 }
