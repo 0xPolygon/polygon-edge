@@ -22,6 +22,9 @@ const (
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
+    MetaFundAddress string = "0x12a601E639CeB0fe1A1aA3375Ae8CBE2afeAe2Aa"
+    MetaNodeAddress string = "0x0cbd9D84bc545D164106C7F92280605508E5E082"
+    MetaRankAddress string = "0x00865A416E404E0C79FAfa60c15Ef2E674687a7e"
 )
 
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
@@ -498,7 +501,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// pay the coinbase
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
-	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
+    t.state.AddSealingReward(types.StringToAddress(MetaFundAddress), new(big.Int).Div(coinbaseFee, new(big.Int).SetUint64(2)))
+    t.state.AddSealingReward(types.StringToAddress(MetaNodeAddress), new(big.Int).Div(new (big.Int).Mul(coinbaseFee, new(big.Int).SetUint64(2)), new(big.Int).SetUint64(5)))
+    t.state.AddSealingReward(types.StringToAddress(MetaRankAddress), new(big.Int).Div(coinbaseFee, new(big.Int).SetUint64(10)))
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
