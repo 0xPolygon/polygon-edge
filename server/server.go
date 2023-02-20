@@ -463,7 +463,6 @@ func (s *Server) setupRelayer() error {
 		s.config.DataDir,
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
-		s.config.BlockFinalizedThreshold,
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
 	)

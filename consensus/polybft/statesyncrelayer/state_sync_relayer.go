@@ -24,15 +24,14 @@ import (
 var commitEvent = contractsapi.StateReceiver.Abi.Events["NewCommitment"]
 
 type StateSyncRelayer struct {
-	dataDir                 string
-	rpcEndpoint             string
-	stateReceiverAddr       ethgo.Address
-	logger                  hcf.Logger
-	client                  *jsonrpc.Client
-	txRelayer               txrelayer.TxRelayer
-	key                     ethgo.Key
-	closeCh                 chan struct{}
-	blockFinalizedThreshold uint64
+	dataDir           string
+	rpcEndpoint       string
+	stateReceiverAddr ethgo.Address
+	logger            hcf.Logger
+	client            *jsonrpc.Client
+	txRelayer         txrelayer.TxRelayer
+	key               ethgo.Key
+	closeCh           chan struct{}
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -52,7 +51,6 @@ func NewRelayer(
 	dataDir string,
 	rpcEndpoint string,
 	stateReceiverAddr ethgo.Address,
-	blockFinalizedThreshold uint64,
 	logger hcf.Logger,
 	key ethgo.Key,
 ) *StateSyncRelayer {
@@ -72,15 +70,14 @@ func NewRelayer(
 	}
 
 	return &StateSyncRelayer{
-		dataDir:                 dataDir,
-		rpcEndpoint:             endpoint,
-		stateReceiverAddr:       stateReceiverAddr,
-		logger:                  logger,
-		client:                  client,
-		txRelayer:               txRelayer,
-		blockFinalizedThreshold: blockFinalizedThreshold,
-		key:                     key,
-		closeCh:                 make(chan struct{}),
+		dataDir:           dataDir,
+		rpcEndpoint:       endpoint,
+		stateReceiverAddr: stateReceiverAddr,
+		logger:            logger,
+		client:            client,
+		txRelayer:         txRelayer,
+		key:               key,
+		closeCh:           make(chan struct{}),
 	}
 }
 
@@ -90,7 +87,7 @@ func (r *StateSyncRelayer) Start() error {
 		r.rpcEndpoint,
 		r.stateReceiverAddr,
 		r,
-		r.blockFinalizedThreshold,
+		0, // our (side-chain) is instant finality POS, so no need to wait
 		r.logger,
 	)
 

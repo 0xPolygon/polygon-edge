@@ -201,8 +201,6 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 			if err := bucketLogs.Put(itob(logIdx), val); err != nil {
 				return err
 			}
-
-			lastBlockNumber = log.BlockNumber
 		}
 
 		e.logger.Info("write event logs",
@@ -212,6 +210,8 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 	}); err != nil {
 		return err
 	}
+
+	lastBlockNumber = logs[len(logs)-1].BlockNumber
 
 	notifyLogs, lastProcessedIdx, err := e.getFinalizedLogs(lastBlockNumber - e.finalizedThreshold)
 	if err != nil {
