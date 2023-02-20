@@ -20,7 +20,7 @@ type TxType byte
 const (
 	LegacyTx     TxType = 0x0
 	StateTx      TxType = 0x7f
-	DynamicFeeTx TxType = 0x8f
+	DynamicFeeTx TxType = 0x02
 )
 
 func txTypeFromByte(b byte) (TxType, error) {
@@ -95,6 +95,16 @@ func (t *Transaction) Copy() *Transaction {
 		tt.GasPrice.Set(t.GasPrice)
 	}
 
+	tt.GasTipCap = new(big.Int)
+	if t.GasTipCap != nil {
+		tt.GasTipCap.Set(t.GasTipCap)
+	}
+
+	tt.GasFeeCap = new(big.Int)
+	if t.GasFeeCap != nil {
+		tt.GasFeeCap.Set(t.GasFeeCap)
+	}
+
 	tt.Value = new(big.Int)
 	if t.Value != nil {
 		tt.Value.Set(t.Value)
@@ -118,8 +128,16 @@ func (t *Transaction) Copy() *Transaction {
 
 // Cost returns gas * gasPrice + value
 func (t *Transaction) Cost() *big.Int {
-	total := new(big.Int).Mul(t.GasPrice, new(big.Int).SetUint64(t.Gas))
-	total.Add(total, t.Value)
+	var factor *big.Int
+
+	if t.GasFeeCap != nil || t.GasFeeCap.BitLen() > 0 {
+		factor = new(big.Int).Set(t.GasFeeCap)
+	} else {
+		factor = new(big.Int).Set(t.GasPrice)
+	}
+
+	total := new(big.Int).Mul(factor, new(big.Int).SetUint64(t.Gas))
+	total = total.Add(total, t.Value)
 
 	return total
 }
