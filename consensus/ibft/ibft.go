@@ -43,7 +43,7 @@ var (
 )
 
 type txPoolInterface interface {
-	Prepare()
+	Prepare(uint64)
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
