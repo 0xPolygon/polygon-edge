@@ -2,13 +2,11 @@ import eth from 'k6/x/ethereum';
 import exec from 'k6/execution';
 import wallet from 'k6/x/ethereum/wallet';
 
-export function fundTestAccounts(root_address, url, priv_key) {
-    const client = new eth.Client({ 
-        url: url,
-        mnemonic: priv_key,
-    });
+export function fundTestAccounts(client, root_address) {
     var accounts = [];
     var nonce = client.getNonce(root_address);
+    nonce++;
+    console.log(nonce);
 
     // fund the VUs accounts
     for (let i = 0; i < exec.instance.vusInitialized; i++) {

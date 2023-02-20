@@ -26,7 +26,12 @@ if (rpc_url == undefined) {
 }
 
 export function setup() {
-  return {accounts: fundTestAccounts(root_address, rpc_url, mnemonic)};
+  const client = new eth.Client({
+    url: rpc_url,
+    mnemonic: mnemonic,
+  });
+
+  return { accounts: fundTestAccounts(client, root_address) };
 }
 
 var nonce = 0;
@@ -42,7 +47,7 @@ export default function (data) {
   }
 
   console.log(`nonce => ${nonce}`);
-  
+
   const tx = {
     to: "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
     value: Number(0.0001 * 1e18),
