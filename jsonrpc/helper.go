@@ -189,6 +189,14 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		arg.GasPrice = argBytesPtr([]byte{})
 	}
 
+	if arg.GasTipCap == nil {
+		arg.GasTipCap = argBytesPtr([]byte{})
+	}
+
+	if arg.GasFeeCap == nil {
+		arg.GasFeeCap = argBytesPtr([]byte{})
+	}
+
 	var input []byte
 	if arg.Data != nil {
 		input = *arg.Data
@@ -209,13 +217,16 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 	}
 
 	txn := &types.Transaction{
-		From:     *arg.From,
-		Gas:      uint64(*arg.Gas),
-		GasPrice: new(big.Int).SetBytes(*arg.GasPrice),
-		Value:    new(big.Int).SetBytes(*arg.Value),
-		Input:    input,
-		Nonce:    uint64(*arg.Nonce),
+		From:      *arg.From,
+		Gas:       uint64(*arg.Gas),
+		GasPrice:  new(big.Int).SetBytes(*arg.GasPrice),
+		GasTipCap: new(big.Int).SetBytes(*arg.GasTipCap),
+		GasFeeCap: new(big.Int).SetBytes(*arg.GasFeeCap),
+		Value:     new(big.Int).SetBytes(*arg.Value),
+		Input:     input,
+		Nonce:     uint64(*arg.Nonce),
 	}
+
 	if arg.To != nil {
 		txn.To = arg.To
 	}

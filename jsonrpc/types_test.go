@@ -225,9 +225,7 @@ func mockTxn() *transaction {
 }
 
 func TestTransaction_Encoding(t *testing.T) {
-	tt := mockTxn()
-
-	testTransaction := func(name string) {
+	testTransaction := func(name string, tt *transaction) {
 		res, err := json.Marshal(tt)
 		require.NoError(t, err)
 
@@ -237,14 +235,28 @@ func TestTransaction_Encoding(t *testing.T) {
 	}
 
 	t.Run("sealed", func(t *testing.T) {
-		testTransaction("testsuite/transaction-sealed.json")
+		tt := mockTxn()
+
+		testTransaction("testsuite/transaction-sealed.json", tt)
 	})
 
 	t.Run("pending", func(t *testing.T) {
+		tt := mockTxn()
 		tt.BlockHash = nil
 		tt.BlockNumber = nil
 		tt.TxIndex = nil
 
-		testTransaction("testsuite/transaction-pending.json")
+		testTransaction("testsuite/transaction-pending.json", tt)
+	})
+
+	t.Run("eip-1559", func(t *testing.T) {
+		gasTipCap := argBig(*big.NewInt(10))
+		gasFeeCap := argBig(*big.NewInt(10))
+
+		tt := mockTxn()
+		tt.GasTipCap = &gasTipCap
+		tt.GasFeeCap = &gasFeeCap
+
+		testTransaction("testsuite/transaction-eip1559.json", tt)
 	})
 }
