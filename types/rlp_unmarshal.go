@@ -396,8 +396,10 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	switch t.Type {
 	case LegacyTx:
 		num = 9
-	case DynamicFeeTx, StateTx:
+	case StateTx:
 		num = 10
+	case DynamicFeeTx:
+		num = 12
 	default:
 		return fmt.Errorf("transaction type %d not found", t.Type)
 	}
@@ -408,21 +410,28 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	p.Hash(t.Hash[:0], v)
 
+	// Skipping Chain ID field since we don't support it (yet)
+	// This is needed to be compatible with other EVM chains and have the same format.
+	// Since we don't have a chain ID, just skip it here.
+	if t.Type == DynamicFeeTx {
+		_ = getElem()
+	}
+
 	// nonce
 	if t.Nonce, err = getElem().GetUint64(); err != nil {
 		return err
 	}
 
 	if t.Type == DynamicFeeTx {
-		// gasFeeCap
-		t.GasFeeCap = new(big.Int)
-		if err = getElem().GetBigInt(t.GasFeeCap); err != nil {
-			return err
-		}
-
 		// gasTipCap
 		t.GasTipCap = new(big.Int)
 		if err = getElem().GetBigInt(t.GasTipCap); err != nil {
+			return err
+		}
+
+		// gasFeeCap
+		t.GasFeeCap = new(big.Int)
+		if err = getElem().GetBigInt(t.GasFeeCap); err != nil {
 			return err
 		}
 	} else {
@@ -432,6 +441,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 	}
+
 	// gas
 	if t.Gas, err = getElem().GetUint64(); err != nil {
 		return err
@@ -456,6 +466,13 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	// input
 	if t.Input, err = getElem().GetBytes(t.Input[:0]); err != nil {
 		return err
+	}
+
+	// Skipping Access List field since we don't support it.
+	// This is needed to be compatible with other EVM chains and have the same format.
+	// Since we don't have access list, just skip it here.
+	if t.Type == DynamicFeeTx {
+		_ = getElem()
 	}
 
 	// V
@@ -488,24 +505,4 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	return nil
-}
-
-func readRlpTxType(rlpValue *fastrlp.Value) (TxType, error) {
-	bytes, err := rlpValue.Bytes()
-	if err != nil {
-		return LegacyTx, err
-	}
-
-	if len(bytes) != 1 {
-		return LegacyTx, fmt.Errorf("expected 1 byte transaction type, but size is %d", len(bytes))
-	}
-
-	b := TxType(bytes[0])
-
-	switch b {
-	case LegacyTx, StateTx, DynamicFeeTx:
-		return b, nil
-	default:
-		return LegacyTx, fmt.Errorf("invalid tx type value: %d", bytes[0])
-	}
 }
