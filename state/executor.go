@@ -402,12 +402,6 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 
 	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, factor)
 
-	// Apply EIP-1559 tx cost calculation logic
-	if msg.GasFeeCap.BitLen() > 0 {
-		upfrontGasCost = new(big.Int).SetUint64(msg.Gas)
-		upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, msg.GasFeeCap)
-	}
-
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
