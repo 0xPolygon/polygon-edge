@@ -194,8 +194,10 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 	}
 
 	if ip.generatesAccount {
-		var a *wallet.Account
-		var err error
+		var (
+			a   *wallet.Account
+			err error
+		)
 
 		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
 			a = wallet.GenerateAccount()
