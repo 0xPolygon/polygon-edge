@@ -23,16 +23,32 @@ func main() {
 		Name string
 	}{
 		{
-			"root/CheckpointManager.sol",
-			"CheckpointManager",
-		},
-		{
-			"root/ExitHelper.sol",
-			"ExitHelper",
+			"child/ChildValidatorSet.sol",
+			"ChildValidatorSet",
 		},
 		{
 			"child/L2StateSender.sol",
 			"L2StateSender",
+		},
+		{
+			"child/StateReceiver.sol",
+			"StateReceiver",
+		},
+		{
+			"child/NativeERC20.sol",
+			"NativeERC20",
+		},
+		{
+			"child/ChildERC20.sol",
+			"ChildERC20",
+		},
+		{
+			"child/ChildERC20Predicate.sol",
+			"ChildERC20Predicate",
+		},
+		{
+			"child/System.sol",
+			"System",
 		},
 		{
 			"common/BLS.sol",
@@ -51,20 +67,20 @@ func main() {
 			"StateReceiver",
 		},
 		{
+			"root/CheckpointManager.sol",
+			"CheckpointManager",
+		},
+		{
+			"root/ExitHelper.sol",
+			"ExitHelper",
+		},
+		{
 			"root/StateSender.sol",
 			"StateSender",
 		},
 		{
-			"child/ChildValidatorSet.sol",
-			"ChildValidatorSet",
-		},
-		{
-			"child/System.sol",
-			"System",
-		},
-		{
-			"child/MRC20.sol",
-			"MRC20",
+			"root/RootERC20Predicate.sol",
+			"RootERC20Predicate",
 		},
 	}
 

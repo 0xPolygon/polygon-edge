@@ -138,14 +138,19 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		if polyBFTConfig.IsBridgeEnabled() {
 			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
 		}
+		// TODO: deploy ChildERC20Predicate
 
-		input, err = contractsapi.MRC20.Abi.Methods["initialize"].Encode(
+		// address rootToken_,
+		// string calldata name_,
+		// string calldata symbol_,
+		// uint8 decimals_
+		input, err = contractsapi.ChildERC20.Abi.Methods["initialize"].Encode(
 			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
 		if err != nil {
 			return err
 		}
 
-		return initContract(contracts.NativeTokenContract, input, "MRC20", transition)
+		return initContract(contracts.NativeTokenContract, input, "ChildERC20", transition)
 	}
 }
 
