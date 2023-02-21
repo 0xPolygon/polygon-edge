@@ -21,6 +21,7 @@ const (
 	validatorsFlag        = "validators"
 	validatorsPathFlag    = "validators-path"
 	validatorsPrefixFlag  = "validators-prefix"
+	chainIDFlag           = "chain-id"
 
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultManifestPath        = "./manifest.json"
@@ -88,6 +89,13 @@ func setFlags(cmd *cobra.Command) {
 		"the amount which will be pre-mined to all the validators",
 	)
 
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPrefixFlag)
 }
@@ -103,7 +111,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	manifest := &polybft.Manifest{GenesisValidators: validators}
+	manifest := &polybft.Manifest{GenesisValidators: validators, ChainID: params.chainID}
 	if err = manifest.Save(params.manifestPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save manifest file '%s': %w", params.manifestPath, err))
 
@@ -119,6 +127,7 @@ type manifestInitParams struct {
 	validatorsPrefixPath string
 	premineValidators    string
 	validators           []string
+	chainID              int64
 }
 
 func (p *manifestInitParams) validateFlags() error {
