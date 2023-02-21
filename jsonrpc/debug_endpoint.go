@@ -51,7 +51,6 @@ type debugBlockchainStore interface {
 
 type debugTxPoolStore interface {
 	GetNonce(types.Address) uint64
-	GetBaseFee() uint64
 }
 
 type debugStateStore interface {

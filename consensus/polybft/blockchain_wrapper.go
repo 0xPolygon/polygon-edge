@@ -152,25 +152,12 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(
-	parent *types.Header,
-	coinbase types.Address,
-	txPool txPoolInterface,
-	blockTime time.Duration,
-	logger hclog.Logger,
-) (blockBuilder, error) {
+	parent *types.Header, coinbase types.Address,
+	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error) {
 	gasLimit, err := p.blockchain.CalculateGasLimit(parent.Number + 1)
 	if err != nil {
 		return nil, err
 	}
-
-	// Calculate next base fee based on the parent head
-	baseFee := p.blockchain.CalculateBaseFee(parent)
-
-	// Update base fee in tx pool so txs could be sorted properly.
-	// This is the right place to update a base fee because this function
-	// gets executed when creating a new block, i.e. in the beginning of
-	// a new block so there are no transactions yet.
-	txPool.SetBaseFee(baseFee)
 
 	return NewBlockBuilder(&BlockBuilderParams{
 		BlockTime: blockTime,
@@ -178,7 +165,7 @@ func (p *blockchainWrapper) NewBlockBuilder(
 		Coinbase:  coinbase,
 		Executor:  p.executor,
 		GasLimit:  gasLimit,
-		BaseFee:   baseFee,
+		BaseFee:   p.blockchain.CalculateBaseFee(parent),
 		TxPool:    txPool,
 		Logger:    logger,
 	}), nil

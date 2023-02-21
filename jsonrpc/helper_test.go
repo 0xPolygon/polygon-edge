@@ -501,7 +501,7 @@ func TestGetNextNonce(t *testing.T) {
 		name     string
 		address  types.Address
 		num      BlockNumber
-		store    dataGetter
+		store    nonceGetter
 		expected uint64
 		err      bool
 	}{
@@ -644,7 +644,7 @@ func TestDecodeTxn(t *testing.T) {
 	tests := []struct {
 		name     string
 		arg      *txnArgs
-		store    dataGetter
+		store    nonceGetter
 		expected *types.Transaction
 		err      bool
 	}{
