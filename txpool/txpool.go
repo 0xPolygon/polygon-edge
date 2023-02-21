@@ -387,11 +387,14 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 
 // Prepare generates all the transactions
 // ready for execution. (primaries)
-func (p *TxPool) Prepare() {
+func (p *TxPool) Prepare(baseFee uint64) {
 	// clear from previous round
 	if p.executables.length() != 0 {
 		p.executables.clear()
 	}
+
+	// set base fee
+	atomic.StoreUint64(&p.baseFee, baseFee)
 
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
