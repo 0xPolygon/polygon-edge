@@ -185,12 +185,13 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 // RootchainConfig contains information about rootchain contract addresses
 // as well as rootchain admin account address
 type RootchainConfig struct {
-	StateSenderAddress       types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
-	BLSAddress               types.Address `json:"blsAddress"`
-	BN256G2Address           types.Address `json:"bn256G2Address"`
-	ExitHelperAddress        types.Address `json:"exitHelperAddress"`
-	AdminAddress             types.Address `json:"adminAddress"`
+	StateSenderAddress        types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress  types.Address `json:"checkpointManagerAddress"`
+	BLSAddress                types.Address `json:"blsAddress"`
+	BN256G2Address            types.Address `json:"bn256G2Address"`
+	ExitHelperAddress         types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
+	AdminAddress              types.Address `json:"adminAddress"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance
