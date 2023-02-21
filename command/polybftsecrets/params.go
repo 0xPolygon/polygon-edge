@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -162,14 +163,15 @@ func (ip *initParams) Execute() (Results, error) {
 			return results, err
 		}
 
+		var gen []string
 		if !ip.output {
-			_, err = ip.initKeys(secretManager)
+			gen, err = ip.initKeys(secretManager)
 			if err != nil {
 				return results, err
 			}
 		}
 
-		res, err := ip.getResult(secretManager)
+		res, err := ip.getResult(secretManager, gen)
 		if err != nil {
 			return results, err
 		}
@@ -226,7 +228,10 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 }
 
 // getResult gets keys from secret manager and return result to display
-func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.CommandResult, error) {
+func (ip *initParams) getResult(
+	secretsManager secrets.SecretsManager,
+	generated []string,
+) (command.CommandResult, error) {
 	var (
 		res = &SecretsInitResult{}
 		err error
@@ -247,6 +252,7 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 		}
 
 		res.BLSSignature = hex.EncodeToString(s)
+		res.Generated = strings.Join(generated, ", ")
 
 		if ip.printPrivateKey {
 			pk, err := account.Ecdsa.MarshallPrivateKey()
