@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -125,7 +126,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	blsSignature, err := bls.UnmarshalSignature(sRaw)
+	sb, err := hex.DecodeString(string(sRaw))
+	if err != nil {
+		return err
+	}
+
+	blsSignature, err := bls.UnmarshalSignature(sb)
 	if err != nil {
 		return err
 	}
