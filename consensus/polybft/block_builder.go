@@ -152,7 +152,7 @@ func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 func (b *BlockBuilder) Fill() {
 	blockTimer := time.NewTimer(b.params.BlockTime)
 
-	b.params.TxPool.Prepare()
+	b.params.TxPool.Prepare(b.params.BaseFee)
 write:
 	for {
 		select {

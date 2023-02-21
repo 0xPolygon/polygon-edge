@@ -1401,7 +1401,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare()
+	pool.Prepare(0)
 	tx := pool.Peek()
 	pool.Pop(tx)
 
@@ -1429,7 +1429,7 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare()
+	pool.Prepare(0)
 	tx := pool.Peek()
 	pool.Drop(tx)
 
@@ -1462,7 +1462,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
-		pool.Prepare()
+		pool.Prepare(0)
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -1498,7 +1498,7 @@ func TestDemote(t *testing.T) {
 		pool.accounts.get(addr1).demotions = maxAccountDemotions
 
 		// call demote
-		pool.Prepare()
+		pool.Prepare(0)
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -2504,7 +2504,7 @@ func TestRecovery(t *testing.T) {
 			assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
 
 			func() {
-				pool.Prepare()
+				pool.Prepare(0)
 				for {
 					tx := pool.Peek()
 					if tx == nil {

@@ -34,16 +34,15 @@ const (
 )
 
 var (
-	ErrInvalidHookParam             = errors.New("invalid IBFT hook param passed in")
-	ErrProposerSealByNonValidator   = errors.New("proposer seal by non-validator")
-	ErrInvalidMixHash               = errors.New("invalid mixhash")
-	ErrInvalidSha3Uncles            = errors.New("invalid sha3 uncles")
-	ErrWrongDifficulty              = errors.New("wrong difficulty")
-	ErrParentCommittedSealsNotFound = errors.New("parent committed seals not found")
+	ErrInvalidHookParam           = errors.New("invalid IBFT hook param passed in")
+	ErrProposerSealByNonValidator = errors.New("proposer seal by non-validator")
+	ErrInvalidMixHash             = errors.New("invalid mixhash")
+	ErrInvalidSha3Uncles          = errors.New("invalid sha3 uncles")
+	ErrWrongDifficulty            = errors.New("wrong difficulty")
 )
 
 type txPoolInterface interface {
-	Prepare()
+	Prepare(uint64)
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
