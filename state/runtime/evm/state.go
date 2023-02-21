@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -113,7 +114,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 		return false
 	}
 
-	return c.bitmap.isSet(uint(udest))
+	return c.bitmap.isSet(udest)
 }
 
 func (c *state) Halt() {
@@ -297,7 +298,7 @@ func (c *state) Len() int {
 // consumes gas if memory needs to be expanded
 func (c *state) allocateMemory(offset, size *big.Int) bool {
 	if !offset.IsUint64() || !size.IsUint64() {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return false
 	}
@@ -310,7 +311,7 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 	s := size.Uint64()
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return false
 	}
@@ -328,19 +329,10 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 		}
 
 		// resize the memory
-		c.memory = extendByteSlice(c.memory, int(w*32))
+		c.memory = common.ExtendByteSlice(c.memory, int(w*32))
 	}
 
 	return true
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-
-	return b[:needLen]
 }
 
 func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {

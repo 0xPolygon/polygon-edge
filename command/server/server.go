@@ -221,6 +221,13 @@ func setFlags(cmd *cobra.Command) {
 		"write all logs to the file at specified location instead of writing them to console",
 	)
 
+	cmd.Flags().BoolVar(
+		&params.rawConfig.Relayer,
+		relayerFlag,
+		defaultConfig.Relayer,
+		"start the state sync relayer service (PolyBFT only)",
+	)
+
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)

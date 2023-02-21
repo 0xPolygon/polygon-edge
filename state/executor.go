@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	spuriousDragonMaxCodeSize = 24576
+	SpuriousDragonMaxCodeSize = 24576
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
@@ -37,7 +38,8 @@ type Executor struct {
 	state   State
 	GetHash GetHashByNumberHelper
 
-	PostHook func(txn *Transition)
+	PostHook        func(txn *Transition)
+	GenesisPostHook func(*Transition) error
 }
 
 // NewExecutor creates a new executor
@@ -52,6 +54,21 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(snap)
+	config := e.config.Forks.At(0)
+
+	env := runtime.TxContext{
+		ChainID: e.config.ChainID,
+	}
+
+	transition := &Transition{
+		logger:      e.logger,
+		ctx:         env,
+		state:       txn,
+		auxState:    e.state,
+		gasPool:     uint64(env.GasLimit),
+		config:      config,
+		precompiles: precompiled.NewPrecompiled(),
+	}
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -68,6 +85,12 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 
 		for key, value := range account.Storage {
 			txn.SetState(addr, key, value)
+		}
+	}
+
+	if e.GenesisPostHook != nil {
+		if err := e.GenesisPostHook(transition); err != nil {
+			panic(fmt.Errorf("Error writing genesis block: %w", err))
 		}
 	}
 
@@ -146,7 +169,7 @@ func (e *Executor) BeginTxn(
 		Number:     int64(header.Number),
 		Difficulty: types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		GasLimit:   int64(header.GasLimit),
-		ChainID:    int64(e.config.ChainID),
+		ChainID:    e.config.ChainID,
 	}
 
 	txn := &Transition{
@@ -217,7 +240,7 @@ var emptyFrom = types.Address{}
 func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-	if txn.From == emptyFrom {
+	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
 		// Decrypt the from address
 		from, err := signer.Sender(txn)
 		if err != nil {
@@ -229,6 +252,7 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
+		TransactionType:   txn.Type,
 		TxHash:            txn.Hash,
 		Logs:              t.state.Logs(),
 	}
@@ -246,11 +270,12 @@ func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
-
 	var err error
-	if txn.From == emptyFrom {
+
+	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
 		// Decrypt the from address
+		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
+
 		txn.From, err = signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
@@ -273,6 +298,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
+		TransactionType:   txn.Type,
 		TxHash:            txn.Hash,
 		GasUsed:           result.GasUsed,
 	}
@@ -412,28 +438,17 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	// First check this message satisfies all consensus rules before
-	// applying the message. The rules include these clauses
-	//
-	// 1. the nonce of the message caller is correct
-	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-	// 3. the amount of gas required is available in the block
-	// 4. there is no overflow when calculating intrinsic gas
-	// 5. the purchased gas is enough to cover intrinsic usage
-	// 6. caller has enough balance to cover asset transfer for **topmost** call
-	txn := t.state
-
-	// 1. the nonce of the message caller is correct
-	if err := t.nonceCheck(msg); err != nil {
-		return nil, NewTransitionApplicationError(err, true)
+	if msg.Type == types.StateTx {
+		if err := checkAndProcessStateTx(msg, t); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := checkAndProcessLegacyTx(msg, t); err != nil {
+			return nil, err
+		}
 	}
 
-	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
-	if err := t.subGasLimitPrice(msg); err != nil {
-		return nil, NewTransitionApplicationError(err, true)
-	}
-
-	// 3. the amount of gas required is available in the block
+	// the amount of gas required is available in the block
 	if err := t.subGasPool(msg.Gas); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
@@ -448,22 +463,17 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		return nil, NewTransitionApplicationError(err, false)
 	}
 
-	// 5. the purchased gas is enough to cover intrinsic usage
+	// the purchased gas is enough to cover intrinsic usage
 	gasLeft := msg.Gas - intrinsicGasCost
-	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
+	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasLeft > msg.Gas {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
-	}
-
-	// 6. caller has enough balance to cover asset transfer for **topmost** call
-	if balance := txn.GetBalance(msg.From); balance.Cmp(msg.Value) < 0 {
-		return nil, NewTransitionApplicationError(ErrNotEnoughFunds, true)
 	}
 
 	gasPrice := new(big.Int).Set(msg.GasPrice)
 	value := new(big.Int).Set(msg.Value)
 
-	// Set the specific transaction fields in the context
+	// set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
@@ -471,11 +481,11 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
-		txn.IncrNonce(msg.From)
+		t.state.IncrNonce(msg.From)
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
-	refund := txn.GetRefund()
+	refund := t.state.GetRefund()
 	result.UpdateGasUsed(msg.Gas, refund)
 
 	if t.ctx.Tracer != nil {
@@ -483,12 +493,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// refund the sender
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
-	txn.AddBalance(msg.From, remaining)
+	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice)
+	t.state.AddBalance(msg.From, remaining)
 
 	// pay the coinbase
-	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), gasPrice)
-	txn.AddBalance(t.ctx.Coinbase, coinbaseFee)
+	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), msg.GasPrice)
+	t.state.AddBalance(t.ctx.Coinbase, coinbaseFee)
 
 	// return gas to the pool
 	t.addGasPool(result.GasLeft)
@@ -535,7 +545,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 }
 
-func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
+func (t *Transition) Transfer(from, to types.Address, amount *big.Int) error {
 	if amount == nil {
 		return nil
 	}
@@ -570,7 +580,7 @@ func (t *Transition) applyCall(
 
 	if callType == runtime.Call {
 		// Transfers only allowed on calls
-		if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+		if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
 				Err:     err,
@@ -640,7 +650,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Transfer the value
-	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
+	if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
 			Err:     err,
@@ -663,7 +673,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		return result
 	}
 
-	if t.config.EIP158 && len(result.ReturnValue) > spuriousDragonMaxCodeSize {
+	if t.config.EIP158 && len(result.ReturnValue) > SpuriousDragonMaxCodeSize {
 		// Contract size exceeds 'SpuriousDragon' size limit
 		t.state.RevertToSnapshot(snapshot)
 
@@ -690,6 +700,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	result.GasLeft -= gasCost
+	result.Address = c.Address
 	t.state.SetCode(c.Address, result.ReturnValue)
 
 	return result
@@ -851,6 +862,56 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	}
 
 	return cost, nil
+}
+
+// checkAndProcessLegacyTx - first check if this message satisfies all consensus rules before
+// applying the message. The rules include these clauses:
+// 1. the nonce of the message caller is correct
+// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+func checkAndProcessLegacyTx(msg *types.Transaction, t *Transition) error {
+	// 1. the nonce of the message caller is correct
+	if err := t.nonceCheck(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice)
+	if err := t.subGasLimitPrice(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
+	}
+
+	return nil
+}
+
+func checkAndProcessStateTx(msg *types.Transaction, t *Transition) error {
+	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
+		return NewTransitionApplicationError(
+			errors.New("gasPrice of state transaction must be zero"),
+			true,
+		)
+	}
+
+	if msg.Gas != types.StateTransactionGasLimit {
+		return NewTransitionApplicationError(
+			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
+			true,
+		)
+	}
+
+	if msg.From != contracts.SystemCaller {
+		return NewTransitionApplicationError(
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
+			true,
+		)
+	}
+
+	if msg.To == nil || *msg.To == types.ZeroAddress {
+		return NewTransitionApplicationError(
+			errors.New("to of state transaction must be specified"),
+			true,
+		)
+	}
+
+	return nil
 }
 
 // captureCallStart calls CallStart in Tracer if context has the tracer

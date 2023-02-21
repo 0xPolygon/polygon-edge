@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	loggerName = "snapshot_validator_set"
+	loggerName      = "snapshot_validator_set"
+	preservedEpochs = 2
 )
 
 // SignerInterface is an interface of the Signer SnapshotValidatorStore calls
@@ -519,12 +520,15 @@ func (s *SnapshotValidatorStore) resetSnapshot(
 func (s *SnapshotValidatorStore) removeLowerSnapshots(
 	currentHeight uint64,
 ) {
-	// remove in-memory snapshots from two epochs before this one
-	lowerEpoch := int(currentHeight/s.epochSize) - 2
-	if lowerEpoch > 0 {
-		purgeBlock := uint64(lowerEpoch) * s.epochSize
-		s.store.deleteLower(purgeBlock)
+	currentEpoch := currentHeight / s.epochSize
+	if currentEpoch < preservedEpochs {
+		return
 	}
+
+	// remove in-memory snapshots from two epochs before this one
+	lowerEpoch := currentEpoch - preservedEpochs
+	purgeBlock := lowerEpoch * s.epochSize
+	s.store.deleteLower(purgeBlock)
 }
 
 // processVote processes vote in the given header and update snapshot

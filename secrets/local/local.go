@@ -66,7 +66,7 @@ func (l *LocalSecretsManager) Setup() error {
 	subDirectories := []string{secrets.ConsensusFolderLocal, secrets.NetworkFolderLocal}
 
 	// Set up the local directories
-	if err := common.SetupDataDir(l.path, subDirectories); err != nil {
+	if err := common.SetupDataDir(l.path, subDirectories, 0770); err != nil {
 		return err
 	}
 
@@ -140,7 +140,7 @@ func (l *LocalSecretsManager) SetSecret(name string, value []byte) error {
 		)
 	}
 	// Write the secret to disk
-	if err := os.WriteFile(secretPath, value, os.ModePerm); err != nil {
+	if err := common.SaveFileSafe(secretPath, value, 0440); err != nil {
 		return fmt.Errorf(
 			"unable to write secret to disk (%s), %w",
 			secretPath,

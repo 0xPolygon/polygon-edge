@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -82,7 +83,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		LibP2PPort:    ports[1].Port(),
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
-		Signer:        crypto.NewEIP155Signer(100),
+		Signer:        crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100),
 		ValidatorType: validators.ECDSAValidatorType,
 	}
 
@@ -195,6 +196,7 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
+	args = append(args, "--insecure")
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir

@@ -6,17 +6,21 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -111,7 +115,7 @@ type result struct {
 func TestAddTxErrors(t *testing.T) {
 	t.Parallel()
 
-	poolSigner := crypto.NewEIP155Signer(100)
+	poolSigner := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -508,7 +512,7 @@ func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
 
 	key, sender := tests.GenerateKeyAndAddr(t)
-	signer := crypto.NewEIP155Signer(uint64(100))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(100))
 	tx := newTx(types.ZeroAddress, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
@@ -1650,9 +1654,9 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 func TestPermissionSmartContractDeployment(t *testing.T) {
 	t.Parallel()
 
-	signer := crypto.NewEIP155Signer(uint64(100))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(100))
 
-	poolSigner := crypto.NewEIP155Signer(100)
+	poolSigner := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -1711,6 +1715,44 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 			ErrSmartContractRestricted,
 		)
 	})
+
+	t.Run("Input larger then the MaxInitCodeSize", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.EIP158 = true
+
+		input := make([]byte, state.SpuriousDragonMaxCodeSize+1)
+		_, err := rand.Read(input)
+		require.NoError(t, err)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+		tx.Input = input
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			runtime.ErrMaxCodeSizeExceeded,
+		)
+	})
+
+	t.Run("Input the same as MaxInitCodeSize", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.EIP158 = true
+
+		input := make([]byte, state.SpuriousDragonMaxCodeSize)
+		_, err := rand.Read(input)
+		require.NoError(t, err)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.To = nil
+		tx.Input = input
+
+		assert.NoError(t,
+			pool.validateTx(signTx(tx)),
+			runtime.ErrMaxCodeSizeExceeded,
+		)
+	})
 }
 
 /* "Integrated" tests */
@@ -1766,7 +1808,7 @@ func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Trans
 	return signedTx
 }
 
-var signerEIP155 = crypto.NewEIP155Signer(100)
+var signerEIP155 = crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 func TestResetAccounts_Promoted(t *testing.T) {
 	t.Parallel()
@@ -2727,5 +2769,75 @@ func TestSetSealing(t *testing.T) {
 				pool.getSealing(),
 			)
 		})
+	}
+}
+
+func TestBatchTx_SingleAccount(t *testing.T) {
+	t.Parallel()
+
+	_, addr := tests.GenerateKeyAndAddr(t)
+
+	pool, err := newTestPool()
+	assert.NoError(t, err)
+
+	pool.SetSigner(&mockSigner{})
+
+	// start event handler goroutines
+	pool.Start()
+	defer pool.Close()
+
+	// subscribe to enqueue and promote events
+	subscription := pool.eventManager.subscribe([]proto.EventType{proto.EventType_ENQUEUED, proto.EventType_PROMOTED})
+	defer pool.eventManager.cancelSubscription(subscription.subscriptionID)
+
+	txHashMap := map[types.Hash]struct{}{}
+	// mutex for txHashMap
+	mux := &sync.RWMutex{}
+
+	// run max number of addTx concurrently
+	for i := 0; i < int(defaultMaxAccountEnqueued); i++ {
+		go func(i uint64) {
+			tx := newTx(addr, i, 1)
+
+			tx.ComputeHash()
+
+			// add transaction hash to map
+			mux.Lock()
+			txHashMap[tx.Hash] = struct{}{}
+			mux.Unlock()
+
+			// submit transaction to pool
+			pool.addTx(local, tx)
+		}(uint64(i))
+	}
+
+	enqueuedCount := 0
+	promotedCount := 0
+
+	// wait for all the submitted transactions to be promoted
+	for {
+		ev := <-subscription.subscriptionChannel
+
+		// check if valid transaction hash
+		mux.Lock()
+		_, hashExists := txHashMap[types.StringToHash(ev.TxHash)]
+		mux.Unlock()
+
+		assert.True(t, hashExists)
+
+		// increment corresponding event type's count
+		if ev.Type == proto.EventType_ENQUEUED {
+			enqueuedCount++
+		} else if ev.Type == proto.EventType_PROMOTED {
+			promotedCount++
+		}
+
+		if enqueuedCount == int(defaultMaxAccountEnqueued) && promotedCount == int(defaultMaxAccountEnqueued) {
+			// compare local tracker to pool internal
+			assert.Equal(t, defaultMaxAccountEnqueued, pool.Length())
+
+			// all transactions are promoted
+			break
+		}
 	}
 }

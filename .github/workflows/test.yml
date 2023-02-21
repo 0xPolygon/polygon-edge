@@ -5,9 +5,9 @@ on:  # yamllint disable-line rule:truthy
   workflow_call:
     secrets:
       SONAR_TOKEN:
-        required: true
+        required: false
       SONAR_HOST_URL:
-        required: true
+        required: false
 
 jobs:
   go_test:
@@ -24,27 +24,29 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Dependencies
+        run: ./setup-ci.sh
+
       - name: Run Go Test
         run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
-
-      - name: Upload coverage file to Codecov
-        uses: codecov/codecov-action@v3
-        with:
-          files: coverage.out
       
       # Triggering SonarQube analysis as results of it are required by Quality Gate check.
       - name: SonarQube Scan
+        if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
         uses: sonarsource/sonarqube-scan-action@master
         env:
+          HAVE_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
       # Check the Quality Gate status.
       - name: SonarQube Quality Gate check
         id: sonarqube-quality-gate-check
+        if: ${{ env.HAVE_SONAR_TOKEN == 'true' }}
         uses: sonarsource/sonarqube-quality-gate-action@master
         # Force to fail step after specific time.
         timeout-minutes: 5
         env:
+          HAVE_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}

@@ -1,13 +1,13 @@
 package crypto
 
 import (
-	"bytes"
 	goCrypto "crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"hash"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -20,16 +20,14 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-var (
-	big1 = big.NewInt(1)
-)
-
 // S256 is the secp256k1 elliptic curve
 var S256 = btcec.S256()
 
 var (
-	secp256k1N = hex.MustDecodeHex("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141")
-	one        = []byte{0x01}
+	secp256k1N, _  = new(big.Int).SetString("fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141", 16)
+	secp256k1NHalf = new(big.Int).Div(secp256k1N, big.NewInt(2))
+	zero           = big.NewInt(0)
+	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
 )
@@ -45,43 +43,38 @@ var (
 	errInvalidSignature = errors.New("invalid signature")
 )
 
-func trimLeftZeros(b []byte) []byte {
-	i := 0
-	for i = range b {
-		if b[i] != 0 {
-			break
-		}
-	}
-
-	return b[i:]
+// KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
+// Read to get a variable amount of data from the hash state. Read is faster than Sum
+// because it doesn't copy the internal state, but also modifies the internal state.
+type KeccakState interface {
+	hash.Hash
+	Read([]byte) (int, error)
 }
 
 // ValidateSignatureValues checks if the signature values are correct
-func ValidateSignatureValues(v byte, r, s *big.Int) bool {
-	// TODO: ECDSA malleability
+func ValidateSignatureValues(v, r, s *big.Int, isHomestead bool) bool {
+	// r & s must not be nil
 	if r == nil || s == nil {
 		return false
 	}
 
-	if v > 1 {
+	// r & s must be positive integer
+	if r.Cmp(one) < 0 || s.Cmp(one) < 0 {
 		return false
 	}
 
-	rr := r.Bytes()
-	rr = trimLeftZeros(rr)
-
-	if bytes.Compare(rr, secp256k1N) >= 0 || bytes.Compare(rr, one) < 0 {
+	// v must be 0 or 1
+	if v.Cmp(zero) == -1 || v.Cmp(one) == 1 {
 		return false
 	}
 
-	ss := s.Bytes()
-	ss = trimLeftZeros(ss)
-
-	if bytes.Compare(ss, secp256k1N) >= 0 || bytes.Compare(ss, one) < 0 {
-		return false
+	// From Homestead, s must be less or equal than secp256k1n/2
+	if isHomestead {
+		return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1NHalf) <= 0
 	}
 
-	return true
+	// In Frontier, r and s must be less than secp256k1n
+	return r.Cmp(secp256k1N) < 0 && s.Cmp(secp256k1N) < 0
 }
 
 var addressPool fastrlp.ArenaPool
@@ -248,6 +241,24 @@ func Keccak256(v ...[]byte) []byte {
 	}
 
 	return h.Sum(nil)
+}
+
+// Keccak256Hash calculates and returns the Keccak256 hash of the input data,
+// converting it to an internal Hash data structure.
+func Keccak256Hash(v ...[]byte) (hash types.Hash) {
+	h := NewKeccakState()
+	for _, b := range v {
+		h.Write(b)
+	}
+
+	h.Read(hash[:])
+
+	return hash
+}
+
+// NewKeccakState creates a new KeccakState
+func NewKeccakState() KeccakState {
+	return sha3.NewLegacyKeccak256().(KeccakState) //nolint:forcetypeassert
 }
 
 // PubKeyToAddress returns the Ethereum address of a public key

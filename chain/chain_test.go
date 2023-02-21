@@ -2,11 +2,13 @@ package chain
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/require"
 )
 
 var emptyAddr types.Address
@@ -147,6 +149,51 @@ func TestGenesisX(t *testing.T) {
 			} else if !reflect.DeepEqual(dec, c.output) {
 				t.Fatal("bad")
 			}
+		})
+	}
+}
+
+func TestGetGenesisAccountBalance(t *testing.T) {
+	t.Parallel()
+
+	testAddr := types.Address{0x2}
+	cases := []struct {
+		name            string
+		address         types.Address
+		allocs          map[types.Address]*GenesisAccount
+		expectedBalance *big.Int
+		shouldFail      bool
+	}{
+		{
+			name:    "Query existing account",
+			address: testAddr,
+			allocs: map[types.Address]*GenesisAccount{
+				testAddr: {Balance: big.NewInt(50)},
+			},
+			expectedBalance: big.NewInt(50),
+			shouldFail:      false,
+		},
+		{
+			name:            "Query non-existing account",
+			address:         testAddr,
+			allocs:          nil,
+			expectedBalance: nil,
+			shouldFail:      true,
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			actualBalance, err := GetGenesisAccountBalance(c.address, c.allocs)
+			if c.shouldFail {
+				require.Equal(t, err.Error(), fmt.Errorf("genesis account %s is not found among genesis allocations", c.address).Error())
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, c.expectedBalance, actualBalance)
 		})
 	}
 }

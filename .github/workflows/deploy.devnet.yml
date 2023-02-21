@@ -28,6 +28,9 @@ jobs:
     name: Test
     uses: ./.github/workflows/test.yml
     needs: build
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   container_image_build:
     name: Build/Push Container Image
@@ -51,7 +54,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -85,13 +88,13 @@ jobs:
           name: polygon-edge
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Notify Slack
-        uses: slackapi/slack-github-action@v1.22.0
+        uses: slackapi/slack-github-action@v1.23.0
         if: false
         continue-on-error: true
         env:
@@ -171,7 +174,7 @@ jobs:
           echo "Devnet Deployment Complete"
 
       - name: Notify Slack - Failures
-        uses: slackapi/slack-github-action@v1.22.0
+        uses: slackapi/slack-github-action@v1.23.0
         if: ${{ job.status != 'success' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/0xPolygon/polygon-edge/command/backup"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -11,13 +13,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/license"
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
+	"github.com/0xPolygon/polygon-edge/command/polybft"
+	"github.com/0xPolygon/polygon-edge/command/polybftmanifest"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/command/rootchain"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
 	"github.com/0xPolygon/polygon-edge/command/whitelist"
-	"github.com/spf13/cobra"
 )
 
 type RootCommand struct {
@@ -45,6 +50,7 @@ func (rc *RootCommand) registerSubCommands() {
 		status.GetCommand(),
 		secrets.GetCommand(),
 		peers.GetCommand(),
+		rootchain.GetCommand(),
 		monitor.GetCommand(),
 		ibft.GetCommand(),
 		backup.GetCommand(),
@@ -52,6 +58,9 @@ func (rc *RootCommand) registerSubCommands() {
 		server.GetCommand(),
 		whitelist.GetCommand(),
 		license.GetCommand(),
+		polybftsecrets.GetCommand(),
+		polybft.GetCommand(),
+		polybftmanifest.GetCommand(),
 	)
 }
 

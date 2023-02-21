@@ -15,6 +15,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
@@ -32,6 +36,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
@@ -70,6 +75,9 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
+
+	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
+	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
 }
 
 var dirPaths = []string{
@@ -136,7 +144,7 @@ func NewServer(config *Config) (*Server, error) {
 	m.logger.Info("Data dir", "path", config.DataDir)
 
 	// Generate all the paths in the dataDir
-	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
@@ -186,12 +194,18 @@ func NewServer(config *Config) (*Server, error) {
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
+	// custom write genesis hook per consensus engine
+	engineName := m.config.Chain.Params.GetEngine()
+	if factory, exists := genesisCreationFactory[ConsensusType(engineName)]; exists {
+		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
+	}
+
 	// compute the genesis root state
 	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
 
 	// blockchain object
 	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
@@ -275,6 +289,13 @@ func NewServer(config *Config) (*Server, error) {
 	// start consensus
 	if err := m.consensus.Start(); err != nil {
 		return nil, err
+	}
+
+	// start relayer
+	if config.Relayer {
+		if err := m.setupRelayer(); err != nil {
+			return nil, err
+		}
 	}
 
 	m.txpool.Start()
@@ -430,6 +451,29 @@ func (s *Server) setupConsensus() error {
 	return nil
 }
 
+// setupRelayer sets up the relayer
+func (s *Server) setupRelayer() error {
+	account, err := wallet.NewAccountFromSecret(s.secretsManager)
+	if err != nil {
+		return fmt.Errorf("failed to create account from secret: %w", err)
+	}
+
+	relayer := statesyncrelayer.NewRelayer(
+		s.config.DataDir,
+		s.config.JSONRPC.JSONRPCAddr.String(),
+		ethgo.Address(contracts.StateReceiverContract),
+		s.logger.Named("relayer"),
+		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
+	)
+
+	// start relayer
+	if err := relayer.Start(); err != nil {
+		return fmt.Errorf("failed to start relayer: %w", err)
+	}
+
+	return nil
+}
+
 type jsonRPCHub struct {
 	state              state.State
 	restoreProgression *progress.ProgressionWrapper
@@ -439,6 +483,7 @@ type jsonRPCHub struct {
 	*state.Executor
 	*network.Server
 	consensus.Consensus
+	consensus.BridgeDataProvider
 }
 
 func (j *jsonRPCHub) GetPeers() int {
@@ -659,6 +704,7 @@ func (s *Server) setupJSONRPC() error {
 		Executor:           s.executor,
 		Consensus:          s.consensus,
 		Server:             s.network,
+		BridgeDataProvider: s.consensus.GetBridgeProvider(),
 	}
 
 	conf := &jsonrpc.Config{
@@ -740,10 +786,15 @@ func (s *Server) Close() {
 		}
 	}
 
-	// close the txpool's main loop
+	// Stop state sync relayer
+	if s.stateSyncRelayer != nil {
+		s.stateSyncRelayer.Stop()
+	}
+
+	// Close the txpool's main loop
 	s.txpool.Close()
 
-	// close DataDog profiler
+	// Close DataDog profiler
 	s.closeDataDogProfiler()
 }
 

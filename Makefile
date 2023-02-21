@@ -1,6 +1,6 @@
 
-.PHONY: download-spec-tests
-download-spec-tests:
+.PHONY: download-submodules
+download-submodules:
 	git submodule init
 	git submodule update
 
@@ -11,10 +11,11 @@ bindata:
 .PHONY: protoc
 protoc:
 	protoc --go_out=. --go-grpc_out=. ./server/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
+	#protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./network/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
 	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
+	protoc --go_out=. --go-grpc_out=. ./consensus/polybft/**/*.proto
 
 .PHONY: build
 build:
@@ -39,7 +40,7 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	go test -timeout=20m `go list ./... | grep -v e2e`
+	go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
 
 .PHONY: test-e2e
 test-e2e:
@@ -49,11 +50,18 @@ test-e2e:
 	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
-.PHONY: run-local
-run-local:
-	docker-compose -f ./docker/local/docker-compose.yml up -d --build
+.PHONY: test-e2e-polybft
+test-e2e-polybft:
+    # We can not build with race because of a bug in boltdb dependency
+	go build -o artifacts/polygon-edge .
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/...
 
-.PHONY: stop-local
-stop-local:
-	docker-compose -f ./docker/local/docker-compose.yml stop
+.PHONY: compile-core-contracts
+compile-core-contracts:
+	cd core-contracts && npm install && npm run compile
+	$(MAKE) generate-smart-contract-bindings
 
+.PHONY: generate-smart-contract-bindings
+generate-smart-contract-bindings:
+	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
+	go run ./consensus/polybft/contractsapi/bindings-gen/main.go

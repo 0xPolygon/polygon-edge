@@ -232,13 +232,14 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 	}
 }
 
-func Test_packCommittedSealsIntoExtra(t *testing.T) {
+func Test_packCommittedSealsAndRoundNumberIntoExtra(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name              string
 		extra             *IstanbulExtra
 		newCommittedSeals Seals
+		roundNumber       *uint64
 	}{
 		{
 			name: "ECDSAExtra",
@@ -260,6 +261,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 				[]byte{0x3},
 				[]byte{0x4},
 			},
+			roundNumber: nil,
 		},
 		{
 			name: "ECDSAExtra without ParentCommittedSeals",
@@ -277,6 +279,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 				[]byte{0x3},
 				[]byte{0x4},
 			},
+			roundNumber: nil,
 		},
 		{
 			name: "BLSExtra",
@@ -298,6 +301,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 				Bitmap:    new(big.Int).SetBytes([]byte{0xa}),
 				Signature: []byte{0x2},
 			},
+			roundNumber: nil,
 		},
 		{
 			name: "BLSExtra without ParentCommittedSeals",
@@ -319,6 +323,7 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 				Bitmap:    new(big.Int).SetBytes([]byte{0xa}),
 				Signature: []byte{0x2},
 			},
+			roundNumber: nil,
 		},
 	}
 
@@ -336,13 +341,14 @@ func Test_packCommittedSealsIntoExtra(t *testing.T) {
 			test.extra.CommittedSeals = originalCommittedSeals
 
 			// update committed seals
-			newExtraBytes := packCommittedSealsIntoExtra(
+			newExtraBytes := packCommittedSealsAndRoundNumberIntoExtra(
 				// prepend IstanbulExtraHeader
 				append(
 					make([]byte, IstanbulExtraVanity),
 					test.extra.MarshalRLPTo(nil)...,
 				),
 				test.newCommittedSeals,
+				test.roundNumber,
 			)
 
 			// decode RLP data

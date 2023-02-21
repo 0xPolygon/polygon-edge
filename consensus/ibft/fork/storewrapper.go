@@ -1,6 +1,8 @@
 package fork
 
 import (
+	"encoding/json"
+	"errors"
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
@@ -10,6 +12,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
 	"github.com/hashicorp/go-hclog"
 )
+
+// isJSONSyntaxError returns bool indicating the giving error is json.SyntaxError or not
+func isJSONSyntaxError(err error) bool {
+	var expected *json.SyntaxError
+
+	if err == nil {
+		return false
+	}
+
+	return errors.As(err, &expected)
+}
 
 // SnapshotValidatorStoreWrapper is a wrapper of store.SnapshotValidatorStore
 // in order to add initialization and closer process with side effect
@@ -51,13 +64,26 @@ func NewSnapshotValidatorStoreWrapper(
 	dirPath string,
 	epochSize uint64,
 ) (*SnapshotValidatorStoreWrapper, error) {
-	snapshotMeta, err := loadSnapshotMetadata(filepath.Join(dirPath, snapshotMetadataFilename))
-	if err != nil {
+	var (
+		snapshotMetadataPath = filepath.Join(dirPath, snapshotMetadataFilename)
+		snapshotsPath        = filepath.Join(dirPath, snapshotSnapshotsFilename)
+	)
+
+	snapshotMeta, err := loadSnapshotMetadata(snapshotMetadataPath)
+	if isJSONSyntaxError(err) {
+		logger.Warn("Snapshot metadata file is broken, recover metadata from local chain", "filepath", snapshotMetadataPath)
+
+		snapshotMeta = nil
+	} else if err != nil {
 		return nil, err
 	}
 
-	snapshots, err := loadSnapshots(filepath.Join(dirPath, snapshotSnapshotsFilename))
-	if err != nil {
+	snapshots, err := loadSnapshots(snapshotsPath)
+	if isJSONSyntaxError(err) {
+		logger.Warn("Snapshots file is broken, recover snapshots from local chain", "filepath", snapshotsPath)
+
+		snapshots = nil
+	} else if err != nil {
 		return nil, err
 	}
 

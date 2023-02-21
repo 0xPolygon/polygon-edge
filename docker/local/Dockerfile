@@ -17,6 +17,7 @@ WORKDIR /polygon-edge
 
 COPY --from=builder /polygon-edge/polygon-edge ./
 COPY ./docker/local/polygon-edge.sh ./
+COPY ./core-contracts/artifacts ./core-contracts/artifacts
 
 # Expose json-rpc, libp2p and grpc ports
 EXPOSE 8545 9632 1478 5001

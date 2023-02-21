@@ -158,7 +158,7 @@ func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address,
 	return crypto.PubKeyToAddress(&privateKey.PublicKey), nil
 }
 
-// LoadValidatorAddress loads BLS key by SecretsManager and returns BLS Public Key
+// LoadBLSPublicKey loads BLS key by SecretsManager and returns BLS Public Key
 func LoadBLSPublicKey(secretsManager secrets.SecretsManager) (string, error) {
 	if !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
 		return "", nil
@@ -206,7 +206,7 @@ func LoadNodeID(secretsManager secrets.SecretsManager) (string, error) {
 	return nodeID.String(), nil
 }
 
-// GetCloudSecretsManager returns the cloud secrets manager from the provided config
+// InitCloudSecretsManager returns the cloud secrets manager from the provided config
 func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secrets.SecretsManager, error) {
 	var secretsManager secrets.SecretsManager
 

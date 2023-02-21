@@ -15,7 +15,9 @@ jobs:
       E2E_LOGS: true
       CI_VERBOSE: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - name: Install Go
         uses: actions/setup-go@v3
         with:
