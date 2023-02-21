@@ -22,6 +22,7 @@ var (
 	System              *artifact.Artifact
 	Merkle              *artifact.Artifact
 	ChildValidatorSet   *artifact.Artifact
+	NativeERC20         *artifact.Artifact
 	StateReceiver       *artifact.Artifact
 	ChildERC20          *artifact.Artifact
 	ChildERC20Predicate *artifact.Artifact
@@ -98,6 +99,11 @@ func init() {
 	}
 
 	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
+	if err != nil {
+		panic(err)
+	}
+
+	NativeERC20, err = artifact.DecodeArtifact([]byte(NativeERC20Artifact))
 	if err != nil {
 		panic(err)
 	}
