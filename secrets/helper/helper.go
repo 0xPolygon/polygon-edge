@@ -166,10 +166,7 @@ func InitValidatorBLSSignature(
 	}
 
 	// Write the signature to the secrets manager storage
-	if setErr := secretsManager.SetSecret(
-		secrets.ValidatorBLSSignature,
-		[]byte(hex.EncodeToString(sb)),
-	); setErr != nil {
+	if setErr := secretsManager.SetSecret(secrets.ValidatorBLSSignature, sb); setErr != nil {
 		return nil, setErr
 	}
 
