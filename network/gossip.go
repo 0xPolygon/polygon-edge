@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"sync/atomic"
 
@@ -85,7 +86,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{},
 		msg, err := sub.Next(ctx)
 		if err != nil {
 			// Above cancelFn() called.
-			if err == ctx.Err() {
+			if errors.Is(err, ctx.Err()) {
 				break
 			}
 

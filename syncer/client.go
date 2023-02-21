@@ -212,6 +212,7 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 
 	if atomic.LoadUint64(m.closed) > 0 {
 		m.logger.Debug("received status from peer after client was closed, ignoring", "id", from)
+
 		return
 	}
 
@@ -258,6 +259,7 @@ func (m *syncPeerClient) startPeerEventProcess() {
 	peerEventCh, err := m.network.SubscribeCh(context.Background())
 	if err != nil {
 		m.logger.Error("failed to subscribe", "err", err)
+
 		return
 	}
 
