@@ -80,7 +80,8 @@ const (
 	DefaultJSONRPCBlockRangeLimit uint64 = 1000
 
 	// DefaultBlockFinalityDepth minimal number of child blocks required for the parent block to be considered final
-	DefaultBlockFinalityDepth uint64 = 100
+	// on ethereum epoch lasts for 32 blocks. more details: https://www.alchemy.com/overviews/ethereum-commitment-levels
+	DefaultBlockFinalityDepth uint64 = 64
 )
 
 // DefaultConfig returns the default server configuration

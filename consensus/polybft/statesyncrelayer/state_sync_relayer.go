@@ -87,7 +87,7 @@ func (r *StateSyncRelayer) Start() error {
 		r.rpcEndpoint,
 		r.stateReceiverAddr,
 		r,
-		0, // our (side-chain) is instant finality POS, so no need to wait
+		0, // sidechain (Polygon POS) is instant finality, so no need to wait
 		r.logger,
 	)
 

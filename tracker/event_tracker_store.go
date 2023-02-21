@@ -2,10 +2,10 @@ package tracker
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/tracker/store"
@@ -15,9 +15,10 @@ import (
 var _ store.Store = (*EventTrackerStore)(nil)
 
 var (
-	dbLogs          = []byte("logs")
-	dbConf          = []byte("conf")
-	dbNextToProcess = []byte("nextToProcess")
+	dbLogs           = []byte("logs")
+	dbConf           = []byte("conf")
+	dbNextToProcess  = []byte("nextToProcess")
+	nextToProcessKey = []byte("0")
 )
 
 // EventTrackerStore is a tracker store implementation.
@@ -31,7 +32,7 @@ type EventTrackerStore struct {
 // NewEventTrackerStore creates a new EventTrackerStore
 func NewEventTrackerStore(
 	path string,
-	finalizedTrashhold uint64,
+	finalityDepth uint64,
 	notifierCh chan<- []*ethgo.Log,
 	logger hcf.Logger) (*EventTrackerStore, error) {
 	db, err := bolt.Open(path, 0600, nil)
@@ -41,7 +42,7 @@ func NewEventTrackerStore(
 
 	store := &EventTrackerStore{
 		conn:          db,
-		finalityDepth: finalizedTrashhold,
+		finalityDepth: finalityDepth,
 		notifierCh:    notifierCh,
 		logger:        logger,
 	}
@@ -157,7 +158,7 @@ type Entry struct {
 	logger              hcf.Logger
 }
 
-// LastIndex implements the store interface
+// LastIndex implements the store.Entry interface
 func (e *Entry) LastIndex() (uint64, error) {
 	var result uint64
 
@@ -172,12 +173,12 @@ func (e *Entry) LastIndex() (uint64, error) {
 	return result, nil
 }
 
-// StoreLog implements the store interface
+// StoreLog implements the store.Entry interface
 func (e *Entry) StoreLog(log *ethgo.Log) error {
 	return e.StoreLogs([]*ethgo.Log{log})
 }
 
-// StoreLogs implements the store interface
+// StoreLogs implements the store.Entry interface
 // logs are added in sequentional order
 func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 	if len(logs) == 0 {
@@ -198,7 +199,7 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 				return err
 			}
 
-			if err := bucketLogs.Put(itob(logIdx), val); err != nil {
+			if err := bucketLogs.Put(common.EncodeUint64ToBytes(logIdx), val); err != nil {
 				return err
 			}
 		}
@@ -212,6 +213,9 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 	}
 
 	lastBlockNumber = logs[len(logs)-1].BlockNumber
+	if lastBlockNumber <= e.finalityDepth {
+		return nil
+	}
 
 	notifyLogs, lastProcessedIdx, err := e.getFinalizedLogs(lastBlockNumber - e.finalityDepth)
 	if err != nil {
@@ -221,13 +225,13 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 	return e.notifyFinalizedLogs(notifyLogs, lastProcessedIdx)
 }
 
-// RemoveLogs implements the store interface
+// RemoveLogs implements the store.Entry interface
 func (e *Entry) RemoveLogs(indx uint64) error {
 	return e.conn.Update(func(tx *bolt.Tx) error {
 		cursorLogs := tx.Bucket(e.bucketLogs).Cursor()
 
 		// remove logs
-		for k, _ := cursorLogs.Seek(itob(indx)); k != nil; k, _ = cursorLogs.Next() {
+		for k, _ := cursorLogs.Seek(common.EncodeUint64ToBytes(indx)); k != nil; k, _ = cursorLogs.Next() {
 			if err := cursorLogs.Delete(); err != nil {
 				return err
 			}
@@ -237,10 +241,10 @@ func (e *Entry) RemoveLogs(indx uint64) error {
 	})
 }
 
-// GetLog implements the store interface
+// GetLog implements the store.Entry interface
 func (e *Entry) GetLog(idx uint64, log *ethgo.Log) error {
 	return e.conn.View(func(tx *bolt.Tx) error {
-		val := tx.Bucket(e.bucketLogs).Get(itob(idx))
+		val := tx.Bucket(e.bucketLogs).Get(common.EncodeUint64ToBytes(idx))
 		if val == nil {
 			return fmt.Errorf("log not found: %d", idx)
 		}
@@ -279,7 +283,7 @@ func (e *Entry) getFinalizedLogs(untilBlockNumber uint64) ([]*ethgo.Log, uint64,
 			}
 
 			logs = append(logs, log)
-			lastProcessedIdx = btoi(key)
+			lastProcessedIdx = common.EncodeBytesToUint64(key)
 		}
 
 		return nil
@@ -298,7 +302,7 @@ func (e *Entry) notifyFinalizedLogs(logs []*ethgo.Log, lastProcessedIdx uint64) 
 	e.logger.Info("notify event logs", "len", len(logs), "last processed", lastProcessedIdx)
 
 	if err := e.conn.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(e.bucketNextToProcess).Put([]byte("0"), itob(lastProcessedIdx+1))
+		return tx.Bucket(e.bucketNextToProcess).Put(nextToProcessKey, common.EncodeUint64ToBytes(lastProcessedIdx+1))
 	}); err != nil {
 		return err
 	}
@@ -313,19 +317,8 @@ func (e *Entry) notifyFinalizedLogs(logs []*ethgo.Log, lastProcessedIdx uint64) 
 
 func getLastIndex(bucket *bolt.Bucket) uint64 {
 	if last, _ := bucket.Cursor().Last(); last != nil {
-		return btoi(last) + 1
+		return common.EncodeBytesToUint64(last) + 1
 	}
 
 	return 0
-}
-
-func btoi(b []byte) uint64 {
-	return binary.BigEndian.Uint64(b)
-}
-
-func itob(u uint64) []byte {
-	buf := [8]byte{}
-	binary.BigEndian.PutUint64(buf[:], u)
-
-	return buf[:]
 }

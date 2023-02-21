@@ -79,6 +79,10 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		for {
 			select {
 			case <-ctx.Done():
+				if err := store.Close(); err != nil {
+					e.logger.Info("error while closing store", "err", err)
+				}
+
 				close(notifierCh) // close notifier channel after everything is finished
 
 				return
