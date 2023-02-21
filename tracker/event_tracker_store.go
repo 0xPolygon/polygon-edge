@@ -185,14 +185,17 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 		return nil
 	}
 
-	var lastBlockNumber uint64
+	var (
+		logFirstIndx    uint64
+		lastBlockNumber = logs[len(logs)-1].BlockNumber
+	)
 
 	if err := e.conn.Update(func(tx *bolt.Tx) error {
 		bucketLogs := tx.Bucket(e.bucketLogs)
-		lastLogIndx := getLastIndex(bucketLogs)
+		logFirstIndx = getLastIndex(bucketLogs)
 
 		for idx, log := range logs {
-			logIdx := lastLogIndx + uint64(idx)
+			logIdx := logFirstIndx + uint64(idx)
 
 			val, err := log.MarshalJSON()
 			if err != nil {
@@ -204,15 +207,14 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 			}
 		}
 
-		e.logger.Info("write event logs",
-			"from", lastLogIndx, "to", lastLogIndx+uint64(len(logs))-1, "block", lastBlockNumber)
-
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	lastBlockNumber = logs[len(logs)-1].BlockNumber
+	e.logger.Info("event logs have been written",
+		"from", logFirstIndx, "to", logFirstIndx+uint64(len(logs))-1, "block", lastBlockNumber)
+
 	if lastBlockNumber <= e.finalityDepth {
 		return nil
 	}
@@ -299,13 +301,13 @@ func (e *Entry) notifyFinalizedLogs(logs []*ethgo.Log, lastProcessedIdx uint64) 
 		return nil
 	}
 
-	e.logger.Info("notify event logs", "len", len(logs), "last processed", lastProcessedIdx)
-
 	if err := e.conn.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(e.bucketNextToProcess).Put(nextToProcessKey, common.EncodeUint64ToBytes(lastProcessedIdx+1))
 	}); err != nil {
 		return err
 	}
+
+	e.logger.Info("event logs have been notified to a subscriber", "len", len(logs), "last processed", lastProcessedIdx)
 
 	// notify logs - for testing purpose chan can be nil
 	if e.notifierCh != nil {

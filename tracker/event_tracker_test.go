@@ -42,7 +42,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	t.Parallel()
 
 	const (
-		blockFinalityDepth = 2
+		blockFinalityDepth = 6
 		eventsPerStep      = 8
 	)
 
@@ -66,7 +66,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	_, addr, err := server.DeployContract(cc)
 	require.NoError(t, err)
 
-	// prefill with eventsPerStep + finalizedTrashhold events
+	// prefill with eventsPerStep + blockFinalityDepth events
 	for i := 0; i < eventsPerStep+blockFinalityDepth; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
