@@ -166,11 +166,11 @@ func InitValidatorBLSSignature(
 	}
 
 	// Write the signature to the secrets manager storage
-	if setErr := secretsManager.SetSecret(secrets.ValidatorBLSSignature, sb); setErr != nil {
-		return nil, setErr
+	if err := secretsManager.SetSecret(secrets.ValidatorBLSSignature, sb); err != nil {
+		return nil, err
 	}
 
-	return sb, err
+	return sb, nil
 }
 
 // LoadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
