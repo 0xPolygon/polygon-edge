@@ -72,6 +72,14 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"ChildERC20Predicate",
+			gensc.ChildERC20Predicate,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

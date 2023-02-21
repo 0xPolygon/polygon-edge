@@ -18,10 +18,12 @@ const (
 )
 
 var (
-	nativeTokenName   = "Polygon"
-	nativeTokenSymbol = "MATIC"
+	nativeTokenName     = "Polygon"
+	nativeTokenSymbol   = "MATIC"
+	nativeTokenDecimals = uint8(18)
 )
 
+// getInitChildValidatorSetInput builds input parameters for ChildValidatorSet SC initialization
 func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	apiValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
 
@@ -49,6 +51,22 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 	return params.EncodeAbi()
 }
 
+// getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
+func getInitChildERC20PredicateInput(rootERC20PredicateAdrr types.Address) ([]byte, error) {
+	params := &contractsapi.InitializeChildERC20PredicateFunction{
+		NewL2StateSender:          contracts.L2StateSenderContract,
+		NewStateReceiver:          contracts.StateReceiverContract,
+		NewRootERC20Predicate:     rootERC20PredicateAdrr,
+		NewChildTokenTemplate:     contracts.ChildERC20Contract,
+		NewNativeTokenRootAddress: types.ZeroAddress, // TODO: Deploy ERC20 token to the rootchain
+		NewNativeTokenName:        nativeTokenName,
+		NewNativeTokenSymbol:      nativeTokenSymbol,
+		NewNativeTokenDecimals:    nativeTokenDecimals,
+	}
+
+	return params.EncodeAbi()
+}
+
 func initContract(to types.Address, input []byte, contractName string, transition *state.Transition) error {
 	result := transition.Call2(contracts.SystemCaller, to, input,
 		big.NewInt(0), 100_000_000)
@@ -61,7 +79,7 @@ func initContract(to types.Address, input []byte, contractName string, transitio
 			}
 		}
 
-		return result.Err
+		return fmt.Errorf("failed to initialize %s contract. Reason: %w", contractName, result.Err)
 	}
 
 	return nil

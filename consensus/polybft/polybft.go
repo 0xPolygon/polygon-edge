@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -120,7 +119,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// Initialize child validator set
+		// initialize ChildValidatorSet SC
 		input, err := getInitChildValidatorSetInput(polyBFTConfig)
 		if err != nil {
 			return err
@@ -130,27 +129,19 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		if err != nil {
-			return fmt.Errorf("failed loading rootchain manifest: %w", err)
-		}
-
-		rootchainAdmin := types.ZeroAddress
+		// initialize ChildERC20Predicate SC
+		// TODO: @Stefan-Ethernal Temporal workaround just to be able to run cluster in non-bridge mode
+		rootERC20PredicateAdrr := types.StringToAddress("0x100")
 		if polyBFTConfig.IsBridgeEnabled() {
-			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
+			rootERC20PredicateAdrr = polyBFTConfig.Bridge.RootERC20PredicateAddr
 		}
-		// TODO: deploy ChildERC20Predicate
 
-		// address rootToken_,
-		// string calldata name_,
-		// string calldata symbol_,
-		// uint8 decimals_
-		input, err = contractsapi.ChildERC20.Abi.Methods["initialize"].Encode(
-			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
+		input, err = getInitChildERC20PredicateInput(rootERC20PredicateAdrr)
 		if err != nil {
 			return err
 		}
 
-		return initContract(contracts.NativeTokenContract, input, "ChildERC20", transition)
+		return initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition)
 	}
 }
 

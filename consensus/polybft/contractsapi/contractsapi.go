@@ -301,3 +301,22 @@ func (i *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
 func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }
+
+type InitializeChildERC20PredicateFunction struct {
+	NewL2StateSender          types.Address `abi:"newL2StateSender"`
+	NewStateReceiver          types.Address `abi:"newStateReceiver"`
+	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
+	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
+	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
+	NewNativeTokenName        string        `abi:"newNativeTokenName"`
+	NewNativeTokenSymbol      string        `abi:"newNativeTokenSymbol"`
+	NewNativeTokenDecimals    uint8         `abi:"newNativeTokenDecimals"`
+}
+
+func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+	return ChildERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC20PredicateFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
