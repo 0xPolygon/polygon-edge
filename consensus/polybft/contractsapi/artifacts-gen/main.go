@@ -43,6 +43,10 @@ func main() {
 			"BN256G2",
 		},
 		{
+			"common/Merkle.sol",
+			"Merkle",
+		},
+		{
 			"child/StateReceiver.sol",
 			"StateReceiver",
 		},
