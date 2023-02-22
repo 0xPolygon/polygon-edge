@@ -167,15 +167,15 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 }
 
 func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
+	t.Parallel()
+
 	txTypes := []TxType{
 		StateTx,
 		LegacyTx,
 	}
 
-	arena := fastrlp.DefaultArenaPool.Get()
-	defer fastrlp.DefaultArenaPool.Put(arena)
-
 	for _, txType := range txTypes {
+		txType := txType
 		testTable := []struct {
 			name          string
 			expectedErr   bool
@@ -207,21 +207,28 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 		}
 
 		for _, tt := range testTable {
-			testData := testRLPData(arena, tt.ommitedValues)
-			pr := fastrlp.DefaultParserPool.Get()
-			v, err := pr.Parse(testData)
-			assert.Nil(t, err)
+			tt := tt
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 
-			unmarshalledTx := &Transaction{Type: txType}
+				arena := fastrlp.DefaultArenaPool.Get()
+				parser := fastrlp.DefaultParserPool.Get()
+				testData := testRLPData(arena, tt.ommitedValues)
+				v, err := parser.Parse(testData)
+				assert.Nil(t, err)
 
-			if tt.expectedErr {
-				assert.Error(t, unmarshalledTx.unmarshalRLPFrom(pr, v), tt.name)
-			} else {
-				assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(pr, v), tt.name)
-				assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From) != 0 && unmarshalledTx.From != ZeroAddress)
-			}
+				unmarshalledTx := &Transaction{Type: txType}
 
-			fastrlp.DefaultParserPool.Put(pr)
+				if tt.expectedErr {
+					assert.Error(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
+				} else {
+					assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
+					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From) != 0 && unmarshalledTx.From != ZeroAddress, unmarshalledTx.Type.String(), unmarshalledTx.From)
+				}
+
+				fastrlp.DefaultParserPool.Put(parser)
+				fastrlp.DefaultArenaPool.Put(arena)
+			})
 		}
 	}
 }
