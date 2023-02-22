@@ -20,8 +20,9 @@ import (
 var (
 	params emitParams
 
-	contractsToParamTypes = map[string]string{
-		contracts.NativeTokenContract.String(): "tuple(address,uint256)",
+	contractsToParamTypes = map[types.Address]string{
+		contracts.ChildERC20PredicateContract: "tuple(bytes32 actionSignature, address rootToken," +
+			"address depositor, address receiver, uint256 amount)",
 	}
 
 	syncStateAbiMethod = contractsapi.StateSender.Abi.Methods["syncState"]
@@ -52,8 +53,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.address,
 		contractFlag,
-		contracts.NativeTokenContract.String(),
-		"ERC20 bridge contract address",
+		contracts.ChildERC20PredicateContract.String(),
+		"Child predicate contract address",
 	)
 
 	cmd.Flags().StringSliceVar(
@@ -107,7 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	paramsType, exists := contractsToParamTypes[params.address]
+	paramsType, exists := contractsToParamTypes[types.StringToAddress(params.address)]
 	if !exists {
 		outputter.SetError(fmt.Errorf("no parameter types for given contract address: %v", params.address))
 
@@ -132,7 +133,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn, err := createEmitTxn(manifest.RootchainConfig.StateSenderAddress, paramsType, wallet, amount)
+				txn, err := createEmitTxn(manifest.RootchainConfig.StateSenderAddress, paramsType, contractsapi.DepositSig,
+					manifest.RootchainConfig.RootERC20Address, helper.GetRootchainAdminKey().Address(), wallet, amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}

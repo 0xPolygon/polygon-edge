@@ -86,7 +86,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
+			contracts.ChildERC20PredicateContract.String(),
 			strings.Join(wallets[:], ","),
 			strings.Join(amounts[:], ","),
 		),

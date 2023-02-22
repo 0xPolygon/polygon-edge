@@ -52,13 +52,22 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 }
 
 // getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
-func getInitChildERC20PredicateInput(rootERC20PredicateAdrr types.Address) ([]byte, error) {
+func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
+	// TODO: @Stefan-Ethernal Temporal workaround just to be able to run cluster in non-bridge mode, until SC is fixed
+	rootERC20PredicateAddr := types.StringToAddress("0xDEAD")
+	rootERC20Addr := types.ZeroAddress
+
+	if config != nil {
+		rootERC20PredicateAddr = config.RootERC20PredicateAddr
+		rootERC20Addr = config.RootERC20Addr
+	}
+
 	params := &contractsapi.InitializeChildERC20PredicateFunction{
 		NewL2StateSender:          contracts.L2StateSenderContract,
 		NewStateReceiver:          contracts.StateReceiverContract,
-		NewRootERC20Predicate:     rootERC20PredicateAdrr,
+		NewRootERC20Predicate:     rootERC20PredicateAddr,
 		NewChildTokenTemplate:     contracts.ChildERC20Contract,
-		NewNativeTokenRootAddress: types.ZeroAddress, // TODO: Deploy ERC20 token to the rootchain
+		NewNativeTokenRootAddress: rootERC20Addr,
 		NewNativeTokenName:        nativeTokenName,
 		NewNativeTokenSymbol:      nativeTokenSymbol,
 		NewNativeTokenDecimals:    nativeTokenDecimals,

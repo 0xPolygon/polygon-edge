@@ -67,6 +67,7 @@ type BridgeConfig struct {
 	BridgeAddr             types.Address `json:"stateSenderAddr"`
 	CheckpointAddr         types.Address `json:"checkpointAddr"`
 	RootERC20PredicateAddr types.Address `json:"rootERC20PredicateAddr"`
+	RootERC20Addr          types.Address `json:"rootERC20Addr"`
 	JSONRPCEndpoint        string        `json:"jsonRPCEndpoint"`
 }
 
@@ -191,6 +192,8 @@ type RootchainConfig struct {
 	BN256G2Address            types.Address `json:"bn256G2Address"`
 	ExitHelperAddress         types.Address `json:"exitHelperAddress"`
 	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
+	RootERC20Address          types.Address `json:"rootERC20Address"`
+	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
 	AdminAddress              types.Address `json:"adminAddress"`
 }
 
@@ -200,6 +203,7 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		BridgeAddr:             r.StateSenderAddress,
 		CheckpointAddr:         r.CheckpointManagerAddress,
 		RootERC20PredicateAddr: r.RootERC20PredicateAddress,
+		RootERC20Addr:          r.RootERC20Address,
 	}
 }
 

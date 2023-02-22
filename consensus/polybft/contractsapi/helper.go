@@ -3,8 +3,15 @@ package contractsapi
 import (
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
+)
+
+var (
+	MapTokenSig = crypto.Keccak256([]byte("MAP_TOKEN"))
+	DepositSig  = crypto.Keccak256([]byte("DEPOSIT"))
+	WithdrawSig = crypto.Keccak256([]byte("WITHDRAW"))
 )
 
 // StateTransactionInput is an abstraction for different state transaction inputs

@@ -29,6 +29,8 @@ const (
 	bn256G2Name            = "BN256G2"
 	exitHelperName         = "ExitHelper"
 	rootERC20PredicateName = "RootERC20Predicate"
+	rootERC20Name          = "RootERC20"
+	erc20TemplateName      = "ERC20Template"
 )
 
 var (
@@ -54,6 +56,12 @@ var (
 		},
 		rootERC20PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC20PredicateAddress = addr
+		},
+		rootERC20Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.RootERC20Address = addr
+		},
+		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.ERC20TemplateAddress = addr
 		},
 	}
 )
@@ -204,6 +212,14 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			name:     "RootERC20Predicate",
 			artifact: contractsapi.RootERC20Predicate,
 		},
+		{
+			name:     "RootERC20",
+			artifact: contractsapi.MockERC20,
+		},
+		{
+			name:     "ERC20Template",
+			artifact: contractsapi.ChildERC20,
+		},
 	}
 
 	rootchainConfig := &polybft.RootchainConfig{}
@@ -318,7 +334,7 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig) error {
 	input, err := contractsapi.RootERC20Predicate.Abi.GetMethod("initialize").
 		Encode([]interface{}{rootchainConfig.StateSenderAddress, rootchainConfig.ExitHelperAddress,
-			contracts.ChildERC20PredicateContract, contracts.ChildERC20Contract})
+			contracts.ChildERC20PredicateContract, rootchainConfig.ERC20TemplateAddress})
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for RootERC20Predicate.initialize. error: %w", err)
 	}

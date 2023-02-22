@@ -130,13 +130,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize ChildERC20Predicate SC
-		// TODO: @Stefan-Ethernal Temporal workaround just to be able to run cluster in non-bridge mode
-		rootERC20PredicateAdrr := types.StringToAddress("0x100")
-		if polyBFTConfig.IsBridgeEnabled() {
-			rootERC20PredicateAdrr = polyBFTConfig.Bridge.RootERC20PredicateAddr
-		}
-
-		input, err = getInitChildERC20PredicateInput(rootERC20PredicateAdrr)
+		input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
 		if err != nil {
 			return err
 		}

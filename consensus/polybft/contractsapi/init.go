@@ -33,6 +33,7 @@ var (
 	testContracts          embed.FS
 	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
+	MockERC20              *artifact.Artifact
 )
 
 func init() {
@@ -108,23 +109,27 @@ func init() {
 		panic(err)
 	}
 
-	testL1StateReceiverRaw, err := testContracts.ReadFile(path.Join(testContractsDir, "TestL1StateReceiver.json"))
+	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))
 	if err != nil {
 		panic(err)
 	}
 
-	TestL1StateReceiver, err = artifact.DecodeArtifact(testL1StateReceiverRaw)
+	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
 	if err != nil {
 		panic(err)
 	}
 
-	testWriteBlockMetadataRaw, err := testContracts.ReadFile(path.Join(testContractsDir, "TestWriteBlockMetadata.json"))
+	MockERC20, err = artifact.DecodeArtifact(readTestContractContent("MockERC20.json"))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func readTestContractContent(contractFileName string) []byte {
+	contractRaw, err := testContracts.ReadFile(path.Join(testContractsDir, contractFileName))
 	if err != nil {
 		panic(err)
 	}
 
-	TestWriteBlockMetadata, err = artifact.DecodeArtifact(testWriteBlockMetadataRaw)
-	if err != nil {
-		panic(err)
-	}
+	return contractRaw
 }
