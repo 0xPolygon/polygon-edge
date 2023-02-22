@@ -75,18 +75,11 @@ func setFlags(cmd *cobra.Command) {
 		"folder prefix names for polybft validator keys",
 	)
 
-	cmd.Flags().Int64Var(
-		&params.chainID,
-		chainIDFlag,
-		command.DefaultChainID,
-		"the ID of the chain",
-	)
-
 	cmd.Flags().StringArrayVar(
 		&params.validators,
 		validatorsFlag,
 		[]string{},
-		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>)",
+		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
 	cmd.Flags().StringVar(
@@ -94,6 +87,13 @@ func setFlags(cmd *cobra.Command) {
 		premineValidatorsFlag,
 		command.DefaultPremineBalance,
 		"the amount which will be pre-mined to all the validators",
+	)
+
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
@@ -199,10 +199,6 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		if err = v.InitKOSKSignature(p.chainID); err != nil {
-			return nil, err
-		}
-
 		v.Balance = balance
 	}
 

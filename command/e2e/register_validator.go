@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -10,12 +11,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/go-glint"
@@ -120,6 +121,21 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	sRaw, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
+	if err != nil {
+		return err
+	}
+
+	sb, err := hex.DecodeString(string(sRaw))
+	if err != nil {
+		return err
+	}
+
+	blsSignature, err := bls.UnmarshalSignature(sb)
+	if err != nil {
+		return err
+	}
+
 	var validator *NewValidator
 
 	steps := []*txnStep{
@@ -138,7 +154,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		{
 			name: "register",
 			action: func() asyncTxn {
-				return registerValidator(newValidatorSender, newValidatorAccount, params.chainID)
+				return registerValidator(newValidatorSender, newValidatorAccount, blsSignature)
 			},
 			postHook: func(receipt *ethgo.Receipt) error {
 				if receipt.Status != uint64(types.ReceiptSuccess) {
@@ -484,15 +500,9 @@ func fund(sender *txnSender, addr types.Address) asyncTxn {
 	return sender.sendTransaction(txn)
 }
 
-func registerValidator(sender *txnSender, account *wallet.Account, chainID int64) asyncTxn {
+func registerValidator(sender *txnSender, account *wallet.Account, signature *bls.Signature) asyncTxn {
 	if registerFn == nil {
 		return &asyncTxnImpl{err: errors.New("failed to create register ABI function")}
-	}
-
-	signature, err := polybft.MakeKOSKSignature(
-		account.Bls, types.Address(sender.account.Ecdsa.Address()), chainID, bls.DomainValidatorSet)
-	if err != nil {
-		return &asyncTxnImpl{err: err}
 	}
 
 	sigMarshal, err := signature.ToBigInt()
