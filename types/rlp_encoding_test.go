@@ -162,6 +162,67 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 
 		unmarshalledTx.ComputeHash()
 		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+		assert.Equal(t, originalTx.Hash, unmarshalledTx.Hash)
+	}
+}
+
+func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
+	txTypes := []TxType{
+		StateTx,
+		LegacyTx,
+	}
+
+	arena := fastrlp.DefaultArenaPool.Get()
+	defer fastrlp.DefaultArenaPool.Put(arena)
+
+	for _, txType := range txTypes {
+		testTable := []struct {
+			name          string
+			expectedErr   bool
+			ommitedValues map[string]bool
+			fromAddrSet   bool
+		}{
+			{
+				name:        "Insuficient params",
+				expectedErr: true,
+				ommitedValues: map[string]bool{
+					"Nonce":    true,
+					"GasPrice": true,
+				},
+			},
+			{
+				name:        "Missing From",
+				expectedErr: false,
+				ommitedValues: map[string]bool{
+					"From": true,
+				},
+				fromAddrSet: false,
+			},
+			{
+				name:          "Address set for state tx only",
+				expectedErr:   false,
+				ommitedValues: map[string]bool{},
+				fromAddrSet:   txType == StateTx,
+			},
+		}
+
+		for _, tt := range testTable {
+			testData := testRLPData(arena, tt.ommitedValues)
+			pr := fastrlp.DefaultParserPool.Get()
+			v, err := pr.Parse(testData)
+			assert.Nil(t, err)
+
+			unmarshalledTx := &Transaction{Type: txType}
+
+			if tt.expectedErr {
+				assert.Error(t, unmarshalledTx.unmarshalRLPFrom(pr, v), tt.name)
+			} else {
+				assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(pr, v), tt.name)
+				assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From) != 0 && unmarshalledTx.From != ZeroAddress)
+			}
+
+			fastrlp.DefaultParserPool.Put(pr)
+		}
 	}
 }
 
@@ -199,4 +260,63 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 			assert.Equal(t, tt.txType, txType)
 		}
 	}
+}
+
+func testRLPData(arena *fastrlp.Arena, ommitValues map[string]bool) []byte {
+	vv := arena.NewArray()
+
+	_, ommit := ommitValues["Nonce"]
+	if !ommit {
+		vv.Set(arena.NewUint(10))
+	}
+
+	_, ommit = ommitValues["GasPrice"]
+	if !ommit {
+		vv.Set(arena.NewBigInt(big.NewInt(11)))
+	}
+
+	_, ommit = ommitValues["Gas"]
+	if !ommit {
+		vv.Set(arena.NewUint(12))
+	}
+
+	_, ommit = ommitValues["To"]
+	if !ommit {
+		vv.Set(arena.NewBytes((StringToAddress("13")).Bytes()))
+	}
+
+	_, ommit = ommitValues["Value"]
+	if !ommit {
+		vv.Set(arena.NewBigInt(big.NewInt(14)))
+	}
+
+	_, ommit = ommitValues["Input"]
+	if !ommit {
+		vv.Set(arena.NewCopyBytes([]byte{1, 2}))
+	}
+
+	_, ommit = ommitValues["V"]
+	if !ommit {
+		vv.Set(arena.NewBigInt(big.NewInt(15)))
+	}
+
+	_, ommit = ommitValues["R"]
+	if !ommit {
+		vv.Set(arena.NewBigInt(big.NewInt(16)))
+	}
+
+	_, ommit = ommitValues["S"]
+	if !ommit {
+		vv.Set(arena.NewBigInt(big.NewInt(17)))
+	}
+
+	_, ommit = ommitValues["From"]
+	if !ommit {
+		vv.Set(arena.NewBytes((StringToAddress("18")).Bytes()))
+	}
+
+	var testData []byte
+	testData = vv.MarshalTo(testData)
+
+	return testData
 }
