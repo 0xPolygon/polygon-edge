@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func TestLondonSigner_Sender(t *testing.T) {
+func TestLondonSignerSender(t *testing.T) {
 	t.Parallel()
 
 	toAddress := types.StringToAddress("1")
