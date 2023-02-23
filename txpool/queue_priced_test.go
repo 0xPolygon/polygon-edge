@@ -32,10 +32,8 @@ func Test_maxPriceQueue(t *testing.T) {
 				},
 				// Lowest tx fee
 				{
-					Type:      types.DynamicFeeTx,
-					GasPrice:  big.NewInt(0),
-					GasFeeCap: big.NewInt(1000),
-					GasTipCap: big.NewInt(100),
+					Type:     types.LegacyTx,
+					GasPrice: big.NewInt(100),
 				},
 				// Middle tx fee
 				{
@@ -62,10 +60,8 @@ func Test_maxPriceQueue(t *testing.T) {
 				},
 				// Lowest tx fee
 				{
-					Type:      types.DynamicFeeTx,
-					GasPrice:  big.NewInt(0),
-					GasFeeCap: big.NewInt(1000),
-					GasTipCap: big.NewInt(100),
+					Type:     types.LegacyTx,
+					GasPrice: big.NewInt(100),
 				},
 			},
 		},
