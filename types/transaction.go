@@ -164,16 +164,14 @@ func (t *Transaction) Size() uint64 {
 // We use EIP-1559 fields of the tx if the london hardfork is enabled.
 // Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
 func (t *Transaction) EffectiveTip(baseFee uint64) *big.Int {
-	effectiveTip := new(big.Int).Set(t.GasPrice)
-
 	if t.Type == DynamicFeeTx && t.GasFeeCap != nil && t.GasTipCap != nil {
-		effectiveTip = common.BigMin(
+		return common.BigMin(
 			new(big.Int).Sub(t.GasFeeCap, new(big.Int).SetUint64(baseFee)),
 			new(big.Int).Set(t.GasTipCap),
 		)
 	}
 
-	return effectiveTip
+	return new(big.Int).Set(t.GasPrice)
 }
 
 func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
