@@ -168,7 +168,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid address: %s", parts[1])
 			}
 
-			if len(parts[2]) != blsKeyLength {
+			if len(strings.TrimPrefix(parts[2], "0x")) != blsKeyLength {
 				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
 			}
 
