@@ -27,9 +27,9 @@ const (
 	defaultManifestPath        = "./manifest.json"
 
 	nodeIDLength       = 53
-	ecdsaAddressLength = 42
-	blsKeyLength       = 258
-	blsSignatureLength = 130
+	ecdsaAddressLength = 40
+	blsKeyLength       = 256
+	blsSignatureLength = 128
 )
 
 var (
@@ -168,11 +168,11 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid address: %s", parts[1])
 			}
 
-			if len(parts[2]) < blsKeyLength {
+			if len(strings.TrimPrefix(parts[2], "0x")) != blsKeyLength {
 				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
 			}
 
-			if len(parts[3]) < blsSignatureLength {
+			if len(parts[3]) != blsSignatureLength {
 				return nil, fmt.Errorf("invalid bls signature: %s", parts[3])
 			}
 

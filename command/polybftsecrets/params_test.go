@@ -1,17 +1,22 @@
 package polybftsecrets
 
 import (
+	"encoding/hex"
 	"os"
 	"path"
 	"testing"
 
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo/wallet"
 )
 
 // Test initKeys
 func Test_initKeys(t *testing.T) {
+	t.Parallel()
+
 	// Creates test directory
 	dir, err := os.MkdirTemp("", "test")
 	defer os.RemoveAll(dir)
@@ -58,4 +63,54 @@ func fileExists(filename string) bool {
 	}
 
 	return !info.IsDir()
+}
+
+func Test_getResult(t *testing.T) {
+	t.Parallel()
+
+	// Creates test directory
+	dir, err := os.MkdirTemp("", "test")
+	defer os.RemoveAll(dir)
+
+	sm, err := helper.SetupLocalSecretsManager(dir)
+	require.NoError(t, err)
+
+	ip := &initParams{
+		generatesAccount: true,
+		generatesNetwork: true,
+		printPrivateKey:  true,
+		chainID:          1,
+	}
+
+	_, err = ip.initKeys(sm)
+	require.NoError(t, err)
+
+	res, err := ip.getResult(sm, []string{})
+	require.NoError(t, err)
+
+	// Test BLS signature
+	sir := res.(*SecretsInitResult) //nolint:forcetypeassert
+	ds, err := hex.DecodeString(sir.BLSSignature)
+	require.NoError(t, err)
+
+	_, err = bls.UnmarshalSignature(ds)
+	require.NoError(t, err)
+
+	// Test public key serialization
+	privKey, err := hex.DecodeString(sir.PrivateKey)
+	require.NoError(t, err)
+	k, err := wallet.NewWalletFromPrivKey(privKey)
+	require.NoError(t, err)
+
+	pubKey := k.Address().String()
+	assert.Equal(t, sir.Address.String(), pubKey)
+
+	// Test BLS public key serialization
+	blsPrivKeyRaw, err := hex.DecodeString(sir.BLSPrivateKey)
+	require.NoError(t, err)
+	blsPrivKey, err := bls.UnmarshalPrivateKey(blsPrivKeyRaw)
+	require.NoError(t, err)
+
+	blsPubKey := hex.EncodeToString(blsPrivKey.PublicKey().Marshal())
+	assert.Equal(t, sir.BLSPubkey, blsPubKey)
 }
