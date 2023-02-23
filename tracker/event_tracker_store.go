@@ -2,8 +2,10 @@ package tracker
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	hcf "github.com/hashicorp/go-hclog"
@@ -12,9 +14,11 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-var _ store.Store = (*EventTrackerStore)(nil)
+const dbLastBlockPrefix = "lastBlock_"
 
 var (
+	_ store.Store = (*EventTrackerStore)(nil)
+
 	dbLogs           = []byte("logs")
 	dbConf           = []byte("conf")
 	dbNextToProcess  = []byte("nextToProcess")
@@ -25,7 +29,7 @@ var (
 type EventTrackerStore struct {
 	conn          *bolt.DB
 	finalityDepth uint64
-	notifierCh    chan<- []*ethgo.Log
+	subscriber    eventSubscription
 	logger        hcf.Logger
 }
 
@@ -33,7 +37,7 @@ type EventTrackerStore struct {
 func NewEventTrackerStore(
 	path string,
 	finalityDepth uint64,
-	notifierCh chan<- []*ethgo.Log,
+	subscriber eventSubscription,
 	logger hcf.Logger) (*EventTrackerStore, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {
@@ -43,7 +47,7 @@ func NewEventTrackerStore(
 	store := &EventTrackerStore{
 		conn:          db,
 		finalityDepth: finalityDepth,
-		notifierCh:    notifierCh,
+		subscriber:    subscriber,
 		logger:        logger,
 	}
 
@@ -109,35 +113,85 @@ func (b *EventTrackerStore) ListPrefix(prefix string) ([]string, error) {
 
 // Set implements the store interface
 func (b *EventTrackerStore) Set(k, v string) error {
-	return b.conn.Update(func(tx *bolt.Tx) error {
+	if err := b.conn.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(dbConf)
 
 		return bucket.Put([]byte(k), []byte(v))
-	})
+	}); err != nil {
+		return err
+	}
+
+	if strings.HasPrefix(k, dbLastBlockPrefix) {
+		if err := b.onNewBlock(k[len(dbLastBlockPrefix):], v); err != nil {
+			b.logger.Warn("new block error", "err", err)
+		}
+	}
+
+	return nil
+}
+
+func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
+	var block ethgo.Block
+
+	bytes, err := hex.DecodeString(blockData)
+	if err != nil {
+		return err
+	}
+
+	if err := block.UnmarshalJSON(bytes); err != nil {
+		return err
+	}
+
+	if block.Number <= b.finalityDepth {
+		return nil // there is nothing to process yet
+	}
+
+	entry, err := b.getImplEntry(filterHash)
+	if err != nil {
+		return nil
+	}
+
+	logs, lastProcessedKey, err := entry.getFinalizedLogs(block.Number - b.finalityDepth)
+	if err != nil {
+		return err
+	}
+
+	if len(logs) == 0 {
+		return nil // nothing to process
+	}
+
+	nextToProcessIdx := common.EncodeBytesToUint64(lastProcessedKey) + 1
+
+	if err := entry.saveNextToProcessIndx(nextToProcessIdx); err != nil {
+		return err
+	}
+
+	// notify subscriber with logs
+	for _, log := range logs {
+		b.subscriber.AddLog(log)
+	}
+
+	b.logger.Info("event logs have been notified to a subscriber", "len", len(logs), "next", nextToProcessIdx)
+
+	return nil
 }
 
 // GetEntry implements the store interface
 func (b *EventTrackerStore) GetEntry(hash string) (store.Entry, error) {
-	var result store.Entry
+	return b.getImplEntry(hash)
+}
+
+func (b *EventTrackerStore) getImplEntry(hash string) (*Entry, error) {
+	logsBucketName := append(dbLogs, []byte(hash)...)
+	nextToProcessBucketName := append(dbNextToProcess, []byte(hash)...)
 
 	if err := b.conn.Update(func(tx *bolt.Tx) error {
-		logsBucketName := append(dbLogs, []byte(hash)...)
 		if _, err := tx.CreateBucketIfNotExists(logsBucketName); err != nil {
 			return err
 		}
 
-		nextToProcessBucketName := append(dbNextToProcess, []byte(hash)...)
 		if _, err := tx.CreateBucketIfNotExists(nextToProcessBucketName); err != nil {
 			return err
-		}
-
-		result = &Entry{
-			conn:                b.conn,
-			bucketLogs:          logsBucketName,
-			bucketNextToProcess: nextToProcessBucketName,
-			finalityDepth:       b.finalityDepth,
-			notifierCh:          b.notifierCh,
-			logger:              b.logger,
 		}
 
 		return nil
@@ -145,7 +199,11 @@ func (b *EventTrackerStore) GetEntry(hash string) (store.Entry, error) {
 		return nil, err
 	}
 
-	return result, nil
+	return &Entry{
+		conn:                b.conn,
+		bucketLogs:          logsBucketName,
+		bucketNextToProcess: nextToProcessBucketName,
+	}, nil
 }
 
 // Entry is an store.Entry implementation
@@ -153,9 +211,6 @@ type Entry struct {
 	conn                *bolt.DB
 	bucketLogs          []byte
 	bucketNextToProcess []byte
-	finalityDepth       uint64
-	notifierCh          chan<- []*ethgo.Log
-	logger              hcf.Logger
 }
 
 // LastIndex implements the store.Entry interface
@@ -181,18 +236,13 @@ func (e *Entry) StoreLog(log *ethgo.Log) error {
 // StoreLogs implements the store.Entry interface
 // logs are added in sequentional order
 func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
-	if len(logs) == 0 {
+	if len(logs) == 0 { // dont start tx if there is nothing to add
 		return nil
 	}
 
-	var (
-		logFirstIndx    uint64
-		lastBlockNumber = logs[len(logs)-1].BlockNumber
-	)
-
-	if err := e.conn.Update(func(tx *bolt.Tx) error {
+	return e.conn.Update(func(tx *bolt.Tx) error {
 		bucketLogs := tx.Bucket(e.bucketLogs)
-		logFirstIndx = getLastIndex(bucketLogs)
+		logFirstIndx := getLastIndex(bucketLogs)
 
 		for idx, log := range logs {
 			logIdx := logFirstIndx + uint64(idx)
@@ -208,23 +258,7 @@ func (e *Entry) StoreLogs(logs []*ethgo.Log) error {
 		}
 
 		return nil
-	}); err != nil {
-		return err
-	}
-
-	e.logger.Info("event logs have been written",
-		"from", logFirstIndx, "to", logFirstIndx+uint64(len(logs))-1, "block", lastBlockNumber)
-
-	if lastBlockNumber <= e.finalityDepth {
-		return nil
-	}
-
-	notifyLogs, lastProcessedIdx, err := e.getFinalizedLogs(lastBlockNumber - e.finalityDepth)
-	if err != nil {
-		return err
-	}
-
-	return e.notifyFinalizedLogs(notifyLogs, lastProcessedIdx)
+	})
 }
 
 // RemoveLogs implements the store.Entry interface
@@ -255,17 +289,16 @@ func (e *Entry) GetLog(idx uint64, log *ethgo.Log) error {
 	})
 }
 
-func (e *Entry) getFinalizedLogs(untilBlockNumber uint64) ([]*ethgo.Log, uint64, error) {
+func (e *Entry) getFinalizedLogs(untilBlockNumber uint64) ([]*ethgo.Log, []byte, error) {
 	var (
 		logs             []*ethgo.Log
-		lastProcessedIdx uint64 = 0
+		lastProcessedKey []byte
+		key, value       []byte
 	)
 
 	if err := e.conn.View(func(tx *bolt.Tx) error {
 		bucketLastProcessedBlock := tx.Bucket(e.bucketNextToProcess)
 		cursorLogs := tx.Bucket(e.bucketLogs).Cursor()
-
-		var key, value []byte
 
 		// pick first unprocessed block
 		if _, val := bucketLastProcessedBlock.Cursor().First(); val != nil {
@@ -285,36 +318,21 @@ func (e *Entry) getFinalizedLogs(untilBlockNumber uint64) ([]*ethgo.Log, uint64,
 			}
 
 			logs = append(logs, log)
-			lastProcessedIdx = common.EncodeBytesToUint64(key)
+			lastProcessedKey = key
 		}
 
 		return nil
 	}); err != nil {
-		return nil, 0, err
+		return nil, nil, err
 	}
 
-	return logs, lastProcessedIdx, nil
+	return logs, lastProcessedKey, nil
 }
 
-func (e *Entry) notifyFinalizedLogs(logs []*ethgo.Log, lastProcessedIdx uint64) error {
-	if len(logs) == 0 {
-		return nil
-	}
-
-	if err := e.conn.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(e.bucketNextToProcess).Put(nextToProcessKey, common.EncodeUint64ToBytes(lastProcessedIdx+1))
-	}); err != nil {
-		return err
-	}
-
-	e.logger.Info("event logs have been notified to a subscriber", "len", len(logs), "last processed", lastProcessedIdx)
-
-	// notify logs - for testing purpose chan can be nil
-	if e.notifierCh != nil {
-		e.notifierCh <- logs
-	}
-
-	return nil
+func (e *Entry) saveNextToProcessIndx(nextToProcessIdx uint64) error {
+	return e.conn.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(e.bucketNextToProcess).Put(nextToProcessKey, common.EncodeUint64ToBytes(nextToProcessIdx))
+	})
 }
 
 func getLastIndex(bucket *bolt.Bucket) uint64 {

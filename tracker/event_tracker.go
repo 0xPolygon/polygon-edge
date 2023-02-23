@@ -46,9 +46,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
-	notifierCh := make(chan []*ethgo.Log)
-
-	store, err := NewEventTrackerStore(e.dbPath, e.finalityDepth, notifierCh, e.logger)
+	store, err := NewEventTrackerStore(e.dbPath, e.finalityDepth, e.subscriber, e.logger)
 	if err != nil {
 		return err
 	}
@@ -72,29 +70,6 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	go func() {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
-		}
-	}()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				if err := store.Close(); err != nil {
-					e.logger.Info("error while closing store", "err", err)
-				}
-
-				close(notifierCh) // close notifier channel after everything is finished
-
-				return
-
-			case evnt := <-notifierCh:
-				for _, log := range evnt {
-					e.subscriber.AddLog(log)
-				}
-
-			case <-tt.DoneCh:
-				e.logger.Info("historical sync done")
-			}
 		}
 	}()
 
