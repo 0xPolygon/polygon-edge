@@ -1,10 +1,12 @@
 package polybftsecrets
 
 import (
+	"encoding/hex"
 	"os"
 	"path"
 	"testing"
 
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,4 +60,32 @@ func fileExists(filename string) bool {
 	}
 
 	return !info.IsDir()
+}
+
+func Test_getResult(t *testing.T) {
+	// Creates test directory
+	dir, err := os.MkdirTemp("", "test")
+	defer os.RemoveAll(dir)
+
+	sm, err := helper.SetupLocalSecretsManager(dir)
+	require.NoError(t, err)
+
+	ip := &initParams{
+		generatesAccount: true,
+		generatesNetwork: true,
+		chainID:          1,
+	}
+
+	_, err = ip.initKeys(sm)
+	require.NoError(t, err)
+
+	res, err := ip.getResult(sm, []string{})
+	require.NoError(t, err)
+
+	sig := res.(*SecretsInitResult).BLSSignature //nolint:forcetypeassert
+	ds, err := hex.DecodeString(sig)
+	require.NoError(t, err)
+
+	_, err = bls.UnmarshalSignature(ds)
+	require.NoError(t, err)
 }

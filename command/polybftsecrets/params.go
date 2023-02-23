@@ -251,7 +251,7 @@ func (ip *initParams) getResult(
 			return nil, err
 		}
 
-		res.BLSSignature = hex.EncodeToString(s)
+		res.BLSSignature = string(s)
 		res.Generated = strings.Join(generated, ", ")
 
 		if ip.printPrivateKey {
