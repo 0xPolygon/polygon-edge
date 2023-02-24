@@ -1,0 +1,127 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+)
+
+// AARelayerRestServer represents the service for handling account abstraction transactions
+type AARelayerRestServer struct {
+	pool         AAPool
+	state        AATxState
+	verification AAVerification
+	server       *http.Server
+}
+
+func NewAARelayerRestServer(pool AAPool, state AATxState, verification AAVerification) *AARelayerRestServer {
+	return &AARelayerRestServer{
+		pool:         pool,
+		state:        state,
+		verification: verification,
+	}
+}
+
+// SendTransaction handles the /v1/sendTransaction endpoint
+func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	var tx AATransaction
+
+	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+
+		return
+	}
+
+	if err := s.verification.Validate(&tx); err != nil {
+		writeMessage(w, http.StatusBadRequest, err.Error())
+
+		return
+	}
+
+	// put to DB
+	stateTx, err := s.state.Add(&tx)
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+
+		return
+	}
+
+	// put to pool
+	s.pool.Put(stateTx.ID, &tx)
+
+	writeOutput(w, map[string]string{"uuid": stateTx.ID})
+}
+
+// GetTransactionReceipt handles the /v1/getTransactionReceipt/{uuid} endpoint
+func (s *AARelayerRestServer) getTransactionReceipt(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+
+		return
+	}
+
+	uuid := r.URL.Path[len("/v1/getTransactionReceipt/"):]
+
+	stateTx, err := s.state.Get(uuid)
+
+	if err != nil {
+		writeMessage(w, http.StatusInternalServerError, err.Error())
+
+		return
+	}
+
+	if stateTx == nil {
+		writeMessage(w, http.StatusNotFound, fmt.Sprintf("tx with uuid = %s does not exist", uuid))
+
+		return
+	}
+
+	receipt := AAReceipt{
+		ID:     uuid,
+		Status: stateTx.Status,
+		Mined:  stateTx.Mined,
+		Error:  stateTx.Error,
+		Gas:    stateTx.Gas,
+	}
+
+	writeOutput(w, receipt)
+}
+
+func (s *AARelayerRestServer) ListenAndServe(addr string) error {
+	s.server = &http.Server{
+		Addr: addr,
+		// TODO: make this configurable?
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	http.HandleFunc("/v1/sendTransaction", s.sendTransaction)
+	http.HandleFunc("/v1/getTransactionReceipt/", s.getTransactionReceipt)
+
+	return s.server.ListenAndServe()
+}
+
+func (s *AARelayerRestServer) Shutdown(ctx context.Context) error {
+	return s.server.Shutdown(ctx)
+}
+
+func writeMessage(w http.ResponseWriter, status int, message string) {
+	w.WriteHeader(status)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"message": message})
+}
+
+func writeOutput(w http.ResponseWriter, output interface{}) {
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(output)
+}
