@@ -152,12 +152,8 @@ func (p *blockchainWrapper) GetHeaderByHash(hash types.Hash) (*types.Header, boo
 
 // NewBlockBuilder is an implementation of blockchainBackend interface
 func (p *blockchainWrapper) NewBlockBuilder(
-	parent *types.Header,
-	coinbase types.Address,
-	txPool txPoolInterface,
-	blockTime time.Duration,
-	logger hclog.Logger,
-) (blockBuilder, error) {
+	parent *types.Header, coinbase types.Address,
+	txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error) {
 	gasLimit, err := p.blockchain.CalculateGasLimit(parent.Number + 1)
 	if err != nil {
 		return nil, err

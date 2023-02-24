@@ -25,9 +25,6 @@ type ethTxPoolStore interface {
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
-
-	// GetBaseFee returns the current base fee
-	GetBaseFee() uint64
 }
 
 type Account struct {

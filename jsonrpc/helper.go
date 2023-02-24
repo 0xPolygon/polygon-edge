@@ -100,7 +100,8 @@ func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*ty
 }
 
 type blockGetter interface {
-	headerGetter
+	Header() *types.Header
+	GetHeaderByNumber(uint64) (*types.Header, bool)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
@@ -129,14 +130,14 @@ func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, store blockGetter) (*
 	return block.Header, nil
 }
 
-type dataGetter interface {
-	headerGetter
+type nonceGetter interface {
+	Header() *types.Header
+	GetHeaderByNumber(uint64) (*types.Header, bool)
 	GetNonce(types.Address) uint64
-	GetBaseFee() uint64
 	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 }
 
-func GetNextNonce(address types.Address, number BlockNumber, store dataGetter) (uint64, error) {
+func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) (uint64, error) {
 	if number == PendingBlockNumber {
 		// Grab the latest pending nonce from the TxPool
 		//
@@ -166,7 +167,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store dataGetter) (
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, store dataGetter) (*types.Transaction, error) {
+func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress

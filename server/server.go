@@ -313,17 +313,6 @@ func NewServer(config *Config) (*Server, error) {
 		}
 	}
 
-	// Calculate and set the latest base fee value
-	{
-		baseFee := m.chain.Genesis.BaseFee
-
-		if header := m.blockchain.Header(); header != nil {
-			baseFee = m.blockchain.CalculateBaseFee(header)
-		}
-
-		m.txpool.SetBaseFee(baseFee)
-	}
-
 	m.txpool.Start()
 
 	return m, nil
