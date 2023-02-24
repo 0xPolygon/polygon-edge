@@ -124,7 +124,7 @@ func (m *mockMsg) sign(val *testValidator) *TransportMessage {
 	return &TransportMessage{
 		Hash:        m.hash,
 		Signature:   signature,
-		NodeID:      val.Address().String(),
+		From:        val.Address().String(),
 		EpochNumber: m.epoch,
 	}
 }
@@ -139,6 +139,50 @@ func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
 	msg := newMockMsg().sign(badVal)
 
 	err := s.saveVote(msg)
+	require.Error(t, err)
+}
+
+func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s.validatorSet = vals.toValidatorSet()
+
+	val := newMockMsg()
+	msg := val.sign(vals.getValidator("0"))
+	msg.EpochNumber = 1
+
+	err := s.saveVote(msg)
+	require.NoError(t, err)
+
+	// no votes for the current epoch
+	votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.Hash)
+	require.NoError(t, err)
+	require.Len(t, votes, 0)
+
+	// returns an error for the invalid epoch
+	_, err = s.state.StateSyncStore.getMessageVotes(1, msg.Hash)
+	require.Error(t, err)
+}
+
+func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) {
+	vals := newTestValidators(5)
+
+	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s.validatorSet = vals.toValidatorSet()
+
+	// validator signs the msg in behalf of another validator
+	val := newMockMsg()
+	msg := val.sign(vals.getValidator("0"))
+	msg.From = vals.getValidator("1").Address().String()
+	err := s.saveVote(msg)
+	require.Error(t, err)
+
+	// non validator signs the msg in behalf of a validator
+	badVal := newTestValidator("a", 0)
+	msg = newMockMsg().sign(badVal)
+	msg.From = vals.getValidator("1").Address().String()
+	err = s.saveVote(msg)
 	require.Error(t, err)
 }
 

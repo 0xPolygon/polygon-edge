@@ -39,8 +39,8 @@ type TransportMessage struct {
 	Hash []byte
 	// Message signature
 	Signature []byte
-	// Node identifier
-	NodeID string
+	// Address of the message signer
+	From string
 	// Number of epoch
 	EpochNumber uint64
 }

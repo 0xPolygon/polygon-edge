@@ -171,17 +171,18 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	valSet := s.validatorSet
 	s.lock.RUnlock()
 
-	if valSet == nil || msg.EpochNumber < epoch {
-		// Epoch metadata is undefined or received message for some of the older epochs
+	if valSet == nil || msg.EpochNumber != epoch {
+		// Epoch metadata is undefined or received message for the unrelvant epoch
 		return nil
 	}
 
-	if !valSet.Includes(types.StringToAddress(msg.NodeID)) {
-		return fmt.Errorf("validator is not among the active validator set")
+	err := s.verifyVoteSignature(valSet, types.StringToAddress(msg.From), msg.Signature, msg.Hash)
+	if err != nil {
+		return fmt.Errorf("error verifying vote signature: %w", err)
 	}
 
 	msgVote := &MessageSignature{
-		From:      msg.NodeID,
+		From:      msg.From,
 		Signature: msg.Signature,
 	}
 
@@ -193,9 +194,28 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	s.logger.Info(
 		"deliver message",
 		"hash", hex.EncodeToString(msg.Hash),
-		"sender", msg.NodeID,
+		"sender", msg.From,
 		"signatures", numSignatures,
 	)
+
+	return nil
+}
+
+func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types.Address, signature []byte,
+	hash []byte) error {
+	validator := valSet.Accounts().GetValidatorMetadata(signer)
+	if validator == nil {
+		return fmt.Errorf("unable to resolve validator %s", signer)
+	}
+
+	unmarshaledSignature, err := bls.UnmarshalSignature(signature)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshall signature: %w", err)
+	}
+
+	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainCheckpointManager) {
+		return fmt.Errorf("incorrect signature from %s", signer)
+	}
 
 	return nil
 }
@@ -523,7 +543,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	s.multicast(&TransportMessage{
 		Hash:        hashBytes,
 		Signature:   signature,
-		NodeID:      s.config.key.String(),
+		From:        s.config.key.String(),
 		EpochNumber: epoch,
 	})
 
