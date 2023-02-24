@@ -55,13 +55,13 @@ type txpoolTransaction struct {
 }
 
 func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
-	var gasTipCap *argBig
+	var gasTipCap, gasFeeCap *argBig
+
 	if t.GasTipCap != nil {
 		gasTipCapVal := argBig(*t.GasTipCap)
 		gasTipCap = &gasTipCapVal
 	}
 
-	var gasFeeCap *argBig
 	if t.GasFeeCap != nil {
 		gasFeeCapVal := argBig(*t.GasFeeCap)
 		gasFeeCap = &gasFeeCapVal
