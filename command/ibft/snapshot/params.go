@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"context"
+	"math"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -16,7 +17,7 @@ var (
 )
 
 type snapshotParams struct {
-	blockNumber int
+	blockNumber uint64
 
 	snapshot *ibftOp.Snapshot
 }
@@ -45,9 +46,9 @@ func (p *snapshotParams) getSnapshotRequest() *ibftOp.SnapshotReq {
 		Latest: true,
 	}
 
-	if p.blockNumber >= 0 {
+	if p.blockNumber != math.MaxUint64 {
 		req.Latest = false
-		req.Number = uint64(p.blockNumber)
+		req.Number = p.blockNumber
 	}
 
 	return req

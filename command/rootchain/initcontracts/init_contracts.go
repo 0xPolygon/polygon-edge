@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -269,9 +268,9 @@ func initializeCheckpointManager(
 	}
 
 	initialize := contractsapi.InitializeCheckpointManagerFunction{
+		ChainID_:        big.NewInt(manifest.ChainID),
 		NewBls:          manifest.RootchainConfig.BLSAddress,
 		NewBn256G2:      manifest.RootchainConfig.BN256G2Address,
-		NewDomain:       types.BytesToHash(bls.GetDomain()),
 		NewValidatorSet: validatorSet,
 	}
 

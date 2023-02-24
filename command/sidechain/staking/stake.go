@@ -108,7 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
 		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
-		Value:    big.NewInt(int64(params.amount)),
+		Value:    new(big.Int).SetUint64(params.amount),
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 

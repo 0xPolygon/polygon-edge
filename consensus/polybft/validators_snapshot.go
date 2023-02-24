@@ -212,7 +212,7 @@ func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot) err
 	copySnap := snapshot.copy()
 	v.snapshots[copySnap.Epoch] = copySnap
 
-	if err := v.state.insertValidatorSnapshot(copySnap); err != nil {
+	if err := v.state.EpochStore.insertValidatorSnapshot(copySnap); err != nil {
 		return fmt.Errorf("failed to insert validator snapshot for epoch %d to the database: %w", copySnap.Epoch, err)
 	}
 
@@ -245,7 +245,7 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 		v.snapshots = cache
 
-		return v.state.cleanValidatorSnapshotsFromDB(latestEpoch)
+		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
 	}
 
 	return nil
@@ -273,7 +273,7 @@ func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*v
 		}
 	}
 
-	dbSnapshot, err := v.state.getLastSnapshot()
+	dbSnapshot, err := v.state.EpochStore.getLastSnapshot()
 	if err != nil {
 		return nil, err
 	}
