@@ -210,7 +210,7 @@ func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types
 
 	unmarshaledSignature, err := bls.UnmarshalSignature(signature)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal signature: %w", err)
+		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signer.String(), err)
 	}
 
 	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainCheckpointManager) {
