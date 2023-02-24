@@ -18,9 +18,8 @@ import (
 )
 
 const (
-	AccountDirFlag = "account"
-	SelfFlag       = "self"
-	AmountFlag     = "amount"
+	SelfFlag   = "self"
+	AmountFlag = "amount"
 
 	DefaultGasPrice = 1879048192 // 0x70000000
 )

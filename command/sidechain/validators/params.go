@@ -10,6 +10,7 @@ import (
 
 type validatorInfoParams struct {
 	accountDir string
+	configPath string
 	jsonRPC    string
 }
 

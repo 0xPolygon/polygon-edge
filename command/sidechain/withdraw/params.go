@@ -14,6 +14,7 @@ var (
 
 type withdrawParams struct {
 	accountDir string
+	configPath string
 	jsonRPC    string
 	addressTo  string
 }

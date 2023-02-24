@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 )
 
 var (
@@ -14,6 +14,7 @@ var (
 
 type stakeParams struct {
 	accountDir      string
+	configPath      string
 	jsonRPC         string
 	amount          uint64
 	self            bool
@@ -21,7 +22,11 @@ type stakeParams struct {
 }
 
 func (v *stakeParams) validateFlags() error {
-	return sidechainHelper.CheckIfDirectoryExist(v.accountDir)
+	if v.accountDir == "" && v.configPath == "" {
+		return polybftsecrets.ErrInvalidParams
+	}
+
+	return nil
 }
 
 type stakeResult struct {

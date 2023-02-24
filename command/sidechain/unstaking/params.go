@@ -14,6 +14,7 @@ var (
 
 type unstakeParams struct {
 	accountDir        string
+	configPath        string
 	jsonRPC           string
 	amount            uint64
 	self              bool
