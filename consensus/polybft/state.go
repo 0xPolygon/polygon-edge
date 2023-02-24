@@ -39,7 +39,7 @@ type TransportMessage struct {
 	Hash []byte
 	// Message signature
 	Signature []byte
-	// Address of the message signer
+	// From is the address of the message signer
 	From string
 	// Number of epoch
 	EpochNumber uint64
