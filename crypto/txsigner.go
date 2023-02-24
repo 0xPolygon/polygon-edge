@@ -33,9 +33,9 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	var signer TxSigner
 
 	if forks.EIP155 {
-		signer = NewEIP155Signer(chainID)
+		signer = NewEIP155Signer(chainID, forks.Homestead)
 	} else {
-		signer = NewFrontierSigner()
+		signer = NewFrontierSigner(forks.Homestead)
 	}
 
 	// London signer requires a fallback signer that is defined above.

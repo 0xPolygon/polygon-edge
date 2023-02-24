@@ -21,13 +21,15 @@ const (
 	validatorsFlag        = "validators"
 	validatorsPathFlag    = "validators-path"
 	validatorsPrefixFlag  = "validators-prefix"
+	chainIDFlag           = "chain-id"
 
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultManifestPath        = "./manifest.json"
 
 	nodeIDLength       = 53
-	ecdsaAddressLength = 42
-	blsKeyLength       = 2
+	ecdsaAddressLength = 40
+	blsKeyLength       = 256
+	blsSignatureLength = 128
 )
 
 var (
@@ -77,7 +79,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.validators,
 		validatorsFlag,
 		[]string{},
-		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>)",
+		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
 	cmd.Flags().StringVar(
@@ -85,6 +87,13 @@ func setFlags(cmd *cobra.Command) {
 		premineValidatorsFlag,
 		command.DefaultPremineBalance,
 		"the amount which will be pre-mined to all the validators",
+	)
+
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
@@ -102,7 +111,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	manifest := &polybft.Manifest{GenesisValidators: validators}
+	manifest := &polybft.Manifest{GenesisValidators: validators, ChainID: params.chainID}
 	if err = manifest.Save(params.manifestPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save manifest file '%s': %w", params.manifestPath, err))
 
@@ -118,6 +127,7 @@ type manifestInitParams struct {
 	validatorsPrefixPath string
 	premineValidators    string
 	validators           []string
+	chainID              int64
 }
 
 func (p *manifestInitParams) validateFlags() error {
@@ -144,9 +154,9 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 		for i, validator := range p.validators {
 			parts := strings.Split(validator, ":")
 
-			if len(parts) != 3 {
-				return nil, fmt.Errorf("expected 3 parts provided in the following format "+
-					"<nodeId:ECDSA address:blsKey>, but got %d part(s)",
+			if len(parts) != 4 {
+				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
+					"<nodeId:ECDSA address:blsKey:blsSignature>, but got %d part(s)",
 					len(parts))
 			}
 
@@ -158,15 +168,20 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid address: %s", parts[1])
 			}
 
-			if len(parts[2]) < blsKeyLength {
+			if len(strings.TrimPrefix(parts[2], "0x")) != blsKeyLength {
 				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
 			}
 
+			if len(parts[3]) != blsSignatureLength {
+				return nil, fmt.Errorf("invalid bls signature: %s", parts[3])
+			}
+
 			validators[i] = &polybft.Validator{
-				NodeID:  parts[0],
-				Address: types.StringToAddress(parts[1]),
-				BlsKey:  parts[2],
-				Balance: balance,
+				NodeID:       parts[0],
+				Address:      types.StringToAddress(parts[1]),
+				BlsKey:       parts[2],
+				BlsSignature: parts[3],
+				Balance:      balance,
 			}
 		}
 

@@ -13,6 +13,7 @@ const (
 	registratorDataDirFlag = "registrator-data-dir"
 	balanceFlag            = "balance"
 	stakeFlag              = "stake"
+	chainIDFlag            = "chain-id"
 )
 
 type registerParams struct {
@@ -21,6 +22,7 @@ type registerParams struct {
 	jsonRPCAddr                 string
 	balance                     string
 	stake                       string
+	chainID                     int64
 }
 
 func (rp *registerParams) validateFlags() error {

@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -207,7 +208,10 @@ func NewServer(config *Config) (*Server, error) {
 	// TODO: Determine crypto signer based on the latest head
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
-		crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID)),
+		crypto.NewEIP155Signer(
+			chain.AllForksEnabled.At(0),
+			uint64(m.config.Chain.Params.ChainID),
+		),
 	)
 
 	// blockchain object
@@ -473,7 +477,7 @@ func (s *Server) setupRelayer() error {
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
 		s.logger.Named("relayer"),
-		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
 	)
 
 	// start relayer
