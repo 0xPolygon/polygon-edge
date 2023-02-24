@@ -49,6 +49,7 @@ func main() {
 			gensc.ChildValidatorSet,
 			[]string{
 				"commitEpoch",
+				"initialize",
 			},
 			[]string{},
 		},

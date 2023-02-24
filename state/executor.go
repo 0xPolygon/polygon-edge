@@ -59,7 +59,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	config := e.config.Forks.At(0)
 
 	env := runtime.TxContext{
-		ChainID: int64(e.config.ChainID),
+		ChainID: e.config.ChainID,
 	}
 
 	transition := &Transition{
@@ -971,7 +971,7 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 		return NewTransitionApplicationError(err, true)
 	}
 
-	// 2. caller has enough balance to cover transaction
+	// 3. caller has enough balance to cover transaction
 	if err := t.subGasLimitPrice(msg); err != nil {
 		return NewTransitionApplicationError(err, true)
 	}

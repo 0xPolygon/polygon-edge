@@ -23,11 +23,14 @@ func (r Results) GetOutput() string {
 }
 
 type SecretsInitResult struct {
-	Address    types.Address `json:"address"`
-	BLSPubkey  string        `json:"bls_pubkey"`
-	NodeID     string        `json:"node_id"`
-	PrivateKey string        `json:"private_key"`
-	Insecure   bool          `json:"insecure"`
+	Address       types.Address `json:"address"`
+	BLSPubkey     string        `json:"bls_pubkey"`
+	NodeID        string        `json:"node_id"`
+	PrivateKey    string        `json:"private_key"`
+	BLSPrivateKey string        `json:"bls_private_key"`
+	BLSSignature  string        `json:"bls_signature"`
+	Insecure      bool          `json:"insecure"`
+	Generated     string        `json:"generated"`
 }
 
 func (r *SecretsInitResult) GetOutput() string {
@@ -47,6 +50,13 @@ func (r *SecretsInitResult) GetOutput() string {
 		)
 	}
 
+	if r.BLSPrivateKey != "" {
+		vals = append(
+			vals,
+			fmt.Sprintf("BLS Private key|%s", r.BLSPrivateKey),
+		)
+	}
+
 	if r.BLSPubkey != "" {
 		vals = append(
 			vals,
@@ -54,10 +64,23 @@ func (r *SecretsInitResult) GetOutput() string {
 		)
 	}
 
+	if r.BLSSignature != "" {
+		vals = append(
+			vals,
+			fmt.Sprintf("BLS Signature|%s", r.BLSSignature),
+		)
+	}
+
 	vals = append(vals, fmt.Sprintf("Node ID|%s", r.NodeID))
 
 	if r.Insecure {
 		buffer.WriteString("\n[WARNING: INSECURE LOCAL SECRETS - SHOULD NOT BE RUN IN PRODUCTION]\n")
+	}
+
+	if r.Generated != "" {
+		buffer.WriteString("\n[SECRETS GENERATED]\n")
+		buffer.WriteString(r.Generated)
+		buffer.WriteString("\n")
 	}
 
 	buffer.WriteString("\n[SECRETS INIT]\n")

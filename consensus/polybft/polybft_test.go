@@ -193,6 +193,8 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 }
 
 func TestPolybft_Close(t *testing.T) {
+	t.Parallel()
+
 	syncer := &syncerMock{}
 	syncer.On("Close", mock.Anything).Return(error(nil)).Once()
 
@@ -225,6 +227,8 @@ func TestPolybft_Close(t *testing.T) {
 }
 
 func TestPolybft_GetSyncProgression(t *testing.T) {
+	t.Parallel()
+
 	result := &progress.Progression{}
 
 	syncer := &syncerMock{}
@@ -238,6 +242,8 @@ func TestPolybft_GetSyncProgression(t *testing.T) {
 }
 
 func Test_Factory(t *testing.T) {
+	t.Parallel()
+
 	const epochSize = uint64(141)
 
 	txPool := &txpool.TxPool{}
