@@ -41,6 +41,8 @@ type StatusResponse struct {
 type txpoolTransaction struct {
 	Nonce       argUint64      `json:"nonce"`
 	GasPrice    argBig         `json:"gasPrice"`
+	GasFeeCap   *argBig        `json:"gasFeeCap,omitempty"`
+	GasTipCap   *argBig        `json:"gasTipCap,omitempty"`
 	Gas         argUint64      `json:"gas"`
 	To          *types.Address `json:"to"`
 	Value       argBig         `json:"value"`
@@ -53,9 +55,23 @@ type txpoolTransaction struct {
 }
 
 func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
+	var gasTipCap *argBig
+	if t.GasTipCap != nil {
+		gasTipCapVal := argBig(*t.GasTipCap)
+		gasTipCap = &gasTipCapVal
+	}
+
+	var gasFeeCap *argBig
+	if t.GasFeeCap != nil {
+		gasFeeCapVal := argBig(*t.GasFeeCap)
+		gasFeeCap = &gasFeeCapVal
+	}
+
 	return &txpoolTransaction{
 		Nonce:       argUint64(t.Nonce),
 		GasPrice:    argBig(*t.GasPrice),
+		GasFeeCap:   gasFeeCap,
+		GasTipCap:   gasTipCap,
 		Gas:         argUint64(t.Gas),
 		To:          t.To,
 		Value:       argBig(*t.Value),
