@@ -172,7 +172,7 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	s.lock.RUnlock()
 
 	if valSet == nil || msg.EpochNumber != epoch {
-		// Epoch metadata is undefined or received message for the unrelvant epoch
+		// Epoch metadata is undefined or received a message for the irrelevant epoch
 		return nil
 	}
 
