@@ -41,22 +41,22 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	// London signer requires a fallback signer that is defined above.
 	// This is the reason why the london signer check is separated.
 	if forks.London {
-		return NewLondonSigner(chainID, signer)
+		return NewLondonSigner(chainID, forks.Homestead, signer)
 	}
 
 	return signer
 }
 
 // encodeSignature generates a signature value based on the R, S and V value
-func encodeSignature(R, S *big.Int, V byte) ([]byte, error) {
-	if !ValidateSignatureValues(V, R, S) {
+func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
+	if !ValidateSignatureValues(V, R, S, isHomestead) {
 		return nil, fmt.Errorf("invalid txn signature")
 	}
 
 	sig := make([]byte, 65)
 	copy(sig[32-len(R.Bytes()):32], R.Bytes())
 	copy(sig[64-len(S.Bytes()):64], S.Bytes())
-	sig[64] = V
+	sig[64] = byte(V.Int64()) // here is safe to convert it since ValidateSignatureValues will validate the v value
 
 	return sig, nil
 }

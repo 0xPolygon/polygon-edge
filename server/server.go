@@ -208,9 +208,10 @@ func NewServer(config *Config) (*Server, error) {
 	// TODO: Determine crypto signer based on the latest head
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
+		chain.AllForksEnabled.At(0).Homestead,
 		crypto.NewEIP155Signer(
-			chain.AllForksEnabled.At(0),
 			uint64(m.config.Chain.Params.ChainID),
+			chain.AllForksEnabled.At(0).Homestead,
 		),
 	)
 

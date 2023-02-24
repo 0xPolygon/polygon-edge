@@ -9,12 +9,16 @@ import (
 )
 
 type EIP155Signer struct {
-	chainID uint64
+	chainID     uint64
+	isHomestead bool
 }
 
 // NewEIP155Signer returns a new EIP155Signer object
-func NewEIP155Signer(chainID uint64) *EIP155Signer {
-	return &EIP155Signer{chainID: chainID}
+func NewEIP155Signer(chainID uint64, isHomestead bool) *EIP155Signer {
+	return &EIP155Signer{
+		chainID:     chainID,
+		isHomestead: isHomestead,
+	}
 }
 
 // Hash is a wrapper function that calls calcTxHash with the EIP155Signer's chainID
@@ -46,7 +50,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(bigV.Int64()))
+	sig, err := encodeSignature(tx.R, tx.S, bigV, e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
