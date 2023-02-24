@@ -3,15 +3,8 @@ package contractsapi
 import (
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
-)
-
-var (
-	MapTokenSig = crypto.Keccak256([]byte("MAP_TOKEN"))
-	DepositSig  = crypto.Keccak256([]byte("DEPOSIT"))
-	WithdrawSig = crypto.Keccak256([]byte("WITHDRAW"))
 )
 
 // StateTransactionInput is an abstraction for different state transaction inputs
@@ -22,9 +15,11 @@ type StateTransactionInput interface {
 	DecodeAbi(b []byte) error
 }
 
-// specific case where we need to encode state sync event as a tuple of tuple
-var stateSyncABIType = abi.MustNewType(
-	"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
+var (
+	// specific case where we need to encode state sync event as a tuple of tuple
+	stateSyncABIType = abi.MustNewType(
+		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
+)
 
 // ToABI converts StateSyncEvent to ABI
 func (sse *StateSyncedEvent) EncodeAbi() ([]byte, error) {

@@ -55,7 +55,7 @@ func checkLogs(
 	}
 }
 
-func TestE2E_Bridge_MainWorkflow(t *testing.T) {
+func TestE2E_Bridge_DepositERC20(t *testing.T) {
 	const (
 		num                   = 10
 		numBlockConfirmations = 4
@@ -85,8 +85,8 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.ChildERC20PredicateContract.String(),
+		cluster.Deposit(
+			"ERC20",
 			strings.Join(wallets[:], ","),
 			strings.Join(amounts[:], ","),
 		),
@@ -150,8 +150,8 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
+		cluster.Deposit(
+			"ERC20",
 			strings.Join(wallets[:2], ","),
 			strings.Join(amounts[:2], ","),
 		),
@@ -179,8 +179,8 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
+		cluster.Deposit(
+			"ERC20",
 			strings.Join(wallets[2:], ","),
 			strings.Join(amounts[2:], ","),
 		),

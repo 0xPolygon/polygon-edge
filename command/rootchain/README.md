@@ -21,10 +21,10 @@ Or
 $ polygon-edge rootchain fund --data-dir data-dir-1
 ```
 
-## Emit event
+## Deposit assets
 
-This command emits the event from the bridge side which invokes the wallets funding logic.
+This is a helper command which bridges assets from rootchain to the child chain (aka deposit workflow)
 
 ```bash
-$ polygon-edge rootchain emit --contract <sidechain-bridge-contract> --wallets <wallets> --amounts <amounts>
+$ polygon-edge rootchain deposit --token <token_type> --receivers <receivers_addresses> --amounts <amounts>
 ```

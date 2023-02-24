@@ -408,26 +408,26 @@ func (c *TestCluster) cmdRun(args ...string) error {
 	return runCommand(c.Config.Binary, args, c.Config.GetStdout(args[0]))
 }
 
-// EmitTransfer function is used to invoke e2e rootchain emit command
-// with appropriately created wallets and amounts for test transactions
-func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts string) error {
-	if len(contractAddress) == 0 {
-		return errors.New("provide contractAddress value")
+// Deposit function is used to invoke e2e rootchain deposit command
+// with appropriately created receivers and amounts for test transactions
+func (c *TestCluster) Deposit(tokenType, receivers, amounts string) error {
+	if tokenType == "" {
+		return errors.New("provide token type value")
 	}
 
-	if len(walletAddresses) == 0 {
-		return errors.New("provide at least one wallet address value")
+	if receivers == "" {
+		return errors.New("provide at least one receiver address value")
 	}
 
-	if len(amounts) == 0 {
+	if amounts == "" {
 		return errors.New("provide at least one amount value")
 	}
 
 	return c.cmdRun("rootchain",
-		"emit",
+		"deposit",
 		"--manifest", path.Join(c.Config.TmpDir, "manifest.json"),
-		"--contract", contractAddress,
-		"--wallets", walletAddresses,
+		"--token", tokenType,
+		"--receivers", receivers,
 		"--amounts", amounts)
 }
 

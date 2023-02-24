@@ -55,19 +55,24 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	// TODO: @Stefan-Ethernal Temporal workaround just to be able to run cluster in non-bridge mode, until SC is fixed
 	rootERC20PredicateAddr := types.StringToAddress("0xDEAD")
-	rootERC20Addr := types.ZeroAddress
+	// TODO: @Stefan-Ethernal Provide rootToken address?
+	// rootERC20Addr := types.ZeroAddress
+	// rootERC20Addr = config.RootERC20Addr
 
 	if config != nil {
 		rootERC20PredicateAddr = config.RootERC20PredicateAddr
-		rootERC20Addr = config.RootERC20Addr
 	}
 
 	params := &contractsapi.InitializeChildERC20PredicateFunction{
-		NewL2StateSender:          contracts.L2StateSenderContract,
-		NewStateReceiver:          contracts.StateReceiverContract,
-		NewRootERC20Predicate:     rootERC20PredicateAddr,
-		NewChildTokenTemplate:     contracts.ChildERC20Contract,
-		NewNativeTokenRootAddress: rootERC20Addr,
+		NewL2StateSender:      contracts.L2StateSenderContract,
+		NewStateReceiver:      contracts.StateReceiverContract,
+		NewRootERC20Predicate: rootERC20PredicateAddr,
+		NewChildTokenTemplate: contracts.ChildERC20Contract,
+		// TODO: Is this correct? If provided config.RootERC20Addr,
+		// rootToken will be mapped to native token on child chain, but not on root chain
+		// (and consequently RootERC20Predicate would try to map token and
+		// invoke mapping on child chain, though rootToken is already mapped, which causes an error)
+		NewNativeTokenRootAddress: types.ZeroAddress,
 		NewNativeTokenName:        nativeTokenName,
 		NewNativeTokenSymbol:      nativeTokenSymbol,
 		NewNativeTokenDecimals:    nativeTokenDecimals,

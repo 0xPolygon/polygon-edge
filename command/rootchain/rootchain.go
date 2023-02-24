@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/emit"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/deposit"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/fund"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/initcontracts"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
@@ -26,8 +26,8 @@ func GetCommand() *cobra.Command {
 
 func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
-		// rootchain emit
-		emit.GetCommand(),
+		// rootchain deposit
+		deposit.GetCommand(),
 		// rootchain fund
 		fund.GetCommand(),
 		// rootchain server

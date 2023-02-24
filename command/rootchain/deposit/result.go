@@ -1,4 +1,4 @@
-package emit
+package deposit
 
 import (
 	"bytes"
@@ -9,20 +9,20 @@ import (
 )
 
 type result struct {
-	Address string   `json:"address"`
-	Wallets []string `json:"wallets"`
-	Amounts []string `json:"amounts"`
+	TokenType string   `json:"tokenType"`
+	Receivers []string `json:"receivers"`
+	Amounts   []string `json:"amounts"`
 }
 
 func (r *result) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)
-	vals = append(vals, fmt.Sprintf("Contract (address)|%s", r.Address))
-	vals = append(vals, fmt.Sprintf("Wallets|%s", strings.Join(r.Wallets, ", ")))
+	vals = append(vals, fmt.Sprintf("Token Type|%s", r.TokenType))
+	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 
-	buffer.WriteString("\n[ROOTCHAIN EMIT]\n")
+	buffer.WriteString("\n[DEPOSIT]\n")
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")
 

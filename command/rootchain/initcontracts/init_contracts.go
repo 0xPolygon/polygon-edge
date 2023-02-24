@@ -31,6 +31,9 @@ const (
 	rootERC20PredicateName = "RootERC20Predicate"
 	rootERC20Name          = "RootERC20"
 	erc20TemplateName      = "ERC20Template"
+
+	// defaultAllowanceValue is value which is assigned to the RootERC20Predicate spender
+	defaultAllowanceValue = 1000000000000000000
 )
 
 var (
@@ -66,7 +69,7 @@ var (
 	}
 )
 
-// GetCommand returns the rootchain emit command
+// GetCommand returns the rootchain init-contracts command
 func GetCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "init-contracts",
@@ -280,6 +283,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
 	})
 
+	// approve RootERC20Predicate
+	if err := approveERC20Predicate(txRelayer, rootchainConfig); err != nil {
+		return err
+	}
+
+	outputter.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s %s contract is approved for spender of %s",
+			contractsDeploymentTitle, rootERC20PredicateName, rootERC20Name),
+	})
+
 	return nil
 }
 
@@ -310,7 +323,7 @@ func initializeCheckpointManager(
 		Input: initCheckpointInput,
 	}
 
-	return sendInitTransaction(txRelayer, txn, checkpointManagerName)
+	return sendTransaction(txRelayer, txn, checkpointManagerName)
 }
 
 // initializeExitHelper invokes initialize function on "ExitHelper" smart contract
@@ -327,7 +340,7 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 		Input: input,
 	}
 
-	return sendInitTransaction(txRelayer, txn, exitHelperName)
+	return sendTransaction(txRelayer, txn, exitHelperName)
 }
 
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
@@ -345,11 +358,28 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 		Input: input,
 	}
 
-	return sendInitTransaction(txRelayer, txn, rootERC20PredicateName)
+	return sendTransaction(txRelayer, txn, rootERC20PredicateName)
 }
 
-// sendInitTransaction sends provided SC initializer transaction
-func sendInitTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string) error {
+// approveERC20Predicate sends approve transaction to ERC20 token so that it is able to spend given root ERC20 token
+func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig) error {
+	input, err := contractsapi.MockERC20.Abi.GetMethod("approve").
+		Encode([]interface{}{config.RootERC20PredicateAddress, big.NewInt(defaultAllowanceValue)})
+	if err != nil {
+		return fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
+	}
+
+	addr := ethgo.Address(config.RootERC20Address)
+	txn := &ethgo.Transaction{
+		To:    &addr,
+		Input: input,
+	}
+
+	return sendTransaction(txRelayer, txn, rootERC20Name)
+}
+
+// sendTransaction sends provided transaction
+func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string) error {
 	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)

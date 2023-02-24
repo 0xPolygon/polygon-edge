@@ -63,10 +63,6 @@ func main() {
 			"Merkle",
 		},
 		{
-			"child/StateReceiver.sol",
-			"StateReceiver",
-		},
-		{
 			"root/CheckpointManager.sol",
 			"CheckpointManager",
 		},
