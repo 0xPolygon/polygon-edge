@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -375,8 +374,8 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 	}
 
 	signer := crypto.NewEIP155Signer(
-		chain.AllForksEnabled.At(0),
 		chainID.Uint64(),
+		true,
 	)
 
 	signedTxn, err := signer.SignTx(txn, privateKey)

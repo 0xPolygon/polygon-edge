@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/umbracle/ethgo"
 
@@ -23,7 +22,7 @@ import (
 
 var (
 	oneEth = framework.EthToWei(1)
-	signer = crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer = crypto.NewEIP155Signer(100, true)
 )
 
 type generateTxReqParams struct {
@@ -188,7 +187,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Required default values
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer := crypto.NewEIP155Signer(100, true)
 
 	// TxPool client
 	clt := srv.TxnPoolOperator()
