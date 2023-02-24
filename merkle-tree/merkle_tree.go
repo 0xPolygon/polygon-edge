@@ -41,12 +41,12 @@ type MerkleNode struct {
 	right  *MerkleNode
 	parent *MerkleNode
 	data   []byte
-	hash   []byte
+	hash   types.Hash
 }
 
 // newMerkleNode creates a new merkle node
 func newMerkleNode(left, right *MerkleNode, data []byte, hasher hash.Hash) *MerkleNode {
-	node := MerkleNode{left: left, right: right, data: data}
+	node := &MerkleNode{left: left, right: right, data: data}
 
 	var dataToHash []byte
 	if left == nil && right == nil {
@@ -54,14 +54,14 @@ func newMerkleNode(left, right *MerkleNode, data []byte, hasher hash.Hash) *Merk
 		dataToHash = data
 	} else {
 		// it's an inner node
-		dataToHash = append(left.hash, right.hash...)
+		dataToHash = append(left.hash.Bytes(), right.hash.Bytes()...)
 	}
 
 	hasher.Reset()
 	hasher.Write(dataToHash)
-	node.hash = hasher.Sum(nil)
+	node.hash = types.BytesToHash(hasher.Sum(nil))
 
-	return &node
+	return node
 }
 
 // MerkleTree is the structure for the Merkle tree.
@@ -132,7 +132,7 @@ func (t *MerkleTree) LeafIndex(leaf []byte) (uint64, error) {
 
 // Hash is the Merkle Tree root hash
 func (t *MerkleTree) Hash() types.Hash {
-	return types.BytesToHash(t.rootNode.hash)
+	return t.rootNode.hash
 }
 
 // String implements the stringer interface
@@ -155,11 +155,11 @@ func (t *MerkleTree) GenerateProof(leaf []byte) ([]types.Hash, error) {
 	}
 
 	node := leafNode
-	for !bytes.Equal(node.hash, t.rootNode.hash) {
-		if bytes.Equal(node.parent.left.hash, node.hash) {
-			proof = append(proof, types.BytesToHash(node.parent.right.hash))
+	for !bytes.Equal(node.hash.Bytes(), t.rootNode.hash.Bytes()) {
+		if bytes.Equal(node.parent.left.hash.Bytes(), node.hash.Bytes()) {
+			proof = append(proof, node.parent.right.hash)
 		} else {
-			proof = append(proof, types.BytesToHash(node.parent.left.hash))
+			proof = append(proof, node.parent.left.hash)
 		}
 
 		node = node.parent
@@ -202,6 +202,7 @@ func VerifyProofUsing(index uint64, leaf []byte, proof []types.Hash, root types.
 	return nil
 }
 
+// getProofHash uses the leaf and proof to recalculate the root hash of a tree that contains given leaf
 func getProofHash(index uint64, leaf []byte, proof []types.Hash, hasher hash.Hash) []byte {
 	hasher.Write(leaf)
 	computedHash := hasher.Sum(nil)
