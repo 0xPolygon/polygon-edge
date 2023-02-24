@@ -1,4 +1,4 @@
-package polybft
+package merkle
 
 import (
 	"bytes"
@@ -14,12 +14,12 @@ import (
 
 // A Merkle tree example:
 //
-//             ROOT
-//            /    \
-//          h3      h7
-//         /  \    /  \
-//       h1   h2  h5   h6
-//      / \   / \ / \   / \
+//              ROOT
+//            /       \
+//          h3         h7
+//         /  \      /    \
+//       h1   h2    h5    h6
+//      / \   / \   / \   / \
 //     L0 L1 L2 L3 L4 L5 L6 L7
 //
 // Each leaf node (L0 - L7) contains a data value, and each intermediate node
@@ -33,8 +33,6 @@ import (
 
 var (
 	errLeafNotFound = errors.New("leaf not found")
-	leftNodeDomain  = []byte("leftNodeDomain")
-	rightNodeDomain = []byte("rightNodeDomain")
 )
 
 // MerkleNode represents a single node in merkle tree
@@ -56,9 +54,7 @@ func newMerkleNode(left, right *MerkleNode, data []byte, hasher hash.Hash) *Merk
 		dataToHash = data
 	} else {
 		// it's an inner node
-		dataToHash = append(leftNodeDomain, left.hash...)
-		dataToHash = append(dataToHash, rightNodeDomain...)
-		dataToHash = append(dataToHash, right.hash...)
+		dataToHash = append(left.hash, right.hash...)
 	}
 
 	hasher.Reset()
@@ -214,14 +210,10 @@ func getProofHash(index uint64, leaf []byte, proof []types.Hash, hasher hash.Has
 		hasher.Reset()
 
 		if index%2 == 0 {
-			hasher.Write(leftNodeDomain)
 			hasher.Write(computedHash)
-			hasher.Write(rightNodeDomain)
 			hasher.Write(proof[i].Bytes())
 		} else {
-			hasher.Write(leftNodeDomain)
 			hasher.Write(proof[i].Bytes())
-			hasher.Write(rightNodeDomain)
 			hasher.Write(computedHash)
 		}
 

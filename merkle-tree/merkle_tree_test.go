@@ -1,4 +1,4 @@
-package polybft
+package merkle
 
 import (
 	"math"
@@ -80,7 +80,7 @@ func TestMerkleTree_VerifyProof_TreeWithOneNode(t *testing.T) {
 	require.NoError(t, VerifyProof(index, leafData, proof, tree.Hash()))
 
 	// invalid proof
-	invalidProof := []types.Hash{types.BytesToHash(generateRandomBytes(t))}
+	invalidProof := []types.Hash{types.BytesToHash([]byte{0, 1, 2, 3, 4})}
 	require.ErrorContains(t, VerifyProof(index, leafData, invalidProof, tree.Hash()), "not a member of merkle tree")
 
 	// invalid index
