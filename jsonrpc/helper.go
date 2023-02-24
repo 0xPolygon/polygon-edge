@@ -230,8 +230,6 @@ func DecodeTxn(arg *txnArgs, store dataGetter) (*types.Transaction, error) {
 		txn.To = arg.To
 	}
 
-	txn.PrefillFees(store.GetBaseFee())
-
 	txn.ComputeHash()
 
 	return txn, nil
