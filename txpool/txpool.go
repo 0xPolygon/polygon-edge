@@ -354,11 +354,6 @@ func (p *TxPool) getSealing() bool {
 	return atomic.LoadUint32(&p.sealing) == 1
 }
 
-// SetBaseFee sets the given base fee
-func (p *TxPool) SetBaseFee(baseFee uint64) {
-	atomic.StoreUint64(&p.baseFee, baseFee)
-}
-
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
 // and broadcasts it to the network (if enabled).
 func (p *TxPool) AddTx(tx *types.Transaction) error {
