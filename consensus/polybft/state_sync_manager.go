@@ -176,8 +176,7 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 		return nil
 	}
 
-	err := s.verifyVoteSignature(valSet, types.StringToAddress(msg.From), msg.Signature, msg.Hash)
-	if err != nil {
+	if err := s.verifyVoteSignature(valSet, types.StringToAddress(msg.From), msg.Signature, msg.Hash); err != nil {
 		return fmt.Errorf("error verifying vote signature: %w", err)
 	}
 
@@ -201,6 +200,7 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	return nil
 }
 
+// Verifies signature of the message against the public key of the signer and checks if the signer is a validator
 func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types.Address, signature []byte,
 	hash []byte) error {
 	validator := valSet.Accounts().GetValidatorMetadata(signer)
@@ -210,7 +210,7 @@ func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types
 
 	unmarshaledSignature, err := bls.UnmarshalSignature(signature)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshall signature: %w", err)
+		return fmt.Errorf("failed to unmarshal signature: %w", err)
 	}
 
 	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainCheckpointManager) {

@@ -143,6 +143,8 @@ func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
 }
 
 func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
+	t.Parallel()
+
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
@@ -166,6 +168,8 @@ func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 }
 
 func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) {
+	t.Parallel()
+
 	vals := newTestValidators(5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
