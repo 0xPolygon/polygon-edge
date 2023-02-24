@@ -180,7 +180,7 @@ func (e *Executor) BeginTxn(
 		Difficulty:   types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		BaseFee:      new(big.Int).SetUint64(header.BaseFee),
 		GasLimit:     int64(header.GasLimit),
-		ChainID:      int64(e.config.ChainID),
+		ChainID:      e.config.ChainID,
 		BurnContract: burnContract,
 	}
 

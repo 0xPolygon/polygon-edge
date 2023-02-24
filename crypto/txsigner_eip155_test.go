@@ -4,30 +4,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestFrontierSigner(t *testing.T) {
-	signer := &FrontierSigner{}
-
-	toAddress := types.StringToAddress("1")
-	key, err := GenerateECDSAKey()
-	assert.NoError(t, err)
-
-	txn := &types.Transaction{
-		To:       &toAddress,
-		Value:    big.NewInt(10),
-		GasPrice: big.NewInt(0),
-	}
-	signedTx, err := signer.SignTx(txn, key)
-	assert.NoError(t, err)
-
-	from, err := signer.Sender(signedTx)
-	assert.NoError(t, err)
-	assert.Equal(t, from, PubKeyToAddress(&key.PublicKey))
-}
 
 func TestEIP155Signer_Sender(t *testing.T) {
 	t.Parallel()
@@ -35,40 +14,49 @@ func TestEIP155Signer_Sender(t *testing.T) {
 	toAddress := types.StringToAddress("1")
 
 	testTable := []struct {
-		name    string
-		chainID *big.Int
+		name        string
+		chainID     *big.Int
+		isHomestead bool
 	}{
 		{
 			"mainnet",
 			big.NewInt(1),
+			true,
 		},
 		{
 			"expanse mainnet",
 			big.NewInt(2),
+			true,
 		},
 		{
 			"ropsten",
 			big.NewInt(3),
+			true,
 		},
 		{
 			"rinkeby",
 			big.NewInt(4),
+			true,
 		},
 		{
 			"goerli",
 			big.NewInt(5),
+			true,
 		},
 		{
 			"kovan",
 			big.NewInt(42),
+			true,
 		},
 		{
 			"geth private",
 			big.NewInt(1337),
+			true,
 		},
 		{
 			"mega large",
 			big.NewInt(0).Exp(big.NewInt(2), big.NewInt(20), nil), // 2**20
+			true,
 		},
 	}
 
@@ -88,7 +76,10 @@ func TestEIP155Signer_Sender(t *testing.T) {
 				GasPrice: big.NewInt(0),
 			}
 
-			signer := NewEIP155Signer(chain.AllForksEnabled.At(0), testCase.chainID.Uint64())
+			signer := NewEIP155Signer(
+				testCase.chainID.Uint64(),
+				testCase.isHomestead,
+			)
 
 			signedTx, signErr := signer.SignTx(txn, key)
 			if signErr != nil {
@@ -121,7 +112,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 			GasPrice: big.NewInt(0),
 		}
 
-		signer := NewEIP155Signer(chain.AllForksEnabled.At(0), chainIDTop)
+		signer := NewEIP155Signer(chainIDTop, true)
 
 		signedTx, signErr := signer.SignTx(txn, key)
 		if signErr != nil {
@@ -129,7 +120,7 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 		}
 
 		for _, chainIDBottom := range chainIDS {
-			signerBottom := NewEIP155Signer(chain.AllForksEnabled.At(0), chainIDBottom)
+			signerBottom := NewEIP155Signer(chainIDBottom, true)
 
 			recoveredSender, recoverErr := signerBottom.Sender(signedTx)
 			if chainIDTop == chainIDBottom {
