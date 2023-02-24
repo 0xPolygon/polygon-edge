@@ -130,7 +130,7 @@ func (t *Transaction) Copy() *Transaction {
 func (t *Transaction) Cost() *big.Int {
 	var factor *big.Int
 
-	if t.GasFeeCap != nil || t.GasFeeCap.BitLen() > 0 {
+	if t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0 {
 		factor = new(big.Int).Set(t.GasFeeCap)
 	} else {
 		factor = new(big.Int).Set(t.GasPrice)

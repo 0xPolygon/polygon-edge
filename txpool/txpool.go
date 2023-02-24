@@ -631,8 +631,12 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Reject underpriced transactions
-	if p.GetBaseFee() > 0 || tx.GasFeeCap.BitLen() > 0 || tx.GasTipCap.BitLen() > 0 {
+	if p.GetBaseFee() > 0 && tx.Type == types.DynamicFeeTx {
 		// Check EIP-1559-related fields and make sure they are correct
+		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
+			return ErrUnderpriced
+		}
+
 		if tx.GasFeeCap.BitLen() > 256 {
 			return ErrFeeCapVeryHigh
 		}
