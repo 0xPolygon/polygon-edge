@@ -16,7 +16,7 @@ type StateTransactionInput interface {
 }
 
 var (
-	// specific case where we need to encode state sync event as a tuple of tuple
+	// stateSyncABIType is a specific case where we need to encode state sync event as a tuple of tuple
 	stateSyncABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
 )
