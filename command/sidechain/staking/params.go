@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 var (
@@ -22,11 +22,7 @@ type stakeParams struct {
 }
 
 func (v *stakeParams) validateFlags() error {
-	if v.accountDir == "" && v.configPath == "" {
-		return polybftsecrets.ErrInvalidParams
-	}
-
-	return nil
+	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.configPath)
 }
 
 type stakeResult struct {

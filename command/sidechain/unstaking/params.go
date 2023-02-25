@@ -22,7 +22,7 @@ type unstakeParams struct {
 }
 
 func (v *unstakeParams) validateFlags() error {
-	return sidechainHelper.CheckIfDirectoryExist(v.accountDir)
+	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.configPath)
 }
 
 type unstakeResult struct {

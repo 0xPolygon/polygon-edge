@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -27,6 +28,18 @@ const (
 func CheckIfDirectoryExist(dir string) error {
 	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("provided directory '%s' doesn't exist", dir)
+	}
+
+	return nil
+}
+
+func ValidateSecretFlags(dataDir, config string) error {
+	if config == "" {
+		if dataDir == "" {
+			return polybftsecrets.ErrInvalidParams
+		} else {
+			return CheckIfDirectoryExist(dataDir)
+		}
 	}
 
 	return nil
