@@ -21,6 +21,7 @@ var (
 	BLS               *artifact.Artifact
 	BLS256            *artifact.Artifact
 	System            *artifact.Artifact
+	Merkle            *artifact.Artifact
 	ChildValidatorSet *artifact.Artifact
 	MRC20             *artifact.Artifact
 
@@ -55,6 +56,11 @@ func init() {
 	}
 
 	BLS256, err = artifact.DecodeArtifact([]byte(BN256G2Artifact))
+	if err != nil {
+		panic(err)
+	}
+
+	Merkle, err = artifact.DecodeArtifact([]byte(MerkleArtifact))
 	if err != nil {
 		panic(err)
 	}

@@ -168,7 +168,7 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
 	} else if bytes.Equal(sig, contractsapi.ChildValidatorSet.Abi.Methods["commitEpoch"].ID()) {
-		// uptime
+		// commit epoch
 		obj = &contractsapi.CommitEpochFunction{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")

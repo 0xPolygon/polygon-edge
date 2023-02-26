@@ -28,9 +28,11 @@ type blockBuilder interface {
 }
 
 var (
-	errUptimeTxDoesNotExist          = errors.New("uptime transaction is not found in the epoch ending block")
-	errUptimeTxNotExpected           = errors.New("didn't expect uptime transaction in a non epoch ending block")
-	errUptimeTxOnlyOneUptimeExpected = errors.New("only one uptime transaction is allowed in epoch ending block")
+	errCommitEpochTxDoesNotExist   = errors.New("commit epoch transaction is not found in the epoch ending block")
+	errCommitEpochTxNotExpected    = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
+	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
+	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
+		"is either nil or it does not match the received one")
 )
 
 type fsm struct {
@@ -58,8 +60,10 @@ type fsm struct {
 	// epochNumber denotes current epoch number
 	epochNumber uint64
 
-	// uptimeCounter holds info about number of times validators sealed a block (only present if isEndOfEpoch is true)
-	uptimeCounter *contractsapi.CommitEpochFunction
+	// commitEpochInput holds info about validators performance during single epoch
+	// (namely how many times each validator signed block during epoch).
+	// It is populated only for epoch-ending blocks.
+	commitEpochInput *contractsapi.CommitEpochFunction
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -99,15 +103,30 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	if f.isEndOfEpoch {
-		tx, err := f.createValidatorsUptimeTx()
+		tx, err := f.createCommitEpochTx()
 		if err != nil {
 			return nil, err
 		}
 
 		if err := f.blockBuilder.WriteTx(tx); err != nil {
-			return nil, fmt.Errorf("failed to commit validators uptime transaction: %w", err)
+			return nil, fmt.Errorf("failed to apply commit epoch transaction: %w", err)
 		}
+	}
 
+	if f.config.IsBridgeEnabled() {
+		for _, tx := range f.stateTransactions() {
+			if err := f.blockBuilder.WriteTx(tx); err != nil {
+				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
+			}
+		}
+	}
+
+	// fill the block with transactions
+	f.blockBuilder.Fill()
+
+	// update extra validators if needed, but only after all transactions has been written
+	// each transaction can update state and therefore change validators stake for example
+	if f.isEndOfEpoch {
 		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
 		if err != nil {
 			return nil, err
@@ -121,17 +140,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 	}
-
-	if f.config.IsBridgeEnabled() {
-		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.WriteTx(tx); err != nil {
-				return nil, fmt.Errorf("failed to commit state transaction. Error: %w", err)
-			}
-		}
-	}
-
-	// fill the block with transactions
-	f.blockBuilder.Fill()
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
 	if err != nil {
@@ -197,10 +205,10 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 	return txns
 }
 
-// createValidatorsUptimeTx create a StateTransaction, which invokes ValidatorSet smart contract
+// createCommitEpochTx create a StateTransaction, which invokes ValidatorSet smart contract
 // and sends all the necessary metadata to it.
-func (f *fsm) createValidatorsUptimeTx() (*types.Transaction, error) {
-	input, err := f.uptimeCounter.EncodeAbi()
+func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
+	input, err := f.commitEpochInput.EncodeAbi()
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +230,7 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 		return fmt.Errorf("failed to unmarshall signature: %w", err)
 	}
 
-	if !signature.Verify(validator.BlsKey, proposalHash) {
+	if !signature.Verify(validator.BlsKey, proposalHash, bls.DomainCheckpointManager) {
 		return fmt.Errorf("incorrect commit signature from %s", from)
 	}
 
@@ -246,13 +254,26 @@ func (f *fsm) Validate(proposal []byte) error {
 		)
 	}
 
-	currentExtra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
 		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
 	parentExtra, err := GetIbftExtra(f.parent.ExtraData)
 	if err != nil {
+		return err
+	}
+
+	if extra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for block %d is missing", block.Number())
+	}
+
+	if parentExtra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for parent block %d is missing", f.parent.Number)
+	}
+
+	if err := extra.ValidateParentSignatures(block.Number(), f.polybftBackend, nil, f.parent, parentExtra,
+		f.backend.GetChainID(), bls.DomainCheckpointManager, f.logger); err != nil {
 		return err
 	}
 
@@ -264,47 +285,26 @@ func (f *fsm) Validate(proposal []byte) error {
 	nextValidators := f.validators.Accounts()
 
 	validateExtraData := func(transition *state.Transition) error {
-		nextValidators, err = f.getCurrentValidators(transition)
-		if err != nil {
+		if f.isEndOfEpoch {
+			if nextValidators, err = f.getCurrentValidators(transition); err != nil {
+				return err
+			}
+		}
+
+		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
 			return err
 		}
 
-		if err := currentExtra.Validate(parentExtra, currentValidators, nextValidators); err != nil {
-			return err
-		}
-
-		return nil
+		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
 	}
 
-	// TODO: Validate validator set delta?
-
-	// TODO: Move signature validation logic to Extra
-	blockNumber := block.Number()
-	if blockNumber > 1 {
-		// verify parent signature
-		// We skip block 0 (genesis) and block 1 (parent is genesis)
-		// since those blocks do not include any parent information with signatures
-		validators, err := f.polybftBackend.GetValidators(blockNumber-2, nil)
+	if f.logger.IsTrace() && block.Number() > 1 {
+		validators, err := f.polybftBackend.GetValidators(block.Number()-2, nil)
 		if err != nil {
-			return fmt.Errorf("cannot get validators:%w", err)
+			return fmt.Errorf("failed to retrieve validators:%w", err)
 		}
 
-		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-
-		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
-		if err != nil {
-			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
-		}
-
-		if err := currentExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
-			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
-				f.parent.Number,
-				parentCheckpointHash,
-				blockNumber,
-				err,
-			)
-		}
+		f.logger.Trace("[FSM Validate]", "Block", block.Number(), "parent validators", validators)
 	}
 
 	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
@@ -313,7 +313,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	if f.logger.IsDebug() {
-		checkpointHash, err := currentExtra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+		checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 		if err != nil {
 			return fmt.Errorf("failed to calculate proposal hash: %w", err)
 		}
@@ -353,8 +353,8 @@ func (f *fsm) ValidateSender(msg *proto.Message) error {
 
 func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	var (
-		commitmentMessageSignedExists bool
-		uptimeTransactionExists       bool
+		commitmentTxExists  bool
+		commitEpochTxExists bool
 	)
 
 	for _, tx := range transactions {
@@ -373,13 +373,13 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("found commitment tx in block which should not contain it: tx = %v", tx.Hash)
 			}
 
-			if commitmentMessageSignedExists {
+			if commitmentTxExists {
 				return fmt.Errorf("only one commitment tx is allowed per block: %v", tx.Hash)
 			}
 
-			commitmentMessageSignedExists = true
-			signers, err := f.validators.Accounts().GetFilteredValidators(stateTxData.AggSignature.Bitmap)
+			commitmentTxExists = true
 
+			signers, err := f.validators.Accounts().GetFilteredValidators(stateTxData.AggSignature.Bitmap)
 			if err != nil {
 				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %w", tx.Hash, err)
 			}
@@ -398,30 +398,30 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return err
 			}
 
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
+			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainCheckpointManager)
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
 		case *contractsapi.CommitEpochFunction:
-			if uptimeTransactionExists {
-				// if we already validated uptime transaction,
-				//that means someone added two or more uptime tx to block,
-				// which is not allowed
-				return errUptimeTxOnlyOneUptimeExpected
+			if commitEpochTxExists {
+				// if we already validated commit epoch tx,
+				// that means someone added more than one commit epoch tx to block,
+				// which is invalid
+				return errCommitEpochTxSingleExpected
 			}
 
-			uptimeTransactionExists = true
+			commitEpochTxExists = true
 
-			if err := f.verifyValidatorsUptimeTx(tx); err != nil {
-				return fmt.Errorf("error while verifying uptime transaction. error: %w", err)
+			if err := f.verifyCommitEpochTx(tx); err != nil {
+				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
 			}
 		}
 	}
 
-	if f.isEndOfEpoch && !uptimeTransactionExists {
-		// this is a check if uptime transaction is not in the list of transactions at all
+	if f.isEndOfEpoch && !commitEpochTxExists {
+		// this is a check if commit epoch transaction is not in the list of transactions at all
 		// but it should be
-		return errUptimeTxDoesNotExist
+		return errCommitEpochTxDoesNotExist
 	}
 
 	return nil
@@ -431,10 +431,23 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.FullBlock, error) {
 	newBlock := f.target
 
+	var proposedBlock types.Block
+	if err := proposedBlock.UnmarshalRLP(proposal); err != nil {
+		return nil, fmt.Errorf("failed to insert proposal, block unmarshaling failed: %w", err)
+	}
+
+	if newBlock == nil || newBlock.Block.Hash() != proposedBlock.Hash() {
+		// if this is the case, we will let syncer insert the block
+		return nil, errProposalDontMatch
+	}
+
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	extra, err := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert proposal, due to not being able to extract extra data: %w", err)
+	}
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())
@@ -514,26 +527,26 @@ func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (Account
 	return newValidators, nil
 }
 
-// verifyValidatorsUptimeTx creates uptime transaction and compares its hash with the one extracted from the block.
-func (f *fsm) verifyValidatorsUptimeTx(blockUptimeTx *types.Transaction) error {
+// verifyCommitEpochTx creates commit epoch transaction and compares its hash with the one extracted from the block.
+func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 	if f.isEndOfEpoch {
-		createdUptimeTx, err := f.createValidatorsUptimeTx()
+		localCommitEpochTx, err := f.createCommitEpochTx()
 		if err != nil {
 			return err
 		}
 
-		if blockUptimeTx.Hash != createdUptimeTx.Hash {
+		if commitEpochTx.Hash != localCommitEpochTx.Hash {
 			return fmt.Errorf(
-				"invalid uptime transaction. Expected '%s', but got '%s' uptime transaction hash",
-				blockUptimeTx.Hash,
-				createdUptimeTx.Hash,
+				"invalid commit epoch transaction. Expected '%s', but got '%s' commit epoch transaction hash",
+				localCommitEpochTx.Hash,
+				commitEpochTx.Hash,
 			)
 		}
 
 		return nil
 	}
 
-	return errUptimeTxNotExpected
+	return errCommitEpochTxNotExpected
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {

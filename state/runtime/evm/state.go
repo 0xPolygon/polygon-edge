@@ -114,7 +114,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 		return false
 	}
 
-	return c.bitmap.isSet(uint(udest))
+	return c.bitmap.isSet(udest)
 }
 
 func (c *state) Halt() {
@@ -298,7 +298,7 @@ func (c *state) Len() int {
 // consumes gas if memory needs to be expanded
 func (c *state) allocateMemory(offset, size *big.Int) bool {
 	if !offset.IsUint64() || !size.IsUint64() {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return false
 	}
@@ -311,7 +311,7 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 	s := size.Uint64()
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return false
 	}

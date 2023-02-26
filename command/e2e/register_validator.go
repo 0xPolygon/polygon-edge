@@ -2,16 +2,21 @@ package e2e
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/secrets"
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/mitchellh/go-glint"
@@ -69,6 +74,13 @@ func setFlags(cmd *cobra.Command) {
 		"stake represents amount which is going to be staked by the new validator account",
 	)
 
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
+	)
+
 	helper.RegisterJSONRPCFlag(cmd)
 }
 
@@ -109,6 +121,21 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	sRaw, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
+	if err != nil {
+		return err
+	}
+
+	sb, err := hex.DecodeString(string(sRaw))
+	if err != nil {
+		return err
+	}
+
+	blsSignature, err := bls.UnmarshalSignature(sb)
+	if err != nil {
+		return err
+	}
+
 	var validator *NewValidator
 
 	steps := []*txnStep{
@@ -127,7 +154,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		{
 			name: "register",
 			action: func() asyncTxn {
-				return registerValidator(newValidatorSender, newValidatorAccount)
+				return registerValidator(newValidatorSender, newValidatorAccount, blsSignature)
 			},
 			postHook: func(receipt *ethgo.Receipt) error {
 				if receipt.Status != uint64(types.ReceiptSuccess) {
@@ -347,7 +374,11 @@ func (t *txnSender) sendTransaction(txn *types.Transaction) asyncTxn {
 		return &asyncTxnImpl{err: err}
 	}
 
-	signer := crypto.NewEIP155Signer(chainID.Uint64())
+	signer := crypto.NewEIP155Signer(
+		chain.AllForksEnabled.At(0),
+		chainID.Uint64(),
+	)
+
 	signedTxn, err := signer.SignTx(txn, privateKey)
 
 	if err != nil {
@@ -469,14 +500,9 @@ func fund(sender *txnSender, addr types.Address) asyncTxn {
 	return sender.sendTransaction(txn)
 }
 
-func registerValidator(sender *txnSender, account *wallet.Account) asyncTxn {
+func registerValidator(sender *txnSender, account *wallet.Account, signature *bls.Signature) asyncTxn {
 	if registerFn == nil {
 		return &asyncTxnImpl{err: errors.New("failed to create register ABI function")}
-	}
-
-	signature, err := account.Bls.Sign([]byte(contracts.PolyBFTRegisterMessage))
-	if err != nil {
-		return &asyncTxnImpl{err: err}
 	}
 
 	sigMarshal, err := signature.ToBigInt()

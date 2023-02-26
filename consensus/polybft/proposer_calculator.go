@@ -33,7 +33,7 @@ type ProposerSnapshot struct {
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
 func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, error) {
-	snapshot, err := config.State.getProposerSnapshot()
+	snapshot, err := config.State.ProposerSnapshotStore.getProposerSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 		}
 	}
 
-	if err := pc.state.writeProposerSnapshot(pc.snapshot); err != nil {
+	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshot(pc.snapshot); err != nil {
 		return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
 	}
 

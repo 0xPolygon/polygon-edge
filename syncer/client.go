@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -36,6 +37,8 @@ type syncPeerClient struct {
 	peerConnectionUpdateCh chan *event.PeerEvent   // peer connection update channel
 
 	shouldEmitBlocks bool // flag for emitting blocks in the topic
+	closeCh          chan struct{}
+	closed           *uint64 // ACTIVE == 0, CLOSED == non-zero.
 }
 
 func NewSyncPeerClient(
@@ -51,11 +54,16 @@ func NewSyncPeerClient(
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 		shouldEmitBlocks:       true,
+		closeCh:                make(chan struct{}),
+		closed:                 new(uint64),
 	}
 }
 
 // Start processes for SyncPeerClient
 func (m *syncPeerClient) Start() error {
+	// Mark client active.
+	atomic.StoreUint64(m.closed, 0)
+
 	go m.startNewBlockProcess()
 	go m.startPeerEventProcess()
 
@@ -68,14 +76,26 @@ func (m *syncPeerClient) Start() error {
 
 // Close terminates running processes for SyncPeerClient
 func (m *syncPeerClient) Close() {
+	if atomic.SwapUint64(m.closed, 1) > 0 {
+		// Already closed.
+		return
+	}
+
+	if m.topic != nil {
+		m.topic.Close()
+	}
+
 	if m.subscription != nil {
 		m.subscription.Close()
 
 		m.subscription = nil
 	}
 
+	if m.closeCh != nil {
+		close(m.closeCh)
+	}
+
 	close(m.peerStatusUpdateCh)
-	close(m.peerConnectionUpdateCh)
 }
 
 // DisablePublishingPeerStatus disables publishing own status via gossip
@@ -190,6 +210,12 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 		return
 	}
 
+	if atomic.LoadUint64(m.closed) > 0 {
+		m.logger.Debug("received status from peer after client was closed, ignoring", "id", from)
+
+		return
+	}
+
 	m.peerStatusUpdateCh <- &NoForkPeer{
 		ID:       from,
 		Number:   status.Number,
@@ -201,7 +227,15 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 func (m *syncPeerClient) startNewBlockProcess() {
 	m.subscription = m.blockchain.SubscribeEvents()
 
-	for event := range m.subscription.GetEventCh() {
+	for {
+		var event *blockchain.Event
+
+		select {
+		case <-m.closeCh:
+			return
+		case event = <-m.subscription.GetEventCh():
+		}
+
 		if !m.shouldEmitBlocks {
 			continue
 		}
@@ -220,6 +254,8 @@ func (m *syncPeerClient) startNewBlockProcess() {
 
 // startPeerEventProcess starts subscribing peer connection change events and process them
 func (m *syncPeerClient) startPeerEventProcess() {
+	defer close(m.peerConnectionUpdateCh)
+
 	peerEventCh, err := m.network.SubscribeCh(context.Background())
 	if err != nil {
 		m.logger.Error("failed to subscribe", "err", err)
@@ -227,9 +263,15 @@ func (m *syncPeerClient) startPeerEventProcess() {
 		return
 	}
 
-	for e := range peerEventCh {
-		if e.Type == event.PeerConnected || e.Type == event.PeerDisconnected {
-			m.peerConnectionUpdateCh <- e
+	for {
+		select {
+		case <-m.closeCh:
+			return
+
+		case e := <-peerEventCh:
+			if e != nil && (e.Type == event.PeerConnected || e.Type == event.PeerDisconnected) {
+				m.peerConnectionUpdateCh <- e
+			}
 		}
 	}
 }

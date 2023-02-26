@@ -14,7 +14,7 @@ type Signature struct {
 }
 
 // Verify checks the BLS signature of the message against the public key of its signer
-func (s *Signature) Verify(pub *PublicKey, message []byte) bool {
+func (s *Signature) Verify(pub *PublicKey, message, domain []byte) bool {
 	point, err := hashToPoint(message, domain)
 	if err != nil {
 		return false
@@ -24,8 +24,8 @@ func (s *Signature) Verify(pub *PublicKey, message []byte) bool {
 }
 
 // VerifyAggregated checks the BLS signature of the message against the aggregated public keys of its signers
-func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg []byte) bool {
-	return s.Verify(PublicKeys(publicKeys).Aggregate(), msg)
+func (s *Signature) VerifyAggregated(publicKeys []*PublicKey, msg, domain []byte) bool {
+	return s.Verify(PublicKeys(publicKeys).Aggregate(), msg, domain)
 }
 
 // Marshal the signature to bytes.

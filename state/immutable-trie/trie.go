@@ -321,11 +321,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			k := search[0]
 			child := n.getEdge(k)
 			newChild := t.insert(child, search[1:], value)
-			if child == nil {
-				b.setEdge(k, newChild)
-			} else {
-				b.setEdge(k, newChild)
-			}
+			b.setEdge(k, newChild)
 
 			return b
 		}
