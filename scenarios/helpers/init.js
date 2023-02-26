@@ -5,8 +5,7 @@ import wallet from 'k6/x/ethereum/wallet';
 export function fundTestAccounts(client, root_address) {
     var accounts = [];
     var nonce = client.getNonce(root_address);
-    nonce++;
-    console.log(nonce);
+    console.log(`nonce => ${nonce}`);
 
     // fund the VUs accounts
     for (let i = 0; i < exec.instance.vusInitialized; i++) {
@@ -16,7 +15,7 @@ export function fundTestAccounts(client, root_address) {
             address: tacc.address,
         };
 
-        // fund each account with 5 ETH
+        // fund each account with some coins
         var tx = {
             to: tacc.address,
             value: Number(0.05 * 1e18),
@@ -26,8 +25,9 @@ export function fundTestAccounts(client, root_address) {
 
         console.log(JSON.stringify(tx));
         var txh = client.sendRawTransaction(tx)
+        console.log(`txn hash => ${txh}`);
         client.waitForTransactionReceipt(txh).then((receipt) => {
-            console.log(`account funded => ${receipt.block_hash}`);
+            console.log(`account funded => ${JSON.stringify(receipt)}`);
         });
 
         nonce++;
