@@ -109,7 +109,7 @@
                     "type": "section",
                     "text": {
                       "type": "mrkdwn",
-                      "text": "*Average TPS*: `${{ steps.k6.outputs.tps_avg }}`\n*Max TPS*: `${{ steps.k6.outputs.tps_max }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`\n*Average Gas Used*: `${{ steps.k6.outputs.gas_avg }}`\n*Max Gas Used*: `${{ steps.k6.outputs.gas_max }}`"
+                      "text": "*Scenario*: `${{ inputs.scenario }}`\n *Average TPS*: `${{ steps.k6.outputs.tps_avg }}`\n*Max TPS*: `${{ steps.k6.outputs.tps_max }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`\n*Average Gas Used*: `${{ steps.k6.outputs.gas_avg }}`\n*Max Gas Used*: `${{ steps.k6.outputs.gas_max }}`"
                     }
                   },
                   {
