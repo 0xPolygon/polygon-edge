@@ -18,10 +18,7 @@
         scenario:
           default: 'simple'
           description: The scenario to run
-          type: choice
-          options:
-            - simple
-            - multiple
+          type: string
     workflow_call:
       inputs:
         environment:
@@ -78,7 +75,7 @@
         - id: k6
           name: Run scenario
           run: |
-            ./k6 run --out statsd scenarios/multiple.js
+            ./k6 run --out statsd scenarios/${{ inputs.scenario }}.js
             echo "tps_avg=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.avg')" >> $GITHUB_OUTPUT
             echo "tps_max=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.max')" >> $GITHUB_OUTPUT
             echo "iterations=$(cat summary.json | jq -r '.metrics.iterations.values.count')" >> $GITHUB_OUTPUT

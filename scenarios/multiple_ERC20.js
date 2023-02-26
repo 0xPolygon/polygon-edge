@@ -11,8 +11,8 @@ export const options = {
             rate: 200,
             timeUnit: '1s',
             duration: '1m',
-            preAllocatedVUs: 200,
-            maxVUs: 200,
+            preAllocatedVUs: 10,
+            maxVUs: 10,
         },
     },
 };
@@ -30,45 +30,40 @@ const ZexCoin = JSON.parse(open("./contracts/ZexCoinERC20.json"));
 export function setup() {
     let data = {};
 
-    const client = new eth.Client({ 
+    const client = new eth.Client({
         url: rpc_url,
         mnemonic: mnemonic,
     });
 
     const receipt = client.deployContract(JSON.stringify(ZexCoin.abi), ZexCoin.bytecode.substring(2), 500000000000, "ZexCoin", "ZEX")
 
-    data.contract_address = receipt.contract_address;
-    return { accounts: fundTestAccounts(client, root_address) };
+    return {
+        accounts: fundTestAccounts(client, root_address),
+        contract_address: data.contract_address
+    };
 }
 
-var nonce = 0;
-var client;
+let nonce = 0;
+let client;
 
 // VU client
 export default function (data) {
+    let acc = data.accounts[exec.vu.idInInstance - 1];
+
     if (client == null) {
         client = new eth.Client({
             url: rpc_url,
-            privateKey: data.accounts[exec.vu.idInInstance - 1].private_key
+            privateKey: acc.private_key
         });
     }
 
-    console.log(`nonce => ${nonce}`);
+    console.log(acc.address);
+    const con = client.newContract(data.contract_address, JSON.stringify(ZexCoin.abi));
+    const res = con.txn("transfer", { gas_limit: 100000, nonce: nonce }, acc.address, 1);
+    console.log(`txn hash => ${res}`);
 
-    const tx = {
-        to: "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
-        value: Number(0.0001 * 1e18),
-        gas_price: client.gasPrice(),
-        nonce: nonce,
-    };
-
-    const txh = client.sendRawTransaction(tx);
-    console.log("tx hash => " + txh);
     nonce++;
-
-    // client.waitForTransactionReceipt(txh).then((receipt) => {
-    //   console.log("tx block hash => " + receipt.block_hash);
-    // });
+    // console.log(JSON.stringify(con.call("balanceOf", acc.address)));
 }
 
 export function handleSummary(data) {
