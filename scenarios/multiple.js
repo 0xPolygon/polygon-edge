@@ -11,8 +11,8 @@ export const options = {
       rate: 200,
       timeUnit: '1s',
       duration: '1m',
-      preAllocatedVUs: 200,
-      maxVUs: 200,
+      preAllocatedVUs: 10,
+      maxVUs: 10,
     },
   },
 };
