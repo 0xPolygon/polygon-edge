@@ -7,3 +7,6 @@
 	url = https://github.com/0xPolygon/core-contracts
 	shallow = true
 	branch = feat-polybft-release
+[submodule "account-abstraction-invoker"]
+	path = account-abstraction-invoker
+	url = https://github.com/0xPolygon/account-abstraction-invoker/

@@ -30,7 +30,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, opts)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, opts)
 		tx := getDummyTxs()[0]
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, nil).Once()
@@ -51,7 +51,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
 		tx := getDummyTxs()[1]
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, errors.New("not nil")).Once()
@@ -69,7 +69,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
 		tx := getDummyTxs()[2]
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, nil).Once()
@@ -87,7 +87,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil"))
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
 		tx := getDummyTxs()[3]
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, errors.New("not nil")).Once()
@@ -109,7 +109,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil"))
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
 		tx := getDummyTxs()[4]
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, net.ErrClosed).Once()
@@ -131,7 +131,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil")).Once()
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
 		tx := getDummyTxs()[0]
 		state.On("Update", mock.Anything).Return(nil)
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).

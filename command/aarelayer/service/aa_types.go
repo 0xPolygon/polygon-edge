@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -66,6 +67,29 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 	t.Signature = sig
 
 	return nil
+}
+
+func (t *AATransaction) ToAbi() (*contractsapi.Signature, *contractsapi.Transaction) {
+	tx := &contractsapi.Transaction{
+		From:    t.Transaction.From,
+		Nonce:   new(big.Int).SetUint64(t.Transaction.Nonce),
+		Payload: make([]*contractsapi.TransactionPayload, len(t.Transaction.Payload)),
+	}
+
+	for i, payload := range t.Transaction.Payload {
+		tx.Payload[i] = &contractsapi.TransactionPayload{
+			To:       *payload.To,
+			Value:    new(big.Int).Set(payload.Value),
+			GasLimit: new(big.Int).Set(payload.GasLimit),
+			Data:     payload.Input,
+		}
+	}
+
+	return &contractsapi.Signature{
+		R: new(big.Int).SetBytes(t.Signature[:32]),
+		S: new(big.Int).SetBytes(t.Signature[32:64]),
+		V: t.Signature[64] != 0,
+	}, tx
 }
 
 // Transaction represents a transaction

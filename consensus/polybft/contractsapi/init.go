@@ -28,6 +28,9 @@ var (
 	ChildERC20Predicate *artifact.Artifact
 	L2StateSender       *artifact.Artifact
 
+	// account abstraction sc
+	AccountAbstractionInvoker *artifact.Artifact
+
 	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
@@ -110,6 +113,11 @@ func init() {
 	}
 
 	RootERC20, err = artifact.DecodeArtifact([]byte(MockERC20Artifact))
+	if err != nil {
+		panic(err)
+	}
+
+	AccountAbstractionInvoker, err = artifact.DecodeArtifact([]byte(AccountAbstractionInvokerArtifact))
 	if err != nil {
 		panic(err)
 	}

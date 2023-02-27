@@ -28,4 +28,7 @@ var (
 	BLSAggSigsVerificationPrecompile = types.StringToAddress("0x2030")
 	// ConsolePrecompile is and address of Hardhat console precompile
 	ConsolePrecompile = types.StringToAddress("0x000000000000000000636F6e736F6c652e6c6f67")
+
+	// AccountAbstractionInvokerContract is address of account abstraction invoker contracts
+	AccountAbstractionInvokerContract = types.StringToAddress("0x3001")
 )

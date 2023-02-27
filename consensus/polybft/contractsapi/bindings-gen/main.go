@@ -125,6 +125,14 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"AccountAbstractionInvoker",
+			gensc.AccountAbstractionInvoker,
+			[]string{
+				"invoke",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

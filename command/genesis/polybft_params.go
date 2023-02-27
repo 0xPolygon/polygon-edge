@@ -220,6 +220,11 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			artifact: contractsapi.L2StateSender,
 			address:  contracts.L2StateSenderContract,
 		},
+		{
+			// AccountAbstractionInvoker contract
+			artifact: contractsapi.AccountAbstractionInvoker,
+			address:  contracts.AccountAbstractionInvokerContract,
+		},
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))

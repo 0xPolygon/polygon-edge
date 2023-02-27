@@ -454,3 +454,65 @@ func (m *MintFunction) EncodeAbi() ([]byte, error) {
 func (m *MintFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }
+
+type Signature struct {
+	R *big.Int `abi:"r"`
+	S *big.Int `abi:"s"`
+	V bool     `abi:"v"`
+}
+
+var SignatureABIType = abi.MustNewType("tuple(uint256 r,uint256 s,bool v)")
+
+func (s *Signature) EncodeAbi() ([]byte, error) {
+	return SignatureABIType.Encode(s)
+}
+
+func (s *Signature) DecodeAbi(buf []byte) error {
+	return decodeStruct(SignatureABIType, buf, &s)
+}
+
+type TransactionPayload struct {
+	To       types.Address `abi:"to"`
+	Value    *big.Int      `abi:"value"`
+	GasLimit *big.Int      `abi:"gasLimit"`
+	Data     []byte        `abi:"data"`
+}
+
+var TransactionPayloadABIType = abi.MustNewType("tuple(address to,uint256 value,uint256 gasLimit,bytes data)")
+
+func (t *TransactionPayload) EncodeAbi() ([]byte, error) {
+	return TransactionPayloadABIType.Encode(t)
+}
+
+func (t *TransactionPayload) DecodeAbi(buf []byte) error {
+	return decodeStruct(TransactionPayloadABIType, buf, &t)
+}
+
+type Transaction struct {
+	From    types.Address         `abi:"from"`
+	Nonce   *big.Int              `abi:"nonce"`
+	Payload []*TransactionPayload `abi:"payload"`
+}
+
+var TransactionABIType = abi.MustNewType("tuple(address from,uint256 nonce,tuple(address to,uint256 value,uint256 gasLimit,bytes data)[] payload)")
+
+func (t *Transaction) EncodeAbi() ([]byte, error) {
+	return TransactionABIType.Encode(t)
+}
+
+func (t *Transaction) DecodeAbi(buf []byte) error {
+	return decodeStruct(TransactionABIType, buf, &t)
+}
+
+type InvokeFunction struct {
+	Signature   *Signature   `abi:"signature"`
+	Transaction *Transaction `abi:"transaction"`
+}
+
+func (i *InvokeFunction) EncodeAbi() ([]byte, error) {
+	return AccountAbstractionInvoker.Abi.Methods["invoke"].Encode(i)
+}
+
+func (i *InvokeFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(AccountAbstractionInvoker.Abi.Methods["invoke"], buf, i)
+}

@@ -7,6 +7,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 )
@@ -17,6 +18,7 @@ type AARelayerService struct {
 	state        AATxState
 	txSender     AATxSender
 	key          ethgo.Key
+	invokerAddr  types.Address
 	pullTime     time.Duration
 	receiptDelay time.Duration
 }
@@ -26,12 +28,14 @@ func NewAARelayerService(
 	pool AAPool,
 	state AATxState,
 	key ethgo.Key,
+	invokerAddr types.Address,
 	opts ...TxRelayerOption) *AARelayerService {
 	service := &AARelayerService{
 		txSender:     txSender,
 		pool:         pool,
 		state:        state,
 		key:          key,
+		invokerAddr:  invokerAddr,
 		pullTime:     time.Millisecond * 5000, // every five seconds pull from pool
 		receiptDelay: time.Millisecond * 50,
 	}
@@ -66,10 +70,15 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 }
 
 func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTransaction) error {
-	var (
-		netErr net.Error
-		tx     = rs.makeEthgoTransaction(stateTx)
-	)
+	var netErr net.Error
+
+	tx, err := rs.makeEthgoTransaction(stateTx)
+	if err != nil {
+		// this should not happened
+		rs.pool.Push(stateTx)
+
+		return err
+	}
 
 	hash, err := rs.txSender.SendTransaction(tx, rs.key)
 	// if its network error return tx back to the pool
@@ -120,12 +129,23 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 	return nil
 }
 
-func (rs *AARelayerService) makeEthgoTransaction(*AAStateTransaction) *ethgo.Transaction {
-	// TODO: encode stateTx to input
+func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) (*ethgo.Transaction, error) {
+	signature, tx := stateTx.Tx.ToAbi()
+	params := &contractsapi.InvokeFunction{
+		Signature:   signature,
+		Transaction: tx,
+	}
+
+	input, err := params.EncodeAbi()
+	if err != nil {
+		return nil, err
+	}
+
 	return &ethgo.Transaction{
 		From:  rs.key.Address(),
-		Input: nil,
-	}
+		To:    (*ethgo.Address)(&rs.invokerAddr),
+		Input: input,
+	}, nil
 }
 
 func populateStateTx(stateTx *AAStateTransaction, receipt *ethgo.Receipt) {

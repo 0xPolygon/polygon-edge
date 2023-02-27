@@ -59,6 +59,7 @@ test-e2e-polybft:
 .PHONY: compile-core-contracts
 compile-core-contracts:
 	cd core-contracts && npm install && npm run compile
+	cd account-abstraction-invoker && npm install && npx hardhat compile
 	$(MAKE) generate-smart-contract-bindings
 
 .PHONY: generate-smart-contract-bindings
