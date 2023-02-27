@@ -62,7 +62,7 @@ In order to do so, run `make compile-core-contracts`.
 
     ```bash
     polygon-edge genesis --consensus polybft --block-gas-limit 10000000 --epoch-size 10
-    [--bridge-json-rpc <rootchain_ip_address>] [--contracts-path ./core-contracts/artifacts] [--manifest ./manifest.json]
+    [--bridge-json-rpc <rootchain_ip_address>] [--manifest ./manifest.json]
     ```
 
 7. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**

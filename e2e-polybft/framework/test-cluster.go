@@ -42,9 +42,6 @@ const (
 )
 
 const (
-	// path to core contracts
-	defaultContractsPath = "./../core-contracts/artifacts/contracts/"
-
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
 )
@@ -78,7 +75,6 @@ type TestClusterConfig struct {
 	LogsDir           string
 	TmpDir            string
 	BlockGasLimit     uint64
-	ContractsDir      string
 	ValidatorPrefix   string
 	Binary            string
 	ValidatorSetSize  uint64
@@ -244,10 +240,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		PremineValidators: command.DefaultPremineBalance,
 	}
 
-	if config.ContractsDir == "" {
-		config.ContractsDir = defaultContractsPath
-	}
-
 	if config.ValidatorPrefix == "" {
 		config.ValidatorPrefix = defaultValidatorPrefix
 	}
@@ -319,7 +311,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--manifest", manifestPath,
 			"--consensus", "polybft",
 			"--dir", path.Join(config.TmpDir, "genesis.json"),
-			"--contracts-path", defaultContractsPath,
 			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
