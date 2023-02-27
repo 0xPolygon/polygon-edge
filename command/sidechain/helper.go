@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -45,13 +44,18 @@ func ValidateSecretFlags(dataDir, config string) error {
 	return nil
 }
 
-func GetAccountFromDir(dir string) (*wallet.Account, error) {
-	secretsManager, err := secretsHelper.SetupLocalSecretsManager(dir)
+func GetAccount(dataDir, config string) (*wallet.Account, error) {
+	// get secret manager and allow reading from local directory (true at the end)
+	secretsManager, err := polybftsecrets.GetSecretsManager(dataDir, config, true)
 	if err != nil {
 		return nil, err
 	}
 
 	return wallet.NewAccountFromSecret(secretsManager)
+}
+
+func GetAccountFromDir(dir string) (*wallet.Account, error) {
+	return GetAccount(dir, "")
 }
 
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address

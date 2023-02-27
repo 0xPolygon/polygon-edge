@@ -10,7 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -87,13 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	// get secret manager and allow reading from local directory (true at the end)
-	secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.configPath, true)
-	if err != nil {
-		return err
-	}
-
-	validatorAccount, err := wallet.NewAccountFromSecret(secretsManager)
+	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.configPath)
 	if err != nil {
 		return err
 	}
