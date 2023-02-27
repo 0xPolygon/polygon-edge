@@ -32,8 +32,8 @@ type Config struct {
 	JSONRPCBlockRangeLimit   uint64     `json:"json_rpc_block_range_limit" yaml:"json_rpc_block_range_limit"`
 	JSONLogFormat            bool       `json:"json_log_format" yaml:"json_log_format"`
 
-	Relayer            bool   `json:"relayer" yaml:"relayer"`
-	BlockFinalityDepth uint64 `json:"block_finality_depth" yaml:"block_finality_depth"`
+	Relayer               bool   `json:"relayer" yaml:"relayer"`
+	NumBlockConfirmations uint64 `json:"num_block_confirmations" yaml:"num_block_confirmations"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -79,9 +79,9 @@ const (
 	// requests with fromBlock/toBlock values (e.g. eth_getLogs)
 	DefaultJSONRPCBlockRangeLimit uint64 = 1000
 
-	// DefaultBlockFinalityDepth minimal number of child blocks required for the parent block to be considered final
+	// DefaultNumBlockConfirmations minimal number of child blocks required for the parent block to be considered final
 	// on ethereum epoch lasts for 32 blocks. more details: https://www.alchemy.com/overviews/ethereum-commitment-levels
-	DefaultBlockFinalityDepth uint64 = 64
+	DefaultNumBlockConfirmations uint64 = 64
 )
 
 // DefaultConfig returns the default server configuration
@@ -119,7 +119,7 @@ func DefaultConfig() *Config {
 		JSONRPCBatchRequestLimit: DefaultJSONRPCBatchRequestLimit,
 		JSONRPCBlockRangeLimit:   DefaultJSONRPCBlockRangeLimit,
 		Relayer:                  false,
-		BlockFinalityDepth:       DefaultBlockFinalityDepth,
+		NumBlockConfirmations:    DefaultNumBlockConfirmations,
 	}
 }
 

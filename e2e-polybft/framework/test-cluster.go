@@ -87,7 +87,7 @@ type TestClusterConfig struct {
 	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
-	BlockFinalityDepth uint64
+	NumBlockConfirmations uint64
 
 	logsDirOnce sync.Once
 }
@@ -226,9 +226,9 @@ func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
 	}
 }
 
-func WithBlockFinalityDepth(blockFinalityDepth uint64) ClusterOption {
+func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.BlockFinalityDepth = blockFinalityDepth
+		h.NumBlockConfirmations = numBlockConfirmations
 	}
 }
 
@@ -397,7 +397,7 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
 		config.Relayer = relayer
-		config.BlockFinalityDepth = c.Config.BlockFinalityDepth
+		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

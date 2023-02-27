@@ -74,7 +74,7 @@ type Params struct {
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
 
-	BlockFinalityDepth uint64
+	NumBlockConfirmations uint64
 }
 
 // Factory is the factory function to create a discovery consensus

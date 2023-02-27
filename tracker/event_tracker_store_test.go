@@ -126,7 +126,7 @@ func TestEventTrackerStore_OnNewBlockNothingToProcess(t *testing.T) {
 
 	value := hex.EncodeToString(bytes)
 
-	// block less than finality depth
+	// block less than numBlockConfirmations
 	assert.NoError(t, tstore.(*EventTrackerStore).onNewBlock("dummy", value)) //nolint
 	assert.Len(t, subs.logs, 0)
 

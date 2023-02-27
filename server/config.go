@@ -44,7 +44,7 @@ type Config struct {
 
 	Relayer bool
 
-	BlockFinalityDepth uint64
+	NumBlockConfirmations uint64
 }
 
 // Telemetry holds the config details for metric services

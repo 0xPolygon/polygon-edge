@@ -229,9 +229,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
-		&params.rawConfig.BlockFinalityDepth,
-		blockFinalityDepthFlag,
-		defaultConfig.BlockFinalityDepth,
+		&params.rawConfig.NumBlockConfirmations,
+		numBlockConfirmationsFlag,
+		defaultConfig.NumBlockConfirmations,
 		"minimal number of child blocks required for the parent block to be considered final",
 	)
 

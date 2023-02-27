@@ -66,7 +66,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	_, addr, err := server.DeployContract(cc)
 	require.NoError(t, err)
 
-	// prefill with eventsPerStep + blockFinalityDepth events
+	// prefill with eventsPerStep + numBlockConfirmations events
 	for i := 0; i < eventsPerStep+numBlockConfirmations; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
