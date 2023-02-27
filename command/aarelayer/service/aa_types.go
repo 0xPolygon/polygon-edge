@@ -42,6 +42,15 @@ var (
 		"tuple(bytes32 typeHash, bytes32 name, bytes32 version, uint256 chainId, address verifyingContract)",
 	)
 
+	// invokerMethodAbiType is function invoke(
+	//	Signature calldata signature, Transaction calldata transaction) external payable nonReentrant
+	invokerMethodAbiType = abi.MustNewMethod(
+		`function invoke(
+			tuple(uint256 r,uint256 s,bool v) signature,
+			tuple(address from,uint256 nonce,tuple(address to,uint256 value,uint256 gasLimit,bytes data)[] payload) transaction
+		) public payable`,
+	)
+
 	//  aaInvokerNoncesAbiType is mapping(address => uint256) public nonces;
 	aaInvokerNoncesAbiType = abi.MustNewMethod("function nonces(address) returns (uint256)")
 )
@@ -88,6 +97,45 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 	}
 
 	return nil
+}
+
+func (t *AATransaction) ToAbi() ([]byte, error) {
+	// sginature "tuple(uint256 r,uint256 s,bool v)"
+	signature := map[string]interface{}{
+		"r": new(big.Int).SetBytes(t.Signature[:32]),
+		"s": new(big.Int).SetBytes(t.Signature[32:64]),
+		"v": t.Signature[64] != 0,
+	}
+
+	// payloads "tuple(address to,uint256 value,uint256 gasLimit,bytes data)"
+	payloads := make([]map[string]interface{}, len(t.Transaction.Payload))
+
+	for i, payload := range t.Transaction.Payload {
+		to := types.ZeroAddress
+		if payload.To != nil {
+			to = *payload.To
+		}
+
+		payloads[i] = map[string]interface{}{
+			"to":       to,
+			"value":    new(big.Int).Set(payload.Value),
+			"gasLimit": new(big.Int).Set(payload.GasLimit),
+			"data":     payload.Input,
+		}
+	}
+
+	// transaction
+	// "tuple(address from,uint256 nonce,tuple(address to,uint256 value,uint256 gasLimit,bytes data)[] payload)"
+	transaction := map[string]interface{}{
+		"from":    t.Transaction.From,
+		"nonce":   new(big.Int).SetUint64(t.Transaction.Nonce),
+		"payload": payloads,
+	}
+
+	return invokerMethodAbiType.Encode(map[string]interface{}{
+		"signature":   signature,
+		"transaction": transaction,
+	})
 }
 
 // Transaction represents a transaction

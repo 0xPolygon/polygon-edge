@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/command/aarelayer/sendtx"
 	"github.com/0xPolygon/polygon-edge/command/aarelayer/service"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -27,6 +28,7 @@ func GetCommand() *cobra.Command {
 		RunE:    runCommand,
 	}
 
+	cmd.AddCommand(sendtx.GetCommand())
 	setFlags(cmd)
 
 	return cmd
