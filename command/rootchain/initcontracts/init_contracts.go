@@ -34,7 +34,7 @@ const (
 	erc20TemplateName      = "ERC20Template"
 
 	// defaultAllowanceValue is value which is assigned to the RootERC20Predicate spender
-	defaultAllowanceValue = 1000000000000000000
+	defaultAllowanceValue = uint64(1e19)
 )
 
 var (
@@ -369,7 +369,7 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 // approveERC20Predicate sends approve transaction to ERC20 token so that it is able to spend given root ERC20 token
 func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig) error {
 	input, err := contractsapi.RootERC20.Abi.GetMethod("approve").
-		Encode([]interface{}{config.RootERC20PredicateAddress, big.NewInt(defaultAllowanceValue)})
+		Encode([]interface{}{config.RootERC20PredicateAddress, new(big.Int).SetUint64(defaultAllowanceValue)})
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
 	}
