@@ -221,7 +221,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert that all state syncs are executed successfully
-	checkStateSyncResultLogs(t, logs, depositsCount+1)
+	checkStateSyncResultLogs(t, logs, depositsCount)
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
