@@ -72,21 +72,21 @@ func setFlags(cmd *cobra.Command) {
 		&params.tokenTypeRaw,
 		tokenFlag,
 		"erc20",
-		"Token type which is being deposited",
+		"token type which is being deposited",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&params.receivers,
 		receiversFlag,
 		nil,
-		"list of wallet addresses",
+		"receiving accounts addresses on child chain",
 	)
 
 	cmd.Flags().StringSliceVar(
 		&params.amounts,
 		amountsFlag,
 		nil,
-		"list of amounts to fund wallets",
+		"amounts to send to child chain receiving accounts",
 	)
 
 	cmd.Flags().StringVar(
@@ -100,7 +100,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.depositorKey,
 		depositorKeyFlag,
 		helper.DefaultPrivateKeyRaw,
-		"Hex encoded private key of the account which sends rootchain deposit transactions",
+		"hex encoded private key of the account which sends rootchain deposit transactions",
 	)
 }
 
