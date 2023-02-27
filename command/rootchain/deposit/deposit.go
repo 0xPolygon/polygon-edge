@@ -210,6 +210,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	outputter.SetCommandResult(&result{
 		TokenType: params.tokenTypeRaw,
+		Sender:    helper.GetRootchainAdminKey().Address().String(),
 		Receivers: params.receivers,
 		Amounts:   params.amounts,
 	})
@@ -219,7 +220,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 func createDepositTxn(config *bridgeConfig, receiver ethgo.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	input, err := config.rootPredicate.Abi.Methods[config.depositFnName].Encode([]interface{}{
 		config.rootTokenAddr,
-		config.childPredicateAddr,
+		receiver,
 		amount,
 	})
 	if err != nil {

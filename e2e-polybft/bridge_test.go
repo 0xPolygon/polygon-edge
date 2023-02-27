@@ -70,6 +70,8 @@ func TestE2E_Bridge_DepositERC20(t *testing.T) {
 
 		receivers[i] = types.Address(key.Address()).String()
 		amounts[i] = fmt.Sprintf("%d", amount)
+
+		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
 	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(),
@@ -120,16 +122,15 @@ func TestE2E_Bridge_DepositERC20(t *testing.T) {
 	logs, err := srv.GetLogs(filter)
 	require.NoError(t, err)
 
-	// TODO: @Stefan-Ethernal Balances doesn't change since NativeERC20 isn't mapped to root token on rootchain
-	// // check receivers balances
-	// for _, receiver := range receivers {
-	// 	balance, err := srv.GetBalance(ethgo.BytesToAddress([]byte(receiver)), ethgo.Latest)
-	// 	require.NoError(t, err)
-	// 	require.Equal(t, big.NewInt(amount), balance)
-	// }
-
 	// assert that all deposits are executed successfully
 	checkStateSyncResultLogs(t, logs, num)
+
+	// check receivers balances got increased by deposited amount
+	for _, receiver := range receivers {
+		balance, err := srv.GetBalance(ethgo.BytesToAddress([]byte(receiver)), ethgo.Latest)
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(amount), balance)
+	}
 }
 
 func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
