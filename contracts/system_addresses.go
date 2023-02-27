@@ -11,8 +11,8 @@ var (
 	MerkleContract = types.StringToAddress("0x103")
 	// StateReceiverContract is an address of bridge contract on the child chain
 	StateReceiverContract = types.StringToAddress("0x1001")
-	// NativeTokenContract is an address of bridge contract (used for transferring native tokens on child chain)
-	NativeTokenContract = types.StringToAddress("0x1010")
+	// NativeERC20TokenContract is an address of bridge contract (used for transferring ERC20 native tokens on child chain)
+	NativeERC20TokenContract = types.StringToAddress("0x1010")
 	// L2StateSenderContract is an address of bridge contract to the rootchain
 	L2StateSenderContract = types.StringToAddress("0x1002")
 	// ChildERC20Contract is an address of bridgable ERC20 token contract on the child chain

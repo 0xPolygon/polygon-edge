@@ -21,7 +21,7 @@ func (c *nativeTransfer) run(input []byte, caller types.Address, host runtime.Ho
 	}
 
 	// check if caller is native token contract
-	if caller != contracts.NativeTokenContract {
+	if caller != contracts.NativeERC20TokenContract {
 		return abiBoolFalse, runtime.ErrUnauthorizedCaller
 	}
 

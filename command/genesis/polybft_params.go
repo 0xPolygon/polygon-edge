@@ -193,7 +193,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 		{
 			// NativeERC20 Token contract
 			artifact: contractsapi.NativeERC20,
-			address:  contracts.NativeTokenContract,
+			address:  contracts.NativeERC20TokenContract,
 		},
 		{
 			// ChildERC20 token contract
