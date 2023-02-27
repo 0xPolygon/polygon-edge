@@ -181,9 +181,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 	lastCommittedID, err := strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
-	// 1 MAP_TOKEN state sync event emitted automatically by RootERC20Predicate
-	// 2 deposit state sync events
-	require.Equal(t, uint64(2+1), lastCommittedID)
+	require.Equal(t, uint64(2), lastCommittedID)
 
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
@@ -205,8 +203,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// check that the second (larger commitment) was also submitted in epoch
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
-	// incremented by one because of MAP_TOKEN state sync event
-	require.Equal(t, uint64(depositsCount+1), lastCommittedID)
+	require.Equal(t, uint64(depositsCount), lastCommittedID)
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
