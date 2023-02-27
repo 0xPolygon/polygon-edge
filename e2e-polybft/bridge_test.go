@@ -311,7 +311,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	}
 
 	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -339,7 +339,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainAdminKey())
+		rootchainHelper.GetRootchainPrivateKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -411,7 +411,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 
 	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -439,7 +439,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainAdminKey())
+		rootchainHelper.GetRootchainPrivateKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -515,7 +515,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpoin
 		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
 	}
 
-	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
+	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainPrivateKey(), contractsapi.ExitHelper, exitHelperAddr,
 		"exit",
 		big.NewInt(int64(checkpointBlock)),
 		uint64(leafIndex),

@@ -17,9 +17,10 @@ const (
 )
 
 var (
-	errWalletsMissing       = errors.New("receivers flag value is not provided")
+	errReceiversMissing     = errors.New("receivers flag value is not provided")
 	errAmountsMissing       = errors.New("amount flag value is not provided")
 	errInconsistentAccounts = errors.New("receivers and amounts must be provided in pairs")
+	errDepositorKeyMissing  = errors.New("depositor private key is not provided")
 )
 
 type depositParams struct {
@@ -28,16 +29,20 @@ type depositParams struct {
 	receivers      []string
 	amounts        []string
 	jsonRPCAddress string
-	adminKey       string
+	depositorKey   string
 }
 
 func (dp *depositParams) validateFlags() error {
+	if dp.depositorKey == "" {
+		return errDepositorKeyMissing
+	}
+
 	if _, err := os.Stat(dp.manifestPath); errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("provided manifest path '%s' doesn't exist", dp.manifestPath)
 	}
 
 	if len(dp.receivers) == 0 {
-		return errWalletsMissing
+		return errReceiversMissing
 	}
 
 	if len(dp.amounts) == 0 {

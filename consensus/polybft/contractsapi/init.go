@@ -33,7 +33,7 @@ var (
 	testContracts          embed.FS
 	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
-	MockERC20              *artifact.Artifact
+	RootERC20              *artifact.Artifact
 )
 
 func init() {
@@ -109,17 +109,17 @@ func init() {
 		panic(err)
 	}
 
+	RootERC20, err = artifact.DecodeArtifact([]byte(MockERC20Artifact))
+	if err != nil {
+		panic(err)
+	}
+
 	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))
 	if err != nil {
 		panic(err)
 	}
 
 	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
-	if err != nil {
-		panic(err)
-	}
-
-	MockERC20, err = artifact.DecodeArtifact(readTestContractContent("MockERC20.json"))
 	if err != nil {
 		panic(err)
 	}

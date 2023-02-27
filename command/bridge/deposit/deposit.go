@@ -97,7 +97,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.adminKey,
+		&params.depositorKey,
 		adminKeyFlag,
 		helper.DefaultPrivateKeyRaw,
 		"Hex encoded private key of the account which sends rootchain transactions",
@@ -119,7 +119,7 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 	configs[ERC20] = newBridgeConfig(
 		contractsapi.RootERC20Predicate,
 		"depositTo",
-		contractsapi.MockERC20,
+		contractsapi.RootERC20,
 		"mint",
 		manifest.RootchainConfig.RootERC20Address,
 		manifest.RootchainConfig.RootERC20PredicateAddress,
@@ -132,8 +132,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	err := helper.InitRootchainAdminKey(params.adminKey)
-	if err != nil {
+	if err := helper.InitRootchainPrivateKey(params.depositorKey); err != nil {
 		outputter.SetError(err)
 
 		return
@@ -166,14 +165,20 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				// mint tokens to transaction sender
-				txn, err := createMintTxn(config, big.NewInt(defaultMintValue))
-				if err != nil {
-					return fmt.Errorf("mint transaction creation failed: %w", err)
-				}
-				receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
-				if err != nil {
-					return fmt.Errorf("mint transaction failed")
+				if helper.IsTestMode(params.depositorKey) {
+					// mint tokens to depositor
+					txn, err := createMintTxn(config, big.NewInt(defaultMintValue))
+					if err != nil {
+						return fmt.Errorf("mint transaction creation failed: %w", err)
+					}
+					receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainPrivateKey())
+					if err != nil {
+						return fmt.Errorf("failed to send mint transaction to depositor %s", helper.GetRootchainPrivateKey().Address())
+					}
+
+					if receipt.Status == uint64(types.ReceiptFailed) {
+						return fmt.Errorf("failed to mint tokens to depositor %s", helper.GetRootchainPrivateKey().Address())
+					}
 				}
 
 				// deposit tokens
@@ -181,12 +186,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				if err != nil {
 					return fmt.Errorf("failed to decode provided amount %s: %w", amount, err)
 				}
-				txn, err = createDepositTxn(config, ethgo.BytesToAddress([]byte(receiver)), amountBig)
+				txn, err := createDepositTxn(config, ethgo.BytesToAddress([]byte(receiver)), amountBig)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				receipt, err = txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
+				receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainPrivateKey())
 				if err != nil {
 					return fmt.Errorf("receiver: %s, amount: %s, error: %w",
 						receiver, amount, err)
@@ -210,7 +215,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	outputter.SetCommandResult(&result{
 		TokenType: params.tokenTypeRaw,
-		Sender:    helper.GetRootchainAdminKey().Address().String(),
+		Sender:    helper.GetRootchainPrivateKey().Address().String(),
 		Receivers: params.receivers,
 		Amounts:   params.amounts,
 	})
@@ -238,7 +243,7 @@ func createDepositTxn(config *bridgeConfig, receiver ethgo.Address, amount *big.
 // createMintTxn encodes parameters for mint function on rootchain token contract
 func createMintTxn(config *bridgeConfig, amount *big.Int) (*ethgo.Transaction, error) {
 	input, err := config.rootToken.Abi.Methods[config.mintFnName].Encode([]interface{}{
-		helper.GetRootchainAdminKey().Address(),
+		helper.GetRootchainPrivateKey().Address(),
 		amount,
 	})
 	if err != nil {

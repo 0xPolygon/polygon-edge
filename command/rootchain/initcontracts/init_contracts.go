@@ -149,7 +149,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	if err := helper.InitRootchainAdminKey(params.adminKey); err != nil {
+	if err := helper.InitRootchainPrivateKey(params.adminKey); err != nil {
 		outputter.SetError(err)
 
 		return
@@ -174,10 +174,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
-	rootchainAdminKey := helper.GetRootchainAdminKey()
+	rootchainAdminKey := helper.GetRootchainPrivateKey()
 	// if admin key is equal to the test private key, then we assume we are working in dev mode
 	// and therefore need to fund that account
-	if params.adminKey == helper.DefaultPrivateKeyRaw {
+	if helper.IsTestMode(params.adminKey) {
 		// fund account
 		rootchainAdminAddr := rootchainAdminKey.Address()
 		txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
@@ -218,7 +218,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		},
 		{
 			name:     "RootERC20",
-			artifact: contractsapi.MockERC20,
+			artifact: contractsapi.RootERC20,
 		},
 		{
 			name:     "ERC20Template",
@@ -368,7 +368,7 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 
 // approveERC20Predicate sends approve transaction to ERC20 token so that it is able to spend given root ERC20 token
 func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig) error {
-	input, err := contractsapi.MockERC20.Abi.GetMethod("approve").
+	input, err := contractsapi.RootERC20.Abi.GetMethod("approve").
 		Encode([]interface{}{config.RootERC20PredicateAddress, big.NewInt(defaultAllowanceValue)})
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
@@ -385,7 +385,7 @@ func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.Rootch
 
 // sendTransaction sends provided transaction
 func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string) error {
-	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainAdminKey())
+	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainPrivateKey())
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)
 	}

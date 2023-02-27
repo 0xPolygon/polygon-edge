@@ -78,6 +78,10 @@ func main() {
 			"root/RootERC20Predicate.sol",
 			"RootERC20Predicate",
 		},
+		{
+			"mocks/MockERC20.sol",
+			"MockERC20",
+		},
 	}
 
 	for _, v := range readContracts {
