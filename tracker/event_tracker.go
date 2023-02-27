@@ -14,12 +14,12 @@ type eventSubscription interface {
 }
 
 type EventTracker struct {
-	dbPath        string
-	rpcEndpoint   string
-	contractAddr  ethgo.Address
-	subscriber    eventSubscription
-	logger        hcf.Logger
-	finalityDepth uint64 // minimal number of child blocks required for the parent block to be considered final
+	dbPath                string
+	rpcEndpoint           string
+	contractAddr          ethgo.Address
+	subscriber            eventSubscription
+	logger                hcf.Logger
+	numBlockConfirmations uint64 // minimal number of child blocks required for the parent block to be considered final
 }
 
 func NewEventTracker(
@@ -27,16 +27,16 @@ func NewEventTracker(
 	rpcEndpoint string,
 	contractAddr ethgo.Address,
 	subscriber eventSubscription,
-	finalityDepth uint64,
+	numBlockConfirmations uint64,
 	logger hcf.Logger,
 ) *EventTracker {
 	return &EventTracker{
-		dbPath:        dbPath,
-		rpcEndpoint:   rpcEndpoint,
-		contractAddr:  contractAddr,
-		subscriber:    subscriber,
-		finalityDepth: finalityDepth,
-		logger:        logger.Named("event_tracker"),
+		dbPath:                dbPath,
+		rpcEndpoint:           rpcEndpoint,
+		contractAddr:          contractAddr,
+		subscriber:            subscriber,
+		numBlockConfirmations: numBlockConfirmations,
+		logger:                logger.Named("event_tracker"),
 	}
 }
 
@@ -46,12 +46,13 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
-	store, err := NewEventTrackerStore(e.dbPath, e.finalityDepth, e.subscriber, e.logger)
+	store, err := NewEventTrackerStore(e.dbPath, e.numBlockConfirmations, e.subscriber, e.logger)
 	if err != nil {
 		return err
 	}
 
-	e.logger.Info("Start tracking events", "block finality depth", e.finalityDepth, "contract address", e.contractAddr)
+	e.logger.Info("Start tracking events",
+		"num block confirmations", e.numBlockConfirmations, "contract address", e.contractAddr)
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),

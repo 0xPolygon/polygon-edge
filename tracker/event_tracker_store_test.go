@@ -15,7 +15,7 @@ import (
 	"github.com/umbracle/ethgo/tracker/store"
 )
 
-func createSetupDB(subscriber eventSubscription, finalityDepth uint64) store.SetupDB {
+func createSetupDB(subscriber eventSubscription, numBlockConfirmations uint64) store.SetupDB {
 	return func(t *testing.T) (store.Store, func()) {
 		t.Helper()
 
@@ -23,7 +23,7 @@ func createSetupDB(subscriber eventSubscription, finalityDepth uint64) store.Set
 		require.NoError(t, err)
 
 		path := filepath.Join(dir, "test.db")
-		store, err := NewEventTrackerStore(path, finalityDepth, subscriber, hclog.Default())
+		store, err := NewEventTrackerStore(path, numBlockConfirmations, subscriber, hclog.Default())
 		require.NoError(t, err)
 
 		closeFn := func() {
@@ -40,13 +40,13 @@ func TestBoltDBStore(t *testing.T) {
 	store.TestStore(t, createSetupDB(nil, 2))
 }
 
-func Test_Entry_getFinalizedLogs(t *testing.T) {
+func TestEntry_getFinalizedLogs(t *testing.T) {
 	t.Parallel()
 
 	const someFilterHash = "test"
 
-	tstore, fn := createSetupDB(nil, 3)(t)
-	defer fn()
+	tstore, closeFn := createSetupDB(nil, 3)(t)
+	defer closeFn()
 
 	entry, err := tstore.(*EventTrackerStore).getImplEntry(someFilterHash)
 	require.NoError(t, err)
@@ -71,11 +71,11 @@ func Test_Entry_getFinalizedLogs(t *testing.T) {
 	assert.Equal(t, common.EncodeUint64ToBytes(4), key)
 }
 
-func Test_Entry_saveNextToProcessIndx(t *testing.T) {
+func TestEntry_saveNextToProcessIndx(t *testing.T) {
 	const someFilterHash = "test"
 
-	tstore, fn := createSetupDB(nil, 2)(t)
-	defer fn()
+	tstore, closeFn := createSetupDB(nil, 2)(t)
+	defer closeFn()
 
 	entry, err := tstore.(*EventTrackerStore).getImplEntry(someFilterHash)
 	require.NoError(t, err)
@@ -89,35 +89,35 @@ func Test_Entry_saveNextToProcessIndx(t *testing.T) {
 	}
 }
 
-func Test_EventTrackerStore_SetNotLastBlock(t *testing.T) {
+func TestEventTrackerStore_SetNotLastBlock(t *testing.T) {
 	t.Parallel()
 
 	subs := &mockEventSubscriber{}
 
-	tstore, fn := createSetupDB(subs, 2)(t)
-	defer fn()
+	tstore, closeFn := createSetupDB(subs, 2)(t)
+	defer closeFn()
 
 	assert.NoError(t, tstore.(*EventTrackerStore).Set("dummy", "dummy")) //nolint
 	assert.Len(t, subs.logs, 0)
 }
 
-func Test_EventTrackerStore_onNewBlockBad(t *testing.T) {
+func TestEventTrackerStore_onNewBlockBad(t *testing.T) {
 	t.Parallel()
 
-	tstore, fn := createSetupDB(nil, 0)(t)
-	defer fn()
+	tstore, closeFn := createSetupDB(nil, 0)(t)
+	defer closeFn()
 
 	assert.Error(t, tstore.(*EventTrackerStore).onNewBlock("dummy", "dummy"))                          //nolint
 	assert.Error(t, tstore.(*EventTrackerStore).onNewBlock("dummy", hex.EncodeToString([]byte{0, 1}))) //nolint
 }
 
-func Test_EventTrackerStore_OnNewBlockNothingToProcess(t *testing.T) {
+func TestEventTrackerStore_OnNewBlockNothingToProcess(t *testing.T) {
 	t.Parallel()
 
 	subs := &mockEventSubscriber{}
 
-	tstore, fn := createSetupDB(subs, 10)(t)
-	defer fn()
+	tstore, closeFn := createSetupDB(subs, 10)(t)
+	defer closeFn()
 
 	block := ethgo.Block{Number: 8}
 
@@ -142,15 +142,15 @@ func Test_EventTrackerStore_OnNewBlockNothingToProcess(t *testing.T) {
 	assert.Len(t, subs.logs, 0)
 }
 
-func Test_EventTrackerStore_SetLastBlockSubscriberNotified(t *testing.T) {
+func TestEventTrackerStore_SetLastBlockSubscriberNotified(t *testing.T) {
 	t.Parallel()
 
 	const hash = "dummy_hash"
 
 	subs := &mockEventSubscriber{}
 
-	tstore, fn := createSetupDB(subs, 2)(t)
-	defer fn()
+	tstore, closeFn := createSetupDB(subs, 2)(t)
+	defer closeFn()
 
 	entry, err := tstore.GetEntry(hash)
 	require.NoError(t, err)
@@ -159,7 +159,12 @@ func Test_EventTrackerStore_SetLastBlockSubscriberNotified(t *testing.T) {
 		{BlockNumber: 1}, {BlockNumber: 2}, {BlockNumber: 3},
 	}))
 
-	for i := 0; i < 3; i++ {
+	// There are 3 logs in store (one for block 1, one for block 2, one for block 3) and numBlockConfirmations is 2
+	// If block 2 arrives (`tstore.Set(dbLastBlockPrefix+hash, value)`) subscriber should be notified with 0 logs
+	// If block 3 arrives subscriber should be notified with 1 log
+	// If block 4 arrives subscriber should be notified with 2 logs
+	// If block 5 arrives subscriber should be notified with all 3 logs
+	for i := 0; i < 4; i++ {
 		block := ethgo.Block{Number: uint64(i + 2)}
 
 		bytes, err := block.MarshalJSON()

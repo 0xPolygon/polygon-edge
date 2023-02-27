@@ -27,16 +27,16 @@ var (
 
 // EventTrackerStore is a tracker store implementation.
 type EventTrackerStore struct {
-	conn          *bolt.DB
-	finalityDepth uint64
-	subscriber    eventSubscription
-	logger        hcf.Logger
+	conn                  *bolt.DB
+	numBlockConfirmations uint64
+	subscriber            eventSubscription
+	logger                hcf.Logger
 }
 
 // NewEventTrackerStore creates a new EventTrackerStore
 func NewEventTrackerStore(
 	path string,
-	finalityDepth uint64,
+	numBlockConfirmations uint64,
 	subscriber eventSubscription,
 	logger hcf.Logger) (*EventTrackerStore, error) {
 	db, err := bolt.Open(path, 0600, nil)
@@ -45,10 +45,10 @@ func NewEventTrackerStore(
 	}
 
 	store := &EventTrackerStore{
-		conn:          db,
-		finalityDepth: finalityDepth,
-		subscriber:    subscriber,
-		logger:        logger,
+		conn:                  db,
+		numBlockConfirmations: numBlockConfirmations,
+		subscriber:            subscriber,
+		logger:                logger,
 	}
 
 	if err := store.setupDB(); err != nil {
@@ -142,7 +142,7 @@ func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 		return err
 	}
 
-	if block.Number <= b.finalityDepth {
+	if block.Number <= b.numBlockConfirmations {
 		return nil // there is nothing to process yet
 	}
 
@@ -151,7 +151,7 @@ func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 		return nil
 	}
 
-	logs, lastProcessedKey, err := entry.getFinalizedLogs(block.Number - b.finalityDepth)
+	logs, lastProcessedKey, err := entry.getFinalizedLogs(block.Number - b.numBlockConfirmations)
 	if err != nil {
 		return err
 	}
