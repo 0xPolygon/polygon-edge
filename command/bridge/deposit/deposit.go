@@ -46,7 +46,7 @@ var (
 	configs = map[TokenType]*bridgeConfig{}
 )
 
-// GetCommand returns the rootchain deposit command
+// GetCommand returns the bridge deposit command
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit",

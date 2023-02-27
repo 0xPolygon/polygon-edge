@@ -2,7 +2,6 @@ package framework
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -308,7 +307,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(manifestPath)
 		require.NoError(t, err)
 
-		err = cluster.Bridge.fundValidators()
+		err = cluster.Bridge.fundRootchainValidators()
 		require.NoError(t, err)
 	}
 
@@ -406,29 +405,6 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 
 func (c *TestCluster) cmdRun(args ...string) error {
 	return runCommand(c.Config.Binary, args, c.Config.GetStdout(args[0]))
-}
-
-// Deposit function is used to invoke e2e rootchain deposit command
-// with appropriately created receivers and amounts for test transactions
-func (c *TestCluster) Deposit(tokenType, receivers, amounts string) error {
-	if tokenType == "" {
-		return errors.New("provide token type value")
-	}
-
-	if receivers == "" {
-		return errors.New("provide at least one receiver address value")
-	}
-
-	if amounts == "" {
-		return errors.New("provide at least one amount value")
-	}
-
-	return c.cmdRun("rootchain",
-		"deposit",
-		"--manifest", path.Join(c.Config.TmpDir, "manifest.json"),
-		"--token", tokenType,
-		"--receivers", receivers,
-		"--amounts", amounts)
 }
 
 func (c *TestCluster) Fail(err error) {

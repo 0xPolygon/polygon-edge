@@ -3,8 +3,6 @@ package rootchain
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/deposit"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/fund"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/initcontracts"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
@@ -14,10 +12,8 @@ import (
 func GetCommand() *cobra.Command {
 	rootchainCmd := &cobra.Command{
 		Use:   "rootchain",
-		Short: "Top level RootChain helper command.",
+		Short: "Top level rootchain helper command.",
 	}
-
-	helper.RegisterGRPCAddressFlag(rootchainCmd)
 
 	registerSubcommands(rootchainCmd)
 
@@ -26,8 +22,6 @@ func GetCommand() *cobra.Command {
 
 func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
-		// rootchain deposit
-		deposit.GetCommand(),
 		// rootchain fund
 		fund.GetCommand(),
 		// rootchain server

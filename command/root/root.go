@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/backup"
+	"github.com/0xPolygon/polygon-edge/command/bridge"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
@@ -61,6 +62,7 @@ func (rc *RootCommand) registerSubCommands() {
 		polybftsecrets.GetCommand(),
 		polybft.GetCommand(),
 		polybftmanifest.GetCommand(),
+		bridge.GetCommand(),
 	)
 }
 

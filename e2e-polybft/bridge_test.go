@@ -84,7 +84,7 @@ func TestE2E_Bridge_DepositERC20(t *testing.T) {
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
-		cluster.Deposit(
+		cluster.Bridge.Deposit(
 			"ERC20",
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
@@ -158,7 +158,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
 		t,
-		cluster.Deposit(
+		cluster.Bridge.Deposit(
 			"ERC20",
 			strings.Join(receivers[:2], ","),
 			strings.Join(amounts[:2], ","),
@@ -188,7 +188,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
 		t,
-		cluster.Deposit(
+		cluster.Bridge.Deposit(
 			"ERC20",
 			strings.Join(receivers[2:], ","),
 			strings.Join(amounts[2:], ","),

@@ -1,9 +1,10 @@
-# RootChain Helper
+# Rootchain helper command
+
+Top level command for manipulating rootchain server.
 
 ## Start rootchain server
 
-This command starts `ethereum/client-go` container which is basically geth node, 
-and deploys the rootchain bridge and the checkpoint manager contracts.
+This command starts `ethereum/client-go` container which is basically geth node.
 
 ```bash
 $ polygon-edge rootchain server
@@ -11,7 +12,7 @@ $ polygon-edge rootchain server
 
 ## Fund initialized accounts
 
-This command funds the initialized accounts via `polygon-edge secrets init ...` command.
+This command funds the initialized accounts via `polygon-edge polybft-secrets` command.
 
 ```bash
 $ polygon-edge rootchain fund --data-dir data-dir- --num 2
@@ -21,10 +22,13 @@ Or
 $ polygon-edge rootchain fund --data-dir data-dir-1
 ```
 
-## Deposit assets
+## Deploy and initialize contracts
 
-This is a helper command which bridges assets from rootchain to the child chain (aka deposit workflow)
+This command deploys and initializes rootchain contracts. Transactions are being sent to given `--json-rpc` endpoint and are signed by private key provided by `--adminKey` flag.
 
 ```bash
-$ polygon-edge rootchain deposit --token <token_type> --receivers <receivers_addresses> --amounts <amounts>
+$ polygon-edge rootchain init-contracts 
+    --manifest <manifest_file_path> 
+    --json-rpc <json_rpc_endpoint> 
+    --adminKey <hex_encoded_rootchain_admin_private_key>
 ```
