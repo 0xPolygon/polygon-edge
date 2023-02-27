@@ -29,11 +29,13 @@ var (
 			"avoid doing so in production")
 )
 
+// function resolve secrets manager instance
+// insecureLocalStore defines if utilization of local secrets manager is allowed
 func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (secrets.SecretsManager, error) {
 	if configPath != "" {
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			return nil, ErrInvalidConfig
+			return nil, fmt.Errorf("%w; : %w", ErrInvalidConfig, readErr)
 		}
 
 		if !secrets.SupportedServiceManager(secretsConfig.Type) {

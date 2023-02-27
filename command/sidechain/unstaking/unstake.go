@@ -74,6 +74,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(sidechainHelper.SelfFlag, undelegateAddressFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {

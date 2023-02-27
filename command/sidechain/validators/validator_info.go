@@ -43,6 +43,8 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		polybftsecrets.ConfigFlagDesc,
 	)
+
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {

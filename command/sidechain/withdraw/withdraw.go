@@ -57,6 +57,7 @@ func setFlags(cmd *cobra.Command) {
 		"address where to withdraw withdrawable amount",
 	)
 
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
 	helper.RegisterJSONRPCFlag(cmd)
 }
 

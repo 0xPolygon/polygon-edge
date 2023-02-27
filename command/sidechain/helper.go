@@ -45,7 +45,7 @@ func ValidateSecretFlags(dataDir, config string) error {
 }
 
 func GetAccount(dataDir, config string) (*wallet.Account, error) {
-	// get secret manager and allow reading from local directory (true at the end)
+	// resolve secrets manager instance and allow usage of insecure local secrets manager
 	secretsManager, err := polybftsecrets.GetSecretsManager(dataDir, config, true)
 	if err != nil {
 		return nil, err
