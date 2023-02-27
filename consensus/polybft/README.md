@@ -54,7 +54,7 @@ In order to do so, run `make compile-core-contracts`.
 5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates manifest configuration with rootchain contract addresses and rootchain default sender address.
 
     ```bash
-    polygon-edge rootchain init-contracts [--manifest ./manifest.json] [--contracts-path ./core-contracts/artifacts]
+    polygon-edge rootchain init-contracts [--manifest ./manifest.json]
     [--json-rpc http://127.0.0.1:8545] [--admin-key <hex_encoded_private_key>]
     ```
 
