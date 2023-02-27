@@ -29,8 +29,8 @@ var (
 			"avoid doing so in production")
 )
 
-// function resolve secrets manager instance
-// insecureLocalStore defines if utilization of local secrets manager is allowed
+// GetSecretsManager function resolves secrets manager instance based on provided data or config paths.
+// insecureLocalStore defines if utilization of local secrets manager is allowed.
 func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (secrets.SecretsManager, error) {
 	if configPath != "" {
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
@@ -45,9 +45,9 @@ func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (se
 		return helper.InitCloudSecretsManager(secretsConfig)
 	}
 
-	//Storing secrets on a local file system should only be allowed with --insecure flag,
-	//to raise awareness that it should be only used in development/testing environments.
-	//Production setups should use one of the supported secrets managers
+	// Storing secrets on a local file system should only be allowed with --insecure flag,
+	// to raise awareness that it should be only used in development/testing environments.
+	// Production setups should use one of the supported secrets managers
 	if !insecureLocalStore {
 		return nil, ErrSecureLocalStoreNotImplemented
 	}
