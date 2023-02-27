@@ -22,9 +22,9 @@ import (
 type TokenType int
 
 const (
-	ERC20   TokenType = iota // ERC20   = 0
-	ERC721                   // ERC721 	= 1
-	ERC1155                  // ERC1155 = 2
+	ERC20 TokenType = iota
+	ERC721
+	ERC1155
 )
 
 const (
