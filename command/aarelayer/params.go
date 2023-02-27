@@ -2,6 +2,8 @@ package aarelayer
 
 import (
 	"fmt"
+	"os"
+	"path"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -12,6 +14,7 @@ import (
 
 const (
 	addrFlag    = "addr"
+	dbPathFlag  = "db-path"
 	chainIDFlag = "chain-id"
 
 	defaultPort = 8198
@@ -19,6 +22,7 @@ const (
 
 type aarelayerParams struct {
 	addr       string
+	dbPath     string
 	accountDir string
 	configPath string
 	chainID    int64
@@ -27,6 +31,13 @@ type aarelayerParams struct {
 func (rp *aarelayerParams) validateFlags() error {
 	if !helper.ValidateIPPort(rp.addr) {
 		return fmt.Errorf("invalid address: %s", rp.addr)
+	}
+
+	dir := path.Dir(rp.dbPath)
+	if dir != "" {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			return err
+		}
 	}
 
 	return sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.configPath)
@@ -38,6 +49,13 @@ func setFlags(cmd *cobra.Command) {
 		addrFlag,
 		fmt.Sprintf("%s:%d", helper.AllInterfacesBinding, defaultPort),
 		"rest server address [ip:port]",
+	)
+
+	cmd.Flags().StringVar(
+		&params.dbPath,
+		dbPathFlag,
+		"aa.db",
+		"path to bolt db",
 	)
 
 	cmd.Flags().StringVar(
