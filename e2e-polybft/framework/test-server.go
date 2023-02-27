@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -114,7 +115,7 @@ func (t *TestServer) Start() {
 	args := []string{
 		"server",
 		// add data dir
-		"--data-dir", config.DataDir,
+		"--" + polybftsecrets.DataPathFlag, config.DataDir,
 		// add custom chain
 		"--chain", config.Chain,
 		// enable p2p port
@@ -161,7 +162,7 @@ func (t *TestServer) Stake(amount uint64) error {
 	args := []string{
 		"polybft",
 		"stake",
-		"--account", t.config.DataDir,
+		"--" + polybftsecrets.DataPathFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--amount", strconv.FormatUint(amount, 10),
 		"--self",
@@ -175,7 +176,7 @@ func (t *TestServer) Unstake(amount uint64) error {
 	args := []string{
 		"polybft",
 		"unstake",
-		"--account", t.config.DataDir,
+		"--" + polybftsecrets.DataPathFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--amount", strconv.FormatUint(amount, 10),
 		"--self",
@@ -189,7 +190,7 @@ func (t *TestServer) RegisterValidator(secrets string, balance string, stake str
 	args := []string{
 		"polybft",
 		"register-validator",
-		"--data-dir", path.Join(t.clusterConfig.TmpDir, secrets),
+		"--" + polybftsecrets.DataPathFlag, path.Join(t.clusterConfig.TmpDir, secrets),
 		"--registrator-data-dir", path.Join(t.clusterConfig.TmpDir, "test-chain-1"),
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--balance", balance,
@@ -204,7 +205,7 @@ func (t *TestServer) Delegate(amount uint64, secrets string, validatorAddr ethgo
 	args := []string{
 		"polybft",
 		"stake",
-		"--account", secrets,
+		"--" + polybftsecrets.DataPathFlag, secrets,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--delegate", validatorAddr.String(),
 		"--amount", strconv.FormatUint(amount, 10),
@@ -218,7 +219,7 @@ func (t *TestServer) Undelegate(amount uint64, secrets string, validatorAddr eth
 	args := []string{
 		"polybft",
 		"unstake",
-		"--account", secrets,
+		"--" + polybftsecrets.DataPathFlag, secrets,
 		"--undelegate", validatorAddr.String(),
 		"--amount", strconv.FormatUint(amount, 10),
 		"--jsonrpc", t.JSONRPCAddr(),
@@ -232,7 +233,7 @@ func (t *TestServer) Withdraw(secrets string, recipient ethgo.Address) error {
 	args := []string{
 		"polybft",
 		"withdraw",
-		"--account", secrets,
+		"--" + polybftsecrets.DataPathFlag, secrets,
 		"--to", recipient.String(),
 		"--jsonrpc", t.JSONRPCAddr(),
 	}

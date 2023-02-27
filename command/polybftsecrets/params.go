@@ -2,7 +2,6 @@ package polybftsecrets
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -15,30 +14,16 @@ import (
 )
 
 const (
-	dataPathFlag   = "data-dir"
-	configFlag     = "config"
-	accountFlag    = "account"
-	privateKeyFlag = "private"
-	networkFlag    = "network"
-	numFlag        = "num"
-	outputFlag     = "output"
-	chainIDFlag    = "chain-id"
+	accountFlag            = "account"
+	privateKeyFlag         = "private"
+	insecureLocalStoreFlag = "insecure"
+	networkFlag            = "network"
+	numFlag                = "num"
+	outputFlag             = "output"
+	chainIDFlag            = "chain-id"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
-
-	insecureLocalStore = "insecure"
-)
-
-var (
-	errInvalidNum                     = fmt.Errorf("num flag value should be between 1 and %d", maxInitNum)
-	errInvalidConfig                  = errors.New("invalid secrets configuration")
-	errInvalidParams                  = errors.New("no config file or data directory passed in")
-	errUnsupportedType                = errors.New("unsupported secrets manager")
-	errSecureLocalStoreNotImplemented = errors.New(
-		"use a secrets backend, or supply an --insecure flag " +
-			"to store the private keys locally on the filesystem, " +
-			"avoid doing so in production")
 )
 
 type initParams struct {
@@ -61,11 +46,11 @@ type initParams struct {
 
 func (ip *initParams) validateFlags() error {
 	if ip.numberOfSecrets < 1 || ip.numberOfSecrets > maxInitNum {
-		return errInvalidNum
+		return ErrInvalidNum
 	}
 
 	if ip.dataPath == "" && ip.configPath == "" {
-		return errInvalidParams
+		return ErrInvalidParams
 	}
 
 	return nil
@@ -74,17 +59,16 @@ func (ip *initParams) validateFlags() error {
 func (ip *initParams) setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&ip.dataPath,
-		dataPathFlag,
+		DataPathFlag,
 		"",
-		"the directory for the Polygon Edge data if the local FS is used",
+		DataPathFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
 		&ip.configPath,
-		configFlag,
+		ConfigFlag,
 		"",
-		"the path to the SecretsManager config file, "+
-			"if omitted, the local FS secrets manager is used",
+		ConfigFlagDesc,
 	)
 
 	cmd.Flags().IntVar(
@@ -96,10 +80,10 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 
 	// Don't accept data-dir and config flags because they are related to different secrets managers.
 	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
-	cmd.MarkFlagsMutuallyExclusive(dataPathFlag, configFlag)
+	cmd.MarkFlagsMutuallyExclusive(DataPathFlag, ConfigFlag)
 
 	// num flag should be used with data-dir flag only so it should not be used with config flag.
-	cmd.MarkFlagsMutuallyExclusive(numFlag, configFlag)
+	cmd.MarkFlagsMutuallyExclusive(numFlag, ConfigFlag)
 
 	cmd.Flags().BoolVar(
 		&ip.generatesAccount,
@@ -124,7 +108,7 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(
 		&ip.insecureLocalStore,
-		insecureLocalStore,
+		insecureLocalStoreFlag,
 		false,
 		"the flag indicating should the secrets stored on the local storage be encrypted",
 	)
@@ -158,7 +142,7 @@ func (ip *initParams) Execute() (Results, error) {
 			configDir = fmt.Sprintf("%s%d", ip.configPath, i+1)
 		}
 
-		secretManager, err := getSecretsManager(dataDir, configDir, ip.insecureLocalStore)
+		secretManager, err := GetSecretsManager(dataDir, configDir, ip.insecureLocalStore)
 		if err != nil {
 			return results, err
 		}
@@ -280,28 +264,4 @@ func (ip *initParams) getResult(
 	res.Insecure = ip.insecureLocalStore
 
 	return res, nil
-}
-
-func getSecretsManager(dataPath, configPath string, insecureLocalStore bool) (secrets.SecretsManager, error) {
-	if configPath != "" {
-		secretsConfig, readErr := secrets.ReadConfig(configPath)
-		if readErr != nil {
-			return nil, errInvalidConfig
-		}
-
-		if !secrets.SupportedServiceManager(secretsConfig.Type) {
-			return nil, errUnsupportedType
-		}
-
-		return helper.InitCloudSecretsManager(secretsConfig)
-	}
-
-	//Storing secrets on a local file system should only be allowed with --insecure flag,
-	//to raise awareness that it should be only used in development/testing environments.
-	//Production setups should use one of the supported secrets managers
-	if !insecureLocalStore {
-		return nil, errSecureLocalStoreNotImplemented
-	}
-
-	return helper.SetupLocalSecretsManager(dataPath)
 }
