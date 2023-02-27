@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/contracts"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -346,8 +347,12 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
 func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig) error {
 	input, err := contractsapi.RootERC20Predicate.Abi.GetMethod("initialize").
-		Encode([]interface{}{rootchainConfig.StateSenderAddress, rootchainConfig.ExitHelperAddress,
-			contracts.ChildERC20PredicateContract, rootchainConfig.ERC20TemplateAddress})
+		Encode([]interface{}{
+			rootchainConfig.StateSenderAddress,
+			rootchainConfig.ExitHelperAddress,
+			contracts.ChildERC20PredicateContract,
+			rootchainConfig.ERC20TemplateAddress,
+			rootchainConfig.RootERC20Address})
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for RootERC20Predicate.initialize. error: %w", err)
 	}
