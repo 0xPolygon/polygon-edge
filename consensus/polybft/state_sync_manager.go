@@ -461,13 +461,21 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 
 	tree, err := createMerkleTree(events)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create merkle tree. error: %w", err)
 	}
 
 	stateSyncProofs := make([]*StateSyncProof, len(events))
 
 	for i, event := range events {
-		p := tree.GenerateProof(uint64(i), 0)
+		leaf, err := event.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("could not encode state sync event. error: %w", err)
+		}
+
+		p, err := tree.GenerateProof(leaf)
+		if err != nil {
+			return fmt.Errorf("error generating proof for event: %v. error: %w", event.ID, err)
+		}
 
 		stateSyncProofs[i] = &StateSyncProof{
 			Proof:     p,

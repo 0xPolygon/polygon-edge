@@ -153,8 +153,10 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	proofExitEvent, err := ExitEventABIType.Encode(exits[0])
 	require.NoError(t, err)
-	proof, err := exitTrie.GenerateProofForLeaf(proofExitEvent, 0)
+
+	proof, err := exitTrie.GenerateProof(proofExitEvent)
 	require.NoError(t, err)
+
 	leafIndex, err := exitTrie.LeafIndex(proofExitEvent)
 	require.NoError(t, err)
 

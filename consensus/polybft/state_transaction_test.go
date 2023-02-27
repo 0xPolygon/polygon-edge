@@ -92,8 +92,13 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 	commitment, commitmentSigned, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, 0)
 	require.Equal(t, uint64(10), commitment.EndID.Sub(commitment.EndID, commitment.StartID).Uint64())
 
-	for i, stateSync := range stateSyncs {
-		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
+	for _, stateSync := range stateSyncs {
+		leaf, err := stateSync.EncodeAbi()
+		require.NoError(t, err)
+
+		proof, err := commitment.MerkleTree.GenerateProof(leaf)
+		require.NoError(t, err)
+
 		execute := &contractsapi.ExecuteFunction{
 			Proof: proof,
 			Obj:   (*contractsapi.StateSync)(stateSync),
@@ -136,7 +141,11 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	tree, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	proof := tree.GenerateProof(0, 0)
+	leaf, err := stateSyncs[0].EncodeAbi()
+	require.NoError(t, err)
+
+	proof, err := tree.GenerateProof(leaf)
+	require.NoError(t, err)
 
 	commitment := &CommitmentMessageSigned{
 		Message: &contractsapi.StateSyncCommitment{

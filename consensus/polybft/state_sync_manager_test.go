@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -229,7 +230,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, commitment)
 
-	tree, err := NewMerkleTree([][]byte{{0x1}})
+	tree, err := merkle.NewMerkleTree([][]byte{{0x1}})
 	require.NoError(t, err)
 
 	s.pendingCommitments = []*PendingCommitment{
