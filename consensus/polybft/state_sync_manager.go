@@ -243,8 +243,6 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 		return
 	}
 
-	s.logger.Info(fmt.Sprintf("Received StateSyncEvent %+v", event))
-
 	if err := s.state.StateSyncStore.insertStateSyncEvent(event); err != nil {
 		s.logger.Error("could not save state sync event to boltDb", "err", err)
 
