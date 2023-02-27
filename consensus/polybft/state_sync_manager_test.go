@@ -25,7 +25,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")
 
 	state := newTestState(t)
-	require.NoError(t, state.insertEpoch(0))
+	require.NoError(t, state.EpochStore.insertEpoch(0))
 
 	topic := &mockTopic{}
 
@@ -60,7 +60,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 
 	// add 5 state syncs starting in index 0, it will generate one smaller commitment
 	for i := 0; i < 5; i++ {
-		require.NoError(t, s.state.insertStateSyncEvent(stateSyncs10[i]))
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
 	}
 
 	require.NoError(t, s.buildCommitment())
@@ -71,7 +71,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 
 	// add the next 5 state syncs, at that point, so that it generates a larger commitment
 	for i := 5; i < 10; i++ {
-		require.NoError(t, s.state.insertStateSyncEvent(stateSyncs10[i]))
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
 	}
 
 	require.NoError(t, s.buildCommitment())
@@ -155,18 +155,18 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 	// vote with validator 1
 	require.NoError(t, s.saveVote(val1signed))
 
-	votes, err := s.state.getMessageVotes(0, msg.hash)
+	votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.hash)
 	require.NoError(t, err)
 	require.Len(t, votes, 1)
 
 	// vote with validator 1 again (the votes do not increase)
 	require.NoError(t, s.saveVote(val1signed))
-	votes, _ = s.state.getMessageVotes(0, msg.hash)
+	votes, _ = s.state.StateSyncStore.getMessageVotes(0, msg.hash)
 	require.Len(t, votes, 1)
 
 	// vote with validator 2
 	require.NoError(t, s.saveVote(val2signed))
-	votes, _ = s.state.getMessageVotes(0, msg.hash)
+	votes, _ = s.state.StateSyncStore.getMessageVotes(0, msg.hash)
 	require.Len(t, votes, 2)
 }
 
@@ -224,7 +224,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
 	for _, evnt := range generateStateSyncEvents(t, 20, 0) {
-		require.NoError(t, s.state.insertStateSyncEvent(evnt))
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(evnt))
 	}
 
 	require.NoError(t, s.buildCommitment())
@@ -254,7 +254,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	require.Equal(t, mockMsg.Message.EndID.Uint64()+1, s.nextCommittedIndex)
 
 	for i := uint64(0); i < 10; i++ {
-		proof, err := s.state.getStateSyncProof(i)
+		proof, err := s.state.StateSyncStore.getStateSyncProof(i)
 		require.NoError(t, err)
 		require.NotNil(t, proof)
 	}
@@ -267,14 +267,14 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 	// empty log which is not an state sync
 	s.AddLog(&ethgo.Log{})
-	stateSyncs, err := s.state.list()
+	stateSyncs, err := s.state.StateSyncStore.list()
 
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 0)
 
 	// log with the state sync topic but incorrect content
 	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateTransferEventABI.ID()}})
-	stateSyncs, err = s.state.list()
+	stateSyncs, err = s.state.StateSyncStore.list()
 
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 0)
@@ -295,7 +295,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 	s.AddLog(goodLog)
 
-	stateSyncs, err = s.state.getStateSyncEventsForCommitment(0, 0)
+	stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
 	require.Len(t, s.pendingCommitments, 0)
@@ -362,7 +362,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.getStateSyncEventsForCommitment(0, 9)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 9)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }
@@ -416,7 +416,7 @@ func TestStateSyncManager_GetProofs_NoProof_HasCommitment_NoStateSyncs(t *testin
 	)
 
 	state := newTestState(t)
-	require.NoError(t, state.insertCommitmentMessage(createTestCommitmentMessage(t, 1)))
+	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(createTestCommitmentMessage(t, 1)))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 
@@ -447,10 +447,10 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 	}
 
 	for _, sse := range stateSyncs {
-		require.NoError(t, state.insertStateSyncEvent(sse))
+		require.NoError(t, state.StateSyncStore.insertStateSyncEvent(sse))
 	}
 
-	require.NoError(t, state.insertCommitmentMessage(commitment))
+	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(commitment))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 

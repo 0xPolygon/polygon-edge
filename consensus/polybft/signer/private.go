@@ -24,7 +24,7 @@ func (p *PrivateKey) Marshal() ([]byte, error) {
 }
 
 // Sign generates a simple BLS signature of the given message
-func (p *PrivateKey) Sign(message []byte) (*Signature, error) {
+func (p *PrivateKey) Sign(message, domain []byte) (*Signature, error) {
 	point, err := hashToPoint(message, domain)
 	if err != nil {
 		return nil, err

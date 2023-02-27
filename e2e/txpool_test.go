@@ -22,7 +22,7 @@ import (
 
 var (
 	oneEth = framework.EthToWei(1)
-	signer = crypto.NewEIP155Signer(100)
+	signer = crypto.NewEIP155Signer(100, true)
 )
 
 type generateTxReqParams struct {
@@ -187,7 +187,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Required default values
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(100, true)
 
 	// TxPool client
 	clt := srv.TxnPoolOperator()

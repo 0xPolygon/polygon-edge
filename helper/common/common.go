@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,17 +63,17 @@ func BigMin(x, y *big.Int) *big.Int {
 	return x
 }
 
-func ConvertUnmarshalledInt(x interface{}) (int64, error) {
+func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	switch tx := x.(type) {
 	case float64:
-		return roundFloat(tx), nil
+		return uint64(roundFloat(tx)), nil
 	case string:
 		v, err := ParseUint64orHex(&tx)
 		if err != nil {
 			return 0, err
 		}
 
-		return int64(v), nil
+		return v, nil
 	default:
 		return 0, errors.New("unsupported type for unmarshalled integer")
 	}
@@ -250,7 +251,7 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	val, err := ConvertUnmarshalledInt(rawValue)
+	val, err := ConvertUnmarshalledUint(rawValue)
 	if err != nil {
 		return err
 	}
@@ -259,7 +260,7 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 		return errors.New("must be positive value")
 	}
 
-	d.Value = uint64(val)
+	d.Value = val
 
 	return nil
 }
@@ -315,4 +316,12 @@ func BigIntDivCeil(a, b *big.Int) *big.Int {
 	return result.Add(a, b).
 		Sub(result, big.NewInt(1)).
 		Div(result, b)
+}
+
+// EncodeUint64ToBytes encodes provided uint64 to big endian byte slice
+func EncodeUint64ToBytes(value uint64) []byte {
+	result := make([]byte, 8)
+	binary.BigEndian.PutUint64(result, value)
+
+	return result
 }

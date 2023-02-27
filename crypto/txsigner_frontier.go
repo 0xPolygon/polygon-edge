@@ -13,11 +13,14 @@ var signerPool fastrlp.ArenaPool
 
 // FrontierSigner implements tx signer interface
 type FrontierSigner struct {
+	isHomestead bool
 }
 
 // NewFrontierSigner is the constructor of FrontierSigner
-func NewFrontierSigner() *FrontierSigner {
-	return &FrontierSigner{}
+func NewFrontierSigner(isHomestead bool) *FrontierSigner {
+	return &FrontierSigner{
+		isHomestead: isHomestead,
+	}
 }
 
 // Hash is a wrapper function for the calcTxHash, with chainID 0
@@ -34,7 +37,7 @@ func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(refV.Int64()))
+	sig, err := encodeSignature(tx.R, tx.S, refV, f.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}

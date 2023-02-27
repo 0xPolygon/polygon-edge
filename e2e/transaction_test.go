@@ -277,7 +277,7 @@ func generateStressTestTx(
 	t.Helper()
 
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(100, true)
 
 	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
 	if !ok {

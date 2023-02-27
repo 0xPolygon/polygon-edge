@@ -31,6 +31,8 @@ var (
 	errCommitEpochTxDoesNotExist   = errors.New("commit epoch transaction is not found in the epoch ending block")
 	errCommitEpochTxNotExpected    = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
+	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
+		"is either nil or it does not match the received one")
 )
 
 type fsm struct {
@@ -228,7 +230,7 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 		return fmt.Errorf("failed to unmarshall signature: %w", err)
 	}
 
-	if !signature.Verify(validator.BlsKey, proposalHash) {
+	if !signature.Verify(validator.BlsKey, proposalHash, bls.DomainCheckpointManager) {
 		return fmt.Errorf("incorrect commit signature from %s", from)
 	}
 
@@ -252,13 +254,26 @@ func (f *fsm) Validate(proposal []byte) error {
 		)
 	}
 
-	currentExtra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(block.Header.ExtraData)
 	if err != nil {
 		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
 	parentExtra, err := GetIbftExtra(f.parent.ExtraData)
 	if err != nil {
+		return err
+	}
+
+	if extra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for block %d is missing", block.Number())
+	}
+
+	if parentExtra.Checkpoint == nil {
+		return fmt.Errorf("checkpoint data for parent block %d is missing", f.parent.Number)
+	}
+
+	if err := extra.ValidateParentSignatures(block.Number(), f.polybftBackend, nil, f.parent, parentExtra,
+		f.backend.GetChainID(), bls.DomainCheckpointManager, f.logger); err != nil {
 		return err
 	}
 
@@ -276,38 +291,20 @@ func (f *fsm) Validate(proposal []byte) error {
 			}
 		}
 
-		return currentExtra.Validate(parentExtra, currentValidators, nextValidators)
+		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
+			return err
+		}
+
+		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
 	}
 
-	// TODO: Validate validator set delta?
-
-	// TODO: Move signature validation logic to Extra
-	blockNumber := block.Number()
-	if blockNumber > 1 {
-		// verify parent signature
-		// We skip block 0 (genesis) and block 1 (parent is genesis)
-		// since those blocks do not include any parent information with signatures
-		validators, err := f.polybftBackend.GetValidators(blockNumber-2, nil)
+	if f.logger.IsTrace() && block.Number() > 1 {
+		validators, err := f.polybftBackend.GetValidators(block.Number()-2, nil)
 		if err != nil {
-			return fmt.Errorf("cannot get validators:%w", err)
+			return fmt.Errorf("failed to retrieve validators:%w", err)
 		}
 
-		f.logger.Trace("[FSM Validate]", "Block", blockNumber, "parent validators", validators)
-
-		parentCheckpointHash, err := parentExtra.Checkpoint.Hash(f.backend.GetChainID(), f.parent.Number, f.parent.Hash)
-		if err != nil {
-			return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
-		}
-
-		if err := currentExtra.Parent.VerifyCommittedFields(validators, parentCheckpointHash, f.logger); err != nil {
-			return fmt.Errorf(
-				"failed to verify signatures for (parent) block#%d, parent signed hash: %v, current block#%d: %w",
-				f.parent.Number,
-				parentCheckpointHash,
-				blockNumber,
-				err,
-			)
-		}
+		f.logger.Trace("[FSM Validate]", "Block", block.Number(), "parent validators", validators)
 	}
 
 	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
@@ -316,7 +313,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	if f.logger.IsDebug() {
-		checkpointHash, err := currentExtra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
+		checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 		if err != nil {
 			return fmt.Errorf("failed to calculate proposal hash: %w", err)
 		}
@@ -401,7 +398,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return err
 			}
 
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes())
+			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainCheckpointManager)
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
@@ -434,10 +431,23 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) (*types.FullBlock, error) {
 	newBlock := f.target
 
+	var proposedBlock types.Block
+	if err := proposedBlock.UnmarshalRLP(proposal); err != nil {
+		return nil, fmt.Errorf("failed to insert proposal, block unmarshaling failed: %w", err)
+	}
+
+	if newBlock == nil || newBlock.Block.Hash() != proposedBlock.Hash() {
+		// if this is the case, we will let syncer insert the block
+		return nil, errProposalDontMatch
+	}
+
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, _ := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	extra, err := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to insert proposal, due to not being able to extract extra data: %w", err)
+	}
 
 	// create map for faster access to indexes
 	nodeIDIndexMap := make(map[types.Address]int, f.validators.Len())

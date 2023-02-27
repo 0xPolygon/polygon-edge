@@ -10,13 +10,15 @@ import (
 // LondonSigner implements signer for EIP-1559
 type LondonSigner struct {
 	chainID        uint64
+	isHomestead    bool
 	fallbackSigner TxSigner
 }
 
 // NewLondonSigner returns a new LondonSigner object
-func NewLondonSigner(chainID uint64, fallbackSigner TxSigner) *LondonSigner {
+func NewLondonSigner(chainID uint64, isHomestead bool, fallbackSigner TxSigner) *LondonSigner {
 	return &LondonSigner{
 		chainID:        chainID,
+		isHomestead:    isHomestead,
 		fallbackSigner: fallbackSigner,
 	}
 }
@@ -33,7 +35,7 @@ func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
 		return e.fallbackSigner.Sender(tx)
 	}
 
-	sig, err := encodeSignature(tx.R, tx.S, byte(tx.V.Int64()))
+	sig, err := encodeSignature(tx.R, tx.S, tx.V, e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}

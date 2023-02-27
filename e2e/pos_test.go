@@ -357,7 +357,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 
 	// Required default values
 	numTransactions := 5
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(100, true)
 	currentNonce := 0
 
 	// TxPool client
@@ -499,7 +499,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	// Required default values
 	numTransactions := 6
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(100, true)
 	currentNonce := 0
 
 	// TxPool client
@@ -630,7 +630,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	// Required default values
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(100, true)
 	currentNonce := 0
 
 	// TxPool client

@@ -16,40 +16,49 @@ func TestLondonSignerSender(t *testing.T) {
 	toAddress := types.StringToAddress("1")
 
 	testTable := []struct {
-		name    string
-		chainID *big.Int
+		name        string
+		chainID     *big.Int
+		isGomestead bool
 	}{
 		{
 			"mainnet",
 			big.NewInt(1),
+			true,
 		},
 		{
 			"expanse mainnet",
 			big.NewInt(2),
+			true,
 		},
 		{
 			"ropsten",
 			big.NewInt(3),
+			true,
 		},
 		{
 			"rinkeby",
 			big.NewInt(4),
+			true,
 		},
 		{
 			"goerli",
 			big.NewInt(5),
+			true,
 		},
 		{
 			"kovan",
 			big.NewInt(42),
+			true,
 		},
 		{
 			"geth private",
 			big.NewInt(1337),
+			true,
 		},
 		{
 			"mega large",
 			big.NewInt(0).Exp(big.NewInt(2), big.NewInt(20), nil), // 2**20
+			true,
 		},
 	}
 
@@ -70,7 +79,7 @@ func TestLondonSignerSender(t *testing.T) {
 			}
 
 			chainID := testCase.chainID.Uint64()
-			signer := NewLondonSigner(chainID, NewEIP155Signer(chainID))
+			signer := NewLondonSigner(chainID, true, NewEIP155Signer(chainID, true))
 
 			signedTx, signErr := signer.SignTx(txn, key)
 			if signErr != nil {
@@ -90,7 +99,7 @@ func TestLondonSignerSender(t *testing.T) {
 func Test_LondonSigner_Sender(t *testing.T) {
 	t.Parallel()
 
-	signer := NewLondonSigner(100, NewEIP155Signer(100))
+	signer := NewLondonSigner(100, true, NewEIP155Signer(100, true))
 	to := types.StringToAddress("0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF")
 
 	r, ok := big.NewInt(0).SetString("102623819621514684481463796449525884981685455700611671612296611353030973716382", 10)

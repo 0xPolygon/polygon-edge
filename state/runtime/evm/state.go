@@ -114,7 +114,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 		return false
 	}
 
-	return c.bitmap.isSet(uint(udest))
+	return c.bitmap.isSet(udest)
 }
 
 func (c *state) Halt() {

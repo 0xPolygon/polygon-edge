@@ -324,7 +324,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			BaseFee:    command.DefaultGenesisBaseFee,
 		},
 		Params: &chain.Params{
-			ChainID:      int(p.chainID),
+			ChainID:      int64(p.chainID),
 			Forks:        chain.AllForksEnabled,
 			Engine:       p.consensusEngineConfig,
 			BurnContract: map[string]string{},

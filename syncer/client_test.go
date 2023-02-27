@@ -44,6 +44,7 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
+		closed:                 new(uint64),
 	}
 
 	// need to register protocol

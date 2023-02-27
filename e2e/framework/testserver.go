@@ -82,7 +82,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		LibP2PPort:    ports[1].Port(),
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
-		Signer:        crypto.NewEIP155Signer(100),
+		Signer:        crypto.NewEIP155Signer(100, true),
 		ValidatorType: validators.ECDSAValidatorType,
 	}
 

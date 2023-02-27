@@ -59,7 +59,7 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 	config := e.config.Forks.At(0)
 
 	env := runtime.TxContext{
-		ChainID: int64(e.config.ChainID),
+		ChainID: e.config.ChainID,
 	}
 
 	transition := &Transition{
@@ -180,7 +180,7 @@ func (e *Executor) BeginTxn(
 		Difficulty:   types.BytesToHash(new(big.Int).SetUint64(header.Difficulty).Bytes()),
 		BaseFee:      new(big.Int).SetUint64(header.BaseFee),
 		GasLimit:     int64(header.GasLimit),
-		ChainID:      int64(e.config.ChainID),
+		ChainID:      e.config.ChainID,
 		BurnContract: burnContract,
 	}
 
@@ -543,7 +543,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
-	gasPrice := new(big.Int).Set(msg.GasPrice)
+	gasPrice := msg.GetGasPrice(t.ctx.BaseFee.Uint64())
 	value := new(big.Int).Set(msg.Value)
 
 	// set the specific transaction fields in the context
@@ -566,14 +566,14 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// Refund the sender
-	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), msg.GasPrice)
+	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
 	t.state.AddBalance(msg.From, remaining)
 
 	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 	// Define effective tip based on tx type.
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
-	effectiveTip := msg.GasPrice
+	effectiveTip := new(big.Int).Set(gasPrice)
 	if t.config.London && msg.Type != types.StateTx {
 		effectiveTip = common.BigMin(
 			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
@@ -971,7 +971,7 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 		return NewTransitionApplicationError(err, true)
 	}
 
-	// 2. caller has enough balance to cover transaction
+	// 3. caller has enough balance to cover transaction
 	if err := t.subGasLimitPrice(msg); err != nil {
 		return NewTransitionApplicationError(err, true)
 	}

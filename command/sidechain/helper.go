@@ -72,18 +72,13 @@ func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer
 		return nil, fmt.Errorf("could not convert decoded outputs to map")
 	}
 
-	decodedValidatorInfoMap, ok := decodedOutputsMap["0"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("could not convert validator info result to a map")
-	}
-
 	return &polybft.ValidatorInfo{
 		Address:             validatorAddr.Address(),
-		Stake:               decodedValidatorInfoMap["stake"].(*big.Int),               //nolint:forcetypeassert
-		TotalStake:          decodedValidatorInfoMap["totalStake"].(*big.Int),          //nolint:forcetypeassert
-		Commission:          decodedValidatorInfoMap["commission"].(*big.Int),          //nolint:forcetypeassert
-		WithdrawableRewards: decodedValidatorInfoMap["withdrawableRewards"].(*big.Int), //nolint:forcetypeassert
-		Active:              decodedValidatorInfoMap["active"].(bool),                  //nolint:forcetypeassert
+		Stake:               decodedOutputsMap["stake"].(*big.Int),               //nolint:forcetypeassert
+		TotalStake:          decodedOutputsMap["totalStake"].(*big.Int),          //nolint:forcetypeassert
+		Commission:          decodedOutputsMap["commission"].(*big.Int),          //nolint:forcetypeassert
+		WithdrawableRewards: decodedOutputsMap["withdrawableRewards"].(*big.Int), //nolint:forcetypeassert
+		Active:              decodedOutputsMap["active"].(bool),                  //nolint:forcetypeassert
 	}, nil
 }
 
