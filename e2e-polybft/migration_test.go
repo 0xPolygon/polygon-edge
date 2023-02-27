@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/syndtr/goleveldb/leveldb/opt"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	frameworkpolybft "github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -16,13 +17,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 )
 
-// Add `-run TestMigration` to Makefile `test-e2e-polybft` command to run this test
 func TestMigration(t *testing.T) {
+	os.Setenv("EDGE_BINARY", "/Users/boris/GolandProjects/polygon-edge/polygon-edge")
+	os.Setenv("E2E_TESTS", "true")
+	os.Setenv("E2E_LOGS", "true")
+
 	userKey, _ := wallet.GenerateKey()
 	userAddr := userKey.Address()
 	userKey2, _ := wallet.GenerateKey()
@@ -115,76 +118,39 @@ func TestMigration(t *testing.T) {
 
 	stateRoot := block.StateRoot
 
-	path := srvs[0].Config.RootDir
+	path := filepath.Join(srvs[0].Config.RootDir, "trie")
 	srvs[0].Stop()
-
-	dbOLD := "trie"
-	dbNEW := "trieNew"
-
-	//hack for db closing
+	//hack for db closing. leveldb allow only one connection
 	time.Sleep(time.Second)
 
-	db, err := leveldb.OpenFile(filepath.Join(path, dbOLD), &opt.Options{ReadOnly: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
+	tmpDir := t.TempDir()
+	defer os.RemoveAll(tmpDir)
 
-	newTrieDB := filepath.Join(path, dbNEW)
-	os.RemoveAll(newTrieDB)
-
-	db2, err := leveldb.OpenFile(newTrieDB, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	stateStorage := itrie.NewKV(db)
-	stateStorageNew := itrie.NewKV(db2)
-
-	exSnapshot, err := itrie.NewState(stateStorage).NewSnapshotAt(types.Hash(stateRoot))
+	err = frameworkpolybft.RunEdgeCommand([]string{
+		"regenesis",
+		"--stateRoot", block.StateRoot.String(),
+		"--triedb", path,
+		"--snapshotPath", tmpDir,
+	}, os.Stdout)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	acc1, err := exSnapshot.GetAccount(types.Address(userAddr))
-	require.NoError(t, err)
-	assert.Equal(t, balanceSender, acc1.Balance)
-
-	rootNode, _, err := itrie.GetNode(stateRoot.Bytes(), stateStorage)
-	if err != nil {
-		t.Fatal()
-	}
-
-	oldTrie := itrie.NewTrieWithRoot(rootNode)
-
-	oldAddr1Node, ok := oldTrie.Get(crypto.Keccak256(userAddr.Bytes()), stateStorage)
-	require.True(t, ok)
-
-	oldAddr2Node, ok := oldTrie.Get(crypto.Keccak256(userAddr2.Bytes()), stateStorage)
-	require.True(t, ok)
-
-	err = itrie.CopyTrie(stateRoot.Bytes(), stateStorage, stateStorageNew, nil, false)
+	db, err := leveldb.OpenFile(tmpDir, &opt.Options{ReadOnly: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	newTrie := itrie.NewTrieWithRoot(rootNode)
-	newAddr1Node, ok := newTrie.Get(crypto.Keccak256(userAddr.Bytes()), stateStorageNew)
-	require.True(t, ok)
-	assert.Equal(t, oldAddr1Node, newAddr1Node)
+	stateStorageNew := itrie.NewKV(db)
 
-	newAddr2Node, ok := newTrie.Get(crypto.Keccak256(userAddr2.Bytes()), stateStorageNew)
-	require.True(t, ok)
-	assert.Equal(t, oldAddr2Node, newAddr2Node)
-
-	checkedStateRoot, err := itrie.HashChecker(stateRoot.Bytes(), stateStorageNew)
+	copiedStateRoot, err := itrie.HashChecker(block.StateRoot.Bytes(), stateStorageNew)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	require.Equal(t, checkedStateRoot, types.Hash(block.StateRoot))
+	require.Equal(t, types.Hash(stateRoot), copiedStateRoot)
 
-	err = db2.Close()
+	err = db.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,7 +158,7 @@ func TestMigration(t *testing.T) {
 	cluster := frameworkpolybft.NewTestCluster(t, 7,
 		frameworkpolybft.WithNonValidators(2),
 		frameworkpolybft.WithValidatorSnapshot(5),
-		frameworkpolybft.WithGenesisState(newTrieDB, types.Hash(stateRoot)),
+		frameworkpolybft.WithGenesisState(tmpDir, types.Hash(stateRoot)),
 	)
 	defer cluster.Stop()
 
@@ -211,44 +177,40 @@ func TestMigration(t *testing.T) {
 	assert.Equal(t, balanceSender, senderBalanceAfterMigration)
 	assert.Equal(t, balanceReceiver, receiverBalanceAfterMigration)
 
-	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
-
 	deployedCode, err := cluster.Servers[0].JSONRPC().Eth().GetCode(deployedContractBalance, ethgo.Latest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	require.Equal(t, deployedCode, *types.EncodeBytes(contractsapi.TestWriteBlockMetadata.DeployedBytecode))
-}
+	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
 
-func PrintDB(t *testing.T, db *leveldb.DB) {
-	t.Helper()
+	//stop last node of validator and non-validator
+	cluster.Servers[4].Stop()
+	cluster.Servers[6].Stop()
 
-	it := db.NewIterator(nil, nil)
-	id := 0
+	require.NoError(t, cluster.WaitForBlock(15, time.Minute))
 
-	for {
-		v := it.Next()
-		if v == false {
-			break
-		}
+	//wait sync of that nodes
+	cluster.Servers[4].Start()
+	cluster.Servers[6].Start()
+	require.NoError(t, cluster.WaitForBlock(20, time.Minute))
 
-		t.Log(id, it.Key(), it.Value())
-		id++
-	}
-}
-
-/*
-	//000001.log      CURRENT         LOCK            LOG             MANIFEST-000000
-	files := []string{"000001.log", "CURRENT", "LOCK", "LOG", "MANIFEST-000000"}
-
-	for _, file := range files {
-		fData, err := ioutil.ReadFile(filepath.Join(path, dbNEW, file))
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Log(file, types.BytesToHash(hashit(fData)).String())
+	for i := range cluster.Servers {
+		cluster.Servers[i].Stop()
 	}
 
+	time.Sleep(time.Second)
 
-*/
+	for i := range cluster.Servers {
+		cluster.Servers[i].Start()
+	}
+
+	require.NoError(t, cluster.WaitForBlock(25, time.Minute))
+
+	_, err = cluster.InitSecrets("test-chain-8", 1)
+	require.NoError(t, err)
+
+	cluster.InitTestServer(t, 8, false, false)
+	require.NoError(t, cluster.WaitForBlock(33, time.Minute))
+}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/0xPolygon/polygon-edge/command/regenesis"
+
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/backup"
@@ -61,6 +63,7 @@ func (rc *RootCommand) registerSubCommands() {
 		polybftsecrets.GetCommand(),
 		polybft.GetCommand(),
 		polybftmanifest.GetCommand(),
+		regenesis.GetCommand(),
 	)
 }
 

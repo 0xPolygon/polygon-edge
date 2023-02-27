@@ -389,6 +389,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, relayer bool) {
 	t.Helper()
+	t.Log("Init node", i)
 
 	logLevel := os.Getenv(envLogLevel)
 
@@ -572,6 +573,11 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 	}
 
 	return nil
+}
+
+// RunEdgeCommand - calls a command line edge function
+func RunEdgeCommand(args []string, stdout io.Writer) error {
+	return runCommand(resolveBinary(), args, stdout)
 }
 
 // InitSecrets initializes account(s) secrets with given prefix.

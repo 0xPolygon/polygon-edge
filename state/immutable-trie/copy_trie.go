@@ -75,10 +75,9 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 			} else {
 				if account.CodeHash != nil {
 					code, ok := storage.GetCode(types.BytesToHash(account.CodeHash))
-					if !ok {
-						fmt.Println("------------------------Code is empty-------------")
+					if ok {
+						newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
 					}
-					newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
 				}
 
 				if account.Root != types.EmptyRootHash {
