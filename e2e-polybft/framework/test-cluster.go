@@ -87,6 +87,8 @@ type TestClusterConfig struct {
 	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
+	NumBlockConfirmations uint64
+
 	logsDirOnce sync.Once
 }
 
@@ -221,6 +223,12 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.PropertyBaseTests = propertyBaseTests
+	}
+}
+
+func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.NumBlockConfirmations = numBlockConfirmations
 	}
 }
 
@@ -389,6 +397,7 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
 		config.Relayer = relayer
+		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

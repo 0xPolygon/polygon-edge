@@ -43,6 +43,8 @@ type Config struct {
 	LogFilePath string
 
 	Relayer bool
+
+	NumBlockConfirmations uint64
 }
 
 // Telemetry holds the config details for metric services

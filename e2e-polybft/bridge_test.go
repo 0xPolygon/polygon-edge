@@ -56,7 +56,10 @@ func checkLogs(
 }
 
 func TestE2E_Bridge_MainWorkflow(t *testing.T) {
-	const num = 10
+	const (
+		num                   = 10
+		numBlockConfirmations = 4
+	)
 
 	var (
 		accounts         = make([]ethgo.Key, num)
@@ -71,13 +74,27 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 		amounts[i] = fmt.Sprintf("%d", 100)
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(), framework.WithPremine(premine[:]...),
+		framework.WithNumBlockConfirmations(numBlockConfirmations))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
 
 	// send a few transactions to the bridge
+	require.NoError(
+		t,
+		cluster.EmitTransfer(
+			contracts.NativeTokenContract.String(),
+			strings.Join(wallets[:], ","),
+			strings.Join(amounts[:], ","),
+		),
+	)
+
+	require.NoError(t, cluster.WaitForBlock(2+numBlockConfirmations*2, 2*time.Minute))
+
+	// send again to trigger previous transactions
 	require.NoError(
 		t,
 		cluster.EmitTransfer(

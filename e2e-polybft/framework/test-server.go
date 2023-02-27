@@ -18,15 +18,16 @@ import (
 )
 
 type TestServerConfig struct {
-	Name        string
-	JSONRPCPort int64
-	GRPCPort    int64
-	P2PPort     int64
-	Seal        bool
-	DataDir     string
-	Chain       string
-	LogLevel    string
-	Relayer     bool
+	Name                  string
+	JSONRPCPort           int64
+	GRPCPort              int64
+	P2PPort               int64
+	Seal                  bool
+	DataDir               string
+	Chain                 string
+	LogLevel              string
+	Relayer               bool
+	NumBlockConfirmations uint64
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -124,6 +125,8 @@ func (t *TestServer) Start() {
 		"--grpc-address", fmt.Sprintf("localhost:%d", config.GRPCPort),
 		// enable jsonrpc
 		"--jsonrpc", fmt.Sprintf(":%d", config.JSONRPCPort),
+		// minimal number of child blocks required for the parent block to be considered final
+		"--num-block-confirmations", strconv.FormatUint(config.NumBlockConfirmations, 10),
 	}
 
 	if len(config.LogLevel) > 0 {
