@@ -29,7 +29,7 @@ const (
 
 const (
 	// defaultMintValue represents amount of tokens which are going to be minted to depositor
-	defaultMintValue = 1000000000000000
+	defaultMintValue = int64(1e18)
 )
 
 var (
