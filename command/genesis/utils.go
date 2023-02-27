@@ -137,7 +137,7 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 	for i, file := range validatorKeyFiles {
 		path := filepath.Join(dir, file)
 
-		account, nodeID, err := getSecrets(path)
+		account, nodeID, blsSignature, err := getSecrets(path)
 		if err != nil {
 			return nil, err
 		}
@@ -146,6 +146,7 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 			Address:       types.Address(account.Ecdsa.Address()),
 			BlsPrivateKey: account.Bls,
 			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			BlsSignature:  blsSignature,
 			NodeID:        nodeID,
 		}
 	}
@@ -153,7 +154,7 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 	return validators, nil
 }
 
-func getSecrets(directory string) (*wallet.Account, string, error) {
+func getSecrets(directory string) (*wallet.Account, string, string, error) {
 	baseConfig := &secrets.SecretsManagerParams{
 		Logger: hclog.NewNullLogger(),
 		Extra: map[string]interface{}{
@@ -163,18 +164,20 @@ func getSecrets(directory string) (*wallet.Account, string, error) {
 
 	localManager, err := local.SecretsManagerFactory(nil, baseConfig)
 	if err != nil {
-		return nil, "", fmt.Errorf("unable to instantiate local secrets manager, %w", err)
+		return nil, "", "", fmt.Errorf("unable to instantiate local secrets manager, %w", err)
 	}
 
 	nodeID, err := helper.LoadNodeID(localManager)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 
 	account, err := wallet.NewAccountFromSecret(localManager)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 
-	return account, nodeID, nil
+	blsSignature, err := helper.LoadBLSSignature(localManager)
+
+	return account, nodeID, blsSignature, err
 }

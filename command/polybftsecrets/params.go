@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -21,6 +22,7 @@ const (
 	networkFlag    = "network"
 	numFlag        = "num"
 	outputFlag     = "output"
+	chainIDFlag    = "chain-id"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -53,6 +55,8 @@ type initParams struct {
 	insecureLocalStore bool
 
 	output bool
+
+	chainID int64
 }
 
 func (ip *initParams) validateFlags() error {
@@ -131,6 +135,13 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		false,
 		"the flag indicating to output existing secrets",
 	)
+
+	cmd.Flags().Int64Var(
+		&ip.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
+	)
 }
 
 func (ip *initParams) Execute() (Results, error) {
@@ -152,14 +163,15 @@ func (ip *initParams) Execute() (Results, error) {
 			return results, err
 		}
 
+		var gen []string
 		if !ip.output {
-			err = ip.initKeys(secretManager)
+			gen, err = ip.initKeys(secretManager)
 			if err != nil {
 				return results, err
 			}
 		}
 
-		res, err := ip.getResult(secretManager)
+		res, err := ip.getResult(secretManager, gen)
 		if err != nil {
 			return results, err
 		}
@@ -170,30 +182,56 @@ func (ip *initParams) Execute() (Results, error) {
 	return results, nil
 }
 
-func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) error {
+func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string, error) {
+	var generated []string
+
 	if ip.generatesNetwork {
-		if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
-			return err
+		if !secretsManager.HasSecret(secrets.NetworkKey) {
+			if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
+				return generated, fmt.Errorf("error initializing network-key: %w", err)
+			}
+
+			generated = append(generated, secrets.NetworkKey)
 		}
 	}
 
 	if ip.generatesAccount {
-		if secretsManager.HasSecret(secrets.ValidatorKey) {
-			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorKey)
+		var (
+			a   *wallet.Account
+			err error
+		)
+
+		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+			a = wallet.GenerateAccount()
+			if err = a.Save(secretsManager); err != nil {
+				return generated, fmt.Errorf("error saving account: %w", err)
+			}
+
+			generated = append(generated, secrets.ValidatorKey, secrets.ValidatorBLSKey)
+		} else {
+			a, err = wallet.NewAccountFromSecret(secretsManager)
+			if err != nil {
+				return generated, fmt.Errorf("error loading account: %w", err)
+			}
 		}
 
-		if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorBLSKey)
-		}
+		if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
+			if _, err = helper.InitValidatorBLSSignature(secretsManager, a, ip.chainID); err != nil {
+				return generated, fmt.Errorf("%w: error initializing validator-bls-signature", err)
+			}
 
-		return wallet.GenerateAccount().Save(secretsManager)
+			generated = append(generated, secrets.ValidatorBLSSignature)
+		}
 	}
 
-	return nil
+	return generated, nil
 }
 
 // getResult gets keys from secret manager and return result to display
-func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.CommandResult, error) {
+func (ip *initParams) getResult(
+	secretsManager secrets.SecretsManager,
+	generated []string,
+) (command.CommandResult, error) {
 	var (
 		res = &SecretsInitResult{}
 		err error
@@ -207,6 +245,14 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
+
+		s, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
+		if err != nil {
+			return nil, err
+		}
+
+		res.BLSSignature = string(s)
+		res.Generated = strings.Join(generated, ", ")
 
 		if ip.printPrivateKey {
 			pk, err := account.Ecdsa.MarshallPrivateKey()

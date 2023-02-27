@@ -15,6 +15,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -238,7 +239,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Balance: validator.VotingPower,
 			}
 
-			signature, err := MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address, 0, bls.DomainValidatorSet)
+			signature, err := secretsHelper.MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address, 0, bls.DomainValidatorSet)
 			require.NoError(t, err)
 
 			signatureBytes, err := signature.Marshal()

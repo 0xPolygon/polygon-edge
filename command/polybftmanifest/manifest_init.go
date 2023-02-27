@@ -27,9 +27,9 @@ const (
 	defaultManifestPath        = "./manifest.json"
 
 	nodeIDLength       = 53
-	ecdsaAddressLength = 42
-	blsKeyLength       = 258
-	blsSignatureLength = 130
+	ecdsaAddressLength = 40
+	blsKeyLength       = 256
+	blsSignatureLength = 128
 )
 
 var (
@@ -75,18 +75,11 @@ func setFlags(cmd *cobra.Command) {
 		"folder prefix names for polybft validator keys",
 	)
 
-	cmd.Flags().Int64Var(
-		&params.chainID,
-		chainIDFlag,
-		command.DefaultChainID,
-		"the ID of the chain",
-	)
-
 	cmd.Flags().StringArrayVar(
 		&params.validators,
 		validatorsFlag,
 		[]string{},
-		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>)",
+		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
 	cmd.Flags().StringVar(
@@ -94,6 +87,13 @@ func setFlags(cmd *cobra.Command) {
 		premineValidatorsFlag,
 		command.DefaultPremineBalance,
 		"the amount which will be pre-mined to all the validators",
+	)
+
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
@@ -168,11 +168,11 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid address: %s", parts[1])
 			}
 
-			if len(parts[2]) < blsKeyLength {
+			if len(strings.TrimPrefix(parts[2], "0x")) != blsKeyLength {
 				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
 			}
 
-			if len(parts[3]) < blsSignatureLength {
+			if len(parts[3]) != blsSignatureLength {
 				return nil, fmt.Errorf("invalid bls signature: %s", parts[3])
 			}
 
@@ -199,10 +199,6 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		if err = v.InitKOSKSignature(p.chainID); err != nil {
-			return nil, err
-		}
-
 		v.Balance = balance
 	}
 

@@ -409,11 +409,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
-	if err := c.state.cleanEpochsFromDB(); err != nil {
+	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
 
-	if err := c.state.insertEpoch(epochNumber); err != nil {
+	if err := c.state.EpochStore.insertEpoch(epochNumber); err != nil {
 		return nil, fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
 
@@ -939,20 +939,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	}
 
 	return firstBlockInEpoch, nil
-}
-
-// validateVote validates if the senders address is in active validator set
-func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
-	// get senders address
-	senderAddress := types.StringToAddress(vote.From)
-	if !epoch.Validators.ContainsAddress(senderAddress) {
-		return fmt.Errorf(
-			"message is received from sender %s, which is not in current validator set",
-			vote.From,
-		)
-	}
-
-	return nil
 }
 
 // createExitTree creates an exit event merkle tree from provided exit events
