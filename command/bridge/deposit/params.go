@@ -13,7 +13,7 @@ const (
 	receiversFlag    = "receivers"
 	amountsFlag      = "amounts"
 	jsonRPCFlag      = "json-rpc"
-	adminKeyFlag     = "admin-key"
+	depositorKeyFlag = "depositor-key"
 )
 
 var (

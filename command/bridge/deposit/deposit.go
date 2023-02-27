@@ -98,9 +98,9 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.depositorKey,
-		adminKeyFlag,
+		depositorKeyFlag,
 		helper.DefaultPrivateKeyRaw,
-		"Hex encoded private key of the account which sends rootchain transactions",
+		"Hex encoded private key of the account which sends rootchain deposit transactions",
 	)
 }
 
