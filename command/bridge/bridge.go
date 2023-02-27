@@ -7,14 +7,14 @@ import (
 
 // GetCommand creates "bridge" helper command
 func GetCommand() *cobra.Command {
-	rootchainCmd := &cobra.Command{
+	bridgeCmd := &cobra.Command{
 		Use:   "bridge",
 		Short: "Top level bridge command.",
 	}
 
-	registerSubcommands(rootchainCmd)
+	registerSubcommands(bridgeCmd)
 
-	return rootchainCmd
+	return bridgeCmd
 }
 
 func registerSubcommands(baseCmd *cobra.Command) {
