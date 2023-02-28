@@ -23,12 +23,11 @@ import (
 )
 
 const (
-	smartContractsRootPathFlag = "contracts-path"
-	manifestPathFlag           = "manifest"
-	validatorSetSizeFlag       = "validator-set-size"
-	sprintSizeFlag             = "sprint-size"
-	blockTimeFlag              = "block-time"
-	bridgeFlag                 = "bridge-json-rpc"
+	manifestPathFlag     = "manifest"
+	validatorSetSizeFlag = "validator-set-size"
+	sprintSizeFlag       = "sprint-size"
+	blockTimeFlag        = "block-time"
+	bridgeFlag           = "bridge-json-rpc"
 
 	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)

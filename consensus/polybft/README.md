@@ -54,7 +54,7 @@ In order to do so, run `make compile-core-contracts`.
 5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates manifest configuration with rootchain contract addresses and rootchain default sender address.
 
     ```bash
-    polygon-edge rootchain init-contracts [--manifest ./manifest.json] [--contracts-path ./core-contracts/artifacts]
+    polygon-edge rootchain init-contracts [--manifest ./manifest.json]
     [--json-rpc http://127.0.0.1:8545] [--admin-key <hex_encoded_private_key>]
     ```
 
@@ -62,7 +62,7 @@ In order to do so, run `make compile-core-contracts`.
 
     ```bash
     polygon-edge genesis --consensus polybft --block-gas-limit 10000000 --epoch-size 10
-    [--bridge-json-rpc <rootchain_ip_address>] [--contracts-path ./core-contracts/artifacts] [--manifest ./manifest.json]
+    [--bridge-json-rpc <rootchain_ip_address>] [--manifest ./manifest.json]
     ```
 
 7. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**
