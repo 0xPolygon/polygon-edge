@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type TestBridge struct {
@@ -91,13 +92,9 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 	}
 }
 
-// Deposit function is used to invoke bridge deposit command
-// with appropriately created receivers and amounts for test transactions
-func (t *TestBridge) Deposit(tokenType, receivers, amounts string) error {
-	if tokenType == "" {
-		return errors.New("provide token type value")
-	}
-
+// DepositERC20 function invokes bridge deposit ERC20 tokens (from the root to the child chain)
+// with given receivers and amounts
+func (t *TestBridge) DepositERC20(rootTokenAddr, rootPredicateAddr types.Address, receivers, amounts string) error {
 	if receivers == "" {
 		return errors.New("provide at least one receiver address value")
 	}
@@ -108,11 +105,40 @@ func (t *TestBridge) Deposit(tokenType, receivers, amounts string) error {
 
 	return t.cmdRun(
 		"bridge",
-		"deposit",
-		"--manifest", path.Join(t.clusterConfig.TmpDir, "manifest.json"),
-		"--token", tokenType,
+		"deposit-erc20",
+		"--root-token", rootTokenAddr.String(),
+		"--root-predicate", rootPredicateAddr.String(),
 		"--receivers", receivers,
 		"--amounts", amounts)
+}
+
+// WithdrawERC20 function is used to invoke bridge withdraw ERC20 tokens (from the child to the root chain)
+// with given receivers and amounts
+func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoint string) error {
+	if senderKey == "" {
+		return errors.New("provide a hex-encoded sender private key")
+	}
+
+	if receivers == "" {
+		return errors.New("provide at least one receiver address value")
+	}
+
+	if amounts == "" {
+		return errors.New("provide at least one amount value")
+	}
+
+	if jsonRPCEndpoint == "" {
+		return errors.New("provide a JSON RPC endpoint URL")
+	}
+
+	return t.cmdRun(
+		"bridge",
+		"withdraw-erc20",
+		"--sender-key", senderKey,
+		"--receivers", receivers,
+		"--amounts", amounts,
+		"--json-rpc", jsonRPCEndpoint,
+	)
 }
 
 // cmdRun executes arbitrary command from the given binary

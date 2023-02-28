@@ -26,6 +26,8 @@ func registerSubcommands(baseCmd *cobra.Command) {
 		// bridge deposit
 		deposit.GetCommand(),
 		// bridge withdraw
-		withdraw.GetCommand(),
+		withdraw.GetWithdrawCommand(),
+		// bridge exit
+		withdraw.GetExitCommand(),
 	)
 }

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -54,11 +55,11 @@ func checkStateSyncResultLogs(
 	}
 }
 
-func TestE2E_Bridge_DepositERC20(t *testing.T) {
+func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	const (
 		num                   = 10
 		amount                = 100
-		numBlockConfirmations = 4
+		numBlockConfirmations = 2
 	)
 
 	receivers := make([]string, num)
@@ -74,30 +75,24 @@ func TestE2E_Bridge_DepositERC20(t *testing.T) {
 		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(),
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
 
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
+	// DEPOSIT ERC20 TOKENS
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
-		cluster.Bridge.Deposit(
-			"ERC20",
-			strings.Join(receivers[:], ","),
-			strings.Join(amounts[:], ","),
-		),
-	)
-
-	require.NoError(t, cluster.WaitForBlock(2+numBlockConfirmations*2, 2*time.Minute))
-
-	// send again to trigger previous transactions
-	require.NoError(
-		t,
-		cluster.Bridge.Deposit(
-			"ERC20",
+		cluster.Bridge.DepositERC20(
+			manifest.RootchainConfig.RootERC20Address,
+			manifest.RootchainConfig.RootERC20PredicateAddress,
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 		),
@@ -131,6 +126,23 @@ func TestE2E_Bridge_DepositERC20(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(amount), balance)
 	}
+
+	// WITHDRAW ERC20 TOKENS
+	senderAccount, err := sidechain.GetAccountFromDir(cluster.Servers[0].DataDir())
+	require.NoError(t, err)
+
+	rawPrivateSenderKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
+	require.NoError(t, err)
+
+	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
+
+	// send withdraw transaction
+	err = cluster.Bridge.WithdrawERC20(
+		hex.EncodeToString(rawPrivateSenderKey),
+		strings.Join(receivers[:], ","),
+		strings.Join(amounts[:], ","),
+		cluster.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
 }
 
 func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
@@ -152,14 +164,18 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 		framework.WithEpochSize(30))
 	defer cluster.Stop()
 
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
 
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
 		t,
-		cluster.Bridge.Deposit(
-			"ERC20",
+		cluster.Bridge.DepositERC20(
+			manifest.RootchainConfig.RootERC20Address,
+			manifest.RootchainConfig.RootERC20PredicateAddress,
 			strings.Join(receivers[:2], ","),
 			strings.Join(amounts[:2], ","),
 		),
@@ -186,8 +202,9 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
 		t,
-		cluster.Bridge.Deposit(
-			"ERC20",
+		cluster.Bridge.DepositERC20(
+			manifest.RootchainConfig.RootERC20Address,
+			manifest.RootchainConfig.RootERC20PredicateAddress,
 			strings.Join(receivers[2:], ","),
 			strings.Join(amounts[2:], ","),
 		),

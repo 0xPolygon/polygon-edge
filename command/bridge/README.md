@@ -6,12 +6,13 @@ This is a helper command, which allows sending deposits from root to child chain
 This is a helper command which bridges assets from the root chain to the child chain (allows depositing)
 
 ```bash
-$ polygon-edge bridge deposit 
+$ polygon-edge bridge deposit-erc20
     --sender-key <hex_encoded_depositor_private_key>
-    --token <token_type>
     --receivers <receivers_addresses>
     --amounts <amounts>
-    --manifest <manifest_file_path>
+    --root-token <root_erc20_token_address>
+    --root-predicate <root_erc20_predicate_address>
+    [--child-token <child_erc20_token_address>]
     --json-rpc <root_chain_json_rpc_endpoint>
 ```
 
@@ -19,11 +20,11 @@ $ polygon-edge bridge deposit
 This is a helper command which bridges assets from the child chain to the root chain (allows withdrawal)
 
 ```bash
-$ polygon-edge bridge withdraw 
+$ polygon-edge bridge withdraw-erc20
     --sender-key <hex_encoded_withdraw_sender_private_key>
-    --token <token_type>
     --receivers <receivers_addresses>
     --amounts <amounts>
-    --manifest <manifest_file_path>
+    --child-predicate <rchild_erc20_predicate_address>
+    [--child-token <child_erc20_token_address>]
     --json-rpc <child_chain_json_rpc_endpoint>
 ```
