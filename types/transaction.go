@@ -166,14 +166,13 @@ func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 
 	gasPrice := new(big.Int)
 	if gasFeeCap.BitLen() > 0 || gasTipCap.BitLen() > 0 {
-		gasPrice = new(big.Int).Add(
-			gasTipCap,
-			new(big.Int).SetUint64(baseFee),
+		gasPrice = common.BigMin(
+			new(big.Int).Add(
+				gasTipCap,
+				new(big.Int).SetUint64(baseFee),
+			),
+			new(big.Int).Set(gasFeeCap),
 		)
-
-		if gasPrice.Cmp(gasFeeCap) > 0 {
-			gasPrice = new(big.Int).Set(gasFeeCap)
-		}
 	}
 
 	return gasPrice
