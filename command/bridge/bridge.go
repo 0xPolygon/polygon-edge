@@ -1,8 +1,11 @@
 package bridge
 
 import (
-	"github.com/0xPolygon/polygon-edge/command/bridge/deposit"
 	"github.com/spf13/cobra"
+
+	"github.com/0xPolygon/polygon-edge/command/bridge/common"
+	"github.com/0xPolygon/polygon-edge/command/bridge/deposit"
+	"github.com/0xPolygon/polygon-edge/command/bridge/withdraw"
 )
 
 // GetCommand creates "bridge" helper command
@@ -12,6 +15,7 @@ func GetCommand() *cobra.Command {
 		Short: "Top level bridge command.",
 	}
 
+	common.RegisterBridgePersistentFlags(bridgeCmd)
 	registerSubcommands(bridgeCmd)
 
 	return bridgeCmd
@@ -21,5 +25,7 @@ func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
 		// bridge deposit
 		deposit.GetCommand(),
+		// bridge withdraw
+		withdraw.GetCommand(),
 	)
 }

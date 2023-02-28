@@ -27,27 +27,19 @@ import (
 func TestIntegratoin_PerformExit(t *testing.T) {
 	t.Parallel()
 
-	//create validator set
+	// create validator set
 	currentValidators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
 	accSet := currentValidators.getPublicIdentities()
 
 	senderAddress := types.Address{1}
 	bn256Addr := types.Address{2}
-	l1Cntract := types.Address{3}
+	l1StateReceiverAddr := types.Address{3}
 
 	alloc := map[types.Address]*chain.GenesisAccount{
-		senderAddress: {
-			Balance: big.NewInt(100000000000),
-		},
-		contracts.BLSContract: {
-			Code: contractsapi.BLS.DeployedBytecode,
-		},
-		bn256Addr: {
-			Code: contractsapi.BLS256.DeployedBytecode,
-		},
-		l1Cntract: {
-			Code: contractsapi.TestL1StateReceiver.DeployedBytecode,
-		},
+		senderAddress:         {Balance: big.NewInt(100000000000)},
+		contracts.BLSContract: {Code: contractsapi.BLS.DeployedBytecode},
+		bn256Addr:             {Code: contractsapi.BLS256.DeployedBytecode},
+		l1StateReceiverAddr:   {Code: contractsapi.TestL1StateReceiver.DeployedBytecode},
 	}
 	transition := newTestTransition(t, alloc)
 
@@ -63,10 +55,25 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		return result.ReturnValue
 	}
 
-	rootchainContractAddress := deployRootchainContract(t, transition, contractsapi.CheckpointManager, senderAddress, accSet, bn256Addr)
-	exitHelperContractAddress := deployExitContract(t, transition, contractsapi.ExitHelper, senderAddress, rootchainContractAddress)
+	checkpointManagerInit := func() ([]byte, error) {
+		initialize := contractsapi.InitializeCheckpointManagerFunction{
+			NewBls:          contracts.BLSContract,
+			NewBn256G2:      bn256Addr,
+			NewValidatorSet: accSet.ToAPIBinding(),
+			ChainID_:        big.NewInt(0),
+		}
 
-	require.Equal(t, getField(rootchainContractAddress, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
+		return initialize.EncodeAbi()
+	}
+
+	checkpointManagerAddr := deployAndInitContract(t, transition, contractsapi.CheckpointManager, senderAddress, checkpointManagerInit)
+
+	exitHelperInit := func() ([]byte, error) {
+		return contractsapi.ExitHelper.Abi.GetMethod("initialize").Encode([]interface{}{ethgo.Address(checkpointManagerAddr)})
+	}
+	exitHelperContractAddress := deployAndInitContract(t, transition, contractsapi.ExitHelper, senderAddress, exitHelperInit)
+
+	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
 
 	cm := checkpointManager{
 		blockchain: &blockchainMock{},
@@ -83,13 +90,13 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		{
 			ID:       1,
 			Sender:   ethgo.Address{7},
-			Receiver: ethgo.Address(l1Cntract),
+			Receiver: ethgo.Address(l1StateReceiverAddr),
 			Data:     []byte{123},
 		},
 		{
 			ID:       2,
 			Sender:   ethgo.Address{7},
-			Receiver: ethgo.Address(l1Cntract),
+			Receiver: ethgo.Address(l1StateReceiverAddr),
 			Data:     []byte{21},
 		},
 	}
@@ -141,11 +148,9 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		accSet)
 	require.NoError(t, err)
 
-	result := transition.Call2(senderAddress, rootchainContractAddress, submitCheckpointEncoded, big.NewInt(0), 1000000000)
+	result := transition.Call2(senderAddress, checkpointManagerAddr, submitCheckpointEncoded, big.NewInt(0), 1000000000)
 	require.NoError(t, result.Err)
-	require.True(t, result.Succeeded())
-	require.False(t, result.Failed())
-	require.Equal(t, getField(rootchainContractAddress, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
+	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
 
 	//check that the exit havent performed
 	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
@@ -170,20 +175,18 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	result = transition.Call2(senderAddress, exitHelperContractAddress, ehExit, big.NewInt(0), 1000000000)
 	require.NoError(t, result.Err)
-	require.True(t, result.Succeeded())
-	require.False(t, result.Failed())
 
-	//check true
+	// check true
 	res = getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
 	require.Equal(t, int(res[31]), 1)
 
-	lastID := getField(l1Cntract, contractsapi.TestL1StateReceiver.Abi, "id")
-	require.Equal(t, lastID[31], uint8(1))
+	lastID := getField(l1StateReceiverAddr, contractsapi.TestL1StateReceiver.Abi, "id")
+	require.Equal(t, uint8(1), lastID[31])
 
-	lastAddr := getField(l1Cntract, contractsapi.TestL1StateReceiver.Abi, "addr")
+	lastAddr := getField(l1StateReceiverAddr, contractsapi.TestL1StateReceiver.Abi, "addr")
 	require.Equal(t, exits[0].Sender[:], lastAddr[12:])
 
-	lastCounter := getField(l1Cntract, contractsapi.TestL1StateReceiver.Abi, "counter")
+	lastCounter := getField(l1StateReceiverAddr, contractsapi.TestL1StateReceiver.Abi, "counter")
 	require.Equal(t, lastCounter[31], uint8(1))
 }
 
@@ -323,47 +326,26 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	}
 }
 
-func deployRootchainContract(t *testing.T, transition *state.Transition, rootchainArtifact *artifact.Artifact, sender types.Address, accSet AccountSet, bn256Addr types.Address) types.Address {
+func deployAndInitContract(t *testing.T, transition *state.Transition, scArtifact *artifact.Artifact, sender types.Address,
+	initCallback func() ([]byte, error)) types.Address {
 	t.Helper()
 
-	result := transition.Create2(sender, rootchainArtifact.Bytecode, big.NewInt(0), 1000000000)
+	result := transition.Create2(sender, scArtifact.Bytecode, big.NewInt(0), 1e9)
 	assert.NoError(t, result.Err)
-	rcAddress := result.Address
+	addr := result.Address
 
-	initialize := contractsapi.InitializeCheckpointManagerFunction{
-		NewBls:          contracts.BLSContract,
-		NewBn256G2:      bn256Addr,
-		NewValidatorSet: accSet.ToAPIBinding(),
-		ChainID_:        big.NewInt(0),
+	var (
+		initInput []byte
+		err       error
+	)
+
+	if initCallback != nil {
+		initInput, err = initCallback()
+		require.NoError(t, err)
+
+		result = transition.Call2(sender, addr, initInput, big.NewInt(0), 1e9)
+		require.NoError(t, result.Err)
 	}
 
-	init, err := initialize.EncodeAbi()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	result = transition.Call2(sender, rcAddress, init, big.NewInt(0), 1000000000)
-	require.True(t, result.Succeeded())
-	require.False(t, result.Failed())
-	require.NoError(t, result.Err)
-
-	return rcAddress
-}
-
-func deployExitContract(t *testing.T, transition *state.Transition, exitHelperArtifcat *artifact.Artifact, sender types.Address, rootchainContractAddress types.Address) types.Address {
-	t.Helper()
-
-	result := transition.Create2(sender, exitHelperArtifcat.Bytecode, big.NewInt(0), 1000000000)
-	assert.NoError(t, result.Err)
-	ehAddress := result.Address
-
-	ehInit, err := exitHelperArtifcat.Abi.GetMethod("initialize").Encode([]interface{}{ethgo.Address(rootchainContractAddress)})
-	require.NoError(t, err)
-
-	result = transition.Call2(sender, ehAddress, ehInit, big.NewInt(0), 1000000000)
-	require.NoError(t, result.Err)
-	require.True(t, result.Succeeded())
-	require.False(t, result.Failed())
-
-	return ehAddress
+	return addr
 }
