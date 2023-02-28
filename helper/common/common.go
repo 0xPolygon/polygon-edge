@@ -309,3 +309,8 @@ func EncodeUint64ToBytes(value uint64) []byte {
 
 	return result
 }
+
+// EncodeBytesToUint64 big endian byte slice to uint64
+func EncodeBytesToUint64(b []byte) uint64 {
+	return binary.BigEndian.Uint64(b)
+}

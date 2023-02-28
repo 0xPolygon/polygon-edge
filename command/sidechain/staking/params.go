@@ -14,6 +14,7 @@ var (
 
 type stakeParams struct {
 	accountDir      string
+	configPath      string
 	jsonRPC         string
 	amount          uint64
 	self            bool
@@ -21,7 +22,7 @@ type stakeParams struct {
 }
 
 func (v *stakeParams) validateFlags() error {
-	return sidechainHelper.CheckIfDirectoryExist(v.accountDir)
+	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.configPath)
 }
 
 type stakeResult struct {

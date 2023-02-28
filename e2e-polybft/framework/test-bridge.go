@@ -60,7 +60,6 @@ func (t *TestBridge) deployRootchainContracts(manifestPath string) error {
 	args := []string{
 		"rootchain",
 		"init-contracts",
-		"--path", t.clusterConfig.ContractsDir,
 		"--manifest", manifestPath,
 	}
 

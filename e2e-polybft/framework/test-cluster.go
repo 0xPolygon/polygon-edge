@@ -42,9 +42,6 @@ const (
 )
 
 const (
-	// path to core contracts
-	defaultContractsPath = "./../core-contracts/artifacts/contracts/"
-
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
 )
@@ -87,6 +84,8 @@ type TestClusterConfig struct {
 	EpochReward       int
 	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
+
+	NumBlockConfirmations uint64
 
 	logsDirOnce sync.Once
 }
@@ -235,6 +234,12 @@ func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
 	}
 }
 
+func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.NumBlockConfirmations = numBlockConfirmations
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -253,10 +258,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochReward:       1,
 		BlockGasLimit:     1e7, // 10M
 		PremineValidators: command.DefaultPremineBalance,
-	}
-
-	if config.ContractsDir == "" {
-		config.ContractsDir = defaultContractsPath
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -330,7 +331,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--manifest", manifestPath,
 			"--consensus", "polybft",
 			"--dir", path.Join(config.TmpDir, "genesis.json"),
-			"--contracts-path", defaultContractsPath,
 			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
@@ -405,6 +405,7 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
 		config.Relayer = relayer
+		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

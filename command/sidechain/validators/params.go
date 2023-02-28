@@ -10,11 +10,12 @@ import (
 
 type validatorInfoParams struct {
 	accountDir string
+	configPath string
 	jsonRPC    string
 }
 
 func (v *validatorInfoParams) validateFlags() error {
-	return sidechainHelper.CheckIfDirectoryExist(v.accountDir)
+	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.configPath)
 }
 
 type validatorsInfoResult struct {
