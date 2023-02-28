@@ -11,28 +11,29 @@ import (
 var configFile embed.FS
 
 type AAConfig struct {
-	Whitelist []string `json:"whitelist"`
-	Blacklist []string `json:"blacklist"`
+	AllowContractCreation bool     `json:"allowContractCreation"`
+	AllowList             []string `json:"allowList"`
+	DenyList              []string `json:"denyList"`
 }
 
 func (c *AAConfig) IsValidAddress(address *types.Address) bool {
 	if address == nil {
-		return true // TODO: contract creation is ok?
+		return c.AllowContractCreation
 	}
 
 	str := address.String()[2:] // skip 0x
 
-	for _, v := range c.Blacklist {
+	for _, v := range c.DenyList {
 		if str == v {
 			return false
 		}
 	}
 
-	if len(c.Whitelist) == 0 {
+	if len(c.AllowList) == 0 {
 		return true
 	}
 
-	for _, v := range c.Whitelist {
+	for _, v := range c.AllowList {
 		if str == v {
 			return true
 		}

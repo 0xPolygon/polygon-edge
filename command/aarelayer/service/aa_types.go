@@ -13,10 +13,10 @@ var marshalArenaPool fastrlp.ArenaPool
 
 // string mapping
 const (
-	StatusPending   string = "pending"   // The AA transaction is on the Pool
-	StatusQueued           = "queued"    // The AA transaction is waiting to be mined.
-	StatusCompleted        = "completed" // The `AA transaction` was mined in a block.
-	StatusFinished         = "finished"  // AA transaction` failed during the process.
+	StatusPending   = "pending"   // The AA transaction is on the Pool
+	StatusQueued    = "queued"    // The AA transaction is waiting to be mined.
+	StatusCompleted = "completed" // The `AA transaction` was mined in a block.
+	StatusFailed    = "failed"    // AA transaction` failed during the process.
 )
 
 // AATransaction represents an AA transaction
@@ -99,7 +99,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 // Payload represents a transaction payload
 type Payload struct {
-	To       *types.Address `json:"to"` // TODO: allow contract creation eq TO == nil?
+	To       *types.Address `json:"to"` // TODO: allow contract creation eq To == nil?
 	Value    uint64         `json:"value"`
 	GasLimit uint64         `json:"gasLimit"`
 	Input    []byte         `json:"data"`

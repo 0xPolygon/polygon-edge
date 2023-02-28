@@ -9,7 +9,7 @@ import (
 const (
 	addrFlag = "addr"
 
-	defaultPort = 8081
+	defaultPort = 8198
 )
 
 type aarelayerParams struct {
