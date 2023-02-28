@@ -41,6 +41,11 @@ func (m *mockEventSubscriber) len() int {
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	t.Parallel()
 
+	const (
+		numBlockConfirmations = 6
+		eventsPerStep         = 8
+	)
+
 	server := testutil.DeployTestServer(t, nil)
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-event-tracker")
@@ -61,8 +66,8 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	_, addr, err := server.DeployContract(cc)
 	require.NoError(t, err)
 
-	// prefill with 10 events
-	for i := 0; i < 10; i++ {
+	// prefill with eventsPerStep + numBlockConfirmations events
+	for i := 0; i < eventsPerStep+numBlockConfirmations; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
@@ -71,25 +76,26 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	sub := &mockEventSubscriber{}
 
 	tracker := &EventTracker{
-		logger:       hclog.NewNullLogger(),
-		subscriber:   sub,
-		dbPath:       path.Join(tmpDir, "test.db"),
-		rpcEndpoint:  server.HTTPAddr(),
-		contractAddr: addr,
+		logger:                hclog.NewNullLogger(),
+		subscriber:            sub,
+		dbPath:                path.Join(tmpDir, "test.db"),
+		rpcEndpoint:           server.HTTPAddr(),
+		contractAddr:          addr,
+		numBlockConfirmations: numBlockConfirmations,
 	}
 
 	err = tracker.Start(context.Background())
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
-	require.Equal(t, sub.len(), 10)
-	// send 10 more events
-	for i := 0; i < 10; i++ {
+	require.Equal(t, eventsPerStep, sub.len())
+	// send eventsPerStep more events
+	for i := 0; i < eventsPerStep; i++ {
 		receipt, err := server.TxnTo(addr, "emitEvent")
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
 	time.Sleep(2 * time.Second)
-	require.Equal(t, sub.len(), 20)
+	require.Equal(t, eventsPerStep*2, sub.len())
 }

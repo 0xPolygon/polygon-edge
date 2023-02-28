@@ -444,16 +444,17 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.Params{
-			Context:        context.Background(),
-			Config:         config,
-			TxPool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:               context.Background(),
+			Config:                config,
+			TxPool:                s.txpool,
+			Network:               s.network,
+			Blockchain:            s.blockchain,
+			Executor:              s.executor,
+			Grpc:                  s.grpcServer,
+			Logger:                s.logger,
+			SecretsManager:        s.secretsManager,
+			BlockTime:             s.config.BlockTime,
+			NumBlockConfirmations: s.config.NumBlockConfirmations,
 		},
 	)
 

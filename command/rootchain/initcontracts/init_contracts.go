@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -71,13 +70,6 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(
-		&params.contractsPath,
-		contractsPathFlag,
-		contracts.ContractsRootFolder,
-		"Root directory path containing POS smart contracts",
-	)
-
 	cmd.Flags().StringVar(
 		&params.manifestPath,
 		manifestPathFlag,
