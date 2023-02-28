@@ -1,3 +1,4 @@
 {
-    "whitelist": null
+    "whitelist": null,
+    "blacklist": null
 }

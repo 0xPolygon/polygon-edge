@@ -7,9 +7,13 @@ import (
 	"github.com/google/uuid"
 )
 
+// AATxState defines the interface for a stateful representation of Account Abstraction (AA) transactions
 type AATxState interface {
+	// Add adds a new AA transaction to the state (database) and returns a wrapper object
 	Add(*AATransaction) (*AAStateTransaction, error)
+	// Get retrieves the metadata for the AA transaction with the specified ID from the state
 	Get(string) (*AAStateTransaction, error)
+	// Update modifies the metadata for the AA transaction with the specified ID in the state
 	Update(string, func(tx *AAStateTransaction)) error
 }
 

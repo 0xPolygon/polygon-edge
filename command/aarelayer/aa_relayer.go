@@ -28,7 +28,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.addr,
 		addrFlag,
 		fmt.Sprintf("%s:%d", helper.AllInterfacesBinding, defaultPort),
-		"web server address [ip:port]",
+		"rest server address [ip:port]",
 	)
 }
 

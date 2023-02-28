@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	getTransactionReceiptURL = "/v1/getTransactionReceipt/"
+	sendTransactionURL       = "/v1/sendTransaction"
+)
+
 // AARelayerRestServer represents the service for handling account abstraction transactions
 type AARelayerRestServer struct {
 	pool         AAPool
@@ -46,7 +51,7 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// put to DB
+	// store tx in the state
 	stateTx, err := s.state.Add(&tx)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
@@ -54,8 +59,8 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// put to pool
-	s.pool.Put(stateTx.ID, &tx)
+	// push tx to the pool
+	s.pool.Push(stateTx.ID, &tx)
 
 	writeOutput(w, map[string]string{"uuid": stateTx.ID})
 }
@@ -68,7 +73,7 @@ func (s *AARelayerRestServer) getTransactionReceipt(w http.ResponseWriter, r *ht
 		return
 	}
 
-	uuid := r.URL.Path[len("/v1/getTransactionReceipt/"):]
+	uuid := r.URL.Path[len(getTransactionReceiptURL):]
 
 	stateTx, err := s.state.Get(uuid)
 
@@ -104,8 +109,8 @@ func (s *AARelayerRestServer) ListenAndServe(addr string) error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	http.HandleFunc("/v1/sendTransaction", s.sendTransaction)
-	http.HandleFunc("/v1/getTransactionReceipt/", s.getTransactionReceipt)
+	http.HandleFunc(sendTransactionURL, s.sendTransaction)
+	http.HandleFunc(getTransactionReceiptURL, s.getTransactionReceipt)
 
 	return s.server.ListenAndServe()
 }
