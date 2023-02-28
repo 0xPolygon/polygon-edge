@@ -96,7 +96,7 @@ func TestE2E_Bridge_DepositERC20(t *testing.T) {
 	// send again to trigger previous transactions
 	require.NoError(
 		t,
-		cluster.Deposit(
+		cluster.Bridge.Deposit(
 			"ERC20",
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
