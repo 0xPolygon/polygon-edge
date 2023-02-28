@@ -130,7 +130,7 @@ func (t *Transaction) Copy() *Transaction {
 func (t *Transaction) Cost() *big.Int {
 	var factor *big.Int
 
-	if t.GasFeeCap != nil || t.GasFeeCap.BitLen() > 0 {
+	if t.GasFeeCap != nil && t.GasFeeCap.BitLen() > 0 {
 		factor = new(big.Int).Set(t.GasFeeCap)
 	} else {
 		factor = new(big.Int).Set(t.GasPrice)
@@ -140,6 +140,42 @@ func (t *Transaction) Cost() *big.Int {
 	total = total.Add(total, t.Value)
 
 	return total
+}
+
+// GetGasPrice returns gas price if not empty, or calculates one based on
+// the given EIP-1559 fields if exist
+//
+// Here is the logic:
+//   - use existing gas price if exists
+//   - or calculate a value with formula: min(gasFeeCap, gasTipCap * baseFee);
+func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
+	if (t.GasPrice != nil && t.GasPrice.BitLen() > 0) || baseFee == 0 {
+		return new(big.Int).Set(t.GasPrice)
+	}
+
+	gasFeeCap := new(big.Int)
+	if t.GasFeeCap != nil {
+		gasFeeCap = gasFeeCap.Set(t.GasFeeCap)
+	}
+
+	gasTipCap := new(big.Int)
+	if t.GasTipCap != nil {
+		gasTipCap = gasTipCap.Set(t.GasTipCap)
+	}
+
+	gasPrice := new(big.Int)
+	if gasFeeCap.BitLen() > 0 || gasTipCap.BitLen() > 0 {
+		gasPrice = new(big.Int).Add(
+			gasTipCap,
+			new(big.Int).SetUint64(baseFee),
+		)
+
+		if gasPrice.Cmp(gasFeeCap) > 0 {
+			gasPrice = new(big.Int).Set(gasFeeCap)
+		}
+	}
+
+	return gasPrice
 }
 
 func (t *Transaction) Size() uint64 {
@@ -160,8 +196,4 @@ func (t *Transaction) Size() uint64 {
 
 func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
 	return t.Gas > blockGasLimit
-}
-
-func (t *Transaction) IsUnderpriced(priceLimit uint64) bool {
-	return t.GasPrice.Cmp(big.NewInt(0).SetUint64(priceLimit)) < 0
 }
