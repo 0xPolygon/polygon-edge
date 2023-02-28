@@ -208,7 +208,3 @@ func (t *Transaction) EffectiveTip(baseFee uint64) *big.Int {
 
 	return new(big.Int).Set(t.GasPrice)
 }
-
-func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
-	return t.Gas > blockGasLimit
-}
