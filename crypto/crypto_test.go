@@ -446,17 +446,17 @@ func TestRecoverPublicKey(t *testing.T) {
 		t.Parallel()
 
 		_, err := RecoverPubkey(testSignature, []byte{})
-		require.ErrorIs(t, err, ErrEmptyOrZeroHash)
+		require.ErrorIs(t, err, errEmptyOrZeroHash)
 	})
 
 	t.Run("Zero hash", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := RecoverPubkey(testSignature, types.ZeroHash[:])
-		require.ErrorIs(t, err, ErrEmptyOrZeroHash)
+		require.ErrorIs(t, err, errEmptyOrZeroHash)
 	})
 
-	t.Run("Ok signature", func(t *testing.T) {
+	t.Run("Ok signature and hash", func(t *testing.T) {
 		t.Parallel()
 
 		hash := []byte{0, 1, 2}

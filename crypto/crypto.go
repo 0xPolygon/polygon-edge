@@ -30,7 +30,8 @@ var (
 	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
-	ErrEmptyOrZeroHash     = errors.New("can not recover public key from zero or empty message hash")
+	errEmptyOrZeroHash     = errors.New("can not recover public key from zero or empty message hash")
+	errInvalidSignature    = errors.New("invalid signature")
 )
 
 type KeyType string
@@ -38,10 +39,6 @@ type KeyType string
 const (
 	KeyECDSA KeyType = "ecdsa"
 	KeyBLS   KeyType = "bls"
-)
-
-var (
-	errInvalidSignature = errors.New("invalid signature")
 )
 
 // KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
@@ -146,7 +143,7 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 // secp256k1 curve.
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 	if len(hash) == 0 || types.BytesToHash(hash) == types.ZeroHash {
-		return nil, ErrEmptyOrZeroHash
+		return nil, errEmptyOrZeroHash
 	}
 
 	size := len(signature)
