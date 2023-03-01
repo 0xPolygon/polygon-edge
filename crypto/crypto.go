@@ -30,6 +30,7 @@ var (
 	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
+	ErrEmptyOrZeroHash     = errors.New("can not recover public key from zero or empty message hash")
 )
 
 type KeyType string
@@ -144,6 +145,10 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 // RecoverPubkey verifies the compact signature "signature" of "hash" for the
 // secp256k1 curve.
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
+	if len(hash) == 0 || types.BytesToHash(hash) == types.ZeroHash {
+		return nil, ErrEmptyOrZeroHash
+	}
+
 	size := len(signature)
 	term := byte(27)
 
