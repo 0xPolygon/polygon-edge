@@ -94,7 +94,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.Bridge.DepositERC20(
-			manifest.RootchainConfig.RootERC20Address,
+			manifest.RootchainConfig.RootNativeERC20Address,
 			manifest.RootchainConfig.RootERC20PredicateAddress,
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
@@ -232,7 +232,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.Bridge.DepositERC20(
-			manifest.RootchainConfig.RootERC20Address,
+			manifest.RootchainConfig.RootNativeERC20Address,
 			manifest.RootchainConfig.RootERC20PredicateAddress,
 			strings.Join(receivers[:2], ","),
 			strings.Join(amounts[:2], ","),
@@ -261,7 +261,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(
 		t,
 		cluster.Bridge.DepositERC20(
-			manifest.RootchainConfig.RootERC20Address,
+			manifest.RootchainConfig.RootNativeERC20Address,
 			manifest.RootchainConfig.RootERC20PredicateAddress,
 			strings.Join(receivers[2:], ","),
 			strings.Join(amounts[2:], ","),
