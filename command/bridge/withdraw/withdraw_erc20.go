@@ -30,14 +30,14 @@ const (
 )
 
 type withdrawParams struct {
-	*common.BridgeParams
+	*common.ERC20BridgeParams
 	childPredicateAddr string
 	childTokenAddr     string
 	jsonRPCAddress     string
 }
 
 var (
-	wp *withdrawParams = &withdrawParams{}
+	wp *withdrawParams = &withdrawParams{ERC20BridgeParams: &common.ERC20BridgeParams{}}
 )
 
 // GetCommand returns the bridge withdraw command
@@ -48,6 +48,27 @@ func GetWithdrawCommand() *cobra.Command {
 		PreRunE: runPreRunWithdraw,
 		Run:     runCommand,
 	}
+
+	withdrawCmd.Flags().StringVar(
+		&wp.TxnSenderKey,
+		common.SenderKeyFlag,
+		"",
+		"hex encoded private key of the account which sends withdraw transactions",
+	)
+
+	withdrawCmd.Flags().StringSliceVar(
+		&wp.Receivers,
+		common.ReceiversFlag,
+		nil,
+		"receiving accounts addresses on the root chain",
+	)
+
+	withdrawCmd.Flags().StringSliceVar(
+		&wp.Amounts,
+		common.AmountsFlag,
+		nil,
+		"amounts to send to receiving accounts",
+	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.childPredicateAddr,
@@ -70,18 +91,15 @@ func GetWithdrawCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
+	withdrawCmd.MarkFlagRequired(common.SenderKeyFlag)
+	withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
+	withdrawCmd.MarkFlagRequired(common.AmountsFlag)
+
 	return withdrawCmd
 }
 
 func runPreRunWithdraw(cmd *cobra.Command, _ []string) error {
-	sharedParams, err := common.GetBridgeParams(cmd)
-	if err != nil {
-		return err
-	}
-
-	wp.BridgeParams = sharedParams
-
-	if err = wp.ValidateFlags(); err != nil {
+	if err := wp.ValidateFlags(); err != nil {
 		return err
 	}
 

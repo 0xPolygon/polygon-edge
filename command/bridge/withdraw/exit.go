@@ -13,6 +13,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -33,7 +34,7 @@ const (
 )
 
 type exitParams struct {
-	*common.BridgeParams
+	txnSenderKey      string
 	exitHelperAddrRaw string
 	exitID            uint64
 	epochNumber       uint64
@@ -50,11 +51,17 @@ var (
 // GetExitCommand returns the bridge exit command
 func GetExitCommand() *cobra.Command {
 	exitCmd := &cobra.Command{
-		Use:     "exit",
-		Short:   "Performs exit transaction from the child chain to the root chain",
-		PreRunE: runPreRunExit,
-		Run:     runExitCommand,
+		Use:   "exit",
+		Short: "Performs exit transaction from the child chain to the root chain",
+		Run:   runExitCommand,
 	}
+
+	exitCmd.Flags().StringVar(
+		&ep.txnSenderKey,
+		common.SenderKeyFlag,
+		helper.DefaultPrivateKeyRaw,
+		"hex encoded private key of the account which sends exit transaction to the root chain",
+	)
 
 	exitCmd.Flags().StringVar(
 		&ep.exitHelperAddrRaw,
@@ -103,26 +110,11 @@ func GetExitCommand() *cobra.Command {
 	return exitCmd
 }
 
-func runPreRunExit(cmd *cobra.Command, _ []string) error {
-	sharedParams, err := common.GetBridgeParams(cmd)
-	if err != nil {
-		return err
-	}
-
-	ep.BridgeParams = sharedParams
-
-	if err = ep.ValidateFlags(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func runExitCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ecdsaRaw, err := hex.DecodeString(ep.TxnSenderKey)
+	ecdsaRaw, err := hex.DecodeString(ep.txnSenderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to decode private key: %w", err))
 

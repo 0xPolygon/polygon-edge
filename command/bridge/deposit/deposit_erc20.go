@@ -29,7 +29,7 @@ const (
 )
 
 type depositParams struct {
-	*common.BridgeParams
+	*common.ERC20BridgeParams
 	rootTokenAddr     string
 	rootPredicateAddr string
 	jsonRPCAddress    string
@@ -37,7 +37,7 @@ type depositParams struct {
 
 var (
 	// depositParams is abstraction for provided bridge parameter values
-	dp *depositParams = &depositParams{}
+	dp *depositParams = &depositParams{ERC20BridgeParams: &common.ERC20BridgeParams{}}
 )
 
 // GetCommand returns the bridge deposit command
@@ -48,6 +48,27 @@ func GetCommand() *cobra.Command {
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
+
+	depositCmd.Flags().StringVar(
+		&dp.TxnSenderKey,
+		common.SenderKeyFlag,
+		helper.DefaultPrivateKeyRaw,
+		"hex encoded private key of the account which sends rootchain deposit transactions",
+	)
+
+	depositCmd.Flags().StringSliceVar(
+		&dp.Receivers,
+		common.ReceiversFlag,
+		nil,
+		"receiving accounts addresses on child chain",
+	)
+
+	depositCmd.Flags().StringSliceVar(
+		&dp.Amounts,
+		common.AmountsFlag,
+		nil,
+		"amounts to send to receiving accounts",
+	)
 
 	depositCmd.Flags().StringVar(
 		&dp.rootTokenAddr,
@@ -70,6 +91,8 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC root chain endpoint",
 	)
 
+	depositCmd.MarkFlagRequired(common.ReceiversFlag)
+	depositCmd.MarkFlagRequired(common.AmountsFlag)
 	depositCmd.MarkFlagRequired(rootTokenFlag)
 	depositCmd.MarkFlagRequired(rootPredicateFlag)
 
@@ -77,13 +100,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
-	bridgeParams, err := common.GetBridgeParams(cmd)
-	if err != nil {
-		return err
-	}
-
-	dp.BridgeParams = bridgeParams
-	if err = dp.ValidateFlags(); err != nil {
+	if err := dp.ValidateFlags(); err != nil {
 		return err
 	}
 
