@@ -39,7 +39,7 @@ func (s *aaTxState) Add(tx *AATransaction) (*AAStateTransaction, error) {
 	id := uuid.NewString()
 	ntx := &AAStateTransaction{
 		ID:     id,
-		Tx:     &tx.Transaction,
+		Tx:     tx,
 		Status: StatusPending,
 	}
 	s.items[id] = ntx

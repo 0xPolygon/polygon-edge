@@ -59,8 +59,8 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// push tx to the pool
-	s.pool.Push(stateTx.ID, &tx)
+	// push state tx to the pool
+	s.pool.Push(stateTx)
 
 	writeOutput(w, map[string]string{"uuid": stateTx.ID})
 }

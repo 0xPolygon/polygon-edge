@@ -153,16 +153,12 @@ type Log struct {
 	Data    []byte        `json:"data"`
 }
 
-type AAPoolTransaction struct {
-	ID string       `json:"id"`
-	Tx *Transaction `json:"tx,omitempty"`
-}
-
 type AAStateTransaction struct {
-	ID     string       `json:"id"`
-	Tx     *Transaction `json:"tx,omitempty"`
-	Status string       `json:"status"`
-	Gas    uint64       `json:"gas"`
-	Mined  *Mined       `json:"mined,omitempty"`
-	Error  *string      `json:"error,omitempty"`
+	ID     string         `json:"id"`
+	Tx     *AATransaction `json:"tx,omitempty"`
+	Time   int64          `json:"time"`
+	Status string         `json:"status"`
+	Gas    uint64         `json:"gas"`
+	Mined  *Mined         `json:"mined,omitempty"`
+	Error  *string        `json:"error,omitempty"`
 }

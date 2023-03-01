@@ -7,9 +7,9 @@ import (
 // AAPool defines the interface for a pool of Account Abstraction (AA) transactions
 type AAPool interface {
 	// Push adds an AA transaction to the pool, associating it with the given account ID
-	Push(string, *AATransaction)
+	Push(*AAStateTransaction)
 	// Pop removes the next transaction from the pool and returns a wrapper object containing the transaction
-	Pop() *AAPoolTransaction
+	Pop() *AAStateTransaction
 	// Init initializes the pool with a set of existing AA transactions. Used on client startup
 	Init([]*AAStateTransaction)
 }
@@ -18,22 +18,21 @@ var _ AAPool = (*aaPool)(nil)
 
 type aaPool struct {
 	mutex sync.Mutex
-	pool  []*AAPoolTransaction
+	pool  []*AAStateTransaction
 }
 
 func NewAAPool() *aaPool {
 	return &aaPool{}
 }
 
-func (p *aaPool) Push(id string, tx *AATransaction) {
+func (p *aaPool) Push(tx *AAStateTransaction) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	ptx := &AAPoolTransaction{ID: id, Tx: &tx.Transaction}
-	p.pool = append(p.pool, ptx)
+	p.pool = append(p.pool, tx)
 }
 
-func (p *aaPool) Pop() *AAPoolTransaction {
+func (p *aaPool) Pop() *AAStateTransaction {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
