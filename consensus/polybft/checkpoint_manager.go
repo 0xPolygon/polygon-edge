@@ -369,22 +369,24 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 	events := make([]*ExitEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
-		for _, log := range receipts[i].Logs {
-			if log.Address != contracts.L2StateSenderContract {
-				continue
-			}
+		if *receipts[i].Status == types.ReceiptSuccess {
+			for _, log := range receipts[i].Logs {
+				if log.Address != contracts.L2StateSenderContract {
+					continue
+				}
 
-			event, err := decodeExitEvent(convertLog(log), epoch, block)
-			if err != nil {
-				return nil, err
-			}
+				event, err := decodeExitEvent(convertLog(log), epoch, block)
+				if err != nil {
+					return nil, err
+				}
 
-			if event == nil {
-				// valid case, not an exit event
-				continue
-			}
+				if event == nil {
+					// valid case, not an exit event
+					continue
+				}
 
-			events = append(events, event)
+				events = append(events, event)
+			}
 		}
 	}
 
