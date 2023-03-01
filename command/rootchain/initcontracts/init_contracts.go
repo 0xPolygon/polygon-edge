@@ -284,15 +284,17 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
 	})
 
-	// approve RootERC20Predicate
-	if err := approveERC20Predicate(txRelayer, rootchainConfig); err != nil {
-		return err
-	}
+	if helper.IsTestMode(params.adminKey) {
+		// approve RootERC20Predicate
+		if err := approveERC20Predicate(txRelayer, rootchainConfig); err != nil {
+			return err
+		}
 
-	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s %s contract is approved for spender of %s",
-			contractsDeploymentTitle, rootERC20PredicateName, rootERC20Name),
-	})
+		outputter.WriteCommandResult(&messageResult{
+			Message: fmt.Sprintf("%s %s contract is approved for spender of %s",
+				contractsDeploymentTitle, rootERC20PredicateName, rootERC20Name),
+		})
+	}
 
 	return nil
 }
