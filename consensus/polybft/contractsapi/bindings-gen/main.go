@@ -80,6 +80,14 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"NativeERC20",
+			gensc.NativeERC20,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

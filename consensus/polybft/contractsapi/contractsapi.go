@@ -308,9 +308,6 @@ type InitializeChildERC20PredicateFunction struct {
 	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
 	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
 	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
-	NewNativeTokenName        string        `abi:"newNativeTokenName"`
-	NewNativeTokenSymbol      string        `abi:"newNativeTokenSymbol"`
-	NewNativeTokenDecimals    uint8         `abi:"newNativeTokenDecimals"`
 }
 
 func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
@@ -319,4 +316,20 @@ func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeChildERC20PredicateFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeNativeERC20Function struct {
+	Predicate_ types.Address `abi:"predicate_"`
+	RootToken_ types.Address `abi:"rootToken_"`
+	Name_      string        `abi:"name_"`
+	Symbol_    string        `abi:"symbol_"`
+	Decimals_  uint8         `abi:"decimals_"`
+}
+
+func (i *InitializeNativeERC20Function) EncodeAbi() ([]byte, error) {
+	return NativeERC20.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeNativeERC20Function) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
 }

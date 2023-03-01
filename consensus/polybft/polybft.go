@@ -135,7 +135,27 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		return initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition)
+		if err = initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition); err != nil {
+			return err
+		}
+
+		rootERC20NativeToken := types.ZeroAddress
+		if polyBFTConfig.Bridge != nil {
+			rootERC20NativeToken = polyBFTConfig.Bridge.RootERC20Addr
+		}
+
+		// initialize NativeERC20 SC
+		input, err = getInitNativeERC20Input(
+			nativeTokenName,
+			nativeTokenSymbol,
+			nativeTokenDecimals,
+			rootERC20NativeToken,
+			contracts.ChildERC20PredicateContract)
+		if err != nil {
+			return err
+		}
+
+		return initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition)
 	}
 }
 
