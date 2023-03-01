@@ -4,12 +4,19 @@ import (
 	"crypto/ecdsa"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/fastrlp"
+	"github.com/umbracle/ethgo/abi"
 )
 
-var marshalArenaPool fastrlp.ArenaPool
+// Types for the structures to be hashed
+var (
+	transactionTypeAbi = abi.MustNewType( // Transaction
+		"tuple(address from,uint256 nonce,bytes32 payloadHash)",
+	)
+	transactionPayloadTypeAbi = abi.MustNewType( // TransactionPayload
+		"tuple(address to,uint256 value,uint256 gasLimit,bytes data)",
+	)
+)
 
 // string mapping
 const (
@@ -30,7 +37,10 @@ func (t *AATransaction) IsFromValid() bool {
 }
 
 func (t *AATransaction) MakeSignature(pk *ecdsa.PrivateKey) error {
-	hash := t.Transaction.ComputeHash()
+	hash, err := t.Transaction.ComputeHash()
+	if err != nil {
+		return err
+	}
 
 	sig, err := crypto.Sign(pk, hash[:])
 	if err != nil {
@@ -54,7 +64,10 @@ func (t *Transaction) UpdateFrom(pk *ecdsa.PrivateKey) {
 }
 
 func (t *Transaction) IsFromValid(signature []byte) bool {
-	hash := t.ComputeHash() // recompute hash
+	hash, err := t.ComputeHash() // recompute hash
+	if err != nil {
+		return false
+	}
 
 	pubKey, err := crypto.Ecrecover(hash[:], signature)
 	if err != nil {
@@ -64,37 +77,27 @@ func (t *Transaction) IsFromValid(signature []byte) bool {
 	return t.From == types.BytesToAddress(crypto.Keccak256(pubKey[1:])[12:])
 }
 
-func (t *Transaction) ComputeHash() types.Hash {
-	var result types.Hash
+func (t *Transaction) ComputeHash() (types.Hash, error) {
+	payload := make([]byte, len(t.Payload)*types.HashLength)
 
-	ar := marshalArenaPool.Get()
-	hash := keccak.DefaultKeccakPool.Get()
-
-	v := t.MarshalRLPWith(ar)
-	hash.WriteRlp(result[:0], v)
-
-	marshalArenaPool.Put(ar)
-	keccak.DefaultKeccakPool.Put(hash)
-
-	return result
-}
-
-func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
-	vv := arena.NewArray()
-
-	vv.Set(arena.NewBytes(t.From[:]))
-	vv.Set(arena.NewUint(t.Nonce))
-
-	// Address may be empty
-	if t.Payload != nil {
-		for _, v := range t.Payload {
-			vv.Set(v.MarshalRLPWith(arena))
+	for i, p := range t.Payload {
+		hash, err := p.Hash()
+		if err != nil {
+			return types.ZeroHash, err
 		}
-	} else {
-		vv.Set(arena.NewNull())
+
+		// abi.encodePacked joins all the bytes into single slice
+		copy(payload[i*types.HashLength:], hash[:])
 	}
 
-	return vv
+	bytes, err := abi.Encode(
+		[]interface{}{t.From, t.Nonce, crypto.Keccak256(payload)},
+		transactionTypeAbi)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(crypto.Keccak256(bytes)), nil
 }
 
 // Payload represents a transaction payload
@@ -105,27 +108,28 @@ type Payload struct {
 	Input    []byte         `json:"data"`
 }
 
-func (p *Payload) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
-	vv := arena.NewArray()
+func (p *Payload) Hash() (types.Hash, error) {
+	var (
+		data []byte
+		to   = types.ZeroAddress
+	)
 
-	// Address may be empty
-	if p.To != nil {
-		vv.Set(arena.NewBytes(p.To[:]))
-	} else {
-		vv.Set(arena.NewNull())
-	}
-
-	vv.Set(arena.NewUint(p.Value))
-	vv.Set(arena.NewUint(p.GasLimit))
-
-	// Address may be empty
 	if p.Input != nil {
-		vv.Set(arena.NewBytes(p.Input))
-	} else {
-		vv.Set(arena.NewNull())
+		data = crypto.Keccak256(p.Input)
 	}
 
-	return vv
+	if p.To != nil {
+		to = *p.To
+	}
+
+	bytes, err := abi.Encode(
+		[]interface{}{to, p.Value, p.GasLimit, data},
+		transactionPayloadTypeAbi)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	return types.BytesToHash(crypto.Keccak256(bytes)), nil
 }
 
 // AAReceipt represents a transaction receipt

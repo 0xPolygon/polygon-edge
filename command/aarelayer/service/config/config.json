@@ -1,5 +1,5 @@
 {
-    "AllowContractCreation": false,
+    "AllowContractCreation": true,
     "allowList": null,
     "denyList": null
 }

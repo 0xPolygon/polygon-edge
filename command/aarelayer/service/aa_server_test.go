@@ -49,6 +49,10 @@ func Test_AAServer(t *testing.T) {
 					{
 						To: &types.Address{1, 2, 3},
 					},
+					{
+						To:    nil,
+						Value: 100,
+					},
 				},
 			},
 		}
