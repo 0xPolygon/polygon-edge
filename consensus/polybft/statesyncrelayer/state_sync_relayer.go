@@ -186,12 +186,11 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 	// event from the marshaled map
 	raw, err := json.Marshal(sseMap)
 	if err != nil {
-		return fmt.Errorf("marshal the state sync map from to byte array failed. Error: %w", err)
+		return fmt.Errorf("failed to marshal state sync map into JSON. Error: %w", err)
 	}
 
-	err = json.Unmarshal(raw, &sse)
-	if err != nil {
-		return fmt.Errorf("unmarshal of state sync from map failed. Error: %w", err)
+	if err = json.Unmarshal(raw, &sse); err != nil {
+		return fmt.Errorf("failed to unmarshal state sync event from JSON. Error: %w", err)
 	}
 
 	execute := &contractsapi.ExecuteFunction{

@@ -2,8 +2,9 @@ package withdraw
 
 import (
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -19,6 +20,7 @@ import (
 )
 
 const (
+	// flag names
 	exitHelperFlag      = "exit-helper"
 	exitEventIDFlag     = "event-id"
 	epochFlag           = "epoch"
@@ -150,7 +152,7 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 
 	var proof types.Proof
 
-	err = childClient.Call(generateExitProofFn, proof,
+	err = childClient.Call(generateExitProofFn, &proof,
 		fmt.Sprintf("0x%x", ep.exitID),
 		fmt.Sprintf("0x%x", ep.epochNumber),
 		fmt.Sprintf("0x%x", ep.checkpointBlock))
@@ -190,17 +192,22 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 
 // createExitTxn encodes parameters for exit function on root chain ExitHelper contract
 func createExitTxn(proof types.Proof, output command.OutputFormatter) (*ethgo.Transaction, error) {
-	output.Write([]byte(fmt.Sprintf("Proof.ID type %v\n", reflect.TypeOf(proof.Metadata["ID"]))))
-	output.Write([]byte(fmt.Sprintf("Proof.Sender type %v\n", reflect.TypeOf(proof.Metadata["Sender"]))))
-	output.Write([]byte(fmt.Sprintf("Proof.Receiver type %v\n", reflect.TypeOf(proof.Metadata["Receiver"]))))
-	output.Write([]byte(fmt.Sprintf("Proof.Data type %v\n", reflect.TypeOf(proof.Metadata["Data"]))))
+	exitEventMap, ok := proof.Metadata["ExitEvent"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("could not get exit event from proof")
+	}
 
-	exitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
-		ID:       uint64(proof.Metadata["ID"].(float64)),
-		Sender:   ethgo.Address(types.BytesToAddress(proof.Metadata["Sender"].([]byte))),
-		Receiver: ethgo.Address(types.BytesToAddress(proof.Metadata["Receiver"].([]byte))),
-		Data:     proof.Metadata["Data"].([]byte),
-	})
+	raw, err := json.Marshal(exitEventMap)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal exit event map to JSON. Error: %w", err)
+	}
+
+	var exitEvent *polybft.ExitEvent
+	if err = json.Unmarshal(raw, &exitEvent); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal exit event from JSON. Error: %w", err)
+	}
+
+	exitEventEncoded, err := polybft.ExitEventABIType.Encode(exitEvent)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode exit event: %w", err)
 	}
@@ -215,10 +222,10 @@ func createExitTxn(proof types.Proof, output command.OutputFormatter) (*ethgo.Tr
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(ep.exitHelperAddrRaw))
+	exitHelperAddr := ethgo.Address(types.StringToAddress(ep.exitHelperAddrRaw))
 
 	return &ethgo.Transaction{
-		To:    &addr,
+		To:    &exitHelperAddr,
 		Input: input,
 	}, nil
 }

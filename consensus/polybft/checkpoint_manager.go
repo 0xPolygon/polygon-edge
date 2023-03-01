@@ -360,10 +360,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		Data: proof,
 		Metadata: map[string]interface{}{
 			"LeafIndex": leafIndex,
-			"ID":        exitEvent.ID,
-			"Sender":    exitEvent.Sender,
-			"Receiver":  exitEvent.Receiver,
-			"Data":      exitEvent.Data,
+			"ExitEvent": exitEvent,
 		},
 	}, nil
 }

@@ -161,7 +161,7 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 		return nil, err
 	}
 
-	eventGeneric, err := decodeEventData(raw, log,
+	eventGeneric, err := DecodeBridgeEventData(raw, log,
 		func(id *big.Int, sender, receiver ethgo.Address, data []byte) interface{} {
 			return &ExitEvent{
 				ID:          id.Uint64(),
@@ -184,9 +184,9 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	return exitEvent, err
 }
 
-// decodeEventData decodes provided map of event metadata and
+// DecodeBridgeEventData decodes provided map of event metadata and
 // creates a generic instance which is returned by eventCreator callback
-func decodeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
+func DecodeBridgeEventData(eventDataMap map[string]interface{}, log *ethgo.Log,
 	eventCreator func(*big.Int, ethgo.Address, ethgo.Address, []byte) interface{}) (interface{}, error) {
 	id, ok := eventDataMap["id"].(*big.Int)
 	if !ok {

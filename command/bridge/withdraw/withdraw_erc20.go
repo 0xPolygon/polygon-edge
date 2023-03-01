@@ -1,9 +1,13 @@
 package withdraw
 
 import (
+	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -11,6 +15,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
+	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -107,8 +113,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	// TODO: Consider to paralellize. The reason why it isn't paralellized is because txn.Nonce isn't set correctly
-	// (nonce is too low for all except the 1st transaction)
+	exitEventIDs := make([]string, len(wp.Receivers))
+	blockNumbers := make([]string, len(wp.Receivers))
+
 	for i := range wp.Receivers {
 		receiver := wp.Receivers[i]
 		amount := wp.Amounts[i]
@@ -140,7 +147,26 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 			return
 		}
+
+		exitEvent, blockNumber, err := extractExitEvent(receipt)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
+
+			return
+		}
+
+		exitEventIDs[i] = strconv.FormatUint(exitEvent.ID, 10)
+		blockNumbers[i] = strconv.FormatUint(blockNumber, 10)
 	}
+
+	outputter.SetCommandResult(
+		&withdrawERC20Result{
+			Sender:       key.Address().String(),
+			Receivers:    wp.Receivers,
+			Amounts:      wp.Amounts,
+			ExitEventIDs: exitEventIDs,
+			BlockNumbers: blockNumbers,
+		})
 }
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
@@ -160,4 +186,68 @@ func createWithdrawTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transact
 		To:    &addr,
 		Input: input,
 	}, nil
+}
+
+// extractExitEvent tries to extract ExitEvent from provided receipt
+func extractExitEvent(receipt *ethgo.Receipt) (*polybft.ExitEvent, uint64, error) {
+	exitEventABI := contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
+
+	for _, log := range receipt.Logs {
+		if !exitEventABI.Match(log) {
+			continue
+		}
+
+		exitEventMap, err := exitEventABI.Inputs.ParseLog(log)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		exitEventGeneric, err := polybft.DecodeBridgeEventData(exitEventMap, log, createExitEvent)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		exitEvent, ok := exitEventGeneric.(*polybft.ExitEvent)
+		if !ok {
+			return nil, 0, errors.New("failed to convert exit event")
+		}
+
+		return exitEvent, receipt.BlockNumber, err
+	}
+
+	return nil, 0, errors.New("failed to find exit event log")
+}
+
+func createExitEvent(id *big.Int, sender ethgo.Address, receiver ethgo.Address, data []byte) interface{} {
+	return &polybft.ExitEvent{
+		ID:       id.Uint64(),
+		Sender:   sender,
+		Receiver: receiver,
+		Data:     data,
+	}
+}
+
+type withdrawERC20Result struct {
+	Sender       string   `json:"sender"`
+	Receivers    []string `json:"receivers"`
+	Amounts      []string `json:"amounts"`
+	ExitEventIDs []string `json:"exitEventIDs"`
+	BlockNumbers []string `json:"blockNumbers"`
+}
+
+func (r *withdrawERC20Result) GetOutput() string {
+	var buffer bytes.Buffer
+
+	vals := make([]string, 0, 5)
+	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
+	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
+	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
+	vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
+	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))
+
+	buffer.WriteString("\n[WITHDRAW ERC20]\n")
+	buffer.WriteString(cmdHelper.FormatKV(vals))
+	buffer.WriteString("\n")
+
+	return buffer.String()
 }

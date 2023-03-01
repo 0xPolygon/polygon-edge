@@ -141,6 +141,29 @@ func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoin
 	)
 }
 
+// SendExitTransaction sends exit transaction to the root chain
+func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID, epoch, checkpointBlock uint64,
+	rootJSONRPCAddr, childJSONRPCAddr string) error {
+	if rootJSONRPCAddr == "" {
+		return errors.New("provide a root JSON RPC endpoint URL")
+	}
+
+	if childJSONRPCAddr == "" {
+		return errors.New("provide a child JSON RPC endpoint URL")
+	}
+
+	return t.cmdRun(
+		"bridge",
+		"exit",
+		"--exit-helper", exitHelper.String(),
+		"--event-id", strconv.FormatUint(exitID, 10),
+		"--epoch", strconv.FormatUint(epoch, 10),
+		"--checkpoint-block", strconv.FormatUint(checkpointBlock, 10),
+		"--root-json-rpc", rootJSONRPCAddr,
+		"--child-json-rpc", childJSONRPCAddr,
+	)
+}
+
 // cmdRun executes arbitrary command from the given binary
 func (t *TestBridge) cmdRun(args ...string) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
