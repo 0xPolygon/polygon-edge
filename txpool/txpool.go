@@ -725,7 +725,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// check for overflow
-	if p.gauge.read()+slotsRequired(tx) > p.gauge.max {
+	if slotsRequired(tx) > p.gauge.max-p.gauge.read() {
 		return ErrTxPoolOverflow
 	}
 

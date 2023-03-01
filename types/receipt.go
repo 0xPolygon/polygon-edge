@@ -147,7 +147,7 @@ func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 
 		referenceByte := b[byteLocation]
 
-		isSet := int(referenceByte & (1 << (bitLocation - 1)))
+		isSet := uint(referenceByte & (1 << (bitLocation - 1)))
 
 		if isSet == 0 {
 			return false

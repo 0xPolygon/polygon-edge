@@ -256,6 +256,27 @@ func TestAddTxErrors(t *testing.T) {
 		)
 	})
 
+	t.Run("FullTxPoolToTheLimit", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+
+		// fill the pool leaving only 1 slot
+		pool.gauge.increase(defaultMaxSlots - 1)
+
+		// create tx requiring 1 slot
+		tx := newTx(defaultAddr, 0, 1)
+		tx = signTx(tx)
+
+		//	enqueue tx
+		go func() {
+			assert.NoError(t,
+				pool.addTx(local, tx),
+			)
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		<-pool.promoteReqCh
+	})
+
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
