@@ -15,7 +15,6 @@ import (
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -26,7 +25,6 @@ const (
 
 	rootTokenFlag     = "root-token"
 	rootPredicateFlag = "root-predicate"
-	childTokenFlag    = "child-token"
 	jsonRPCFlag       = "json-rpc"
 )
 
@@ -34,7 +32,6 @@ type depositParams struct {
 	*common.BridgeParams
 	rootTokenAddr     string
 	rootPredicateAddr string
-	childTokenAddr    string
 	jsonRPCAddress    string
 }
 
@@ -64,13 +61,6 @@ func GetCommand() *cobra.Command {
 		rootPredicateFlag,
 		"",
 		"ERC20 root chain predicate address",
-	)
-
-	depositCmd.Flags().StringVar(
-		&dp.childTokenAddr,
-		childTokenFlag,
-		contracts.NativeERC20TokenContract.String(),
-		"ERC20 child chain token address",
 	)
 
 	depositCmd.Flags().StringVar(
