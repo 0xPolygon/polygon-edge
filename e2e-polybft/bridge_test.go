@@ -201,28 +201,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 	}
-
-	// TODO: Figure out how to query balances
-	// query receivers balance on the root chain and
-	// assert they are equal to the amount of tokens which were previously deposited on the child chain
-	// for _, receiver := range receivers {
-	// 	balanceInput, err := contractsapi.RootERC20.Abi.Methods["balanceOf"].Encode([]interface{}{receiver})
-	// 	require.NoError(t, err)
-
-	// 	balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(manifest.RootchainConfig.RootERC20Address), balanceInput)
-	// 	require.NoError(t, err)
-	// 	t.Logf("Rootchain balance: %s\n", balanceRaw)
-
-	// 	balance, err := types.ParseUint256orHex(&balanceRaw)
-	// 	require.NoError(t, err)
-	// 	require.Equal(t, big.NewInt(amount), balance)
-	// }
-
-	// for _, receiver := range receivers {
-	// 	rootchainBalance, err := rootchainClient.Eth().GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
-	// 	require.NoError(t, err)
-	// 	require.Equal(t, amount, rootchainBalance)
-	// }
 }
 
 func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {

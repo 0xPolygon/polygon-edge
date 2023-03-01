@@ -163,8 +163,6 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.Write([]byte(fmt.Sprintf("Proof: %+v\n", proof)))
-
 	// exit transaction
 	txn, err := createExitTxn(proof, outputter)
 	if err != nil {
