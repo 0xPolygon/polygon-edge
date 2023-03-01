@@ -12,7 +12,6 @@ $ polygon-edge bridge deposit-erc20
     --amounts <amounts>
     --root-token <root_erc20_token_address>
     --root-predicate <root_erc20_predicate_address>
-    [--child-token <child_erc20_token_address>]
     --json-rpc <root_chain_json_rpc_endpoint>
 ```
 
