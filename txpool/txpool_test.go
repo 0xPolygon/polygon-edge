@@ -140,6 +140,19 @@ func TestAddTxErrors(t *testing.T) {
 		return signedTx
 	}
 
+	t.Run("ErrInvalidTxType", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.StateTx
+
+		assert.ErrorIs(t,
+			pool.addTx(local, signTx(tx)),
+			ErrInvalidTxType,
+		)
+	})
+
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
