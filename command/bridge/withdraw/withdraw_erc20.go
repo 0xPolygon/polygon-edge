@@ -61,7 +61,7 @@ func GetWithdrawCommand() *cobra.Command {
 		&wp.jsonRPCAddress,
 		jsonRPCFlag,
 		"http://127.0.0.1:9545",
-		"the JSON RPC child chain endpoint (e.g. http://127.0.0.1:9545)",
+		"the JSON RPC child chain endpoint",
 	)
 
 	return withdrawCmd

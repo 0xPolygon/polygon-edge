@@ -86,19 +86,17 @@ func GetExitCommand() *cobra.Command {
 		&ep.rootJSONRPCAddr,
 		rootJSONRPCFlag,
 		"http://127.0.0.1:8545",
-		"the JSON RPC root chain endpoint (e.g. http://127.0.0.1:8545)",
+		"the JSON RPC root chain endpoint",
 	)
 
 	exitCmd.Flags().StringVar(
 		&ep.childJSONRPCAddr,
 		childJSONRPCFlag,
 		"http://127.0.0.1:9545",
-		"the JSON RPC child chain endpoint (e.g. http://127.0.0.1:9545)",
+		"the JSON RPC child chain endpoint",
 	)
 
 	exitCmd.MarkFlagRequired(exitHelperFlag)
-	exitCmd.MarkFlagRequired(rootJSONRPCFlag)
-	exitCmd.MarkFlagRequired(childJSONRPCFlag)
 
 	return exitCmd
 }

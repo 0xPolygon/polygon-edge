@@ -77,12 +77,11 @@ func GetCommand() *cobra.Command {
 		&dp.jsonRPCAddress,
 		jsonRPCFlag,
 		"http://127.0.0.1:8545",
-		"the JSON RPC root chain endpoint (e.g. http://127.0.0.1:8545)",
+		"the JSON RPC root chain endpoint",
 	)
 
 	depositCmd.MarkFlagRequired(rootTokenFlag)
 	depositCmd.MarkFlagRequired(rootPredicateFlag)
-	depositCmd.MarkFlagRequired(jsonRPCFlag)
 
 	return depositCmd
 }
