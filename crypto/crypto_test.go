@@ -446,28 +446,35 @@ func TestRecoverPublicKey(t *testing.T) {
 		t.Parallel()
 
 		_, err := RecoverPubkey(testSignature, []byte{})
-		require.ErrorIs(t, err, errEmptyOrZeroHash)
+		require.ErrorIs(t, err, errHashOfInvalidLength)
+	})
+
+	t.Run("Hash of non appropriate length", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := RecoverPubkey(testSignature, []byte{0, 1})
+		require.ErrorIs(t, err, errHashOfInvalidLength)
 	})
 
 	t.Run("Zero hash", func(t *testing.T) {
 		t.Parallel()
 
 		_, err := RecoverPubkey(testSignature, types.ZeroHash[:])
-		require.ErrorIs(t, err, errEmptyOrZeroHash)
+		require.ErrorIs(t, err, errZeroHash)
 	})
 
 	t.Run("Ok signature and hash", func(t *testing.T) {
 		t.Parallel()
 
-		hash := []byte{0, 1, 2}
+		hash := types.BytesToHash([]byte{0, 1, 2})
 
 		privateKey, err := GenerateECDSAKey()
 		require.NoError(t, err)
 
-		signature, err := Sign(privateKey, hash)
+		signature, err := Sign(privateKey, hash.Bytes())
 		require.NoError(t, err)
 
-		publicKey, err := RecoverPubkey(signature, hash)
+		publicKey, err := RecoverPubkey(signature, hash.Bytes())
 		require.NoError(t, err)
 
 		require.True(t, privateKey.PublicKey.Equal(publicKey))
