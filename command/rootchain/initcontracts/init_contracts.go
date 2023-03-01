@@ -62,7 +62,7 @@ var (
 			rootchainConfig.RootERC20PredicateAddress = addr
 		},
 		rootERC20Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootERC20Address = addr
+			rootchainConfig.RootNativeERC20Address = addr
 		},
 		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ERC20TemplateAddress = addr
@@ -346,13 +346,15 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
 func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig) error {
-	input, err := contractsapi.RootERC20Predicate.Abi.GetMethod("initialize").
-		Encode([]interface{}{
-			rootchainConfig.StateSenderAddress,
-			rootchainConfig.ExitHelperAddress,
-			contracts.ChildERC20PredicateContract,
-			rootchainConfig.ERC20TemplateAddress,
-			rootchainConfig.RootERC20Address})
+	rootERC20PredicateParams := &contractsapi.InitializeRootERC20PredicateFunction{
+		NewStateSender:         rootchainConfig.StateSenderAddress,
+		NewExitHelper:          rootchainConfig.ExitHelperAddress,
+		NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
+		NewChildTokenTemplate:  rootchainConfig.ERC20TemplateAddress,
+		NativeTokenRootAddress: rootchainConfig.RootNativeERC20Address,
+	}
+
+	input, err := rootERC20PredicateParams.EncodeAbi()
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for RootERC20Predicate.initialize. error: %w", err)
 	}
@@ -368,13 +370,17 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 
 // approveERC20Predicate sends approve transaction to ERC20 token so that it is able to spend given root ERC20 token
 func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig) error {
-	input, err := contractsapi.RootERC20.Abi.GetMethod("approve").
-		Encode([]interface{}{config.RootERC20PredicateAddress, new(big.Int).SetUint64(defaultAllowanceValue)})
+	approveFnParams := &contractsapi.ApproveFunction{
+		Spender: config.RootERC20PredicateAddress,
+		Amount:  new(big.Int).SetUint64(defaultAllowanceValue),
+	}
+
+	input, err := approveFnParams.EncodeAbi()
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
 	}
 
-	addr := ethgo.Address(config.RootERC20Address)
+	addr := ethgo.Address(config.RootNativeERC20Address)
 	txn := &ethgo.Transaction{
 		To:    &addr,
 		Input: input,

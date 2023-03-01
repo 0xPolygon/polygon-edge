@@ -333,3 +333,32 @@ func (i *InitializeNativeERC20Function) EncodeAbi() ([]byte, error) {
 func (i *InitializeNativeERC20Function) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
 }
+
+type InitializeRootERC20PredicateFunction struct {
+	NewStateSender         types.Address `abi:"newStateSender"`
+	NewExitHelper          types.Address `abi:"newExitHelper"`
+	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
+	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
+	NativeTokenRootAddress types.Address `abi:"nativeTokenRootAddress"`
+}
+
+func (i *InitializeRootERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeRootERC20PredicateFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type ApproveFunction struct {
+	Spender types.Address `abi:"spender"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (a *ApproveFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["approve"].Encode(a)
+}
+
+func (a *ApproveFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["approve"], buf, a)
+}

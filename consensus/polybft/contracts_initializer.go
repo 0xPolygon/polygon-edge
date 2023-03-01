@@ -59,7 +59,7 @@ func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 
 	if config != nil {
 		rootERC20PredicateAddr = config.RootERC20PredicateAddr
-		rootERC20Addr = config.RootERC20Addr
+		rootERC20Addr = config.RootNativeERC20Addr
 	}
 
 	params := &contractsapi.InitializeChildERC20PredicateFunction{

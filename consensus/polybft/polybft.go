@@ -139,9 +139,9 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		rootERC20NativeToken := types.ZeroAddress
+		rootNativeERC20Token := types.ZeroAddress
 		if polyBFTConfig.Bridge != nil {
-			rootERC20NativeToken = polyBFTConfig.Bridge.RootERC20Addr
+			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
 		}
 
 		// initialize NativeERC20 SC
@@ -149,7 +149,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			nativeTokenName,
 			nativeTokenSymbol,
 			nativeTokenDecimals,
-			rootERC20NativeToken,
+			rootNativeERC20Token,
 			contracts.ChildERC20PredicateContract)
 		if err != nil {
 			return err

@@ -121,7 +121,7 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 		"depositTo",
 		contractsapi.RootERC20,
 		"mint",
-		manifest.RootchainConfig.RootERC20Address,
+		manifest.RootchainConfig.RootNativeERC20Address,
 		manifest.RootchainConfig.RootERC20PredicateAddress,
 		contracts.ChildERC20PredicateContract)
 
