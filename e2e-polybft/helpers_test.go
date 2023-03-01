@@ -52,9 +52,9 @@ func isExitEventProcessed(exitEventID uint64, exitHelper ethgo.Address, rootTxRe
 }
 
 // getRootchainValidators queries rootchain validator set
-func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, sender ethgo.Address) ([]*polybft.ValidatorInfo, error) {
+func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
 	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
-		checkpointManagerAddr, sender, "currentValidatorSetLength")
+		checkpointManagerAddr, ethgo.ZeroAddress, "currentValidatorSetLength")
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr, 
 
 	for i := 0; i < int(validatorsCount); i++ {
 		validatorRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
-			checkpointManagerAddr, sender, "currentValidatorSet", i)
+			checkpointManagerAddr, ethgo.ZeroAddress, "currentValidatorSet", i)
 		if err != nil {
 			return nil, err
 		}

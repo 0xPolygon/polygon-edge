@@ -400,7 +400,6 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
-	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
@@ -457,7 +456,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
 		require.NoError(t, err)
 
-		isProcessed, err := sendExitTransaction(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitID)
+		isProcessed, err := sendExitTransaction(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitID)
 		require.NoError(t, err)
 		require.True(t, isProcessed)
 	}
@@ -499,7 +498,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
-	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
@@ -542,7 +540,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		fail := 0
 
 		for range time.Tick(time.Second) {
-			currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
+			currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, ethgo.ZeroAddress, "currentEpoch")
 			require.NoError(t, err)
 
 			currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
@@ -565,14 +563,14 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		for j := 0; j < userNumber; j++ {
 			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber], uint64(i+1)*checkpointEpoch, uint64(i+1)*checkpointBlock)
 			require.NoError(t, err)
-			isProcessed, err := sendExitTransaction(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
+			isProcessed, err := sendExitTransaction(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
 			require.NoError(t, err)
 			require.True(t, isProcessed)
 		}
 	}
 }
 
-func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
+func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),

@@ -228,7 +228,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	rootchainConfig := &polybft.RootchainConfig{}
 	manifest.RootchainConfig = rootchainConfig
-	rootchainConfig.AdminAddress = types.Address(rootchainAdminKey.Address())
 
 	for _, contract := range deployContracts {
 		txn := &ethgo.Transaction{

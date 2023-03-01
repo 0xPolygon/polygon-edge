@@ -194,7 +194,6 @@ type RootchainConfig struct {
 	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
 	RootNativeERC20Address    types.Address `json:"rootNativeERC20Address"`
 	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
-	AdminAddress              types.Address `json:"adminAddress"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance
