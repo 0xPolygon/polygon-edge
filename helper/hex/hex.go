@@ -95,5 +95,9 @@ func DecodeHexToBig(hexNum string) *big.Int {
 }
 
 func DropHexPrefix(input []byte) []byte {
-	return input[2:]
+	if len(input) > 2 {
+		return input[2:]
+	} else {
+		return input[:]
+	}
 }
