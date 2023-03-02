@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 
 	"github.com/spf13/cobra"
@@ -211,12 +212,19 @@ func createExitTxn(proof types.Proof, output command.OutputFormatter) (*ethgo.Tr
 		return nil, nil, fmt.Errorf("failed to encode exit event: %w", err)
 	}
 
-	input, err := contractsapi.ExitHelper.Abi.Methods["exit"].Encode([]interface{}{
-		ep.checkpointBlock,
-		proof.Metadata["LeafIndex"].(float64),
-		exitEventEncoded,
-		proof.Data,
-	})
+	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
+	if !ok {
+		return nil, nil, errors.New("failed to convert proof leaf index to float64")
+	}
+
+	exitFn := &contractsapi.ExitFunction{
+		BlockNumber:  new(big.Int).SetUint64(ep.checkpointBlock),
+		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
+		UnhashedLeaf: exitEventEncoded,
+		Proof:        proof.Data,
+	}
+
+	input, err := exitFn.EncodeAbi()
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}

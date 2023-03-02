@@ -302,6 +302,21 @@ func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }
 
+type ExitFunction struct {
+	BlockNumber  *big.Int     `abi:"blockNumber"`
+	LeafIndex    *big.Int     `abi:"leafIndex"`
+	UnhashedLeaf []byte       `abi:"unhashedLeaf"`
+	Proof        []types.Hash `abi:"proof"`
+}
+
+func (e *ExitFunction) EncodeAbi() ([]byte, error) {
+	return ExitHelper.Abi.Methods["exit"].Encode(e)
+}
+
+func (e *ExitFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ExitHelper.Abi.Methods["exit"], buf, e)
+}
+
 type InitializeChildERC20PredicateFunction struct {
 	NewL2StateSender          types.Address `abi:"newL2StateSender"`
 	NewStateReceiver          types.Address `abi:"newStateReceiver"`
@@ -316,6 +331,20 @@ func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeChildERC20PredicateFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawToFunction struct {
+	ChildToken types.Address `abi:"childToken"`
+	Receiver   types.Address `abi:"receiver"`
+	Amount     *big.Int      `abi:"amount"`
+}
+
+func (w *WithdrawToFunction) EncodeAbi() ([]byte, error) {
+	return ChildERC20Predicate.Abi.Methods["withdrawTo"].Encode(w)
+}
+
+func (w *WithdrawToFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
 }
 
 type InitializeNativeERC20Function struct {
@@ -350,6 +379,20 @@ func (i *InitializeRootERC20PredicateFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["initialize"], buf, i)
 }
 
+type DepositToFunction struct {
+	RootToken types.Address `abi:"rootToken"`
+	Receiver  types.Address `abi:"receiver"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (d *DepositToFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20Predicate.Abi.Methods["depositTo"].Encode(d)
+}
+
+func (d *DepositToFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
+}
+
 type ApproveFunction struct {
 	Spender types.Address `abi:"spender"`
 	Amount  *big.Int      `abi:"amount"`
@@ -361,4 +404,17 @@ func (a *ApproveFunction) EncodeAbi() ([]byte, error) {
 
 func (a *ApproveFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["approve"], buf, a)
+}
+
+type MintFunction struct {
+	To     types.Address `abi:"to"`
+	Amount *big.Int      `abi:"amount"`
+}
+
+func (m *MintFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["mint"].Encode(m)
+}
+
+func (m *MintFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }

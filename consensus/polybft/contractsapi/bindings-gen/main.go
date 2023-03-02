@@ -73,10 +73,19 @@ func main() {
 			[]string{},
 		},
 		{
+			"ExitHelper",
+			gensc.ExitHelper,
+			[]string{
+				"exit",
+			},
+			[]string{},
+		},
+		{
 			"ChildERC20Predicate",
 			gensc.ChildERC20Predicate,
 			[]string{
 				"initialize",
+				"withdrawTo",
 			},
 			[]string{},
 		},
@@ -93,6 +102,7 @@ func main() {
 			gensc.RootERC20Predicate,
 			[]string{
 				"initialize",
+				"depositTo",
 			},
 			[]string{},
 		},
@@ -101,6 +111,7 @@ func main() {
 			gensc.RootERC20,
 			[]string{
 				"approve",
+				"mint",
 			},
 			[]string{},
 		},

@@ -139,7 +139,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 				if helper.IsTestMode(dp.TxnSenderKey) {
 					// mint tokens to depositor, so he is able to send them
-					txn, err := createMintTxn(helper.GetRootchainPrivateKey().Address(), amountBig)
+					txn, err := createMintTxn(types.Address(helper.GetRootchainPrivateKey().Address()), amountBig)
 					if err != nil {
 						return fmt.Errorf("mint transaction creation failed: %w", err)
 					}
@@ -154,7 +154,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				}
 
 				// deposit tokens
-				txn, err := createDepositTxn(ethgo.BytesToAddress([]byte(receiver)), amountBig)
+				txn, err := createDepositTxn(types.StringToAddress(receiver), amountBig)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
@@ -189,12 +189,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
-func createDepositTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	input, err := contractsapi.RootERC20Predicate.Abi.Methods["depositTo"].Encode([]interface{}{
-		dp.rootTokenAddr,
-		receiver,
-		amount,
-	})
+func createDepositTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+	depositToFn := &contractsapi.DepositToFunction{
+		RootToken: types.StringToAddress(dp.rootTokenAddr),
+		Receiver:  receiver,
+		Amount:    amount,
+	}
+
+	input, err := depositToFn.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
@@ -208,11 +210,13 @@ func createDepositTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transacti
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
-func createMintTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	input, err := contractsapi.RootERC20.Abi.Methods["mint"].Encode([]interface{}{
-		helper.GetRootchainPrivateKey().Address(),
-		amount,
-	})
+func createMintTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+	mintFn := &contractsapi.MintFunction{
+		To:     receiver,
+		Amount: amount,
+	}
+
+	input, err := mintFn.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}

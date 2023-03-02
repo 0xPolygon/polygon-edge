@@ -146,7 +146,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 
 		// withdraw tokens transaction
-		txn, err := createWithdrawTxn(ethgo.Address(types.StringToAddress(receiver)), amountBig)
+		txn, err := createWithdrawTxn(types.StringToAddress(receiver), amountBig)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
@@ -188,12 +188,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
-func createWithdrawTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	input, err := contractsapi.ChildERC20Predicate.Abi.Methods["withdrawTo"].Encode([]interface{}{
-		wp.childTokenAddr,
-		receiver,
-		amount,
-	})
+func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+	withdrawToFn := &contractsapi.WithdrawToFunction{
+		ChildToken: types.StringToAddress(wp.childTokenAddr),
+		Receiver:   receiver,
+		Amount:     amount,
+	}
+
+	input, err := withdrawToFn.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}

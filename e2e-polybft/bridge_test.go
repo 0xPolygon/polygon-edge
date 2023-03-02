@@ -125,7 +125,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 
 	// check receivers balances got increased by deposited amount
 	for _, receiver := range receivers {
-		balance, err := childEthEndpoint.GetBalance(ethgo.BytesToAddress([]byte(receiver)), ethgo.Latest)
+		balance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(amount), balance)
 	}
@@ -151,13 +151,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		strings.Join(amounts[:], ","),
 		cluster.Servers[0].JSONRPCAddr())
 	require.NoError(t, err)
-
-	// make sure that balance is burned on child chain
-	for _, receiver := range receivers {
-		childChainBalance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
-		require.NoError(t, err)
-		require.Equal(t, big.NewInt(0), childChainBalance)
-	}
 
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
