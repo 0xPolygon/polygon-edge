@@ -80,7 +80,8 @@ func (cm *CommitmentMessageSigned) VerifyStateSyncProof(proof []types.Hash,
 		return errors.New("no state sync event")
 	}
 
-	if stateSync.ID.Uint64() < cm.Message.StartID.Uint64() {
+	if stateSync.ID.Uint64() < cm.Message.StartID.Uint64() ||
+		stateSync.ID.Uint64() > cm.Message.EndID.Uint64() {
 		return errors.New("invalid state sync ID")
 	}
 

@@ -38,3 +38,45 @@ func TestDecodeUint64(t *testing.T) {
 		assert.Equal(t, uint64Array[index], decodedValue)
 	}
 }
+
+func TestDropHexPrefix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		input          []byte
+		expectedOutput string
+	}{
+		{
+			name:           "hex prefix should be removed",
+			input:          []byte("0x123"),
+			expectedOutput: "123",
+		},
+		{
+			name:           "hex prefix should be removed(upper case)",
+			input:          []byte("0X123"),
+			expectedOutput: "123",
+		},
+		{
+			name:           "no hex prefix",
+			input:          []byte("abc"),
+			expectedOutput: "abc",
+		},
+		{
+			name:           "length less then expexted",
+			input:          []byte("3"),
+			expectedOutput: "3",
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			output := DropHexPrefix(test.input)
+			assert.Equal(t, test.expectedOutput, string(output))
+		})
+	}
+}
