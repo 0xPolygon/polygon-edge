@@ -35,7 +35,7 @@ func Test_validateFlags_ErrorValidateDbPath(t *testing.T) {
 	t.Parallel()
 
 	p := aarelayerParams{
-		dbPath: "/e___78787878___KLO___909090887672512561/e.db",
+		dbPath: "/tmp/non_existing_path_to/non_existing_file.db",
 		addr:   "127.0.0.1:8289",
 	}
 

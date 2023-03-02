@@ -26,7 +26,7 @@ const (
 func Test_AAServer(t *testing.T) {
 	t.Parallel()
 
-	dbpath, err := os.MkdirTemp("/tmp", "aa_server_state_db")
+	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
 	require.NoError(t, err)
 
 	defer os.RemoveAll(dbpath)

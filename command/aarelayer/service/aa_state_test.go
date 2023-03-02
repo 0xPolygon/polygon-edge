@@ -13,7 +13,7 @@ import (
 func Test_AAState_AddAndGet(t *testing.T) {
 	t.Parallel()
 
-	dbpath, err := os.MkdirTemp("/tmp", "aa_server_state_db")
+	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
 	require.NoError(t, err)
 
 	t.Cleanup(func() { os.RemoveAll(dbpath) })
@@ -50,7 +50,7 @@ func Test_AAState_AddAndGet(t *testing.T) {
 func Test_AAState_GetPending(t *testing.T) {
 	t.Parallel()
 
-	dbpath, err := os.MkdirTemp("/tmp", "aa_server_state_db")
+	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
 	require.NoError(t, err)
 
 	t.Cleanup(func() { os.RemoveAll(dbpath) })
@@ -77,7 +77,7 @@ func Test_AAState_GetPending(t *testing.T) {
 func Test_AAState_Update(t *testing.T) {
 	t.Parallel()
 
-	dbpath, err := os.MkdirTemp("/tmp", "aa_server_state_db")
+	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
 	require.NoError(t, err)
 
 	t.Cleanup(func() { os.RemoveAll(dbpath) })
