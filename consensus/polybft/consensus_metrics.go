@@ -23,7 +23,7 @@ func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) e
 	}
 
 	// update the number of transactions in the block metric
-	metrics.SetGauge([]string{consensusMetricsPrefix, "num_txs"}, float32(len(currentBlock.Body().Transactions)))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "num_txs"}, float32(len(currentBlock.Transactions)))
 
 	extra, err := GetIbftExtra(currentBlock.Header.ExtraData)
 	if err != nil {
