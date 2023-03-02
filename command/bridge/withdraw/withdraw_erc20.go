@@ -146,7 +146,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 
 		// withdraw tokens transaction
-		txn, err := createWithdrawTxn(ethgo.BytesToAddress([]byte(receiver)), amountBig)
+		txn, err := createWithdrawTxn(ethgo.Address(types.StringToAddress(receiver)), amountBig)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
