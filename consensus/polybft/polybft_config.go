@@ -64,10 +64,11 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	BridgeAddr      types.Address `json:"stateSenderAddr"`
-	CheckpointAddr  types.Address `json:"checkpointAddr"`
-	AdminAddress    types.Address `json:"adminAddress"`
-	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
+	BridgeAddr             types.Address `json:"stateSenderAddr"`
+	CheckpointAddr         types.Address `json:"checkpointAddr"`
+	RootERC20PredicateAddr types.Address `json:"rootERC20PredicateAddr"`
+	RootNativeERC20Addr    types.Address `json:"rootNativeERC20Addr"`
+	JSONRPCEndpoint        string        `json:"jsonRPCEndpoint"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
@@ -185,20 +186,24 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 // RootchainConfig contains information about rootchain contract addresses
 // as well as rootchain admin account address
 type RootchainConfig struct {
-	StateSenderAddress       types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
-	BLSAddress               types.Address `json:"blsAddress"`
-	BN256G2Address           types.Address `json:"bn256G2Address"`
-	ExitHelperAddress        types.Address `json:"exitHelperAddress"`
-	AdminAddress             types.Address `json:"adminAddress"`
+	StateSenderAddress        types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress  types.Address `json:"checkpointManagerAddress"`
+	BLSAddress                types.Address `json:"blsAddress"`
+	BN256G2Address            types.Address `json:"bn256G2Address"`
+	ExitHelperAddress         types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
+	RootNativeERC20Address    types.Address `json:"rootNativeERC20Address"`
+	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
+	AdminAddress              types.Address `json:"adminAddress"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance
 func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
-		BridgeAddr:     r.StateSenderAddress,
-		CheckpointAddr: r.CheckpointManagerAddress,
-		AdminAddress:   r.AdminAddress,
+		BridgeAddr:             r.StateSenderAddress,
+		CheckpointAddr:         r.CheckpointManagerAddress,
+		RootERC20PredicateAddr: r.RootERC20PredicateAddress,
+		RootNativeERC20Addr:    r.RootNativeERC20Address,
 	}
 }
 

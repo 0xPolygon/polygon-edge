@@ -72,6 +72,38 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"ChildERC20Predicate",
+			gensc.ChildERC20Predicate,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"NativeERC20",
+			gensc.NativeERC20,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootERC20Predicate",
+			gensc.RootERC20Predicate,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootERC20",
+			gensc.RootERC20,
+			[]string{
+				"approve",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

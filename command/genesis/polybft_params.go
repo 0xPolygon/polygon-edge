@@ -191,9 +191,19 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			address:  contracts.StateReceiverContract,
 		},
 		{
-			// Native Token contract (Matic ERC-20)
-			artifact: contractsapi.MRC20,
-			address:  contracts.NativeTokenContract,
+			// NativeERC20 Token contract
+			artifact: contractsapi.NativeERC20,
+			address:  contracts.NativeERC20TokenContract,
+		},
+		{
+			// ChildERC20 token contract
+			artifact: contractsapi.ChildERC20,
+			address:  contracts.ChildERC20Contract,
+		},
+		{
+			// ChildERC20Predicate contract
+			artifact: contractsapi.ChildERC20Predicate,
+			address:  contracts.ChildERC20PredicateContract,
 		},
 		{
 			// BLS contract

@@ -25,7 +25,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	ethgow "github.com/umbracle/ethgo/wallet"
@@ -35,9 +34,9 @@ const (
 	manifestFileName = "manifest.json"
 )
 
-// checkLogs is helper function which parses given ResultEvent event's logs,
+// checkStateSyncResultLogs is helper function which parses given StateSyncResultEvent event's logs,
 // extracts status topic value and makes assertions against it.
-func checkLogs(
+func checkStateSyncResultLogs(
 	t *testing.T,
 	logs []*ethgo.Log,
 	expectedCount int,
@@ -47,35 +46,35 @@ func checkLogs(
 
 	for _, log := range logs {
 		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
-		assert.NoError(t, stateSyncResultEvent.ParseLog(log))
+		require.NoError(t, stateSyncResultEvent.ParseLog(log))
 
-		t.Logf("Block Number=%d, Decoded Log=%+v", log.BlockNumber, stateSyncResultEvent)
+		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
 
-		assert.True(t, stateSyncResultEvent.Status)
+		require.True(t, stateSyncResultEvent.Status)
 	}
 }
 
-func TestE2E_Bridge_MainWorkflow(t *testing.T) {
+func TestE2E_Bridge_DepositERC20(t *testing.T) {
 	const (
 		num                   = 10
+		amount                = 100
 		numBlockConfirmations = 4
 	)
 
-	var (
-		accounts         = make([]ethgo.Key, num)
-		wallets, amounts [num]string
-		premine          [num]types.Address
-	)
+	receivers := make([]string, num)
+	amounts := make([]string, num)
 
 	for i := 0; i < num; i++ {
-		accounts[i], _ = ethgow.GenerateKey()
-		premine[i] = types.Address(accounts[i].Address())
-		wallets[i] = premine[i].String()
-		amounts[i] = fmt.Sprintf("%d", 100)
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		receivers[i] = types.Address(key.Address()).String()
+		amounts[i] = fmt.Sprintf("%d", amount)
+
+		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
-	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(), framework.WithPremine(premine[:]...),
+	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations))
 	defer cluster.Stop()
 
@@ -85,9 +84,9 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[:], ","),
+		cluster.Bridge.Deposit(
+			"ERC20",
+			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 		),
 	)
@@ -97,9 +96,9 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	// send again to trigger previous transactions
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[:], ","),
+		cluster.Bridge.Deposit(
+			"ERC20",
+			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 		),
 	)
@@ -118,30 +117,39 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	filter.SetFromUint64(0)
 	filter.SetToUint64(100)
 
-	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
+	srv := cluster.Servers[0].JSONRPC().Eth()
+
+	logs, err := srv.GetLogs(filter)
 	require.NoError(t, err)
 
-	// Assert that all state syncs are executed successfully
-	checkLogs(t, logs, num)
+	// assert that all deposits are executed successfully
+	checkStateSyncResultLogs(t, logs, num)
+
+	// check receivers balances got increased by deposited amount
+	for _, receiver := range receivers {
+		balance, err := srv.GetBalance(ethgo.BytesToAddress([]byte(receiver)), ethgo.Latest)
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(amount), balance)
+	}
 }
 
 func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
-	const num = 10
+	const depositsCount = 10
 
-	var (
-		accounts         = make([]ethgo.Key, num)
-		wallets, amounts [num]string
-		premine          [num]types.Address
-	)
+	receivers := make([]string, depositsCount)
+	amounts := make([]string, depositsCount)
 
-	for i := 0; i < num; i++ {
-		accounts[i], _ = ethgow.GenerateKey()
-		premine[i] = types.Address(accounts[i].Address())
-		wallets[i] = premine[i].String()
+	for i := 0; i < depositsCount; i++ {
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		receivers[i] = types.Address(key.Address()).String()
 		amounts[i] = fmt.Sprintf("%d", 100)
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...), framework.WithEpochSize(30))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithEpochSize(30))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
@@ -150,9 +158,9 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[:2], ","),
+		cluster.Bridge.Deposit(
+			"ERC20",
+			strings.Join(receivers[:2], ","),
 			strings.Join(amounts[:2], ","),
 		),
 	)
@@ -160,8 +168,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
 
-	client := cluster.Servers[0].JSONRPC()
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
 	require.NoError(t, err)
 
 	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
@@ -169,7 +176,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that we submitted the minimal commitment to smart contract
-	result, err := txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	result, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
 	require.NoError(t, err)
 
 	lastCommittedID, err := strconv.ParseUint(result, 0, 64)
@@ -179,9 +186,9 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[2:], ","),
+		cluster.Bridge.Deposit(
+			"ERC20",
+			strings.Join(receivers[2:], ","),
 			strings.Join(amounts[2:], ","),
 		),
 	)
@@ -190,13 +197,13 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(40, 3*time.Minute))
 
 	// check that we submitted the minimal commitment to smart contract
-	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	result, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
 	require.NoError(t, err)
 
 	// check that the second (larger commitment) was also submitted in epoch
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
-	require.Equal(t, uint64(10), lastCommittedID)
+	require.Equal(t, uint64(depositsCount), lastCommittedID)
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
@@ -213,8 +220,8 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
 	require.NoError(t, err)
 
-	// Assert that all state syncs are executed successfully
-	checkLogs(t, logs, num)
+	// assert that all state syncs are executed successfully
+	checkStateSyncResultLogs(t, logs, depositsCount)
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
@@ -304,7 +311,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	}
 
 	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -332,7 +339,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainAdminKey())
+		rootchainHelper.GetRootchainPrivateKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -392,7 +399,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	)
 
 	exitEventIds := make([]uint64, userNumber*roundNumber)
-
 	sidechainKeys := make([]*ethgow.Key, userNumber)
 	accountAddress := make([]types.Address, userNumber)
 
@@ -405,7 +411,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 
 	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -433,7 +439,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainAdminKey())
+		rootchainHelper.GetRootchainPrivateKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -443,7 +449,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	// Start test
 	// send crosschain transaction on l2 and get exit id
 	stateSenderData := []byte{123}
-	//g, _ := errgroup.WithContext(context.Background())
 	addTransaction := func(j, i uint64) {
 		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[j], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
 		require.NoError(t, err)
@@ -510,7 +515,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpoin
 		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
 	}
 
-	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
+	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainPrivateKey(), contractsapi.ExitHelper, exitHelperAddr,
 		"exit",
 		big.NewInt(int64(checkpointBlock)),
 		uint64(leafIndex),

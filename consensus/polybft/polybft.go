@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -120,7 +119,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// Initialize child validator set
+		// initialize ChildValidatorSet SC
 		input, err := getInitChildValidatorSetInput(polyBFTConfig)
 		if err != nil {
 			return err
@@ -130,22 +129,33 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		if err != nil {
-			return fmt.Errorf("failed loading rootchain manifest: %w", err)
-		}
-
-		rootchainAdmin := types.ZeroAddress
-		if polyBFTConfig.IsBridgeEnabled() {
-			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
-		}
-
-		input, err = contractsapi.MRC20.Abi.Methods["initialize"].Encode(
-			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
+		// initialize ChildERC20Predicate SC
+		input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
 		if err != nil {
 			return err
 		}
 
-		return initContract(contracts.NativeTokenContract, input, "MRC20", transition)
+		if err = initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition); err != nil {
+			return err
+		}
+
+		rootNativeERC20Token := types.ZeroAddress
+		if polyBFTConfig.Bridge != nil {
+			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
+		}
+
+		// initialize NativeERC20 SC
+		input, err = getInitNativeERC20Input(
+			nativeTokenName,
+			nativeTokenSymbol,
+			nativeTokenDecimals,
+			rootNativeERC20Token,
+			contracts.ChildERC20PredicateContract)
+		if err != nil {
+			return err
+		}
+
+		return initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition)
 	}
 }
 

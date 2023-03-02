@@ -301,3 +301,64 @@ func (i *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
 func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }
+
+type InitializeChildERC20PredicateFunction struct {
+	NewL2StateSender          types.Address `abi:"newL2StateSender"`
+	NewStateReceiver          types.Address `abi:"newStateReceiver"`
+	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
+	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
+	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
+}
+
+func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+	return ChildERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC20PredicateFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeNativeERC20Function struct {
+	Predicate_ types.Address `abi:"predicate_"`
+	RootToken_ types.Address `abi:"rootToken_"`
+	Name_      string        `abi:"name_"`
+	Symbol_    string        `abi:"symbol_"`
+	Decimals_  uint8         `abi:"decimals_"`
+}
+
+func (i *InitializeNativeERC20Function) EncodeAbi() ([]byte, error) {
+	return NativeERC20.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeNativeERC20Function) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeRootERC20PredicateFunction struct {
+	NewStateSender         types.Address `abi:"newStateSender"`
+	NewExitHelper          types.Address `abi:"newExitHelper"`
+	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
+	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
+	NativeTokenRootAddress types.Address `abi:"nativeTokenRootAddress"`
+}
+
+func (i *InitializeRootERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeRootERC20PredicateFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type ApproveFunction struct {
+	Spender types.Address `abi:"spender"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (a *ApproveFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["approve"].Encode(a)
+}
+
+func (a *ApproveFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["approve"], buf, a)
+}

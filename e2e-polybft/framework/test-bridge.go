@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"strconv"
@@ -56,37 +57,6 @@ func (t *TestBridge) Start() error {
 	return nil
 }
 
-func (t *TestBridge) deployRootchainContracts(manifestPath string) error {
-	args := []string{
-		"rootchain",
-		"init-contracts",
-		"--manifest", manifestPath,
-	}
-
-	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
-	if err != nil {
-		return fmt.Errorf("failed to deploy rootchain contracts: %w", err)
-	}
-
-	return nil
-}
-
-func (t *TestBridge) fundValidators() error {
-	args := []string{
-		"rootchain",
-		"fund",
-		"--data-dir", path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
-		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
-	}
-
-	err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
-	if err != nil {
-		return fmt.Errorf("failed to deploy fund validators: %w", err)
-	}
-
-	return nil
-}
-
 func (t *TestBridge) Stop() {
 	if err := t.node.Stop(); err != nil {
 		t.t.Error(err)
@@ -119,4 +89,64 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 			return nil
 		}
 	}
+}
+
+// Deposit function is used to invoke bridge deposit command
+// with appropriately created receivers and amounts for test transactions
+func (t *TestBridge) Deposit(tokenType, receivers, amounts string) error {
+	if tokenType == "" {
+		return errors.New("provide token type value")
+	}
+
+	if receivers == "" {
+		return errors.New("provide at least one receiver address value")
+	}
+
+	if amounts == "" {
+		return errors.New("provide at least one amount value")
+	}
+
+	return t.cmdRun(
+		"bridge",
+		"deposit",
+		"--manifest", path.Join(t.clusterConfig.TmpDir, "manifest.json"),
+		"--token", tokenType,
+		"--receivers", receivers,
+		"--amounts", amounts)
+}
+
+// cmdRun executes arbitrary command from the given binary
+func (t *TestBridge) cmdRun(args ...string) error {
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
+}
+
+// deployRootchainContracts deploys and initializes rootchain contracts
+func (t *TestBridge) deployRootchainContracts(manifestPath string) error {
+	args := []string{
+		"rootchain",
+		"init-contracts",
+		"--manifest", manifestPath,
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to deploy rootchain contracts: %w", err)
+	}
+
+	return nil
+}
+
+// fundRootchainValidators sends predefined amount of tokens to rootchain validators
+func (t *TestBridge) fundRootchainValidators() error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--data-dir", path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
+		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to deploy fund validators: %w", err)
+	}
+
+	return nil
 }
