@@ -8,7 +8,6 @@ const (
 	SenderKeyFlag = "sender-key"
 	ReceiversFlag = "receivers"
 	AmountsFlag   = "amounts"
-	jsonRPCFlag   = "json-rpc"
 )
 
 var (
