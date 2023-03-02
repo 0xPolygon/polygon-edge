@@ -106,12 +106,12 @@ func (q *maxPriceQueue) Pop() interface{} {
 
 func (q *maxPriceQueue) cmp(a, b *types.Transaction) int {
 	baseFee := atomic.LoadUint64(&q.baseFee)
+	effectiveTipA := a.EffectiveTip(baseFee)
+	effectiveTipB := b.EffectiveTip(baseFee)
 
-	if baseFee > 0 {
-		// Compare effective tips if baseFee is specified
-		if c := a.EffectiveTip(baseFee).Cmp(b.EffectiveTip(baseFee)); c != 0 {
-			return c
-		}
+	// Compare effective tips if baseFee is specified
+	if c := effectiveTipA.Cmp(effectiveTipB); c != 0 {
+		return c
 	}
 
 	// Compare fee caps if baseFee is not specified or effective tips are equal

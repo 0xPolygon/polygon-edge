@@ -141,6 +141,38 @@ func Test_maxPriceQueue(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    "sort txs without base fee by gas price",
+			baseFee: 0,
+			unsorted: []*types.Transaction{
+				// Highest tx fee
+				{
+					GasPrice: big.NewInt(1000),
+				},
+				// Lowest tx fee
+				{
+					GasPrice: big.NewInt(100),
+				},
+				// Middle tx fee
+				{
+					GasPrice: big.NewInt(500),
+				},
+			},
+			sorted: []*types.Transaction{
+				// Highest tx fee
+				{
+					GasPrice: big.NewInt(1000),
+				},
+				// Middle tx fee
+				{
+					GasPrice: big.NewInt(500),
+				},
+				// Lowest tx fee
+				{
+					GasPrice: big.NewInt(100),
+				},
+			},
+		},
 	}
 
 	for _, tt := range testTable {
