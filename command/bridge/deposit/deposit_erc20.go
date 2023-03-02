@@ -20,9 +20,6 @@ import (
 )
 
 const (
-	// defaultMintValue represents amount of tokens which are going to be minted to depositor
-	defaultMintValue = int64(1e18)
-
 	rootTokenFlag     = "root-token"
 	rootPredicateFlag = "root-predicate"
 	jsonRPCFlag       = "json-rpc"
@@ -135,9 +132,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
+				amountBig, err := types.ParseUint256orHex(&amount)
+				if err != nil {
+					return fmt.Errorf("failed to decode provided amount %s: %w", amount, err)
+				}
+
 				if helper.IsTestMode(dp.TxnSenderKey) {
-					// mint tokens to depositor
-					txn, err := createMintTxn(big.NewInt(defaultMintValue))
+					// mint tokens to depositor, so he is able to send them
+					txn, err := createMintTxn(helper.GetRootchainPrivateKey().Address(), amountBig)
 					if err != nil {
 						return fmt.Errorf("mint transaction creation failed: %w", err)
 					}
@@ -152,10 +154,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				}
 
 				// deposit tokens
-				amountBig, err := types.ParseUint256orHex(&amount)
-				if err != nil {
-					return fmt.Errorf("failed to decode provided amount %s: %w", amount, err)
-				}
 				txn, err := createDepositTxn(ethgo.BytesToAddress([]byte(receiver)), amountBig)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
@@ -210,7 +208,7 @@ func createDepositTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transacti
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
-func createMintTxn(amount *big.Int) (*ethgo.Transaction, error) {
+func createMintTxn(receiver ethgo.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	input, err := contractsapi.RootERC20.Abi.Methods["mint"].Encode([]interface{}{
 		helper.GetRootchainPrivateKey().Address(),
 		amount,

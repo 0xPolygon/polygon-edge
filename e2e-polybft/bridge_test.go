@@ -152,6 +152,13 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		cluster.Servers[0].JSONRPCAddr())
 	require.NoError(t, err)
 
+	// make sure that balance is burned on child chain
+	for _, receiver := range receivers {
+		childChainBalance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(0), childChainBalance)
+	}
+
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
@@ -196,10 +203,24 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 			currentBlock.Number, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
-		// make sure it is processed successfully
+		// make sure exit event is processed successfully
 		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
 		require.NoError(t, err)
 		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
+	}
+
+	// assert that receiver's balances on RootERC20 smart contract are expected
+	for _, receiver := range receivers {
+		balanceInput, err := contractsapi.RootERC20.Abi.Methods["balanceOf"].Encode([]interface{}{receiver})
+		require.NoError(t, err)
+
+		balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress,
+			ethgo.Address(manifest.RootchainConfig.RootNativeERC20Address), balanceInput)
+		require.NoError(t, err)
+
+		balance, err := types.ParseUint256orHex(&balanceRaw)
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(amount), balance)
 	}
 }
 

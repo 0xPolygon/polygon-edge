@@ -398,7 +398,7 @@ func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, cont
 	}
 
 	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return fmt.Errorf("failed to initialize %s contract", contractName)
+		return fmt.Errorf("transaction execution failed on %s contract", contractName)
 	}
 
 	return nil
