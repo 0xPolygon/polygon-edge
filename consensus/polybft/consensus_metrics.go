@@ -32,8 +32,8 @@ func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) e
 
 	// number of rounds needed to seal a block
 	metrics.SetGauge([]string{consensusMetricsPrefix, "rounds"}, float32(extra.Checkpoint.BlockRound))
-	metrics.SetGauge([]string{consensusMetricsPrefix, "current_block"}, float32(currentBlock.Number()))
-	metrics.IncrCounter([]string{consensusMetricsPrefix, "insert_block"}, float32(1))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "chain_head"}, float32(currentBlock.Number()))
+	metrics.IncrCounter([]string{consensusMetricsPrefix, "block_counter"}, float32(1))
 
 	return nil
 }
