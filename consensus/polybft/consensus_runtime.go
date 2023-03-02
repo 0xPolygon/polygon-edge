@@ -11,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -68,14 +69,15 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig  *PolyBFTConfig
-	DataDir        string
-	Key            *wallet.Key
-	State          *State
-	blockchain     blockchainBackend
-	polybftBackend polybftBackend
-	txPool         txPoolInterface
-	bridgeTopic    topic
+	PolyBFTConfig         *PolyBFTConfig
+	DataDir               string
+	Key                   *wallet.Key
+	State                 *State
+	blockchain            blockchainBackend
+	polybftBackend        polybftBackend
+	txPool                txPoolInterface
+	bridgeTopic           topic
+	numBlockConfirmations uint64
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -159,12 +161,13 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 			logger,
 			c.config.State,
 			&stateSyncConfig{
-				key:               c.config.Key,
-				stateSenderAddr:   c.config.PolyBFTConfig.Bridge.BridgeAddr,
-				jsonrpcAddr:       c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:           c.config.DataDir,
-				topic:             c.config.bridgeTopic,
-				maxCommitmentSize: maxCommitmentSize,
+				key:                   c.config.Key,
+				stateSenderAddr:       c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:               c.config.DataDir,
+				topic:                 c.config.bridgeTopic,
+				maxCommitmentSize:     maxCommitmentSize,
+				numBlockConfirmations: c.config.numBlockConfirmations,
 			},
 		)
 
@@ -942,7 +945,7 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 }
 
 // createExitTree creates an exit event merkle tree from provided exit events
-func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
+func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	numOfEvents := len(exitEvents)
 	data := make([][]byte, numOfEvents)
 
@@ -955,7 +958,7 @@ func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
 		data[i] = b
 	}
 
-	return NewMerkleTree(data)
+	return merkle.NewMerkleTree(data)
 }
 
 // getSealersForBlock checks who sealed a given block and updates the counter

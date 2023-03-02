@@ -59,12 +59,13 @@ func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Pro
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr   types.Address
-	jsonrpcAddr       string
-	dataDir           string
-	topic             topic
-	key               *wallet.Key
-	maxCommitmentSize uint64
+	stateSenderAddr       types.Address
+	jsonrpcAddr           string
+	dataDir               string
+	topic                 topic
+	key                   *wallet.Key
+	maxCommitmentSize     uint64
+	numBlockConfirmations uint64
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -130,6 +131,7 @@ func (s *stateSyncManager) initTracker() error {
 		s.config.jsonrpcAddr,
 		ethgo.Address(s.config.stateSenderAddr),
 		s,
+		s.config.numBlockConfirmations,
 		s.logger)
 
 	go func() {
@@ -171,17 +173,17 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	valSet := s.validatorSet
 	s.lock.RUnlock()
 
-	if valSet == nil || msg.EpochNumber < epoch {
-		// Epoch metadata is undefined or received message for some of the older epochs
+	if valSet == nil || msg.EpochNumber != epoch {
+		// Epoch metadata is undefined or received a message for the irrelevant epoch
 		return nil
 	}
 
-	if !valSet.Includes(types.StringToAddress(msg.NodeID)) {
-		return fmt.Errorf("validator is not among the active validator set")
+	if err := s.verifyVoteSignature(valSet, types.StringToAddress(msg.From), msg.Signature, msg.Hash); err != nil {
+		return fmt.Errorf("error verifying vote signature: %w", err)
 	}
 
 	msgVote := &MessageSignature{
-		From:      msg.NodeID,
+		From:      msg.From,
 		Signature: msg.Signature,
 	}
 
@@ -193,9 +195,29 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	s.logger.Info(
 		"deliver message",
 		"hash", hex.EncodeToString(msg.Hash),
-		"sender", msg.NodeID,
+		"sender", msg.From,
 		"signatures", numSignatures,
 	)
+
+	return nil
+}
+
+// Verifies signature of the message against the public key of the signer and checks if the signer is a validator
+func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types.Address, signature []byte,
+	hash []byte) error {
+	validator := valSet.Accounts().GetValidatorMetadata(signer)
+	if validator == nil {
+		return fmt.Errorf("unable to resolve validator %s", signer)
+	}
+
+	unmarshaledSignature, err := bls.UnmarshalSignature(signature)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signer.String(), err)
+	}
+
+	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainCheckpointManager) {
+		return fmt.Errorf("incorrect signature from %s", signer)
+	}
 
 	return nil
 }
@@ -441,13 +463,21 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 
 	tree, err := createMerkleTree(events)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create merkle tree. error: %w", err)
 	}
 
 	stateSyncProofs := make([]*StateSyncProof, len(events))
 
 	for i, event := range events {
-		p := tree.GenerateProof(uint64(i), 0)
+		leaf, err := event.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("could not encode state sync event. error: %w", err)
+		}
+
+		p, err := tree.GenerateProof(leaf)
+		if err != nil {
+			return fmt.Errorf("error generating proof for event: %v. error: %w", event.ID, err)
+		}
 
 		stateSyncProofs[i] = &StateSyncProof{
 			Proof:     p,
@@ -523,7 +553,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	s.multicast(&TransportMessage{
 		Hash:        hashBytes,
 		Signature:   signature,
-		NodeID:      s.config.key.String(),
+		From:        s.config.key.String(),
 		EpochNumber: epoch,
 	})
 
