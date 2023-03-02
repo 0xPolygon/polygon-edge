@@ -104,6 +104,10 @@ func (q *maxPriceQueue) Pop() interface{} {
 	return x
 }
 
+// cmp compares the given transactions by their fees and returns:
+//   - 0 if they have same fees
+//   - 1 if a has higher fees than b
+//   - -1 if b has higher fees than a
 func (q *maxPriceQueue) cmp(a, b *types.Transaction) int {
 	baseFee := atomic.LoadUint64(&q.baseFee)
 	effectiveTipA := a.EffectiveTip(baseFee)
