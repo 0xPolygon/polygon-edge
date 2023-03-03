@@ -15,6 +15,7 @@ const (
 	defaultGasPrice   = 1879048192 // 0x70000000
 	defaultGasLimit   = 5242880    // 0x500000
 	DefaultRPCAddress = "http://127.0.0.1:8545"
+	numRetries        = 1000
 )
 
 var (
@@ -159,7 +160,7 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 			return receipt, nil
 		}
 
-		if count > 100 {
+		if count > numRetries {
 			return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 		}
 
