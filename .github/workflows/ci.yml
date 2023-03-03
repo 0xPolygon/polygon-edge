@@ -16,30 +16,3 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-  
-  loadtest:
-    uses: ./.github/workflows/loadtest.yml
-    name: Load Test
-    secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-    with:
-      runner: devnet
-      environment: devnet-ephemeral
-      scenario: multiple
-  
-  loadtestERC20:
-    needs: loadtest
-    uses: ./.github/workflows/loadtest.yml
-    name: Load Test
-    secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-    with:
-      runner: devnet
-      environment: devnet-ephemeral
-      scenario: multiple_ERC20
