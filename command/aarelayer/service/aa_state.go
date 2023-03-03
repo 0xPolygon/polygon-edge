@@ -17,7 +17,7 @@ type AATxState interface {
 	Get(string) (*AAStateTransaction, error)
 	// Get all pending transactions
 	GetAllPending() ([]*AAStateTransaction, error)
-	// Get all pending transactions
+	// Get all queued transactions
 	GetAllQueued() ([]*AAStateTransaction, error)
 	// Update modifies the metadata for the AA transaction
 	Update(stateTx *AAStateTransaction) error
