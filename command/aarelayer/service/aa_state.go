@@ -27,6 +27,14 @@ var (
 	pendingBucket  = []byte("pending")
 	queuedBucket   = []byte("queued")
 	finishedBucket = []byte("finished")
+
+	allBuckets        = [][]byte{pendingBucket, queuedBucket, finishedBucket}
+	statusToBucketMap = map[string][]byte{
+		StatusPending:   pendingBucket,
+		StatusQueued:    queuedBucket,
+		StatusCompleted: finishedBucket,
+		StatusFailed:    finishedBucket,
+	}
 )
 
 var _ AATxState = (*aaTxState)(nil)
@@ -71,7 +79,7 @@ func (s *aaTxState) Get(id string) (result *AAStateTransaction, err error) {
 	if err := s.db.View(func(tx *bolt.Tx) error {
 		idb := []byte(id)
 
-		for _, bucket := range [][]byte{pendingBucket, queuedBucket, finishedBucket} {
+		for _, bucket := range allBuckets {
 			value := tx.Bucket(bucket).Get(idb)
 			if value != nil {
 				return json.Unmarshal(value, &result)
@@ -97,15 +105,10 @@ func (s *aaTxState) GetAllQueued() ([]*AAStateTransaction, error) {
 func (s *aaTxState) Update(stateTx *AAStateTransaction) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		idb := []byte(stateTx.ID)
-		newStatusBacket := map[string][]byte{
-			StatusPending:   pendingBucket,
-			StatusQueued:    queuedBucket,
-			StatusCompleted: finishedBucket,
-			StatusFailed:    finishedBucket,
-		}[stateTx.Status] // this is just fancy switch case
+		newStatusBacket := statusToBucketMap[stateTx.Status]
 
 		// check if item exist in another bucket, and if it is, delete item from the old bucket
-		for _, bucket := range [][]byte{pendingBucket, queuedBucket, finishedBucket} {
+		for _, bucket := range allBuckets {
 			if !bytes.Equal(newStatusBacket, bucket) {
 				if value := tx.Bucket(bucket).Get(idb); value != nil {
 					// delete item from old bucket
@@ -142,7 +145,7 @@ func (s *aaTxState) init(dbFilePath string) (err error) {
 	}
 
 	return s.db.Update(func(tx *bolt.Tx) error {
-		for _, bucket := range [][]byte{pendingBucket, queuedBucket, finishedBucket} {
+		for _, bucket := range allBuckets {
 			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
 				return err
 			}

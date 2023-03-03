@@ -24,8 +24,14 @@ func Test_validateFlags_ErrorValidateIPPort(t *testing.T) {
 func Test_validateFlags_SecretsError(t *testing.T) {
 	t.Parallel()
 
+	tmpFilePath, err := os.MkdirTemp("/tmp", "aa_test_test_happy_path")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(tmpFilePath)
+
 	p := aarelayerParams{
-		addr: "127.0.0.1:8289",
+		addr:   "127.0.0.1:8289",
+		dbPath: path.Join(tmpFilePath, "e.db"),
 	}
 
 	assert.ErrorContains(t, p.validateFlags(), "no config file or data directory passed in")
