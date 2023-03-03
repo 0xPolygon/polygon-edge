@@ -758,7 +758,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		require.Equal(t, stakedAmount, validator.TotalStake)
 	})
 
-	// assert that block 20 gets checkpointed
 	require.NoError(t, cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
 		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
 		if err != nil {
