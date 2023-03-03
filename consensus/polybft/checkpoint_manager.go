@@ -370,6 +370,10 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 	events := make([]*ExitEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
+		if receipts[i].Status == nil || *receipts[i].Status != types.ReceiptSuccess {
+			continue
+		}
+
 		for _, log := range receipts[i].Logs {
 			if log.Address != contracts.L2StateSenderContract {
 				continue

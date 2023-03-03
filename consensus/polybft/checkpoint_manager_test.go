@@ -297,6 +297,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		receipts[i] = &types.Receipt{Logs: []*types.Log{
 			createTestLogForExitEvent(t, uint64(i)),
 		}}
+		receipts[i].SetStatus(types.ReceiptSuccess)
 	}
 
 	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}, Receipts: receipts},
