@@ -74,6 +74,10 @@ func (t *TestServer) Conn() proto.SystemClient {
 	return proto.NewSystemClient(conn)
 }
 
+func (t *TestServer) DataDir() string {
+	return t.config.DataDir
+}
+
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
@@ -96,8 +100,8 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback Test
 	}
 
 	srv := &TestServer{
-		clusterConfig: clusterConfig,
 		t:             t,
+		clusterConfig: clusterConfig,
 		config:        config,
 	}
 	srv.Start()

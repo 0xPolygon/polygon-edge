@@ -383,13 +383,12 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
-	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
 	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
 	rootchainValidators := []*polybft.ValidatorInfo{}
 	err = cluster.Bridge.WaitUntil(time.Second, 10*time.Second, func() (bool, error) {
-		rootchainValidators, err = getRootchainValidators(l1Relayer, checkpointManagerAddr, rootchainSender)
+		rootchainValidators, err = getRootchainValidators(l1Relayer, checkpointManagerAddr)
 		if err != nil {
 			return true, err
 		}

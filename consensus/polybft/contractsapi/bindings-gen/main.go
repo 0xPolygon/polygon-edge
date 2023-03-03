@@ -64,6 +64,14 @@ func main() {
 			},
 		},
 		{
+			"L2StateSender",
+			gensc.L2StateSender,
+			[]string{},
+			[]string{
+				"L2StateSynced",
+			},
+		},
+		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
 			[]string{
@@ -73,10 +81,19 @@ func main() {
 			[]string{},
 		},
 		{
+			"ExitHelper",
+			gensc.ExitHelper,
+			[]string{
+				"exit",
+			},
+			[]string{},
+		},
+		{
 			"ChildERC20Predicate",
 			gensc.ChildERC20Predicate,
 			[]string{
 				"initialize",
+				"withdrawTo",
 			},
 			[]string{},
 		},
@@ -93,6 +110,7 @@ func main() {
 			gensc.RootERC20Predicate,
 			[]string{
 				"initialize",
+				"depositTo",
 			},
 			[]string{},
 		},
@@ -101,6 +119,7 @@ func main() {
 			gensc.RootERC20,
 			[]string{
 				"approve",
+				"mint",
 			},
 			[]string{},
 		},

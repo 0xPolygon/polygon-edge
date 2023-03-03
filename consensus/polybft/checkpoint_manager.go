@@ -331,7 +331,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
-	e, err := ExitEventABIType.Encode(exitEvent)
+	e, err := ExitEventInputsABIType.Encode(exitEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -360,6 +360,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		Data: proof,
 		Metadata: map[string]interface{}{
 			"LeafIndex": leafIndex,
+			"ExitEvent": exitEvent,
 		},
 	}, nil
 }
