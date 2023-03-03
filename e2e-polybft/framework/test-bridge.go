@@ -179,7 +179,7 @@ func (t *TestBridge) deployRootchainContracts(manifestPath string) error {
 		"rootchain",
 		"init-contracts",
 		"--manifest", manifestPath,
-		"test",
+		"--test",
 	}
 
 	if err := t.cmdRun(args...); err != nil {
