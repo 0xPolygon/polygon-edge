@@ -256,7 +256,7 @@ func TestAddTxErrors(t *testing.T) {
 		)
 	})
 
-	t.Run("FullTxPoolToTheLimit", func(t *testing.T) {
+	t.Run("FillTxPoolToTheLimit", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 
@@ -398,7 +398,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			//	enqueue tx
+			// enqueue tx
 			go func() {
 				assert.NoError(t,
 					pool.addTx(local, newTx(addr1, 0, 1)),

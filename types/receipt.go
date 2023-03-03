@@ -2,6 +2,7 @@ package types
 
 import (
 	goHex "encoding/hex"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -55,7 +56,7 @@ const BloomByteLength = 256
 type Bloom [BloomByteLength]byte
 
 func (b *Bloom) UnmarshalText(input []byte) error {
-	input = hex.DropHexPrefix(input)
+	input = []byte(strings.TrimPrefix(strings.ToLower(string(input)), "0x"))
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}
