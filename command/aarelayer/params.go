@@ -1,6 +1,7 @@
 package aarelayer
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -33,11 +34,15 @@ func (rp *aarelayerParams) validateFlags() error {
 		return fmt.Errorf("invalid address: %s", rp.addr)
 	}
 
-	dir := path.Dir(rp.dbPath)
+	dir, fn := path.Split(rp.dbPath)
 	if dir != "" {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
 			return err
 		}
+	}
+
+	if fn == "" {
+		return errors.New("file name for boltdb not specified")
 	}
 
 	return sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.configPath)

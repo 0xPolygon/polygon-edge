@@ -3,7 +3,6 @@ package service
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,8 +17,10 @@ type AATxState interface {
 	Get(string) (*AAStateTransaction, error)
 	// Get all pending transactions
 	GetAllPending() ([]*AAStateTransaction, error)
-	// Update modifies the metadata for the AA transaction with the specified ID in the state
-	Update(string, func(tx *AAStateTransaction) error) error
+	// Get all pending transactions
+	GetAllQueued() ([]*AAStateTransaction, error)
+	// Update modifies the metadata for the AA transaction
+	Update(stateTx *AAStateTransaction) error
 }
 
 var (
@@ -68,12 +69,16 @@ func (s *aaTxState) Add(tx *AATransaction) (*AAStateTransaction, error) {
 
 func (s *aaTxState) Get(id string) (result *AAStateTransaction, err error) {
 	if err := s.db.View(func(tx *bolt.Tx) error {
-		value := s.getSerialized(tx, id)
-		if value == nil {
-			return nil
+		idb := []byte(id)
+
+		for _, bucket := range [][]byte{pendingBucket, queuedBucket, finishedBucket} {
+			value := tx.Bucket(bucket).Get(idb)
+			if value != nil {
+				return json.Unmarshal(value, &result)
+			}
 		}
 
-		return json.Unmarshal(value, &result)
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -85,37 +90,40 @@ func (s *aaTxState) GetAllPending() ([]*AAStateTransaction, error) {
 	return s.getAllFromBucket(pendingBucket)
 }
 
-func (s *aaTxState) Update(id string, fn func(tx *AAStateTransaction) error) error {
-	statusToBucketMap := map[string][]byte{
-		StatusPending:   pendingBucket,
-		StatusQueued:    queuedBucket,
-		StatusCompleted: finishedBucket,
-		StatusFailed:    finishedBucket,
-	}
+func (s *aaTxState) GetAllQueued() ([]*AAStateTransaction, error) {
+	return s.getAllFromBucket(queuedBucket)
+}
 
+func (s *aaTxState) Update(stateTx *AAStateTransaction) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		value := s.getSerialized(tx, id)
-		if value == nil {
-			return fmt.Errorf("tx with uuid = %s does not exist", id)
-		}
+		idb := []byte(stateTx.ID)
+		newStatusBacket := map[string][]byte{
+			StatusPending:   pendingBucket,
+			StatusQueued:    queuedBucket,
+			StatusCompleted: finishedBucket,
+			StatusFailed:    finishedBucket,
+		}[stateTx.Status] // this is just fancy switch case
 
-		var stateTx AAStateTransaction
+		// check if item exist in another bucket, and if it is, delete item from the old bucket
+		for _, bucket := range [][]byte{pendingBucket, queuedBucket, finishedBucket} {
+			if !bytes.Equal(newStatusBacket, bucket) {
+				if value := tx.Bucket(bucket).Get(idb); value != nil {
+					// delete item from old bucket
+					if err := tx.Bucket(bucket).Delete(idb); err != nil {
+						return err
+					}
 
-		if err := json.Unmarshal(value, &stateTx); err != nil {
-			return err
-		}
+					// update time
+					switch stateTx.Status {
+					case StatusQueued:
+						stateTx.TimeQueued = time.Now().Unix()
+					case StatusCompleted, StatusFailed:
+						stateTx.TimeFinished = time.Now().Unix()
+					}
 
-		oldStatusBucket := statusToBucketMap[stateTx.Status]
-
-		if err := fn(&stateTx); err != nil {
-			return err
-		}
-
-		newStatusBacket := statusToBucketMap[stateTx.Status]
-
-		// if item changed bucket, remove it from old one
-		if !bytes.Equal(newStatusBacket, oldStatusBucket) {
-			tx.Bucket(oldStatusBucket).Delete([]byte(id))
+					break
+				}
+			}
 		}
 
 		bytesStateTx, err := json.Marshal(stateTx)
@@ -124,21 +132,8 @@ func (s *aaTxState) Update(id string, fn func(tx *AAStateTransaction) error) err
 		}
 
 		// put new value into new backet. Overwrite if already exists
-		return tx.Bucket(newStatusBacket).Put([]byte(id), bytesStateTx)
+		return tx.Bucket(newStatusBacket).Put(idb, bytesStateTx)
 	})
-}
-
-func (s *aaTxState) getSerialized(tx *bolt.Tx, id string) []byte {
-	idb := []byte(id)
-
-	for _, bucket := range [][]byte{pendingBucket, queuedBucket, finishedBucket} {
-		value := tx.Bucket(bucket).Get(idb)
-		if value != nil {
-			return value
-		}
-	}
-
-	return nil
 }
 
 func (s *aaTxState) init(dbFilePath string) (err error) {
@@ -158,20 +153,19 @@ func (s *aaTxState) init(dbFilePath string) (err error) {
 }
 
 func (s *aaTxState) getAllFromBucket(bucketName []byte) ([]*AAStateTransaction, error) {
-	var (
-		result  []*AAStateTransaction
-		stateTx AAStateTransaction
-	)
+	var result []*AAStateTransaction
 
 	if err := s.db.View(func(tx *bolt.Tx) error {
 		cursor := tx.Bucket(bucketName).Cursor()
 
 		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
-			if err := json.Unmarshal(value, &stateTx); err != nil {
+			stateTx := &AAStateTransaction{}
+
+			if err := json.Unmarshal(value, stateTx); err != nil {
 				return err
 			}
 
-			result = append(result, &stateTx)
+			result = append(result, stateTx)
 		}
 
 		return nil

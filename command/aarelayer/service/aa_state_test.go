@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"os"
 	"path"
 	"testing"
@@ -10,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func Test_AAState_AddAndGet(t *testing.T) {
+func Test_AAState_AddGetUpdate(t *testing.T) {
 	t.Parallel()
 
 	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
@@ -21,22 +20,20 @@ func Test_AAState_AddAndGet(t *testing.T) {
 	state, err := NewAATxState(path.Join(dbpath, "k.db"))
 	require.NoError(t, err)
 
-	key := [3]string{"", "", ""}
+	stateTxs := [5]*AAStateTransaction{}
 
-	// add 3 items
-	for i := 0; i < len(key); i++ {
-		rtx, err := state.Add(&AATransaction{Transaction: Transaction{Nonce: 10 + uint64(i)}})
+	// add 5 items
+	for i := range stateTxs {
+		stateTxs[i], err = state.Add(&AATransaction{Transaction: Transaction{Nonce: 10 + uint64(i)}})
 
 		require.NoError(t, err)
-		assert.True(t, len(rtx.ID) >= 5)
-		assert.Equal(t, StatusPending, rtx.Status)
-
-		key[i] = rtx.ID
+		assert.True(t, len(stateTxs[i].ID) >= 5)
+		assert.Equal(t, StatusPending, stateTxs[i].Status)
 	}
 
 	// retrieve
-	for i, k := range key {
-		rtx, err := state.Get(k)
+	for i, tx := range stateTxs {
+		rtx, err := state.Get(tx.ID)
 
 		require.NoError(t, err)
 		assert.Equal(t, rtx.Tx.Transaction.Nonce, uint64(i)+10)
@@ -45,9 +42,27 @@ func Test_AAState_AddAndGet(t *testing.T) {
 	rtx, err := state.Get("not_existing_key")
 	require.NoError(t, err)
 	assert.Nil(t, rtx)
+
+	// move some of txs to different bucket
+	stateTxs[0].Status = StatusQueued
+	require.NoError(t, state.Update(stateTxs[0]))
+
+	stateTxs[1].Status = StatusFailed
+	require.NoError(t, state.Update(stateTxs[0]))
+
+	stateTxs[2].Status = StatusCompleted
+	require.NoError(t, state.Update(stateTxs[0]))
+
+	// retrieve should still work
+	for i, tx := range stateTxs {
+		rtx, err := state.Get(tx.ID)
+
+		require.NoError(t, err)
+		assert.Equal(t, rtx.Tx.Transaction.Nonce, uint64(i)+10)
+	}
 }
 
-func Test_AAState_GetPending(t *testing.T) {
+func Test_AAState_UpdateGetQueuedGetPending(t *testing.T) {
 	t.Parallel()
 
 	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
@@ -58,77 +73,79 @@ func Test_AAState_GetPending(t *testing.T) {
 	state, err := NewAATxState(path.Join(dbpath, "k.db"))
 	require.NoError(t, err)
 
-	// add 3 items
-	for i := 0; i < 3; i++ {
-		rtx, err := state.Add(&AATransaction{Transaction: Transaction{Nonce: 10 + uint64(i)}})
+	stateTxs := [8]*AAStateTransaction{}
+
+	// add 8 pending items
+	for i := range stateTxs {
+		stateTxs[i], err = state.Add(&AATransaction{Transaction: Transaction{Nonce: 10 + uint64(i)}})
 
 		require.NoError(t, err)
-		assert.True(t, len(rtx.ID) >= 5)
-		assert.Equal(t, StatusPending, rtx.Status)
+		assert.True(t, len(stateTxs[i].ID) >= 5)
+		assert.Equal(t, StatusPending, stateTxs[i].Status)
 	}
+
+	// update second and third to queued
+	for i := 1; i <= 2; i++ {
+		stateTxs[i].Status = StatusQueued
+		require.NoError(t, state.Update(stateTxs[i]))
+	}
+
+	// update forth to completed
+	stateTxs[3].Status = StatusCompleted
+	require.NoError(t, state.Update(stateTxs[3]))
+
+	// update sixt to failed
+	stateTxs[5].Status = StatusFailed
+	require.NoError(t, state.Update(stateTxs[5]))
 
 	// retrieve
-	txs, err := state.GetAllPending()
+	txsQueued, err1 := state.GetAllQueued()
+	txsPending, err2 := state.GetAllPending()
 
-	require.NoError(t, err)
-	assert.Len(t, txs, 3)
-}
+	assert.NoError(t, err1)
+	assert.Len(t, txsPending, 4)
+	assert.NoError(t, err2)
+	assert.Len(t, txsQueued, 2)
 
-func Test_AAState_Update(t *testing.T) {
-	t.Parallel()
+	// update second to completed
+	stateTxs[1].Status = StatusCompleted
+	require.NoError(t, state.Update(stateTxs[1]))
 
-	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
-	require.NoError(t, err)
+	// retrieve again
+	txsQueued, err1 = state.GetAllQueued()
+	txsPending, err2 = state.GetAllPending()
 
-	t.Cleanup(func() { os.RemoveAll(dbpath) })
+	assert.NoError(t, err1)
+	assert.Len(t, txsPending, 4)
+	assert.NoError(t, err2)
+	assert.Len(t, txsQueued, 1)
 
-	state, err := NewAATxState(path.Join(dbpath, "k.db"))
-	require.NoError(t, err)
+	// update third to failed
+	stateTxs[2].Status = StatusFailed
+	require.NoError(t, state.Update(stateTxs[2]))
 
-	key := [3]string{"", "", ""}
+	// retrieve again
+	txsQueued, err1 = state.GetAllQueued()
+	txsPending, err2 = state.GetAllPending()
 
-	// add 3 items
-	for i := 0; i < 3; i++ {
-		rtx, err := state.Add(&AATransaction{Transaction: Transaction{Nonce: 10 + uint64(i)}})
+	assert.NoError(t, err1)
+	assert.Len(t, txsPending, 4)
+	assert.NoError(t, err2)
+	assert.Len(t, txsQueued, 0)
 
-		require.NoError(t, err)
-		assert.True(t, len(rtx.ID) >= 5)
-		assert.Equal(t, StatusPending, rtx.Status)
+	// queue all pending
+	for i := range txsPending {
+		txsPending[i].Status = StatusQueued
 
-		key[i] = rtx.ID
+		require.NoError(t, state.Update(txsPending[i]))
 	}
 
-	require.NoError(t, state.Update(key[2], func(tx *AAStateTransaction) error {
-		tx.Gas = 800
+	// retrieve again
+	txsQueued, err1 = state.GetAllQueued()
+	txsPending, err2 = state.GetAllPending()
 
-		return nil
-	}))
-
-	require.NoError(t, state.Update(key[1], func(tx *AAStateTransaction) error {
-		tx.Status = StatusCompleted
-
-		return nil
-	}))
-
-	require.Error(t, state.Update("NotExist", func(tx *AAStateTransaction) error {
-		tx.Status = StatusCompleted
-
-		return nil
-	}))
-
-	require.ErrorContains(t, state.Update(key[1], func(tx *AAStateTransaction) error {
-		tx.Status = StatusCompleted
-
-		return errors.New("dummy error")
-	}), "dummy error")
-
-	rtx, err := state.Get(key[2])
-
-	require.NoError(t, err)
-	assert.Equal(t, uint64(800), rtx.Gas)
-
-	rtx, err = state.Get(key[1])
-
-	require.NoError(t, err)
-	assert.Equal(t, rtx.Status, StatusCompleted)
+	assert.NoError(t, err1)
+	assert.Len(t, txsPending, 0)
+	assert.NoError(t, err2)
+	assert.Len(t, txsQueued, 4)
 }

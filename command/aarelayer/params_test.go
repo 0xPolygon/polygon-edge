@@ -40,6 +40,9 @@ func Test_validateFlags_ErrorValidateDbPath(t *testing.T) {
 	}
 
 	assert.ErrorContains(t, p.validateFlags(), "no such file or directory")
+
+	p.dbPath = ""
+	assert.ErrorContains(t, p.validateFlags(), "file name for boltdb not specified")
 }
 
 func Test_validateFlags_HappyPath(t *testing.T) {
