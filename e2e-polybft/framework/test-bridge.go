@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -107,6 +108,7 @@ func (t *TestBridge) DepositERC20(rootTokenAddr, rootPredicateAddr types.Address
 	return t.cmdRun(
 		"bridge",
 		"deposit-erc20",
+		"--test",
 		"--root-token", rootTokenAddr.String(),
 		"--root-predicate", rootPredicateAddr.String(),
 		"--receivers", receivers,
@@ -115,9 +117,9 @@ func (t *TestBridge) DepositERC20(rootTokenAddr, rootPredicateAddr types.Address
 
 // WithdrawERC20 function is used to invoke bridge withdraw ERC20 tokens (from the child to the root chain)
 // with given receivers and amounts
-func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoint string) error {
-	if senderKey == "" {
-		return errors.New("provide a hex-encoded sender private key")
+func (t *TestBridge) WithdrawERC20(secretsDataDir, receivers, amounts, jsonRPCEndpoint string) error {
+	if secretsDataDir == "" {
+		return errors.New("provide a data directory which holds sender secrets")
 	}
 
 	if receivers == "" {
@@ -135,7 +137,7 @@ func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoin
 	return t.cmdRun(
 		"bridge",
 		"withdraw-erc20",
-		"--sender-key", senderKey,
+		"--"+polybftsecrets.DataPathFlag, secretsDataDir,
 		"--receivers", receivers,
 		"--amounts", amounts,
 		"--json-rpc", jsonRPCEndpoint,
@@ -162,6 +164,7 @@ func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID, epoch
 		"--checkpoint-block", strconv.FormatUint(checkpointBlock, 10),
 		"--root-json-rpc", rootJSONRPCAddr,
 		"--child-json-rpc", childJSONRPCAddr,
+		"--test",
 	)
 }
 

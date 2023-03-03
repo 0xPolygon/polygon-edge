@@ -2,7 +2,6 @@ package withdraw
 
 import (
 	"bytes"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -11,13 +10,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -50,10 +50,17 @@ func GetWithdrawCommand() *cobra.Command {
 	}
 
 	withdrawCmd.Flags().StringVar(
-		&wp.TxnSenderKey,
-		common.SenderKeyFlag,
+		&wp.SecretsDataPath,
+		polybftsecrets.DataPathFlag,
 		"",
-		"hex encoded private key of the account which sends withdraw transactions",
+		polybftsecrets.DataPathFlagDesc,
+	)
+
+	withdrawCmd.Flags().StringVar(
+		&wp.SecretsConfigPath,
+		polybftsecrets.ConfigFlag,
+		"",
+		polybftsecrets.ConfigFlagDesc,
 	)
 
 	withdrawCmd.Flags().StringSliceVar(
@@ -91,15 +98,16 @@ func GetWithdrawCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
-	withdrawCmd.MarkFlagRequired(common.SenderKeyFlag)
 	withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
 	withdrawCmd.MarkFlagRequired(common.AmountsFlag)
+
+	withdrawCmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
 
 	return withdrawCmd
 }
 
 func runPreRunWithdraw(cmd *cobra.Command, _ []string) error {
-	if err := wp.ValidateFlags(); err != nil {
+	if err := wp.ValidateFlags(false); err != nil {
 		return err
 	}
 
@@ -110,16 +118,16 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ecdsaRaw, err := hex.DecodeString(wp.TxnSenderKey)
+	secretsManager, err := polybftsecrets.GetSecretsManager(wp.SecretsDataPath, wp.SecretsConfigPath, true)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to decode private key: %w", err))
+		outputter.SetError(err)
 
 		return
 	}
 
-	key, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
+	senderAccount, err := wallet.NewAccountFromSecret(secretsManager)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to create wallet from private key: %w", err))
+		outputter.SetError(err)
 
 		return
 	}
@@ -153,7 +161,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		receipt, err := txRelayer.SendTransaction(txn, key)
+		receipt, err := txRelayer.SendTransaction(txn, senderAccount.Ecdsa)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("receiver: %s, amount: %s, error: %w", receiver, amount, err))
 
@@ -179,7 +187,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	outputter.SetCommandResult(
 		&withdrawERC20Result{
-			Sender:       key.Address().String(),
+			Sender:       senderAccount.Ecdsa.Address().String(),
 			Receivers:    wp.Receivers,
 			Amounts:      wp.Amounts,
 			ExitEventIDs: exitEventIDs,

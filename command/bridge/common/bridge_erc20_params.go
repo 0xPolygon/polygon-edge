@@ -2,6 +2,8 @@ package common
 
 import (
 	"errors"
+
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 const (
@@ -15,12 +17,20 @@ var (
 )
 
 type ERC20BridgeParams struct {
-	TxnSenderKey string
-	Receivers    []string
-	Amounts      []string
+	SecretsDataPath   string
+	SecretsConfigPath string
+	Receivers         []string
+	Amounts           []string
 }
 
-func (bp *ERC20BridgeParams) ValidateFlags() error {
+func (bp *ERC20BridgeParams) ValidateFlags(testMode bool) error {
+	// in case of test mode test rootchain account is being used as the rootchain transactions sender
+	if !testMode {
+		if err := sidechain.ValidateSecretFlags(bp.SecretsDataPath, bp.SecretsConfigPath); err != nil {
+			return err
+		}
+	}
+
 	if len(bp.Receivers) != len(bp.Amounts) {
 		return errInconsistentAccounts
 	}

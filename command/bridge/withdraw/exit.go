@@ -2,7 +2,6 @@ package withdraw
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,14 +11,15 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
-	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -38,13 +38,25 @@ const (
 )
 
 type exitParams struct {
-	txnSenderKey      string
+	secretsDataPath   string
+	secretsConfigPath string
 	exitHelperAddrRaw string
 	exitID            uint64
 	epochNumber       uint64
 	checkpointBlock   uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
+	testMode          bool
+}
+
+func (ep *exitParams) validateFlags() error {
+	if !ep.testMode {
+		if err := sidechain.ValidateSecretFlags(ep.secretsDataPath, ep.secretsConfigPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 var (
@@ -55,16 +67,24 @@ var (
 // GetExitCommand returns the bridge exit command
 func GetExitCommand() *cobra.Command {
 	exitCmd := &cobra.Command{
-		Use:   "exit",
-		Short: "Performs exit transaction from the child chain to the root chain",
-		Run:   runExitCommand,
+		Use:     "exit",
+		Short:   "Sends exit transaction to the Exit helper contract on the root chain",
+		Run:     runExitCommand,
+		PreRunE: runExitPreRun,
 	}
 
 	exitCmd.Flags().StringVar(
-		&ep.txnSenderKey,
-		common.SenderKeyFlag,
-		helper.DefaultPrivateKeyRaw,
-		"hex encoded private key of the account which sends exit transaction to the root chain",
+		&ep.secretsDataPath,
+		polybftsecrets.DataPathFlag,
+		"",
+		polybftsecrets.DataPathFlagDesc,
+	)
+
+	exitCmd.Flags().StringVar(
+		&ep.secretsConfigPath,
+		polybftsecrets.ConfigFlag,
+		"",
+		polybftsecrets.ConfigFlagDesc,
 	)
 
 	exitCmd.Flags().StringVar(
@@ -109,7 +129,17 @@ func GetExitCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
+	exitCmd.Flags().BoolVar(
+		&ep.testMode,
+		helper.TestModeFlag,
+		false,
+		"test indicates whether exit transaction sender is hardcoded test account",
+	)
+
 	exitCmd.MarkFlagRequired(exitHelperFlag)
+	exitCmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag)
+	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.ConfigFlag)
 
 	return exitCmd
 }
@@ -118,18 +148,32 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ecdsaRaw, err := hex.DecodeString(ep.txnSenderKey)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to decode private key: %w", err))
+	var senderKey ethgo.Key
 
-		return
-	}
+	if !ep.testMode {
+		secretsManager, err := polybftsecrets.GetSecretsManager(ep.secretsDataPath, ep.secretsConfigPath, true)
+		if err != nil {
+			outputter.SetError(err)
 
-	key, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to create wallet from private key: %w", err))
+			return
+		}
 
-		return
+		senderAccount, err := wallet.NewAccountFromSecret(secretsManager)
+		if err != nil {
+			outputter.SetError(err)
+
+			return
+		}
+
+		senderKey = senderAccount.Ecdsa
+	} else {
+		if err := helper.InitRootchainPrivateKey(""); err != nil {
+			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
+
+			return
+		}
+
+		senderKey = helper.GetRootchainPrivateKey()
 	}
 
 	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr))
@@ -146,6 +190,7 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	// acquire proof for given exit event
 	var proof types.Proof
 
 	err = childClient.Call(generateExitProofFn, &proof,
@@ -159,15 +204,16 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	// exit transaction
-	txn, exitEvent, err := createExitTxn(proof, outputter)
+	// create exit transaction
+	txn, exitEvent, err := createExitTxn(senderKey.Address(), proof)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
 		return
 	}
 
-	receipt, err := rootTxRelayer.SendTransaction(txn, key)
+	// send exit transaction
+	receipt, err := rootTxRelayer.SendTransaction(txn, senderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to send exit transaction "+
 			"(exit id=%d, epoch number=%d, checkpoint block=%d): %w",
@@ -190,8 +236,17 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
+// runExitPreRun is used to validate input values
+func runExitPreRun(_ *cobra.Command, _ []string) error {
+	if err := ep.validateFlags(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // createExitTxn encodes parameters for exit function on root chain ExitHelper contract
-func createExitTxn(proof types.Proof, output command.OutputFormatter) (*ethgo.Transaction, *polybft.ExitEvent, error) {
+func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction, *polybft.ExitEvent, error) {
 	exitEventMap, ok := proof.Metadata["ExitEvent"].(map[string]interface{})
 	if !ok {
 		return nil, nil, errors.New("could not get exit event from proof")
@@ -231,6 +286,7 @@ func createExitTxn(proof types.Proof, output command.OutputFormatter) (*ethgo.Tr
 
 	exitHelperAddr := ethgo.Address(types.StringToAddress(ep.exitHelperAddrRaw))
 	txn := &ethgo.Transaction{
+		From:  sender,
 		To:    &exitHelperAddr,
 		Input: input,
 	}
@@ -252,7 +308,7 @@ func (r *exitResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receiver|%s", r.Receiver))
 
-	buffer.WriteString("\n[EXIT HELPER]\n")
+	buffer.WriteString("\n[EXIT TRANSACTION RELAYER]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 
