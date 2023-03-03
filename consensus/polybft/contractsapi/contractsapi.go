@@ -223,6 +223,17 @@ func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
 }
 
+type L2StateSyncedEvent struct {
+	ID       *big.Int      `abi:"id"`
+	Sender   types.Address `abi:"sender"`
+	Receiver types.Address `abi:"receiver"`
+	Data     []byte        `abi:"data"`
+}
+
+func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) error {
+	return decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
+}
+
 type CheckpointMetadata struct {
 	BlockHash               types.Hash `abi:"blockHash"`
 	BlockRound              *big.Int   `abi:"blockRound"`

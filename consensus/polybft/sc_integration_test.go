@@ -156,7 +156,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
 	require.Equal(t, int(res[31]), 0)
 
-	proofExitEvent, err := ExitEventABIType.Encode(exits[0])
+	proofExitEvent, err := ExitEventInputsABIType.Encode(exits[0])
 	require.NoError(t, err)
 
 	proof, err := exitTrie.GenerateProof(proofExitEvent)
@@ -334,13 +334,8 @@ func deployAndInitContract(t *testing.T, transition *state.Transition, scArtifac
 	assert.NoError(t, result.Err)
 	addr := result.Address
 
-	var (
-		initInput []byte
-		err       error
-	)
-
 	if initCallback != nil {
-		initInput, err = initCallback()
+		initInput, err := initCallback()
 		require.NoError(t, err)
 
 		result = transition.Call2(sender, addr, initInput, big.NewInt(0), 1e9)

@@ -463,7 +463,7 @@ func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	t.Helper()
 
 	topics := make([]types.Hash, 4)
-	topics[0] = types.Hash(exitEventABI.ID())
+	topics[0] = types.Hash(ExitEventABI.ID())
 	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
 	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
 	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())

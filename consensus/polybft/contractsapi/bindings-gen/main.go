@@ -64,6 +64,14 @@ func main() {
 			},
 		},
 		{
+			"L2StateSender",
+			gensc.L2StateSender,
+			[]string{},
+			[]string{
+				"L2StateSynced",
+			},
+		},
+		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
 			[]string{

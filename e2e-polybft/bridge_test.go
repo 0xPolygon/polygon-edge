@@ -585,7 +585,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 }
 
 func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
-	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
+	proofExitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,

@@ -207,7 +207,7 @@ func createExitTxn(proof types.Proof, output command.OutputFormatter) (*ethgo.Tr
 		return nil, nil, fmt.Errorf("failed to unmarshal exit event from JSON. Error: %w", err)
 	}
 
-	exitEventEncoded, err := polybft.ExitEventABIType.Encode(exitEvent)
+	exitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(exitEvent)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encode exit event: %w", err)
 	}

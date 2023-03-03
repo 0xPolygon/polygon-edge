@@ -166,15 +166,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		exitEvent, blockNumber, err := extractExitEvent(receipt)
+		exitEventID, err := extractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
 
-		exitEventIDs[i] = strconv.FormatUint(exitEvent.ID, 10)
-		blockNumbers[i] = strconv.FormatUint(blockNumber, 10)
+		exitEventIDs[i] = strconv.FormatUint(exitEventID.Uint64(), 10)
+		blockNumbers[i] = strconv.FormatUint(receipt.BlockNumber, 10)
 	}
 
 	outputter.SetCommandResult(
@@ -208,43 +208,22 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 	}, nil
 }
 
-// extractExitEvent tries to extract ExitEvent from provided receipt
-func extractExitEvent(receipt *ethgo.Receipt) (*polybft.ExitEvent, uint64, error) {
-	exitEventABI := contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
-
+// extractExitEventID tries to extract exit event id from provided receipt
+func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	for _, log := range receipt.Logs {
-		if !exitEventABI.Match(log) {
+		if !polybft.ExitEventABI.Match(log) {
 			continue
 		}
 
-		exitEventMap, err := exitEventABI.Inputs.ParseLog(log)
-		if err != nil {
-			return nil, 0, err
+		exitEvent := &contractsapi.L2StateSyncedEvent{}
+		if err := exitEvent.ParseLog(log); err != nil {
+			return nil, err
 		}
 
-		exitEventGeneric, err := polybft.DecodeBridgeEventData(exitEventMap, log, createExitEvent)
-		if err != nil {
-			return nil, 0, err
-		}
-
-		exitEvent, ok := exitEventGeneric.(*polybft.ExitEvent)
-		if !ok {
-			return nil, 0, errors.New("failed to convert exit event")
-		}
-
-		return exitEvent, receipt.BlockNumber, err
+		return exitEvent.ID, nil
 	}
 
-	return nil, 0, errors.New("failed to find exit event log")
-}
-
-func createExitEvent(id *big.Int, sender ethgo.Address, receiver ethgo.Address, data []byte) interface{} {
-	return &polybft.ExitEvent{
-		ID:       id.Uint64(),
-		Sender:   sender,
-		Receiver: receiver,
-		Data:     data,
-	}
+	return nil, errors.New("failed to find exit event log")
 }
 
 type withdrawERC20Result struct {
