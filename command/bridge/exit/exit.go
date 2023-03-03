@@ -1,4 +1,4 @@
-package withdraw
+package exit
 
 import (
 	"bytes"
@@ -64,13 +64,13 @@ var (
 	ep *exitParams = &exitParams{}
 )
 
-// GetExitCommand returns the bridge exit command
-func GetExitCommand() *cobra.Command {
+// GetCommand returns the bridge exit command
+func GetCommand() *cobra.Command {
 	exitCmd := &cobra.Command{
 		Use:     "exit",
 		Short:   "Sends exit transaction to the Exit helper contract on the root chain",
-		Run:     runExitCommand,
-		PreRunE: runExitPreRun,
+		PreRunE: preRun,
+		Run:     run,
 	}
 
 	exitCmd.Flags().StringVar(
@@ -144,7 +144,7 @@ func GetExitCommand() *cobra.Command {
 	return exitCmd
 }
 
-func runExitCommand(cmd *cobra.Command, _ []string) {
+func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
@@ -236,8 +236,8 @@ func runExitCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-// runExitPreRun is used to validate input values
-func runExitPreRun(_ *cobra.Command, _ []string) error {
+// preRun is used to validate input values
+func preRun(_ *cobra.Command, _ []string) error {
 	if err := ep.validateFlags(); err != nil {
 		return err
 	}

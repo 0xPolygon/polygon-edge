@@ -41,12 +41,12 @@ var (
 )
 
 // GetCommand returns the bridge withdraw command
-func GetWithdrawCommand() *cobra.Command {
+func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc20",
 		Short:   "Withdraws tokens from the child chain to the root chain",
-		PreRunE: runPreRunWithdraw,
-		Run:     runCommand,
+		PreRunE: preRun,
+		Run:     run,
 	}
 
 	withdrawCmd.Flags().StringVar(
@@ -106,7 +106,7 @@ func GetWithdrawCommand() *cobra.Command {
 	return withdrawCmd
 }
 
-func runPreRunWithdraw(cmd *cobra.Command, _ []string) error {
+func preRun(cmd *cobra.Command, _ []string) error {
 	if err := wp.ValidateFlags(false); err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func runPreRunWithdraw(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runCommand(cmd *cobra.Command, _ []string) {
+func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
