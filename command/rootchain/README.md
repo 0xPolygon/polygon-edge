@@ -30,5 +30,8 @@ This command deploys and initializes rootchain contracts. Transactions are being
 $ polygon-edge rootchain init-contracts 
     --manifest <manifest_file_path> 
     --json-rpc <json_rpc_endpoint> 
-    --adminKey <hex_encoded_rootchain_admin_private_key>
+    --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>]
+    [--test]
 ```
+
+**Note:** In case `test` flag is provided, it engages test mode, which uses predefined test account private key to send transactions to the rootchain.
