@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"math/big"
 	"path"
 	"testing"
@@ -100,24 +101,30 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	const (
-		validatorSize       = 5
-		epochSize           = 5
-		newValidatorSecrets = "test-chain-6"
-		premineBalance      = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough balance to fund new validator)
+		validatorSize  = 5
+		epochSize      = 5
+		epochReward    = 1000000000
+		premineBalance = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough balance to fund new validator)
 	)
 
-	newValidatorStakeRaw := "0x152D02C7E14AF6800000"   // 100k native tokens
-	newValidatorBalanceRaw := "0xD3C21BCECCEDA1000000" // 1M native tokens
+	// new validator data
+	firstValidatorDataDir := fmt.Sprintf("test-chain-%d", validatorSize+1)  // directory where the first validator secrets will be stored
+	secondValidatorDataDir := fmt.Sprintf("test-chain-%d", validatorSize+2) // directory where the second validator secrets will be stored
+	newValidatorInitBalance := "500000000000000000000000"                   // 500k - balance which will be transferred to the new validator
+	newValidatorStakeRaw := "0x8AC7230489E80000"                            // 10 native tokens  - amout which will be staked by the new validator
 	newValidatorStake, err := types.ParseUint256orHex(&newValidatorStakeRaw)
 	require.NoError(t, err)
 
+	// start cluster with 'validatorSize' validators
 	cluster := framework.NewTestCluster(t, validatorSize,
 		framework.WithEpochSize(epochSize),
-		framework.WithEpochReward(1000),
+		framework.WithEpochReward(epochReward),
 		framework.WithPremineValidators(premineBalance))
 	defer cluster.Stop()
-	srv := cluster.Servers[0]
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+
+	// first validator is the owner of ChildValidator set smart contract
+	owner := cluster.Servers[0]
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	systemState := polybft.NewSystemState(
@@ -126,41 +133,98 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 			ValidatorSetAddr:  contracts.ValidatorSetContract},
 		&e2eStateProvider{txRelayer: txRelayer})
 
-	// create new account
-	addrs, err := cluster.InitSecrets(newValidatorSecrets, 1)
+	// create the first account and extract the address
+	addrs, err := cluster.InitSecrets(firstValidatorDataDir, 1)
 	require.NoError(t, err)
 
-	// extract new validator address
-	newValidatorAddr := ethgo.Address(addrs[0])
+	firstValidatorAddr := ethgo.Address(addrs[0])
 
-	// assert that account is created
+	// create the second account and extract the address
+	addrs, err = cluster.InitSecrets(secondValidatorDataDir, 1)
+	require.NoError(t, err)
+
+	secondValidatorAddr := ethgo.Address(addrs[0])
+
+	// assert that accounts are created
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)
-	require.Equal(t, validatorSize+1, len(validatorSecrets))
+	require.Equal(t, validatorSize+2, len(validatorSecrets))
+
+	// collect owners validator secrets
+	ownerSecrets := validatorSecrets[0]
 
 	// wait for consensus to start
 	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
 
-	// register new validator
-	require.NoError(t, srv.RegisterValidator(newValidatorSecrets, newValidatorBalanceRaw, newValidatorStakeRaw))
+	// owner enlists both new validators
+	require.NoError(t, owner.WhitelistValidator(firstValidatorAddr.String(), ownerSecrets))
+	require.NoError(t, owner.WhitelistValidator(secondValidatorAddr.String(), ownerSecrets))
 
-	go func() {
-		// start new validator
-		cluster.InitTestServer(t, 6, true, false)
-	}()
+	// start the first and the second validator
+	cluster.InitTestServer(t, validatorSize+1, true, false)
+	cluster.InitTestServer(t, validatorSize+2, true, false)
+
+	ownerAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, ownerSecrets))
+	require.NoError(t, err)
+
+	// get the initial balance of the new validator
+	initialBalance, ok := new(big.Int).SetString(newValidatorInitBalance, 10)
+	require.True(t, ok)
+
+	// send some tokens from the owner to the first validator so that the first validator can register and stake
+	receipt1, err := txRelayer.SendTransaction(&ethgo.Transaction{
+		From:  ownerAcc.Ecdsa.Address(),
+		To:    &firstValidatorAddr,
+		Value: initialBalance,
+	}, ownerAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt1.Status)
+
+	// send some tokens from the owner to the second validator so that the second validator can register and stake
+	receipt2, err := txRelayer.SendTransaction(&ethgo.Transaction{
+		From:  ownerAcc.Ecdsa.Address(),
+		To:    &secondValidatorAddr,
+		Value: initialBalance,
+	}, ownerAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt2.Status)
+
+	// collect the first and the second validator from the cluster
+	firstValidator := cluster.Servers[validatorSize]
+	secondValidator := cluster.Servers[validatorSize+1]
+
+	// wait for the first validator's balance to be received
+	firstBalance, err := firstValidator.WaitForNonZeroBalance(firstValidatorAddr, 5*time.Second)
+	require.NoError(t, err)
+	t.Logf("First validator balance=%d\n", firstBalance)
+
+	// wait for the first validator's balance to be received
+	secondBalance, err := secondValidator.WaitForNonZeroBalance(secondValidatorAddr, 5*time.Second)
+	require.NoError(t, err)
+	t.Logf("Second validator balance=%d\n", secondBalance)
+
+	// register the first validator with stake
+	require.NoError(t, firstValidator.RegisterValidator(firstValidatorDataDir, newValidatorStakeRaw))
+
+	// register the second validator without stake
+	require.NoError(t, secondValidator.RegisterValidator(secondValidatorDataDir, ""))
+
+	// stake manually for the second validator
+	require.NoError(t, secondValidator.Stake(newValidatorStake.Uint64()))
 
 	validators := polybft.AccountSet{}
+
 	// assert that new validator is among validator set
 	require.NoError(t, cluster.WaitUntil(20*time.Second, func() bool {
 		// query validators
 		validators, err = systemState.GetValidatorSet()
 		require.NoError(t, err)
 
-		return validators.ContainsAddress((types.Address(newValidatorAddr)))
+		return validators.ContainsAddress((types.Address(firstValidatorAddr))) && validators.ContainsAddress((types.Address(secondValidatorAddr)))
 	}))
 
 	// assert that validators hash is correct
-	block, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+	block, err := owner.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 	t.Logf("Block Number=%d\n", block.Number)
 
@@ -174,28 +238,54 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, validatorsHash)
 
-	// query registered validator
-	newValidatorInfo, err := sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
+	// query the first validator
+	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	// assert registered validator's stake
-	t.Logf("New validator stake=%d\n", newValidatorInfo.TotalStake)
-	require.Equal(t, newValidatorStake, newValidatorInfo.TotalStake)
+	// assert the first validator's stake
+	t.Logf("First validator stake=%d\n", firstValidatorInfo.TotalStake)
+	require.Equal(t, newValidatorStake, firstValidatorInfo.TotalStake)
+
+	// query the second validatorr
+	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr, txRelayer)
+	require.NoError(t, err)
+
+	// assert the second validator's stake
+	t.Logf("Second validator stake=%d\n", secondValidatorInfo.TotalStake)
+	require.Equal(t, newValidatorStake, secondValidatorInfo.TotalStake)
 
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
-	currentBlock, err := srv.JSONRPC().Eth().BlockNumber()
+	currentBlock, err := owner.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
 	cluster.WaitForBlock(currentBlock+3*epochSize, 2*time.Minute)
 
-	// query registered validator
-	newValidatorInfo, err = sidechain.GetValidatorInfo(newValidatorAddr, txRelayer)
+	// query the first validator info again
+	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr, txRelayer)
 	require.NoError(t, err)
 
-	// assert registered validator's rewards
-	currentBlock, err = srv.JSONRPC().Eth().BlockNumber()
+	// check if the first validator has signed any prposals
+	firstSealed, err := firstValidator.HasValidatorSealed(currentBlock, currentBlock+3*epochSize, validators, firstValidatorAddr)
 	require.NoError(t, err)
-	t.Logf("New validator rewards (block %d)=%d\n", currentBlock, newValidatorInfo.WithdrawableRewards)
-	require.True(t, newValidatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+
+	if firstSealed {
+		// assert registered validator's rewards)
+		t.Logf("First validator rewards (block %d)=%d\n", currentBlock, firstValidatorInfo.WithdrawableRewards)
+		require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+	}
+
+	// query the second validator info again
+	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr, txRelayer)
+	require.NoError(t, err)
+
+	// check if the second validator has signed any prposals
+	secondSealed, err := secondValidator.HasValidatorSealed(currentBlock, currentBlock+3*epochSize, validators, secondValidatorAddr)
+	require.NoError(t, err)
+
+	if secondSealed {
+		// assert registered validator's rewards
+		t.Logf("Second validator rewards (block %d)=%d\n", currentBlock, secondValidatorInfo.WithdrawableRewards)
+		require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+	}
 }
 
 func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {

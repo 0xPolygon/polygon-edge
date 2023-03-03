@@ -199,6 +199,31 @@ func (i *InitializeChildValidatorSetFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["initialize"], buf, i)
 }
 
+type AddToWhitelistFunction struct {
+	WhitelistAddreses []ethgo.Address `abi:"whitelistAddreses"`
+}
+
+func (a *AddToWhitelistFunction) EncodeAbi() ([]byte, error) {
+	return ChildValidatorSet.Abi.Methods["addToWhitelist"].Encode(a)
+}
+
+func (a *AddToWhitelistFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildValidatorSet.Abi.Methods["addToWhitelist"], buf, a)
+}
+
+type RegisterFunction struct {
+	Signature [2]*big.Int `abi:"signature"`
+	Pubkey    [4]*big.Int `abi:"pubkey"`
+}
+
+func (r *RegisterFunction) EncodeAbi() ([]byte, error) {
+	return ChildValidatorSet.Abi.Methods["register"].Encode(r)
+}
+
+func (r *RegisterFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildValidatorSet.Abi.Methods["register"], buf, r)
+}
+
 type SyncStateFunction struct {
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`

@@ -134,7 +134,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
-	var foundLog bool
+	foundLog := false
 
 	// check the logs to check for the result
 	for _, log := range receipt.Logs {

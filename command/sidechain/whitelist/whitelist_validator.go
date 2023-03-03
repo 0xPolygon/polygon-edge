@@ -1,8 +1,7 @@
-package withdraw
+package whitelist
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -18,21 +17,23 @@ import (
 )
 
 var (
-	params           withdrawParams
-	withdrawEventABI = contractsapi.ChildValidatorSet.Abi.Events["Withdrawal"]
+	whitelistFn       = contractsapi.ChildValidatorSet.Abi.Methods["addToWhitelist"]
+	whitelistEventABI = contractsapi.ChildValidatorSet.Abi.Events["AddedToWhitelist"]
 )
 
+var params whitelistParams
+
 func GetCommand() *cobra.Command {
-	withdrawCmd := &cobra.Command{
-		Use:     "withdraw",
-		Short:   "Withdraws sender's withdrawable amount to specified address",
+	registerCmd := &cobra.Command{
+		Use:     "whitelist-validator",
+		Short:   "whitelist a new validator",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	setFlags(withdrawCmd)
+	setFlags(registerCmd)
 
-	return withdrawCmd
+	return registerCmd
 }
 
 func setFlags(cmd *cobra.Command) {
@@ -51,10 +52,10 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.addressTo,
-		addressToFlag,
+		&params.newValidatorAddress,
+		newValidatorAddressFlag,
 		"",
-		"address where to withdraw withdrawable amount",
+		"account address of a possible validator",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
@@ -71,54 +72,48 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.configPath)
+	ownerAccount, err := sidechainHelper.GetAccount(params.accountDir, params.configPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
 		txrelayer.WithReceiptTimeout(150*time.Millisecond))
 	if err != nil {
-		return err
+		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["withdraw"].Encode(
-		[]interface{}{ethgo.HexToAddress(params.addressTo)})
-	if err != nil {
-		return err
-	}
+	encoded, err := whitelistFn.Encode([]interface{}{
+		[]types.Address{types.StringToAddress(params.newValidatorAddress)},
+	})
 
 	txn := &ethgo.Transaction{
-		From:     validatorAccount.Ecdsa.Address(),
+		From:     ownerAccount.Ecdsa.Address(),
 		Input:    encoded,
 		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 
-	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
+	receipt, err := txRelayer.SendTransaction(txn, ownerAccount.Ecdsa)
 	if err != nil {
-		return err
+		return fmt.Errorf("enlist validator failed %w", err)
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("withdraw transaction failed on block %d", receipt.BlockNumber)
+		return fmt.Errorf("enlist validator transaction failed on block %d", receipt.BlockNumber)
 	}
 
-	result := &withdrawResult{
-		validatorAddress: validatorAccount.Ecdsa.Address().String(),
-	}
-
+	result := &enlistResult{}
 	foundLog := false
 
 	for _, log := range receipt.Logs {
-		if withdrawEventABI.Match(log) {
-			event, err := withdrawEventABI.ParseLog(log)
+		if whitelistEventABI.Match(log) {
+			event, err := whitelistEventABI.ParseLog(log)
 			if err != nil {
 				return err
 			}
 
-			result.amount = event["amount"].(*big.Int).Uint64()       //nolint:forcetypeassert
-			result.withdrawnTo = event["to"].(ethgo.Address).String() //nolint:forcetypeassert
+			result.newValidatorAddress = event["validator"].(ethgo.Address).String() //nolint:forcetypeassert
 			foundLog = true
 
 			break
@@ -126,7 +121,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that withdrawal happened")
+		return fmt.Errorf("could not find an appropriate log in receipt that enlistment happened")
 	}
 
 	outputter.WriteCommandResult(result)
