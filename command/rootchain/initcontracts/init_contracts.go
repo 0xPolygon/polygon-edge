@@ -6,17 +6,18 @@ import (
 	"math/big"
 	"sort"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/contracts"
-
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -35,6 +36,9 @@ const (
 
 	// defaultAllowanceValue is value which is assigned to the RootERC20Predicate spender
 	defaultAllowanceValue = uint64(1e19)
+
+	// defaultFundAmount is value which is sent to rootchain contracts deployer account
+	defaultFundAmount = uint64(1e19)
 )
 
 var (
@@ -79,32 +83,45 @@ func GetCommand() *cobra.Command {
 		Run:     runCommand,
 	}
 
-	setFlags(cmd)
-
-	return cmd
-}
-
-func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.manifestPath,
 		manifestPathFlag,
 		defaultManifestPath,
-		"Manifest file path, which contains metadata",
+		"manifest file path, which contains metadata",
 	)
 
 	cmd.Flags().StringVar(
-		&params.adminKey,
-		adminKeyFlag,
-		helper.DefaultPrivateKeyRaw,
-		"Hex encoded private key of the account which deploys rootchain contracts",
+		&params.secretsConfigPath,
+		polybftsecrets.ConfigFlag,
+		"",
+		polybftsecrets.ConfigFlagDesc,
+	)
+
+	cmd.Flags().StringVar(
+		&params.secretsDataPath,
+		polybftsecrets.DataPathFlag,
+		"",
+		polybftsecrets.DataPathFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
 		&params.jsonRPCAddress,
 		jsonRPCFlag,
 		txrelayer.DefaultRPCAddress,
-		"the JSON RPC rootchain IP address (e.g. "+txrelayer.DefaultRPCAddress+")",
+		"the JSON RPC rootchain IP address",
 	)
+
+	cmd.Flags().BoolVar(
+		&params.isTestMode,
+		helper.TestModeFlag,
+		false,
+		"test indicates whether rootchain contracts deployer is hardcoded test account"+
+			" (otherwise provided secrets are used to resolve deployer account)",
+	)
+
+	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+
+	return cmd
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
@@ -118,6 +135,35 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter.WriteCommandResult(&messageResult{
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
+
+	var deployerKey ethgo.Key
+
+	if !params.isTestMode {
+		secretsManager, err := polybftsecrets.GetSecretsManager(params.secretsDataPath, params.secretsConfigPath, true)
+		if err != nil {
+			outputter.SetError(err)
+
+			return
+		}
+
+		deployerAccount, err := wallet.NewAccountFromSecret(secretsManager)
+		if err != nil {
+			outputter.SetError(err)
+
+			return
+		}
+
+		deployerKey = deployerAccount.Ecdsa
+	} else {
+		rootchainKey, err := helper.GetRootchainTestPrivKey()
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
+
+			return
+		}
+
+		deployerKey = rootchainKey
+	}
 
 	client, err := jsonrpc.NewClient(params.jsonRPCAddress)
 	if err != nil {
@@ -149,13 +195,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	if err := helper.InitRootchainPrivateKey(params.adminKey); err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	if err := deployContracts(outputter, client, manifest); err != nil {
+	if err := deployContracts(outputter, client, manifest, deployerKey); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
@@ -167,23 +207,21 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, manifest *polybft.Manifest) error {
+func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
+	manifest *polybft.Manifest, deployerKey ethgo.Key) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
-	rootchainAdminKey := helper.GetRootchainPrivateKey()
-	// if admin key is equal to the test private key, then we assume we are working in dev mode
-	// and therefore need to fund that account
-	if helper.IsTestMode(params.adminKey) {
+	// if running in test mode, we need to fund deployer account
+	if params.isTestMode {
 		// fund account
-		rootchainAdminAddr := rootchainAdminKey.Address()
-		txn := &ethgo.Transaction{To: &rootchainAdminAddr, Value: big.NewInt(1000000000000000000)}
-		_, err = txRelayer.SendTransactionLocal(txn)
+		deployerAddress := deployerKey.Address()
 
-		if err != nil {
+		txn := &ethgo.Transaction{To: &deployerAddress, Value: new(big.Int).SetUint64(defaultFundAmount)}
+		if _, err := txRelayer.SendTransactionLocal(txn); err != nil {
 			return err
 		}
 	}
@@ -235,7 +273,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			Input: contract.artifact.Bytecode,
 		}
 
-		receipt, err := txRelayer.SendTransaction(txn, rootchainAdminKey)
+		receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 		if err != nil {
 			return err
 		}
@@ -261,7 +299,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	// init CheckpointManager
-	if err := initializeCheckpointManager(txRelayer, manifest); err != nil {
+	if err := initializeCheckpointManager(txRelayer, manifest, deployerKey); err != nil {
 		return err
 	}
 
@@ -270,7 +308,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	})
 
 	// init ExitHelper
-	if err := initializeExitHelper(txRelayer, rootchainConfig); err != nil {
+	if err := initializeExitHelper(txRelayer, rootchainConfig, deployerKey); err != nil {
 		return err
 	}
 
@@ -279,7 +317,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	})
 
 	// init RootERC20Predicate
-	if err := initializeRootERC20Predicate(txRelayer, rootchainConfig); err != nil {
+	if err := initializeRootERC20Predicate(txRelayer, rootchainConfig, deployerKey); err != nil {
 		return err
 	}
 
@@ -287,9 +325,9 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
 	})
 
-	if helper.IsTestMode(params.adminKey) {
+	if params.isTestMode {
 		// approve RootERC20Predicate
-		if err := approveERC20Predicate(txRelayer, rootchainConfig); err != nil {
+		if err := approveERC20Predicate(txRelayer, rootchainConfig, deployerKey); err != nil {
 			return err
 		}
 
@@ -305,7 +343,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 // initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
 func initializeCheckpointManager(
 	txRelayer txrelayer.TxRelayer,
-	manifest *polybft.Manifest) error {
+	manifest *polybft.Manifest,
+	deployerKey ethgo.Key) error {
 	validatorSet, err := validatorSetToABISlice(manifest.GenesisValidators)
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
@@ -329,11 +368,12 @@ func initializeCheckpointManager(
 		Input: initCheckpointInput,
 	}
 
-	return sendTransaction(txRelayer, txn, checkpointManagerName)
+	return sendTransaction(txRelayer, txn, checkpointManagerName, deployerKey)
 }
 
 // initializeExitHelper invokes initialize function on "ExitHelper" smart contract
-func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig) error {
+func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
+	deployerKey ethgo.Key) error {
 	input, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
 		Encode([]interface{}{rootchainConfig.CheckpointManagerAddress})
 	if err != nil {
@@ -346,11 +386,12 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 		Input: input,
 	}
 
-	return sendTransaction(txRelayer, txn, exitHelperName)
+	return sendTransaction(txRelayer, txn, exitHelperName, deployerKey)
 }
 
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
-func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig) error {
+func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
+	deployerKey ethgo.Key) error {
 	rootERC20PredicateParams := &contractsapi.InitializeRootERC20PredicateFunction{
 		NewStateSender:         rootchainConfig.StateSenderAddress,
 		NewExitHelper:          rootchainConfig.ExitHelperAddress,
@@ -370,11 +411,12 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 		Input: input,
 	}
 
-	return sendTransaction(txRelayer, txn, rootERC20PredicateName)
+	return sendTransaction(txRelayer, txn, rootERC20PredicateName, deployerKey)
 }
 
 // approveERC20Predicate sends approve transaction to ERC20 token so that it is able to spend given root ERC20 token
-func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig) error {
+func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig,
+	deployerKey ethgo.Key) error {
 	approveFnParams := &contractsapi.ApproveFunction{
 		Spender: config.RootERC20PredicateAddress,
 		Amount:  new(big.Int).SetUint64(defaultAllowanceValue),
@@ -391,12 +433,13 @@ func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.Rootch
 		Input: input,
 	}
 
-	return sendTransaction(txRelayer, txn, rootERC20Name)
+	return sendTransaction(txRelayer, txn, rootERC20Name, deployerKey)
 }
 
 // sendTransaction sends provided transaction
-func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string) error {
-	receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainPrivateKey())
+func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string,
+	deployerKey ethgo.Key) error {
+	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)
 	}

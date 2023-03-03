@@ -46,13 +46,18 @@ type exitParams struct {
 	checkpointBlock   uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
-	testMode          bool
+	isTestMode        bool
 }
 
+// validateFlags validates input values
 func (ep *exitParams) validateFlags() error {
-	if !ep.testMode {
+	if !ep.isTestMode {
 		if err := sidechain.ValidateSecretFlags(ep.secretsDataPath, ep.secretsConfigPath); err != nil {
 			return err
+		}
+	} else {
+		if ep.secretsDataPath != "" || ep.secretsConfigPath != "" {
+			return helper.ErrTestModeSecrets
 		}
 	}
 
@@ -130,16 +135,14 @@ func GetCommand() *cobra.Command {
 	)
 
 	exitCmd.Flags().BoolVar(
-		&ep.testMode,
+		&ep.isTestMode,
 		helper.TestModeFlag,
 		false,
 		"test indicates whether exit transaction sender is hardcoded test account",
 	)
 
 	exitCmd.MarkFlagRequired(exitHelperFlag)
-	exitCmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
-	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag)
-	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.ConfigFlag)
+	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
 
 	return exitCmd
 }
@@ -150,7 +153,7 @@ func run(cmd *cobra.Command, _ []string) {
 
 	var senderKey ethgo.Key
 
-	if !ep.testMode {
+	if !ep.isTestMode {
 		secretsManager, err := polybftsecrets.GetSecretsManager(ep.secretsDataPath, ep.secretsConfigPath, true)
 		if err != nil {
 			outputter.SetError(err)
@@ -167,13 +170,14 @@ func run(cmd *cobra.Command, _ []string) {
 
 		senderKey = senderAccount.Ecdsa
 	} else {
-		if err := helper.InitRootchainPrivateKey(""); err != nil {
+		rootchainKey, err := helper.GetRootchainTestPrivKey()
+		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
 
 			return
 		}
 
-		senderKey = helper.GetRootchainPrivateKey()
+		senderKey = rootchainKey
 	}
 
 	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr))

@@ -3,11 +3,11 @@ package common
 import (
 	"errors"
 
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 const (
-	SenderKeyFlag = "sender-key"
 	ReceiversFlag = "receivers"
 	AmountsFlag   = "amounts"
 )
@@ -28,6 +28,10 @@ func (bp *ERC20BridgeParams) ValidateFlags(testMode bool) error {
 	if !testMode {
 		if err := sidechain.ValidateSecretFlags(bp.SecretsDataPath, bp.SecretsConfigPath); err != nil {
 			return err
+		}
+	} else {
+		if bp.SecretsDataPath != "" || bp.SecretsConfigPath != "" {
+			return helper.ErrTestModeSecrets
 		}
 	}
 

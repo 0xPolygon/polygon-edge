@@ -111,9 +111,7 @@ func GetCommand() *cobra.Command {
 	depositCmd.MarkFlagRequired(rootTokenFlag)
 	depositCmd.MarkFlagRequired(rootPredicateFlag)
 
-	depositCmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
-	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag)
-	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.ConfigFlag)
+	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
 
 	return depositCmd
 }
@@ -149,18 +147,19 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		depositorKey = depositorAccount.Ecdsa
 	} else {
-		if err := helper.InitRootchainPrivateKey(""); err != nil {
+		rootchainKey, err := helper.GetRootchainTestPrivKey()
+		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
 
 			return
 		}
 
-		depositorKey = helper.GetRootchainPrivateKey()
+		depositorKey = rootchainKey
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.jsonRPCAddress))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed not initialize rootchain tx relayer: %w", err))
+		outputter.SetError(fmt.Errorf("failed to initialize rootchain tx relayer: %w", err))
 
 		return
 	}
@@ -190,13 +189,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 						return fmt.Errorf("mint transaction creation failed: %w", err)
 					}
 
-					receipt, err := txRelayer.SendTransaction(txn, helper.GetRootchainPrivateKey())
+					receipt, err := txRelayer.SendTransaction(txn, depositorKey)
 					if err != nil {
-						return fmt.Errorf("failed to send mint transaction to depositor %s", helper.GetRootchainPrivateKey().Address())
+						return fmt.Errorf("failed to send mint transaction to depositor %s", depositorKey.Address())
 					}
 
 					if receipt.Status == uint64(types.ReceiptFailed) {
-						return fmt.Errorf("failed to mint tokens to depositor %s", helper.GetRootchainPrivateKey().Address())
+						return fmt.Errorf("failed to mint tokens to depositor %s", depositorKey.Address())
 					}
 				}
 
@@ -227,7 +226,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(&depositERC20Result{
-		Sender:    helper.GetRootchainPrivateKey().Address().String(),
+		Sender:    depositorKey.Address().String(),
 		Receivers: dp.Receivers,
 		Amounts:   dp.Amounts,
 	})
@@ -249,6 +248,7 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 	addr := ethgo.Address(types.StringToAddress(dp.rootPredicateAddr))
 
 	return &ethgo.Transaction{
+		From:  ethgo.Address(sender),
 		To:    &addr,
 		Input: input,
 	}, nil
