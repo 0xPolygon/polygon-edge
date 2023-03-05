@@ -3,6 +3,7 @@
 This is a helper command, which allows sending deposits from root to child chain and make withdrawals from child chain to root chain.
 
 ## Deposit ERC20
+
 This is a helper command which deposits ERC20 tokens from the root chain to the child chain
 
 ```bash
@@ -18,6 +19,7 @@ $ polygon-edge bridge deposit-erc20
 **Note:** for using test account provided by Geth dev instance, use `--test` flag. In that case `--data-dir` and `--config` flags can be omitted and test account is used as depositor.
 
 ## Withdraw ERC20
+
 This is a helper command which withdraws ERC20 tokens from the child chain to the root chain
 
 ```bash
@@ -31,6 +33,7 @@ $ polygon-edge bridge withdraw-erc20
 ```
 
 ## Exit
+
 This is a helper command which qeuries child chain for exit event proof and sends an exit transaction to ExitHelper smart contract.
 
 ```bash
