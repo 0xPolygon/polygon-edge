@@ -1,0 +1,24 @@
+---
+name: Nightly Build
+on:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron:  '30 23 * * *'
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+    needs: build
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  e2e:
+    name: E2E Tests
+    uses: ./.github/workflows/e2e-polybft.yml
+  
