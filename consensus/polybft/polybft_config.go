@@ -106,9 +106,10 @@ func (v *Validator) MarshalJSON() ([]byte, error) {
 }
 
 func (v *Validator) UnmarshalJSON(data []byte) error {
-	var raw validatorRaw
-
-	var err error
+	var (
+		raw validatorRaw
+		err error
+	)
 
 	if err = json.Unmarshal(data, &raw); err != nil {
 		return err
