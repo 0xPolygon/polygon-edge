@@ -1,11 +1,22 @@
 package service
 
 import (
-	"crypto/ecdsa"
-
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+)
+
+const (
+	domainSeparatorName    = "Account Abstraction Invoker"
+	domainSeparatorVersion = "1.0.0"
+	hashHeader             = "\\x19\\x01"
+
+	// Statuses
+	StatusPending   = "pending"   // The AA transaction is on the Pool
+	StatusQueued    = "queued"    // The AA transaction is waiting to be mined.
+	StatusCompleted = "completed" // The `AA transaction` was mined in a block.
+	StatusFailed    = "failed"    // AA transaction` failed during the process.
 )
 
 // Types for the structures to be hashed
@@ -16,14 +27,10 @@ var (
 	transactionPayloadTypeAbi = abi.MustNewType( // TransactionPayload
 		"tuple(address to,uint256 value,uint256 gasLimit,bytes data)",
 	)
-)
 
-// string mapping
-const (
-	StatusPending   = "pending"   // The AA transaction is on the Pool
-	StatusQueued    = "queued"    // The AA transaction is waiting to be mined.
-	StatusCompleted = "completed" // The `AA transaction` was mined in a block.
-	StatusFailed    = "failed"    // AA transaction` failed during the process.
+	eip712DomainTypeAbi = abi.MustNewType( // EIP712Domain
+		"tuple(bytes name,bytes version,uint256 chainId,address verifyingContract)",
+	)
 )
 
 // AATransaction represents an AA transaction
@@ -32,17 +39,13 @@ type AATransaction struct {
 	Transaction Transaction `json:"transaction"`
 }
 
-func (t *AATransaction) IsFromValid() bool {
-	return t.Transaction.IsFromValid(t.Signature)
-}
-
-func (t *AATransaction) MakeSignature(pk *ecdsa.PrivateKey) error {
-	hash, err := t.Transaction.ComputeHash()
+func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key ethgo.Key) error {
+	hash, err := t.Transaction.ComputeEip712Hash(address, chainID)
 	if err != nil {
 		return err
 	}
 
-	sig, err := crypto.Sign(pk, hash[:])
+	sig, err := key.Sign(hash[:])
 	if err != nil {
 		return err
 	}
@@ -59,12 +62,8 @@ type Transaction struct {
 	Payload []Payload     `json:"payload"`
 }
 
-func (t *Transaction) UpdateFrom(pk *ecdsa.PrivateKey) {
-	t.From = crypto.PubKeyToAddress(&pk.PublicKey)
-}
-
-func (t *Transaction) IsFromValid(signature []byte) bool {
-	hash, err := t.ComputeHash() // recompute hash
+func (t *Transaction) IsFromValid(address types.Address, chainID int64, signature []byte) bool {
+	hash, err := t.ComputeEip712Hash(address, chainID)
 	if err != nil {
 		return false
 	}
@@ -75,6 +74,35 @@ func (t *Transaction) IsFromValid(signature []byte) bool {
 	}
 
 	return t.From == types.BytesToAddress(crypto.Keccak256(pubKey[1:])[12:])
+}
+
+func (t *Transaction) ComputeEip712Hash(address types.Address, chainID int64) (types.Hash, error) {
+	bytes, err := abi.Encode(
+		[]interface{}{
+			crypto.Keccak256([]byte(domainSeparatorName)),
+			crypto.Keccak256([]byte(domainSeparatorVersion)),
+			chainID,
+			address,
+		},
+		eip712DomainTypeAbi)
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	domainSeparatorBytes := types.BytesToHash(crypto.Keccak256(bytes))
+	headerBytes := []byte(hashHeader)
+
+	txHashBytes, err := t.ComputeHash()
+	if err != nil {
+		return types.ZeroHash, err
+	}
+
+	bytes = make([]byte, len(headerBytes)+len(domainSeparatorBytes)+len(txHashBytes))
+	copy(bytes, headerBytes)
+	copy(bytes[len(headerBytes):], domainSeparatorBytes[:])
+	copy(bytes[len(headerBytes)+len(domainSeparatorBytes):], txHashBytes[:])
+
+	return types.BytesToHash(crypto.Keccak256(bytes)), nil
 }
 
 func (t *Transaction) ComputeHash() (types.Hash, error) {

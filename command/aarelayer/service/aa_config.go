@@ -3,6 +3,7 @@ package service
 import (
 	"embed"
 	"encoding/json"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -21,10 +22,10 @@ func (c *AAConfig) IsValidAddress(address *types.Address) bool {
 		return c.AllowContractCreation
 	}
 
-	str := address.String()[2:] // skip 0x
+	addressStr := strings.TrimPrefix(address.String(), "0x")
 
 	for _, v := range c.DenyList {
-		if str == v {
+		if addressStr == strings.TrimPrefix(v, "0x") {
 			return false
 		}
 	}
@@ -34,7 +35,7 @@ func (c *AAConfig) IsValidAddress(address *types.Address) bool {
 	}
 
 	for _, v := range c.AllowList {
-		if str == v {
+		if addressStr == strings.TrimPrefix(v, "0x") {
 			return true
 		}
 	}

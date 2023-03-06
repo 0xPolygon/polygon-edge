@@ -3,8 +3,6 @@ package service
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
-	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,17 +10,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/stretchr/testify/require"
 )
 
-const baseURL = "127.0.0.1:8289"
+const (
+	baseURL = "127.0.0.1:8289"
+	chainID = 100
+)
 
 func Test_AAServer(t *testing.T) {
 	t.Parallel()
 
-	aaServer := getServer(t)
+	invoker := wallet.GenerateAccount()
+	user := wallet.GenerateAccount()
+	aaServer := getServer(t, types.Address(invoker.Ecdsa.Address()))
 
 	go func() {
 		aaServer.ListenAndServe(baseURL)
@@ -31,9 +34,6 @@ func Test_AAServer(t *testing.T) {
 	t.Cleanup(func() {
 		aaServer.Shutdown(context.Background())
 	})
-
-	priv, err := ecdsa.GenerateKey(btcec.S256(), rand.Reader)
-	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 100) // wait for server to start
 
@@ -44,6 +44,7 @@ func Test_AAServer(t *testing.T) {
 		tx := &AATransaction{
 			Signature: nil,
 			Transaction: Transaction{
+				From:  types.Address(user.Ecdsa.Address()),
 				Nonce: 0,
 				Payload: []Payload{
 					{
@@ -57,11 +58,9 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		tx.Transaction.UpdateFrom(priv)
+		require.NoError(t, tx.MakeSignature(types.Address(invoker.Ecdsa.Address()), chainID, user.Ecdsa))
 
-		require.NoError(t, tx.MakeSignature(priv))
-
-		require.True(t, tx.IsFromValid())
+		require.True(t, tx.Transaction.IsFromValid(types.Address(invoker.Ecdsa.Address()), chainID, tx.Signature))
 
 		req := makeRequest(t, "POST", "sendTransaction", tx)
 
@@ -180,7 +179,7 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(priv))
+		require.NoError(t, tx.MakeSignature(types.Address(invoker.Ecdsa.Address()), chainID, user.Ecdsa))
 
 		req := makeRequest(t, "POST", "sendTransaction", &tx)
 
@@ -191,7 +190,7 @@ func Test_AAServer(t *testing.T) {
 	})
 }
 
-func getServer(t *testing.T) *AARelayerRestServer {
+func getServer(t *testing.T, address types.Address) *AARelayerRestServer {
 	t.Helper()
 
 	state, err := NewAATxState()
@@ -201,7 +200,7 @@ func getServer(t *testing.T) *AARelayerRestServer {
 	require.NoError(t, err)
 
 	pool := NewAAPool()
-	verification := NewAAVerification(config, func(a *AATransaction) bool {
+	verification := NewAAVerification(config, address, chainID, func(a *AATransaction) bool {
 		return true
 	})
 

@@ -1,10 +1,10 @@
 package aarelayer
 
 import (
-	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/command/aarelayer/service"
-	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 )
 
@@ -23,15 +23,6 @@ func GetCommand() *cobra.Command {
 	return cmd
 }
 
-func setFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(
-		&params.addr,
-		addrFlag,
-		fmt.Sprintf("%s:%d", helper.AllInterfacesBinding, defaultPort),
-		"rest server address [ip:port]",
-	)
-}
-
 func runPreRun(cmd *cobra.Command, _ []string) error {
 	return params.validateFlags()
 }
@@ -47,10 +38,22 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.configPath, true)
+	if err != nil {
+		return err
+	}
+
+	newValidatorAccount, err := wallet.NewAccountFromSecret(secretsManager)
+	if err != nil {
+		return err
+	}
+
 	pool := service.NewAAPool()
-	verification := service.NewAAVerification(config, func(a *service.AATransaction) bool {
-		return true
-	})
+	verification := service.NewAAVerification(
+		config,
+		types.Address(newValidatorAccount.Ecdsa.Address()),
+		params.chainID,
+		func(*service.AATransaction) bool { return true })
 	restService := service.NewAARelayerRestServer(pool, state, verification)
 
 	cmd.Printf("Listening on %s...\n", params.addr)

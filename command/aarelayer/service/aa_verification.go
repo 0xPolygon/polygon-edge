@@ -3,6 +3,8 @@ package service
 import (
 	"errors"
 	"fmt"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type ValidationFunc func(*AATransaction) bool
@@ -14,14 +16,19 @@ type AAVerification interface {
 var _ AAVerification = (*aaVerification)(nil)
 
 type aaVerification struct {
-	validationFn ValidationFunc
-	config       *AAConfig
+	validationFn   ValidationFunc
+	config         *AAConfig
+	chainID        int64
+	invokerAddress types.Address
 }
 
-func NewAAVerification(config *AAConfig, validationFn ValidationFunc) *aaVerification {
+func NewAAVerification(
+	config *AAConfig, invokerAddress types.Address, chainID int64, validationFn ValidationFunc) *aaVerification {
 	return &aaVerification{
-		validationFn: validationFn,
-		config:       config,
+		validationFn:   validationFn,
+		config:         config,
+		chainID:        chainID,
+		invokerAddress: invokerAddress,
 	}
 }
 
@@ -41,7 +48,7 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 	}
 
 	// TODO: full validation will be implemented in another PR/task
-	if !tx.IsFromValid() {
+	if !tx.Transaction.IsFromValid(p.invokerAddress, p.chainID, tx.Signature) {
 		return fmt.Errorf("tx has invalid from: %s", tx.Transaction.From.String())
 	}
 
