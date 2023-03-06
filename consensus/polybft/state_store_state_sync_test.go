@@ -190,7 +190,7 @@ func TestState_getCommitmentForStateSync(t *testing.T) {
 	}
 }
 
-func Test_GetNestedBucketInEpoch(t *testing.T) {
+func TestState_GetNestedBucketInEpoch(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
