@@ -240,6 +240,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			return err
 		}
 
+		if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
+			return fmt.Errorf("deployment of %s contract failed", contract.name)
+		}
+
 		contractAddr := types.Address(receipt.ContractAddress)
 
 		populatorFn, ok := metadataPopulatorMap[contract.name]
@@ -397,7 +401,7 @@ func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, cont
 		return fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)
 	}
 
-	if receipt.Status != uint64(types.ReceiptSuccess) {
+	if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
 		return fmt.Errorf("transaction execution failed on %s contract", contractName)
 	}
 
