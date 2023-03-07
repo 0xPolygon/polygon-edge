@@ -1,6 +1,9 @@
 package state
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"math/big"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
@@ -34,6 +37,9 @@ type Txn struct {
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
+
+	// tracing
+	journal []*journalEntry
 }
 
 func NewTxn(snapshot Snapshot) *Txn {
@@ -54,6 +60,7 @@ func newTxn(snapshot readSnapshot) *Txn {
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
 		codeCache: codeCache,
+		journal:   []*journalEntry{},
 	}
 }
 
@@ -75,6 +82,65 @@ func (txn *Txn) RevertToSnapshot(id int) {
 
 	tree := txn.snapshots[id]
 	txn.txn = tree.Txn()
+}
+
+func (txn *Txn) getCompactJournal() map[types.Address]*journalEntry {
+	// Instead of creating a new object to represent the aggregate on how
+	// an account has changed during the compaction, we piggyback the same
+	// journalEntry object for now.
+	res := map[types.Address]*journalEntry{}
+
+	for _, entry := range txn.journal {
+		fmt.Println("--")
+		entry.printJSON()
+
+		obj, ok := res[entry.Addr]
+		if !ok {
+			obj = &journalEntry{}
+			res[entry.Addr] = obj
+		}
+
+		obj.merge(entry)
+
+		obj.printJSON()
+	}
+
+	// reset the journal
+	txn.journal = txn.journal[:0]
+
+	return res
+}
+
+func (txn *Txn) addJournalEntry(j *journalEntry) {
+	txn.journal = append(txn.journal, j)
+}
+
+const (
+	nonceChange   = "nonce"
+	codeChange    = "code"
+	balanceChange = "balance"
+)
+
+func (txn *Txn) trackAccountChange(addr types.Address, changeType string, object *StateObject) {
+	entry := &journalEntry{
+		Addr: addr,
+	}
+
+	if changeType == nonceChange {
+		// the node has changed
+		entry.Nonce = &object.Account.Nonce
+	} else if changeType == codeChange {
+		// the code has been initialized
+		entry.Code = object.Code
+	} else if changeType == balanceChange {
+		// the balance has changed
+		entry.Balance = object.Account.Balance
+	} else {
+		// this is covered on unit tests
+		panic(fmt.Sprintf("BUG: Not expected change '%s'", changeType))
+	}
+
+	txn.addJournalEntry(entry)
 }
 
 // GetAccount returns an account
@@ -138,11 +204,13 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Suicide {
-			*object = *newStateObject(txn)
+			*object = *newStateObject()
 			object.Account.Balance.SetBytes(balance.Bytes())
 		} else {
 			object.Account.Balance.Add(object.Account.Balance, balance)
 		}
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 }
 
@@ -150,6 +218,8 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 }
 
@@ -167,6 +237,8 @@ func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
 
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Sub(object.Account.Balance, amount)
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 
 	return nil
@@ -176,6 +248,8 @@ func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
 func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 }
 
@@ -316,6 +390,13 @@ func (txn *Txn) SetState(
 		} else {
 			object.Txn.Insert(key.Bytes(), value.Bytes())
 		}
+
+		txn.addJournalEntry(&journalEntry{
+			Addr: addr,
+			Storage: map[types.Hash]types.Hash{
+				key: value,
+			},
+		})
 	})
 }
 
@@ -348,6 +429,8 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 func (txn *Txn) IncrNonce(addr types.Address) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce++
+
+		txn.trackAccountChange(addr, nonceChange, object)
 	})
 }
 
@@ -355,6 +438,8 @@ func (txn *Txn) IncrNonce(addr types.Address) {
 func (txn *Txn) SetNonce(addr types.Address, nonce uint64) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce = nonce
+
+		txn.trackAccountChange(addr, nonceChange, object)
 	})
 }
 
@@ -376,6 +461,8 @@ func (txn *Txn) SetCode(addr types.Address, code []byte) {
 		object.Account.CodeHash = crypto.Keccak256(code)
 		object.DirtyCode = true
 		object.Code = code
+
+		txn.trackAccountChange(addr, codeChange, object)
 	})
 }
 
@@ -425,6 +512,11 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 		} else {
 			suicided = true
 			object.Suicide = true
+
+			txn.addJournalEntry(&journalEntry{
+				Addr:    addr,
+				Suicide: &suicided,
+			})
 		}
 		if object != nil {
 			object.Account.Balance = new(big.Int)
@@ -506,7 +598,7 @@ func (txn *Txn) Empty(addr types.Address) bool {
 	return obj.Empty()
 }
 
-func newStateObject(txn *Txn) *StateObject {
+func newStateObject() *StateObject {
 	return &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),
@@ -617,4 +709,62 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) []*Object {
 	})
 
 	return objs
+}
+
+type journalEntry struct {
+	// Addr is the address of the account affected by the
+	// journal change
+	Addr types.Address `json:"address"`
+
+	// Balance tracks changes in the account Balance
+	Balance *big.Int `json:"balance,omitempty"`
+
+	// Nonce tracks changes in the account Nonce
+	Nonce *uint64 `json:"nonce,omitempty"`
+
+	// Storage track changes in the storage
+	Storage map[types.Hash]types.Hash `json:"storage,omitempty"`
+
+	// Code tracks the initialization of the contract Code
+	Code []byte `json:"code,omitempty"`
+
+	// Suicide tracks whether the contract has been self destructed
+	Suicide *bool `json:"suicide,omitempty"`
+}
+
+func (j *journalEntry) printJSON() {
+	data, err := json.Marshal(j)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(data))
+}
+
+func (j *journalEntry) merge(jj *journalEntry) {
+	if jj.Nonce != nil && jj.Nonce != j.Nonce {
+		j.Nonce = jj.Nonce
+	}
+
+	if jj.Balance != nil && jj.Balance != j.Balance {
+		j.Balance = jj.Balance
+	}
+
+	if jj.Storage != nil {
+		if j.Storage == nil {
+			j.Storage = map[types.Hash]types.Hash{}
+		}
+
+		for k, v := range jj.Storage {
+			j.Storage[k] = v
+		}
+	}
+
+	if jj.Code != nil && !bytes.Equal(jj.Code, j.Code) {
+		j.Code = jj.Code
+	}
+
+	if jj.Suicide != nil && jj.Suicide != j.Suicide {
+		j.Suicide = jj.Suicide
+	}
 }
