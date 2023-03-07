@@ -25,7 +25,7 @@ if (rpc_url == undefined) {
     rpc_url = "http://localhost:10002"
 }
 
-const ZexCoin = JSON.parse(open("./contracts/ZexCoinERC20.json"));
+const ZexCoin = JSON.parse(open("../contracts/ZexCoinERC20.json"));
 
 export function setup() {
     let data = {};
