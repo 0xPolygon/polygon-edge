@@ -82,7 +82,7 @@ type Validator struct {
 	BlsKey        string
 	BlsSignature  string
 	Balance       *big.Int
-	NodeID        string
+	MultiAddr     string
 }
 
 type validatorRaw struct {
@@ -90,11 +90,11 @@ type validatorRaw struct {
 	BlsKey       string        `json:"blsKey"`
 	BlsSignature string        `json:"blsSignature"`
 	Balance      *string       `json:"balance"`
-	NodeID       string        `json:"nodeId"`
+	MultiAddr    string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID, BlsSignature: v.BlsSignature}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 
 	return json.Marshal(raw)
@@ -112,7 +112,7 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
 	v.BlsSignature = raw.BlsSignature
-	v.NodeID = raw.NodeID
+	v.MultiAddr = raw.MultiAddr
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
 	if err != nil {

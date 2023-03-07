@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +27,6 @@ const (
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultManifestPath        = "./manifest.json"
 
-	nodeIDLength       = 53
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
 	blsSignatureLength = 128
@@ -79,7 +79,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.validators,
 		validatorsFlag,
 		[]string{},
-		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>:<BLS signature>)",
+		"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
 	cmd.Flags().StringVar(
@@ -153,31 +153,30 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 		validators := make([]*polybft.Validator, len(p.validators))
 		for i, validator := range p.validators {
 			parts := strings.Split(validator, ":")
-
 			if len(parts) != 4 {
 				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
-					"<nodeId:ECDSA address:blsKey:blsSignature>, but got %d part(s)",
+					"<P2P multi address:ECDSA address:public BLS key:BLS signature>, but got %d part(s)",
 					len(parts))
 			}
 
-			if len(parts[0]) != nodeIDLength {
-				return nil, fmt.Errorf("invalid node id: %s", parts[0])
+			if _, err := multiaddr.NewMultiaddr(parts[0]); err != nil {
+				return nil, fmt.Errorf("invalid P2P multi address '%s' provided: %w ", parts[0], err)
 			}
 
-			if len(parts[1]) != ecdsaAddressLength {
-				return nil, fmt.Errorf("invalid address: %s", parts[1])
+			if len(strings.TrimPrefix(parts[1], "0x")) != ecdsaAddressLength {
+				return nil, fmt.Errorf("invalid ECDSA address: %s", parts[1])
 			}
 
 			if len(strings.TrimPrefix(parts[2], "0x")) != blsKeyLength {
-				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
+				return nil, fmt.Errorf("invalid BLS key: %s", parts[2])
 			}
 
 			if len(parts[3]) != blsSignatureLength {
-				return nil, fmt.Errorf("invalid bls signature: %s", parts[3])
+				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
 			}
 
 			validators[i] = &polybft.Validator{
-				NodeID:       parts[0],
+				MultiAddr:    parts[0],
 				Address:      types.StringToAddress(parts[1]),
 				BlsKey:       parts[2],
 				BlsSignature: parts[3],
