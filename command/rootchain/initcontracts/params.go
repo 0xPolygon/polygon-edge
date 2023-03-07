@@ -17,20 +17,20 @@ const (
 )
 
 type initContractsParams struct {
-	manifestPath      string
-	secretsDataPath   string
-	secretsConfigPath string
-	jsonRPCAddress    string
-	isTestMode        bool
+	manifestPath   string
+	accountDir     string
+	accountConfig  string
+	jsonRPCAddress string
+	isTestMode     bool
 }
 
 func (ip *initContractsParams) validateFlags() error {
 	if !ip.isTestMode {
-		if err := sidechain.ValidateSecretFlags(ip.secretsDataPath, ip.secretsConfigPath); err != nil {
+		if err := sidechain.ValidateSecretFlags(ip.accountDir, ip.accountConfig); err != nil {
 			return err
 		}
 	} else {
-		if ip.secretsDataPath != "" || ip.secretsConfigPath != "" {
+		if ip.accountDir != "" || ip.accountConfig != "" {
 			return helper.ErrTestModeSecrets
 		}
 	}

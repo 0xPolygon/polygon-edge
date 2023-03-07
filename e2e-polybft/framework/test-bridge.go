@@ -137,7 +137,7 @@ func (t *TestBridge) WithdrawERC20(secretsDataDir, receivers, amounts, jsonRPCEn
 	return t.cmdRun(
 		"bridge",
 		"withdraw-erc20",
-		"--"+polybftsecrets.DataPathFlag, secretsDataDir,
+		"--"+polybftsecrets.AccountDirFlag, secretsDataDir,
 		"--receivers", receivers,
 		"--amounts", amounts,
 		"--json-rpc", jsonRPCEndpoint,

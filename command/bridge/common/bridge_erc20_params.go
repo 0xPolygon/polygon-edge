@@ -17,20 +17,20 @@ var (
 )
 
 type ERC20BridgeParams struct {
-	SecretsDataPath   string
-	SecretsConfigPath string
-	Receivers         []string
-	Amounts           []string
+	AccountDir    string
+	AccountConfig string
+	Receivers     []string
+	Amounts       []string
 }
 
 func (bp *ERC20BridgeParams) ValidateFlags(testMode bool) error {
 	// in case of test mode test rootchain account is being used as the rootchain transactions sender
 	if !testMode {
-		if err := sidechain.ValidateSecretFlags(bp.SecretsDataPath, bp.SecretsConfigPath); err != nil {
+		if err := sidechain.ValidateSecretFlags(bp.AccountDir, bp.AccountConfig); err != nil {
 			return err
 		}
 	} else {
-		if bp.SecretsDataPath != "" || bp.SecretsConfigPath != "" {
+		if bp.AccountDir != "" || bp.AccountConfig != "" {
 			return helper.ErrTestModeSecrets
 		}
 	}

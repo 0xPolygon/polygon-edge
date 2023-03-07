@@ -38,8 +38,8 @@ const (
 )
 
 type exitParams struct {
-	secretsDataPath   string
-	secretsConfigPath string
+	accountDir        string
+	accountConfig     string
 	exitHelperAddrRaw string
 	exitID            uint64
 	epochNumber       uint64
@@ -52,11 +52,11 @@ type exitParams struct {
 // validateFlags validates input values
 func (ep *exitParams) validateFlags() error {
 	if !ep.isTestMode {
-		if err := sidechain.ValidateSecretFlags(ep.secretsDataPath, ep.secretsConfigPath); err != nil {
+		if err := sidechain.ValidateSecretFlags(ep.accountDir, ep.accountConfig); err != nil {
 			return err
 		}
 	} else {
-		if ep.secretsDataPath != "" || ep.secretsConfigPath != "" {
+		if ep.accountDir != "" || ep.accountConfig != "" {
 			return helper.ErrTestModeSecrets
 		}
 	}
@@ -79,17 +79,17 @@ func GetCommand() *cobra.Command {
 	}
 
 	exitCmd.Flags().StringVar(
-		&ep.secretsDataPath,
-		polybftsecrets.DataPathFlag,
+		&ep.accountDir,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	exitCmd.Flags().StringVar(
-		&ep.secretsConfigPath,
-		polybftsecrets.ConfigFlag,
+		&ep.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	exitCmd.Flags().StringVar(
@@ -142,7 +142,10 @@ func GetCommand() *cobra.Command {
 	)
 
 	exitCmd.MarkFlagRequired(exitHelperFlag)
-	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	exitCmd.MarkFlagsMutuallyExclusive(
+		helper.TestModeFlag,
+		polybftsecrets.AccountDirFlag,
+		polybftsecrets.AccountConfigFlag)
 
 	return exitCmd
 }
@@ -154,7 +157,7 @@ func run(cmd *cobra.Command, _ []string) {
 	var senderKey ethgo.Key
 
 	if !ep.isTestMode {
-		secretsManager, err := polybftsecrets.GetSecretsManager(ep.secretsDataPath, ep.secretsConfigPath, true)
+		secretsManager, err := polybftsecrets.GetSecretsManager(ep.accountDir, ep.accountConfig, true)
 		if err != nil {
 			outputter.SetError(err)
 

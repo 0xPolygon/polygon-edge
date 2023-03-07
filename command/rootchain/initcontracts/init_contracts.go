@@ -91,17 +91,17 @@ func GetCommand() *cobra.Command {
 	)
 
 	cmd.Flags().StringVar(
-		&params.secretsConfigPath,
-		polybftsecrets.ConfigFlag,
+		&params.accountDir,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.secretsDataPath,
-		polybftsecrets.DataPathFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
@@ -119,7 +119,10 @@ func GetCommand() *cobra.Command {
 			" (otherwise provided secrets are used to resolve deployer account)",
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(
+		helper.TestModeFlag,
+		polybftsecrets.AccountDirFlag,
+		polybftsecrets.AccountConfigFlag)
 
 	return cmd
 }
@@ -139,7 +142,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var deployerKey ethgo.Key
 
 	if !params.isTestMode {
-		secretsManager, err := polybftsecrets.GetSecretsManager(params.secretsDataPath, params.secretsConfigPath, true)
+		secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.accountConfig, true)
 		if err != nil {
 			outputter.SetError(err)
 

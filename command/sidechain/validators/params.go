@@ -9,13 +9,13 @@ import (
 )
 
 type validatorInfoParams struct {
-	accountDir string
-	configPath string
-	jsonRPC    string
+	accountDir    string
+	accountConfig string
+	jsonRPC       string
 }
 
 func (v *validatorInfoParams) validateFlags() error {
-	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.configPath)
+	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.accountConfig)
 }
 
 type validatorsInfoResult struct {

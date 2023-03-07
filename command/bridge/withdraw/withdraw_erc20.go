@@ -50,17 +50,17 @@ func GetCommand() *cobra.Command {
 	}
 
 	withdrawCmd.Flags().StringVar(
-		&wp.SecretsDataPath,
-		polybftsecrets.DataPathFlag,
+		&wp.AccountDir,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.SecretsConfigPath,
-		polybftsecrets.ConfigFlag,
+		&wp.AccountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	withdrawCmd.Flags().StringSliceVar(
@@ -101,7 +101,7 @@ func GetCommand() *cobra.Command {
 	withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
 	withdrawCmd.MarkFlagRequired(common.AmountsFlag)
 
-	withdrawCmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	withdrawCmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 
 	return withdrawCmd
 }
@@ -118,7 +118,7 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	secretsManager, err := polybftsecrets.GetSecretsManager(wp.SecretsDataPath, wp.SecretsConfigPath, true)
+	secretsManager, err := polybftsecrets.GetSecretsManager(wp.AccountDir, wp.AccountConfig, true)
 	if err != nil {
 		outputter.SetError(err)
 

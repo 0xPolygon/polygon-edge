@@ -15,15 +15,15 @@ const (
 )
 
 type registerParams struct {
-	accountDir string
-	configPath string
-	jsonRPC    string
-	stake      string
-	chainID    int64
+	accountDir    string
+	accountConfig string
+	jsonRPC       string
+	stake         string
+	chainID       int64
 }
 
 func (rp *registerParams) validateFlags() error {
-	if err := sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.configPath); err != nil {
+	if err := sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.accountConfig); err != nil {
 		return err
 	}
 

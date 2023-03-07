@@ -50,17 +50,17 @@ func GetCommand() *cobra.Command {
 	}
 
 	depositCmd.Flags().StringVar(
-		&dp.SecretsDataPath,
-		polybftsecrets.DataPathFlag,
+		&dp.AccountDir,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	depositCmd.Flags().StringVar(
-		&dp.SecretsConfigPath,
-		polybftsecrets.ConfigFlag,
+		&dp.AccountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	depositCmd.Flags().StringSliceVar(
@@ -111,7 +111,10 @@ func GetCommand() *cobra.Command {
 	depositCmd.MarkFlagRequired(rootTokenFlag)
 	depositCmd.MarkFlagRequired(rootPredicateFlag)
 
-	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	depositCmd.MarkFlagsMutuallyExclusive(
+		helper.TestModeFlag,
+		polybftsecrets.AccountDirFlag,
+		polybftsecrets.AccountConfigFlag)
 
 	return depositCmd
 }
@@ -131,7 +134,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var depositorKey ethgo.Key
 
 	if !dp.testMode {
-		secretsManager, err := polybftsecrets.GetSecretsManager(dp.SecretsDataPath, dp.SecretsConfigPath, true)
+		secretsManager, err := polybftsecrets.GetSecretsManager(dp.AccountDir, dp.AccountConfig, true)
 		if err != nil {
 			outputter.SetError(err)
 
