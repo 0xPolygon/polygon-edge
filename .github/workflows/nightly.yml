@@ -3,7 +3,7 @@ name: Nightly Build
 on:
   schedule:
     # * is a special character in YAML so you have to quote this string
-    - cron:  '30 23 * * *'
+  - cron: '0 2 * * *' # run at 2 AM UTC
 
 jobs:
   build:
