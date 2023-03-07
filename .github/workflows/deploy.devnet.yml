@@ -221,7 +221,7 @@ jobs:
     with:
       runner: devnet
       environment: devnet-ephemeral
-      scenario: multiple
+      scenario: multiple_EOA
   
   loadtestERC20:
     needs: loadtest
