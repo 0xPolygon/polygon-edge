@@ -2,7 +2,6 @@ package state
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -91,9 +90,6 @@ func (txn *Txn) getCompactJournal() map[types.Address]*journalEntry {
 	res := map[types.Address]*journalEntry{}
 
 	for _, entry := range txn.journal {
-		fmt.Println("--")
-		entry.printJSON()
-
 		obj, ok := res[entry.Addr]
 		if !ok {
 			obj = &journalEntry{}
@@ -101,8 +97,6 @@ func (txn *Txn) getCompactJournal() map[types.Address]*journalEntry {
 		}
 
 		obj.merge(entry)
-
-		obj.printJSON()
 	}
 
 	// reset the journal
@@ -742,15 +736,6 @@ type journalEntry struct {
 
 	// Touched tracks whether the account has been touched/created
 	Touched *bool `json:"touched,omitempty"`
-}
-
-func (j *journalEntry) printJSON() {
-	data, err := json.Marshal(j)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(string(data))
 }
 
 func (j *journalEntry) merge(jj *journalEntry) {
