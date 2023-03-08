@@ -120,7 +120,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		if i, ok := validatorPreminesMap[premineInfo.address]; ok {
 			premineInfos[i] = premineInfo
 		} else {
-			premineInfos = append(premineInfos, premineInfo) //nolint:makezero
+			premineInfos = append(premineInfos, premineInfo)
 		}
 	}
 
