@@ -152,8 +152,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 
 		// set genesis validators as boot nodes if boot nodes not provided via CLI
 		if len(p.bootnodes) == 0 {
-			bootNodeMultiAddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
-			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bootNodeMultiAddr)
+			chainConfig.Bootnodes = append(chainConfig.Bootnodes, validator.MultiAddr)
 		}
 	}
 

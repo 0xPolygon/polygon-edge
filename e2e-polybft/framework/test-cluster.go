@@ -341,15 +341,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 
 		if cluster.Config.BootnodeCount > 0 {
-			cnt := cluster.Config.BootnodeCount
-			if len(validators) < cnt {
-				cnt = len(validators)
+			bootNodesCnt := cluster.Config.BootnodeCount
+			if len(validators) < bootNodesCnt {
+				bootNodesCnt = len(validators)
 			}
 
-			for i := 0; i < cnt; i++ {
-				maddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s",
-					"127.0.0.1", cluster.initialPort+int64(i+1), validators[i].NodeID)
-				args = append(args, "--bootnode", maddr)
+			for i := 0; i < bootNodesCnt; i++ {
+				args = append(args, "--bootnode", validators[i].MultiAddr)
 			}
 		}
 
