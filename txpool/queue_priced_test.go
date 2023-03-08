@@ -1,11 +1,11 @@
 package txpool
 
 import (
+	"github.com/stretchr/testify/assert"
 	"math/big"
+	"math/rand"
 	"sort"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -62,6 +62,56 @@ func Test_maxPriceQueue(t *testing.T) {
 				{
 					Type:     types.LegacyTx,
 					GasPrice: big.NewInt(100),
+				},
+			},
+		},
+		{
+			name:    "sort txs by nonce with base fee",
+			baseFee: 1000,
+			unsorted: []*types.Transaction{
+				// Highest tx fee
+				{
+					Type:      types.DynamicFeeTx,
+					GasFeeCap: big.NewInt(2000),
+					GasTipCap: big.NewInt(500),
+					Nonce:     3,
+				},
+				// Lowest tx fee
+				{
+					Type:      types.DynamicFeeTx,
+					GasFeeCap: big.NewInt(2000),
+					GasTipCap: big.NewInt(500),
+					Nonce:     1,
+				},
+				// Middle tx fee
+				{
+					Type:      types.DynamicFeeTx,
+					GasFeeCap: big.NewInt(2000),
+					GasTipCap: big.NewInt(500),
+					Nonce:     2,
+				},
+			},
+			sorted: []*types.Transaction{
+				// Highest tx fee
+				{
+					Type:      types.DynamicFeeTx,
+					GasFeeCap: big.NewInt(2000),
+					GasTipCap: big.NewInt(500),
+					Nonce:     3,
+				},
+				// Middle tx fee
+				{
+					Type:      types.DynamicFeeTx,
+					GasFeeCap: big.NewInt(2000),
+					GasTipCap: big.NewInt(500),
+					Nonce:     2,
+				},
+				// Lowest tx fee
+				{
+					Type:      types.DynamicFeeTx,
+					GasFeeCap: big.NewInt(2000),
+					GasTipCap: big.NewInt(500),
+					Nonce:     1,
 				},
 			},
 		},
@@ -194,4 +244,80 @@ func Test_maxPriceQueue(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Benchmark_pricedQueue(t *testing.B) {
+	testTable := []struct {
+		name        string
+		unsortedTxs []*types.Transaction
+	}{
+		{
+			name:        "1000 transactions",
+			unsortedTxs: generateTxs(1000),
+		},
+		{
+			name:        "10000 transactions",
+			unsortedTxs: generateTxs(10000),
+		},
+		{
+			name:        "100000 transactions",
+			unsortedTxs: generateTxs(100000),
+		},
+	}
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(b *testing.B) {
+			for i := 0; i < t.N; i++ {
+				q := newPricedQueue()
+				q.queue.baseFee = uint64(i)
+
+				for _, tx := range tt.unsortedTxs {
+					q.push(tx)
+				}
+
+				for q.length() > 0 {
+					_ = q.pop()
+				}
+			}
+		})
+	}
+}
+
+func generateTxs(num int) []*types.Transaction {
+	txs := make([]*types.Transaction, num)
+	for i := 0; i < num; i++ {
+		txs[i] = generateTx(i + 1)
+	}
+	return txs
+}
+
+func generateTx(i int) *types.Transaction {
+	s := rand.NewSource(int64(i))
+	r := rand.New(s)
+
+	txTypes := []types.TxType{
+		types.LegacyTx,
+		types.DynamicFeeTx,
+	}
+
+	tx := &types.Transaction{
+		Type: txTypes[r.Intn(len(txTypes))],
+	}
+
+	switch tx.Type {
+	case types.LegacyTx:
+		minGasPrice := 1000 * i
+		maxGasPrice := 100000 * i
+		tx.GasPrice = new(big.Int).SetInt64(int64(rand.Intn(maxGasPrice-minGasPrice) + minGasPrice))
+	case types.DynamicFeeTx:
+		minGasFeeCap := 1000 * i
+		maxGasFeeCap := 100000 * i
+		tx.GasFeeCap = new(big.Int).SetInt64(int64(rand.Intn(maxGasFeeCap-minGasFeeCap) + minGasFeeCap))
+
+		minGasTipCap := 100 * i
+		maxGasTipCap := 10000 * i
+		tx.GasTipCap = new(big.Int).SetInt64(int64(rand.Intn(maxGasTipCap-minGasTipCap) + minGasTipCap))
+	}
+
+	return tx
 }
