@@ -79,7 +79,8 @@ func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	}
 }
 
-// ParseUint64orHex parses the given uint64 hex string into the number
+// ParseUint64orHex parses the given uint64 hex string into the number.
+// It can parse the string with 0x prefix as well.
 func ParseUint64orHex(val *string) (uint64, error) {
 	if val == nil {
 		return 0, nil
