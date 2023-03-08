@@ -15,9 +15,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -118,14 +118,7 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	secretsManager, err := polybftsecrets.GetSecretsManager(wp.AccountDir, wp.AccountConfig, true)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	senderAccount, err := wallet.NewAccountFromSecret(secretsManager)
+	senderAccount, err := sidechain.GetAccount(wp.AccountDir, wp.AccountConfig)
 	if err != nil {
 		outputter.SetError(err)
 

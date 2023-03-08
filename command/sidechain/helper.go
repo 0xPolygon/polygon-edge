@@ -44,9 +44,10 @@ func ValidateSecretFlags(dataDir, config string) error {
 	return nil
 }
 
-func GetAccount(dataDir, config string) (*wallet.Account, error) {
+// GetAccount resolves secrets manager and returns an account object
+func GetAccount(accountDir, accountConfig string) (*wallet.Account, error) {
 	// resolve secrets manager instance and allow usage of insecure local secrets manager
-	secretsManager, err := polybftsecrets.GetSecretsManager(dataDir, config, true)
+	secretsManager, err := polybftsecrets.GetSecretsManager(accountDir, accountConfig, true)
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +55,9 @@ func GetAccount(dataDir, config string) (*wallet.Account, error) {
 	return wallet.NewAccountFromSecret(secretsManager)
 }
 
-func GetAccountFromDir(dir string) (*wallet.Account, error) {
-	return GetAccount(dir, "")
+// GetAccountFromDir returns an account object from local secrets manager
+func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
+	return GetAccount(accountDir, "")
 }
 
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address

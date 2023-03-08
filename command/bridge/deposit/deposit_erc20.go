@@ -15,8 +15,8 @@ import (
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -134,14 +134,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var depositorKey ethgo.Key
 
 	if !dp.testMode {
-		secretsManager, err := polybftsecrets.GetSecretsManager(dp.AccountDir, dp.AccountConfig, true)
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		depositorAccount, err := wallet.NewAccountFromSecret(secretsManager)
+		depositorAccount, err := sidechain.GetAccount(dp.AccountDir, dp.AccountConfig)
 		if err != nil {
 			outputter.SetError(err)
 
