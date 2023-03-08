@@ -2,6 +2,7 @@ package txpool
 
 import (
 	"container/heap"
+	"math/big"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -118,11 +119,31 @@ func (q *maxPriceQueue) cmp(a, b *types.Transaction) int {
 		return c
 	}
 
+	aGasFeeCap, bGasFeeCap := new(big.Int), new(big.Int)
+
+	if a.GasFeeCap != nil {
+		aGasFeeCap = aGasFeeCap.Set(a.GasFeeCap)
+	}
+
+	if b.GasFeeCap != nil {
+		bGasFeeCap = bGasFeeCap.Set(b.GasFeeCap)
+	}
+
 	// Compare fee caps if baseFee is not specified or effective tips are equal
-	if c := a.GasFeeCap.Cmp(b.GasFeeCap); c != 0 {
+	if c := aGasFeeCap.Cmp(bGasFeeCap); c != 0 {
 		return c
 	}
 
+	aGasTipCap, bGasTipCap := new(big.Int), new(big.Int)
+
+	if a.GasTipCap != nil {
+		aGasTipCap = aGasTipCap.Set(a.GasTipCap)
+	}
+
+	if b.GasTipCap != nil {
+		bGasTipCap = bGasTipCap.Set(b.GasTipCap)
+	}
+
 	// Compare tips if effective tips and fee caps are equal
-	return a.GasTipCap.Cmp(b.GasTipCap)
+	return aGasTipCap.Cmp(bGasTipCap)
 }
