@@ -163,11 +163,13 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid P2P multi address '%s' provided: %w ", parts[0], err)
 			}
 
-			if len(strings.TrimPrefix(parts[1], "0x")) != ecdsaAddressLength {
+			trimmedAddress := strings.TrimPrefix(parts[1], "0x")
+			if len(trimmedAddress) != ecdsaAddressLength {
 				return nil, fmt.Errorf("invalid ECDSA address: %s", parts[1])
 			}
 
-			if len(strings.TrimPrefix(parts[2], "0x")) != blsKeyLength {
+			trimmedBLSKey := strings.TrimPrefix(parts[2], "0x")
+			if len(trimmedBLSKey) != blsKeyLength {
 				return nil, fmt.Errorf("invalid BLS key: %s", parts[2])
 			}
 
@@ -177,8 +179,8 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 
 			validators[i] = &polybft.Validator{
 				MultiAddr:    parts[0],
-				Address:      types.StringToAddress(parts[1]),
-				BlsKey:       parts[2],
+				Address:      types.StringToAddress(trimmedAddress),
+				BlsKey:       trimmedBLSKey,
 				BlsSignature: parts[3],
 				Balance:      balance,
 			}
