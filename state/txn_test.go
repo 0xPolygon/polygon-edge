@@ -85,6 +85,9 @@ func TestTxn_TracesCompaction(t *testing.T) {
 	txn.SetState(addr, types.ZeroHash, oneHash) // updates
 	txn.SetState(addr, oneHash, types.ZeroHash)
 
+	txn.TouchAccount(addr)
+	require.Len(t, txn.journal, 8)
+
 	trace := txn.getCompactJournal()
 	require.Len(t, trace, 1)
 
@@ -97,12 +100,12 @@ func TestTxn_TracesCompaction(t *testing.T) {
 			types.ZeroHash: oneHash,
 			oneHash:        types.ZeroHash,
 		},
+		Touched: boolTruePtr(),
 	})
 }
 
 func TestJournalEntry_Merge(t *testing.T) {
 	one := uint64(1)
-	boolTrue := true
 
 	entryAllSet := func() *journalEntry {
 		// use a function because the merge function
@@ -115,7 +118,8 @@ func TestJournalEntry_Merge(t *testing.T) {
 				types.ZeroHash: types.ZeroHash,
 			},
 			Code:    []byte{0x1},
-			Suicide: &boolTrue,
+			Suicide: boolTruePtr(),
+			Touched: boolTruePtr(),
 		}
 	}
 

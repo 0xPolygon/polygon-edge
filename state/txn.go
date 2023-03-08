@@ -502,6 +502,12 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 	return types.BytesToHash(object.Account.CodeHash)
 }
 
+func boolTruePtr() *bool {
+	t := true
+
+	return &t
+}
+
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr types.Address) bool {
 	var suicided bool
@@ -515,7 +521,7 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 
 			txn.addJournalEntry(&journalEntry{
 				Addr:    addr,
-				Suicide: &suicided,
+				Suicide: boolTruePtr(),
 			})
 		}
 		if object != nil {
@@ -577,7 +583,10 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 
 func (txn *Txn) TouchAccount(addr types.Address) {
 	txn.upsertAccount(addr, true, func(obj *StateObject) {
-
+		txn.addJournalEntry(&journalEntry{
+			Addr:    addr,
+			Touched: boolTruePtr(),
+		})
 	})
 }
 
@@ -730,6 +739,9 @@ type journalEntry struct {
 
 	// Suicide tracks whether the contract has been self destructed
 	Suicide *bool `json:"suicide,omitempty"`
+
+	// Touched tracks whether the account has been touched/created
+	Touched *bool `json:"touched,omitempty"`
 }
 
 func (j *journalEntry) printJSON() {
@@ -766,5 +778,9 @@ func (j *journalEntry) merge(jj *journalEntry) {
 
 	if jj.Suicide != nil && jj.Suicide != j.Suicide {
 		j.Suicide = jj.Suicide
+	}
+
+	if jj.Touched != nil && jj.Touched != j.Touched {
+		j.Touched = jj.Touched
 	}
 }
