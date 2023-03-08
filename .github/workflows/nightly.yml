@@ -1,11 +1,9 @@
 ---
 name: Nightly Build
 on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - main
-      - develop
-  pull_request:
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron: '*/5 * * * *'
 
 jobs:
   build:
@@ -21,12 +19,12 @@ jobs:
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   e2e:
-    name: E2E Tests
+    name: Polybft E2E Tests
     uses: ./.github/workflows/e2e-polybft.yml
     needs: build
 
   property:
-    name: Property Tests
+    name: Polybft Property Tests
     uses: ./.github/workflows/property-polybft.yml
     needs: build
   
