@@ -36,8 +36,7 @@ message GetTraceRequest {
 }
 
 message GetTraceResponse {
-  map<string,string> accountTrace = 1;
-  map<string,string> storageTrace = 2;
+  bytes trace = 1;
 }
 
 message BlockchainEvent {

@@ -188,6 +188,7 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	}
 
 	_, trace, root := transition.Commit()
+	trace.ParentStateRoot = parent.StateRoot
 
 	// write the trace
 	{

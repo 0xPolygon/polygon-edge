@@ -2,12 +2,14 @@ package sidecar
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -69,14 +71,19 @@ func (s *sidecar) run() {
 			continue
 		}
 
-		trace, err := s.clt.GetTrace(context.Background(), &proto.GetTraceRequest{Number: uint64(status.Current.Number)})
+		traceResp, err := s.clt.GetTrace(context.Background(), &proto.GetTraceRequest{Number: uint64(status.Current.Number)})
 		if err != nil {
 			panic(err)
 		}
 
+		var trace *types.Trace
+		if err := json.Unmarshal(traceResp.Trace, &trace); err != nil {
+			panic(err)
+		}
+
 		fmt.Println("-----")
-		fmt.Println(trace.AccountTrace)
-		fmt.Println(trace.StorageTrace)
+		fmt.Println(trace.AccountTrie)
+		fmt.Println(trace.StorageTrie)
 
 		select {
 		case <-time.After(500 * time.Millisecond):

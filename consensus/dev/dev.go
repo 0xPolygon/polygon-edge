@@ -190,6 +190,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 
 	// Commit the changes
 	_, trace, root := transition.Commit()
+	trace.ParentStateRoot = parent.StateRoot
 
 	// write the trace
 	{

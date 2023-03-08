@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -31,14 +30,8 @@ func (s *systemService) GetTrace(ctx context.Context, req *proto.GetTraceRequest
 		return nil, err
 	}
 
-	var trace *types.Trace
-	if err := json.Unmarshal(data, &trace); err != nil {
-		return nil, err
-	}
-
 	resp := &proto.GetTraceResponse{
-		AccountTrace: trace.AccountTrie,
-		StorageTrace: trace.StorageTrie,
+		Trace: data,
 	}
 
 	return resp, nil

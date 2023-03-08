@@ -1,7 +1,6 @@
 package state
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 
@@ -38,7 +37,7 @@ type Txn struct {
 	codeCache *lru.Cache
 
 	// tracing
-	journal []*journalEntry
+	journal []*types.JournalEntry
 }
 
 func NewTxn(snapshot Snapshot) *Txn {
@@ -59,7 +58,7 @@ func newTxn(snapshot readSnapshot) *Txn {
 		snapshots: []*iradix.Tree{},
 		txn:       i.Txn(),
 		codeCache: codeCache,
-		journal:   []*journalEntry{},
+		journal:   []*types.JournalEntry{},
 	}
 }
 
@@ -83,20 +82,20 @@ func (txn *Txn) RevertToSnapshot(id int) {
 	txn.txn = tree.Txn()
 }
 
-func (txn *Txn) getCompactJournal() map[types.Address]*journalEntry {
+func (txn *Txn) getCompactJournal() map[types.Address]*types.JournalEntry {
 	// Instead of creating a new object to represent the aggregate on how
 	// an account has changed during the compaction, we piggyback the same
 	// journalEntry object for now.
-	res := map[types.Address]*journalEntry{}
+	res := map[types.Address]*types.JournalEntry{}
 
 	for _, entry := range txn.journal {
 		obj, ok := res[entry.Addr]
 		if !ok {
-			obj = &journalEntry{}
+			obj = &types.JournalEntry{}
 			res[entry.Addr] = obj
 		}
 
-		obj.merge(entry)
+		obj.Merge(entry)
 	}
 
 	// reset the journal
@@ -105,7 +104,7 @@ func (txn *Txn) getCompactJournal() map[types.Address]*journalEntry {
 	return res
 }
 
-func (txn *Txn) addJournalEntry(j *journalEntry) {
+func (txn *Txn) addJournalEntry(j *types.JournalEntry) {
 	txn.journal = append(txn.journal, j)
 }
 
@@ -116,7 +115,7 @@ const (
 )
 
 func (txn *Txn) trackAccountChange(addr types.Address, changeType string, object *StateObject) {
-	entry := &journalEntry{
+	entry := &types.JournalEntry{
 		Addr: addr,
 	}
 
@@ -385,7 +384,7 @@ func (txn *Txn) SetState(
 			object.Txn.Insert(key.Bytes(), value.Bytes())
 		}
 
-		txn.addJournalEntry(&journalEntry{
+		txn.addJournalEntry(&types.JournalEntry{
 			Addr: addr,
 			Storage: map[types.Hash]types.Hash{
 				key: value,
@@ -513,7 +512,7 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 			suicided = true
 			object.Suicide = true
 
-			txn.addJournalEntry(&journalEntry{
+			txn.addJournalEntry(&types.JournalEntry{
 				Addr:    addr,
 				Suicide: boolTruePtr(),
 			})
@@ -577,7 +576,7 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 
 func (txn *Txn) TouchAccount(addr types.Address) {
 	txn.upsertAccount(addr, true, func(obj *StateObject) {
-		txn.addJournalEntry(&journalEntry{
+		txn.addJournalEntry(&types.JournalEntry{
 			Addr:    addr,
 			Touched: boolTruePtr(),
 		})
@@ -712,60 +711,4 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) []*Object {
 	})
 
 	return objs
-}
-
-type journalEntry struct {
-	// Addr is the address of the account affected by the
-	// journal change
-	Addr types.Address `json:"address"`
-
-	// Balance tracks changes in the account Balance
-	Balance *big.Int `json:"balance,omitempty"`
-
-	// Nonce tracks changes in the account Nonce
-	Nonce *uint64 `json:"nonce,omitempty"`
-
-	// Storage track changes in the storage
-	Storage map[types.Hash]types.Hash `json:"storage,omitempty"`
-
-	// Code tracks the initialization of the contract Code
-	Code []byte `json:"code,omitempty"`
-
-	// Suicide tracks whether the contract has been self destructed
-	Suicide *bool `json:"suicide,omitempty"`
-
-	// Touched tracks whether the account has been touched/created
-	Touched *bool `json:"touched,omitempty"`
-}
-
-func (j *journalEntry) merge(jj *journalEntry) {
-	if jj.Nonce != nil && jj.Nonce != j.Nonce {
-		j.Nonce = jj.Nonce
-	}
-
-	if jj.Balance != nil && jj.Balance != j.Balance {
-		j.Balance = jj.Balance
-	}
-
-	if jj.Storage != nil {
-		if j.Storage == nil {
-			j.Storage = map[types.Hash]types.Hash{}
-		}
-
-		for k, v := range jj.Storage {
-			j.Storage[k] = v
-		}
-	}
-
-	if jj.Code != nil && !bytes.Equal(jj.Code, j.Code) {
-		j.Code = jj.Code
-	}
-
-	if jj.Suicide != nil && jj.Suicide != j.Suicide {
-		j.Suicide = jj.Suicide
-	}
-
-	if jj.Touched != nil && jj.Touched != j.Touched {
-		j.Touched = jj.Touched
-	}
 }

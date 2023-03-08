@@ -189,6 +189,8 @@ type Transition struct {
 
 	PostHook func(t *Transition)
 
+	trace *types.Trace
+
 	// runtimes
 	evm         *evm.EVM
 	precompiles *precompiled.Precompiled
@@ -201,6 +203,9 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 }
 
@@ -296,6 +301,11 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
+	t.trace.TxnTraces = append(t.trace.TxnTraces, &types.TxnTrace{
+		Transaction: txn.MarshalRLP(),
+		Delta:       t.Txn().getCompactJournal(),
+	})
+
 	return nil
 }
 
@@ -308,9 +318,12 @@ func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash) {
 	t.state.AddBalance(targetAddr, big.NewInt(10))
 
 	objs := t.state.Commit(t.config.EIP155)
-	s2, traces, root := t.snap.Commit(objs)
+	s2, snapTrace, root := t.snap.Commit(objs)
 
-	return s2, traces, types.BytesToHash(root)
+	t.trace.AccountTrie = snapTrace.AccountTrie
+	t.trace.StorageTrie = snapTrace.StorageTrie
+
+	return s2, t.trace, types.BytesToHash(root)
 }
 
 func (t *Transition) subGasPool(amount uint64) error {

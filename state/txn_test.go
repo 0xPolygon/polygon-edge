@@ -93,7 +93,7 @@ func TestTxn_TracesCompaction(t *testing.T) {
 
 	nonce := uint64(2)
 
-	require.Equal(t, trace[addr], &journalEntry{
+	require.Equal(t, trace[addr], &types.JournalEntry{
 		Balance: big.NewInt(2),
 		Nonce:   &nonce,
 		Storage: map[types.Hash]types.Hash{
@@ -107,11 +107,11 @@ func TestTxn_TracesCompaction(t *testing.T) {
 func TestJournalEntry_Merge(t *testing.T) {
 	one := uint64(1)
 
-	entryAllSet := func() *journalEntry {
+	entryAllSet := func() *types.JournalEntry {
 		// use a function because the merge function
 		// modifies the caller and the test would
 		// have side effects.
-		return &journalEntry{
+		return &types.JournalEntry{
 			Nonce:   &one,
 			Balance: big.NewInt(1),
 			Storage: map[types.Hash]types.Hash{
@@ -124,22 +124,22 @@ func TestJournalEntry_Merge(t *testing.T) {
 	}
 
 	cases := []struct {
-		a, b, c *journalEntry // a.merge(b) = c
+		a, b, c *types.JournalEntry // a.merge(b) = c
 	}{
 		{
-			&journalEntry{},
+			&types.JournalEntry{},
 			entryAllSet(),
 			entryAllSet(),
 		},
 		{
 			entryAllSet(),
-			&journalEntry{},
+			&types.JournalEntry{},
 			entryAllSet(),
 		},
 	}
 
 	for _, c := range cases {
-		c.a.merge(c.b)
+		c.a.Merge(c.b)
 		require.Equal(t, c.c, c.a)
 	}
 }
