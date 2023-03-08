@@ -148,6 +148,48 @@ func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
+// TODO: Replace jsonrpc/types/argByte with this?
+// Still unsure if the codification will be done on protobuf side more
+// than marshaling in json and if this will become necessary.
+type ArgBytes []byte
+
+func (b ArgBytes) MarshalText() ([]byte, error) {
+	return encodeToHex(b), nil
+}
+
+func (b *ArgBytes) UnmarshalText(input []byte) error {
+	hh, err := decodeToHex(input)
+	if err != nil {
+		return nil
+	}
+
+	aux := make([]byte, len(hh))
+	copy(aux[:], hh[:])
+	*b = aux
+
+	return nil
+}
+
+func decodeToHex(b []byte) ([]byte, error) {
+	str := string(b)
+	str = strings.TrimPrefix(str, "0x")
+
+	if len(str)%2 != 0 {
+		str = "0" + str
+	}
+
+	return hex.DecodeString(str)
+}
+
+func encodeToHex(b []byte) []byte {
+	str := hex.EncodeToString(b)
+	if len(str)%2 != 0 {
+		str = "0" + str
+	}
+
+	return []byte("0x" + str)
+}
+
 var (
 	// EmptyRootHash is the root when there are no transactions
 	EmptyRootHash = StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
@@ -172,7 +214,7 @@ type Trace struct {
 
 type TxnTrace struct {
 	// Transaction is the RLP encoding of the transaction
-	Transaction []byte `json:"txn"`
+	Transaction ArgBytes `json:"txn"`
 
 	// Delta is the list of updates per account during this transaction
 	Delta map[Address]*JournalEntry `json:"delta"`
