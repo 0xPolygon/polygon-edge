@@ -286,9 +286,11 @@ func Benchmark_pricedQueue(t *testing.B) {
 
 func generateTxs(num int) []*types.Transaction {
 	txs := make([]*types.Transaction, num)
+
 	for i := 0; i < num; i++ {
 		txs[i] = generateTx(i + 1)
 	}
+
 	return txs
 }
 
