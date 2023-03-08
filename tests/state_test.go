@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"os"
 	"strings"
@@ -32,6 +33,13 @@ var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 
 func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, index int, p postEntry) {
 	t.Helper()
+
+	// Filter by specific test
+	/*
+		if file != "" && name != "" && fork != "" && index != "" {
+			return
+		}
+	*/
 
 	config, ok := Forks[fork]
 	if !ok {
@@ -71,6 +79,16 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
 	objs := txn.Commit(forks.EIP155)
+
+	// Print the updated objects
+	for _, obj := range objs {
+		fmt.Println("-- obj --")
+		fmt.Println(obj.Address, obj.Balance, obj.Code, obj.Deleted, obj.Nonce)
+		for _, v := range obj.Storage {
+			fmt.Println("=>", v.Key, v.Val, v.Deleted)
+		}
+	}
+
 	_, root := snapshot.Commit(objs)
 
 	if !bytes.Equal(root, p.Root.Bytes()) {
@@ -121,49 +139,51 @@ func TestState(t *testing.T) {
 
 	for _, folder := range folders {
 		folder := folder
-		t.Run(folder, func(t *testing.T) {
-			t.Parallel()
 
-			files, err := listFiles(folder)
+		// Remove parallel execution to debug better
+		//t.Run(folder, func(t *testing.T) {
+		//	t.Parallel()
+
+		files, err := listFiles(folder)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, file := range files {
+			if !strings.HasSuffix(file, ".json") {
+				continue
+			}
+
+			if contains(long, file) && testing.Short() {
+				t.Skipf("Long tests are skipped in short mode")
+
+				continue
+			}
+
+			if contains(skip, file) {
+				t.Skip()
+
+				continue
+			}
+
+			data, err := os.ReadFile(file)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			for _, file := range files {
-				if !strings.HasSuffix(file, ".json") {
-					continue
-				}
+			var c map[string]stateCase
+			if err := json.Unmarshal(data, &c); err != nil {
+				t.Fatal(err)
+			}
 
-				if contains(long, file) && testing.Short() {
-					t.Skipf("Long tests are skipped in short mode")
-
-					continue
-				}
-
-				if contains(skip, file) {
-					t.Skip()
-
-					continue
-				}
-
-				data, err := os.ReadFile(file)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				var c map[string]stateCase
-				if err := json.Unmarshal(data, &c); err != nil {
-					t.Fatal(err)
-				}
-
-				for name, i := range c {
-					for fork, f := range i.Post {
-						for indx, e := range f {
-							RunSpecificTest(t, file, i, name, fork, indx, e)
-						}
+			for name, i := range c {
+				for fork, f := range i.Post {
+					for indx, e := range f {
+						RunSpecificTest(t, file, i, name, fork, indx, e)
 					}
 				}
 			}
-		})
+		}
+		//})
 	}
 }
