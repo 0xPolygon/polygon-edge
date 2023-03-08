@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sort"
@@ -15,12 +16,16 @@ import (
 	metrics "github.com/armon/go-metrics"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
+	// TODO: @Stefan-Ethernal use the function from contractsapi
+	findCheckpointBlockMethod = abi.MustNewMethod(
+		"function findCheckpointBlock(uint256 blockNumber) returns tuple(uint256, bool)")
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
 )
@@ -28,7 +33,7 @@ var (
 type CheckpointManager interface {
 	PostBlock(req *PostBlockRequest) error
 	BuildEventRoot(epoch uint64) (types.Hash, error)
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error)
+	GenerateExitProof(exitID, blockNumber uint64) (types.Proof, error)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
@@ -39,7 +44,7 @@ func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return
 func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return types.ZeroHash, nil
 }
-func (d *dummyCheckpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
+func (d *dummyCheckpointManager) GenerateExitProof(exitID, blockNumber uint64) (types.Proof, error) {
 	return types.Proof{}, nil
 }
 
@@ -53,8 +58,8 @@ type checkpointManager struct {
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
 	consensusBackend polybftBackend
-	// txRelayer abstracts rootchain interaction logic (Call and SendTransaction invocations to the rootchain)
-	txRelayer txrelayer.TxRelayer
+	// rootChainRelayer abstracts rootchain interaction logic (Call and SendTransaction invocations to the rootchain)
+	rootChainRelayer txrelayer.TxRelayer
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
 	// checkpointManagerAddr is address of CheckpointManager smart contract
@@ -76,7 +81,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		key:                   key,
 		blockchain:            blockchain,
 		consensusBackend:      backend,
-		txRelayer:             txRelayer,
+		rootChainRelayer:      txRelayer,
 		checkpointsOffset:     checkpointOffset,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
@@ -91,7 +96,7 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
 
-	latestCheckpointBlockRaw, err := c.txRelayer.Call(
+	latestCheckpointBlockRaw, err := c.rootChainRelayer.Call(
 		c.key.Address(),
 		ethgo.Address(c.checkpointManagerAddr),
 		checkpointBlockNumMethodEncoded)
@@ -213,7 +218,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	txn.Input = input
 
-	receipt, err := c.txRelayer.SendTransaction(txn, c.key)
+	receipt, err := c.rootChainRelayer.SendTransaction(txn, c.key)
 	if err != nil {
 		return err
 	}
@@ -324,9 +329,29 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return tree.Hash(), nil
 }
 
-// GenerateExitProof generates proof of exit
-func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
-	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID, epoch)
+// GenerateExitProof generates proof of exit event
+func (c *checkpointManager) GenerateExitProof(exitID, blockNumber uint64) (types.Proof, error) {
+	_, extra, err := getBlockData(blockNumber, c.blockchain)
+	if err != nil {
+		return types.Proof{}, err
+	}
+
+	// TODO: @Stefan-Ethernal invoke checkpoint manager to retrieve checkpoint block
+	response, err := c.rootChainRelayer.Call(c.key.Address(), ethgo.Address(c.checkpointManagerAddr), nil)
+	if err != nil {
+		return types.Proof{}, err
+	}
+
+	_, err = hex.DecodeString(response)
+	if err != nil {
+		return types.Proof{}, err
+	}
+
+	// TODO: @Stefan-Ethernal extract checkpoint block from decodedResp
+	// (abi.encode(tuple(uint256 checkpointBlock, bool tuple))
+	checkpointBlock := uint64(0)
+
+	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID, extra.Checkpoint.EpochNumber)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -336,7 +361,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(epoch, checkpointBlock)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(extra.Checkpoint.EpochNumber, checkpointBlock)
 	if err != nil {
 		return types.Proof{}, err
 	}
