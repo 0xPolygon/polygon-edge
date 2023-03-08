@@ -1,9 +1,11 @@
 ---
 name: Nightly Build
-on:
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-  - cron: '0 2 * * *' # run at 2 AM UTC
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
 
 jobs:
   build:
@@ -21,8 +23,10 @@ jobs:
   e2e:
     name: E2E Tests
     uses: ./.github/workflows/e2e-polybft.yml
+    needs: build
 
   property:
     name: Property Tests
     uses: ./.github/workflows/property-polybft.yml
+    needs: build
   

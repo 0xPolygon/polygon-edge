@@ -1,5 +1,11 @@
 ---
-name: PolyBFT Property based tests
+name: PolyBFT Property tests
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop  
+  workflow_call:
 
 jobs:
   build:
@@ -17,8 +23,8 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: 1.18.x
-      - name: Run property tests
-        run: make test-e2e-polybft-property:
+      - name: Run tests
+        run: make test-property-polybft
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@v3
