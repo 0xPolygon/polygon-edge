@@ -25,11 +25,11 @@ import (
 
 const (
 	// flag names
-	exitHelperFlag      = "exit-helper"
-	exitEventIDFlag     = "event-id"
-	checkpointBlockFlag = "checkpoint-block"
-	rootJSONRPCFlag     = "root-json-rpc"
-	childJSONRPCFlag    = "child-json-rpc"
+	exitHelperFlag   = "exit-helper"
+	exitEventIDFlag  = "event-id"
+	blockNumberFlag  = "block-number"
+	rootJSONRPCFlag  = "root-json-rpc"
+	childJSONRPCFlag = "child-json-rpc"
 
 	// generateExitProofFn is JSON RPC endpoint which creates exit proof
 	generateExitProofFn = "bridge_generateExitProof"
@@ -95,7 +95,7 @@ func GetCommand() *cobra.Command {
 
 	exitCmd.Flags().Uint64Var(
 		&ep.blockNumber,
-		checkpointBlockFlag,
+		blockNumberFlag,
 		0,
 		"child chain exit event block number",
 	)

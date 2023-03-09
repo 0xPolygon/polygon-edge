@@ -41,8 +41,7 @@ $ polygon-edge bridge exit
     --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>]
     --exit-helper <exit_helper_address>
     --event-id <exit_event_id>
-    --epoch <epoch_in_which_exit_event_got_processed>
-    --checkpoint-block <epoch_in_which_exit_event_got_processed>
+    --block-number <block_number_in_which_exit_event_was_included>
     --root-json-rpc <root_chain_json_rpc_endpoint>
     --child-json-rpc <child_chain_json_rpc_endpoint>
 ```
