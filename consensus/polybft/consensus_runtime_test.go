@@ -1176,7 +1176,7 @@ func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 	encodedEvents := make([][]byte, len(exitEvents))
 
 	for i, e := range exitEvents {
-		encodedEvent, err := ExitEventABIType.Encode(e)
+		encodedEvent, err := ExitEventInputsABIType.Encode(e)
 		require.NoError(t, err)
 
 		encodedEvents[i] = encodedEvent

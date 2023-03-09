@@ -23,7 +23,7 @@ func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) e
 	}
 
 	// update the number of transactions in the block metric
-	metrics.SetGauge([]string{consensusMetricsPrefix, "num_txs"}, float32(len(currentBlock.Body().Transactions)))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "num_txs"}, float32(len(currentBlock.Transactions)))
 
 	extra, err := GetIbftExtra(currentBlock.Header.ExtraData)
 	if err != nil {
@@ -32,6 +32,8 @@ func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) e
 
 	// number of rounds needed to seal a block
 	metrics.SetGauge([]string{consensusMetricsPrefix, "rounds"}, float32(extra.Checkpoint.BlockRound))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "chain_head"}, float32(currentBlock.Number()))
+	metrics.IncrCounter([]string{consensusMetricsPrefix, "block_counter"}, float32(1))
 
 	return nil
 }

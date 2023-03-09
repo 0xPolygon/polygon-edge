@@ -38,14 +38,14 @@ func Test_NativeTransferPrecompile(t *testing.T) {
 		require.ErrorIs(t, err, runtime.ErrUnauthorizedCaller)
 	})
 	t.Run("Insufficient balance", func(t *testing.T) {
-		err := run(contracts.NativeTokenContract, sender, receiver, big.NewInt(10), newDummyHost())
+		err := run(contracts.NativeERC20TokenContract, sender, receiver, big.NewInt(10), newDummyHost())
 		require.ErrorIs(t, err, runtime.ErrInsufficientBalance)
 	})
 	t.Run("Correct transfer", func(t *testing.T) {
 		host := newDummyHost()
 		host.AddBalance(sender, big.NewInt(1000))
 
-		err := run(contracts.NativeTokenContract, sender, receiver, big.NewInt(100), host)
+		err := run(contracts.NativeERC20TokenContract, sender, receiver, big.NewInt(100), host)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(900), host.GetBalance(sender))
 		require.Equal(t, big.NewInt(100), host.GetBalance(receiver))

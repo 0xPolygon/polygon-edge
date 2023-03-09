@@ -67,7 +67,7 @@ func Test_loadSnapshotMetadata(t *testing.T) {
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
-		assert.NoError(t, os.WriteFile(filePath, fileData, os.ModePerm))
+		assert.NoError(t, os.WriteFile(filePath, fileData, 0775))
 
 		res, err := loadSnapshotMetadata(filePath)
 
@@ -124,7 +124,7 @@ func Test_loadSnapshots(t *testing.T) {
 
 		dirPath := createTestTempDirectory(t)
 		filePath := path.Join(dirPath, "test.dat")
-		assert.NoError(t, os.WriteFile(filePath, fileData, os.ModePerm))
+		assert.NoError(t, os.WriteFile(filePath, fileData, 0775))
 
 		res, err := loadSnapshots(filePath)
 
@@ -166,7 +166,7 @@ func Test_readDataStore(t *testing.T) {
 
 		assert.NoError(
 			t,
-			os.WriteFile(filePath, []byte("hello: world"), os.ModePerm),
+			os.WriteFile(filePath, []byte("hello: world"), 0775),
 		)
 
 		data := map[string]interface{}{}
@@ -186,7 +186,7 @@ func Test_readDataStore(t *testing.T) {
 
 		assert.NoError(
 			t,
-			os.WriteFile(filePath, []byte(sampleJSON), os.ModePerm),
+			os.WriteFile(filePath, []byte(sampleJSON), 0775),
 		)
 
 		data := map[string]interface{}{}

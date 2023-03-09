@@ -91,7 +91,7 @@ func TestState_decodeExitEvent(t *testing.T) {
 	state := newTestState(t)
 
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = exitEventABI.ID()
+	topics[0] = ExitEventABI.ID()
 	topics[1] = ethgo.BytesToHash([]byte{exitID})
 	topics[2] = ethgo.BytesToHash(ethgo.HexToAddress("0x1111").Bytes())
 	topics[3] = ethgo.BytesToHash(ethgo.HexToAddress("0x2222").Bytes())

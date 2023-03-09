@@ -289,8 +289,7 @@ func getNestedBucketInEpoch(tx *bolt.Tx, epoch uint64, bucketKey []byte) (*bolt.
 	}
 
 	bucket := epochBucket.Bucket(bucketKey)
-
-	if epochBucket == nil {
+	if bucket == nil {
 		return nil, fmt.Errorf("could not find %v bucket for epoch: %v", string(bucketKey), epoch)
 	}
 

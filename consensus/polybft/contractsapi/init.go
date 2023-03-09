@@ -13,23 +13,27 @@ const (
 
 var (
 	// core-contracts smart contracts
-	CheckpointManager *artifact.Artifact
-	ExitHelper        *artifact.Artifact
-	L2StateSender     *artifact.Artifact
-	StateSender       *artifact.Artifact
-	StateReceiver     *artifact.Artifact
-	BLS               *artifact.Artifact
-	BLS256            *artifact.Artifact
-	System            *artifact.Artifact
-	Merkle            *artifact.Artifact
-	ChildValidatorSet *artifact.Artifact
-	MRC20             *artifact.Artifact
+	CheckpointManager   *artifact.Artifact
+	ExitHelper          *artifact.Artifact
+	StateSender         *artifact.Artifact
+	RootERC20Predicate  *artifact.Artifact
+	BLS                 *artifact.Artifact
+	BLS256              *artifact.Artifact
+	System              *artifact.Artifact
+	Merkle              *artifact.Artifact
+	ChildValidatorSet   *artifact.Artifact
+	NativeERC20         *artifact.Artifact
+	StateReceiver       *artifact.Artifact
+	ChildERC20          *artifact.Artifact
+	ChildERC20Predicate *artifact.Artifact
+	L2StateSender       *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
 	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
+	RootERC20              *artifact.Artifact
 )
 
 func init() {
@@ -70,6 +74,11 @@ func init() {
 		panic(err)
 	}
 
+	RootERC20Predicate, err = artifact.DecodeArtifact([]byte(RootERC20PredicateArtifact))
+	if err != nil {
+		panic(err)
+	}
+
 	StateReceiver, err = artifact.DecodeArtifact([]byte(StateReceiverArtifact))
 	if err != nil {
 		panic(err)
@@ -80,7 +89,12 @@ func init() {
 		panic(err)
 	}
 
-	MRC20, err = artifact.DecodeArtifact([]byte(MRC20Artifact))
+	ChildERC20, err = artifact.DecodeArtifact([]byte(ChildERC20Artifact))
+	if err != nil {
+		panic(err)
+	}
+
+	ChildERC20Predicate, err = artifact.DecodeArtifact([]byte(ChildERC20PredicateArtifact))
 	if err != nil {
 		panic(err)
 	}
@@ -90,23 +104,32 @@ func init() {
 		panic(err)
 	}
 
-	testL1StateReceiverRaw, err := testContracts.ReadFile(path.Join(testContractsDir, "TestL1StateReceiver.json"))
+	NativeERC20, err = artifact.DecodeArtifact([]byte(NativeERC20Artifact))
 	if err != nil {
 		panic(err)
 	}
 
-	TestL1StateReceiver, err = artifact.DecodeArtifact(testL1StateReceiverRaw)
+	RootERC20, err = artifact.DecodeArtifact([]byte(MockERC20Artifact))
 	if err != nil {
 		panic(err)
 	}
 
-	testWriteBlockMetadataRaw, err := testContracts.ReadFile(path.Join(testContractsDir, "TestWriteBlockMetadata.json"))
+	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))
 	if err != nil {
 		panic(err)
 	}
 
-	TestWriteBlockMetadata, err = artifact.DecodeArtifact(testWriteBlockMetadataRaw)
+	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
 	if err != nil {
 		panic(err)
 	}
+}
+
+func readTestContractContent(contractFileName string) []byte {
+	contractRaw, err := testContracts.ReadFile(path.Join(testContractsDir, contractFileName))
+	if err != nil {
+		panic(err)
+	}
+
+	return contractRaw
 }

@@ -3,13 +3,17 @@ package framework
 import (
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"path"
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/server/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/umbracle/ethgo"
@@ -74,6 +78,10 @@ func (t *TestServer) Conn() proto.SystemClient {
 	return proto.NewSystemClient(conn)
 }
 
+func (t *TestServer) DataDir() string {
+	return t.config.DataDir
+}
+
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
@@ -96,8 +104,8 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback Test
 	}
 
 	srv := &TestServer{
-		clusterConfig: clusterConfig,
 		t:             t,
+		clusterConfig: clusterConfig,
 		config:        config,
 	}
 	srv.Start()
@@ -189,18 +197,33 @@ func (t *TestServer) Unstake(amount uint64) error {
 }
 
 // RegisterValidator is a wrapper function which registers new validator with given balance and stake
-func (t *TestServer) RegisterValidator(secrets string, balance string, stake string) error {
+func (t *TestServer) RegisterValidator(secrets string, stake string) error {
 	args := []string{
 		"polybft",
 		"register-validator",
 		"--" + polybftsecrets.DataPathFlag, path.Join(t.clusterConfig.TmpDir, secrets),
-		"--registrator-data-dir", path.Join(t.clusterConfig.TmpDir, "test-chain-1"),
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--balance", balance,
-		"--stake", stake,
+	}
+
+	if stake != "" {
+		args = append(args, "--stake", stake)
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("register-validator"))
+}
+
+// WhitelistValidator invokes whitelist-validator helper CLI command,
+// which sends whitelist transaction to ChildValidatorSet
+func (t *TestServer) WhitelistValidator(address, secrets string) error {
+	args := []string{
+		"polybft",
+		"whitelist-validator",
+		"--" + polybftsecrets.DataPathFlag, path.Join(t.clusterConfig.TmpDir, secrets),
+		"--address", address,
+		"--jsonrpc", t.JSONRPCAddr(),
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("whitelist-validator"))
 }
 
 // Delegate delegates given amount by the account in secrets to validatorAddr validator
@@ -242,4 +265,58 @@ func (t *TestServer) Withdraw(secrets string, recipient ethgo.Address) error {
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdrawal"))
+}
+
+// HasValidatorSealed checks whether given validator has signed at least single block for the given range of blocks
+func (t *TestServer) HasValidatorSealed(firstBlock, lastBlock uint64, validators polybft.AccountSet,
+	validatorAddr ethgo.Address) (bool, error) {
+	rpcClient := t.JSONRPC()
+	for i := firstBlock + 1; i <= lastBlock; i++ {
+		block, err := rpcClient.Eth().GetBlockByNumber(ethgo.BlockNumber(i), false)
+		if err != nil {
+			return false, err
+		}
+
+		extra, err := polybft.GetIbftExtra(block.ExtraData)
+		if err != nil {
+			return false, err
+		}
+
+		signers, err := validators.GetFilteredValidators(extra.Parent.Bitmap)
+		if err != nil {
+			return false, err
+		}
+
+		if signers.ContainsAddress(types.Address(validatorAddr)) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (t *TestServer) WaitForNonZeroBalance(address ethgo.Address, dur time.Duration) (*big.Int, error) {
+	timer := time.NewTimer(dur)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(150 * time.Millisecond)
+	defer ticker.Stop()
+
+	rpcClient := t.JSONRPC()
+
+	for {
+		select {
+		case <-timer.C:
+			return nil, fmt.Errorf("timeout occurred while waiting for balance ")
+		case <-ticker.C:
+			balance, err := rpcClient.Eth().GetBalance(address, ethgo.Latest)
+			if err != nil {
+				return nil, fmt.Errorf("error getting balance")
+			}
+
+			if balance.Cmp(big.NewInt(0)) == 1 {
+				return balance, nil
+			}
+		}
+	}
 }
