@@ -189,8 +189,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		exitEventID := i + 1
 
 		// send exit transaction to exit helper
-		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, currentEpoch,
-			currentBlock.Number, rootJSONRPC, childJSONRPC)
+		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
 		// make sure exit event is processed successfully

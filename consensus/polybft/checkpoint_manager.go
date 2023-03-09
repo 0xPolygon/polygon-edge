@@ -21,11 +21,8 @@ import (
 var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
-	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
+	currentCheckpointBlockNumMethod = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
 	// TODO: @Stefan-Ethernal use the function from contractsapi
-	// findCheckpointBlockMethod = abi.MustNewMethod(
-	//"function findCheckpointBlock(uint256 blockNumber) returns tuple(uint256, bool)")
-	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
 )
 

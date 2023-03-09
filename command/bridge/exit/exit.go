@@ -26,8 +26,7 @@ import (
 const (
 	// flag names
 	exitHelperFlag   = "exit-helper"
-	exitEventIDFlag  = "event-id"
-	blockNumberFlag  = "block-number"
+	exitEventIDFlag  = "exit-id"
 	rootJSONRPCFlag  = "root-json-rpc"
 	childJSONRPCFlag = "child-json-rpc"
 
@@ -40,7 +39,6 @@ type exitParams struct {
 	accountConfig     string
 	exitHelperAddrRaw string
 	exitID            uint64
-	blockNumber       uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
 	isTestMode        bool
@@ -91,13 +89,6 @@ func GetCommand() *cobra.Command {
 		exitEventIDFlag,
 		0,
 		"child chain exit event ID",
-	)
-
-	exitCmd.Flags().Uint64Var(
-		&ep.blockNumber,
-		blockNumberFlag,
-		0,
-		"child chain exit event block number",
 	)
 
 	exitCmd.Flags().StringVar(
@@ -180,12 +171,9 @@ func run(cmd *cobra.Command, _ []string) {
 	// acquire proof for given exit event
 	var proof types.Proof
 
-	err = childClient.Call(generateExitProofFn, &proof,
-		fmt.Sprintf("0x%x", ep.exitID),
-		fmt.Sprintf("0x%x", ep.blockNumber))
+	err = childClient.Call(generateExitProofFn, &proof, fmt.Sprintf("0x%x", ep.exitID))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to get exit proof (exit id=%d, block number=%d): %w",
-			ep.exitID, ep.blockNumber, err))
+		outputter.SetError(fmt.Errorf("failed to get exit proof (exit id=%d): %w", ep.exitID, err))
 
 		return
 	}
@@ -201,16 +189,13 @@ func run(cmd *cobra.Command, _ []string) {
 	// send exit transaction
 	receipt, err := rootTxRelayer.SendTransaction(txn, senderKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send exit transaction "+
-			"(exit id=%d, block number=%d): %w",
-			ep.exitID, ep.blockNumber, err))
+		outputter.SetError(fmt.Errorf("failed to send exit transaction (exit id=%d): %w", ep.exitID, err))
 
 		return
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		outputter.SetError(fmt.Errorf("failed to execute exit transaction (exit id=%d, block number=%d)",
-			ep.exitID, ep.blockNumber))
+		outputter.SetError(fmt.Errorf("failed to execute exit transaction (exit id=%d)", ep.exitID))
 
 		return
 	}
