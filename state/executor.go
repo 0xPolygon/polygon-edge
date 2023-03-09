@@ -426,6 +426,10 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 // checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
 // Basically, makes sure gas tip cap and gas fee cap are good.
 func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
+	if msg.Type != types.DynamicFeeTx {
+		return nil
+	}
+
 	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
 		return nil
 	}
