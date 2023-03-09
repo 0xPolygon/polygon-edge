@@ -375,8 +375,9 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 	return types.Proof{
 		Data: proof,
 		Metadata: map[string]interface{}{
-			"LeafIndex": leafIndex,
-			"ExitEvent": exitEvent,
+			"LeafIndex":       leafIndex,
+			"ExitEvent":       exitEvent,
+			"CheckpointBlock": checkpointBlock,
 		},
 	}, nil
 }
