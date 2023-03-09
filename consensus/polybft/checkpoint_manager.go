@@ -16,7 +16,6 @@ import (
 	metrics "github.com/armon/go-metrics"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
@@ -24,8 +23,8 @@ var (
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
 	// TODO: @Stefan-Ethernal use the function from contractsapi
-	findCheckpointBlockMethod = abi.MustNewMethod(
-		"function findCheckpointBlock(uint256 blockNumber) returns tuple(uint256, bool)")
+	// findCheckpointBlockMethod = abi.MustNewMethod(
+	//"function findCheckpointBlock(uint256 blockNumber) returns tuple(uint256, bool)")
 	// frequency at which checkpoints are sent to the rootchain (in blocks count)
 	defaultCheckpointsOffset = uint64(900)
 )
@@ -33,7 +32,7 @@ var (
 type CheckpointManager interface {
 	PostBlock(req *PostBlockRequest) error
 	BuildEventRoot(epoch uint64) (types.Hash, error)
-	GenerateExitProof(exitID, blockNumber uint64) (types.Proof, error)
+	GenerateExitProof(exitID uint64) (types.Proof, error)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
@@ -44,7 +43,7 @@ func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return
 func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return types.ZeroHash, nil
 }
-func (d *dummyCheckpointManager) GenerateExitProof(exitID, blockNumber uint64) (types.Proof, error) {
+func (d *dummyCheckpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
 }
 
@@ -330,8 +329,8 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 }
 
 // GenerateExitProof generates proof of exit event
-func (c *checkpointManager) GenerateExitProof(exitID, blockNumber uint64) (types.Proof, error) {
-	_, extra, err := getBlockData(blockNumber, c.blockchain)
+func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
+	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -351,17 +350,12 @@ func (c *checkpointManager) GenerateExitProof(exitID, blockNumber uint64) (types
 	// (abi.encode(tuple(uint256 checkpointBlock, bool tuple))
 	checkpointBlock := uint64(0)
 
-	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID, extra.Checkpoint.EpochNumber)
-	if err != nil {
-		return types.Proof{}, err
-	}
-
 	e, err := ExitEventInputsABIType.Encode(exitEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(extra.Checkpoint.EpochNumber, checkpointBlock)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock)
 	if err != nil {
 		return types.Proof{}, err
 	}

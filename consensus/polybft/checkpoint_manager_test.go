@@ -385,7 +385,7 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	tree, err := merkle.NewMerkleTree(checkpointEvents)
 	require.NoError(t, err)
 
-	proof, err := checkpointManager.GenerateExitProof(1, 1)
+	proof, err := checkpointManager.GenerateExitProof(1)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
@@ -410,7 +410,7 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	t.Run("Generate exit proof - no event", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := checkpointManager.GenerateExitProof(21, 1)
+		_, err := checkpointManager.GenerateExitProof(21)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
 	})
 }
