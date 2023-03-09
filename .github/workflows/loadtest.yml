@@ -74,7 +74,6 @@
 
         - id: k6
           name: Run scenario
-          continue-on-error: true
           run: |
             ./k6 run --out statsd loadtest/scenarios/${{ inputs.scenario }}.js
             echo "tps_avg=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.avg')" >> $GITHUB_OUTPUT
