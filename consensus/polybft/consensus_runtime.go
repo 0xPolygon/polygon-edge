@@ -950,7 +950,7 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	data := make([][]byte, numOfEvents)
 
 	for i := 0; i < numOfEvents; i++ {
-		b, err := ExitEventABIType.Encode(exitEvents[i])
+		b, err := ExitEventInputsABIType.Encode(exitEvents[i])
 		if err != nil {
 			return nil, err
 		}

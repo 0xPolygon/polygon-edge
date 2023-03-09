@@ -79,7 +79,12 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to call getValidator function: %w", err)
 		}
 
-		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["blsKey"].([4]*big.Int))
+		blsKey, ok := output["blsKey"].([4]*big.Int)
+		if !ok {
+			return nil, fmt.Errorf("failed to decode blskey")
+		}
+
+		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(blsKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal BLS public key: %w", err)
 		}

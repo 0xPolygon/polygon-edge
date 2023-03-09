@@ -247,14 +247,14 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 			if len(test.storedSnapshotMetadata) != 0 {
 				assert.NoError(
 					t,
-					os.WriteFile(path.Join(dirPath, snapshotMetadataFilename), []byte(test.storedSnapshotMetadata), os.ModePerm),
+					os.WriteFile(path.Join(dirPath, snapshotMetadataFilename), []byte(test.storedSnapshotMetadata), 0775),
 				)
 			}
 
 			if len(test.storedSnapshots) != 0 {
 				assert.NoError(
 					t,
-					os.WriteFile(path.Join(dirPath, snapshotSnapshotsFilename), []byte(test.storedSnapshots), os.ModePerm),
+					os.WriteFile(path.Join(dirPath, snapshotSnapshotsFilename), []byte(test.storedSnapshots), 0775),
 				)
 			}
 

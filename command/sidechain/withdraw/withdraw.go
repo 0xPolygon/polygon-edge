@@ -108,7 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
-	var foundLog bool
+	foundLog := false
 
 	for _, log := range receipt.Logs {
 		if withdrawEventABI.Match(log) {

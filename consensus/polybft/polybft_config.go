@@ -64,10 +64,11 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	BridgeAddr      types.Address `json:"stateSenderAddr"`
-	CheckpointAddr  types.Address `json:"checkpointAddr"`
-	AdminAddress    types.Address `json:"adminAddress"`
-	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
+	BridgeAddr             types.Address `json:"stateSenderAddr"`
+	CheckpointAddr         types.Address `json:"checkpointAddr"`
+	RootERC20PredicateAddr types.Address `json:"rootERC20PredicateAddr"`
+	RootNativeERC20Addr    types.Address `json:"rootNativeERC20Addr"`
+	JSONRPCEndpoint        string        `json:"jsonRPCEndpoint"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
@@ -81,7 +82,7 @@ type Validator struct {
 	BlsKey        string
 	BlsSignature  string
 	Balance       *big.Int
-	NodeID        string
+	MultiAddr     string
 }
 
 type validatorRaw struct {
@@ -89,11 +90,11 @@ type validatorRaw struct {
 	BlsKey       string        `json:"blsKey"`
 	BlsSignature string        `json:"blsSignature"`
 	Balance      *string       `json:"balance"`
-	NodeID       string        `json:"nodeId"`
+	MultiAddr    string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID, BlsSignature: v.BlsSignature}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 
 	return json.Marshal(raw)
@@ -111,7 +112,7 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
 	v.BlsSignature = raw.BlsSignature
-	v.NodeID = raw.NodeID
+	v.MultiAddr = raw.MultiAddr
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
 	if err != nil {
@@ -185,20 +186,23 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 // RootchainConfig contains information about rootchain contract addresses
 // as well as rootchain admin account address
 type RootchainConfig struct {
-	StateSenderAddress       types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
-	BLSAddress               types.Address `json:"blsAddress"`
-	BN256G2Address           types.Address `json:"bn256G2Address"`
-	ExitHelperAddress        types.Address `json:"exitHelperAddress"`
-	AdminAddress             types.Address `json:"adminAddress"`
+	StateSenderAddress        types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress  types.Address `json:"checkpointManagerAddress"`
+	BLSAddress                types.Address `json:"blsAddress"`
+	BN256G2Address            types.Address `json:"bn256G2Address"`
+	ExitHelperAddress         types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
+	RootNativeERC20Address    types.Address `json:"rootNativeERC20Address"`
+	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance
 func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
-		BridgeAddr:     r.StateSenderAddress,
-		CheckpointAddr: r.CheckpointManagerAddress,
-		AdminAddress:   r.AdminAddress,
+		BridgeAddr:             r.StateSenderAddress,
+		CheckpointAddr:         r.CheckpointManagerAddress,
+		RootERC20PredicateAddr: r.RootERC20PredicateAddress,
+		RootNativeERC20Addr:    r.RootNativeERC20Address,
 	}
 }
 

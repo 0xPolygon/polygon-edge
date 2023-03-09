@@ -18,13 +18,13 @@ var (
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
 
-	// rootchainAdminKey is a private key of account which is rootchain administrator
-	// namely it represents account which deploys rootchain smart contracts
-	rootchainAdminKey *wallet.Key
+	// rootchainAccountKey is a private key of account which is used for different actions on rootchain
+	// (smart contracts deployment, deposits etc.)
+	rootchainAccountKey *wallet.Key
 )
 
-// InitRootchainAdminKey initializes a private key instance from provided hex encoded private key
-func InitRootchainAdminKey(rawKey string) error {
+// InitRootchainPrivateKey initializes a private key instance from provided hex encoded private key
+func InitRootchainPrivateKey(rawKey string) error {
 	privateKeyRaw := DefaultPrivateKeyRaw
 	if rawKey != "" {
 		privateKeyRaw = rawKey
@@ -35,7 +35,7 @@ func InitRootchainAdminKey(rawKey string) error {
 		return fmt.Errorf("failed to decode private key string '%s': %w", privateKeyRaw, err)
 	}
 
-	rootchainAdminKey, err = wallet.NewWalletFromPrivKey(dec)
+	rootchainAccountKey, err = wallet.NewWalletFromPrivKey(dec)
 	if err != nil {
 		return fmt.Errorf("failed to initialize key from provided private key '%s': %w", privateKeyRaw, err)
 	}
@@ -43,9 +43,9 @@ func InitRootchainAdminKey(rawKey string) error {
 	return nil
 }
 
-// GetRootchainAdminKey returns rootchain admin private key
-func GetRootchainAdminKey() ethgo.Key {
-	return rootchainAdminKey
+// GetRootchainPrivateKey returns rootchain account private key
+func GetRootchainPrivateKey() ethgo.Key {
+	return rootchainAccountKey
 }
 
 func GetRootchainID() (string, error) {
@@ -90,4 +90,9 @@ func ReadRootchainIP() (string, error) {
 	}
 
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
+}
+
+// IsTestMode returns true in case provided rootchain private key is the same as DefaultPrivateKey one
+func IsTestMode(rootchainPrivKey string) bool {
+	return rootchainPrivKey == DefaultPrivateKeyRaw
 }

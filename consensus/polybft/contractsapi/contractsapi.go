@@ -199,6 +199,31 @@ func (i *InitializeChildValidatorSetFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["initialize"], buf, i)
 }
 
+type AddToWhitelistFunction struct {
+	WhitelistAddreses []ethgo.Address `abi:"whitelistAddreses"`
+}
+
+func (a *AddToWhitelistFunction) EncodeAbi() ([]byte, error) {
+	return ChildValidatorSet.Abi.Methods["addToWhitelist"].Encode(a)
+}
+
+func (a *AddToWhitelistFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildValidatorSet.Abi.Methods["addToWhitelist"], buf, a)
+}
+
+type RegisterFunction struct {
+	Signature [2]*big.Int `abi:"signature"`
+	Pubkey    [4]*big.Int `abi:"pubkey"`
+}
+
+func (r *RegisterFunction) EncodeAbi() ([]byte, error) {
+	return ChildValidatorSet.Abi.Methods["register"].Encode(r)
+}
+
+func (r *RegisterFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildValidatorSet.Abi.Methods["register"], buf, r)
+}
+
 type SyncStateFunction struct {
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`
@@ -221,6 +246,17 @@ type StateSyncedEvent struct {
 
 func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
 	return decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
+}
+
+type L2StateSyncedEvent struct {
+	ID       *big.Int      `abi:"id"`
+	Sender   types.Address `abi:"sender"`
+	Receiver types.Address `abi:"receiver"`
+	Data     []byte        `abi:"data"`
+}
+
+func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) error {
+	return decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
 }
 
 type CheckpointMetadata struct {
@@ -300,4 +336,121 @@ func (i *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
+}
+
+type ExitFunction struct {
+	BlockNumber  *big.Int     `abi:"blockNumber"`
+	LeafIndex    *big.Int     `abi:"leafIndex"`
+	UnhashedLeaf []byte       `abi:"unhashedLeaf"`
+	Proof        []types.Hash `abi:"proof"`
+}
+
+func (e *ExitFunction) EncodeAbi() ([]byte, error) {
+	return ExitHelper.Abi.Methods["exit"].Encode(e)
+}
+
+func (e *ExitFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ExitHelper.Abi.Methods["exit"], buf, e)
+}
+
+type InitializeChildERC20PredicateFunction struct {
+	NewL2StateSender          types.Address `abi:"newL2StateSender"`
+	NewStateReceiver          types.Address `abi:"newStateReceiver"`
+	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
+	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
+	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
+}
+
+func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+	return ChildERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC20PredicateFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawToFunction struct {
+	ChildToken types.Address `abi:"childToken"`
+	Receiver   types.Address `abi:"receiver"`
+	Amount     *big.Int      `abi:"amount"`
+}
+
+func (w *WithdrawToFunction) EncodeAbi() ([]byte, error) {
+	return ChildERC20Predicate.Abi.Methods["withdrawTo"].Encode(w)
+}
+
+func (w *WithdrawToFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
+}
+
+type InitializeNativeERC20Function struct {
+	Predicate_ types.Address `abi:"predicate_"`
+	RootToken_ types.Address `abi:"rootToken_"`
+	Name_      string        `abi:"name_"`
+	Symbol_    string        `abi:"symbol_"`
+	Decimals_  uint8         `abi:"decimals_"`
+}
+
+func (i *InitializeNativeERC20Function) EncodeAbi() ([]byte, error) {
+	return NativeERC20.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeNativeERC20Function) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeRootERC20PredicateFunction struct {
+	NewStateSender         types.Address `abi:"newStateSender"`
+	NewExitHelper          types.Address `abi:"newExitHelper"`
+	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
+	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
+	NativeTokenRootAddress types.Address `abi:"nativeTokenRootAddress"`
+}
+
+func (i *InitializeRootERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeRootERC20PredicateFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type DepositToFunction struct {
+	RootToken types.Address `abi:"rootToken"`
+	Receiver  types.Address `abi:"receiver"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (d *DepositToFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20Predicate.Abi.Methods["depositTo"].Encode(d)
+}
+
+func (d *DepositToFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
+}
+
+type ApproveFunction struct {
+	Spender types.Address `abi:"spender"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (a *ApproveFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["approve"].Encode(a)
+}
+
+func (a *ApproveFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["approve"], buf, a)
+}
+
+type MintFunction struct {
+	To     types.Address `abi:"to"`
+	Amount *big.Int      `abi:"amount"`
+}
+
+func (m *MintFunction) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["mint"].Encode(m)
+}
+
+func (m *MintFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }

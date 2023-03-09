@@ -56,6 +56,7 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
+	ErrInvalidTxType           = errors.New("invalid tx type")
 	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
 	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
@@ -584,6 +585,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // validateTx ensures the transaction conforms to specific
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
+	// Check the transaction type. State transactions are not expected to be added to the pool
+	if tx.Type == types.StateTx {
+		return ErrInvalidTxType
+	}
+
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
 		return ErrOversizedData
@@ -753,7 +759,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// check for overflow
-	if p.gauge.read()+slotsRequired(tx) > p.gauge.max {
+	if slotsRequired(tx) > p.gauge.max-p.gauge.read() {
 		return ErrTxPoolOverflow
 	}
 

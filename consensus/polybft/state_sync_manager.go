@@ -126,7 +126,7 @@ func (s *stateSyncManager) Close() {
 func (s *stateSyncManager) initTracker() error {
 	ctx, cancelFn := context.WithCancel(context.Background())
 
-	tracker := tracker.NewEventTracker(
+	evtTracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
 		s.config.jsonrpcAddr,
 		ethgo.Address(s.config.stateSenderAddr),
@@ -139,7 +139,7 @@ func (s *stateSyncManager) initTracker() error {
 		cancelFn()
 	}()
 
-	return tracker.Start(ctx)
+	return evtTracker.Start(ctx)
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)
@@ -318,7 +318,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 	var signatures bls.Signatures
 
 	publicKeys := make([][]byte, 0)
-	bitmap := bitmap.Bitmap{}
+	bmap := bitmap.Bitmap{}
 	signers := make(map[types.Address]struct{}, 0)
 
 	for _, vote := range votes {
@@ -332,7 +332,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 			return Signature{}, nil, err
 		}
 
-		bitmap.Set(uint64(index))
+		bmap.Set(uint64(index))
 
 		signatures = append(signatures, signature)
 		publicKeys = append(publicKeys, validatorsMetadata[index].BlsKey.Marshal())
@@ -350,7 +350,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 
 	result := Signature{
 		AggregatedSignature: aggregatedSignature,
-		Bitmap:              bitmap,
+		Bitmap:              bmap,
 	}
 
 	return result, publicKeys, nil

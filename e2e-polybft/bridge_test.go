@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	ethgow "github.com/umbracle/ethgo/wallet"
+
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	rootchainHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -24,20 +29,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
-	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
 const (
 	manifestFileName = "manifest.json"
 )
 
-// checkLogs is helper function which parses given ResultEvent event's logs,
+// checkStateSyncResultLogs is helper function which parses given StateSyncResultEvent event's logs,
 // extracts status topic value and makes assertions against it.
-func checkLogs(
+func checkStateSyncResultLogs(
 	t *testing.T,
 	logs []*ethgo.Log,
 	expectedCount int,
@@ -47,59 +47,56 @@ func checkLogs(
 
 	for _, log := range logs {
 		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
-		assert.NoError(t, stateSyncResultEvent.ParseLog(log))
+		require.NoError(t, stateSyncResultEvent.ParseLog(log))
 
-		t.Logf("Block Number=%d, Decoded Log=%+v", log.BlockNumber, stateSyncResultEvent)
+		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
 
-		assert.True(t, stateSyncResultEvent.Status)
+		require.True(t, stateSyncResultEvent.Status)
 	}
 }
 
-func TestE2E_Bridge_MainWorkflow(t *testing.T) {
+func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	const (
 		num                   = 10
-		numBlockConfirmations = 4
+		amount                = 100
+		numBlockConfirmations = 2
+		// make epoch size long enough, so that all exit events are processed within the same epoch
+		epochSize = 30
 	)
 
-	var (
-		accounts         = make([]ethgo.Key, num)
-		wallets, amounts [num]string
-		premine          [num]types.Address
-	)
+	receivers := make([]string, num)
+	amounts := make([]string, num)
 
 	for i := 0; i < num; i++ {
-		accounts[i], _ = ethgow.GenerateKey()
-		premine[i] = types.Address(accounts[i].Address())
-		wallets[i] = premine[i].String()
-		amounts[i] = fmt.Sprintf("%d", 100)
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		receivers[i] = types.Address(key.Address()).String()
+		amounts[i] = fmt.Sprintf("%d", amount)
+
+		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(), framework.WithPremine(premine[:]...),
-		framework.WithNumBlockConfirmations(numBlockConfirmations))
+		framework.WithBridge(),
+		framework.WithNumBlockConfirmations(numBlockConfirmations),
+		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
 	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
 
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
+
+	// DEPOSIT ERC20 TOKENS
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[:], ","),
-			strings.Join(amounts[:], ","),
-		),
-	)
-
-	require.NoError(t, cluster.WaitForBlock(2+numBlockConfirmations*2, 2*time.Minute))
-
-	// send again to trigger previous transactions
-	require.NoError(
-		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[:], ","),
+		cluster.Bridge.DepositERC20(
+			manifest.RootchainConfig.RootNativeERC20Address,
+			manifest.RootchainConfig.RootERC20PredicateAddress,
+			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 		),
 	)
@@ -107,7 +104,7 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
-	// the transactions are mined and there should be a success events
+	// the transactions are processed and there should be a success events
 	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
@@ -118,31 +115,129 @@ func TestE2E_Bridge_MainWorkflow(t *testing.T) {
 	filter.SetFromUint64(0)
 	filter.SetToUint64(100)
 
-	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
+	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+
+	logs, err := childEthEndpoint.GetLogs(filter)
 	require.NoError(t, err)
 
-	// Assert that all state syncs are executed successfully
-	checkLogs(t, logs, num)
+	// assert that all deposits are executed successfully
+	checkStateSyncResultLogs(t, logs, num)
+
+	// check receivers balances got increased by deposited amount
+	for _, receiver := range receivers {
+		balance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(amount), balance)
+	}
+
+	t.Log("Deposits were successfully processed")
+
+	// WITHDRAW ERC20 TOKENS
+	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	senderAccount, err := sidechain.GetAccountFromDir(cluster.Servers[0].DataDir())
+	require.NoError(t, err)
+
+	rawPrivateSenderKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
+	require.NoError(t, err)
+
+	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
+
+	// send withdraw transaction
+	err = cluster.Bridge.WithdrawERC20(
+		hex.EncodeToString(rawPrivateSenderKey),
+		strings.Join(receivers[:], ","),
+		strings.Join(amounts[:], ","),
+		cluster.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
+
+	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
+	require.NoError(t, err)
+
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	require.NoError(t, err)
+
+	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
+
+	currentEpoch := currentExtra.Checkpoint.EpochNumber
+	fail := 0
+
+	// make sure we have progressed to the next epoch on the root chain
+	// before sending exit transaction to the root chain
+	// (it means that checkpoint was submitted)
+	for range time.Tick(time.Second) {
+		currentEpochString, err := ABICall(rootchainTxRelayer, contractsapi.CheckpointManager,
+			ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress), ethgo.ZeroAddress, "currentEpoch")
+		require.NoError(t, err)
+
+		rootchainEpoch, err := types.ParseUint64orHex(&currentEpochString)
+		require.NoError(t, err)
+
+		if rootchainEpoch >= currentEpoch {
+			break
+		}
+
+		if fail > 300 {
+			t.Fatal("root chain hasn't progressed to the next epoch")
+		}
+		fail++
+	}
+
+	exitHelper := manifest.RootchainConfig.ExitHelperAddress
+	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
+	childJSONRPC := cluster.Servers[0].JSONRPCAddr()
+
+	for i := uint64(0); i < num; i++ {
+		exitEventID := i + 1
+
+		// send exit transaction to exit helper
+		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, currentEpoch,
+			currentBlock.Number, rootJSONRPC, childJSONRPC)
+		require.NoError(t, err)
+
+		// make sure exit event is processed successfully
+		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
+		require.NoError(t, err)
+		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
+	}
+
+	// assert that receiver's balances on RootERC20 smart contract are expected
+	for _, receiver := range receivers {
+		balanceInput, err := contractsapi.RootERC20.Abi.Methods["balanceOf"].Encode([]interface{}{receiver})
+		require.NoError(t, err)
+
+		balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress,
+			ethgo.Address(manifest.RootchainConfig.RootNativeERC20Address), balanceInput)
+		require.NoError(t, err)
+
+		balance, err := types.ParseUint256orHex(&balanceRaw)
+		require.NoError(t, err)
+		require.Equal(t, big.NewInt(amount), balance)
+	}
 }
 
 func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
-	const num = 10
+	const depositsCount = 10
 
-	var (
-		accounts         = make([]ethgo.Key, num)
-		wallets, amounts [num]string
-		premine          [num]types.Address
-	)
+	receivers := make([]string, depositsCount)
+	amounts := make([]string, depositsCount)
 
-	for i := 0; i < num; i++ {
-		accounts[i], _ = ethgow.GenerateKey()
-		premine[i] = types.Address(accounts[i].Address())
-		wallets[i] = premine[i].String()
+	for i := 0; i < depositsCount; i++ {
+		key, err := ethgow.GenerateKey()
+		require.NoError(t, err)
+
+		receivers[i] = types.Address(key.Address()).String()
 		amounts[i] = fmt.Sprintf("%d", 100)
 	}
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithPremine(premine[:]...), framework.WithEpochSize(30))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithEpochSize(30))
 	defer cluster.Stop()
+
+	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	require.NoError(t, err)
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
@@ -150,9 +245,10 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[:2], ","),
+		cluster.Bridge.DepositERC20(
+			manifest.RootchainConfig.RootNativeERC20Address,
+			manifest.RootchainConfig.RootERC20PredicateAddress,
+			strings.Join(receivers[:2], ","),
 			strings.Join(amounts[:2], ","),
 		),
 	)
@@ -160,8 +256,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
 
-	client := cluster.Servers[0].JSONRPC()
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
 	require.NoError(t, err)
 
 	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
@@ -169,7 +264,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, err)
 
 	// check that we submitted the minimal commitment to smart contract
-	result, err := txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	result, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
 	require.NoError(t, err)
 
 	lastCommittedID, err := strconv.ParseUint(result, 0, 64)
@@ -179,9 +274,10 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
 		t,
-		cluster.EmitTransfer(
-			contracts.NativeTokenContract.String(),
-			strings.Join(wallets[2:], ","),
+		cluster.Bridge.DepositERC20(
+			manifest.RootchainConfig.RootNativeERC20Address,
+			manifest.RootchainConfig.RootERC20PredicateAddress,
+			strings.Join(receivers[2:], ","),
 			strings.Join(amounts[2:], ","),
 		),
 	)
@@ -190,13 +286,13 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(40, 3*time.Minute))
 
 	// check that we submitted the minimal commitment to smart contract
-	result, err = txRelayer.Call(accounts[0].Address(), ethgo.Address(contracts.StateReceiverContract), encode)
+	result, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
 	require.NoError(t, err)
 
 	// check that the second (larger commitment) was also submitted in epoch
 	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
 	require.NoError(t, err)
-	require.Equal(t, uint64(10), lastCommittedID)
+	require.Equal(t, uint64(depositsCount), lastCommittedID)
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
@@ -213,8 +309,8 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
 	require.NoError(t, err)
 
-	// Assert that all state syncs are executed successfully
-	checkLogs(t, logs, num)
+	// assert that all state syncs are executed successfully
+	checkStateSyncResultLogs(t, logs, depositsCount)
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
@@ -230,10 +326,9 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
-	rootchainSender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	testCheckpointBlockNumber := func(expectedCheckpointBlock uint64) (bool, error) {
-		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr, rootchainSender)
+		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
 		if err != nil {
 			return false, err
 		}
@@ -269,9 +364,9 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 }
 
 // getCheckpointBlockNumber gets current checkpoint block number from checkpoint manager smart contract
-func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAddr, sender ethgo.Address) (uint64, error) {
+func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) (uint64, error) {
 	checkpointBlockNumRaw, err := ABICall(l1Relayer, contractsapi.CheckpointManager,
-		checkpointManagerAddr, sender, "currentCheckpointBlockNumber")
+		checkpointManagerAddr, ethgo.ZeroAddress, "currentCheckpointBlockNumber")
 	if err != nil {
 		return 0, err
 	}
@@ -304,7 +399,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	}
 
 	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -319,7 +414,6 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
-	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
@@ -332,7 +426,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainAdminKey())
+		rootchainHelper.GetRootchainPrivateKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -353,7 +447,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	fail := 0
 
 	for range time.Tick(time.Second) {
-		currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
+		currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, ethgo.ZeroAddress, "currentEpoch")
 		require.NoError(t, err)
 
 		currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
@@ -376,7 +470,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
 		require.NoError(t, err)
 
-		isProcessed, err := isExitEventProcessed(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitID)
+		isProcessed, err := sendExitTransaction(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitID)
 		require.NoError(t, err)
 		require.True(t, isProcessed)
 	}
@@ -392,7 +486,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	)
 
 	exitEventIds := make([]uint64, userNumber*roundNumber)
-
 	sidechainKeys := make([]*ethgow.Key, userNumber)
 	accountAddress := make([]types.Address, userNumber)
 
@@ -405,14 +498,13 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 
 	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainAdminKey(""))
+	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithPremine(accountAddress...),
 		framework.WithEpochSize(epochSize),
 	)
-
 	defer cluster.Stop()
 
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
@@ -420,7 +512,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
-	adminAddr := ethgo.Address(manifest.RootchainConfig.AdminAddress)
 
 	// wait for a couple of blocks
 	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
@@ -433,7 +524,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainAdminKey())
+		rootchainHelper.GetRootchainPrivateKey())
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -443,7 +534,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	// Start test
 	// send crosschain transaction on l2 and get exit id
 	stateSenderData := []byte{123}
-	//g, _ := errgroup.WithContext(context.Background())
 	addTransaction := func(j, i uint64) {
 		receipt, err := ABITransaction(l2TxRelayer, sidechainKeys[j], contractsapi.L2StateSender, l2StateSenderAddress, "syncState", l1ExitTestAddr, stateSenderData)
 		require.NoError(t, err)
@@ -464,7 +554,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		fail := 0
 
 		for range time.Tick(time.Second) {
-			currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, adminAddr, "currentEpoch")
+			currentEpochString, err := ABICall(l1TxRelayer, contractsapi.CheckpointManager, checkpointManagerAddr, ethgo.ZeroAddress, "currentEpoch")
 			require.NoError(t, err)
 
 			currentEpoch, err := types.ParseUint64orHex(&currentEpochString)
@@ -487,15 +577,15 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		for j := 0; j < userNumber; j++ {
 			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber], uint64(i+1)*checkpointEpoch, uint64(i+1)*checkpointBlock)
 			require.NoError(t, err)
-			isProcessed, err := isExitEventProcessed(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, adminAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
+			isProcessed, err := sendExitTransaction(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
 			require.NoError(t, err)
 			require.True(t, isProcessed)
 		}
 	}
 }
 
-func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr, adminAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
-	proofExitEventEncoded, err := polybft.ExitEventABIType.Encode(&polybft.ExitEvent{
+func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
+	proofExitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,
@@ -510,7 +600,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpoin
 		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
 	}
 
-	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainAdminKey(), contractsapi.ExitHelper, exitHelperAddr,
+	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainPrivateKey(), contractsapi.ExitHelper, exitHelperAddr,
 		"exit",
 		big.NewInt(int64(checkpointBlock)),
 		uint64(leafIndex),
@@ -526,17 +616,7 @@ func isExitEventProcessed(sidechainKey *ethgow.Key, proof types.Proof, checkpoin
 		return false, errors.New("transaction execution failed")
 	}
 
-	result, err := ABICall(l1TxRelayer, contractsapi.ExitHelper, exitHelperAddr, adminAddr, "processedExits", big.NewInt(int64(exitEventID)))
-	if err != nil {
-		return false, err
-	}
-
-	parserRes, err := types.ParseUint64orHex(&result)
-	if err != nil {
-		return false, err
-	}
-
-	return parserRes == uint64(1), nil
+	return isExitEventProcessed(exitEventID, exitHelperAddr, l1TxRelayer)
 }
 
 func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
@@ -579,7 +659,7 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 	return rspProof.Result, nil
 }
 
-// TODO: Remove this to some separate file, containing helper functions?
+// TODO: Move this to some separate file, containing helper functions?
 func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractAddress ethgo.Address, senderAddr ethgo.Address, method string, params ...interface{}) (string, error) {
 	input, err := artifact.Abi.GetMethod(method).Encode(params)
 	if err != nil {
@@ -678,10 +758,8 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		require.Equal(t, stakedAmount, validator.TotalStake)
 	})
 
-	l1Sender := ethgo.Address(manifest.RootchainConfig.AdminAddress)
-	// assert that block 20 gets checkpointed
 	require.NoError(t, cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
-		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr, l1Sender)
+		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
 		if err != nil {
 			return false, err
 		}
