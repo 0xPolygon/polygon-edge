@@ -5,6 +5,7 @@ package v1;
 option go_package = "/server/proto";
 
 import "google/protobuf/empty.proto";
+import "validate/validate.proto";
 
 service System {
   // GetInfo returns info about the client
@@ -61,7 +62,7 @@ message Peer {
 }
 
 message PeersAddRequest {
-  string id = 1;
+  string id = 1[(validate.rules).string.pattern = "^\\/[A-Za-z0-9._~-]+(\\/[A-Za-z0-9._~-]+)*$"];
 }
 
 message PeersAddResponse {
@@ -69,7 +70,7 @@ message PeersAddResponse {
 }
 
 message PeersStatusRequest {
-  string id = 1;
+  string id = 1[(validate.rules).string.pattern = "^[A-Za-z0-9]{1,}$"];
 }
 
 message PeersListResponse {
