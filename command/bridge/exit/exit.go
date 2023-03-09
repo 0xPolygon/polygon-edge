@@ -27,7 +27,6 @@ const (
 	// flag names
 	exitHelperFlag      = "exit-helper"
 	exitEventIDFlag     = "event-id"
-	epochFlag           = "epoch"
 	checkpointBlockFlag = "checkpoint-block"
 	rootJSONRPCFlag     = "root-json-rpc"
 	childJSONRPCFlag    = "child-json-rpc"
@@ -41,8 +40,7 @@ type exitParams struct {
 	accountConfig     string
 	exitHelperAddrRaw string
 	exitID            uint64
-	epochNumber       uint64
-	checkpointBlock   uint64
+	blockNumber       uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
 	isTestMode        bool
@@ -96,17 +94,10 @@ func GetCommand() *cobra.Command {
 	)
 
 	exitCmd.Flags().Uint64Var(
-		&ep.epochNumber,
-		epochFlag,
-		0,
-		"child chain exit event epoch number",
-	)
-
-	exitCmd.Flags().Uint64Var(
-		&ep.checkpointBlock,
+		&ep.blockNumber,
 		checkpointBlockFlag,
 		0,
-		"child chain exit event checkpoint block",
+		"child chain exit event block number",
 	)
 
 	exitCmd.Flags().StringVar(
@@ -191,11 +182,10 @@ func run(cmd *cobra.Command, _ []string) {
 
 	err = childClient.Call(generateExitProofFn, &proof,
 		fmt.Sprintf("0x%x", ep.exitID),
-		fmt.Sprintf("0x%x", ep.epochNumber),
-		fmt.Sprintf("0x%x", ep.checkpointBlock))
+		fmt.Sprintf("0x%x", ep.blockNumber))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to get exit proof (exit id=%d, epoch number=%d, checkpoint block=%d): %w",
-			ep.exitID, ep.epochNumber, ep.checkpointBlock, err))
+		outputter.SetError(fmt.Errorf("failed to get exit proof (exit id=%d, block number=%d): %w",
+			ep.exitID, ep.blockNumber, err))
 
 		return
 	}
@@ -212,15 +202,15 @@ func run(cmd *cobra.Command, _ []string) {
 	receipt, err := rootTxRelayer.SendTransaction(txn, senderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to send exit transaction "+
-			"(exit id=%d, epoch number=%d, checkpoint block=%d): %w",
-			ep.exitID, ep.epochNumber, ep.checkpointBlock, err))
+			"(exit id=%d, block number=%d): %w",
+			ep.exitID, ep.blockNumber, err))
 
 		return
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		outputter.SetError(fmt.Errorf("failed to execute exit transaction (exit id=%d, epoch number=%d, checkpoint block=%d)",
-			ep.exitID, ep.epochNumber, ep.checkpointBlock))
+		outputter.SetError(fmt.Errorf("failed to execute exit transaction (exit id=%d, block number=%d)",
+			ep.exitID, ep.blockNumber))
 
 		return
 	}
@@ -265,11 +255,16 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 
 	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
 	if !ok {
-		return nil, nil, errors.New("failed to convert proof leaf index to float64")
+		return nil, nil, errors.New("failed to convert proof leaf index")
+	}
+
+	checkpointBlock, ok := proof.Metadata["CheckpointBlock"].(float64)
+	if !ok {
+		return nil, nil, errors.New("failed to convert proof checkpoint block")
 	}
 
 	exitFn := &contractsapi.ExitFunction{
-		BlockNumber:  new(big.Int).SetUint64(ep.checkpointBlock),
+		BlockNumber:  new(big.Int).SetUint64(uint64(checkpointBlock)),
 		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
 		UnhashedLeaf: exitEventEncoded,
 		Proof:        proof.Data,
