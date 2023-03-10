@@ -111,6 +111,13 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC rootchain IP address",
 	)
 
+	cmd.Flags().StringVar(
+		&params.rootERC20TokenAddr,
+		rootchainERC20Flag,
+		"",
+		"existing root chain ERC20 token address",
+	)
+
 	cmd.Flags().BoolVar(
 		&params.isTestMode,
 		helper.TestModeFlag,
@@ -271,6 +278,26 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	manifest.RootchainConfig = rootchainConfig
 
 	for _, contract := range deployContracts {
+		if contract.name == "RootERC20" && params.rootERC20TokenAddr != "" {
+			addr := types.StringToAddress(params.rootERC20TokenAddr)
+
+			code, err := client.Eth().GetCode(ethgo.Address(addr), ethgo.Latest)
+			if err != nil {
+				return fmt.Errorf("failed to check is root chain ERC20 token deployed: %w", err)
+			} else if code == "0x" {
+				return fmt.Errorf("root chain ERC20 token is not deployed on provided address %s", params.rootERC20TokenAddr)
+			}
+
+			populatorFn, ok := metadataPopulatorMap[contract.name]
+			if !ok {
+				return fmt.Errorf("rootchain metadata populator not registered for contract '%s'", contract.name)
+			}
+
+			populatorFn(manifest.RootchainConfig, addr)
+
+			continue
+		}
+
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
 			Input: contract.artifact.Bytecode,
