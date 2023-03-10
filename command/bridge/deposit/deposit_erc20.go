@@ -195,13 +195,27 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					}
 				}
 
+				// approve root erc20 predicate
+				txn, err := createApproveERC20PredicateTxn(amountBig,
+					types.StringToAddress(dp.rootPredicateAddr),
+					types.StringToAddress(dp.rootTokenAddr))
+
+				receipt, err := txRelayer.SendTransaction(txn, depositorKey)
+				if err != nil {
+					return fmt.Errorf("failed to send root erc20 approve transaction")
+				}
+
+				if receipt.Status == uint64(types.ReceiptFailed) {
+					return fmt.Errorf("failed to approve root erc20 predicate")
+				}
+
 				// deposit tokens
-				txn, err := createDepositTxn(types.Address(depositorKey.Address()), types.StringToAddress(receiver), amountBig)
+				txn, err = createDepositTxn(types.Address(depositorKey.Address()), types.StringToAddress(receiver), amountBig)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				receipt, err := txRelayer.SendTransaction(txn, depositorKey)
+				receipt, err = txRelayer.SendTransaction(txn, depositorKey)
 				if err != nil {
 					return fmt.Errorf("receiver: %s, amount: %s, error: %w", receiver, amount, err)
 				}
@@ -266,6 +280,28 @@ func createMintTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Tran
 
 	return &ethgo.Transaction{
 		From:  ethgo.Address(sender),
+		To:    &addr,
+		Input: input,
+	}, nil
+}
+
+// createApproveERC20PredicateTxn sends approve transaction
+// to ERC20 token for ERC20 predicate so that it is able to spend given tokens
+func createApproveERC20PredicateTxn(amount *big.Int,
+	rootERC20Predicate, rootERC20Token types.Address) (*ethgo.Transaction, error) {
+	approveFnParams := &contractsapi.ApproveFunction{
+		Spender: rootERC20Predicate,
+		Amount:  amount,
+	}
+
+	input, err := approveFnParams.EncodeAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
+	}
+
+	addr := ethgo.Address(rootERC20Token)
+
+	return &ethgo.Transaction{
 		To:    &addr,
 		Input: input,
 	}, nil

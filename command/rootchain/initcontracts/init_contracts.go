@@ -33,12 +33,6 @@ const (
 	rootERC20PredicateName = "RootERC20Predicate"
 	rootERC20Name          = "RootERC20"
 	erc20TemplateName      = "ERC20Template"
-
-	// defaultAllowanceValue is value which is assigned to the RootERC20Predicate spender
-	defaultAllowanceValue = uint64(1e19)
-
-	// defaultFundAmount is value which is sent to rootchain contracts deployer account
-	defaultFundAmount = uint64(1e19)
 )
 
 var (
@@ -328,18 +322,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
 	})
 
-	if params.isTestMode {
-		// approve RootERC20Predicate
-		if err := approveERC20Predicate(txRelayer, rootchainConfig, deployerKey); err != nil {
-			return err
-		}
-
-		outputter.WriteCommandResult(&messageResult{
-			Message: fmt.Sprintf("%s %s contract is approved for spender of %s",
-				contractsDeploymentTitle, rootERC20PredicateName, rootERC20Name),
-		})
-	}
-
 	return nil
 }
 
@@ -415,28 +397,6 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 	}
 
 	return sendTransaction(txRelayer, txn, rootERC20PredicateName, deployerKey)
-}
-
-// approveERC20Predicate sends approve transaction to ERC20 token so that it is able to spend given root ERC20 token
-func approveERC20Predicate(txRelayer txrelayer.TxRelayer, config *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
-	approveFnParams := &contractsapi.ApproveFunction{
-		Spender: config.RootERC20PredicateAddress,
-		Amount:  new(big.Int).SetUint64(defaultAllowanceValue),
-	}
-
-	input, err := approveFnParams.EncodeAbi()
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
-	}
-
-	addr := ethgo.Address(config.RootNativeERC20Address)
-	txn := &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}
-
-	return sendTransaction(txRelayer, txn, rootERC20Name, deployerKey)
 }
 
 // sendTransaction sends provided transaction
