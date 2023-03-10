@@ -50,6 +50,8 @@ func main() {
 			[]string{
 				"commitEpoch",
 				"initialize",
+				"addToWhitelist",
+				"register",
 			},
 			[]string{},
 		},
@@ -64,11 +66,62 @@ func main() {
 			},
 		},
 		{
+			"L2StateSender",
+			gensc.L2StateSender,
+			[]string{},
+			[]string{
+				"L2StateSynced",
+			},
+		},
+		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
 			[]string{
 				"submit",
 				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"ExitHelper",
+			gensc.ExitHelper,
+			[]string{
+				"exit",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC20Predicate",
+			gensc.ChildERC20Predicate,
+			[]string{
+				"initialize",
+				"withdrawTo",
+			},
+			[]string{},
+		},
+		{
+			"NativeERC20",
+			gensc.NativeERC20,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootERC20Predicate",
+			gensc.RootERC20Predicate,
+			[]string{
+				"initialize",
+				"depositTo",
+			},
+			[]string{},
+		},
+		{
+			"RootERC20",
+			gensc.RootERC20,
+			[]string{
+				"approve",
+				"mint",
 			},
 			[]string{},
 		},

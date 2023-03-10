@@ -331,7 +331,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
-	e, err := ExitEventABIType.Encode(exitEvent)
+	e, err := ExitEventInputsABIType.Encode(exitEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -360,6 +360,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		Data: proof,
 		Metadata: map[string]interface{}{
 			"LeafIndex": leafIndex,
+			"ExitEvent": exitEvent,
 		},
 	}, nil
 }
@@ -369,6 +370,10 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 	events := make([]*ExitEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
+		if receipts[i].Status == nil || *receipts[i].Status != types.ReceiptSuccess {
+			continue
+		}
+
 		for _, log := range receipts[i].Logs {
 			if log.Address != contracts.L2StateSenderContract {
 				continue

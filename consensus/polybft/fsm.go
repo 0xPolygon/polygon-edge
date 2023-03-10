@@ -415,6 +415,8 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if err := f.verifyCommitEpochTx(tx); err != nil {
 				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
 			}
+		default:
+			return fmt.Errorf("invalid state transaction data type: %v", stateTxData)
 		}
 	}
 

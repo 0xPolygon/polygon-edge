@@ -147,7 +147,7 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 			BlsPrivateKey: account.Bls,
 			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),
 			BlsSignature:  blsSignature,
-			NodeID:        nodeID,
+			MultiAddr:     fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
 		}
 	}
 

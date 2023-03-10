@@ -140,6 +140,19 @@ func TestAddTxErrors(t *testing.T) {
 		return signedTx
 	}
 
+	t.Run("ErrInvalidTxType", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.StateTx
+
+		assert.ErrorIs(t,
+			pool.addTx(local, signTx(tx)),
+			ErrInvalidTxType,
+		)
+	})
+
 	t.Run("ErrNegativeValue", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
@@ -241,6 +254,27 @@ func TestAddTxErrors(t *testing.T) {
 			pool.addTx(local, tx),
 			ErrTxPoolOverflow,
 		)
+	})
+
+	t.Run("FillTxPoolToTheLimit", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+
+		// fill the pool leaving only 1 slot
+		pool.gauge.increase(defaultMaxSlots - 1)
+
+		// create tx requiring 1 slot
+		tx := newTx(defaultAddr, 0, 1)
+		tx = signTx(tx)
+
+		//	enqueue tx
+		go func() {
+			assert.NoError(t,
+				pool.addTx(local, tx),
+			)
+		}()
+		go pool.handleEnqueueRequest(<-pool.enqueueReqCh)
+		<-pool.promoteReqCh
 	})
 
 	t.Run("ErrIntrinsicGas", func(t *testing.T) {
@@ -364,7 +398,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			//	enqueue tx
+			// enqueue tx
 			go func() {
 				assert.NoError(t,
 					pool.addTx(local, newTx(addr1, 0, 1)),

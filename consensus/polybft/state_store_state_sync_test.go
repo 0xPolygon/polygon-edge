@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.etcd.io/bbolt"
 )
 
 func TestState_InsertEvent(t *testing.T) {
@@ -186,6 +187,57 @@ func TestState_getCommitmentForStateSync(t *testing.T) {
 		} else {
 			require.ErrorIs(t, errNoCommitmentForStateSync, err)
 		}
+	}
+}
+
+func TestState_GetNestedBucketInEpoch(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name        string
+		epochNumber uint64
+		bucketName  []byte
+		errMsg      string
+	}{
+		{
+			name:        "Not existing inner bucket",
+			epochNumber: 3,
+			bucketName:  []byte("Foo"),
+			errMsg:      "could not find Foo bucket for epoch: 3",
+		},
+		{
+			name:        "Happy path",
+			epochNumber: 5,
+			bucketName:  messageVotesBucket,
+			errMsg:      "",
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			var (
+				nestedBucket *bbolt.Bucket
+				err          error
+			)
+
+			s := newTestState(t)
+			require.NoError(t, s.EpochStore.insertEpoch(c.epochNumber))
+			err = s.db.View(func(tx *bbolt.Tx) error {
+				nestedBucket, err = getNestedBucketInEpoch(tx, c.epochNumber, c.bucketName)
+
+				return err
+			})
+			if c.errMsg != "" {
+				require.ErrorContains(t, err, c.errMsg)
+				require.Nil(t, nestedBucket)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, nestedBucket)
+			}
+		})
 	}
 }
 

@@ -93,7 +93,3 @@ func DecodeHexToBig(hexNum string) *big.Int {
 
 	return createdNum
 }
-
-func DropHexPrefix(input []byte) []byte {
-	return input[2:]
-}
