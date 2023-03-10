@@ -220,7 +220,7 @@ jobs:
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
       runner: devnet
-      environment: devnet-ephemeral
+      environment: devnet
       scenario: multiple_EOA
   
   loadtestERC20:
@@ -234,5 +234,5 @@ jobs:
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
       runner: devnet
-      environment: devnet-ephemeral
+      environment: devnet
       scenario: multiple_ERC20  
