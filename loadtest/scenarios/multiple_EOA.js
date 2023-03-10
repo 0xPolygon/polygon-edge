@@ -50,7 +50,7 @@ export default function (data) {
 
   const tx = {
     to: "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
-    value: Number(0.0001 * 1e18),
+    value: Number(0.00000001 * 1e18),
     gas_price: client.gasPrice(),
     nonce: nonce,
   };
