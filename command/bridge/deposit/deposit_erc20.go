@@ -153,9 +153,69 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		depositorKey = rootchainKey
 	}
 
+	depositorAddr := depositorKey.Address()
+
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.jsonRPCAddress))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize rootchain tx relayer: %w", err))
+
+		return
+	}
+
+	amounts := make([]*big.Int, len(dp.Amounts))
+	aggregateAmount := new(big.Int)
+
+	for i, amountRaw := range dp.Amounts {
+		amountRaw := amountRaw
+
+		amount, err := types.ParseUint256orHex(&amountRaw)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amount, err))
+
+			return
+		}
+
+		amounts[i] = amount
+		aggregateAmount.Add(aggregateAmount, amount)
+	}
+
+	if dp.testMode {
+		// mint tokens to depositor, so he is able to send them
+		mintTxn, err := createMintTxn(types.Address(depositorAddr), types.Address(depositorAddr), aggregateAmount)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
+
+			return
+		}
+
+		receipt, err := txRelayer.SendTransaction(mintTxn, depositorKey)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
+
+			return
+		}
+
+		if receipt.Status == uint64(types.ReceiptFailed) {
+			outputter.SetError(fmt.Errorf("failed to mint tokens to depositor %s", depositorAddr))
+
+			return
+		}
+	}
+
+	// approve root erc20 predicate
+	approveTxn, err := createApproveERC20PredicateTxn(aggregateAmount,
+		types.StringToAddress(dp.rootPredicateAddr),
+		types.StringToAddress(dp.rootTokenAddr))
+
+	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to send root erc20 approve transaction"))
+
+		return
+	}
+
+	if receipt.Status == uint64(types.ReceiptFailed) {
+		outputter.SetError(fmt.Errorf("failed to approve root erc20 predicate"))
 
 		return
 	}
@@ -164,58 +224,20 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
-		amount := dp.Amounts[i]
+		amount := amounts[i]
 
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				amountBig, err := types.ParseUint256orHex(&amount)
-				if err != nil {
-					return fmt.Errorf("failed to decode provided deposit amount %s: %w", amount, err)
-				}
-
-				if dp.testMode {
-					// mint tokens to the depositor, so he is able to deposit them
-					// Note: this works only if using test account on the rootchain,
-					// because it is expected that it is the one which deploys rootchain smart contracts as well
-					txn, err := createMintTxn(types.Address(depositorKey.Address()), types.Address(depositorKey.Address()), amountBig)
-					if err != nil {
-						return fmt.Errorf("mint transaction creation failed: %w", err)
-					}
-
-					receipt, err := txRelayer.SendTransaction(txn, depositorKey)
-					if err != nil {
-						return fmt.Errorf("failed to send mint transaction to depositor %s", depositorKey.Address())
-					}
-
-					if receipt.Status == uint64(types.ReceiptFailed) {
-						return fmt.Errorf("failed to mint tokens to depositor %s", depositorKey.Address())
-					}
-				}
-
-				// approve root erc20 predicate
-				txn, err := createApproveERC20PredicateTxn(amountBig.Add(amountBig, big.NewInt(1e18)),
-					types.StringToAddress(dp.rootPredicateAddr),
-					types.StringToAddress(dp.rootTokenAddr))
-
-				receipt, err := txRelayer.SendTransaction(txn, depositorKey)
-				if err != nil {
-					return fmt.Errorf("failed to send root erc20 approve transaction")
-				}
-
-				if receipt.Status == uint64(types.ReceiptFailed) {
-					return fmt.Errorf("failed to approve root erc20 predicate")
-				}
-
 				// deposit tokens
-				txn, err = createDepositTxn(types.Address(depositorKey.Address()), types.StringToAddress(receiver), amountBig)
+				depositTxn, err := createDepositTxn(types.Address(depositorAddr), types.StringToAddress(receiver), amount)
 				if err != nil {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				receipt, err = txRelayer.SendTransaction(txn, depositorKey)
+				receipt, err = txRelayer.SendTransaction(depositTxn, depositorKey)
 				if err != nil {
 					return fmt.Errorf("receiver: %s, amount: %s, error: %w", receiver, amount, err)
 				}
@@ -236,7 +258,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(&depositERC20Result{
-		Sender:    depositorKey.Address().String(),
+		Sender:    depositorAddr.String(),
 		Receivers: dp.Receivers,
 		Amounts:   dp.Amounts,
 	})

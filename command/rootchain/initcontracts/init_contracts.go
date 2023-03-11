@@ -38,6 +38,8 @@ const (
 var (
 	params initContractsParams
 
+	defaultFundAmount, _ = new(big.Int).SetString(command.DefaultPremineBalance, 16)
+
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
 	metadataPopulatorMap = map[string]func(*polybft.RootchainConfig, types.Address){
@@ -217,7 +219,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		// fund account
 		deployerAddress := deployerKey.Address()
 
-		txn := &ethgo.Transaction{To: &deployerAddress, Value: new(big.Int).SetUint64(defaultFundAmount)}
+		txn := &ethgo.Transaction{To: &deployerAddress, Value: defaultFundAmount}
 		if _, err := txRelayer.SendTransactionLocal(txn); err != nil {
 			return err
 		}
