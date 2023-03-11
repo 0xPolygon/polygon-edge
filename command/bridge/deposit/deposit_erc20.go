@@ -196,7 +196,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				}
 
 				// approve root erc20 predicate
-				txn, err := createApproveERC20PredicateTxn(amountBig,
+				txn, err := createApproveERC20PredicateTxn(amountBig.Add(amountBig, big.NewInt(1e18)),
 					types.StringToAddress(dp.rootPredicateAddr),
 					types.StringToAddress(dp.rootTokenAddr))
 
