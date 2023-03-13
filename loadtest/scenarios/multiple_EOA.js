@@ -3,6 +3,11 @@ import exec from 'k6/execution';
 import { fundTestAccounts } from '../helpers/init.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
+let duration = __ENV.LOADTEST_DURATION;
+if (duration == undefined) {
+    duration = "2m";
+}
+
 export const options = {
   setupTimeout: '220s',
   scenarios: {
@@ -10,7 +15,7 @@ export const options = {
       executor: 'constant-arrival-rate',
       rate: 300,
       timeUnit: '1s',
-      duration: '10m',
+      duration: duration,
       preAllocatedVUs: 20,
       maxVUs: 20,
     },

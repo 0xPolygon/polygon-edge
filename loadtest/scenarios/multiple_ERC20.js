@@ -3,6 +3,11 @@ import exec from 'k6/execution';
 import { fundTestAccounts } from '../helpers/init.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
+let duration = __ENV.LOADTEST_DURATION;
+if (duration == undefined) {
+    duration = "2m";
+}
+
 export const options = {
     setupTimeout: '220s',
     scenarios: {
@@ -10,7 +15,7 @@ export const options = {
             executor: 'constant-arrival-rate',
             rate: 200,
             timeUnit: '1s',
-            duration: '1m',
+            duration: duration,
             preAllocatedVUs: 10,
             maxVUs: 10,
         },
@@ -22,7 +27,7 @@ const root_address = "0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa";
 const mnemonic = __ENV.LOADTEST_MNEMONIC;
 let rpc_url = __ENV.RPC_URL;
 if (rpc_url == undefined) {
-    rpc_url = "http://localhost:10002"
+    rpc_url = "http://localhost:10002";
 }
 
 const ZexCoin = JSON.parse(open("../contracts/ZexCoinERC20.json"));
