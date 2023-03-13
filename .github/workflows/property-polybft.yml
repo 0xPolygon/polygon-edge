@@ -13,7 +13,7 @@ jobs:
     env:
       E2E_TESTS: true
       E2E_LOGS: true
-      E2E_TESTS_TYPE: 'Property Based'
+      E2E_TESTS_TYPE: 'property'
       CI_VERBOSE: true
     steps:
       - uses: actions/checkout@v3

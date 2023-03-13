@@ -251,7 +251,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	if !isTrueEnv(envE2ETestsEnabled) {
 		testType := os.Getenv(envE2ETestsType)
 		if testType == "" {
-			testType = "Integration"
+			testType = "integration"
 		}
 
 		t.Skip(fmt.Sprintf("%s tests are disabled.", testType))
