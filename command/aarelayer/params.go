@@ -7,24 +7,21 @@ import (
 	"path"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/aarelayer/service"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 )
 
 const (
-	addrFlag       = "addr"
-	dbPathFlag     = "db-path"
-	chainIDFlag    = "chain-id"
-	ivokerAddrFlag = "invoker-addr"
+	addrFlag        = "addr"
+	dbPathFlag      = "db-path"
+	chainIDFlag     = "chain-id"
+	invokerAddrFlag = "invoker-addr"
 
 	defaultPort = 8198
 )
-
-// address of invoker smart contract
-var defaultAAInvokerAddress = types.StringToAddress("3001").String()
 
 type aarelayerParams struct {
 	addr        string
@@ -92,8 +89,8 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.invokerAddr,
-		chainIDFlag,
-		defaultAAInvokerAddress,
+		invokerAddrFlag,
+		service.DefaultAAInvokerAddress.String(),
 		"address of invoker smart contract",
 	)
 

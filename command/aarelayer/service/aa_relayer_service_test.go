@@ -27,13 +27,15 @@ func Test_AARelayerService_Start(t *testing.T) {
 		}
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		relayer := new(dummyTxRelayer)
+		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(relayer, pool, state, account.Ecdsa, opts)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, opts)
 		tx := getDummyTxs()[0]
-		relayer.On("SendTransactionWithoutReceipt", mock.Anything, mock.Anything).Return(ethgo.ZeroHash, nil).Once()
-		relayer.On("WaitForReceipt", mock.Anything, mock.Anything).Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Logs: log}, nil)
+		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(ethgo.ZeroHash, nil).Once()
+		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Logs: log}, nil)
 
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 
@@ -46,13 +48,15 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		relayer := new(dummyTxRelayer)
+		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(relayer, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
 		tx := getDummyTxs()[1]
-		relayer.On("SendTransactionWithoutReceipt", mock.Anything, mock.Anything).Return(ethgo.ZeroHash, errors.New("not nil")).Once()
-		relayer.On("WaitForReceipt", mock.Anything, mock.Anything).Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(ethgo.ZeroHash, errors.New("not nil")).Once()
+		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 		err := aaRelayerService.executeJob(context.Background(), tx)
 		require.Error(t, err)
@@ -62,13 +66,15 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		relayer := new(dummyTxRelayer)
+		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(relayer, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
 		tx := getDummyTxs()[2]
-		relayer.On("SendTransactionWithoutReceipt", mock.Anything, mock.Anything).Return(ethgo.ZeroHash, nil).Once()
-		relayer.On("WaitForReceipt", mock.Anything, mock.Anything).Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, errors.New("not nil")).Once()
+		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(ethgo.ZeroHash, nil).Once()
+		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, errors.New("not nil")).Once()
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 		err := aaRelayerService.executeJob(context.Background(), tx)
 		require.Error(t, err)
@@ -78,13 +84,15 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		relayer := new(dummyTxRelayer)
+		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil"))
-		aaRelayerService := NewAARelayerService(relayer, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
 		tx := getDummyTxs()[3]
-		relayer.On("SendTransactionWithoutReceipt", mock.Anything, mock.Anything).Return(ethgo.ZeroHash, errors.New("not nil")).Once()
-		relayer.On("WaitForReceipt", mock.Anything, mock.Anything).Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(ethgo.ZeroHash, errors.New("not nil")).Once()
+		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
 
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 
@@ -98,14 +106,16 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		relayer := new(dummyTxRelayer)
+		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil"))
-		aaRelayerService := NewAARelayerService(relayer, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
 		tx := getDummyTxs()[4]
-		relayer.On("SendTransactionWithoutReceipt", mock.Anything, mock.Anything).Return(ethgo.ZeroHash, net.ErrClosed).Once()
+		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(ethgo.ZeroHash, net.ErrClosed).Once()
 		pool.On("Push", mock.Anything)
-		relayer.On("WaitForReceipt", mock.Anything, mock.Anything).Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
 
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 
@@ -118,15 +128,17 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		relayer := new(dummyTxRelayer)
+		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil")).Once()
-		aaRelayerService := NewAARelayerService(relayer, pool, state, account.Ecdsa)
+		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
 		tx := getDummyTxs()[0]
 		state.On("Update", mock.Anything).Return(nil)
-		relayer.On("SendTransactionWithoutReceipt", mock.Anything, mock.Anything).Return(ethgo.ZeroHash, nil).Once()
+		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
+			Return(ethgo.ZeroHash, nil).Once()
 		pool.On("Push", mock.Anything)
-		relayer.On("WaitForReceipt", mock.Anything, mock.Anything).Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
+			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
 
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 
@@ -198,45 +210,27 @@ func (t *dummyAATxState) Update(stateTx *AAStateTransaction) error {
 	return args.Error(0)
 }
 
-type dummyTxRelayer struct {
+type dummyAATxSender struct {
 	mock.Mock
 
 	test             *testing.T
 	checkpointBlocks []uint64
 }
 
-func newDummyTxRelayer(t *testing.T) *dummyTxRelayer {
+func newDummyAATxSender(t *testing.T) *dummyAATxSender {
 	t.Helper()
 
-	return &dummyTxRelayer{test: t}
+	return &dummyAATxSender{test: t}
 }
 
-func (d dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
-	args := d.Called(from, to, input)
-
-	return args.String(0), args.Error(1)
-}
-
-func (d *dummyTxRelayer) SendTransaction(transaction *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
-	args := d.Called(transaction, key)
+func (d *dummyAATxSender) WaitForReceipt(
+	ctx context.Context, hash ethgo.Hash, delay time.Duration) (*ethgo.Receipt, error) {
+	args := d.Called(ctx, hash, delay)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-// SendTransactionLocal sends non-signed transaction (this is only for testing purposes)
-func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
-	args := d.Called(txn)
-
-	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
-}
-
-func (d *dummyTxRelayer) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error) {
-	args := d.Called(ctx, hash)
-
-	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
-}
-
-func (d *dummyTxRelayer) SendTransactionWithoutReceipt(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+func (d *dummyAATxSender) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
 	args := d.Called()
 
 	return args.Get(0).(ethgo.Hash), args.Error(1) //nolint:forcetypeassert
