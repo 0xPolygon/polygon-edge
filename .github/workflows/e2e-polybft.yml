@@ -17,9 +17,7 @@ jobs:
       E2E_TESTS_TYPE: 'integration'
       CI_VERBOSE: true
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v3        
       - name: Install Go
         uses: actions/setup-go@v3
         with:
