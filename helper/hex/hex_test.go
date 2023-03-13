@@ -56,5 +56,9 @@ func TestDecodeHexToBig(t *testing.T) {
 		big, err := DecodeHexToBig("0123456")
 		require.NoError(t, err)
 		require.Equal(t, uint64(1193046), big.Uint64())
+
+		big, err = DecodeHexToBig("0x0000000000000000000000000000000000000200")
+		require.NoError(t, err)
+		require.Equal(t, uint64(512), big.Uint64())
 	})
 }
