@@ -261,7 +261,7 @@ func Keccak256Hash(v ...[]byte) (hash types.Hash) {
 		h.Write(b)
 	}
 
-	h.Read(hash[:])
+	h.Read(hash[:]) //nolint:errcheck
 
 	return hash
 }

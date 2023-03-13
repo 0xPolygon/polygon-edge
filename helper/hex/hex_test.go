@@ -44,11 +44,15 @@ func TestDecodeHexToBig(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Error on decoding", func(t *testing.T) {
+		t.Parallel()
+
 		_, err := DecodeHexToBig("012345q")
 		require.ErrorContains(t, err, "failed to convert string")
 	})
 
 	t.Run("Happy path", func(t *testing.T) {
+		t.Parallel()
+
 		big, err := DecodeHexToBig("0123456")
 		require.NoError(t, err)
 		require.Equal(t, uint64(1193046), big.Uint64())

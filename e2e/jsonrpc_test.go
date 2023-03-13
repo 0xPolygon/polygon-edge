@@ -85,7 +85,9 @@ func TestJsonRPC(t *testing.T) {
 		// Test. TODO. you can query the nonce at any block hash in time
 		block, err := client.GetBlockByNumber(ethgo.BlockNumber(txn.Receipt().BlockNumber)-1, false)
 		require.NoError(t, err)
-		client.GetNonce(key1.Address(), block.Hash)
+
+		_, err = client.GetNonce(key1.Address(), block.Hash)
+		require.NoError(t, err)
 	})
 
 	t.Run("eth_getStorage", func(t *testing.T) {

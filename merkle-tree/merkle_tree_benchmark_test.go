@@ -102,7 +102,7 @@ func benchmarkVerifyProof(b *testing.B, numOfLeaves uint64) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		VerifyProof(leafIndex, data[leafIndex], proof, rootHash)
+		VerifyProof(leafIndex, data[leafIndex], proof, rootHash) //nolint:errcheck
 	}
 }
 
@@ -117,7 +117,7 @@ func benchmarkMerkleTreeCreation(b *testing.B, numOfLeaves uint64) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		NewMerkleTree(data)
+		NewMerkleTree(data) //nolint:errcheck
 	}
 }
 
@@ -135,6 +135,6 @@ func benchmarkGenerateProof(b *testing.B, numOfLeaves uint64) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		tree.GenerateProof(data[0])
+		tree.GenerateProof(data[0]) //nolint:errcheck
 	}
 }

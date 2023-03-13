@@ -98,8 +98,8 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
-	withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
-	withdrawCmd.MarkFlagRequired(common.AmountsFlag)
+	withdrawCmd.MarkFlagRequired(common.ReceiversFlag) //nolint:errcheck
+	withdrawCmd.MarkFlagRequired(common.AmountsFlag)   //nolint:errcheck
 
 	withdrawCmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 

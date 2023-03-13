@@ -351,7 +351,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(21, 2*time.Minute))
 
 	// restart rootchain server
-	cluster.Bridge.Start()
+	require.NoError(t, cluster.Bridge.Start())
 
 	// check if pending checkpoint blocks were submitted (namely the last checkpointed block must be block 20)
 	err = cluster.Bridge.WaitUntil(2*time.Second, 50*time.Second, func() (bool, error) {

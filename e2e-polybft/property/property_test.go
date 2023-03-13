@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 )
 
@@ -43,6 +44,6 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 		defer cluster.Stop()
 
 		// wait for single epoch to process withdrawal
-		cluster.WaitForBlock(numBlocks, blockTime*time.Duration(numBlocks))
+		require.NoError(t, cluster.WaitForBlock(numBlocks, blockTime*time.Duration(numBlocks)))
 	})
 }
