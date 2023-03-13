@@ -40,7 +40,7 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 
 func runCommand(cmd *cobra.Command, _ []string) error {
 	cmd.SilenceUsage = true
-	cmd.SetOut(os.Stdin)
+	cmd.SetOut(os.Stdout)
 
 	state, err := service.NewAATxState(params.dbPath)
 	if err != nil {

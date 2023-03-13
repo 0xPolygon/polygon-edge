@@ -39,7 +39,7 @@ func runPreRun(_ *cobra.Command, _ []string) error {
 func runCommand(cmd *cobra.Command, _ []string) error {
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
-	cmd.SetOut(os.Stdin)
+	cmd.SetOut(os.Stdout)
 
 	secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.configPath, true)
 	if err != nil {

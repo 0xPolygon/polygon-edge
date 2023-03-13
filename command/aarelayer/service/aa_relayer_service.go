@@ -112,14 +112,18 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 	default:
 	}
 
-	recipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay)
+	receipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay)
 	if err != nil {
 		errstr := err.Error()
 		stateTx.Error = &errstr
 		stateTx.Status = StatusFailed
 	} else {
-		stateTx.Status = StatusCompleted
-		populateStateTx(stateTx, recipt)
+		populateStateTx(stateTx, receipt)
+		if receipt.Status == 1 { // Status == 1 is ReceiptSuccess status
+			stateTx.Status = StatusCompleted
+		} else {
+			stateTx.Status = StatusFailed
+		}
 	}
 
 	if err := rs.state.Update(stateTx); err != nil {
