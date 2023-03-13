@@ -1,4 +1,4 @@
-package e2e
+package property
 
 import (
 	"fmt"
@@ -35,7 +35,6 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 
 		cluster := framework.NewTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
-			framework.WithPropertyBaseTests(true),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i, a := range adresses {
 					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premine[i]))
