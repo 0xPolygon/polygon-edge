@@ -1,15 +1,10 @@
 package service
 
 import (
-	"embed"
-	"encoding/json"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-//go:embed config/*
-var configFile embed.FS
 
 type AAConfig struct {
 	AllowContractCreation bool     `json:"allowContractCreation"`
@@ -17,11 +12,7 @@ type AAConfig struct {
 	DenyList              []string `json:"denyList"`
 }
 
-func (c *AAConfig) IsValidAddress(address *types.Address) bool {
-	if address == nil {
-		return c.AllowContractCreation
-	}
-
+func (c *AAConfig) IsValidAddress(address types.Address) bool {
 	addressStr := strings.TrimPrefix(address.String(), "0x")
 
 	for _, v := range c.DenyList {
@@ -43,17 +34,10 @@ func (c *AAConfig) IsValidAddress(address *types.Address) bool {
 	return false
 }
 
-func GetConfig() (*AAConfig, error) {
-	bytes, err := configFile.ReadFile("config/config.json")
-	if err != nil {
-		return nil, err
+func DefaultConfig() *AAConfig {
+	return &AAConfig{
+		AllowContractCreation: true,
+		AllowList:             nil,
+		DenyList:              nil,
 	}
-
-	config := &AAConfig{}
-
-	if err := json.Unmarshal(bytes, &config); err != nil {
-		return nil, err
-	}
-
-	return config, nil
 }

@@ -33,17 +33,14 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	config, err := service.GetConfig()
-	if err != nil {
-		return err
-	}
+	config := service.DefaultConfig()
 
 	secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.configPath, true)
 	if err != nil {
 		return err
 	}
 
-	newValidatorAccount, err := wallet.NewAccountFromSecret(secretsManager)
+	account, err := wallet.NewAccountFromSecret(secretsManager)
 	if err != nil {
 		return err
 	}
@@ -51,9 +48,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	pool := service.NewAAPool()
 	verification := service.NewAAVerification(
 		config,
-		types.Address(newValidatorAccount.Ecdsa.Address()),
+		types.Address(account.Ecdsa.Address()),
 		params.chainID,
-		func(*service.AATransaction) bool { return true })
+		func(a *service.AATransaction) error { return nil })
 	restService := service.NewAARelayerRestServer(pool, state, verification)
 
 	cmd.Printf("Listening on %s...\n", params.addr)

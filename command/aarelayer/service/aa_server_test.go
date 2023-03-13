@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"testing"
 	"time"
@@ -48,11 +49,14 @@ func Test_AAServer(t *testing.T) {
 				Nonce: 0,
 				Payload: []Payload{
 					{
-						To: &types.Address{1, 2, 3},
+						To:       &types.Address{1, 2, 3},
+						Value:    big.NewInt(10),
+						GasLimit: big.NewInt(21000),
 					},
 					{
-						To:    nil,
-						Value: 100,
+						To:       nil,
+						Value:    big.NewInt(100),
+						GasLimit: big.NewInt(21000),
 					},
 				},
 			},
@@ -173,13 +177,65 @@ func Test_AAServer(t *testing.T) {
 				Nonce: 0,
 				Payload: []Payload{
 					{
-						To: &types.Address{1, 2, 3},
+						To:       &types.Address{1, 2, 3},
+						Value:    big.NewInt(100),
+						GasLimit: big.NewInt(21000),
 					},
 				},
 			},
 		}
 
 		require.NoError(t, tx.MakeSignature(types.Address(invoker.Ecdsa.Address()), chainID, user.Ecdsa))
+
+		req := makeRequest(t, "POST", "sendTransaction", &tx)
+
+		res, err := client.Do(req)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+
+	t.Run("sendTransaction_EmptyValue", func(t *testing.T) {
+		t.Parallel()
+
+		client := &http.Client{}
+		tx := &AATransaction{
+			Signature: nil,
+			Transaction: Transaction{
+				Nonce: 0,
+				Payload: []Payload{
+					{
+						To:       &types.Address{1, 2, 3},
+						GasLimit: big.NewInt(21000),
+						Value:    nil,
+					},
+				},
+			},
+		}
+
+		req := makeRequest(t, "POST", "sendTransaction", &tx)
+
+		res, err := client.Do(req)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+	})
+
+	t.Run("sendTransaction_EmptyGasLimit", func(t *testing.T) {
+		t.Parallel()
+
+		client := &http.Client{}
+		tx := &AATransaction{
+			Signature: nil,
+			Transaction: Transaction{
+				Nonce: 0,
+				Payload: []Payload{
+					{
+						To: &types.Address{1, 2, 3},
+					},
+				},
+			},
+		}
 
 		req := makeRequest(t, "POST", "sendTransaction", &tx)
 
@@ -196,12 +252,10 @@ func getServer(t *testing.T, address types.Address) *AARelayerRestServer {
 	state, err := NewAATxState()
 	require.NoError(t, err)
 
-	config, err := GetConfig()
-	require.NoError(t, err)
-
+	config := DefaultConfig()
 	pool := NewAAPool()
-	verification := NewAAVerification(config, address, chainID, func(a *AATransaction) bool {
-		return true
+	verification := NewAAVerification(config, address, chainID, func(a *AATransaction) error {
+		return nil
 	})
 
 	return NewAARelayerRestServer(pool, state, verification)
