@@ -19,6 +19,11 @@
           default: 'simple'
           description: The scenario to run
           type: string
+        duration:
+          default: '2m'
+          description: Duration of the test
+          required: false
+          type: string
     workflow_call:
       inputs:
         environment:
@@ -33,12 +38,17 @@
           required: true
           description: The mode for the stress test
           type: string
+        duration:
+          default: '2m'
+          description: Duration of the test
+          required: false
+          type: string
       secrets:
         SLACK_PERFORMANCE_WEBHOOK_URL:
           required: true
         DD_API_KEY:
           required: true
-        RPC_URL:
+        LOADTEST_RPC_URL:
           required: true
         LOADTEST_MNEMONIC:
           required: true
@@ -85,9 +95,10 @@
             echo "gas_max=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.max')" >> $GITHUB_OUTPUT
           env:
             K6_STATSD_ENABLE_TAGS: true
-            RPC_URL: ${{ secrets.RPC_URL }}
+            RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
             SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
             LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+            LOADTEST_DURATION: ${{ inputs.duration }}
         
         - name: Notify Slack
           uses: slackapi/slack-github-action@v1.23.0
@@ -124,7 +135,7 @@
                         },
                         {
                           "type": "mrkdwn",
-                          "text": "JSON-RPC Endpoint: ${{ secrets.RPC_URL }}"
+                          "text": "JSON-RPC Endpoint: ${{ secrets.LOADTEST_RPC_URL }}"
                         },
                         {
                           "type": "mrkdwn",
