@@ -106,7 +106,8 @@ func (s *CheckpointStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
 
 		epochBytes := lookupBucket.Get(exitIDBytes)
 		if epochBytes == nil {
-			return fmt.Errorf("could not find epoch in lookup table for exit event: %v", exitEventID)
+			return fmt.Errorf("could not find any exit event that has an id: %v. Its epoch was not found in lookup table",
+				exitEventID)
 		}
 
 		key := bytes.Join([][]byte{epochBytes, exitIDBytes}, nil)

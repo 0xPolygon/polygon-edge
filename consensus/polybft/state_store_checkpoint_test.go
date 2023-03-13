@@ -107,7 +107,7 @@ func TestState_NoEpochForExitEventInLookup(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = state.CheckpointStore.getExitEvent(exitToTest)
-	require.ErrorContains(t, err, "could not find epoch in lookup table for exit event")
+	require.ErrorContains(t, err, "epoch was not found in lookup table")
 }
 
 func TestState_decodeExitEvent(t *testing.T) {

@@ -368,19 +368,36 @@ func TestCheckpointManager_BuildEventRoot(t *testing.T) {
 }
 
 func TestCheckpointManager_GenerateExitProof(t *testing.T) {
-	// TODO: FIX TEST
-	t.Skip("FIX ME")
 	t.Parallel()
 
 	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
+		numOfBlocks           = 10
+		numOfEventsPerBlock   = 2
+		correctBlockToGetExit = 1
+		futureBlockToGetExit  = 2
 	)
 
 	state := newTestState(t)
-	dummyTxRelayer := newDummyTxRelayer(t)
-	dummyTxRelayer.On("Call", mock.Anything, mock.Anything, mock.Anything).Return(hex.EncodeToString([]byte("1")), error(nil))
 
+	// setup mocks for valid case
+	foundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+		"isFound":         true,
+		"checkpointBlock": 1,
+	})
+	require.NoError(t, err)
+
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+		BlockNumber: new(big.Int).SetUint64(correctBlockToGetExit),
+	}
+
+	input, err := getCheckpointBlockFn.EncodeAbi()
+	require.NoError(t, err)
+
+	dummyTxRelayer := newDummyTxRelayer(t)
+	dummyTxRelayer.On("Call", ethgo.ZeroAddress, ethgo.ZeroAddress, input).
+		Return(hex.EncodeToString(foundCheckpointReturn), error(nil))
+
+	// create checkpoint manager and insert exit events
 	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
 		createTestKey(t)),
 		0,
@@ -399,14 +416,14 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	tree, err := merkle.NewMerkleTree(checkpointEvents)
 	require.NoError(t, err)
 
-	proof, err := checkpointMgr.GenerateExitProof(1)
+	proof, err := checkpointMgr.GenerateExitProof(correctBlockToGetExit)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
 		t.Parallel()
 		// verify generated proof on desired tree
-		require.NoError(t, merkle.VerifyProof(1, encodedEvents[1], proof.Data, tree.Hash()))
+		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], proof.Data, tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
@@ -418,7 +435,8 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree
-		require.ErrorContains(t, merkle.VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+		require.ErrorContains(t, merkle.VerifyProof(correctBlockToGetExit,
+			encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
 	})
 
 	t.Run("Generate exit proof - no event", func(t *testing.T) {
@@ -426,6 +444,27 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 
 		_, err := checkpointMgr.GenerateExitProof(21)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
+
+	t.Run("Generate exit proof - future lookup where checkpoint not yet submitted", func(t *testing.T) {
+		t.Parallel()
+
+		// setup mocks for invalid case
+		notFoundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+			"isFound":         false,
+			"checkpointBlock": 0,
+		})
+		require.NoError(t, err)
+
+		getCheckpointBlockFn.BlockNumber = new(big.Int).SetUint64(futureBlockToGetExit)
+		inputTwo, err := getCheckpointBlockFn.EncodeAbi()
+		require.NoError(t, err)
+
+		dummyTxRelayer.On("Call", ethgo.ZeroAddress, ethgo.ZeroAddress, inputTwo).
+			Return(hex.EncodeToString(notFoundCheckpointReturn), error(nil))
+
+		_, err = checkpointMgr.GenerateExitProof(futureBlockToGetExit)
+		require.ErrorContains(t, err, "checkpoint block not found for exit ID")
 	})
 }
 
