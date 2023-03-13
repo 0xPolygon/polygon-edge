@@ -334,12 +334,16 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
 		BlockNumber: new(big.Int).SetUint64(exitEvent.BlockNumber),
 	}
+
 	input, err := getCheckpointBlockFn.EncodeAbi()
 	if err != nil {
 		return types.Proof{}, fmt.Errorf("failed to encode get checkpoint block input: %w", err)
 	}
 
-	getCheckpointBlockResp, err := c.rootChainRelayer.Call(ethgo.ZeroAddress, ethgo.Address(c.checkpointManagerAddr), input)
+	getCheckpointBlockResp, err := c.rootChainRelayer.Call(
+		ethgo.ZeroAddress,
+		ethgo.Address(c.checkpointManagerAddr),
+		input)
 	if err != nil {
 		return types.Proof{}, fmt.Errorf("failed to retrieve checkpoint block for exit ID %d: %w", exitID, err)
 	}
