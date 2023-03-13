@@ -298,7 +298,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	manifest.RootchainConfig = rootchainConfig
 
 	for _, contract := range deployContracts {
-
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
 			Input: contract.artifact.Bytecode,
