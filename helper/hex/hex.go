@@ -87,9 +87,12 @@ func EncodeBig(bigint *big.Int) string {
 }
 
 // DecodeHexToBig converts a hex number to a big.Int value
-func DecodeHexToBig(hexNum string) *big.Int {
+func DecodeHexToBig(hexNum string) (*big.Int, error) {
 	createdNum := new(big.Int)
-	createdNum.SetString(hexNum, 16)
+	_, ok := createdNum.SetString(hexNum, 16)
+	if !ok {
+		return nil, fmt.Errorf("failed to convert string: %s to big.Int with base: 16", hexNum)
+	}
 
-	return createdNum
+	return createdNum, nil
 }

@@ -483,6 +483,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
@@ -499,6 +502,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 			}
 
 			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
