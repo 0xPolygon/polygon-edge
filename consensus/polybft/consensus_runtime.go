@@ -157,12 +157,14 @@ func (c *consensusRuntime) close() {
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
+		stateSenderAddr := c.config.PolyBFTConfig.Bridge.BridgeAddr
 		stateSyncManager, err := NewStateSyncManager(
 			logger,
 			c.config.State,
 			&stateSyncConfig{
 				key:                   c.config.Key,
-				stateSenderAddr:       c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				stateSenderAddr:       stateSenderAddr,
+				stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
 				jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
 				dataDir:               c.config.DataDir,
 				topic:                 c.config.bridgeTopic,

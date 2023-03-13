@@ -64,11 +64,12 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	BridgeAddr             types.Address `json:"stateSenderAddr"`
-	CheckpointAddr         types.Address `json:"checkpointAddr"`
-	RootERC20PredicateAddr types.Address `json:"rootERC20PredicateAddr"`
-	RootNativeERC20Addr    types.Address `json:"rootNativeERC20Addr"`
-	JSONRPCEndpoint        string        `json:"jsonRPCEndpoint"`
+	BridgeAddr              types.Address            `json:"stateSenderAddr"`
+	CheckpointAddr          types.Address            `json:"checkpointAddr"`
+	RootERC20PredicateAddr  types.Address            `json:"rootERC20PredicateAddr"`
+	RootNativeERC20Addr     types.Address            `json:"rootNativeERC20Addr"`
+	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
+	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
