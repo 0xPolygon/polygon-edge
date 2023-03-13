@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -502,6 +503,14 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	args := d.Called(txn)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+}
+
+func (d *dummyTxRelayer) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error) {
+	return nil, nil
+}
+
+func (d *dummyTxRelayer) SendTransactionWithoutReceipt(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+	return ethgo.ZeroHash, nil
 }
 
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {

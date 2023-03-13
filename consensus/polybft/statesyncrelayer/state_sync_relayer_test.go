@@ -1,6 +1,7 @@
 package statesyncrelayer
 
 import (
+	"context"
 	"math/big"
 	"testing"
 
@@ -33,6 +34,14 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	args := t.Called(txn)
 
 	return nil, args.Error(1)
+}
+
+func (t *txRelayerMock) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error) {
+	return nil, nil
+}
+
+func (t *txRelayerMock) SendTransactionWithoutReceipt(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+	return ethgo.ZeroHash, nil
 }
 
 func Test_executeStateSync(t *testing.T) {
