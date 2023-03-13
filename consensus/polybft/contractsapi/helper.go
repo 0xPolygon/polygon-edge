@@ -19,6 +19,9 @@ var (
 	// stateSyncABIType is a specific case where we need to encode state sync event as a tuple of tuple
 	stateSyncABIType = abi.MustNewType(
 		"tuple(tuple(uint256 id, address sender, address receiver, bytes data))")
+
+	// GetCheckpointBlockABIResponse is the ABI type for getCheckpointBlock function return value
+	GetCheckpointBlockABIResponse = abi.MustNewType("tuple(bool isFound, uint256 checkpointBlock)")
 )
 
 // ToABI converts StateSyncEvent to ABI

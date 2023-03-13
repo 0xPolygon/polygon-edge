@@ -338,6 +338,18 @@ func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }
 
+type GetCheckpointBlockFunction struct {
+	BlockNumber *big.Int `abi:"blockNumber"`
+}
+
+func (g *GetCheckpointBlockFunction) EncodeAbi() ([]byte, error) {
+	return CheckpointManager.Abi.Methods["getCheckpointBlock"].Encode(g)
+}
+
+func (g *GetCheckpointBlockFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(CheckpointManager.Abi.Methods["getCheckpointBlock"], buf, g)
+}
+
 type ExitFunction struct {
 	BlockNumber  *big.Int     `abi:"blockNumber"`
 	LeafIndex    *big.Int     `abi:"leafIndex"`

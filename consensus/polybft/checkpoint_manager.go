@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sort"
@@ -11,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	metrics "github.com/armon/go-metrics"
@@ -22,8 +22,7 @@ var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
-	// TODO: @Stefan-Ethernal use the function from contractsapi
-	defaultCheckpointsOffset = uint64(900)
+	defaultCheckpointsOffset        = uint64(900)
 )
 
 type CheckpointManager interface {
@@ -332,27 +331,60 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
-	// TODO: @Stefan-Ethernal invoke checkpoint manager to retrieve checkpoint block
-	response, err := c.rootChainRelayer.Call(c.key.Address(), ethgo.Address(c.checkpointManagerAddr), nil)
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+		BlockNumber: new(big.Int).SetUint64(exitEvent.BlockNumber),
+	}
+	input, err := getCheckpointBlockFn.EncodeAbi()
 	if err != nil {
-		return types.Proof{}, err
+		return types.Proof{}, fmt.Errorf("failed to encode get checkpoint block input: %w", err)
 	}
 
-	_, err = hex.DecodeString(response)
+	getCheckpointBlockResp, err := c.rootChainRelayer.Call(ethgo.ZeroAddress, ethgo.Address(c.checkpointManagerAddr), input)
 	if err != nil {
-		return types.Proof{}, err
+		return types.Proof{}, fmt.Errorf("failed to retrieve checkpoint block for exit ID %d: %w", exitID, err)
 	}
 
-	// TODO: @Stefan-Ethernal extract checkpoint block from decodedResp
-	// (abi.encode(tuple(uint256 checkpointBlock, bool tuple))
-	checkpointBlock := uint64(0)
+	getCheckpointBlockRespRaw, err := hex.DecodeHex(getCheckpointBlockResp)
+	if err != nil {
+		return types.Proof{}, fmt.Errorf("failed to decode hex response for exit ID %d: %w", exitID, err)
+	}
+
+	getCheckpointBlockGeneric, err := contractsapi.GetCheckpointBlockABIResponse.Decode(getCheckpointBlockRespRaw)
+	if err != nil {
+		return types.Proof{}, fmt.Errorf("failed to decode checkpoint block response for exit ID %d: %w", exitID, err)
+	}
+
+	checkpointBlockMap, ok := getCheckpointBlockGeneric.(map[string]interface{})
+	if !ok {
+		return types.Proof{}, fmt.Errorf("failed to convert for checkpoint block response exit ID %d", exitID)
+	}
+
+	isFoundGeneric, ok := checkpointBlockMap["isFound"]
+	if !ok {
+		return types.Proof{}, fmt.Errorf("invalid response for exit ID %d", exitID)
+	}
+
+	isCheckpointFound, ok := isFoundGeneric.(bool)
+	if !ok || !isCheckpointFound {
+		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
+	}
+
+	checkpointBlockGeneric, ok := checkpointBlockMap["checkpointBlock"]
+	if !ok {
+		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
+	}
+
+	checkpointBlock, ok := checkpointBlockGeneric.(*big.Int)
+	if !ok {
+		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
+	}
 
 	e, err := ExitEventInputsABIType.Encode(exitEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock.Uint64())
 	if err != nil {
 		return types.Proof{}, err
 	}
