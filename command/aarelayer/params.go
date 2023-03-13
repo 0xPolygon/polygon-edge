@@ -10,23 +10,29 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 )
 
 const (
-	addrFlag    = "addr"
-	dbPathFlag  = "db-path"
-	chainIDFlag = "chain-id"
+	addrFlag       = "addr"
+	dbPathFlag     = "db-path"
+	chainIDFlag    = "chain-id"
+	ivokerAddrFlag = "invoker-addr"
 
 	defaultPort = 8198
 )
 
+// address of invoker smart contract
+var defaultAAInvokerAddress = types.StringToAddress("3001").String()
+
 type aarelayerParams struct {
-	addr       string
-	dbPath     string
-	accountDir string
-	configPath string
-	chainID    int64
+	addr        string
+	dbPath      string
+	accountDir  string
+	configPath  string
+	chainID     int64
+	invokerAddr string
 }
 
 func (rp *aarelayerParams) validateFlags() error {
@@ -84,5 +90,13 @@ func setFlags(cmd *cobra.Command) {
 		"the ID of the chain",
 	)
 
+	cmd.Flags().StringVar(
+		&params.invokerAddr,
+		chainIDFlag,
+		defaultAAInvokerAddress,
+		"address of invoker smart contract",
+	)
+
+	helper.RegisterJSONRPCFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.ConfigFlag, polybftsecrets.DataPathFlag)
 }

@@ -1,6 +1,7 @@
 package txrelayer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -30,6 +31,10 @@ type TxRelayer interface {
 	// SendTransactionLocal sends non-signed transaction
 	// (this function is meant only for testing purposes and is about to be removed at some point)
 	SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error)
+	// WaitForReceipt waits for receipt of specific transaction
+	WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error)
+	// SendTransactionWithoutReceipt ends transaction but does not wait for receipt
+	SendTransactionWithoutReceipt(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error)
 }
 
 var _ TxRelayer = (*TxRelayerImpl)(nil)
@@ -76,15 +81,15 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 
 // SendTransaction signs given transaction by provided key and sends it to the blockchain
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
-	txnHash, err := t.sendTransactionLocked(txn, key)
+	txnHash, err := t.SendTransactionWithoutReceipt(txn, key)
 	if err != nil {
 		return nil, err
 	}
 
-	return t.waitForReceipt(txnHash)
+	return t.WaitForReceipt(context.Background(), txnHash)
 }
 
-func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+func (t *TxRelayerImpl) SendTransactionWithoutReceipt(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -142,13 +147,14 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 		return nil, err
 	}
 
-	return t.waitForReceipt(txnHash)
+	return t.WaitForReceipt(context.Background(), txnHash)
 }
 
-func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
-	count := uint(0)
+func (t *TxRelayerImpl) WaitForReceipt(ctx context.Context, hash ethgo.Hash) (*ethgo.Receipt, error) {
+	ticker := time.NewTicker(t.receiptTimeout)
+	defer ticker.Stop()
 
-	for {
+	for i := 0; i < numRetries; i++ {
 		receipt, err := t.client.Eth().GetTransactionReceipt(hash)
 		if err != nil {
 			if err.Error() != "not found" {
@@ -160,13 +166,14 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 			return receipt, nil
 		}
 
-		if count > numRetries {
-			return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
 		}
-
-		time.Sleep(t.receiptTimeout)
-		count++
 	}
+
+	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 }
 
 type TxRelayerOption func(*TxRelayerImpl)

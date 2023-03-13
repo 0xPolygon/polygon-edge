@@ -31,9 +31,8 @@ func Test_AAServer(t *testing.T) {
 
 	defer os.RemoveAll(dbpath)
 
-	invoker := wallet.GenerateAccount()
 	user := wallet.GenerateAccount()
-	aaServer := getServer(t, types.Address(invoker.Ecdsa.Address()), dbpath)
+	aaServer := getServer(t, aaInvokerAddress, dbpath)
 
 	go func() {
 		aaServer.ListenAndServe(baseURL)
@@ -69,9 +68,9 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(types.Address(invoker.Ecdsa.Address()), chainID, user.Ecdsa))
+		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, user.Ecdsa))
 
-		require.True(t, tx.Transaction.IsFromValid(types.Address(invoker.Ecdsa.Address()), chainID, tx.Signature))
+		require.True(t, tx.Transaction.IsFromValid(aaInvokerAddress, chainID, tx.Signature))
 
 		req := makeRequest(t, "POST", "sendTransaction", tx)
 
@@ -192,7 +191,7 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(types.Address(invoker.Ecdsa.Address()), chainID, user.Ecdsa))
+		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, user.Ecdsa))
 
 		req := makeRequest(t, "POST", "sendTransaction", &tx)
 
