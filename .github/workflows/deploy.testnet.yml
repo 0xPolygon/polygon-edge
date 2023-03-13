@@ -201,6 +201,7 @@ jobs:
             }
 
   loadtest:
+    needs: deploy_testnet
     uses: ./.github/workflows/loadtest.yml
     name: Load Test
     secrets:
