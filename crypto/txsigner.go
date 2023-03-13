@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -98,7 +99,7 @@ func (f *FrontierSigner) Sender(tx *types.Transaction) (types.Address, error) {
 
 	refV.Sub(refV, big27)
 
-	sig, err := encodeSignature(tx.R, tx.S, refV, f.isHomestead)
+	sig, err := EncodeSignature(tx.R, tx.S, refV, f.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -181,7 +182,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 	bigV.Sub(bigV, mulOperand)
 	bigV.Sub(bigV, big35)
 
-	sig, err := encodeSignature(tx.R, tx.S, bigV, e.isHomestead)
+	sig, err := EncodeSignature(tx.R, tx.S, bigV, e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -229,8 +230,8 @@ func (e *EIP155Signer) CalculateV(parity byte) []byte {
 	return reference.Bytes()
 }
 
-// encodeSignature generates a signature value based on the R, S and V value
-func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
+// EncodeSignature generates a signature value based on the R, S and V value
+func EncodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 	if !ValidateSignatureValues(V, R, S, isHomestead) {
 		return nil, fmt.Errorf("invalid txn signature")
 	}
@@ -241,4 +242,16 @@ func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 	sig[64] = byte(V.Int64()) // here is safe to convert it since ValidateSignatureValues will validate the v value
 
 	return sig, nil
+}
+
+// Eip3074Magic serialize EIP-3074 messages in form
+// keccak256(type ++ invoker ++ commit)
+func Eip3074Magic(commit []byte, invokerAddr types.Address) []byte {
+	var msg [64]byte
+
+	msg[0] = 0x03
+	copy(msg[13:33], invokerAddr.Bytes())
+	copy(msg[33:], commit)
+
+	return ethgo.Keccak256(msg[:])
 }
