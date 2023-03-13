@@ -236,10 +236,12 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		}
 	}
 
-	deployContracts := []struct {
+	type contractInfo struct {
 		name     string
 		artifact *artifact.Artifact
-	}{
+	}
+
+	deployContracts := []*contractInfo{
 		{
 			name:     "StateSender",
 			artifact: contractsapi.StateSender,
@@ -265,38 +267,37 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			artifact: contractsapi.RootERC20Predicate,
 		},
 		{
-			name:     "RootERC20",
-			artifact: contractsapi.RootERC20,
-		},
-		{
 			name:     "ERC20Template",
 			artifact: contractsapi.ChildERC20,
 		},
+	}
+
+	if params.rootERC20TokenAddr != "" {
+		// use existing root chain ERC20 token
+		addr := types.StringToAddress(params.rootERC20TokenAddr)
+
+		code, err := client.Eth().GetCode(ethgo.Address(addr), ethgo.Latest)
+		if err != nil {
+			return fmt.Errorf("failed to check is root chain ERC20 token deployed: %w", err)
+		} else if code == "0x" {
+			return fmt.Errorf("root chain ERC20 token is not deployed on provided address %s", params.rootERC20TokenAddr)
+		}
+
+		populatorFn, ok := metadataPopulatorMap["RootERC20"]
+		if !ok {
+			return fmt.Errorf("root chain metadata populator not registered for contract 'RootERC20'")
+		}
+
+		populatorFn(manifest.RootchainConfig, addr)
+	} else {
+		// deploy MockERC20 as default root chain ERC20 token
+		deployContracts = append(deployContracts, &contractInfo{name: "RootERC20", artifact: contractsapi.RootERC20})
 	}
 
 	rootchainConfig := &polybft.RootchainConfig{}
 	manifest.RootchainConfig = rootchainConfig
 
 	for _, contract := range deployContracts {
-		if contract.name == "RootERC20" && params.rootERC20TokenAddr != "" {
-			addr := types.StringToAddress(params.rootERC20TokenAddr)
-
-			code, err := client.Eth().GetCode(ethgo.Address(addr), ethgo.Latest)
-			if err != nil {
-				return fmt.Errorf("failed to check is root chain ERC20 token deployed: %w", err)
-			} else if code == "0x" {
-				return fmt.Errorf("root chain ERC20 token is not deployed on provided address %s", params.rootERC20TokenAddr)
-			}
-
-			populatorFn, ok := metadataPopulatorMap[contract.name]
-			if !ok {
-				return fmt.Errorf("rootchain metadata populator not registered for contract '%s'", contract.name)
-			}
-
-			populatorFn(manifest.RootchainConfig, addr)
-
-			continue
-		}
 
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
