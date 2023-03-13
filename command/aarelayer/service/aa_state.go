@@ -159,9 +159,7 @@ func (s *aaTxState) getAllFromBucket(bucketName []byte) ([]*AAStateTransaction, 
 	var result []*AAStateTransaction
 
 	if err := s.db.View(func(tx *bolt.Tx) error {
-		cursor := tx.Bucket(bucketName).Cursor()
-
-		for key, value := cursor.First(); key != nil; key, value = cursor.Next() {
+		return tx.Bucket(bucketName).ForEach(func(key, value []byte) error {
 			stateTx := &AAStateTransaction{}
 
 			if err := json.Unmarshal(value, stateTx); err != nil {
@@ -169,9 +167,9 @@ func (s *aaTxState) getAllFromBucket(bucketName []byte) ([]*AAStateTransaction, 
 			}
 
 			result = append(result, stateTx)
-		}
 
-		return nil
+			return nil
+		})
 	}); err != nil {
 		return nil, err
 	}
