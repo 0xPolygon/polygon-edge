@@ -147,6 +147,11 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 }
 
 func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
+	txn.addJournalEntry(&types.JournalEntry{
+		Addr: addr,
+		Read: boolTruePtr(),
+	})
+
 	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
@@ -399,6 +404,13 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 	if !exists {
 		return types.Hash{}
 	}
+
+	txn.addJournalEntry(&types.JournalEntry{
+		Addr: addr,
+		StorageRead: map[types.Hash]struct{}{
+			key: {},
+		},
+	})
 
 	// Try to get account state from radix tree first
 	// Because the latest account state should be in in-memory radix tree

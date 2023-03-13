@@ -234,6 +234,9 @@ type JournalEntry struct {
 	// Storage track changes in the storage
 	Storage map[Hash]Hash `json:"storage,omitempty"`
 
+	// StorageRead is the list of storage slots read
+	StorageRead map[Hash]struct{} `json:"storage_read,omitempty"`
+
 	// Code tracks the initialization of the contract Code
 	Code []byte `json:"code,omitempty"`
 
@@ -242,6 +245,9 @@ type JournalEntry struct {
 
 	// Touched tracks whether the account has been touched/created
 	Touched *bool `json:"touched,omitempty"`
+
+	// Read signals whether the account was read
+	Read *bool `json:"read,omitempty"`
 }
 
 func (j *JournalEntry) Merge(jj *JournalEntry) {
@@ -273,5 +279,19 @@ func (j *JournalEntry) Merge(jj *JournalEntry) {
 
 	if jj.Touched != nil && jj.Touched != j.Touched {
 		j.Touched = jj.Touched
+	}
+
+	if jj.Read != nil && jj.Read != j.Read {
+		j.Read = jj.Read
+	}
+
+	if jj.StorageRead != nil {
+		if j.StorageRead == nil {
+			j.StorageRead = map[Hash]struct{}{}
+		}
+
+		for k := range jj.StorageRead {
+			j.StorageRead[k] = struct{}{}
+		}
 	}
 }

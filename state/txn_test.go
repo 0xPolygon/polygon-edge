@@ -86,7 +86,7 @@ func TestTxn_TracesCompaction(t *testing.T) {
 	txn.SetState(addr, oneHash, types.ZeroHash)
 
 	txn.TouchAccount(addr)
-	require.Len(t, txn.journal, 8)
+	require.Len(t, txn.journal, 16)
 
 	trace := txn.getCompactJournal()
 	require.Len(t, trace, 1)
@@ -101,6 +101,7 @@ func TestTxn_TracesCompaction(t *testing.T) {
 			oneHash:        types.ZeroHash,
 		},
 		Touched: boolTruePtr(),
+		Read:    boolTruePtr(),
 	})
 }
 
@@ -120,6 +121,10 @@ func TestJournalEntry_Merge(t *testing.T) {
 			Code:    []byte{0x1},
 			Suicide: boolTruePtr(),
 			Touched: boolTruePtr(),
+			Read:    boolTruePtr(),
+			StorageRead: map[types.Hash]struct{}{
+				types.ZeroHash: {},
+			},
 		}
 	}
 
