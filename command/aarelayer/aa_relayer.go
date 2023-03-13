@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -54,7 +53,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		jsonRPC = "http://" + jsonRPC
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPC))
+	txSender, err := service.NewAATxSender(jsonRPC)
 	if err != nil {
 		return err
 	}
@@ -80,7 +79,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		params.chainID,
 		func(a *service.AATransaction) error { return nil })
 	restService := service.NewAARelayerRestServer(pool, state, verification)
-	relayerService := service.NewAARelayerService(txRelayer, pool, state, account.Ecdsa)
+	relayerService := service.NewAARelayerService(txSender, pool, state, account.Ecdsa)
 
 	ctx, cancel := context.WithCancel(cmd.Context())
 	stopCh := common.GetTerminationSignalCh()

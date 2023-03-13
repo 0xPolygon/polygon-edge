@@ -7,32 +7,33 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 )
 
 // AARelayerService pulls transaction from pool one at the time and sends it to relayer
 type AARelayerService struct {
-	pool      AAPool
-	state     AATxState
-	txRelayer txrelayer.TxRelayer
-	key       ethgo.Key
-	pullTime  time.Duration
+	pool         AAPool
+	state        AATxState
+	txSender     AATxSender
+	key          ethgo.Key
+	pullTime     time.Duration
+	receiptDelay time.Duration
 }
 
 func NewAARelayerService(
-	txRelayer txrelayer.TxRelayer,
+	txSender AATxSender,
 	pool AAPool,
 	state AATxState,
 	key ethgo.Key,
 	opts ...TxRelayerOption) *AARelayerService {
 	service := &AARelayerService{
-		txRelayer: txRelayer,
-		pool:      pool,
-		state:     state,
-		key:       key,
-		pullTime:  time.Millisecond * 5000,
+		txSender:     txSender,
+		pool:         pool,
+		state:        state,
+		key:          key,
+		pullTime:     time.Millisecond * 5000, // every five seconds pull from pool
+		receiptDelay: time.Millisecond * 50,
 	}
 
 	for _, opt := range opts {
@@ -70,7 +71,7 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 		tx     = rs.makeEthgoTransaction(stateTx)
 	)
 
-	hash, err := rs.txRelayer.SendTransactionWithoutReceipt(tx, rs.key)
+	hash, err := rs.txSender.SendTransaction(tx, rs.key)
 	// if its network error return tx back to the pool
 	if errors.As(err, &netErr) {
 		rs.pool.Push(stateTx)
@@ -102,7 +103,7 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 	default:
 	}
 
-	recipt, err := rs.txRelayer.WaitForReceipt(ctx, hash)
+	recipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay)
 	if err != nil {
 		errstr := err.Error()
 		stateTx.Error = &errstr
@@ -157,5 +158,11 @@ type TxRelayerOption func(*AARelayerService)
 func WithPullTime(pullTime time.Duration) TxRelayerOption {
 	return func(t *AARelayerService) {
 		t.pullTime = pullTime
+	}
+}
+
+func WithReceiptDelay(receiptDelay time.Duration) TxRelayerOption {
+	return func(t *AARelayerService) {
+		t.receiptDelay = receiptDelay
 	}
 }
