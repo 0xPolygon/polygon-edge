@@ -39,8 +39,6 @@ const (
 var (
 	params initContractsParams
 
-	defaultFundAmount, _ = new(big.Int).SetString(strings.TrimPrefix(command.DefaultPremineBalance, "0x"), 16)
-
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
 	metadataPopulatorMap = map[string]func(*polybft.RootchainConfig, types.Address){
@@ -217,10 +215,17 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	// if running in test mode, we need to fund deployer account
 	if params.isTestMode {
+		fundAmountRaw := strings.TrimPrefix(command.DefaultPremineBalance, "0x")
+
+		fundAmount, ok := new(big.Int).SetString(fundAmountRaw, 16)
+		if !ok {
+			return fmt.Errorf("failed to parse provided fund amount: %s", fundAmountRaw)
+		}
+
 		// fund account
 		deployerAddress := deployerKey.Address()
 
-		txn := &ethgo.Transaction{To: &deployerAddress, Value: defaultFundAmount}
+		txn := &ethgo.Transaction{To: &deployerAddress, Value: fundAmount}
 		if _, err := txRelayer.SendTransactionLocal(txn); err != nil {
 			return err
 		}
