@@ -6,46 +6,32 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 )
 
-const DefaultPrivateKeyRaw = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
+const (
+	testAccountPrivKey = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
+	TestModeFlag       = "test"
+)
 
 var (
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
-
-	// rootchainAccountKey is a private key of account which is used for different actions on rootchain
-	// (smart contracts deployment, deposits etc.)
-	rootchainAccountKey *wallet.Key
+	errTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
 )
 
-// InitRootchainPrivateKey initializes a private key instance from provided hex encoded private key
-func InitRootchainPrivateKey(rawKey string) error {
-	privateKeyRaw := DefaultPrivateKeyRaw
-	if rawKey != "" {
-		privateKeyRaw = rawKey
-	}
-
-	dec, err := hex.DecodeString(privateKeyRaw)
+// GetRootchainTestPrivKey initializes a private key instance from hardcoded test account hex encoded private key
+func GetRootchainTestPrivKey() (ethgo.Key, error) {
+	testAccPrivKeyRaw, err := hex.DecodeString(testAccountPrivKey)
 	if err != nil {
-		return fmt.Errorf("failed to decode private key string '%s': %w", privateKeyRaw, err)
+		return nil, fmt.Errorf("failed to decode private key string '%s': %w", testAccountPrivKey, err)
 	}
 
-	rootchainAccountKey, err = wallet.NewWalletFromPrivKey(dec)
-	if err != nil {
-		return fmt.Errorf("failed to initialize key from provided private key '%s': %w", privateKeyRaw, err)
-	}
-
-	return nil
-}
-
-// GetRootchainPrivateKey returns rootchain account private key
-func GetRootchainPrivateKey() ethgo.Key {
-	return rootchainAccountKey
+	return wallet.NewWalletFromPrivKey(testAccPrivKeyRaw)
 }
 
 func GetRootchainID() (string, error) {
@@ -92,7 +78,19 @@ func ReadRootchainIP() (string, error) {
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
 }
 
-// IsTestMode returns true in case provided rootchain private key is the same as DefaultPrivateKey one
-func IsTestMode(rootchainPrivKey string) bool {
-	return rootchainPrivKey == DefaultPrivateKeyRaw
+// ValidateSecretFlags validates provided secret flags.
+// In case isTestMode is set to true, test account is being used and no need to specify secrets,
+// otherwise they must be present.
+func ValidateSecretFlags(isTestMode bool, accountDir, accountConfigPath string) error {
+	if !isTestMode {
+		if err := sidechain.ValidateSecretFlags(accountDir, accountConfigPath); err != nil {
+			return err
+		}
+	} else {
+		if accountDir != "" || accountConfigPath != "" {
+			return errTestModeSecrets
+		}
+	}
+
+	return nil
 }

@@ -14,13 +14,13 @@ var (
 
 type whitelistParams struct {
 	accountDir          string
-	configPath          string
+	accountConfig       string
 	jsonRPC             string
 	newValidatorAddress string
 }
 
 func (ep *whitelistParams) validateFlags() error {
-	return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.configPath)
+	return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.accountConfig)
 }
 
 type enlistResult struct {

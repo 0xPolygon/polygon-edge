@@ -45,16 +45,16 @@ func GetCommand() *cobra.Command {
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.accountDir,
-		polybftsecrets.DataPathFlag,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.configPath,
-		polybftsecrets.ConfigFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
@@ -72,7 +72,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	helper.RegisterJSONRPCFlag(cmd)
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.ConfigFlag, polybftsecrets.DataPathFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountConfigFlag, polybftsecrets.AccountDirFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -85,7 +85,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.configPath, true)
+	secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.accountConfig, true)
 	if err != nil {
 		return err
 	}

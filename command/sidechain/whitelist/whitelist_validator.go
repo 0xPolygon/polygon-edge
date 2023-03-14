@@ -39,16 +39,16 @@ func GetCommand() *cobra.Command {
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.accountDir,
-		polybftsecrets.DataPathFlag,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.configPath,
-		polybftsecrets.ConfigFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
@@ -58,7 +58,7 @@ func setFlags(cmd *cobra.Command) {
 		"account address of a possible validator",
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 	helper.RegisterJSONRPCFlag(cmd)
 }
 
@@ -72,7 +72,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ownerAccount, err := sidechainHelper.GetAccount(params.accountDir, params.configPath)
+	ownerAccount, err := sidechainHelper.GetAccount(params.accountDir, params.accountConfig)
 	if err != nil {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}

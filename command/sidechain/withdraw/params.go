@@ -13,14 +13,14 @@ var (
 )
 
 type withdrawParams struct {
-	accountDir string
-	configPath string
-	jsonRPC    string
-	addressTo  string
+	accountDir    string
+	accountConfig string
+	jsonRPC       string
+	addressTo     string
 }
 
 func (v *withdrawParams) validateFlags() error {
-	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.configPath)
+	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.accountConfig)
 }
 
 type withdrawResult struct {

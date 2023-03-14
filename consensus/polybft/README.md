@@ -9,9 +9,6 @@ It has native support for running bridge, which enables running cross-chain tran
 
 ### Precondition
 
-Smart contracts in the `core-contracts` submodule must be compiled before running following commands.
-In order to do so, run `make compile-core-contracts`.
-
 1. Build binary
 
     ```bash
@@ -55,8 +52,11 @@ In order to do so, run `make compile-core-contracts`.
 5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates manifest configuration with rootchain contract addresses and rootchain default sender address.
 
     ```bash
-    polygon-edge rootchain init-contracts [--manifest ./manifest.json]
-    [--json-rpc http://127.0.0.1:8545] [--admin-key <hex_encoded_private_key>]
+    polygon-edge rootchain init-contracts 
+    --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>] 
+    [--manifest ./manifest.json]
+    [--json-rpc http://127.0.0.1:8545]
+    [--test]
     ```
 
 6. Create chain configuration - this command creates chain configuration, which is needed to run a blockchain
