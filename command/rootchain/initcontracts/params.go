@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 const (
@@ -25,14 +24,8 @@ type initContractsParams struct {
 }
 
 func (ip *initContractsParams) validateFlags() error {
-	if !ip.isTestMode {
-		if err := sidechain.ValidateSecretFlags(ip.accountDir, ip.accountConfig); err != nil {
-			return err
-		}
-	} else {
-		if ip.accountDir != "" || ip.accountConfig != "" {
-			return helper.ErrTestModeSecrets
-		}
+	if err := helper.ValidateSecretFlags(ip.isTestMode, ip.accountDir, ip.accountConfig); err != nil {
+		return err
 	}
 
 	if _, err := os.Stat(ip.manifestPath); errors.Is(err, os.ErrNotExist) {

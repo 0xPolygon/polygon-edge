@@ -16,7 +16,6 @@ import (
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -51,17 +50,7 @@ type exitParams struct {
 
 // validateFlags validates input values
 func (ep *exitParams) validateFlags() error {
-	if !ep.isTestMode {
-		if err := sidechain.ValidateSecretFlags(ep.accountDir, ep.accountConfig); err != nil {
-			return err
-		}
-	} else {
-		if ep.accountDir != "" || ep.accountConfig != "" {
-			return helper.ErrTestModeSecrets
-		}
-	}
-
-	return nil
+	return helper.ValidateSecretFlags(ep.isTestMode, ep.accountDir, ep.accountConfig)
 }
 
 var (

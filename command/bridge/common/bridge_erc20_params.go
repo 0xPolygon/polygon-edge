@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 const (
@@ -23,16 +22,10 @@ type ERC20BridgeParams struct {
 	Amounts       []string
 }
 
-func (bp *ERC20BridgeParams) ValidateFlags(testMode bool) error {
+func (bp *ERC20BridgeParams) ValidateFlags(isTestMode bool) error {
 	// in case of test mode test rootchain account is being used as the rootchain transactions sender
-	if !testMode {
-		if err := sidechain.ValidateSecretFlags(bp.AccountDir, bp.AccountConfig); err != nil {
-			return err
-		}
-	} else {
-		if bp.AccountDir != "" || bp.AccountConfig != "" {
-			return helper.ErrTestModeSecrets
-		}
+	if err := helper.ValidateSecretFlags(isTestMode, bp.AccountDir, bp.AccountConfig); err != nil {
+		return err
 	}
 
 	if len(bp.Receivers) != len(bp.Amounts) {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
@@ -20,7 +21,7 @@ const (
 var (
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
-	ErrTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
+	errTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
 )
 
 // GetRootchainTestPrivKey initializes a private key instance from hardcoded test account hex encoded private key
@@ -75,4 +76,21 @@ func ReadRootchainIP() (string, error) {
 	}
 
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
+}
+
+// ValidateSecretFlags validates provided secret flags.
+// In case isTestMode is set to true, test account is being used and no need to specify secrets,
+// otherwise they must be present.
+func ValidateSecretFlags(isTestMode bool, accountDir, accountConfigPath string) error {
+	if !isTestMode {
+		if err := sidechain.ValidateSecretFlags(accountDir, accountConfigPath); err != nil {
+			return err
+		}
+	} else {
+		if accountDir != "" || accountConfigPath != "" {
+			return errTestModeSecrets
+		}
+	}
+
+	return nil
 }
