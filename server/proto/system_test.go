@@ -47,6 +47,13 @@ func TestRequestValidation(t *testing.T) {
 			valid: true,
 		},
 		{
+			name: "PeersAddRequest: valid id format dns4",
+			req: &PeersAddRequest{
+				Id: "/dns4/ams-2.bootstrap.libp2p.io/tcp/443/wss/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
+			},
+			valid: true,
+		},
+		{
 			name: "PeersStatusRequest: empty id",
 			req: &PeersStatusRequest{
 				Id: "",
