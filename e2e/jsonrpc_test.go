@@ -86,7 +86,7 @@ func TestJsonRPC(t *testing.T) {
 		block, err := client.GetBlockByNumber(ethgo.BlockNumber(txn.Receipt().BlockNumber)-1, false)
 		require.NoError(t, err)
 
-		_, err = client.GetNonce(key1.Address(), block.Hash)
+		_, err = client.GetNonce(key1.Address(), ethgo.BlockNumber(block.Number))
 		require.NoError(t, err)
 	})
 
