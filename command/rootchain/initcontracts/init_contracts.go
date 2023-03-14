@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -38,7 +39,7 @@ const (
 var (
 	params initContractsParams
 
-	defaultFundAmount, _ = new(big.Int).SetString(command.DefaultPremineBalance, 16)
+	defaultFundAmount, _ = new(big.Int).SetString(strings.TrimPrefix(command.DefaultPremineBalance, "0x"), 16)
 
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
