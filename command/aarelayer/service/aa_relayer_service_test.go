@@ -25,6 +25,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		var log = []*ethgo.Log{
 			{BlockNumber: 1, Topics: []ethgo.Hash{ethgo.ZeroHash}}, {BlockNumber: 5, Topics: []ethgo.Hash{ethgo.ZeroHash}}, {BlockNumber: 8, Topics: []ethgo.Hash{ethgo.ZeroHash}},
 		}
+		receipt := &ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Logs: log, Status: 1}
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
 		aaTxSender := new(dummyAATxSender)
@@ -35,7 +36,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, nil).Once()
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
-			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Logs: log}, nil)
+			Return(receipt, nil)
 
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 
@@ -129,6 +130,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		state := new(dummyAATxState)
 		pool := new(dummyAApool)
 		aaTxSender := new(dummyAATxSender)
+		receipt := &ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Status: 1}
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(errors.New("not nil")).Once()
 		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
@@ -138,7 +140,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 			Return(ethgo.ZeroHash, nil).Once()
 		pool.On("Push", mock.Anything)
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything).
-			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+			Return(receipt, nil).Once()
 
 		tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa)
 
