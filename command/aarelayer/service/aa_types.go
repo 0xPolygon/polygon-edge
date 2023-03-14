@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -38,6 +37,14 @@ var (
 		"tuple(bytes32 typeHash, bytes32 name, bytes32 version, uint256 chainId, address verifyingContract)",
 	)
 
+	// function invoke(Signature calldata signature, Transaction calldata transaction) external payable nonReentrant {
+	invokerMethodAbiType = abi.MustNewMethod(
+		`function invoke(
+			tuple(uint256 r,uint256 s,bool v) signature,
+			tuple(address from,uint256 nonce,tuple(address to,uint256 value,uint256 gasLimit,bytes data)[] payload) transaction
+		) public payable`,
+	)
+
 	// default address of invoker smart contract
 	DefaultAAInvokerAddress = types.StringToAddress("3001")
 )
@@ -69,27 +76,43 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 	return nil
 }
 
-func (t *AATransaction) ToAbi() (*contractsapi.Signature, *contractsapi.Transaction) {
-	tx := &contractsapi.Transaction{
-		From:    t.Transaction.From,
-		Nonce:   new(big.Int).SetUint64(t.Transaction.Nonce),
-		Payload: make([]*contractsapi.TransactionPayload, len(t.Transaction.Payload)),
+func (t *AATransaction) ToAbi() ([]byte, error) {
+	// sginature "tuple(uint256 r,uint256 s,bool v)"
+	signature := map[string]interface{}{
+		"r": new(big.Int).SetBytes(t.Signature[:32]),
+		"s": new(big.Int).SetBytes(t.Signature[32:64]),
+		"v": t.Signature[64] != 0,
 	}
 
+	// payloads "tuple(address to,uint256 value,uint256 gasLimit,bytes data)"
+	payloads := make([]map[string]interface{}, len(t.Transaction.Payload))
+
 	for i, payload := range t.Transaction.Payload {
-		tx.Payload[i] = &contractsapi.TransactionPayload{
-			To:       *payload.To,
-			Value:    new(big.Int).Set(payload.Value),
-			GasLimit: new(big.Int).Set(payload.GasLimit),
-			Data:     payload.Input,
+		to := types.ZeroAddress
+		if payload.To != nil {
+			to = *payload.To
+		}
+
+		payloads[i] = map[string]interface{}{
+			"to":       to,
+			"value":    new(big.Int).Set(payload.Value),
+			"gasLimit": new(big.Int).Set(payload.GasLimit),
+			"data":     payload.Input,
 		}
 	}
 
-	return &contractsapi.Signature{
-		R: new(big.Int).SetBytes(t.Signature[:32]),
-		S: new(big.Int).SetBytes(t.Signature[32:64]),
-		V: t.Signature[64] != 0,
-	}, tx
+	// transaction
+	// "tuple(address from,uint256 nonce,tuple(address to,uint256 value,uint256 gasLimit,bytes data)[] payload)"
+	transaction := map[string]interface{}{
+		"from":    t.Transaction.From,
+		"nonce":   new(big.Int).SetUint64(t.Transaction.Nonce),
+		"payload": payloads,
+	}
+
+	return invokerMethodAbiType.Encode(map[string]interface{}{
+		"signature":   signature,
+		"transaction": transaction,
+	})
 }
 
 // Transaction represents a transaction

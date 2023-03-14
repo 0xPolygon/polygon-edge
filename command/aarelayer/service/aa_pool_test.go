@@ -1,6 +1,7 @@
 package service
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -56,6 +57,9 @@ func checkPops(t *testing.T, aaPool AAPool) {
 }
 
 func getDummyTxs() []*AAStateTransaction {
+	dummyAddress1 := types.StringToAddress("87830111")
+	dummyAddress2 := types.StringToAddress("87830111")
+
 	return []*AAStateTransaction{
 		{
 			Tx: &AATransaction{
@@ -65,13 +69,37 @@ func getDummyTxs() []*AAStateTransaction {
 		},
 		{
 			Tx: &AATransaction{
-				Transaction: Transaction{Nonce: 2, From: types.StringToAddress("cc")},
+				Transaction: Transaction{
+					Nonce: 2, From: types.StringToAddress("cc"),
+					Payload: []Payload{
+						{
+							To:       &dummyAddress1,
+							Value:    big.NewInt(10),
+							GasLimit: big.NewInt(20),
+						},
+					},
+				},
 			},
 			Time: 1,
 		},
 		{
 			Tx: &AATransaction{
-				Transaction: Transaction{Nonce: 1, From: types.StringToAddress("aa")},
+				Transaction: Transaction{
+					Nonce: 1, From: types.StringToAddress("aa"),
+					Payload: []Payload{
+						{
+							To:       &dummyAddress2,
+							Value:    big.NewInt(1),
+							GasLimit: big.NewInt(21000),
+						},
+						{
+							To:       nil,
+							Value:    big.NewInt(100),
+							GasLimit: big.NewInt(201),
+							Input:    []byte{1, 2, 3},
+						},
+					},
+				},
 			},
 			Time: 40,
 		},

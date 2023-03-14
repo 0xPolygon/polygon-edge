@@ -7,7 +7,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 )
@@ -134,13 +133,7 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 }
 
 func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) (*ethgo.Transaction, error) {
-	signature, tx := stateTx.Tx.ToAbi()
-	params := &contractsapi.InvokeFunction{
-		Signature:   signature,
-		Transaction: tx,
-	}
-
-	input, err := params.EncodeAbi()
+	input, err := stateTx.Tx.ToAbi()
 	if err != nil {
 		return nil, err
 	}

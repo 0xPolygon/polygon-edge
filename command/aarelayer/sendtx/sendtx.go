@@ -90,22 +90,25 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	cmd.Printf("Transaction has been successfully sent: %s\n", responseObj["uuid"])
+	uuid := responseObj["uuid"]
+
+	cmd.Printf("Transaction has been successfully sent: %s\n", uuid)
 
 	if params.waitForReceipt {
 		cmd.Println("waiting for receipt...")
 
-		receipt, err := waitForRecipt(cmd, responseObj["uuid"])
+		receipt, err := waitForRecipt(cmd, uuid)
 		if err != nil {
 			return err
 		}
 
-		if receipt.Error == nil {
-			cmd.Printf("Transaction has been included in block: %s\n", receipt.Mined.BlockHash.String())
-		} else {
-			cmd.Println("Transaction failed to be included in block")
-			cmd.Printf("Error: %s\n", *receipt.Error)
+		if receipt.Error != nil {
+			return fmt.Errorf("transaction %s failed with an error: %s", uuid, *receipt.Error)
+		} else if receipt.Status == service.StatusFailed {
+			return fmt.Errorf("transaction %s failed", uuid)
 		}
+
+		cmd.Printf("Transaction has been included in block: %s\n", receipt.Mined.BlockHash.String())
 	}
 
 	return nil
