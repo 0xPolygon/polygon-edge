@@ -94,15 +94,15 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]uint64, error) {
 	trackerStartBlocksConfig := make(map[types.Address]uint64, len(trackerStartBlocksRaw))
 
-	for _, startBlockRawConfig := range trackerStartBlocksRaw {
-		delimiterIdx := strings.Index(startBlockRawConfig, ":")
+	for _, startBlockRaw := range trackerStartBlocksRaw {
+		delimiterIdx := strings.Index(startBlockRaw, ":")
 		if delimiterIdx == -1 {
 			return nil, fmt.Errorf("invalid event tracker start block configuration provided: %s", trackerStartBlocksRaw)
 		}
 
 		// <contractAddress>:<startBlock>
-		address := types.StringToAddress(startBlockRawConfig[:delimiterIdx])
-		startBlockRaw := startBlockRawConfig[delimiterIdx+1:]
+		address := types.StringToAddress(startBlockRaw[:delimiterIdx])
+		startBlockRaw := startBlockRaw[delimiterIdx+1:]
 
 		startBlock, err := strconv.ParseUint(startBlockRaw, 10, 64)
 		if err != nil {

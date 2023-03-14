@@ -193,7 +193,7 @@ func setFlags(cmd *cobra.Command) {
 
 		cmd.Flags().StringArrayVar(
 			&params.eventTrackerStartBlocks,
-			trackerStartBlockFlag,
+			trackerStartBlocksFlag,
 			[]string{},
 			"event tracker starting block configuration, which is specified per contract address "+
 				"(format: <contract address>:<start block>)",

@@ -23,12 +23,12 @@ import (
 )
 
 const (
-	manifestPathFlag      = "manifest"
-	validatorSetSizeFlag  = "validator-set-size"
-	sprintSizeFlag        = "sprint-size"
-	blockTimeFlag         = "block-time"
-	bridgeFlag            = "bridge-json-rpc"
-	trackerStartBlockFlag = "tracker-start-block"
+	manifestPathFlag       = "manifest"
+	validatorSetSizeFlag   = "validator-set-size"
+	sprintSizeFlag         = "sprint-size"
+	blockTimeFlag          = "block-time"
+	bridgeFlag             = "bridge-json-rpc"
+	trackerStartBlocksFlag = "tracker-start-blocks"
 
 	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)
