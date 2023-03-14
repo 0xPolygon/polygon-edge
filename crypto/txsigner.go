@@ -7,9 +7,9 @@ import (
 	"math/bits"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -244,14 +244,13 @@ func EncodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 	return sig, nil
 }
 
-// Eip3074Magic serialize EIP-3074 messages in form
-// keccak256(type ++ invoker ++ commit)
-func Eip3074Magic(commit []byte, invokerAddr types.Address) []byte {
-	var msg [64]byte
-
+// Make3074Hash serialize EIP-3074 messages in form keccak256(type ++ invoker ++ commit)
+func Make3074Hash(chainID int64, invokerAddr types.Address, commit []byte) []byte {
+	var msg [97]byte
 	msg[0] = 0x03
-	copy(msg[13:33], invokerAddr.Bytes())
-	copy(msg[33:], commit)
+	copy(msg[1:], common.PadLeftOrTrim(big.NewInt(chainID).Bytes(), 32))
+	copy(msg[45:65], invokerAddr.Bytes())
+	copy(msg[65:], commit)
 
-	return ethgo.Keccak256(msg[:])
+	return Keccak256(msg[:])
 }
