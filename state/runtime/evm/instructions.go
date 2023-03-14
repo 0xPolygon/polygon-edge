@@ -1145,7 +1145,7 @@ func opCall(op OpCode) instruction {
 			callType = runtime.StaticCall
 
 		default:
-			panic("not expected")
+			panic("not expected") //nolint:gocritic
 		}
 
 		contract, offset, size, err := c.buildCallContract(op)

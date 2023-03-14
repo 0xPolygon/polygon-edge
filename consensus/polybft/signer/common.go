@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 
 	pcrypto "github.com/0xPolygon/polygon-edge/crypto"
@@ -30,13 +31,13 @@ var (
 func mustG2Point(str string) *bn256.G2 {
 	buf, err := hex.DecodeString(str)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	b := new(bn256.G2)
 
 	if _, err := b.Unmarshal(buf); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return b

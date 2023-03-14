@@ -105,7 +105,7 @@ func TestFSM_BuildProposal_WithoutCommitEpochTxGood(t *testing.T) {
 
 	eventRoot := types.ZeroHash
 
-	validators := newTestValidators(accountCount)
+	validators := newTestValidators(t, accountCount)
 	validatorSet := validators.getPublicIdentities()
 	extra := createTestExtra(validatorSet, AccountSet{}, accountCount-1, committedCount, parentCount)
 
@@ -170,7 +170,7 @@ func TestFSM_BuildProposal_WithCommitEpochTxGood(t *testing.T) {
 
 	eventRoot := types.ZeroHash
 
-	validators := newTestValidators(accountCount)
+	validators := newTestValidators(t, accountCount)
 	extra := createTestExtra(validators.getPublicIdentities(), AccountSet{}, accountCount-1, committedCount, parentCount)
 
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
@@ -250,7 +250,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToApplyStateTx(t *testing.T) {
 		parentBlockNumber = 1023
 	)
 
-	validators := newTestValidators(accountCount)
+	validators := newTestValidators(t, accountCount)
 	extra := createTestExtra(validators.getPublicIdentities(), AccountSet{}, accountCount-1, committedCount, parentCount)
 
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
@@ -283,7 +283,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 		parentBlockNumber        = 49
 	)
 
-	validators := newTestValidators(validatorsCount).getPublicIdentities()
+	validators := newTestValidators(t, validatorsCount).getPublicIdentities()
 	extra := createTestExtra(validators, AccountSet{}, validatorsCount-1, signaturesCount, signaturesCount)
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
 	parent.ComputeHash()
@@ -295,7 +295,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	blockBuilderMock.On("GetState").Return(transition).Once()
 
 	newValidators := validators[:remainingValidatorsCount].Copy()
-	addedValidators := newTestValidators(2).getPublicIdentities()
+	addedValidators := newTestValidators(t, 2).getPublicIdentities()
 	newValidators = append(newValidators, addedValidators...)
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetValidatorSet").Return(newValidators).Once()
@@ -356,7 +356,7 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 		parentBlockNumber = 9
 	)
 
-	testValidators := newTestValidators(accountCount)
+	testValidators := newTestValidators(t, accountCount)
 	extra := createTestExtra(testValidators.getPublicIdentities(), AccountSet{}, accountCount-1, signaturesCount, signaturesCount)
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: extra}
 	parent.ComputeHash()
@@ -395,7 +395,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToCreateValidatorsDelta(t *testi
 		parentBlockNumber = 49
 	)
 
-	testValidators := newTestValidators(accountCount)
+	testValidators := newTestValidators(t, accountCount)
 	allAccounts := testValidators.getPublicIdentities()
 	extra := createTestExtra(allAccounts, AccountSet{}, accountCount-1, signaturesCount, signaturesCount)
 
@@ -509,7 +509,7 @@ func TestFSM_VerifyStateTransactions_EndOfEpochMoreThanOneCommitEpochTx(t *testi
 func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidators(5)
+	validators := newTestValidators(t, 5)
 
 	validatorSet := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
 
@@ -536,7 +536,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidators(5)
+	validators := newTestValidators(t, 5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
 	commitment.AggSignature = Signature{
 		AggregatedSignature: []byte{1, 2},
@@ -570,9 +570,9 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidators(5)
+	validators := newTestValidators(t, 5)
 	commitment := createTestCommitment(t, validators.getPrivateIdentities())
-	nonValidators := newTestValidators(3)
+	nonValidators := newTestValidators(t, 3)
 	aggregatedSigs := bls.Signatures{}
 
 	nonValidators.iterAcct(nil, func(t *testValidator) {
@@ -616,7 +616,7 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 		parentBlockNumber = 10
 	)
 
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(t, accountsCount)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 5, 3, 3),
@@ -643,7 +643,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 		parentBlockNumber = 10
 	)
 
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(t, accountsCount)
 
 	parent := &types.Header{
 		Number:    parentBlockNumber,
@@ -659,7 +659,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	_, err := fsm.BuildProposal(0)
 	assert.NoError(t, err)
 
-	nonValidatorAcc := newTestValidator("non_validator", 1)
+	nonValidatorAcc := newTestValidator(t, "non_validator", 1)
 	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
 	require.NoError(t, err)
 
@@ -672,7 +672,7 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 
 	const parentBlockNumber = 10
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	validatorsMetadata := validators.getPublicIdentities()
 
 	parent := &types.Header{Number: parentBlockNumber, ExtraData: createTestExtra(validatorsMetadata, AccountSet{}, 5, 3, 3)}
@@ -709,7 +709,7 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 		signaturesCount   = 3
 	)
 
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(t, accountsCount)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, signaturesCount, signaturesCount),
@@ -740,7 +740,7 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 		signaturesCount   = 3
 	)
 
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(t, accountsCount)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, signaturesCount, signaturesCount),
@@ -770,7 +770,7 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 
 	const parentBlockNumber = 10
 
-	validators := newTestValidators(5)
+	validators := newTestValidators(t, 5)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, 3, 3),
@@ -806,7 +806,7 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 
 	const parentBlockNumber = 10
 
-	validators := newTestValidators(5)
+	validators := newTestValidators(t, 5)
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, 3, 3),
@@ -850,7 +850,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 	)
 
 	setupFn := func() (*fsm, []*messages.CommittedSeal, *types.FullBlock, *blockchainMock) {
-		validators := newTestValidators(accountCount)
+		validators := newTestValidators(t, accountCount)
 		allAccounts := validators.getPrivateIdentities()
 		validatorsMetadata := validators.getPublicIdentities()
 
@@ -943,7 +943,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 		signaturesCount   = 3
 	)
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	validatorsMetadata := validators.getPublicIdentities()
 
 	parent := &types.Header{Number: parentBlockNumber}
@@ -975,7 +975,7 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	require.NoError(t, err)
 
 	// create test account outside of validator set
-	nonValidatorAccount := newTestValidator("non_validator", 1)
+	nonValidatorAccount := newTestValidator(t, "non_validator", 1)
 	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash).Marshal()
 	require.NoError(t, err)
 
@@ -1060,7 +1060,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 		signedCommitments [2]*CommitmentMessageSigned
 	)
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	commitments[0], signedCommitments[0], stateSyncs[0] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	commitments[1], signedCommitments[1], stateSyncs[1] = buildCommitmentAndStateSyncs(t, 10, uint64(3), 12)
 
@@ -1116,7 +1116,7 @@ func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T)
 func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: true,
@@ -1145,7 +1145,7 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
 		isEndOfSprint: true,
@@ -1159,7 +1159,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	var txns []*types.Transaction
 
 	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
-	invalidValidator := newTestValidator("G", 1)
+	invalidValidator := newTestValidator(t, "G", 1)
 	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message")).Marshal()
 	require.NoError(t, err)
 
@@ -1181,7 +1181,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 
 	validatorSet := NewValidatorSet(validators.getPublicIdentities(), hclog.NewNullLogger())
@@ -1223,7 +1223,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 		signaturesCount   = 3
 	)
 
-	validators := newTestValidators(accountsCount)
+	validators := newTestValidators(t, accountsCount)
 	validatorsMetadata := validators.getPublicIdentities()
 
 	extra := createTestExtraObject(validatorsMetadata, AccountSet{}, 4, signaturesCount, signaturesCount)

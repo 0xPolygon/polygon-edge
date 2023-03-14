@@ -72,15 +72,15 @@ func (d dummyHost) AddBalance(addr types.Address, balance *big.Int) {
 }
 
 func (d dummyHost) AccountExists(addr types.Address) bool {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetBalance(addr types.Address) *big.Int {
@@ -93,43 +93,43 @@ func (d dummyHost) GetBalance(addr types.Address) *big.Int {
 }
 
 func (d dummyHost) GetCodeSize(addr types.Address) int {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetCodeHash(addr types.Address) types.Hash {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetCode(addr types.Address) []byte {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetTxContext() runtime.TxContext {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetBlockHash(number int64) types.Hash {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) Callx(_ *runtime.Contract, _ runtime.Host) *runtime.ExecutionResult {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) Empty(addr types.Address) bool {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) GetNonce(addr types.Address) uint64 {
-	panic("not implemented")
+	panic("not implemented") //nolint:gocritic
 }
 
 func (d dummyHost) Transfer(from types.Address, to types.Address, amount *big.Int) error {

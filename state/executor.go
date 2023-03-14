@@ -51,7 +51,7 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	}
 }
 
-func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
+func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) (types.Hash, error) {
 	snap := e.state.NewSnapshot()
 	txn := NewTxn(snap)
 	config := e.config.Forks.At(0)
@@ -90,14 +90,14 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 
 	if e.GenesisPostHook != nil {
 		if err := e.GenesisPostHook(transition); err != nil {
-			panic(fmt.Errorf("Error writing genesis block: %w", err))
+			return types.Hash{}, fmt.Errorf("Error writing genesis block: %w", err)
 		}
 	}
 
 	objs := txn.Commit(false)
 	_, root := snap.Commit(objs)
 
-	return types.BytesToHash(root)
+	return types.BytesToHash(root), nil
 }
 
 type BlockResult struct {

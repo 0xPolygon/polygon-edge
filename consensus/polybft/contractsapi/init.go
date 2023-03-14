@@ -2,6 +2,7 @@ package contractsapi
 
 import (
 	"embed"
+	"log"
 	"path"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
@@ -41,94 +42,94 @@ func init() {
 
 	CheckpointManager, err = artifact.DecodeArtifact([]byte(CheckpointManagerArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ExitHelper, err = artifact.DecodeArtifact([]byte(ExitHelperArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	L2StateSender, err = artifact.DecodeArtifact([]byte(L2StateSenderArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	BLS, err = artifact.DecodeArtifact([]byte(BLSArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	BLS256, err = artifact.DecodeArtifact([]byte(BN256G2Artifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	Merkle, err = artifact.DecodeArtifact([]byte(MerkleArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	StateSender, err = artifact.DecodeArtifact([]byte(StateSenderArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	RootERC20Predicate, err = artifact.DecodeArtifact([]byte(RootERC20PredicateArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	StateReceiver, err = artifact.DecodeArtifact([]byte(StateReceiverArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	System, err = artifact.DecodeArtifact([]byte(SystemArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ChildERC20, err = artifact.DecodeArtifact([]byte(ChildERC20Artifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ChildERC20Predicate, err = artifact.DecodeArtifact([]byte(ChildERC20PredicateArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	NativeERC20, err = artifact.DecodeArtifact([]byte(NativeERC20Artifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	RootERC20, err = artifact.DecodeArtifact([]byte(MockERC20Artifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 
 func readTestContractContent(contractFileName string) []byte {
 	contractRaw, err := testContracts.ReadFile(path.Join(testContractsDir, contractFileName))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	return contractRaw

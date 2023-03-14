@@ -12,7 +12,7 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 	t.Parallel()
 
 	// enough signers for quorum (2/3 super-majority of validators are signers)
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F", "G"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F", "G"})
 	vs := validators.toValidatorSet()
 
 	signers := make(map[types.Address]struct{})

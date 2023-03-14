@@ -655,7 +655,7 @@ func (t *Txn) sendImpl() error {
 
 func (t *Txn) Send() *Txn {
 	if t.hash != nil {
-		panic("BUG: txn already sent")
+		panic("BUG: txn already sent") //nolint:gocritic
 	}
 
 	t.sendErr = t.sendImpl()

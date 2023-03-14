@@ -264,7 +264,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		ExtraData:  []byte{}, // if not set it will fail
 	}
 	if err := s.WriteHeader(header); err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	addr1 := types.StringToAddress("11")
@@ -297,9 +297,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	}
 
 	body0 := block.Body()
-	if err := s.WriteBody(header.Hash, body0); err != nil {
-		panic(err)
-	}
+	assert.NoError(t, s.WriteBody(header.Hash, body0))
 
 	body1, err := s.ReadBody(header.Hash)
 	assert.NoError(t, err)

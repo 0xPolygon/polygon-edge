@@ -126,7 +126,7 @@ func WrapClient(s network.Stream) *grpc.ClientConn {
 
 	if err != nil {
 		// TODO: this should not fail at all
-		panic(err)
+		panic(err) //nolint:gocritic
 	}
 
 	return conn
