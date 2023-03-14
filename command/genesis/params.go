@@ -77,12 +77,13 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	manifestPath      string
-	validatorSetSize  int
-	sprintSize        uint64
-	blockTime         time.Duration
-	bridgeJSONRPCAddr string
-	epochReward       uint64
+	manifestPath            string
+	validatorSetSize        int
+	sprintSize              uint64
+	blockTime               time.Duration
+	bridgeJSONRPCAddr       string
+	epochReward             uint64
+	eventTrackerStartBlocks []string
 }
 
 func (p *genesisParams) validateFlags() error {

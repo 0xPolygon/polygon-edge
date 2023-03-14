@@ -60,6 +60,7 @@ func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Pro
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
 	stateSenderAddr       types.Address
+	stateSenderStartBlock uint64
 	jsonrpcAddr           string
 	dataDir               string
 	topic                 topic
@@ -132,6 +133,7 @@ func (s *stateSyncManager) initTracker() error {
 		ethgo.Address(s.config.stateSenderAddr),
 		s,
 		s.config.numBlockConfirmations,
+		s.config.stateSenderStartBlock,
 		s.logger)
 
 	go func() {
