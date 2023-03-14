@@ -228,18 +228,6 @@ func VerifyBLSSignatureFromBytes(rawPubkey, rawSig, message []byte) error {
 	return VerifyBLSSignature(pubkey, signature, message)
 }
 
-// SigToPub returns the public key that created the given signature.
-func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
-	s, err := Ecrecover(hash, sig)
-	if err != nil {
-		return nil, err
-	}
-
-	x, y := elliptic.Unmarshal(S256, s)
-
-	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
-}
-
 // Keccak256 calculates the Keccak256
 func Keccak256(v ...[]byte) []byte {
 	h := sha3.NewLegacyKeccak256()
@@ -258,7 +246,7 @@ func Keccak256Hash(v ...[]byte) (hash types.Hash) {
 		h.Write(b)
 	}
 
-	h.Read(hash[:])
+	h.Read(hash[:]) //nolint:errcheck
 
 	return hash
 }

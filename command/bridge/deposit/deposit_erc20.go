@@ -106,10 +106,10 @@ func GetCommand() *cobra.Command {
 			"(in that case tokens are minted to it, so it is able to make deposits)",
 	)
 
-	depositCmd.MarkFlagRequired(common.ReceiversFlag)
-	depositCmd.MarkFlagRequired(common.AmountsFlag)
-	depositCmd.MarkFlagRequired(rootTokenFlag)
-	depositCmd.MarkFlagRequired(rootPredicateFlag)
+	depositCmd.MarkFlagRequired(common.ReceiversFlag) //nolint:errcheck
+	depositCmd.MarkFlagRequired(common.AmountsFlag)   //nolint:errcheck
+	depositCmd.MarkFlagRequired(rootTokenFlag)        //nolint:errcheck
+	depositCmd.MarkFlagRequired(rootPredicateFlag)    //nolint:errcheck
 
 	depositCmd.MarkFlagsMutuallyExclusive(
 		helper.TestModeFlag,

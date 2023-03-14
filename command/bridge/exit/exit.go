@@ -130,7 +130,7 @@ func GetCommand() *cobra.Command {
 		"test indicates whether exit transaction sender is hardcoded test account",
 	)
 
-	exitCmd.MarkFlagRequired(exitHelperFlag)
+	exitCmd.MarkFlagRequired(exitHelperFlag) //nolint:errcheck
 	exitCmd.MarkFlagsMutuallyExclusive(
 		helper.TestModeFlag,
 		polybftsecrets.AccountDirFlag,

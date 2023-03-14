@@ -51,9 +51,9 @@ func TestEntry_getFinalizedLogs(t *testing.T) {
 	entry, err := tstore.(*EventTrackerStore).getImplEntry(someFilterHash)
 	require.NoError(t, err)
 
-	entry.StoreLogs([]*ethgo.Log{
+	require.NoError(t, entry.StoreLogs([]*ethgo.Log{
 		{BlockNumber: 1}, {BlockNumber: 5}, {BlockNumber: 8}, {BlockNumber: 11}, {BlockNumber: 12}, {BlockNumber: 15},
-	})
+	}))
 
 	logs, key, err := entry.getFinalizedLogs(10)
 
@@ -80,9 +80,9 @@ func TestEntry_saveNextToProcessIndx(t *testing.T) {
 	entry, err := tstore.(*EventTrackerStore).getImplEntry(someFilterHash)
 	require.NoError(t, err)
 
-	entry.StoreLogs([]*ethgo.Log{
+	require.NoError(t, entry.StoreLogs([]*ethgo.Log{
 		{BlockNumber: 1}, {BlockNumber: 5}, {BlockNumber: 8}, {BlockNumber: 11}, {BlockNumber: 12}, {BlockNumber: 15},
-	})
+	}))
 
 	for i := 0; i < 10; i++ {
 		require.NoError(t, entry.saveNextToProcessIndx(uint64(i)))
