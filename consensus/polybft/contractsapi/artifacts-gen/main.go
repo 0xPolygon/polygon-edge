@@ -51,6 +51,10 @@ func main() {
 			"System",
 		},
 		{
+			"child/EIP1559Burn.sol",
+			"EIP1559Burn",
+		},
+		{
 			"common/BLS.sol",
 			"BLS",
 		},

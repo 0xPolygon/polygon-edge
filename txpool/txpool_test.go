@@ -1795,6 +1795,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
 		tx.GasFeeCap = big.NewInt(1100)
 		tx.GasTipCap = big.NewInt(10)
 
@@ -1808,6 +1809,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
 		tx.GasFeeCap = big.NewInt(100)
 		tx.GasTipCap = big.NewInt(10)
 
@@ -1824,6 +1826,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
 		tx.GasFeeCap = big.NewInt(10000)
 		tx.GasTipCap = big.NewInt(100000)
 

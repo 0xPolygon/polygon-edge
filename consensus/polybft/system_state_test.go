@@ -62,16 +62,16 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	})
 
 	solcContract, err := cc.Compile()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	bin, err := hex.DecodeString(solcContract.Bin)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	transition := newTestTransition(t, nil)
 
 	// deploy a contract
 	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
-	assert.NoError(t, result.Err)
+	require.NoError(t, result.Err)
 
 	provider := &stateProvider{
 		transition: transition,
@@ -198,6 +198,9 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
+		BurnContract: map[string]string{
+			"0": types.ZeroAddress.String(),
+		},
 	}, st, hclog.NewNullLogger())
 
 	rootHash := ex.WriteGenesis(alloc)

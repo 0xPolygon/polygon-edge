@@ -426,6 +426,10 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 // checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
 // Basically, makes sure gas tip cap and gas fee cap are good.
 func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
+	if msg.Type != types.DynamicFeeTx {
+		return nil
+	}
+
 	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
 		return nil
 	}
@@ -574,7 +578,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
 	effectiveTip := new(big.Int).Set(gasPrice)
-	if t.config.London && msg.Type != types.StateTx {
+	if t.config.London && msg.Type == types.DynamicFeeTx {
 		effectiveTip = common.BigMin(
 			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
 			new(big.Int).Set(msg.GasTipCap),
