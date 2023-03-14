@@ -9,18 +9,20 @@ import (
 )
 
 const (
-	manifestPathFlag = "manifest"
-	jsonRPCFlag      = "json-rpc"
+	manifestPathFlag   = "manifest"
+	jsonRPCFlag        = "json-rpc"
+	rootchainERC20Flag = "rootchain-erc20"
 
 	defaultManifestPath = "./manifest.json"
 )
 
 type initContractsParams struct {
-	manifestPath   string
-	accountDir     string
-	accountConfig  string
-	jsonRPCAddress string
-	isTestMode     bool
+	manifestPath       string
+	accountDir         string
+	accountConfig      string
+	jsonRPCAddress     string
+	rootERC20TokenAddr string
+	isTestMode         bool
 }
 
 func (ip *initContractsParams) validateFlags() error {
