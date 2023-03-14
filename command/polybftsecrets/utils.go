@@ -36,6 +36,7 @@ func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (se
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
 			invalidConfigErr := ErrInvalidConfig.Error()
+
 			return nil, fmt.Errorf("%s: %w", invalidConfigErr, readErr)
 		}
 

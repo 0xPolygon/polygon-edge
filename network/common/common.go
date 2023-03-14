@@ -60,7 +60,7 @@ var (
 func AddrInfoToString(addr *peer.AddrInfo) (string, error) {
 	// Safety check
 	if len(addr.Addrs) == 0 {
-		return "", errors.New("No dial addresses found")
+		return "", errors.New("no dial addresses found")
 	}
 
 	dialAddress := addr.Addrs[0].String()

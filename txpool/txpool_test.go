@@ -1834,6 +1834,8 @@ func (e *eoa) create(t *testing.T) *eoa {
 }
 
 func (e *eoa) signTx(t *testing.T, tx *types.Transaction, signer crypto.TxSigner) *types.Transaction {
+	t.Helper()
+
 	signedTx, err := signer.SignTx(tx, e.PrivateKey)
 	require.NoError(t, err)
 

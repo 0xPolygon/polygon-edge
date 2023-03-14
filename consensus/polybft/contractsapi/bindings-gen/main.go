@@ -313,9 +313,12 @@ func generateAbiFuncsForNestedType(name string) (string, error) {
 // generateEvent generates code for smart contract events
 func generateEvent(generatedData *generatedData, contractName string, event *abi.Event) error {
 	name := fmt.Sprintf(eventNameFormat, event.Name)
-
 	res := []string{}
-	generateType(generatedData, name, event.Inputs, &res)
+
+	_, err := generateType(generatedData, name, event.Inputs, &res)
+	if err != nil {
+		return err
+	}
 
 	// write encode/decode functions
 	tmplStr := `
@@ -357,7 +360,11 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 	methodName = fmt.Sprintf(functionNameFormat, methodName)
 
 	res := []string{}
-	generateType(generatedData, methodName, method.Inputs, &res)
+
+	_, err := generateType(generatedData, methodName, method.Inputs, &res)
+	if err != nil {
+		return err
+	}
 
 	// write encode/decode functions
 	tmplStr := `
