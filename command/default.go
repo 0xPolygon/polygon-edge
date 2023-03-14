@@ -7,7 +7,7 @@ const (
 	DefaultChainName       = "polygon-edge"
 	DefaultChainID         = 100
 	DefaultPremineBalance  = "0xD3C21BCECCEDA1000000" // 1 million units of native network currency
-	DefaultConsensus       = server.IBFTConsensus
+	DefaultConsensus       = server.PolyBFTConsensus
 	DefaultGenesisGasUsed  = 458752  // 0x70000
 	DefaultGenesisGasLimit = 5242880 // 0x500000
 )
