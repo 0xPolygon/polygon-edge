@@ -1436,7 +1436,7 @@ func opAuth(c *state) {
 		return
 	}
 
-	magicBytes := crypto.Eip3074Magic(commit.Bytes(), c.msg.CodeAddress)
+	magicBytes := crypto.Make3074Hash(c.host.GetTxContext().ChainID, c.msg.CodeAddress, commit.Bytes())
 
 	pubKey, err := crypto.RecoverPubkey(signature, magicBytes)
 	if err != nil {

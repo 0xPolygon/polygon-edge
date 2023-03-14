@@ -58,7 +58,7 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 		return err
 	}
 
-	sig, err := key.Sign(Eip3074Magic(hash[:], address))
+	sig, err := key.Sign(crypto.Make3074Hash(chainID, address, hash[:]))
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func (t *Transaction) IsFromValid(address types.Address, chainID int64, signatur
 		return false
 	}
 
-	pubKey, err := crypto.Ecrecover(Eip3074Magic(hash[:], address), signature)
+	pubKey, err := crypto.Ecrecover(crypto.Make3074Hash(chainID, address, hash[:]), signature)
 	if err != nil {
 		return false
 	}
@@ -228,16 +228,4 @@ func GetDomainSeperatorHash(address types.Address, chainID int64) (types.Hash, e
 	}
 
 	return types.BytesToHash(crypto.Keccak256(bytes)), nil
-}
-
-// Eip3074Magic serialize EIP-3074 messages in form
-// keccak256(type ++ invoker ++ commit)
-func Eip3074Magic(commit []byte, invokerAddr types.Address) []byte {
-	var msg [64]byte
-
-	msg[0] = 0x03
-	copy(msg[13:33], invokerAddr.Bytes())
-	copy(msg[33:], commit)
-
-	return ethgo.Keccak256(msg[:])
 }
