@@ -62,8 +62,8 @@ It has native support for running bridge, which enables running cross-chain tran
 6. Create chain configuration - this command creates chain configuration, which is needed to run a blockchain
 
     ```bash
-    polygon-edge genesis --consensus polybft --block-gas-limit 10000000 --epoch-size 10
-    [--bridge-json-rpc <rootchain_ip_address>] [--manifest ./manifest.json]
+    polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10
+    [--consensus polybft] [--bridge-json-rpc <rootchain_ip_address>] [--manifest ./manifest.json]
     ```
 
 7. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**
