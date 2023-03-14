@@ -98,7 +98,7 @@ func Test_maxPriceQueue(t *testing.T) {
 					Type:      types.DynamicFeeTx,
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     3,
+					Nonce:     1,
 				},
 				// Middle tx fee
 				{
@@ -112,7 +112,7 @@ func Test_maxPriceQueue(t *testing.T) {
 					Type:      types.DynamicFeeTx,
 					GasFeeCap: big.NewInt(2000),
 					GasTipCap: big.NewInt(500),
-					Nonce:     1,
+					Nonce:     3,
 				},
 			},
 		},
