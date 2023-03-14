@@ -189,8 +189,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		exitEventID := i + 1
 
 		// send exit transaction to exit helper
-		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, currentEpoch,
-			currentBlock.Number, rootJSONRPC, childJSONRPC)
+		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
 		// make sure exit event is processed successfully
@@ -465,7 +464,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	for i := 0; i < userNumber; i++ {
 		exitID := uint64(i + 1) // because exit events start from ID = 1
-		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
+		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID)
 		require.NoError(t, err)
 
 		isProcessed, err := sendExitTransaction(sidechainKeys[i], rootchainKey, proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitID)
@@ -575,7 +574,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	for i := 0; i < roundNumber; i++ {
 		for j := 0; j < userNumber; j++ {
-			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber], uint64(i+1)*checkpointEpoch, uint64(i+1)*checkpointBlock)
+			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber])
 			require.NoError(t, err)
 			isProcessed, err := sendExitTransaction(sidechainKeys[j], rootchainKey, proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
 			require.NoError(t, err)
@@ -628,7 +627,7 @@ func sendExitTransaction(
 	return isExitEventProcessed(exitEventID, exitHelperAddr, l1TxRelayer)
 }
 
-func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
+func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
 	query := struct {
 		Jsonrpc string   `json:"jsonrpc"`
 		Method  string   `json:"method"`
@@ -637,7 +636,7 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 	}{
 		"2.0",
 		"bridge_generateExitProof",
-		[]string{fmt.Sprintf("0x%x", exitID), fmt.Sprintf("0x%x", epoch), fmt.Sprintf("0x%x", checkpointBlock)},
+		[]string{fmt.Sprintf("0x%x", exitID)},
 		1,
 	}
 

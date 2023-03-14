@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"strconv"
@@ -98,7 +99,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
 		key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
-		txRelayer:        txRelayerMock,
+		rootChainRelayer: txRelayerMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
 		logger:           hclog.NewNullLogger(),
@@ -214,9 +215,9 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				Once()
 
 			checkpointMgr := &checkpointManager{
-				txRelayer: txRelayerMock,
-				key:       wallet.GenerateAccount().Ecdsa,
-				logger:    hclog.NewNullLogger(),
+				rootChainRelayer: txRelayerMock,
+				key:              wallet.GenerateAccount().Ecdsa,
+				logger:           hclog.NewNullLogger(),
 			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
 			if c.errSubstring == "" {
@@ -370,12 +371,42 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	t.Parallel()
 
 	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
+		numOfBlocks           = 10
+		numOfEventsPerBlock   = 2
+		correctBlockToGetExit = 1
+		futureBlockToGetExit  = 2
 	)
 
 	state := newTestState(t)
-	checkpointManager := &checkpointManager{state: state}
+
+	// setup mocks for valid case
+	foundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+		"isFound":         true,
+		"checkpointBlock": 1,
+	})
+	require.NoError(t, err)
+
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+		BlockNumber: new(big.Int).SetUint64(correctBlockToGetExit),
+	}
+
+	input, err := getCheckpointBlockFn.EncodeAbi()
+	require.NoError(t, err)
+
+	dummyTxRelayer := newDummyTxRelayer(t)
+	dummyTxRelayer.On("Call", ethgo.ZeroAddress, ethgo.ZeroAddress, input).
+		Return(hex.EncodeToString(foundCheckpointReturn), error(nil))
+
+	// create checkpoint manager and insert exit events
+	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
+		createTestKey(t)),
+		0,
+		types.ZeroAddress,
+		dummyTxRelayer,
+		nil,
+		nil,
+		hclog.NewNullLogger(),
+		state)
 
 	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
 	encodedEvents := encodeExitEvents(t, exitEvents)
@@ -385,14 +416,14 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	tree, err := merkle.NewMerkleTree(checkpointEvents)
 	require.NoError(t, err)
 
-	proof, err := checkpointManager.GenerateExitProof(1, 1, 1)
+	proof, err := checkpointMgr.GenerateExitProof(correctBlockToGetExit)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
 		t.Parallel()
 		// verify generated proof on desired tree
-		require.NoError(t, merkle.VerifyProof(1, encodedEvents[1], proof.Data, tree.Hash()))
+		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], proof.Data, tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
@@ -404,14 +435,36 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree
-		require.ErrorContains(t, merkle.VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+		require.ErrorContains(t, merkle.VerifyProof(correctBlockToGetExit,
+			encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
 	})
 
 	t.Run("Generate exit proof - no event", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := checkpointManager.GenerateExitProof(21, 1, 1)
+		_, err := checkpointMgr.GenerateExitProof(21)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
+
+	t.Run("Generate exit proof - future lookup where checkpoint not yet submitted", func(t *testing.T) {
+		t.Parallel()
+
+		// setup mocks for invalid case
+		notFoundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+			"isFound":         false,
+			"checkpointBlock": 0,
+		})
+		require.NoError(t, err)
+
+		getCheckpointBlockFn.BlockNumber = new(big.Int).SetUint64(futureBlockToGetExit)
+		inputTwo, err := getCheckpointBlockFn.EncodeAbi()
+		require.NoError(t, err)
+
+		dummyTxRelayer.On("Call", ethgo.ZeroAddress, ethgo.ZeroAddress, inputTwo).
+			Return(hex.EncodeToString(notFoundCheckpointReturn), error(nil))
+
+		_, err = checkpointMgr.GenerateExitProof(futureBlockToGetExit)
+		require.ErrorContains(t, err, "checkpoint block not found for exit ID")
 	})
 }
 

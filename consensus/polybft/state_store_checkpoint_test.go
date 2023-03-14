@@ -3,10 +3,12 @@ package polybft
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	bolt "go.etcd.io/bbolt"
 )
 
 func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
@@ -77,6 +79,35 @@ func TestState_Insert_And_Get_ExitEvents_ForProof_NoEvents(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Nil(t, events)
+}
+
+func TestState_NoEpochForExitEventInLookup(t *testing.T) {
+	t.Parallel()
+
+	const (
+		exitToTest         = uint64(11)
+		epochToMatch       = uint64(2)
+		blockNumberToMatch = uint64(12)
+	)
+
+	state := newTestState(t)
+	insertTestExitEvents(t, state, 3, 10, 1)
+
+	exitEventFromDB, err := state.CheckpointStore.getExitEvent(exitToTest)
+	require.NoError(t, err)
+	require.Equal(t, exitToTest, exitEventFromDB.ID)
+	require.Equal(t, epochToMatch, exitEventFromDB.EpochNumber)
+	require.Equal(t, blockNumberToMatch, exitEventFromDB.BlockNumber)
+
+	// simulate invalid case (for some reason lookup table doesn't have epoch for given exit)
+	err = state.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(exitEventToEpochLookupBucket).Delete(common.EncodeUint64ToBytes(exitEventFromDB.ID))
+	})
+
+	require.NoError(t, err)
+
+	_, err = state.CheckpointStore.getExitEvent(exitToTest)
+	require.ErrorContains(t, err, "epoch was not found in lookup table")
 }
 
 func TestState_decodeExitEvent(t *testing.T) {

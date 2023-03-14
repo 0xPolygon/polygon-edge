@@ -145,7 +145,7 @@ func (t *TestBridge) WithdrawERC20(secretsDataDir, receivers, amounts, jsonRPCEn
 }
 
 // SendExitTransaction sends exit transaction to the root chain
-func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID, epoch, checkpointBlock uint64,
+func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64,
 	rootJSONRPCAddr, childJSONRPCAddr string) error {
 	if rootJSONRPCAddr == "" {
 		return errors.New("provide a root JSON RPC endpoint URL")
@@ -159,9 +159,7 @@ func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID, epoch
 		"bridge",
 		"exit",
 		"--exit-helper", exitHelper.String(),
-		"--event-id", strconv.FormatUint(exitID, 10),
-		"--epoch", strconv.FormatUint(epoch, 10),
-		"--checkpoint-block", strconv.FormatUint(checkpointBlock, 10),
+		"--exit-id", strconv.FormatUint(exitID, 10),
 		"--root-json-rpc", rootJSONRPCAddr,
 		"--child-json-rpc", childJSONRPCAddr,
 		"--test",

@@ -544,8 +544,8 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
-	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
+func (c *consensusRuntime) GenerateExitProof(exitID uint64) (types.Proof, error) {
+	return c.checkpointManager.GenerateExitProof(exitID)
 }
 
 // GetStateSyncProof returns the proof for the state sync

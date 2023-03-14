@@ -40,9 +40,7 @@ This is a helper command which qeuries child chain for exit event proof and send
 $ polygon-edge bridge exit
     --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>]
     --exit-helper <exit_helper_address>
-    --event-id <exit_event_id>
-    --epoch <epoch_in_which_exit_event_got_processed>
-    --checkpoint-block <epoch_in_which_exit_event_got_processed>
+    --exit-id <exit_event_id>
     --root-json-rpc <root_chain_json_rpc_endpoint>
     --child-json-rpc <child_chain_json_rpc_endpoint>
 ```

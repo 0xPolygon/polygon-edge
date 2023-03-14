@@ -15,7 +15,8 @@ import (
 
 var (
 	// bucket to store exit contract events
-	exitEventsBucket = []byte("exitEvent")
+	exitEventsBucket             = []byte("exitEvent")
+	exitEventToEpochLookupBucket = []byte("exitIdToEpochLookup")
 
 	ExitEventABI           = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
 	ExitEventInputsABIType = ExitEventABI.Inputs
@@ -35,6 +36,7 @@ Bolt DB schema:
 
 exit events/
 |--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
+|--> (exitEventID) -> epochNumber
 */
 type CheckpointStore struct {
 	db *bolt.DB
@@ -44,6 +46,10 @@ type CheckpointStore struct {
 func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 	if _, err := tx.CreateBucketIfNotExists(exitEventsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(exitEventToEpochLookupBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventToEpochLookupBucket), err)
 	}
 
 	return nil
@@ -57,9 +63,10 @@ func (s *CheckpointStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	}
 
 	return s.db.Update(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(exitEventsBucket)
+		exitEventBucket := tx.Bucket(exitEventsBucket)
+		lookupBucket := tx.Bucket(exitEventToEpochLookupBucket)
 		for i := 0; i < len(exitEvents); i++ {
-			if err := insertExitEventToBucket(bucket, exitEvents[i]); err != nil {
+			if err := insertExitEventToBucket(exitEventBucket, lookupBucket, exitEvents[i]); err != nil {
 				return err
 			}
 		}
@@ -69,30 +76,47 @@ func (s *CheckpointStore) insertExitEvents(exitEvents []*ExitEvent) error {
 }
 
 // insertExitEventToBucket inserts exit event to exit event bucket
-func insertExitEventToBucket(bucket *bolt.Bucket, exitEvent *ExitEvent) error {
+func insertExitEventToBucket(exitEventBucket, lookupBucket *bolt.Bucket, exitEvent *ExitEvent) error {
 	raw, err := json.Marshal(exitEvent)
 	if err != nil {
 		return err
 	}
 
-	return bucket.Put(bytes.Join([][]byte{common.EncodeUint64ToBytes(exitEvent.EpochNumber),
-		common.EncodeUint64ToBytes(exitEvent.ID), common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
+	epochBytes := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
+	exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID)
+
+	err = exitEventBucket.Put(bytes.Join([][]byte{epochBytes,
+		exitIDBytes, common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
+	if err != nil {
+		return err
+	}
+
+	return lookupBucket.Put(exitIDBytes, epochBytes)
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
-func (s *CheckpointStore) getExitEvent(exitEventID, epoch uint64) (*ExitEvent, error) {
+func (s *CheckpointStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
 	var exitEvent *ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		bucket := tx.Bucket(exitEventsBucket)
+		exitEventBucket := tx.Bucket(exitEventsBucket)
+		lookupBucket := tx.Bucket(exitEventToEpochLookupBucket)
 
-		key := bytes.Join([][]byte{common.EncodeUint64ToBytes(epoch), common.EncodeUint64ToBytes(exitEventID)}, nil)
-		k, v := bucket.Cursor().Seek(key)
+		exitIDBytes := common.EncodeUint64ToBytes(exitEventID)
+
+		epochBytes := lookupBucket.Get(exitIDBytes)
+		if epochBytes == nil {
+			return fmt.Errorf("could not find any exit event that has an id: %v. Its epoch was not found in lookup table",
+				exitEventID)
+		}
+
+		key := bytes.Join([][]byte{epochBytes, exitIDBytes}, nil)
+		k, v := exitEventBucket.Cursor().Seek(key)
 
 		if bytes.HasPrefix(k, key) == false || v == nil {
 			return &exitEventNotFoundError{
 				exitID: exitEventID,
-				epoch:  epoch,
+				epoch:  common.EncodeBytesToUint64(epochBytes),
 			}
 		}
 
