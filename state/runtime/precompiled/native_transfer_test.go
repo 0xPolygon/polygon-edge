@@ -62,6 +62,8 @@ type dummyHost struct {
 }
 
 func newDummyHost(t *testing.T) *dummyHost {
+	t.Helper()
+
 	return &dummyHost{
 		t:        t,
 		balances: map[types.Address]*big.Int{},
