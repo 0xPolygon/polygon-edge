@@ -325,11 +325,12 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		require.NoError(t, checkpointManager.PostBlock(req))
 
 		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
-			return exitEvent.BlockNumber == block
+			return exitEvent.BlockNumber == block+1
 		})
 
 		require.NoError(t, err)
 		require.Len(t, exitEvents, numOfReceipts)
+		require.Equal(t, uint64(block+1), exitEvents[0].BlockNumber)
 		require.Equal(t, uint64(epoch+1), exitEvents[0].EpochNumber)
 	})
 }

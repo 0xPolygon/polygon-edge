@@ -272,15 +272,20 @@ func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingB
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
 func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
-	epoch := req.Epoch
+	var (
+		epoch = req.Epoch
+		block = req.FullBlock.Block.Number()
+	)
+
 	if req.IsEpochEndingBlock {
 		// exit events that happened in epoch ending blocks,
 		// should be added to the tree of the next epoch
 		epoch++
+		block++
 	}
 
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(epoch, req.FullBlock.Block.Number(), req.FullBlock.Receipts)
+	events, err := getExitEventsFromReceipts(epoch, block, req.FullBlock.Receipts)
 	if err != nil {
 		return err
 	}
