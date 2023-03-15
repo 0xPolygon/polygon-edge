@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -22,7 +23,7 @@ func TestBroadcast(t *testing.T) {
 	// Opened the ticket to check + fix it
 	t.Skip()
 
-	signer := &crypto.FrontierSigner{}
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
@@ -43,25 +44,8 @@ func TestBroadcast(t *testing.T) {
 			numNodes:          10,
 			numConnectedNodes: 5,
 			createTx: func(t *testing.T) *types.Transaction {
-				tx, err := signer.SignTx(&types.Transaction{
-					Nonce:    0,
-					From:     senderAddr,
-					To:       &receiverAddr,
-					Value:    framework.EthToWei(1),
-					Gas:      1000000,
-					GasPrice: big.NewInt(10000),
-					Input:    []byte{},
-				}, senderKey)
-				require.NoError(t, err, "failed to sign transaction")
+				t.Helper()
 
-				return tx
-			},
-		},
-		{
-			name:              "legacy tx should reach to last node",
-			numNodes:          10,
-			numConnectedNodes: 10,
-			createTx: func(t *testing.T) *types.Transaction {
 				tx, err := signer.SignTx(&types.Transaction{
 					Nonce:    0,
 					From:     senderAddr,
@@ -81,6 +65,8 @@ func TestBroadcast(t *testing.T) {
 			numNodes:          10,
 			numConnectedNodes: 5,
 			createTx: func(t *testing.T) *types.Transaction {
+				t.Helper()
+
 				tx, err := signer.SignTx(&types.Transaction{
 					Type:      types.DynamicFeeTx,
 					Nonce:     0,
@@ -98,10 +84,33 @@ func TestBroadcast(t *testing.T) {
 			},
 		},
 		{
+			name:              "legacy tx should reach to last node",
+			numNodes:          10,
+			numConnectedNodes: 10,
+			createTx: func(t *testing.T) *types.Transaction {
+				t.Helper()
+
+				tx, err := signer.SignTx(&types.Transaction{
+					Nonce:    0,
+					From:     senderAddr,
+					To:       &receiverAddr,
+					Value:    framework.EthToWei(1),
+					Gas:      1000000,
+					GasPrice: big.NewInt(10000),
+					Input:    []byte{},
+				}, senderKey)
+				require.NoError(t, err, "failed to sign transaction")
+
+				return tx
+			},
+		},
+		{
 			name:              "dynamic fee tx should reach to last node",
 			numNodes:          10,
 			numConnectedNodes: 10,
 			createTx: func(t *testing.T) *types.Transaction {
+				t.Helper()
+
 				tx, err := signer.SignTx(&types.Transaction{
 					Type:      types.DynamicFeeTx,
 					Nonce:     0,
