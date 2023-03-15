@@ -21,7 +21,7 @@ import (
 func createTestKey(t *testing.T) *wallet.Key {
 	t.Helper()
 
-	return wallet.NewKey(wallet.GenerateAccount(), bls.DomainCheckpointManager)
+	return wallet.NewKey(generateTestAccount(t), bls.DomainCheckpointManager)
 }
 
 func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
@@ -30,7 +30,7 @@ func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
 	result := make([]*wallet.Key, numberOfKeys, numberOfKeys)
 
 	for i := 0; i < numberOfKeys; i++ {
-		result[i] = wallet.NewKey(wallet.GenerateAccount(), bls.DomainCheckpointManager)
+		result[i] = wallet.NewKey(generateTestAccount(t), bls.DomainCheckpointManager)
 	}
 
 	return result
@@ -61,7 +61,7 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64, validatorSet Accou
 	t.Helper()
 
 	if validatorSet == nil {
-		validatorSet = newTestValidators(5).getPublicIdentities()
+		validatorSet = newTestValidators(t, 5).getPublicIdentities()
 	}
 
 	var startBlock uint64 = 0
@@ -155,4 +155,13 @@ func newTestState(t *testing.T) *State {
 	})
 
 	return state
+}
+
+func generateTestAccount(t *testing.T) *wallet.Account {
+	t.Helper()
+
+	acc, err := wallet.GenerateAccount()
+	require.NoError(t, err)
+
+	return acc
 }

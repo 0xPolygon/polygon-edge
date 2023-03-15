@@ -202,7 +202,11 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
+	if err != nil {
+		return nil, err
+	}
+
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer

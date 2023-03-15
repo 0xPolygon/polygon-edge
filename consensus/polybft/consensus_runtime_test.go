@@ -183,7 +183,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	)
 
 	currentEpochNumber := getEpochNumber(t, epochSize, epochSize)
-	validatorSet := newTestValidators(validatorsCount).getPublicIdentities()
+	validatorSet := newTestValidators(t, validatorsCount).getPublicIdentities()
 	header, headerMap := createTestBlocks(t, epochSize, epochSize, validatorSet)
 	builtBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: header,
@@ -289,7 +289,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
 
 	snapshot := NewProposerSnapshot(1, nil)
 	config := &runtimeConfig{
@@ -324,7 +324,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 
-	validators := newTestValidators(3)
+	validators := newTestValidators(t, 3)
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
@@ -382,7 +382,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		toIndex           = uint64(9)
 	)
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	validators := validatorAccounts.getPublicIdentities()
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
@@ -450,7 +450,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		BlockTime:        2 * time.Second,
 	}
 
-	validators := newTestValidators(3).getPublicIdentities()
+	validators := newTestValidators(t, 3).getPublicIdentities()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1)).Once()
@@ -497,7 +497,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	const originalBlockNumber = uint64(5)
 
 	newCurrentHeader := &types.Header{Number: originalBlockNumber + 1}
-	validatorSet := newTestValidators(3).getPublicIdentities()
+	validatorSet := newTestValidators(t, 3).getPublicIdentities()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1), nil).Once()
@@ -547,7 +547,7 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		sprintSize      = 5
 	)
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	polybftConfig := &PolyBFTConfig{
 		ValidatorSetAddr: contracts.ValidatorSetContract,
 		EpochSize:        epochSize,
@@ -596,7 +596,7 @@ func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 	setupFn := func(t *testing.T) (*consensusRuntime, *testValidators) {
 		t.Helper()
 
-		validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+		validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 		epoch := &epochMetadata{
 			Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 		}
@@ -654,7 +654,7 @@ func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 	t.Parallel()
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	epoch := &epochMetadata{
 		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 	}
@@ -676,7 +676,7 @@ func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 	t.Parallel()
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	epoch := &epochMetadata{
 		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 	}
@@ -838,7 +838,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	const round = 5
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 
 	extra := &Extra{
 		Checkpoint: &CheckpointData{},

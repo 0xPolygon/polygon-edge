@@ -75,7 +75,7 @@ func (kv *KVStorage) Get(k []byte) ([]byte, bool) {
 		if err.Error() == "leveldb: not found" {
 			return nil, false
 		} else {
-			panic(err)
+			panic(err) //nolint:gocritic
 		}
 	}
 
