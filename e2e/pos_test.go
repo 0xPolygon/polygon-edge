@@ -9,8 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -20,9 +24,6 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 // foundInValidatorSet is a helper function for searching through the passed in set for a specific
@@ -359,7 +360,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 
 	// Required default values
 	numTransactions := 5
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	currentNonce := 0
 
 	// TxPool client
@@ -509,7 +510,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	// Required default values
 	numTransactions := 6
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	currentNonce := 0
 
 	// TxPool client
@@ -648,7 +649,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	// Required default values
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	currentNonce := 0
 
 	// TxPool client
