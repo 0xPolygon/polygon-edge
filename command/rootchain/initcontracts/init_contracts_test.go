@@ -1,6 +1,7 @@
 package initcontracts
 
 import (
+	"os"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -15,6 +16,12 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	t.Parallel()
 
 	server := testutil.DeployTestServer(t, nil)
+	t.Cleanup(func() {
+		err := os.RemoveAll(params.manifestPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
 
 	client, err := jsonrpc.NewClient(server.HTTPAddr())
 	require.NoError(t, err)
