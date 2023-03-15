@@ -11,6 +11,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	metrics "github.com/armon/go-metrics"
@@ -290,6 +291,11 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
+	if len(events) > 0 {
+		c.logger.Debug("Gotten exit events from logs on block",
+			"eventsNum", len(events), "block", req.FullBlock.Block.Number())
+	}
+
 	if err := c.state.CheckpointStore.insertExitEvents(events); err != nil {
 		return err
 	}
@@ -332,6 +338,8 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 
 // GenerateExitProof generates proof of exit event
 func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
+	c.logger.Debug("Generating proof for exit", "exitID", exitID)
+
 	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID)
 	if err != nil {
 		return types.Proof{}, err
@@ -414,6 +422,8 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
+	c.logger.Debug("Generated proof for exit", "exitID", exitID, "leafIndex", leafIndex, "proofLen", len(proof))
+
 	return types.Proof{
 		Data: proof,
 		Metadata: map[string]interface{}{
@@ -458,4 +468,21 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 	})
 
 	return events, nil
+}
+
+// createExitTree creates an exit event merkle tree from provided exit events
+func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
+	numOfEvents := len(exitEvents)
+	data := make([][]byte, numOfEvents)
+
+	for i := 0; i < numOfEvents; i++ {
+		b, err := ExitEventInputsABIType.Encode(exitEvents[i])
+		if err != nil {
+			return nil, err
+		}
+
+		data[i] = b
+	}
+
+	return merkle.NewMerkleTree(data)
 }
