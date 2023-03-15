@@ -11,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -950,23 +949,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	}
 
 	return firstBlockInEpoch, nil
-}
-
-// createExitTree creates an exit event merkle tree from provided exit events
-func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
-	numOfEvents := len(exitEvents)
-	data := make([][]byte, numOfEvents)
-
-	for i := 0; i < numOfEvents; i++ {
-		b, err := ExitEventInputsABIType.Encode(exitEvents[i])
-		if err != nil {
-			return nil, err
-		}
-
-		data[i] = b
-	}
-
-	return merkle.NewMerkleTree(data)
 }
 
 // getSealersForBlock checks who sealed a given block and updates the counter
