@@ -36,7 +36,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 		cluster := framework.NewTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
 			framework.WithPropertyBaseTests(true),
-			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
+			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig, _ *framework.TestCluster) {
 				for i, a := range adresses {
 					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premine[i]))
 				}
