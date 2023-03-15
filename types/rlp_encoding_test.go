@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -177,6 +178,7 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 	txTypes := []TxType{
 		StateTx,
 		LegacyTx,
+		DynamicFeeTx,
 	}
 
 	for _, txType := range txTypes {
@@ -184,41 +186,54 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 		testTable := []struct {
 			name          string
 			expectedErr   bool
-			ommitedValues map[string]bool
+			omittedValues map[string]bool
 			fromAddrSet   bool
 		}{
 			{
-				name:        "Insuficient params",
+				name:        fmt.Sprintf("[%s] Insuficient params", txType),
 				expectedErr: true,
-				ommitedValues: map[string]bool{
+				omittedValues: map[string]bool{
 					"Nonce":    true,
 					"GasPrice": true,
 				},
 			},
 			{
-				name:        "Missing From",
+				name:        fmt.Sprintf("[%s] Missing From", txType),
 				expectedErr: false,
-				ommitedValues: map[string]bool{
-					"From": true,
+				omittedValues: map[string]bool{
+					"ChainID":    txType != DynamicFeeTx,
+					"GasTipCap":  txType != DynamicFeeTx,
+					"GasFeeCap":  txType != DynamicFeeTx,
+					"GasPrice":   txType == DynamicFeeTx,
+					"AccessList": txType != DynamicFeeTx,
+					"From":       txType != StateTx,
 				},
-				fromAddrSet: false,
+				fromAddrSet: txType == StateTx,
 			},
 			{
-				name:          "Address set for state tx only",
-				expectedErr:   false,
-				ommitedValues: map[string]bool{},
-				fromAddrSet:   txType == StateTx,
+				name:        fmt.Sprintf("[%s] Address set for state tx only", txType),
+				expectedErr: false,
+				omittedValues: map[string]bool{
+					"ChainID":    txType != DynamicFeeTx,
+					"GasTipCap":  txType != DynamicFeeTx,
+					"GasFeeCap":  txType != DynamicFeeTx,
+					"GasPrice":   txType == DynamicFeeTx,
+					"AccessList": txType != DynamicFeeTx,
+					"From":       txType != StateTx,
+				},
+				fromAddrSet: txType == StateTx,
 			},
 		}
 
 		for _, tt := range testTable {
 			tt := tt
+
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
 				arena := fastrlp.DefaultArenaPool.Get()
 				parser := fastrlp.DefaultParserPool.Get()
-				testData := testRLPData(arena, tt.ommitedValues)
+				testData := testRLPData(arena, tt.omittedValues)
 				v, err := parser.Parse(testData)
 				assert.Nil(t, err)
 
@@ -278,56 +293,62 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 	}
 }
 
-func testRLPData(arena *fastrlp.Arena, ommitValues map[string]bool) []byte {
+func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
 	vv := arena.NewArray()
 
-	_, ommit := ommitValues["Nonce"]
-	if !ommit {
+	if omit, _ := omitValues["ChainID"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(0)))
+	}
+
+	if omit, _ := omitValues["Nonce"]; !omit {
 		vv.Set(arena.NewUint(10))
 	}
 
-	_, ommit = ommitValues["GasPrice"]
-	if !ommit {
+	if omit, _ := omitValues["GasTipCap"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(11)))
 	}
 
-	_, ommit = ommitValues["Gas"]
-	if !ommit {
+	if omit, _ := omitValues["GasFeeCap"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(11)))
+	}
+
+	if omit, _ := omitValues["GasPrice"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(11)))
+	}
+
+	if omit, _ := omitValues["Gas"]; !omit {
 		vv.Set(arena.NewUint(12))
 	}
 
-	_, ommit = ommitValues["To"]
-	if !ommit {
+	if omit, _ := omitValues["To"]; !omit {
 		vv.Set(arena.NewBytes((StringToAddress("13")).Bytes()))
 	}
 
-	_, ommit = ommitValues["Value"]
-	if !ommit {
+	if omit, _ := omitValues["Value"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(14)))
 	}
 
-	_, ommit = ommitValues["Input"]
-	if !ommit {
+	if omit, _ := omitValues["Input"]; !omit {
 		vv.Set(arena.NewCopyBytes([]byte{1, 2}))
 	}
 
-	_, ommit = ommitValues["V"]
-	if !ommit {
+	if omit, _ := omitValues["AccessList"]; !omit {
+		vv.Set(arena.NewArray())
+	}
+
+	if omit, _ := omitValues["V"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(15)))
 	}
 
-	_, ommit = ommitValues["R"]
-	if !ommit {
+	if omit, _ := omitValues["R"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(16)))
 	}
 
-	_, ommit = ommitValues["S"]
-	if !ommit {
+	if omit, _ := omitValues["S"]; !omit {
 		vv.Set(arena.NewBigInt(big.NewInt(17)))
 	}
 
-	_, ommit = ommitValues["From"]
-	if !ommit {
+	if omit, _ := omitValues["From"]; !omit {
 		vv.Set(arena.NewBytes((StringToAddress("18")).Bytes()))
 	}
 
