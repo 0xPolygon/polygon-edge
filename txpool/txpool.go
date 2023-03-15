@@ -632,7 +632,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Reject underpriced transactions
-	if p.GetBaseFee() > 0 && tx.Type == types.DynamicFeeTx {
+	if tx.Type == types.DynamicFeeTx {
 		// Check EIP-1559-related fields and make sure they are correct
 		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
 			return ErrUnderpriced
@@ -655,7 +655,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	} else {
 		// Legacy approach to check if the given tx is not underpriced
-		if tx.GasPrice.Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+		if tx.GetGasPrice(p.GetBaseFee()).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
 			return ErrUnderpriced
 		}
 	}
