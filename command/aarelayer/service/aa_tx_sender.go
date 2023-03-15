@@ -16,7 +16,6 @@ const (
 	defaultGasPrice   = 1879048192 // 0x70000000
 	defaultGasLimit   = 5242880    // 0x500000
 	DefaultRPCAddress = "http://127.0.0.1:8545"
-	numRetries        = 100
 )
 
 var (
@@ -24,10 +23,12 @@ var (
 )
 
 type AATxSender interface {
+	// GetNonce retrieves current nonce for address
+	GetNonce(address ethgo.Address) (uint64, error)
 	// SendTransaction sends transaction but does not wait for receipt
 	SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error)
 	// WaitForReceipt waits for receipt of specific transaction
-	WaitForReceipt(ctx context.Context, hash ethgo.Hash, delay time.Duration) (*ethgo.Receipt, error)
+	WaitForReceipt(ctx context.Context, hash ethgo.Hash, delay time.Duration, numRetries int) (*ethgo.Receipt, error)
 }
 
 var _ AATxSender = (*AATxSenderImpl)(nil)
@@ -54,7 +55,7 @@ func (t *AATxSenderImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) 
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
+	nonce, err := t.GetNonce(key.Address())
 	if err != nil {
 		return ethgo.ZeroHash, err
 	}
@@ -91,7 +92,7 @@ func (t *AATxSenderImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) 
 }
 
 func (t *AATxSenderImpl) WaitForReceipt(
-	ctx context.Context, hash ethgo.Hash, delay time.Duration) (*ethgo.Receipt, error) {
+	ctx context.Context, hash ethgo.Hash, delay time.Duration, numRetries int) (*ethgo.Receipt, error) {
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
 
@@ -115,4 +116,8 @@ func (t *AATxSenderImpl) WaitForReceipt(
 	}
 
 	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
+}
+
+func (t *AATxSenderImpl) GetNonce(address ethgo.Address) (uint64, error) {
+	return t.client.Eth().GetNonce(address, ethgo.Pending)
 }

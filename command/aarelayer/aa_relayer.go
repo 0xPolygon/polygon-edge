@@ -79,7 +79,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		params.chainID,
 		func(a *service.AATransaction) error { return nil })
 	restService := service.NewAARelayerRestServer(pool, state, verification)
-	relayerService := service.NewAARelayerService(txSender, pool, state, account.Ecdsa)
+	relayerService := service.NewAARelayerService(txSender, pool, state, account.Ecdsa,
+		service.WithPullTime(config.PullTime),
+		service.WithReceiptDelay(config.ReceiptRetryDelay),
+		service.WithNumRetries(config.ReceiptNumRetries))
 
 	ctx, cancel := context.WithCancel(cmd.Context())
 	stopCh := common.GetTerminationSignalCh()

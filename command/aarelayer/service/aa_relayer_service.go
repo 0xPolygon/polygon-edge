@@ -17,8 +17,9 @@ type AARelayerService struct {
 	state        AATxState
 	txSender     AATxSender
 	key          ethgo.Key
-	pullTime     time.Duration
+	pullTime     time.Duration // pull from txpool every `pullTime` second/millisecond
 	receiptDelay time.Duration
+	numRetries   int
 }
 
 func NewAARelayerService(
@@ -32,8 +33,9 @@ func NewAARelayerService(
 		pool:         pool,
 		state:        state,
 		key:          key,
-		pullTime:     time.Millisecond * 5000, // every five seconds pull from pool
-		receiptDelay: time.Millisecond * 50,
+		pullTime:     time.Millisecond * 5000,
+		receiptDelay: time.Millisecond * 500,
+		numRetries:   100,
 	}
 
 	for _, opt := range opts {
@@ -97,13 +99,7 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 		fmt.Printf("error while updating state tx = %s after sending it, err = %v", stateTx.ID, err)
 	}
 
-	select {
-	case <-ctx.Done():
-		return nil
-	default:
-	}
-
-	recipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay)
+	recipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay, rs.numRetries)
 	if err != nil {
 		errstr := err.Error()
 		stateTx.Error = &errstr
@@ -164,5 +160,11 @@ func WithPullTime(pullTime time.Duration) TxRelayerOption {
 func WithReceiptDelay(receiptDelay time.Duration) TxRelayerOption {
 	return func(t *AARelayerService) {
 		t.receiptDelay = receiptDelay
+	}
+}
+
+func WithNumRetries(numRetries int) TxRelayerOption {
+	return func(t *AARelayerService) {
+		t.numRetries = numRetries
 	}
 }
