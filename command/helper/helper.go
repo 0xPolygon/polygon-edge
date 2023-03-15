@@ -250,3 +250,24 @@ func SetRequiredFlags(cmd *cobra.Command, requiredFlags []string) {
 		_ = cmd.MarkFlagRequired(requiredFlag)
 	}
 }
+
+func ValidateIPPort(ipPort string) bool {
+	// Split the IP:port string into IP and port
+	host, port, err := net.SplitHostPort(ipPort)
+	if err != nil {
+		return false
+	}
+
+	// Check if the IP address is valid
+	if ip := net.ParseIP(host); ip == nil {
+		return false
+	}
+
+	// Check if the port is valid
+	if _, err = net.LookupPort("tcp", port); err != nil {
+		return false
+	}
+
+	// If both IP and port are valid, return true
+	return true
+}
