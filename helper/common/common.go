@@ -13,10 +13,10 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -68,7 +68,7 @@ func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	case float64:
 		return uint64(roundFloat(tx)), nil
 	case string:
-		v, err := types.ParseUint64orHex(&tx)
+		v, err := ParseUint64orHex(&tx)
 		if err != nil {
 			return 0, err
 		}
@@ -77,6 +77,24 @@ func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	default:
 		return 0, errors.New("unsupported type for unmarshalled integer")
 	}
+}
+
+// ParseUint64orHex parses the given uint64 hex string into the number.
+// It can parse the string with 0x prefix as well.
+func ParseUint64orHex(val *string) (uint64, error) {
+	if val == nil {
+		return 0, nil
+	}
+
+	str := *val
+	base := 10
+
+	if strings.HasPrefix(str, "0x") {
+		str = str[2:]
+		base = 16
+	}
+
+	return strconv.ParseUint(str, base, 64)
 }
 
 func roundFloat(num float64) int64 {

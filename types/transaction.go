@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
@@ -149,8 +150,10 @@ func (t *Transaction) Cost() *big.Int {
 //   - use existing gas price if exists
 //   - or calculate a value with formula: min(gasFeeCap, gasTipCap * baseFee);
 func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
-	if (t.GasPrice != nil && t.GasPrice.BitLen() > 0) || baseFee == 0 {
+	if t.GasPrice != nil && t.GasPrice.BitLen() > 0 {
 		return new(big.Int).Set(t.GasPrice)
+	} else if baseFee == 0 {
+		return new(big.Int)
 	}
 
 	gasFeeCap := new(big.Int)
@@ -165,14 +168,13 @@ func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 
 	gasPrice := new(big.Int)
 	if gasFeeCap.BitLen() > 0 || gasTipCap.BitLen() > 0 {
-		gasPrice = new(big.Int).Add(
-			gasTipCap,
-			new(big.Int).SetUint64(baseFee),
+		gasPrice = common.BigMin(
+			new(big.Int).Add(
+				gasTipCap,
+				new(big.Int).SetUint64(baseFee),
+			),
+			new(big.Int).Set(gasFeeCap),
 		)
-
-		if gasPrice.Cmp(gasFeeCap) > 0 {
-			gasPrice = new(big.Int).Set(gasFeeCap)
-		}
 	}
 
 	return gasPrice
@@ -194,6 +196,17 @@ func (t *Transaction) Size() uint64 {
 	return size
 }
 
-func (t *Transaction) ExceedsBlockGasLimit(blockGasLimit uint64) bool {
-	return t.Gas > blockGasLimit
+// EffectiveTip defines effective tip based on tx type.
+// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
+// We use EIP-1559 fields of the tx if the london hardfork is enabled.
+// Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
+func (t *Transaction) EffectiveTip(baseFee uint64) *big.Int {
+	if t.GasFeeCap != nil && t.GasTipCap != nil {
+		return common.BigMin(
+			new(big.Int).Sub(t.GasFeeCap, new(big.Int).SetUint64(baseFee)),
+			new(big.Int).Set(t.GasTipCap),
+		)
+	}
+
+	return t.GetGasPrice(baseFee)
 }

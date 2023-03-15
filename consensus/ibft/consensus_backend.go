@@ -384,7 +384,7 @@ func (i *backendIBFT) writeTransaction(
 		return nil, false
 	}
 
-	if tx.ExceedsBlockGasLimit(gasLimit) {
+	if tx.Gas > gasLimit {
 		i.txpool.Drop(tx)
 
 		if err := transition.WriteFailedReceipt(tx); err != nil {

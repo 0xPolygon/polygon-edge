@@ -131,7 +131,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 
 // WriteTx applies given transaction to the state. If transaction apply fails, it reverts the saved snapshot.
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
-	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
+	if tx.Gas > b.params.GasLimit {
 		if err := b.state.WriteFailedReceipt(tx); err != nil {
 			return err
 		}
