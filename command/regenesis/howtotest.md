@@ -9,19 +9,29 @@ curl -s -X POST --data '{"jsonrpc":"2.0", "method":"eth_getBalance", "params":["
 {"jsonrpc":"2.0","id":1,"result":"0x3635c9adc5dea00000"}
 ```
 
-3) make trie snapshot
+3) get trie root
 ```bash
+./polygon-edge regenesis getroot --rpc "http://localhost:10002"
+
+[Trie copy SUCCESS]
+state root 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663 for block 38
+
+```
+
+4) make trie snapshot
+```bash
+
 ./polygon-edge regenesis --snapshotPath ./trie_new --stateRoot 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663  --triedb ./test-chain-1/trie 
 
 [Trie copy SUCCESS]
 
 ```
 
-4) remove old chain data
+5) remove old chain data
 ```bash
 rm -rf test-chain-*
 ```
-5) create new validators
+6) create new validators
 ```bash
 ./polygon-edge polybft-secrets --insecure --data-dir test-chain- --num 4
 
@@ -55,12 +65,12 @@ Node ID              = 16Uiu2HAmEuYYyzQKpyVr2HVCG8Gqx5e5DLCi8LWY4TkFYvHYcWAq
 
 ```
 
-6) generate genesis manifest
+7) generate genesis manifest
 ```bash
 ./polygon-edge manifest
 ```
 
-7) generate genesis file
+8) generate genesis file
 ```bash
 ./polygon-edge genesis --consensus polybft --validator-set-size=4 --bridge-json-rpc http://127.0.0.1:8545 \
 --block-gas-limit 10000000 \
@@ -72,7 +82,7 @@ Genesis written to ./genesis.json
 
 ```
 
-8) Try to start a new v0.7 chain
+9) Try to start a new v0.7 chain
 ```bash
  ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --seal --log-level DEBUG &
 ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 --seal --log-level DEBUG &
@@ -104,7 +114,7 @@ invalid initial state root
 
 It fails, because we havent provided trie database with correct state trie.
 
-9) Copy snapshot trie to our data directory
+10) Copy snapshot trie to our data directory
 ```bash
 rm -rf ./test-chain-1/trie
 rm -rf ./test-chain-2/trie
@@ -116,7 +126,7 @@ cp -fR ./trie_new/ ./test-chain-3/trie/
 cp -fR ./trie_new/ ./test-chain-4/trie/
 ```
 
-10) run chain again
+11) run chain again
 ```bash
  ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --seal --log-level DEBUG &
 ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 --seal --log-level DEBUG &
@@ -148,7 +158,7 @@ wait
 ...
 ```
 
-10) check that balance of account on v0.6 is not 0
+12) check that balance of account on v0.6 is not 0
 ```bash
  curl -s -X POST --data '{"jsonrpc":"2.0", "method":"eth_getBalance", "params":["0x85da99c8a7c2c95964c8efd687e95e632fc533d6", "latest"], "id":1}' http://localhost:10002
 
