@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/bridge/deposit"
+	"github.com/0xPolygon/polygon-edge/command/bridge/exit"
 	"github.com/0xPolygon/polygon-edge/command/bridge/withdraw"
 )
 
@@ -24,8 +25,8 @@ func registerSubcommands(baseCmd *cobra.Command) {
 		// bridge deposit
 		deposit.GetCommand(),
 		// bridge withdraw
-		withdraw.GetWithdrawCommand(),
+		withdraw.GetCommand(),
 		// bridge exit
-		withdraw.GetExitCommand(),
+		exit.GetCommand(),
 	)
 }

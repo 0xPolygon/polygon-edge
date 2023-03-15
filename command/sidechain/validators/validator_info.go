@@ -32,19 +32,19 @@ func GetCommand() *cobra.Command {
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.accountDir,
-		polybftsecrets.DataPathFlag,
+		polybftsecrets.AccountDirFlag,
 		"",
-		polybftsecrets.DataPathFlagDesc,
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.configPath,
-		polybftsecrets.ConfigFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		polybftsecrets.ConfigFlagDesc,
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.DataPathFlag, polybftsecrets.ConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -57,7 +57,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.configPath)
+	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.accountConfig)
 	if err != nil {
 		return err
 	}

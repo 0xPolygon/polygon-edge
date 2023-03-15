@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -81,12 +80,13 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	manifestPath      string
-	validatorSetSize  int
-	sprintSize        uint64
-	blockTime         time.Duration
-	bridgeJSONRPCAddr string
-	epochReward       uint64
+	manifestPath            string
+	validatorSetSize        int
+	sprintSize              uint64
+	blockTime               time.Duration
+	bridgeJSONRPCAddr       string
+	epochReward             uint64
+	eventTrackerStartBlocks []string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -388,6 +388,6 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 
 func (p *genesisParams) getResult() command.CommandResult {
 	return &GenesisResult{
-		Message: fmt.Sprintf("%s\nGenesis written to %s\n", polybft.DisclaimerMessage, p.genesisPath),
+		Message: fmt.Sprintf("\nGenesis written to %s\n", p.genesisPath),
 	}
 }

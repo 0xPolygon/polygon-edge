@@ -257,7 +257,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
 	currentBlock, err := owner.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
-	cluster.WaitForBlock(currentBlock+3*epochSize, 2*time.Minute)
+	require.NoError(t, cluster.WaitForBlock(currentBlock+3*epochSize, 2*time.Minute))
 
 	// query the first validator info again
 	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr, txRelayer)
@@ -316,7 +316,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait for consensus to start
-	cluster.WaitForBlock(1, 10*time.Second)
+	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
 
 	// extract delegator's secrets
 	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
@@ -369,7 +369,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	// wait for 2 epochs to accumulate delegator rewards
 	currentBlockNum, err := srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
-	cluster.WaitForBlock(currentBlockNum+2*epochSize, 1*time.Minute)
+	require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 1*time.Minute))
 
 	// query delegator rewards
 	_, delegatorReward := getDelegatorInfo()
@@ -394,7 +394,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	// wait for single epoch to process withdrawal
 	currentBlockNum, err = srv.JSONRPC().Eth().BlockNumber()
 	require.NoError(t, err)
-	cluster.WaitForBlock(currentBlockNum+epochSize, time.Minute)
+	require.NoError(t, cluster.WaitForBlock(currentBlockNum+epochSize, time.Minute))
 
 	// assert that delegator doesn't receive any rewards
 	delegatorBalance, delegatorReward = getDelegatorInfo()
@@ -556,7 +556,7 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 		for {
 			delegationAmount := uint64(1e18)
 
-			cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
+			err = cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
 			require.NoError(t, err)
 
 			select {

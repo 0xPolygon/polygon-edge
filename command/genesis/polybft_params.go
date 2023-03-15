@@ -23,11 +23,12 @@ import (
 )
 
 const (
-	manifestPathFlag     = "manifest"
-	validatorSetSizeFlag = "validator-set-size"
-	sprintSizeFlag       = "sprint-size"
-	blockTimeFlag        = "block-time"
-	bridgeFlag           = "bridge-json-rpc"
+	manifestPathFlag       = "manifest"
+	validatorSetSizeFlag   = "validator-set-size"
+	sprintSizeFlag         = "sprint-size"
+	blockTimeFlag          = "block-time"
+	bridgeFlag             = "bridge-json-rpc"
+	trackerStartBlocksFlag = "tracker-start-blocks"
 
 	defaultManifestPath     = "./manifest.json"
 	defaultSprintSize       = uint64(5)
@@ -54,12 +55,18 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		return errNoGenesisValidators
 	}
 
+	eventTrackerStartBlock, err := parseTrackerStartBlocks(params.eventTrackerStartBlocks)
+	if err != nil {
+		return err
+	}
+
 	var bridge *polybft.BridgeConfig
 
 	// populate bridge configuration
 	if p.bridgeJSONRPCAddr != "" && manifest.RootchainConfig != nil {
 		bridge = manifest.RootchainConfig.ToBridgeConfig()
 		bridge.JSONRPCEndpoint = p.bridgeJSONRPCAddr
+		bridge.EventTrackerStartBlocks = eventTrackerStartBlock
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{

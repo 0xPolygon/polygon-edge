@@ -36,8 +36,8 @@ const (
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
 
-	// property based tests enabled
-	envPropertyBaseTestEnabled = "E2E_PROPERTY_TESTS"
+	// envE2ETestsType used just to display type of test if skipped
+	envE2ETestsType = "E2E_TESTS_TYPE"
 )
 
 const (
@@ -81,7 +81,6 @@ type TestClusterConfig struct {
 	ValidatorSetSize  uint64
 	EpochSize         int
 	EpochReward       int
-	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
 	NumBlockConfirmations uint64
@@ -132,7 +131,7 @@ func (c *TestClusterConfig) GetStdout(name string, custom ...io.Writer) io.Write
 }
 
 func (c *TestClusterConfig) initLogsDir() {
-	logsDir := path.Join("..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
+	logsDir := path.Join("../..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
 
 	if err := common.CreateDirSafe(logsDir, 0750); err != nil {
 		c.t.Fatal(err)
@@ -227,12 +226,6 @@ func WithBurnContract(block uint64, address types.Address) ClusterOption {
 	}
 }
 
-func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.PropertyBaseTests = propertyBaseTests
-	}
-}
-
 func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.NumBlockConfirmations = numBlockConfirmations
@@ -267,9 +260,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		opt(config)
 	}
 
-	if !config.PropertyBaseTests && !isTrueEnv(envE2ETestsEnabled) ||
-		config.PropertyBaseTests && !isTrueEnv(envPropertyBaseTestEnabled) {
-		t.Skip("Integration tests are disabled.")
+	if !isTrueEnv(envE2ETestsEnabled) {
+		testType := os.Getenv(envE2ETestsType)
+		if testType == "" {
+			testType = "integration"
+		}
+
+		t.Skip(fmt.Sprintf("%s tests are disabled.", testType))
 	}
 
 	config.TmpDir, err = os.MkdirTemp("/tmp", "e2e-polybft-")

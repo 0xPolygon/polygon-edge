@@ -2886,7 +2886,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 			mux.Unlock()
 
 			// submit transaction to pool
-			pool.addTx(local, tx)
+			assert.NoError(t, pool.addTx(local, tx))
 		}(uint64(i))
 	}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -474,10 +475,21 @@ func (s *Server) setupRelayer() error {
 		return fmt.Errorf("failed to create account from secret: %w", err)
 	}
 
+	polyBFTConfig, err := polybft.GetPolyBFTConfig(s.config.Chain)
+	if err != nil {
+		return fmt.Errorf("failed to extract polybft config: %w", err)
+	}
+
+	trackerStartBlockConfig := map[types.Address]uint64{}
+	if polyBFTConfig.Bridge != nil {
+		trackerStartBlockConfig = polyBFTConfig.Bridge.EventTrackerStartBlocks
+	}
+
 	relayer := statesyncrelayer.NewRelayer(
 		s.config.DataDir,
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
+		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
 	)

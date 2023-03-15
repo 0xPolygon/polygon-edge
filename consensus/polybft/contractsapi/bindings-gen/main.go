@@ -79,6 +79,7 @@ func main() {
 			[]string{
 				"submit",
 				"initialize",
+				"getCheckpointBlock",
 			},
 			[]string{},
 		},

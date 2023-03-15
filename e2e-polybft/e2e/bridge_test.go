@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,6 +26,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -139,14 +139,11 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	senderAccount, err := sidechain.GetAccountFromDir(cluster.Servers[0].DataDir())
 	require.NoError(t, err)
 
-	rawPrivateSenderKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
-	require.NoError(t, err)
-
 	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
 
 	// send withdraw transaction
 	err = cluster.Bridge.WithdrawERC20(
-		hex.EncodeToString(rawPrivateSenderKey),
+		cluster.Servers[0].DataDir(),
 		strings.Join(receivers[:], ","),
 		strings.Join(amounts[:], ","),
 		cluster.Servers[0].JSONRPCAddr())
@@ -192,8 +189,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		exitEventID := i + 1
 
 		// send exit transaction to exit helper
-		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, currentEpoch,
-			currentBlock.Number, rootJSONRPC, childJSONRPC)
+		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
 		// make sure exit event is processed successfully
@@ -354,7 +350,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(21, 2*time.Minute))
 
 	// restart rootchain server
-	cluster.Bridge.Start()
+	require.NoError(t, cluster.Bridge.Start())
 
 	// check if pending checkpoint blocks were submitted (namely the last checkpointed block must be block 20)
 	err = cluster.Bridge.WaitUntil(2*time.Second, 50*time.Second, func() (bool, error) {
@@ -398,8 +394,9 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 		accountAddress[i] = types.Address(key.Address())
 	}
 
-	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
+	// use test account for rootchain
+	rootchainKey, err := rootchainHelper.GetRootchainTestPrivKey()
+	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -426,7 +423,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	// deploy L1ExitTest contract
 	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainPrivateKey())
+		rootchainKey)
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -467,10 +464,10 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 
 	for i := 0; i < userNumber; i++ {
 		exitID := uint64(i + 1) // because exit events start from ID = 1
-		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID, checkpointEpoch, checkpointBlock)
+		proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitID)
 		require.NoError(t, err)
 
-		isProcessed, err := sendExitTransaction(sidechainKeys[i], proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitID)
+		isProcessed, err := sendExitTransaction(sidechainKeys[i], rootchainKey, proof, checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitID)
 		require.NoError(t, err)
 		require.True(t, isProcessed)
 	}
@@ -497,8 +494,9 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 		accountAddress[i] = types.Address(key.Address())
 	}
 
-	// initialize rootchain admin key to default one
-	require.NoError(t, rootchainHelper.InitRootchainPrivateKey(""))
+	// use test account for rootchain
+	rootchainKey, err := rootchainHelper.GetRootchainTestPrivKey()
+	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -523,8 +521,9 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	require.NoError(t, err)
 
 	// deploy L1ExitTest contract
-	receipt, err := l1TxRelayer.SendTransaction(&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
-		rootchainHelper.GetRootchainPrivateKey())
+	receipt, err := l1TxRelayer.SendTransaction(
+		&ethgo.Transaction{Input: contractsapi.TestL1StateReceiver.Bytecode},
+		rootchainKey)
 	require.NoError(t, err)
 	require.Equal(t, receipt.Status, uint64(types.ReceiptSuccess))
 
@@ -575,16 +574,25 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 
 	for i := 0; i < roundNumber; i++ {
 		for j := 0; j < userNumber; j++ {
-			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber], uint64(i+1)*checkpointEpoch, uint64(i+1)*checkpointBlock)
+			proof, err = getExitProof(cluster.Servers[0].JSONRPCAddr(), exitEventIds[j+i*userNumber])
 			require.NoError(t, err)
-			isProcessed, err := sendExitTransaction(sidechainKeys[j], proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
+			isProcessed, err := sendExitTransaction(sidechainKeys[j], rootchainKey, proof, uint64(i+1)*checkpointBlock, stateSenderData, l1ExitTestAddr, exitHelperAddr, l1TxRelayer, exitEventIds[j+i*userNumber])
 			require.NoError(t, err)
 			require.True(t, isProcessed)
 		}
 	}
 }
 
-func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpointBlock uint64, stateSenderData []byte, l1ExitTestAddr, exitHelperAddr ethgo.Address, l1TxRelayer txrelayer.TxRelayer, exitEventID uint64) (bool, error) {
+func sendExitTransaction(
+	sidechainKey *ethgow.Key,
+	rootchainKey ethgo.Key,
+	proof types.Proof,
+	checkpointBlock uint64,
+	stateSenderData []byte,
+	l1ExitTestAddr,
+	exitHelperAddr ethgo.Address,
+	l1TxRelayer txrelayer.TxRelayer,
+	exitEventID uint64) (bool, error) {
 	proofExitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
@@ -600,7 +608,7 @@ func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpoint
 		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
 	}
 
-	receipt, err := ABITransaction(l1TxRelayer, rootchainHelper.GetRootchainPrivateKey(), contractsapi.ExitHelper, exitHelperAddr,
+	receipt, err := ABITransaction(l1TxRelayer, rootchainKey, contractsapi.ExitHelper, exitHelperAddr,
 		"exit",
 		big.NewInt(int64(checkpointBlock)),
 		uint64(leafIndex),
@@ -619,7 +627,7 @@ func sendExitTransaction(sidechainKey *ethgow.Key, proof types.Proof, checkpoint
 	return isExitEventProcessed(exitEventID, exitHelperAddr, l1TxRelayer)
 }
 
-func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
+func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
 	query := struct {
 		Jsonrpc string   `json:"jsonrpc"`
 		Method  string   `json:"method"`
@@ -628,7 +636,7 @@ func getExitProof(rpcAddress string, exitID, epoch, checkpointBlock uint64) (typ
 	}{
 		"2.0",
 		"bridge_generateExitProof",
-		[]string{fmt.Sprintf("0x%x", exitID), fmt.Sprintf("0x%x", epoch), fmt.Sprintf("0x%x", checkpointBlock)},
+		[]string{fmt.Sprintf("0x%x", exitID)},
 		1,
 	}
 
