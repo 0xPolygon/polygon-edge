@@ -238,6 +238,9 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		}
 	}
 
+	rootchainConfig := &polybft.RootchainConfig{}
+	manifest.RootchainConfig = rootchainConfig
+
 	type contractInfo struct {
 		name     string
 		artifact *artifact.Artifact
@@ -295,9 +298,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		// deploy MockERC20 as default root chain ERC20 token
 		deployContracts = append(deployContracts, &contractInfo{name: "RootERC20", artifact: contractsapi.RootERC20})
 	}
-
-	rootchainConfig := &polybft.RootchainConfig{}
-	manifest.RootchainConfig = rootchainConfig
 
 	for _, contract := range deployContracts {
 		txn := &ethgo.Transaction{
