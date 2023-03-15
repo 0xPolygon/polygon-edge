@@ -77,7 +77,7 @@ func (m *mockHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
 }
 
 func (m *mockHost) GetTxContext() runtime.TxContext {
-	panic("Not implemented in tests") //nolint:gocritic
+	return runtime.TxContext{}
 }
 
 func (m *mockHost) GetBlockHash(number int64) types.Hash {
@@ -208,10 +208,12 @@ func TestRun(t *testing.T) {
 				Byzantium: true,
 			},
 			expected: &runtime.ExecutionResult{
-				ReturnValue: hex.MustDecodeHex("0x0000000000000000000000003D09c91F44C87C30901dDB742D99f168F5AEEf01"),
-				GasUsed:     3100 + 4*3,
-				GasLeft:     0,
-				Err:         nil,
+				ReturnValue: []uint8{
+					0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x39, 0x11, 0x78, 0xe6, 0x5, 0xe, 0xd3, 0x97, 0x53, 0xac, 0x65, 0x3b, 0x63, 0x60, 0x67, 0x33, 0x3f, 0xe5, 0xa7, 0xe6,
+				},
+				GasLeft: 0x0,
+				GasUsed: 0xc28, // 3100 + 4*3
+				Err:     nil,
 			},
 		},
 	}
@@ -416,7 +418,7 @@ func TestRunWithTracer(t *testing.T) {
 
 			_, _ = state.Run()
 
-			assert.Equal(t, tt.expected, tracer.calls)
+			assert.Equal(t, tt.expected, tracer.calls, "failed for %s", tt.name)
 		})
 	}
 }
