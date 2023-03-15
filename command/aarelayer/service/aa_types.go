@@ -36,6 +36,9 @@ var (
 	eip712DomainTypeAbi = abi.MustNewType( // EIP712Domain
 		"tuple(bytes32 typeHash, bytes32 name, bytes32 version, uint256 chainId, address verifyingContract)",
 	)
+
+	// default address of invoker smart contract
+	DefaultAAInvokerAddress = types.StringToAddress("3001")
 )
 
 // AATransaction represents an AA transaction
