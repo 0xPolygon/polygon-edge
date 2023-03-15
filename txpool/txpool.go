@@ -390,7 +390,7 @@ func (p *TxPool) Prepare(baseFee uint64) {
 	}
 
 	// set base fee
-	atomic.StoreUint64(&p.baseFee, baseFee)
+	p.updateBaseFee(baseFee)
 
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
@@ -990,6 +990,12 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
+}
+
+// updateBaseFee updates base fee in the tx pool and priced queue
+func (p *TxPool) updateBaseFee(baseFee uint64) {
+	atomic.StoreUint64(&p.baseFee, baseFee)
+	atomic.StoreUint64(&p.executables.queue.baseFee, baseFee)
 }
 
 // toHash returns the hash(es) of given transaction(s)
