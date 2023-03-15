@@ -12,18 +12,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 func TestPreminedBalance(t *testing.T) {
@@ -280,7 +280,7 @@ func generateStressTestTx(
 	t.Helper()
 
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 
 	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
 	if !ok {
