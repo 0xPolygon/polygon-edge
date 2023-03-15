@@ -28,7 +28,12 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) error {
-	state, err := service.NewAATxState()
+	state, err := service.NewAATxState(params.dbPath)
+	if err != nil {
+		return err
+	}
+
+	pending, err := state.GetAllPending()
 	if err != nil {
 		return err
 	}
@@ -46,6 +51,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	pool := service.NewAAPool()
+	pool.Init(pending)
+
 	verification := service.NewAAVerification(
 		config,
 		types.Address(account.Ecdsa.Address()),

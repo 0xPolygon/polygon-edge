@@ -8,6 +8,8 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -24,9 +26,14 @@ const (
 func Test_AAServer(t *testing.T) {
 	t.Parallel()
 
+	dbpath, err := os.MkdirTemp("", "aa_server_state_db")
+	require.NoError(t, err)
+
+	defer os.RemoveAll(dbpath)
+
 	invoker := wallet.GenerateAccount()
 	user := wallet.GenerateAccount()
-	aaServer := getServer(t, types.Address(invoker.Ecdsa.Address()))
+	aaServer := getServer(t, types.Address(invoker.Ecdsa.Address()), dbpath)
 
 	go func() {
 		aaServer.ListenAndServe(baseURL)
@@ -246,10 +253,10 @@ func Test_AAServer(t *testing.T) {
 	})
 }
 
-func getServer(t *testing.T, address types.Address) *AARelayerRestServer {
+func getServer(t *testing.T, address types.Address, dbpath string) *AARelayerRestServer {
 	t.Helper()
 
-	state, err := NewAATxState()
+	state, err := NewAATxState(path.Join(dbpath, "relayer.db"))
 	require.NoError(t, err)
 
 	config := DefaultConfig()
