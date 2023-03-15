@@ -36,23 +36,50 @@ func checkPops(t *testing.T, aaPool AAPool) {
 
 	require.Equal(t, 5, aaPool.Len())
 
-	for i := 1; i <= 2; i++ {
-		item := aaPool.Pop()
-		require.Equal(t, types.StringToAddress("cc"), item.Tx.Transaction.From)
-		require.Equal(t, uint64(i), item.Tx.Transaction.Nonce)
-		require.Equal(t, 5-i, aaPool.Len())
-	}
-
 	item := aaPool.Pop()
+	require.Equal(t, types.StringToAddress("cc"), item.Tx.Transaction.From)
+	require.Equal(t, uint64(1), item.Tx.Transaction.Nonce)
+	require.Equal(t, 4, aaPool.Len())
+
+	aaPool.Push(&AAStateTransaction{
+		Tx: &AATransaction{
+			Transaction: Transaction{Nonce: 3, From: types.StringToAddress("cc")},
+		},
+		Time: 180,
+	})
+
+	item = aaPool.Pop()
 	require.Equal(t, types.StringToAddress("aa"), item.Tx.Transaction.From)
-	require.Equal(t, 2, aaPool.Len())
+	require.Equal(t, 4, aaPool.Len())
+
+	item = aaPool.Pop()
+	require.Equal(t, types.StringToAddress("cc"), item.Tx.Transaction.From)
+	require.Equal(t, uint64(2), item.Tx.Transaction.Nonce)
+	require.Equal(t, 3, aaPool.Len())
 
 	for i := 1; i <= 2; i++ {
 		item = aaPool.Pop()
 		require.Equal(t, types.StringToAddress("ff"), item.Tx.Transaction.From)
 		require.Equal(t, uint64(i), item.Tx.Transaction.Nonce)
-		require.Equal(t, 2-i, aaPool.Len())
+		require.Equal(t, 3-i, aaPool.Len())
 	}
+
+	aaPool.Push(&AAStateTransaction{
+		Tx: &AATransaction{
+			Transaction: Transaction{Nonce: 3, From: types.StringToAddress("ff")},
+		},
+		Time: 120,
+	})
+
+	item = aaPool.Pop()
+	require.Equal(t, types.StringToAddress("ff"), item.Tx.Transaction.From)
+	require.Equal(t, uint64(3), item.Tx.Transaction.Nonce)
+	require.Equal(t, 1, aaPool.Len())
+
+	item = aaPool.Pop()
+	require.Equal(t, types.StringToAddress("cc"), item.Tx.Transaction.From)
+	require.Equal(t, uint64(3), item.Tx.Transaction.Nonce)
+	require.Equal(t, 0, aaPool.Len())
 }
 
 func getDummyTxs() []*AAStateTransaction {
@@ -67,7 +94,7 @@ func getDummyTxs() []*AAStateTransaction {
 			Tx: &AATransaction{
 				Transaction: Transaction{Nonce: 2, From: types.StringToAddress("cc")},
 			},
-			Time: 1,
+			Time: 45,
 		},
 		{
 			Tx: &AATransaction{
