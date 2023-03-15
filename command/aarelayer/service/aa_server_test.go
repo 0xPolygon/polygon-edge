@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -36,11 +37,12 @@ func Test_AAServer(t *testing.T) {
 	aaServer := getServer(t, types.Address(invoker.Ecdsa.Address()), dbpath)
 
 	go func() {
-		aaServer.ListenAndServe(baseURL)
+		err := aaServer.ListenAndServe(baseURL)
+		require.True(t, err == nil || errors.Is(err, http.ErrServerClosed))
 	}()
 
 	t.Cleanup(func() {
-		aaServer.Shutdown(context.Background())
+		require.NoError(t, aaServer.Shutdown(context.Background()))
 	})
 
 	time.Sleep(time.Millisecond * 100) // wait for server to start
