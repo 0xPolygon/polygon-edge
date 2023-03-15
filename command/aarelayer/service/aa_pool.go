@@ -6,7 +6,7 @@ import (
 
 // AAPool defines the interface for a pool of Account Abstraction (AA) transactions
 type AAPool interface {
-	// Push adds an AA transaction to the pool, associating it with the given account ID
+	// Push adds an AA state transaction to the pool, associating it with the given account ID
 	Push(*AAStateTransaction)
 	// Pop removes the next transaction from the pool and returns a wrapper object containing the transaction
 	Pop() *AAStateTransaction
@@ -49,5 +49,11 @@ func (p *aaPool) Pop() *AAStateTransaction {
 	return item
 }
 
-func (p *aaPool) Init([]*AAStateTransaction) {
+func (p *aaPool) Init(txs []*AAStateTransaction) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	for _, tx := range txs {
+		p.pool = append(p.pool, tx)
+	}
 }
