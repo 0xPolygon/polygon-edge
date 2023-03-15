@@ -62,7 +62,7 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 	// push state tx to the pool
 	s.pool.Push(stateTx)
 
-	writeOutput(w, map[string]string{"uuid": stateTx.ID})
+	writeOutput(w, http.StatusOK, map[string]string{"uuid": stateTx.ID})
 }
 
 // GetTransactionReceipt handles the /v1/getTransactionReceipt/{uuid} endpoint
@@ -89,15 +89,13 @@ func (s *AARelayerRestServer) getTransactionReceipt(w http.ResponseWriter, r *ht
 		return
 	}
 
-	receipt := AAReceipt{
+	writeOutput(w, http.StatusOK, AAReceipt{
 		ID:     uuid,
 		Status: stateTx.Status,
 		Mined:  stateTx.Mined,
 		Error:  stateTx.Error,
 		Gas:    stateTx.Gas,
-	}
-
-	writeOutput(w, receipt)
+	})
 }
 
 func (s *AARelayerRestServer) ListenAndServe(addr string) error {
@@ -120,13 +118,14 @@ func (s *AARelayerRestServer) Shutdown(ctx context.Context) error {
 }
 
 func writeMessage(w http.ResponseWriter, status int, message string) {
-	w.WriteHeader(status)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"message": message})
+	writeOutput(w, status, map[string]string{"message": message})
 }
 
-func writeOutput(w http.ResponseWriter, output interface{}) {
-	w.WriteHeader(http.StatusOK)
+func writeOutput(w http.ResponseWriter, status int, object interface{}) {
+	w.WriteHeader(status)
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(output)
+
+	if err := json.NewEncoder(w).Encode(object); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
