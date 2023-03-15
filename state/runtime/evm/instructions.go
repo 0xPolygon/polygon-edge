@@ -1279,7 +1279,12 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	parent := c
 
 	fromAddr := parent.msg.Address
+
 	if op == AUTHCALL {
+		if c.authorized == nil {
+			return nil, 0, 0, fmt.Errorf("not authorized")
+		}
+
 		fromAddr = *c.authorized
 	}
 
