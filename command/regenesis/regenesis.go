@@ -1,32 +1,17 @@
 package regenesis
 
 import (
+	"bytes"
 	"fmt"
-
 	"github.com/0xPolygon/polygon-edge/command"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 )
 
-var (
-	params = &regenesisParams{}
-)
-
-type regenesisParams struct {
-	GenesisPath        string
-	TrieDBPath         string
-	SnapshotTrieDBPath string
-	TrieRoot           string
-	JSONRPCAddress     string
-	BlockNumber        int64
-}
-
-func GetCommand() *cobra.Command {
+func RegenesisCMD() *cobra.Command {
 	genesisCmd := &cobra.Command{
 		Use:   "regenesis",
 		Short: "Copies trie for specific block to a separate folder",
@@ -102,47 +87,18 @@ func GetCommand() *cobra.Command {
 		"block state root of old chain",
 	)
 
-	getRootCmd := &cobra.Command{
-		Use:   "getroot",
-		Short: "returns state root of old chain",
-		Run: func(cmd *cobra.Command, args []string) {
-			outputter := command.InitializeOutputter(genesisCmd)
-			defer outputter.WriteOutput()
-
-			rpcClient, err := jsonrpc.NewClient(params.JSONRPCAddress)
-			if err != nil {
-				outputter.SetError(fmt.Errorf("connect to client error:%w", err))
-
-				return
-			}
-
-			block, err := rpcClient.Eth().GetBlockByNumber(ethgo.BlockNumber(params.BlockNumber), false)
-			if err != nil {
-				outputter.SetError(fmt.Errorf("get block error:%w", err))
-
-				return
-			}
-
-			outputter.WriteCommandResult(&ReGenesisResult{
-				Message: fmt.Sprintf("state root %s for block %d", block.StateRoot, block.Number),
-			})
-		},
-	}
-
-	genesisCmd.AddCommand(getRootCmd)
-	//genesisCmd.AddCommand(RegenesisCMD())
-	getRootCmd.Flags().StringVar(
-		&params.JSONRPCAddress,
-		"rpc",
-		"",
-		"the JSON RPC IP address for old chain",
-	)
-	getRootCmd.Flags().Int64Var(
-		&params.BlockNumber,
-		"block",
-		int64(ethgo.Latest),
-		"Block number of trie snapshot",
-	)
-
 	return genesisCmd
+}
+
+type ReGenesisResult struct {
+	Message string `json:"message"`
+}
+
+func (r *ReGenesisResult) GetOutput() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString("\n[Trie copy SUCCESS]\n")
+	buffer.WriteString(r.Message)
+
+	return buffer.String()
 }
