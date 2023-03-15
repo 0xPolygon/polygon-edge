@@ -191,7 +191,7 @@ func getInternalType(paramName string, paramAbiType *abi.Type) string {
 // generateType generates code for structs used in smart contract functions and events
 func generateType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) (string, error) {
 	if obj.Kind() != abi.KindTuple {
-		return "", errors.New(" Type not expected")
+		return "", errors.New("type not expected")
 	}
 
 	internalType := getInternalType(name, obj)
