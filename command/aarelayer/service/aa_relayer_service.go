@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -17,6 +18,8 @@ type AARelayerService struct {
 	state        AATxState
 	txSender     AATxSender
 	key          ethgo.Key
+	invokerAddr  types.Address
+	currentNonce uint64
 	pullTime     time.Duration // pull from txpool every `pullTime` second/millisecond
 	receiptDelay time.Duration
 	numRetries   int
@@ -27,12 +30,20 @@ func NewAARelayerService(
 	pool AAPool,
 	state AATxState,
 	key ethgo.Key,
-	opts ...TxRelayerOption) *AARelayerService {
+	invokerAddr types.Address,
+	opts ...TxRelayerOption) (*AARelayerService, error) {
+	nonce, err := txSender.GetNonce(key.Address())
+	if err != nil {
+		return nil, err
+	}
+
 	service := &AARelayerService{
 		txSender:     txSender,
 		pool:         pool,
 		state:        state,
 		key:          key,
+		invokerAddr:  invokerAddr,
+		currentNonce: nonce,
 		pullTime:     time.Millisecond * 5000,
 		receiptDelay: time.Millisecond * 500,
 		numRetries:   100,
@@ -42,7 +53,7 @@ func NewAARelayerService(
 		opt(service)
 	}
 
-	return service
+	return service, nil
 }
 
 func (rs *AARelayerService) Start(ctx context.Context) {
@@ -54,7 +65,8 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			stateTx := rs.pool.Pop()
+			stateTx := rs.getFirstValidTx()
+
 			if stateTx != nil { // there is something to process
 				go func() {
 					if err := rs.executeJob(ctx, stateTx); err != nil {
@@ -68,10 +80,18 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 }
 
 func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTransaction) error {
-	var (
-		netErr net.Error
-		tx     = rs.makeEthgoTransaction(stateTx)
-	)
+	var netErr net.Error
+
+	fmt.Printf("executing transaction (%s, %s) with nonce = %d\n",
+		stateTx.ID, stateTx.Tx.Transaction.From.String(), stateTx.Tx.Transaction.Nonce)
+
+	tx, err := rs.makeEthgoTransaction(stateTx)
+	if err != nil {
+		// this should not happened
+		rs.pool.Push(stateTx)
+
+		return err
+	}
 
 	hash, err := rs.txSender.SendTransaction(tx, rs.key)
 	// if its network error return tx back to the pool
@@ -93,20 +113,29 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 		return fmt.Errorf("error while getting nonce for state tx = %s, err = %w", stateTx.ID, err)
 	}
 
+	atomic.AddUint64(&rs.currentNonce, 1) // increment global nonce for this relayer
+
 	stateTx.Status = StatusQueued
 	if err := rs.state.Update(stateTx); err != nil {
 		// TODO: log error but do not return
-		fmt.Printf("error while updating state tx = %s after sending it, err = %v", stateTx.ID, err)
+		fmt.Printf("error while updating state tx = %s after sending it, err = %v\n", stateTx.ID, err)
 	}
 
-	recipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay, rs.numRetries)
+	fmt.Printf("transaction (%s, %s) with nonce = %d has been sent to the invoker\n",
+		stateTx.ID, stateTx.Tx.Transaction.From.String(), stateTx.Tx.Transaction.Nonce)
+
+	receipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay, rs.numRetries)
 	if err != nil {
 		errstr := err.Error()
 		stateTx.Error = &errstr
 		stateTx.Status = StatusFailed
 	} else {
-		stateTx.Status = StatusCompleted
-		populateStateTx(stateTx, recipt)
+		populateStateTx(stateTx, receipt)
+		if receipt.Status == 1 { // Status == 1 is ReceiptSuccess status
+			stateTx.Status = StatusCompleted
+		} else {
+			stateTx.Status = StatusFailed
+		}
 	}
 
 	if err := rs.state.Update(stateTx); err != nil {
@@ -116,12 +145,61 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 	return nil
 }
 
-func (rs *AARelayerService) makeEthgoTransaction(*AAStateTransaction) *ethgo.Transaction {
+func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) (*ethgo.Transaction, error) {
 	// TODO: encode stateTx to input
 	return &ethgo.Transaction{
 		From:  rs.key.Address(),
 		Input: nil,
+		Nonce: atomic.LoadUint64(&rs.currentNonce),
+	}, nil
+}
+
+// getFirstValidTx takes from the pool first arrived transaction which nonce is good
+func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
+	var (
+		pushBackList []*AAStateTransaction
+		stateTx      = (*AAStateTransaction)(nil)
+	)
+
+	for {
+		poppedTx := rs.pool.Pop()
+		if poppedTx == nil {
+			break
+		}
+
+		address := poppedTx.Tx.Transaction.From
+
+		nonce, err := rs.txSender.GetAANonce(ethgo.Address(rs.invokerAddr), ethgo.Address(address))
+		if err != nil {
+			// TODO: log
+			fmt.Printf("failed to retrieve nonce for tx (%s, %s): %v", poppedTx.ID, address.String(), err)
+
+			pushBackList = append(pushBackList, poppedTx)
+
+			break
+		}
+
+		if nonce != poppedTx.Tx.Transaction.Nonce {
+			// TODO: log
+			fmt.Printf("transaction can not be sent to invoker - different nonces %d vs %d: %s \n",
+				poppedTx.Tx.Transaction.Nonce, nonce, poppedTx.ID)
+
+			pushBackList = append(pushBackList, poppedTx)
+		} else {
+			stateTx = poppedTx
+			// update pool -> put statetx with next nonce to the timeHeap
+			rs.pool.Update(stateTx.Tx.Transaction.From)
+
+			break
+		}
 	}
+
+	// return all transactions with incorrect nonces to the list
+	for _, x := range pushBackList {
+		rs.pool.Push(x)
+	}
+
+	return stateTx
 }
 
 func populateStateTx(stateTx *AAStateTransaction, receipt *ethgo.Receipt) {

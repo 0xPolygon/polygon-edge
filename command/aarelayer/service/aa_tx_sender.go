@@ -2,29 +2,23 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
 
-const (
-	defaultGasPrice   = 1879048192 // 0x70000000
-	defaultGasLimit   = 5242880    // 0x500000
-	DefaultRPCAddress = "http://127.0.0.1:8545"
-)
-
-var (
-	errNoAccounts = errors.New("no accounts registered")
-)
+const defaultGasLimit = 5242880 // 0x500000
 
 type AATxSender interface {
 	// GetNonce retrieves current nonce for address
 	GetNonce(address ethgo.Address) (uint64, error)
+	// GetNonce retrieves current aa invoker nonce for address
+	GetAANonce(invokerAddress, address ethgo.Address) (uint64, error)
 	// SendTransaction sends transaction but does not wait for receipt
 	SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error)
 	// WaitForReceipt waits for receipt of specific transaction
@@ -55,18 +49,13 @@ func (t *AATxSenderImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) 
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	nonce, err := t.GetNonce(key.Address())
-	if err != nil {
-		return ethgo.ZeroHash, err
-	}
-
-	txn.Nonce = nonce
-
 	if txn.GasPrice == 0 {
-		txn.GasPrice, err = t.client.Eth().GasPrice()
+		gasPrice, err := t.client.Eth().GasPrice()
 		if err != nil {
 			return ethgo.ZeroHash, err
 		}
+
+		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
@@ -120,4 +109,28 @@ func (t *AATxSenderImpl) WaitForReceipt(
 
 func (t *AATxSenderImpl) GetNonce(address ethgo.Address) (uint64, error) {
 	return t.client.Eth().GetNonce(address, ethgo.Pending)
+}
+
+func (t *AATxSenderImpl) GetAANonce(invokerAddress, address ethgo.Address) (uint64, error) {
+	data, err := aaInvokerNoncesAbiType.Encode([]interface{}{address})
+	if err != nil {
+		return 0, nil
+	}
+
+	callMsg := &ethgo.CallMsg{
+		To:   &invokerAddress,
+		Data: data,
+	}
+
+	response, err := t.client.Eth().Call(callMsg, ethgo.Pending)
+	if err != nil {
+		return 0, err
+	}
+
+	nonce, err := types.ParseUint256orHex(&response)
+	if err != nil {
+		return 0, fmt.Errorf("unable to decode hex response, %w", err)
+	}
+
+	return nonce.Uint64(), nil
 }
