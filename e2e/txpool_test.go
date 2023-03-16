@@ -385,7 +385,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	// 1. Send a first valid transaction with gasLimit = block gas limit - 1
 	//
 	// 2. Send a second transaction with gasLimit = block gas limit / 2. Since there is not enough gas remaining,
-	// the transaction will be pushed back to the pending queue so that is can be executed in the next block.
+	// the transaction will be pushed back to the pending queue so that can be executed in the next block.
 	//
 	// 3. Send a third - valid - transaction, both the previous one and this one should be executed.
 	//
@@ -412,13 +412,15 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			From:     senderAddress,
 		},
 		{
-			Nonce:    2,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     senderAddress,
+			Type:      types.DynamicFeeTx,
+			Nonce:     2,
+			GasFeeCap: big.NewInt(10000),
+			GasTipCap: big.NewInt(1000),
+			Gas:       22000,
+			To:        &receiverAddress,
+			Value:     oneEth,
+			V:         big.NewInt(27),
+			From:      senderAddress,
 		},
 	}
 
