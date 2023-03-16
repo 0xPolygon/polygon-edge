@@ -28,7 +28,10 @@ func NoUseOfTimeNowWithoutUTCRule(m dsl.Matcher) {
 	m.Match(`time.Now().$f()`,
 		`time.Now().$f($_)`,
 		`time.Now().$f($_, $_)`,
-		`time.Now().$f($_, $_, $_)`).
+		`time.Now().$f($_, $_, $_)`,
+		`time.Now().$f($_, $_, $_, $_)`,
+		`time.Now().$f($_, $_, $_, $, $_)`,
+		`time.Now().$f($_, $_, $_, $_, $_, $_)`).
 		Where(!m["f"].Text.Matches("UTC")).
 		Suggest("time.Now().UTC()").
 		Report(`use UTC time when calling time.Now`)
