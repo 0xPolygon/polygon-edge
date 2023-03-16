@@ -198,24 +198,26 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 // It will update priorities and save the updated snapshot to db
 func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 	blockNumber := req.FullBlock.Block.Number()
-	pc.logger.Info("Update proposal snapshot started", "block", blockNumber)
+	pc.logger.Debug("Update proposers snapshot started", "target block", blockNumber)
 
 	from := pc.snapshot.Height
 
 	// using a for loop if in some previous block, an error occurred while updating snapshot
-	// so that we can recalculate it to have accurate priorities
+	// so that we can recalculate it to have accurate priorities.
 	// Note, this will change once we introduce component wide global transaction
 	for height := from; height <= blockNumber; height++ {
 		if err := pc.updatePerBlock(height); err != nil {
 			return err
 		}
+		pc.logger.Debug("Proposers snapshot has been updated", "current block", blockNumber+1,
+			"validators count", len(pc.snapshot.Validators))
 	}
 
 	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshot(pc.snapshot); err != nil {
-		return fmt.Errorf("cannot save proposer calculator snapshot for block %d: %w", blockNumber, err)
+		return fmt.Errorf("cannot save proposers snapshot for block %d: %w", blockNumber, err)
 	}
 
-	pc.logger.Info("Update proposal snapshot finished", "block", blockNumber)
+	pc.logger.Debug("Update proposers snapshot finished", "target block", blockNumber)
 
 	return nil
 }
@@ -223,12 +225,12 @@ func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 // Updates ProposerSnapshot to block block with number `blockNumber`
 func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	if pc.snapshot.Height != blockNumber {
-		return fmt.Errorf("proposer calculator update wrong block=%d, height = %d", blockNumber, pc.snapshot.Height)
+		return fmt.Errorf("proposers snapshot update wrong block=%d, snapshot block number = %d", blockNumber, pc.snapshot.Height)
 	}
 
 	_, extra, err := getBlockData(blockNumber, pc.config.blockchain)
 	if err != nil {
-		return fmt.Errorf("cannot get block header and extra while updating proposer snapshot %d: %w", blockNumber, err)
+		return fmt.Errorf("cannot get block header and extra while updating proposers snapshot %d: %w", blockNumber, err)
 	}
 
 	var newValidatorSet AccountSet = nil
@@ -243,7 +245,7 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	// if round = 0 then we need one iteration
 	_, err = incrementProposerPriorityNTimes(pc.snapshot, extra.Checkpoint.BlockRound+1)
 	if err != nil {
-		return fmt.Errorf("failed to update calculator for block %d: %w", blockNumber, err)
+		return fmt.Errorf("failed to update proposers snapshot for block %d: %w", blockNumber, err)
 	}
 
 	// update to new validator set and center if needed
@@ -254,9 +256,6 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	pc.snapshot.Height = blockNumber + 1 // snapshot (validator priorities) is prepared for the next block
 	pc.snapshot.Round = 0
 	pc.snapshot.Proposer = nil
-
-	pc.logger.Info("proposer calculator update has been finished", "height", blockNumber+1,
-		"len", len(pc.snapshot.Validators))
 
 	return nil
 }
@@ -467,12 +466,14 @@ func computeMaxMinPriorityDiff(validators []*PrioritizedValidator) *big.Int {
 	return diff
 }
 
+// isBetterProposer compares provided PrioritizedValidator instances
+// and chooses either one with higher ProposerPriority or the one with the smaller address (compared lexicographically).
 func isBetterProposer(a, b *PrioritizedValidator) bool {
 	if b == nil || a.ProposerPriority.Cmp(b.ProposerPriority) > 0 {
 		return true
 	} else if a.ProposerPriority == b.ProposerPriority {
 		return bytes.Compare(a.Metadata.Address.Bytes(), b.Metadata.Address.Bytes()) <= 0
-	} else {
-		return false
 	}
+
+	return false
 }
