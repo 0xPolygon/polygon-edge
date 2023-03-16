@@ -56,7 +56,7 @@ type TestServerConfig struct {
 	SaveLogs                bool                     // Flag specifying if logs are saved
 	LogsDir                 string                   // Directory where logs are saved
 	IsPos                   bool                     // Specifies the mechanism used for IBFT (PoA / PoS)
-	Signer                  *crypto.EIP155Signer     // Signer used for transactions
+	Signer                  crypto.TxSigner          // Signer used for transactions
 	MinValidatorCount       uint64                   // Min validator count
 	MaxValidatorCount       uint64                   // Max validator count
 	BlockTime               uint64                   // Minimum block generation time (in s)
@@ -79,7 +79,7 @@ func (t *TestServerConfig) DataDir() string {
 	}
 }
 
-func (t *TestServerConfig) SetSigner(signer *crypto.EIP155Signer) {
+func (t *TestServerConfig) SetSigner(signer crypto.TxSigner) {
 	t.Signer = signer
 }
 

@@ -12,16 +12,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 func TestPreminedBalance(t *testing.T) {
@@ -270,6 +272,7 @@ func getCount(
 // IBFT_Loop and Dev_Loop stress tests
 func generateStressTestTx(
 	t *testing.T,
+	txNum int,
 	currentNonce uint64,
 	contractAddr types.Address,
 	senderKey *ecdsa.PrivateKey,
@@ -277,7 +280,7 @@ func generateStressTestTx(
 	t.Helper()
 
 	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
-	signer := crypto.NewEIP155Signer(100, true)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 
 	setNameMethod, ok := abis.StressTestABI.Methods["setName"]
 	if !ok {
@@ -293,20 +296,27 @@ func generateStressTestTx(
 		t.Fatalf("Unable to encode inputs, %v", encodeErr)
 	}
 
-	signedTx, signErr := signer.SignTx(&types.Transaction{
-		Nonce:    currentNonce,
-		From:     types.ZeroAddress,
-		To:       &contractAddr,
-		GasPrice: bigGasPrice,
-		Gas:      framework.DefaultGasLimit,
-		Value:    big.NewInt(0),
-		V:        big.NewInt(1), // it is necessary to encode in rlp,
-		Input:    append(setNameMethod.ID(), encodedInput...),
-	}, senderKey)
-
-	if signErr != nil {
-		t.Fatalf("Unable to sign transaction, %v", signErr)
+	unsignedTx := &types.Transaction{
+		Nonce: currentNonce,
+		From:  types.ZeroAddress,
+		To:    &contractAddr,
+		Gas:   framework.DefaultGasLimit,
+		Value: big.NewInt(0),
+		V:     big.NewInt(1), // it is necessary to encode in rlp,
+		Input: append(setNameMethod.ID(), encodedInput...),
 	}
+
+	if txNum%2 == 0 {
+		unsignedTx.Type = types.DynamicFeeTx
+		unsignedTx.GasFeeCap = bigGasPrice
+		unsignedTx.GasTipCap = bigGasPrice
+	} else {
+		unsignedTx.Type = types.LegacyTx
+		unsignedTx.GasPrice = bigGasPrice
+	}
+
+	signedTx, err := signer.SignTx(unsignedTx, senderKey)
+	require.NoError(t, err, "Unable to sign transaction")
 
 	return signedTx
 }
@@ -330,6 +340,7 @@ func addStressTxnsWithHashes(
 	for i := 0; i < numTransactions; i++ {
 		setNameTxn := generateStressTestTx(
 			t,
+			i,
 			uint64(currentNonce),
 			contractAddr,
 			senderKey,
