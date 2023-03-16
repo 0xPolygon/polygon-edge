@@ -14,6 +14,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -1126,7 +1127,7 @@ func createTestBitmaps(t *testing.T, validators AccountSet, numberOfBlocks uint6
 
 	bitmaps := make(map[uint64]bitmap.Bitmap, numberOfBlocks)
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(timeutils.UnixNow())
 
 	for i := numberOfBlocks; i > 1; i-- {
 		bitmap := bitmap.Bitmap{}

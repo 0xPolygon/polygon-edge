@@ -6,9 +6,9 @@ import (
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -22,7 +22,7 @@ type IBFTServerConfigCallback func(index int, config *TestServerConfig)
 var startTime int64
 
 func init() {
-	startTime = time.Now().UnixMilli()
+	startTime = timeutils.UnixMilliNow()
 }
 
 func NewIBFTServersManager(

@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	mRand "math/rand"
 	"testing"
-	"time"
 
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	bn256 "github.com/umbracle/go-eth-bn256"
@@ -34,7 +34,7 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 	t.Parallel()
 
 	// Get a random integer between 1 and 1000
-	mRand.Seed(time.Now().UnixNano())
+	mRand.Seed(timeutils.UnixNanoNow())
 	messageSize := mRand.Intn(1000) + 1
 
 	validTestMsg := testGenRandomBytes(t, messageSize)

@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -127,7 +128,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	parentHeader := &types.Header{
 		Number:    polyBftConfig.EpochSize,
-		Timestamp: uint64(time.Now().UnixMilli()),
+		Timestamp: uint64(timeutils.UnixMilliNow()),
 	}
 	parentCommitment := updateHeaderExtra(parentHeader, parentDelta, nil, &CheckpointData{EpochNumber: 1}, accountSetParent)
 

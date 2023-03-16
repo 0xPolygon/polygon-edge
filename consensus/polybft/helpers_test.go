@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -136,7 +137,7 @@ func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
 func newTestState(t *testing.T) *State {
 	t.Helper()
 
-	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().Format(time.RFC3339Nano))
+	dir := fmt.Sprintf("/tmp/consensus-temp_%v", timeutils.Now().Format(time.RFC3339Nano))
 	err := os.Mkdir(dir, 0775)
 
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
@@ -67,8 +68,8 @@ func (b *BlockBuilder) Reset() error {
 	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
 	headerTime := parentTime.Add(b.params.BlockTime)
 
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
+	if headerTime.Before(timeutils.Now()) {
+		headerTime = timeutils.Now()
 	}
 
 	b.header = &types.Header{

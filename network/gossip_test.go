@@ -8,6 +8,7 @@ import (
 	"time"
 
 	testproto "github.com/0xPolygon/polygon-edge/network/proto"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
@@ -31,7 +32,7 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 
 func TestSimpleGossip(t *testing.T) {
 	numServers := 10
-	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
+	sentMessage := fmt.Sprintf("%d", timeutils.UnixNow())
 	servers, createErr := createServers(numServers, nil)
 
 	if createErr != nil {

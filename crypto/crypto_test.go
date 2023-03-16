@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -405,7 +405,7 @@ func TestPrivateKeyRead(t *testing.T) {
 }
 
 func TestPrivateKeyGeneration(t *testing.T) {
-	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().Unix(), 10) + ".key"
+	tempFile := "./privateKeyTesting-" + strconv.FormatInt(timeutils.UnixNow(), 10) + ".key"
 
 	t.Cleanup(func() {
 		_ = os.Remove(tempFile)
