@@ -2,8 +2,10 @@ package framework
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"os/exec"
 	"path"
@@ -21,6 +23,10 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
+	"github.com/umbracle/ethgo/wallet"
 )
 
 const (
@@ -81,6 +87,7 @@ type TestClusterConfig struct {
 	EpochReward       int
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
+	AdminAllowList        []types.Address
 	NumBlockConfirmations uint64
 
 	logsDirOnce sync.Once
@@ -148,6 +155,8 @@ type TestCluster struct {
 	once         sync.Once
 	failCh       chan struct{}
 	executionErr error
+
+	sendTxnLock sync.Mutex
 }
 
 type ClusterOption func(*TestClusterConfig)
@@ -217,6 +226,12 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.NumBlockConfirmations = numBlockConfirmations
+	}
+}
+
+func WithAllowList(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.AdminAllowList = append(h.AdminAllowList, addr)
 	}
 }
 
@@ -352,6 +367,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
 		}
 
+		if len(cluster.Config.AdminAllowList) != 0 {
+			addrs := []string{}
+			for _, addr := range cluster.Config.AdminAllowList {
+				addrs = append(addrs, addr.String())
+			}
+			args = append(args, "--allow-list-admin", strings.Join(addrs, ","))
+		}
+
 		// run cmd init-genesis with all the arguments
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
@@ -451,6 +474,10 @@ func (c *TestCluster) WaitUntil(dur time.Duration, handler func() bool) error {
 			return nil
 		}
 	}
+}
+
+func (c *TestCluster) WaitForReady(t *testing.T) {
+	require.NoError(t, c.WaitForBlock(3, 1*time.Minute))
 }
 
 func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
@@ -553,4 +580,167 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 	}
 
 	return result, nil
+}
+
+var (
+	defaultGasPrice = uint64(1879048192) // 0x70000000
+	defaultGasLimit = uint64(5242880)    // 0x500000
+)
+
+func (t *TestCluster) ExistsCode(tt *testing.T, addr ethgo.Address) bool {
+	client, err := jsonrpc.NewClient(t.Servers[0].JSONRPCAddr())
+	require.NoError(tt, err)
+
+	code, err := client.Eth().GetCode(addr, ethgo.Latest)
+	if err != nil {
+		fmt.Println("-- err ", err)
+		return false
+	}
+	if code == "0x" {
+		return false
+	}
+
+	return true
+}
+
+func (t *TestCluster) Call(tt *testing.T, to types.Address, method *abi.Method, args ...interface{}) map[string]interface{} {
+	client, err := jsonrpc.NewClient(t.Servers[0].JSONRPCAddr())
+	require.NoError(tt, err)
+
+	input, err := method.Encode(args)
+	require.NoError(tt, err)
+
+	fmt.Println("-- input --")
+	fmt.Println(input)
+
+	toAddr := ethgo.Address(to)
+
+	msg := &ethgo.CallMsg{
+		To:   &toAddr,
+		Data: input,
+	}
+	resp, err := client.Eth().Call(msg, ethgo.Latest)
+	require.NoError(tt, err)
+
+	fmt.Println(resp)
+
+	data, err := hex.DecodeString(resp[2:])
+	require.NoError(tt, err)
+
+	output, err := method.Decode(data)
+	require.NoError(tt, err)
+
+	return output
+}
+
+type TestCall struct {
+}
+
+func (t *TestCluster) Deploy(tt *testing.T, sender ethgo.Key, bytecode []byte) *TestTxn {
+	return t.SendTxn(tt, sender, &ethgo.Transaction{Input: bytecode})
+}
+
+func (t *TestCluster) Transfer(tt *testing.T, sender ethgo.Key, target types.Address, value *big.Int) *TestTxn {
+	targetAddr := ethgo.Address(target)
+	return t.SendTxn(tt, sender, &ethgo.Transaction{To: &targetAddr, Value: value})
+}
+
+func (t *TestCluster) MethodTxn(tt *testing.T, sender ethgo.Key, target types.Address, input []byte) *TestTxn {
+	targetAddr := ethgo.Address(target)
+	return t.SendTxn(tt, sender, &ethgo.Transaction{To: &targetAddr, Input: input})
+}
+
+// SendTxn sends a transaction
+func (t *TestCluster) SendTxn(tt *testing.T, sender ethgo.Key, txn *ethgo.Transaction) *TestTxn {
+	// since we might use get nonce to query the latest nonce and that value is only
+	// updated if the transaction is on the pool, it is recommended to lock the whole
+	// execution in case we send multiple transactions from the same account and we expect
+	// to get a sequential nonce order.
+	t.sendTxnLock.Lock()
+	defer t.sendTxnLock.Unlock()
+
+	client, err := jsonrpc.NewClient(t.Servers[0].JSONRPCAddr())
+	require.NoError(tt, err)
+
+	// initialize transaction values if not set
+	if txn.Nonce == 0 {
+		nonce, err := client.Eth().GetNonce(sender.Address(), ethgo.Latest)
+		require.NoError(tt, err)
+
+		txn.Nonce = nonce
+	}
+	if txn.GasPrice == 0 {
+		txn.GasPrice = defaultGasPrice
+	}
+	if txn.Gas == 0 {
+		txn.Gas = defaultGasLimit
+	}
+
+	chainID, err := client.Eth().ChainID()
+	require.NoError(tt, err)
+
+	signer := wallet.NewEIP155Signer(chainID.Uint64())
+	signedTxn, err := signer.SignTx(txn, sender)
+	require.NoError(tt, err)
+
+	txnRaw, err := signedTxn.MarshalRLPTo(nil)
+	require.NoError(tt, err)
+
+	hash, err := client.Eth().SendRawTransaction(txnRaw)
+	require.NoError(tt, err)
+
+	tTxn := &TestTxn{
+		client: client.Eth(),
+		txn:    txn,
+		hash:   hash,
+	}
+	return tTxn
+}
+
+type TestTxn struct {
+	client  *jsonrpc.Eth
+	hash    ethgo.Hash
+	txn     *ethgo.Transaction
+	receipt *ethgo.Receipt
+}
+
+// Txn returns the raw transaction that was sent
+func (t *TestTxn) Txn() *ethgo.Transaction {
+	return t.txn
+}
+
+// Receipt returns the receipt of the transaction
+func (t *TestTxn) Receipt() *ethgo.Receipt {
+	return t.receipt
+}
+
+// Wait waits for the transaction to be executed
+func (t *TestTxn) Wait() error {
+	return t.WaitWithDuration(1 * time.Minute)
+}
+
+// WaitWithDuration waits for the transaction to be executed with a given timeout
+func (t *TestTxn) WaitWithDuration(timeout time.Duration) error {
+	for {
+		select {
+		case <-time.After(100 * time.Millisecond):
+			receipt, err := t.client.GetTransactionReceipt(t.hash)
+			if err != nil {
+				if err.Error() != "not found" {
+					return err
+				}
+			}
+			if receipt != nil {
+				fmt.Println("- found -")
+				fmt.Println(receipt)
+
+				t.receipt = receipt
+				return nil
+			}
+
+		case <-time.After(timeout):
+			fmt.Println("- timeout -")
+			return fmt.Errorf("timeout")
+		}
+	}
 }

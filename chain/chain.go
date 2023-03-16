@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-multierror"
 )

@@ -178,6 +178,18 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		Mixhash:    polybft.PolyBFTMixDigest,
 	}
 
+	// allowlist
+	if len(p.adminAllowList) != 0 {
+		addrs := []types.Address{}
+		for _, addr := range p.adminAllowList {
+			addrs = append(addrs, types.StringToAddress(addr))
+		}
+
+		chainConfig.Params.ContractsAllowList = &chain.AllowListConfig{
+			AdminAddresses: addrs,
+		}
+	}
+
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 

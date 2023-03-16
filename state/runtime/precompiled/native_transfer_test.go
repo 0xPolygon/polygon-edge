@@ -79,6 +79,14 @@ func (d dummyHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	panic("not implemented")
 }
 
+func (d dummyHost) SetState(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+) {
+	panic("Not implemented in tests")
+}
+
 func (d dummyHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
 	panic("not implemented")
 }

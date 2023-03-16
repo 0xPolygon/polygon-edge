@@ -199,6 +199,16 @@ func setFlags(cmd *cobra.Command) {
 				"(format: <contract address>:<start block>)",
 		)
 	}
+
+	// Allow list
+	{
+		cmd.Flags().StringArrayVar(
+			&params.adminAllowList,
+			"allow-list-admin",
+			[]string{},
+			"",
+		)
+	}
 }
 
 // setLegacyFlags sets the legacy flags to preserve backwards compatibility
