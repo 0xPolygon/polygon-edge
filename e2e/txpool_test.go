@@ -79,8 +79,8 @@ func generateReq(params generateTxReqParams) *txpoolOp.AddTxnReq {
 
 func TestTxPool_ErrorCodes(t *testing.T) {
 	gasPrice := big.NewInt(10000)
-	gasFeeCap := big.NewInt(10000)
-	gasTipCap := big.NewInt(1000)
+	gasFeeCap := big.NewInt(1000000000)
+	gasTipCap := big.NewInt(100000000)
 	devInterval := 5
 
 	testTable := []struct {
@@ -98,7 +98,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			// -> Check if tx has been parsed
 			// Add tx with nonce 0
 			// -> tx shouldn't be added, since the nonce is too low
-			name:           "ErrNonceTooLow",
+			name:           "ErrNonceTooLow - legacy",
 			defaultBalance: framework.EthToWei(10),
 			txValue:        oneEth,
 			gasPrice:       gasPrice,
@@ -110,7 +110,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			// -> Check if tx has been parsed
 			// Add tx with nonce 0
 			// -> tx shouldn't be added, since the nonce is too low
-			name:           "ErrNonceTooLow",
+			name:           "ErrNonceTooLow - dynamic fees",
 			defaultBalance: framework.EthToWei(10),
 			txValue:        oneEth,
 			gasFeeCap:      gasFeeCap,
@@ -121,7 +121,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			// Test scenario:
 			// Add legacy tx with insufficient funds
 			// -> Tx should be discarded because of low funds
-			name:           "ErrInsufficientFunds",
+			name:           "ErrInsufficientFunds - legacy",
 			defaultBalance: framework.EthToWei(1),
 			txValue:        framework.EthToWei(5),
 			gasPrice:       gasPrice,
@@ -131,7 +131,7 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 			// Test scenario:
 			// Add dynamic fee tx with insufficient funds
 			// -> Tx should be discarded because of low funds
-			name:           "ErrInsufficientFunds",
+			name:           "ErrInsufficientFunds - dynamic fee",
 			defaultBalance: framework.EthToWei(1),
 			txValue:        framework.EthToWei(5),
 			gasFeeCap:      gasFeeCap,
