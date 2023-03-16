@@ -8,14 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBroadcast(t *testing.T) {
@@ -23,110 +20,31 @@ func TestBroadcast(t *testing.T) {
 	// Opened the ticket to check + fix it
 	t.Skip()
 
-	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
+	testCases := []struct {
+		name     string
+		numNodes int
+		// Number of nodes that connects to left node
+		numConnectedNodes int
+	}{
+		{
+			name:              "tx should not reach to last node",
+			numNodes:          10,
+			numConnectedNodes: 5,
+		},
+		{
+			name:              "tx should reach to last node",
+			numNodes:          10,
+			numConnectedNodes: 10,
+		},
+	}
+
+	signer := &crypto.FrontierSigner{}
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	_, receiverAddr := tests.GenerateKeyAndAddr(t)
 
 	conf := func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDummy)
 		config.Premine(senderAddr, framework.EthToWei(10))
-	}
-
-	testCases := []struct {
-		name     string
-		numNodes int
-		// Number of nodes that connects to left node
-		numConnectedNodes int
-		createTx          func(t *testing.T) *types.Transaction
-	}{
-		{
-			name:              "legacy tx should not reach to last node",
-			numNodes:          10,
-			numConnectedNodes: 5,
-			createTx: func(t *testing.T) *types.Transaction {
-				t.Helper()
-
-				tx, err := signer.SignTx(&types.Transaction{
-					Nonce:    0,
-					From:     senderAddr,
-					To:       &receiverAddr,
-					Value:    framework.EthToWei(1),
-					Gas:      1000000,
-					GasPrice: big.NewInt(10000),
-					Input:    []byte{},
-				}, senderKey)
-				require.NoError(t, err, "failed to sign transaction")
-
-				return tx
-			},
-		},
-		{
-			name:              "dynamic fee tx should not reach to last node",
-			numNodes:          10,
-			numConnectedNodes: 5,
-			createTx: func(t *testing.T) *types.Transaction {
-				t.Helper()
-
-				tx, err := signer.SignTx(&types.Transaction{
-					Type:      types.DynamicFeeTx,
-					Nonce:     0,
-					From:      senderAddr,
-					To:        &receiverAddr,
-					Value:     framework.EthToWei(1),
-					Gas:       1000000,
-					GasFeeCap: big.NewInt(10000),
-					GasTipCap: big.NewInt(1000),
-					Input:     []byte{},
-				}, senderKey)
-				require.NoError(t, err, "failed to sign transaction")
-
-				return tx
-			},
-		},
-		{
-			name:              "legacy tx should reach to last node",
-			numNodes:          10,
-			numConnectedNodes: 10,
-			createTx: func(t *testing.T) *types.Transaction {
-				t.Helper()
-
-				tx, err := signer.SignTx(&types.Transaction{
-					Nonce:    0,
-					From:     senderAddr,
-					To:       &receiverAddr,
-					Value:    framework.EthToWei(1),
-					Gas:      1000000,
-					GasPrice: big.NewInt(10000),
-					Input:    []byte{},
-				}, senderKey)
-				require.NoError(t, err, "failed to sign transaction")
-
-				return tx
-			},
-		},
-		{
-			name:              "dynamic fee tx should reach to last node",
-			numNodes:          10,
-			numConnectedNodes: 10,
-			createTx: func(t *testing.T) *types.Transaction {
-				t.Helper()
-
-				tx, err := signer.SignTx(&types.Transaction{
-					Type:      types.DynamicFeeTx,
-					Nonce:     0,
-					From:      senderAddr,
-					To:        &receiverAddr,
-					Value:     framework.EthToWei(1),
-					Gas:       1000000,
-					GasFeeCap: big.NewInt(10000),
-					GasTipCap: big.NewInt(1000),
-					Input:     []byte{},
-				}, senderKey)
-				require.NoError(t, err, "failed to sign transaction")
-
-				return tx
-			},
-		},
 	}
 
 	for _, tt := range testCases {
@@ -183,9 +101,20 @@ func TestBroadcast(t *testing.T) {
 			// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 			time.Sleep(time.Second * 2)
 
-			tx := tt.createTx(t)
+			tx, err := signer.SignTx(&types.Transaction{
+				Nonce:    0,
+				From:     senderAddr,
+				To:       &receiverAddr,
+				Value:    framework.EthToWei(1),
+				Gas:      1000000,
+				GasPrice: big.NewInt(10000),
+				Input:    []byte{},
+			}, senderKey)
+			if err != nil {
+				t.Fatalf("failed to sign transaction, err=%+v", err)
+			}
 
-			_, err := srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
+			_, err = srvs[0].JSONRPC().Eth().SendRawTransaction(tx.MarshalRLP())
 			if err != nil {
 				t.Fatalf("failed to send transaction, err=%+v", err)
 			}
