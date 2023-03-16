@@ -13,6 +13,7 @@ import (
 	"github.com/umbracle/ethgo/contract"
 )
 
+//StateProvider in test
 type e2eStateProvider struct {
 	txRelayer txrelayer.TxRelayer
 }
