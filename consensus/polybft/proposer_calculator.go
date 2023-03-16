@@ -209,6 +209,7 @@ func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 		if err := pc.updatePerBlock(height); err != nil {
 			return err
 		}
+
 		pc.logger.Debug("Proposers snapshot has been updated", "current block", blockNumber+1,
 			"validators count", len(pc.snapshot.Validators))
 	}
@@ -225,7 +226,8 @@ func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 // Updates ProposerSnapshot to block block with number `blockNumber`
 func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 	if pc.snapshot.Height != blockNumber {
-		return fmt.Errorf("proposers snapshot update wrong block=%d, snapshot block number = %d", blockNumber, pc.snapshot.Height)
+		return fmt.Errorf("proposers snapshot update called for wrong block. block number=%d, snapshot block number=%d",
+			blockNumber, pc.snapshot.Height)
 	}
 
 	_, extra, err := getBlockData(blockNumber, pc.config.blockchain)
