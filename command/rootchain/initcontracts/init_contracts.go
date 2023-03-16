@@ -1,10 +1,8 @@
 package initcontracts
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -452,15 +450,9 @@ func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, cont
 // validatorSetToABISlice converts given validators to generic map
 // which is used for ABI encoding validator set being sent to the rootchain contract
 func validatorSetToABISlice(validators []*polybft.Validator) ([]*contractsapi.Validator, error) {
-	genesisValidators := make([]*polybft.Validator, len(validators))
-	copy(genesisValidators, validators)
-	sort.Slice(genesisValidators, func(i, j int) bool {
-		return bytes.Compare(genesisValidators[i].Address.Bytes(), genesisValidators[j].Address.Bytes()) < 0
-	})
+	accSet := make(polybft.AccountSet, len(validators))
 
-	accSet := make(polybft.AccountSet, len(genesisValidators))
-
-	for i, validatorInfo := range genesisValidators {
+	for i, validatorInfo := range validators {
 		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err

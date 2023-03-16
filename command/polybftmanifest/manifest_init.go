@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -185,6 +186,11 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				Balance:      balance,
 			}
 		}
+
+		// sort initial validator set by addresses
+		sort.Slice(validators, func(i, j int) bool {
+			return bytes.Compare(validators[i].Address.Bytes(), validators[j].Address.Bytes()) < 0
+		})
 
 		return validators, nil
 	}
