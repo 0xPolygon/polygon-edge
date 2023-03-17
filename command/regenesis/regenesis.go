@@ -11,11 +11,33 @@ import (
 	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
+/*
+./polygon-edge regenesis --target-path ./trie_new --stateRoot 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663  --source-path ./test-chain-1/trie
+*/
 func RegenesisCMD() *cobra.Command {
 	genesisCmd := &cobra.Command{
 		Use:   "regenesis",
 		Short: "Copies trie for specific block to a separate folder",
 	}
+
+	genesisCmd.Flags().StringVar(
+		&params.SnapshotTrieDBPath,
+		"target-path",
+		"",
+		"the directory of trie data of trie copy",
+	)
+	genesisCmd.Flags().StringVar(
+		&params.TrieDBPath,
+		"source-path",
+		"",
+		"the directory of trie data of old chain",
+	)
+	genesisCmd.Flags().StringVar(
+		&params.TrieRoot,
+		"stateRoot",
+		"",
+		"block state root of old chain",
+	)
 
 	genesisCmd.Run = func(cmd *cobra.Command, args []string) {
 		outputter := command.InitializeOutputter(genesisCmd)
@@ -67,25 +89,6 @@ func RegenesisCMD() *cobra.Command {
 
 		outputter.WriteCommandResult(&ReGenesisResult{})
 	}
-
-	genesisCmd.Flags().StringVar(
-		&params.SnapshotTrieDBPath,
-		"snapshotPath",
-		"",
-		"the directory of trie data of trie copy",
-	)
-	genesisCmd.Flags().StringVar(
-		&params.TrieDBPath,
-		"triedb",
-		"",
-		"the directory of trie data of old chain",
-	)
-	genesisCmd.Flags().StringVar(
-		&params.TrieRoot,
-		"stateRoot",
-		"",
-		"block state root of old chain",
-	)
 
 	return genesisCmd
 }

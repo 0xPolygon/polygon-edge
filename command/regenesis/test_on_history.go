@@ -12,24 +12,35 @@ import (
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
 	ldbstorage "github.com/syndtr/goleveldb/leveldb/storage"
-	"path/filepath"
 	"time"
 )
 
+var (
+	triePath  string
+	chainPath string
+	toBlock   uint64
+	fromBlock uint64
+)
+
+/*
+Run: ./polygon-edge regenesis history --triedb "path_to_triedb" --chaindb "path_to_blockchain_db"
+*/
 func HistoryTestCmd() *cobra.Command {
 	historyTestCMD := &cobra.Command{
 		Use:   "history",
 		Short: "run history test",
 	}
+
+	historyTestCMD.Flags().StringVar(&triePath, "triedb", "", "path to trie db")
+	historyTestCMD.Flags().StringVar(&chainPath, "chaindb", "", "path to chain db")
+	historyTestCMD.Flags().Uint64Var(&toBlock, "to", 0, "upper bound of regenesis test(default is head)")
+	historyTestCMD.Flags().Uint64Var(&fromBlock, "from", 0, "lower bound of regenesis test(default is 0)")
+
 	historyTestCMD.Run = func(cmd *cobra.Command, args []string) {
 		outputter := command.InitializeOutputter(historyTestCMD)
 		defer outputter.WriteOutput()
 
-		path := "/Users/boris/Downloads/edge-ip-10-230-1-165"
-		trie := filepath.Join(path, "trie.bak")
-		chainPath := filepath.Join(path, "blockchain.bak")
-
-		trieDB, err := leveldb.OpenFile(trie, &opt.Options{ReadOnly: true})
+		trieDB, err := leveldb.OpenFile(triePath, &opt.Options{ReadOnly: true})
 		if err != nil {
 			outputter.SetError(err)
 			return
@@ -41,14 +52,19 @@ func HistoryTestCmd() *cobra.Command {
 			return
 		}
 
-		lastBlockNumber, ok := st.ReadHeadNumber()
-		if !ok {
-			outputter.SetError(errors.New("can't read head"))
-			return
+		if toBlock == 0 {
+			var ok bool
+			toBlock, ok = st.ReadHeadNumber()
+			if !ok {
+				outputter.SetError(errors.New("can't read head"))
+				return
+			}
 		}
 
+		outputter.Write([]byte(fmt.Sprintf("running test from %d to %d", toBlock, fromBlock)))
+
 		lastStateRoot := types.Hash{}
-		for i := lastBlockNumber - 100; i > lastBlockNumber-100000; i-- {
+		for i := toBlock; i > fromBlock; i-- {
 			canonicalHash, ok := st.ReadCanonicalHash(i)
 			if !ok {
 				outputter.SetError(errors.New("can't read canonical hash"))
@@ -76,6 +92,7 @@ func HistoryTestCmd() *cobra.Command {
 
 			tmpStorage := itrie.NewKV(tmpDb)
 			tt := time.Now()
+
 			err = itrie.CopyTrie(header.StateRoot.Bytes(), itrie.NewKV(trieDB), tmpStorage, []byte{}, false)
 			if err != nil {
 				outputter.SetError(fmt.Errorf("copy trie for block %v returned error %w", i, err))
@@ -87,17 +104,25 @@ func HistoryTestCmd() *cobra.Command {
 				outputter.SetError(fmt.Errorf("check trie root for block %v returned error %w", i, err))
 				return
 			}
+
 			if hash != header.StateRoot {
 				outputter.SetError(fmt.Errorf("check trie root for block %v returned another hash"+
 					"expected: %s, got: %s", i, header.StateRoot.String(), hash.String()))
 				return
 			}
-			tmpDb.Close()
+
+			err = tmpDb.Close()
+			if err != nil {
+				outputter.SetError(err)
+				return
+			}
 			_, err = outputter.Write([]byte(fmt.Sprintf("block %v checked successfully, time %v", i, time.Since(tt).String())))
 			if err != nil {
 				outputter.SetError(err)
+				return
 			}
 		}
 	}
+
 	return historyTestCMD
 }

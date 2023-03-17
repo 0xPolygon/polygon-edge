@@ -21,7 +21,7 @@ state root 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663 fo
 4) make trie snapshot
 ```bash
 
-./polygon-edge regenesis --snapshotPath ./trie_new --stateRoot 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663  --triedb ./test-chain-1/trie 
+./polygon-edge regenesis --target-path ./trie_new --stateRoot 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663  --source-path ./test-chain-1/trie 
 
 [Trie copy SUCCESS]
 
