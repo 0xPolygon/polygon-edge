@@ -25,40 +25,57 @@ func Test_AARelayerService_Start(t *testing.T) {
 		var log = []*ethgo.Log{
 			{BlockNumber: 1, Topics: []ethgo.Hash{ethgo.ZeroHash}}, {BlockNumber: 5, Topics: []ethgo.Hash{ethgo.ZeroHash}}, {BlockNumber: 8, Topics: []ethgo.Hash{ethgo.ZeroHash}},
 		}
-		state := new(dummyAATxState)
+		receipt := &ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Logs: log, Status: 1}
 		pool := new(dummyAApool)
-		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
+
+		state := new(dummyAATxState)
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa,
-			WithPullTime(2*time.Second), WithReceiptDelay(time.Second*3), WithNumRetries(5))
-		tx := getDummyTxs()[0]
+
+		aaTxSender := new(dummyAATxSender)
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, nil).Once()
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, time.Second*3, 5).
-			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Logs: log}, nil)
+			Return(receipt, nil)
+		aaTxSender.On("GetNonce", mock.Anything).
+			Return(uint64(0), error(nil)).Once()
+
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress,
+			WithPullTime(2*time.Second), WithReceiptDelay(time.Second*3), WithNumRetries(5))
+		require.NoError(t, err)
+
+		tx := getDummyTxs()[0]
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
 		require.NoError(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
+
 	t.Run("executeJob_sendTransactionError", func(t *testing.T) {
 		t.Parallel()
 
-		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
+
+		state := new(dummyAATxState)
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
-		tx := getDummyTxs()[1]
+
+		aaTxSender := new(dummyAATxSender)
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, errors.New("not nil")).Once()
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("GetNonce", mock.Anything).
+			Return(uint64(0), error(nil)).Once()
+
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		require.NoError(t, err)
+
+		tx := getDummyTxs()[1]
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
+
 	t.Run("executeJob_WaitForReceiptError", func(t *testing.T) {
 		t.Parallel()
 
@@ -67,30 +84,43 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
 		state.On("Update", mock.Anything).Return(nil)
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
-		tx := getDummyTxs()[2]
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, nil).Once()
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, errors.New("not nil")).Once()
+		aaTxSender.On("GetNonce", mock.Anything).
+			Return(uint64(0), error(nil)).Once()
+
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		require.NoError(t, err)
+
+		tx := getDummyTxs()[2]
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
+
 	t.Run("executeJob_UpdateError", func(t *testing.T) {
 		t.Parallel()
 
-		state := new(dummyAATxState)
 		pool := new(dummyAApool)
-		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
+
+		state := new(dummyAATxState)
 		state.On("Update", mock.Anything).Return(errors.New("not nil"))
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
-		tx := getDummyTxs()[3]
+
+		aaTxSender := new(dummyAATxSender)
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, errors.New("not nil")).Once()
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("GetNonce", mock.Anything).
+			Return(uint64(0), error(nil)).Once()
+
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		require.NoError(t, err)
+
+		tx := getDummyTxs()[3]
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
@@ -99,41 +129,71 @@ func Test_AARelayerService_Start(t *testing.T) {
 	t.Run("executeJob_NetError", func(t *testing.T) {
 		t.Parallel()
 
-		state := new(dummyAATxState)
-		pool := new(dummyAApool)
-		aaTxSender := new(dummyAATxSender)
 		account := wallet.GenerateAccount()
+
+		state := new(dummyAATxState)
 		state.On("Update", mock.Anything).Return(errors.New("not nil"))
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
-		tx := getDummyTxs()[4]
+
+		pool := new(dummyAApool)
+		pool.On("Push", mock.Anything)
+
+		aaTxSender := new(dummyAATxSender)
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, net.ErrClosed).Once()
-		pool.On("Push", mock.Anything)
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+		aaTxSender.On("GetNonce", mock.Anything).
+			Return(uint64(0), error(nil)).Once()
+
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		require.NoError(t, err)
+
+		tx := getDummyTxs()[4]
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
+
 	t.Run("executeJob_SecondUpdateError", func(t *testing.T) {
 		t.Parallel()
 
-		state := new(dummyAATxState)
-		pool := new(dummyAApool)
 		aaTxSender := new(dummyAATxSender)
+		receipt := &ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash, Status: 1}
 		account := wallet.GenerateAccount()
-		state.On("Update", mock.Anything).Return(errors.New("not nil")).Once()
-		aaRelayerService := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa)
-		tx := getDummyTxs()[0]
+
+		state := new(dummyAATxState)
 		state.On("Update", mock.Anything).Return(nil)
+		state.On("Update", mock.Anything).Return(errors.New("not nil")).Once()
+
+		pool := new(dummyAApool)
+		pool.On("Push", mock.Anything)
+
 		aaTxSender.On("SendTransaction", mock.Anything, mock.Anything).
 			Return(ethgo.ZeroHash, nil).Once()
-		pool.On("Push", mock.Anything)
 		aaTxSender.On("WaitForReceipt", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(&ethgo.Receipt{GasUsed: 10, BlockHash: ethgo.ZeroHash, TransactionHash: ethgo.ZeroHash}, nil).Once()
+			Return(receipt, nil).Once()
+		aaTxSender.On("GetNonce", mock.Anything).Return(uint64(0), error(nil)).Once()
+
+		tx := getDummyTxs()[0]
+
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		require.NoError(t, err)
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
 		require.NoError(t, aaRelayerService.executeJob(context.Background(), tx))
+	})
+
+	t.Run("NewAARelayerService_errorGetNonce", func(t *testing.T) {
+		t.Parallel()
+
+		targetErr := errors.New("err")
+		account := wallet.GenerateAccount()
+
+		aaTxSender := new(dummyAATxSender)
+		aaTxSender.On("GetNonce", mock.Anything).Return(uint64(0), targetErr).Once()
+
+		_, err := NewAARelayerService(aaTxSender, nil, nil, account.Ecdsa, aaInvokerAddress)
+		require.ErrorIs(t, err, targetErr)
 	})
 }
 
@@ -150,6 +210,11 @@ func (p *dummyAApool) Pop() *AAStateTransaction {
 	args := p.Called()
 
 	return args.Get(0).(*AAStateTransaction) //nolint:forcetypeassert
+}
+
+func (p *dummyAApool) Update(address types.Address) {
+	args := p.Called(address)
+	_ = args
 }
 
 func (p *dummyAApool) Init(txs []*AAStateTransaction) {
@@ -227,6 +292,12 @@ func (d *dummyAATxSender) SendTransaction(txn *ethgo.Transaction, key ethgo.Key)
 
 func (d *dummyAATxSender) GetNonce(address ethgo.Address) (uint64, error) {
 	args := d.Called(address)
+
+	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
+}
+
+func (d *dummyAATxSender) GetAANonce(invokerAddress, address ethgo.Address) (uint64, error) {
+	args := d.Called(invokerAddress, address)
 
 	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
 }

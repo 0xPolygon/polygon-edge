@@ -55,7 +55,7 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 		}
 	}
 
-	if !p.config.IsValidAddress(tx.Transaction.From) {
+	if !p.config.IsAddressAllowed(tx.Transaction.From) {
 		return fmt.Errorf("tx has from which is not allowed: %s", tx.Transaction.From)
 	}
 

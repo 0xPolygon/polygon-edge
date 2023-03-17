@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command/aarelayer/service"
@@ -36,6 +37,9 @@ func runPreRun(cmd *cobra.Command, _ []string) error {
 }
 
 func runCommand(cmd *cobra.Command, _ []string) error {
+	cmd.SilenceUsage = true
+	cmd.SetOut(os.Stdout)
+
 	state, err := service.NewAATxState(params.dbPath)
 	if err != nil {
 		return err
@@ -79,10 +83,19 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		params.chainID,
 		func(a *service.AATransaction) error { return nil })
 	restService := service.NewAARelayerRestServer(pool, state, verification)
-	relayerService := service.NewAARelayerService(txSender, pool, state, account.Ecdsa,
+
+	relayerService, err := service.NewAARelayerService(
+		txSender,
+		pool,
+		state,
+		account.Ecdsa,
+		invokerAddress,
 		service.WithPullTime(config.PullTime),
 		service.WithReceiptDelay(config.ReceiptRetryDelay),
 		service.WithNumRetries(config.ReceiptNumRetries))
+	if err != nil {
+		return err
+	}
 
 	ctx, cancel := context.WithCancel(cmd.Context())
 	stopCh := common.GetTerminationSignalCh()
