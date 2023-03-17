@@ -46,7 +46,7 @@ var (
 )
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
-func (p *genesisParams) generatePolyBftChainConfig() error {
+func (p *genesisParams) generatePolyBftChainConfig(outputter command.OutputFormatter) error {
 	// load manifest file
 	manifest, err := polybft.LoadManifest(p.manifestPath)
 	if err != nil {
@@ -69,6 +69,11 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		bridge = manifest.RootchainConfig.ToBridgeConfig()
 		bridge.JSONRPCEndpoint = p.bridgeJSONRPCAddr
 		bridge.EventTrackerStartBlocks = eventTrackerStartBlock
+	}
+
+	outputter.Write([]byte("[GENESIS VALIDATORS]\n"))
+	for _, v := range manifest.GenesisValidators {
+		outputter.Write([]byte(fmt.Sprintf("%v\n", v)))
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{

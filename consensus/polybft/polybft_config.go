@@ -184,6 +184,12 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 	return metadata, nil
 }
 
+// String implements fmt.Stringer interface
+func (v *Validator) String() string {
+	return fmt.Sprintf("Address=%s; Balance=%d; P2P Multi addr=%s; BLS Key=%s;",
+		v.Address, v.Balance, v.MultiAddr, v.BlsKey)
+}
+
 // RootchainConfig contains information about rootchain contract addresses
 // as well as rootchain admin account address
 type RootchainConfig struct {
