@@ -62,7 +62,8 @@ var (
 	errNotAuth             = fmt.Errorf("not auth")
 )
 
-func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64, isStatic bool) ([]byte, uint64, error) {
+func (a *AllowList) runInputCall(caller types.Address, input []byte,
+	gas uint64, isStatic bool) ([]byte, uint64, error) {
 	// decode the function signature from the input
 	if len(input) < 4 {
 		return nil, 0, errNoFunctionSignature
@@ -78,11 +79,14 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64,
 	}
 
 	var gasUsed uint64
+
 	consumeGas := func(gasConsume uint64) error {
 		if gas < gasConsume {
 			return runtime.ErrOutOfGas
 		}
+
 		gasUsed = gasConsume
+
 		return nil
 	}
 
@@ -153,9 +157,11 @@ func (r Role) Uint64() uint64 {
 	if r == EnabledRole {
 		return 1
 	}
+
 	if r == AdminRole {
 		return 2
 	}
+
 	return 0
 }
 

@@ -277,5 +277,6 @@ func stringSliceToAddressSlice(addrs []string) []types.Address {
 	for _, addr := range addrs {
 		res = append(res, types.StringToAddress(addr))
 	}
+
 	return res
 }

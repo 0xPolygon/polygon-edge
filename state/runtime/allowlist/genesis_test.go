@@ -10,7 +10,6 @@ import (
 )
 
 func TestGenesis(t *testing.T) {
-
 	one := types.Address{0x1}
 	two := types.Address{0x2}
 	three := types.Address{0x3}

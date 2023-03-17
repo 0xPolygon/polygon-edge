@@ -42,6 +42,7 @@ func (g *genesisState) SetState(addr types.Address, key, value types.Hash) {
 	if alloc.Storage == nil {
 		alloc.Storage = map[types.Hash]types.Hash{}
 	}
+
 	alloc.Storage[key] = value
 }
 

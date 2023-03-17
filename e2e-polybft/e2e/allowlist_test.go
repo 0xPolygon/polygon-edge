@@ -16,7 +16,6 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 	// create two accounts, one for an admin sender and a second
 	// one for a non-enabled account that will switch on-off between
 	// both enabled and non-enabled roles.
-
 	admin, _ := wallet.GenerateKey()
 	target, _ := wallet.GenerateKey()
 
@@ -39,7 +38,13 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 
 	expectRole := func(addr types.Address, role allowlist.Role) {
 		out := cluster.Call(t, allowlist.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
-		require.Equal(t, role.Uint64(), out["0"].(*big.Int).Uint64())
+
+		num, ok := out["0"].(*big.Int)
+		if !ok {
+			t.Fatal("unexpected")
+		}
+
+		require.Equal(t, role.Uint64(), num.Uint64())
 	}
 
 	{

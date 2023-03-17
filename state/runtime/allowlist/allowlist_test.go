@@ -25,6 +25,7 @@ func newMockAllowList() *AllowList {
 	state := &mockState{
 		state: map[types.Hash]types.Hash{},
 	}
+
 	return NewAllowList(state, types.Address{})
 }
 
