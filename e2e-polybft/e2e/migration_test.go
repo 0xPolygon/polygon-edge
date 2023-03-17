@@ -61,8 +61,6 @@ func TestMigration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Log(block.Number, block.Hash.String(), block.StateRoot.String())
-
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(rpcClient))
 	require.NoError(t, err)
 

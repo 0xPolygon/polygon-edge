@@ -40,7 +40,12 @@ func GetRootCMD() *cobra.Command {
 			return
 		}
 
-		outputter.Write([]byte(fmt.Sprintf("state root %s for block %d\n", block.StateRoot, block.Number)))
+		_, err = outputter.Write([]byte(fmt.Sprintf("state root %s for block %d\n", block.StateRoot, block.Number)))
+		if err != nil {
+			outputter.SetError(fmt.Errorf("get block error:%w", err))
+
+			return
+		}
 	}
 
 	getRootCmd.Flags().StringVar(

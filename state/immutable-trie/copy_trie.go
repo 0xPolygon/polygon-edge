@@ -182,7 +182,7 @@ func hashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage)
 		}
 
 	default:
-		panic(fmt.Sprintf("unknown node type %v", n))
+		return nil, fmt.Errorf("unknown node type %T", node)
 	}
 
 	if val.Len() < 32 {

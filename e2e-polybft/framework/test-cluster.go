@@ -383,8 +383,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, relayer bool) {
 	t.Helper()
-	t.Log("Init node", i)
-
 	logLevel := os.Getenv(envLogLevel)
 
 	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
@@ -581,7 +579,7 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 }
 
 func CopyDir(source, destination string) error {
-	err := os.Mkdir(destination, 0777)
+	err := os.Mkdir(destination, 0755)
 	if err != nil {
 		return err
 	}
