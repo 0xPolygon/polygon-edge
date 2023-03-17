@@ -192,7 +192,7 @@ func (e *Executor) BeginTxn(
 	}
 
 	// enable contract deployment allow list (if any)
-	if e.config.ContractsAllowList != nil {
+	if e.config.ContractDeployerAllowList != nil {
 		txn.deploymentAllowlist = allowlist.NewAllowList(txn, allowlist.AllowListContractsAddr)
 	}
 
@@ -543,8 +543,6 @@ func (t *Transition) Call2(
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
-	fmt.Println("- run a contract -", contract.CodeAddress)
-
 	// check allow list (if any)
 	if t.deploymentAllowlist != nil && t.deploymentAllowlist.Addr() == contract.CodeAddress {
 		return t.deploymentAllowlist.Run(contract, host, &t.config)

@@ -87,7 +87,9 @@ type TestClusterConfig struct {
 	EpochReward       int
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
 
-	AdminAllowList        []types.Address
+	ContractDeployerAllowListAdmin   []types.Address
+	ContractDeployerAllowListEnabled []types.Address
+
 	NumBlockConfirmations uint64
 
 	logsDirOnce sync.Once
@@ -229,9 +231,15 @@ func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	}
 }
 
-func WithAllowList(addr types.Address) ClusterOption {
+func WithContractDeployerAllowListAdmin(addr types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.AdminAllowList = append(h.AdminAllowList, addr)
+		h.ContractDeployerAllowListAdmin = append(h.ContractDeployerAllowListAdmin, addr)
+	}
+}
+
+func WithContractDeployerAllowListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ContractDeployerAllowListEnabled = append(h.ContractDeployerAllowListEnabled, addr)
 	}
 }
 
@@ -367,12 +375,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
 		}
 
-		if len(cluster.Config.AdminAllowList) != 0 {
-			addrs := []string{}
-			for _, addr := range cluster.Config.AdminAllowList {
-				addrs = append(addrs, addr.String())
-			}
-			args = append(args, "--allow-list-admin", strings.Join(addrs, ","))
+		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
+			args = append(args, "--contract-deployer-allow-list-admin",
+				strings.Join(sliceArrayToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
+		}
+
+		if len(cluster.Config.ContractDeployerAllowListEnabled) != 0 {
+			args = append(args, "--contract-deployer-allow-list-enabled",
+				strings.Join(sliceArrayToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
 		}
 
 		// run cmd init-genesis with all the arguments
@@ -593,7 +603,6 @@ func (t *TestCluster) ExistsCode(tt *testing.T, addr ethgo.Address) bool {
 
 	code, err := client.Eth().GetCode(addr, ethgo.Latest)
 	if err != nil {
-		fmt.Println("-- err ", err)
 		return false
 	}
 	if code == "0x" {
@@ -610,9 +619,6 @@ func (t *TestCluster) Call(tt *testing.T, to types.Address, method *abi.Method, 
 	input, err := method.Encode(args)
 	require.NoError(tt, err)
 
-	fmt.Println("-- input --")
-	fmt.Println(input)
-
 	toAddr := ethgo.Address(to)
 
 	msg := &ethgo.CallMsg{
@@ -621,8 +627,6 @@ func (t *TestCluster) Call(tt *testing.T, to types.Address, method *abi.Method, 
 	}
 	resp, err := client.Eth().Call(msg, ethgo.Latest)
 	require.NoError(tt, err)
-
-	fmt.Println(resp)
 
 	data, err := hex.DecodeString(resp[2:])
 	require.NoError(tt, err)
@@ -714,6 +718,27 @@ func (t *TestTxn) Receipt() *ethgo.Receipt {
 	return t.receipt
 }
 
+const (
+	statusFailed  = uint64(0)
+	statusSucceed = uint64(1)
+)
+
+// Succeed returns whether the transaction succeed and it was not reverted
+func (t *TestTxn) Succeed() bool {
+	return t.receipt.Status == statusSucceed
+}
+
+// Failed returns whether the transaction failed
+func (t *TestTxn) Failed() bool {
+	return t.receipt.Status == statusFailed
+}
+
+// Reverted returns whether the transaction failed and was reverted consuming
+// all the gas from the call
+func (t *TestTxn) Reverted() bool {
+	return t.receipt.Status == statusFailed && t.txn.Gas == t.receipt.GasUsed
+}
+
 // Wait waits for the transaction to be executed
 func (t *TestTxn) Wait() error {
 	return t.WaitWithDuration(1 * time.Minute)
@@ -731,16 +756,20 @@ func (t *TestTxn) WaitWithDuration(timeout time.Duration) error {
 				}
 			}
 			if receipt != nil {
-				fmt.Println("- found -")
-				fmt.Println(receipt)
-
 				t.receipt = receipt
 				return nil
 			}
 
 		case <-time.After(timeout):
-			fmt.Println("- timeout -")
 			return fmt.Errorf("timeout")
 		}
 	}
+}
+
+func sliceArrayToSliceString(addrs []types.Address) []string {
+	res := []string{}
+	for _, i := range addrs {
+		res = append(res, i.String())
+	}
+	return res
 }

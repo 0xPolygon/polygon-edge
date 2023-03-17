@@ -15,7 +15,7 @@ type Params struct {
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
 	// AllowList configuration
-	ContractsAllowList *AllowListConfig `json:"contracts-allowList,omitempty"`
+	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowListConfig,omitempty"`
 }
 
 type AllowListConfig struct {

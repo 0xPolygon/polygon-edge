@@ -203,8 +203,15 @@ func setFlags(cmd *cobra.Command) {
 	// Allow list
 	{
 		cmd.Flags().StringArrayVar(
-			&params.adminAllowList,
-			"allow-list-admin",
+			&params.contractDeployerAllowListAdmin,
+			contractDeployedAllowListAdminFlag,
+			[]string{},
+			"",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListEnabled,
+			contractDeployedAllowListEnabledFlag,
 			[]string{},
 			"",
 		)

@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"fmt"
+	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -11,11 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/compiler"
 	"github.com/umbracle/ethgo/wallet"
-)
-
-const (
-	statusFailed  = uint64(0)
-	statusSucceed = uint64(1)
 )
 
 var allowListE2EContractCode = `// SPDX-License-Identifier: MIT
@@ -57,9 +53,12 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 	adminAddr := types.Address(admin.Address())
 	targetAddr := types.Address(target.Address())
 
+	otherAddr := types.Address{0x1}
+
 	cluster := framework.NewTestCluster(t, 3,
 		framework.WithPremine(adminAddr, targetAddr),
-		framework.WithAllowList(adminAddr),
+		framework.WithContractDeployerAllowListAdmin(adminAddr),
+		framework.WithContractDeployerAllowListEnabled(otherAddr),
 	)
 	defer cluster.Stop()
 
@@ -67,86 +66,77 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 
 	bytecode, _ := hex.DecodeString(allowListE2EContract.Bin)
 
-	/*
-		expectRole := func(addr types.Address, role allowlist.Role) {
-			out := cluster.Call(t, allowlist.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
-			require.Equal(t, role.Uint64(), out["0"].(*big.Int).Uint64())
-		}
-	*/
+	expectRole := func(addr types.Address, role allowlist.Role) {
+		out := cluster.Call(t, allowlist.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
+		require.Equal(t, role.Uint64(), out["0"].(*big.Int).Uint64())
+	}
 
-	/*
-		{
-			// Step 0. Check the role of both accounts
-			expectRole(adminAddr, allowlist.AdminRole)
-			expectRole(targetAddr, allowlist.NoRole)
-		}
+	{
+		// Step 0. Check the role of both accounts
+		expectRole(adminAddr, allowlist.AdminRole)
+		expectRole(targetAddr, allowlist.NoRole)
+		expectRole(otherAddr, allowlist.EnabledRole)
+	}
 
-		{
-			// Step 1. 'targetAddr' can send a normal transaction (non-contract creation).
-			err := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1)).Wait()
-			require.NoError(t, err)
-		}
+	{
+		// Step 1. 'targetAddr' can send a normal transaction (non-contract creation).
+		err := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1)).Wait()
+		require.NoError(t, err)
+	}
 
-		{
-			// Step 2. 'targetAddr' **cannot** deploy a contract because it is not whitelisted.
-			// (The transaction does not fail but the contract is not deployed and all gas
-			// for the transaction is consumed)
-			deployTxn := cluster.Deploy(t, target, bytecode)
-			require.NoError(t, deployTxn.Wait())
-			require.Equal(t, statusFailed, deployTxn.Receipt().Status)
-			require.Equal(t, deployTxn.Txn().Gas, deployTxn.Receipt().GasUsed)
-			require.False(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
-		}
-
-	*/
-
-	var deployedContractAddr types.Address
+	{
+		// Step 2. 'targetAddr' **cannot** deploy a contract because it is not whitelisted.
+		// (The transaction does not fail but the contract is not deployed and all gas
+		// for the transaction is consumed)
+		deployTxn := cluster.Deploy(t, target, bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Reverted())
+		require.False(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
+	}
 
 	{
 		// Step 3. 'adminAddr' can create contracts
 		deployTxn := cluster.Deploy(t, admin, bytecode)
 		require.NoError(t, deployTxn.Wait())
-		require.Equal(t, statusSucceed, deployTxn.Receipt().Status)
+		require.True(t, deployTxn.Succeed())
 		require.True(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
+	}
 
-		deployedContractAddr = types.Address(deployTxn.Receipt().ContractAddress)
+	{
+		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
+		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+
+		adminSetTxn := cluster.MethodTxn(t, admin, allowlist.AllowListContractsAddr, input)
+		require.NoError(t, adminSetTxn.Wait())
+		expectRole(targetAddr, allowlist.EnabledRole)
+	}
+
+	{
+		// Step 5. 'targetAddr' can create contracts now.
+		deployTxn := cluster.Deploy(t, target, bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Succeed())
+		require.True(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
+	}
+
+	{
+		// Step 6. 'targetAddr' cannot enable other accounts since it is not an admin
+		// (The transaction fails)
+		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+
+		adminSetFailTxn := cluster.MethodTxn(t, target, allowlist.AllowListContractsAddr, input)
+		require.NoError(t, adminSetFailTxn.Wait())
+		require.True(t, adminSetFailTxn.Failed())
+		expectRole(types.ZeroAddress, allowlist.NoRole)
 	}
 
 	/*
-		{
-			// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
-			input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
-
-			adminSetTxn := cluster.MethodTxn(t, admin, allowlist.AllowListContractsAddr, input)
-			require.NoError(t, adminSetTxn.Wait())
-			expectRole(targetAddr, allowlist.EnabledRole)
-		}
+		fmt.Println("_ CONTRACT _", deployedContractAddr)
 
 		{
-			// Step 5. 'targetAddr' can create contracts now.
-			deployTxn := cluster.Deploy(t, target, bytecode)
-			require.NoError(t, deployTxn.Wait())
-			require.Equal(t, statusSucceed, deployTxn.Receipt().Status)
-			require.True(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
-		}
-
-		{
-			// Step 6. 'targetAddr' cannot enable other accounts since it is not an admin
-			// (The transaction reverts and fails)
-			input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
-
-			adminSetFailTxn := cluster.MethodTxn(t, target, allowlist.AllowListContractsAddr, input)
-			require.NoError(t, adminSetFailTxn.Wait())
-			require.Equal(t, statusFailed, adminSetFailTxn.Receipt().Status)
-			expectRole(types.ZeroAddress, allowlist.NoRole)
+			// Step 7. The allowlist contract is accessible from another smart contract
+			out := cluster.Call(t, deployedContractAddr, allowlist.ReadAllowListFunc, adminAddr)
+			fmt.Println(out["0"])
 		}
 	*/
-
-	fmt.Println("_ CONTRACT _", deployedContractAddr)
-
-	{
-		// Step 7. The allowlist contract is accessible from another smart contract
-		out := cluster.Call(t, deployedContractAddr, allowlist.ReadAllowListFunc, adminAddr)
-		fmt.Println(out["0"])
-	}
 }

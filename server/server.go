@@ -203,8 +203,8 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// apply allow list genesis data
-	if m.config.Chain.Params.ContractsAllowList != nil {
-		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, allowlist.AllowListContractsAddr, m.config.Chain.Params.ContractsAllowList)
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, allowlist.AllowListContractsAddr, m.config.Chain.Params.ContractDeployerAllowList)
 	}
 
 	// compute the genesis root state
@@ -562,8 +562,6 @@ func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
 ) (result *runtime.ExecutionResult, err error) {
-	fmt.Println("__ CALL TXN __")
-
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
 		return nil, err

@@ -86,7 +86,8 @@ type genesisParams struct {
 	eventTrackerStartBlocks []string
 
 	// allowlist
-	adminAllowList []string
+	contractDeployerAllowListAdmin   []string
+	contractDeployerAllowListEnabled []string
 }
 
 func (p *genesisParams) validateFlags() error {
