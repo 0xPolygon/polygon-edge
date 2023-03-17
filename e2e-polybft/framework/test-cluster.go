@@ -383,6 +383,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, relayer bool) {
 	t.Helper()
+
 	logLevel := os.Getenv(envLogLevel)
 
 	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))

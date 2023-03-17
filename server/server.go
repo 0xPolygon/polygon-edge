@@ -222,6 +222,7 @@ func NewServer(config *Config) (*Server, error) {
 			}
 
 			logger.Warn("Initial state root checked and correct")
+
 			initialStateRoot = polyBFTConfig.InitialTrieRoot
 		}
 	}

@@ -198,6 +198,7 @@ func TestMigration(t *testing.T) {
 	for i := range cluster.Servers {
 		cluster.Servers[i].Stop()
 	}
+
 	time.Sleep(time.Second)
 
 	for i := range cluster.Servers {
