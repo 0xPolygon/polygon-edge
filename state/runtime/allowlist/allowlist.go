@@ -154,15 +154,14 @@ var (
 )
 
 func (r Role) Uint64() uint64 {
-	if r == EnabledRole {
+	switch r {
+	case EnabledRole:
 		return 1
-	}
-
-	if r == AdminRole {
+	case AdminRole:
 		return 2
+	default:
+		return 0
 	}
-
-	return 0
 }
 
 func (r Role) Bytes() []byte {

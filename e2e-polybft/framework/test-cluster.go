@@ -21,6 +21,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -594,11 +595,6 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 	return result, nil
 }
 
-var (
-	defaultGasPrice = uint64(1879048192) // 0x70000000
-	defaultGasLimit = uint64(5242880)    // 0x500000
-)
-
 func (c *TestCluster) ExistsCode(t *testing.T, addr ethgo.Address) bool {
 	t.Helper()
 
@@ -610,11 +606,7 @@ func (c *TestCluster) ExistsCode(t *testing.T, addr ethgo.Address) bool {
 		return false
 	}
 
-	if code == "0x" {
-		return false
-	}
-
-	return true
+	return code != "0x"
 }
 
 func (c *TestCluster) Call(t *testing.T, to types.Address, method *abi.Method,
@@ -643,9 +635,6 @@ func (c *TestCluster) Call(t *testing.T, to types.Address, method *abi.Method,
 	require.NoError(t, err)
 
 	return output
-}
-
-type TestCall struct {
 }
 
 func (c *TestCluster) Deploy(t *testing.T, sender ethgo.Key, bytecode []byte) *TestTxn {
@@ -693,11 +682,11 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	}
 
 	if txn.GasPrice == 0 {
-		txn.GasPrice = defaultGasPrice
+		txn.GasPrice = txrelayer.DefaultGasPrice
 	}
 
 	if txn.Gas == 0 {
-		txn.Gas = defaultGasLimit
+		txn.Gas = txrelayer.DefaultGasLimit
 	}
 
 	chainID, err := client.Eth().ChainID()
@@ -790,9 +779,9 @@ func (t *TestTxn) WaitWithDuration(timeout time.Duration) error {
 }
 
 func sliceArrayToSliceString(addrs []types.Address) []string {
-	res := []string{}
-	for _, i := range addrs {
-		res = append(res, i.String())
+	res := make([]string, len(addrs))
+	for indx, addr := range addrs {
+		res[indx] = addr.String()
 	}
 
 	return res

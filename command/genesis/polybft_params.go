@@ -273,9 +273,9 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 }
 
 func stringSliceToAddressSlice(addrs []string) []types.Address {
-	res := []types.Address{}
-	for _, addr := range addrs {
-		res = append(res, types.StringToAddress(addr))
+	res := make([]types.Address, len(addrs))
+	for indx, addr := range addrs {
+		res[indx] = types.StringToAddress(addr)
 	}
 
 	return res
