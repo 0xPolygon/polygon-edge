@@ -48,17 +48,25 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 		go func(i int, to ethgo.Address) {
 			defer wg.Done()
 
-			gasPrice, err := client.GasPrice()
-			require.NoError(t, err)
-
 			txn := &ethgo.Transaction{
-				From:     sender.Address(),
-				To:       &to,
-				GasPrice: gasPrice,
-				Gas:      30000, // enough to send a transfer
-				Value:    big.NewInt(int64(sendAmount)),
-				Nonce:    uint64(i),
+				From:  sender.Address(),
+				To:    &to,
+				Gas:   30000, // enough to send a transfer
+				Value: big.NewInt(int64(sendAmount)),
+				Nonce: uint64(i),
 			}
+
+			// Send every second transaction as a dynamic fees one
+			if i%2 == 0 {
+				txn.MaxFeePerGas = big.NewInt(1000000000)
+				txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+			} else {
+				gasPrice, err := client.GasPrice()
+				require.NoError(t, err)
+
+				txn.GasPrice = gasPrice
+			}
+
 			sendTransaction(t, client, sender, txn)
 		}(i, receivers[i])
 	}
@@ -142,12 +150,20 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		amount := gasCost*(num-i-1) + sendAmount*(num-i)
 		recipient := receivers[i].Address()
 		txn := &ethgo.Transaction{
-			Value:    big.NewInt(int64(amount)),
-			To:       &recipient,
-			GasPrice: gasPrice,
-			Gas:      21000,
-			Nonce:    0,
+			Value: big.NewInt(int64(amount)),
+			To:    &recipient,
+			Gas:   21000,
+			Nonce: 0,
 		}
+
+		// Send every second transaction as a dynamic fees one
+		if i%2 == 0 {
+			txn.MaxFeePerGas = big.NewInt(1000000000)
+			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+		} else {
+			txn.GasPrice = gasPrice
+		}
+
 		sendTransaction(t, client, receivers[i-1], txn)
 
 		err := waitUntilBalancesChanged(receivers[i].Address())
