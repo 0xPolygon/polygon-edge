@@ -4,13 +4,15 @@ import (
 	"errors"
 	"math/big"
 
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/contract"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/contract"
 )
 
 type e2eStateProvider struct {
@@ -59,7 +61,7 @@ func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr e
 		return nil, err
 	}
 
-	validatorsCount, err := types.ParseUint64orHex(&validatorsCountRaw)
+	validatorsCount, err := common.ParseUint64orHex(&validatorsCountRaw)
 	if err != nil {
 		return nil, err
 	}
