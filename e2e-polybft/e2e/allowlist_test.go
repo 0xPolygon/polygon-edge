@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -10,37 +9,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo/compiler"
 	"github.com/umbracle/ethgo/wallet"
 )
-
-var allowListE2EContractCode = `// SPDX-License-Identifier: MIT
-pragma solidity ^0.5.5;
-
-interface AllowListInterface {
-    function readAllowList() external view;
-}
-
-contract AllowListProxy {
-	AllowListInterface allowlist = AllowListInterface(0x0200000000000000000000000000000000000000);
-
-	function readAllowList(address addr) public view returns (uint256) {
-		allowlist.readAllowList();
-		return 1;
-	}
-}
-`
-
-var allowListE2EContract *compiler.Artifact
-
-func init() {
-	output, err := compiler.NewSolidityCompiler("solc").CompileCode(allowListE2EContractCode)
-	if err != nil {
-		panic(fmt.Sprintf("BUG: failed to compile sm: %v", err))
-	}
-
-	allowListE2EContract = output.Contracts["<stdin>:AllowListProxy"]
-}
 
 func TestAllowList_ContractDeployment(t *testing.T) {
 	// create two accounts, one for an admin sender and a second
@@ -64,7 +34,8 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	bytecode, _ := hex.DecodeString(allowListE2EContract.Bin)
+	// bytecode for an empty smart contract
+	bytecode, _ := hex.DecodeString("6080604052348015600f57600080fd5b50603e80601d6000396000f3fe6080604052600080fdfea265627a7a7231582027748e4afe5ee282a786005d286f4427f13dac1b62e03f9aed311c2db7e8245364736f6c63430005110032")
 
 	expectRole := func(addr types.Address, role allowlist.Role) {
 		out := cluster.Call(t, allowlist.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
@@ -129,14 +100,4 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 		require.True(t, adminSetFailTxn.Failed())
 		expectRole(types.ZeroAddress, allowlist.NoRole)
 	}
-
-	/*
-		fmt.Println("_ CONTRACT _", deployedContractAddr)
-
-		{
-			// Step 7. The allowlist contract is accessible from another smart contract
-			out := cluster.Call(t, deployedContractAddr, allowlist.ReadAllowListFunc, adminAddr)
-			fmt.Println(out["0"])
-		}
-	*/
 }
