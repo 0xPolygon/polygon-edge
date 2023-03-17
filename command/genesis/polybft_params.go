@@ -69,9 +69,14 @@ func (p *genesisParams) generatePolyBftChainConfig(outputter command.OutputForma
 		bridge.EventTrackerStartBlocks = eventTrackerStartBlock
 	}
 
-	outputter.Write([]byte("[GENESIS VALIDATORS]\n"))
+	if _, err := outputter.Write([]byte("[GENESIS VALIDATORS]\n")); err != nil {
+		return err
+	}
+
 	for _, v := range manifest.GenesisValidators {
-		outputter.Write([]byte(fmt.Sprintf("%v\n", v)))
+		if _, err := outputter.Write([]byte(fmt.Sprintf("%v\n", v))); err != nil {
+			return err
+		}
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{
