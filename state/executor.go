@@ -448,8 +448,6 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 }
 
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	fmt.Println("=> APPLY TXN <==")
-
 	if msg.Type == types.StateTx {
 		if err := checkAndProcessStateTx(msg, t); err != nil {
 			return nil, err
@@ -685,12 +683,9 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	// check if contract creation allow list is enabled
 	if t.deploymentAllowlist != nil {
-
 		role := t.deploymentAllowlist.GetRole(c.Caller)
-		fmt.Println("-- check role ", c.Caller, role, role.Enabled())
 
 		if !role.Enabled() {
-			fmt.Println("- fails -")
 			return &runtime.ExecutionResult{
 				GasLeft: 0,
 				Err:     runtime.ErrNotAuth,

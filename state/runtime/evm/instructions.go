@@ -1107,8 +1107,6 @@ func opCreate(op OpCode) instruction {
 
 func opCall(op OpCode) instruction {
 	return func(c *state) {
-		fmt.Println("_ TRYING TO CALL!! _")
-
 		c.resetReturnData()
 
 		if op == CALL && c.inStaticCall() {

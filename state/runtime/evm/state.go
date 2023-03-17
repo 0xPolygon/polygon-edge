@@ -2,7 +2,6 @@ package evm
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
 
@@ -227,8 +226,6 @@ func (c *state) Run() ([]byte, error) {
 	for !c.stop {
 		op, ok = c.CurrentOpCode()
 		gasCopy, ipCopy := c.gas, uint64(c.ip)
-
-		fmt.Println(op, c.gas)
 
 		c.captureState(int(op))
 
