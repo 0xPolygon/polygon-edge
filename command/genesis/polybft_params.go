@@ -181,8 +181,9 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		Mixhash:    polybft.PolyBFTMixDigest,
 	}
 
-	if len(p.contractDeployerAllowListAdmin) != 0 || len(p.contractDeployerAllowListEnabled) != 0 {
-		// allow list for contract deployment is enabled
+	if len(p.contractDeployerAllowListAdmin) != 0 {
+		// only enable allow list if there is at least one address as **admin**, otherwise
+		// the allow list could never be updated
 		chainConfig.Params.ContractDeployerAllowList = &chain.AllowListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.contractDeployerAllowListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.contractDeployerAllowListEnabled),
