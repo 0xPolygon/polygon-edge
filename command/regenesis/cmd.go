@@ -91,7 +91,7 @@ func GetCommand() *cobra.Command {
 	)
 	genesisCmd.Flags().StringVar(
 		&params.TrieDBPath,
-		"triedb",
+		"source-path",
 		"",
 		"the directory of trie data of old chain",
 	)
