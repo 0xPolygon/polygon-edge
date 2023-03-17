@@ -38,7 +38,9 @@ const (
 	devFlag                      = "dev"
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
-	relayerFlag                  = "relayer"
+
+	relayerFlag               = "relayer"
+	numBlockConfirmationsFlag = "num-block-confirmations"
 )
 
 // Flags that are deprecated, but need to be preserved for
@@ -181,6 +183,8 @@ func (p *serverParams) generateConfig() *server.Config {
 		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
 		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,
-		Relayer:            p.relayer,
+
+		Relayer:               p.relayer,
+		NumBlockConfirmations: p.rawConfig.NumBlockConfirmations,
 	}
 }

@@ -1,0 +1,30 @@
+---
+name: Nightly Build
+on:  # yamllint disable-line rule:truthy
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron: '0 0 * * *'
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+
+  test:
+    name: Test
+    uses: ./.github/workflows/test.yml
+    needs: build
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  e2e:
+    name: Polybft E2E Tests
+    uses: ./.github/workflows/e2e-polybft.yml
+    needs: build
+
+  property:
+    name: Polybft Property Tests
+    uses: ./.github/workflows/property-polybft.yml
+    needs: build
+  

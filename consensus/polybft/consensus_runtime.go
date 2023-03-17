@@ -68,14 +68,15 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig  *PolyBFTConfig
-	DataDir        string
-	Key            *wallet.Key
-	State          *State
-	blockchain     blockchainBackend
-	polybftBackend polybftBackend
-	txPool         txPoolInterface
-	bridgeTopic    topic
+	PolyBFTConfig         *PolyBFTConfig
+	DataDir               string
+	Key                   *wallet.Key
+	State                 *State
+	blockchain            blockchainBackend
+	polybftBackend        polybftBackend
+	txPool                txPoolInterface
+	bridgeTopic           topic
+	numBlockConfirmations uint64
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -155,16 +156,19 @@ func (c *consensusRuntime) close() {
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
+		stateSenderAddr := c.config.PolyBFTConfig.Bridge.BridgeAddr
 		stateSyncManager, err := NewStateSyncManager(
 			logger,
 			c.config.State,
 			&stateSyncConfig{
-				key:               c.config.Key,
-				stateSenderAddr:   c.config.PolyBFTConfig.Bridge.BridgeAddr,
-				jsonrpcAddr:       c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:           c.config.DataDir,
-				topic:             c.config.bridgeTopic,
-				maxCommitmentSize: maxCommitmentSize,
+				key:                   c.config.Key,
+				stateSenderAddr:       stateSenderAddr,
+				stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
+				jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				dataDir:               c.config.DataDir,
+				topic:                 c.config.bridgeTopic,
+				maxCommitmentSize:     maxCommitmentSize,
+				numBlockConfirmations: c.config.numBlockConfirmations,
 			},
 		)
 
@@ -409,11 +413,11 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
-	if err := c.state.cleanEpochsFromDB(); err != nil {
+	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {
 		c.logger.Error("Could not clean previous epochs from db.", "error", err)
 	}
 
-	if err := c.state.insertEpoch(epochNumber); err != nil {
+	if err := c.state.EpochStore.insertEpoch(epochNumber); err != nil {
 		return nil, fmt.Errorf("an error occurred while inserting new epoch in db. Reason: %w", err)
 	}
 
@@ -480,6 +484,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
@@ -496,6 +503,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 			}
 
 			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -533,8 +543,8 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
-	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
+func (c *consensusRuntime) GenerateExitProof(exitID uint64) (types.Proof, error) {
+	return c.checkpointManager.GenerateExitProof(exitID)
 }
 
 // GetStateSyncProof returns the proof for the state sync
@@ -939,37 +949,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	}
 
 	return firstBlockInEpoch, nil
-}
-
-// validateVote validates if the senders address is in active validator set
-func validateVote(vote *MessageSignature, epoch *epochMetadata) error {
-	// get senders address
-	senderAddress := types.StringToAddress(vote.From)
-	if !epoch.Validators.ContainsAddress(senderAddress) {
-		return fmt.Errorf(
-			"message is received from sender %s, which is not in current validator set",
-			vote.From,
-		)
-	}
-
-	return nil
-}
-
-// createExitTree creates an exit event merkle tree from provided exit events
-func createExitTree(exitEvents []*ExitEvent) (*MerkleTree, error) {
-	numOfEvents := len(exitEvents)
-	data := make([][]byte, numOfEvents)
-
-	for i := 0; i < numOfEvents; i++ {
-		b, err := ExitEventABIType.Encode(exitEvents[i])
-		if err != nil {
-			return nil, err
-		}
-
-		data[i] = b
-	}
-
-	return NewMerkleTree(data)
 }
 
 // getSealersForBlock checks who sealed a given block and updates the counter

@@ -1227,7 +1227,7 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 
 	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
 	if !ok {
-		panic("failed to get header difficulty")
+		return errors.New("failed to get header difficulty")
 	}
 
 	// parent total difficulty of incoming header

@@ -30,6 +30,9 @@ var (
 	one            = big.NewInt(1)
 
 	ErrInvalidBLSSignature = errors.New("invalid BLS Signature")
+	errZeroHash            = errors.New("can not recover public key from zero or empty message hash")
+	errHashOfInvalidLength = errors.New("message hash of invalid length")
+	errInvalidSignature    = errors.New("invalid signature")
 )
 
 type KeyType string
@@ -37,10 +40,6 @@ type KeyType string
 const (
 	KeyECDSA KeyType = "ecdsa"
 	KeyBLS   KeyType = "bls"
-)
-
-var (
-	errInvalidSignature = errors.New("invalid signature")
 )
 
 // KeccakState wraps sha3.state. In addition to the usual hash methods, it also supports
@@ -144,6 +143,14 @@ func Ecrecover(hash, sig []byte) ([]byte, error) {
 // RecoverPubkey verifies the compact signature "signature" of "hash" for the
 // secp256k1 curve.
 func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
+	if len(hash) != types.HashLength {
+		return nil, errHashOfInvalidLength
+	}
+
+	if types.BytesToHash(hash) == types.ZeroHash {
+		return nil, errZeroHash
+	}
+
 	size := len(signature)
 	term := byte(27)
 
@@ -221,18 +228,6 @@ func VerifyBLSSignatureFromBytes(rawPubkey, rawSig, message []byte) error {
 	return VerifyBLSSignature(pubkey, signature, message)
 }
 
-// SigToPub returns the public key that created the given signature.
-func SigToPub(hash, sig []byte) (*ecdsa.PublicKey, error) {
-	s, err := Ecrecover(hash, sig)
-	if err != nil {
-		return nil, err
-	}
-
-	x, y := elliptic.Unmarshal(S256, s)
-
-	return &ecdsa.PublicKey{Curve: S256, X: x, Y: y}, nil
-}
-
 // Keccak256 calculates the Keccak256
 func Keccak256(v ...[]byte) []byte {
 	h := sha3.NewLegacyKeccak256()
@@ -251,7 +246,7 @@ func Keccak256Hash(v ...[]byte) (hash types.Hash) {
 		h.Write(b)
 	}
 
-	h.Read(hash[:])
+	h.Read(hash[:]) //nolint:errcheck
 
 	return hash
 }

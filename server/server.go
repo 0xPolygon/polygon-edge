@@ -17,6 +17,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -34,7 +36,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	hclog "github.com/hashicorp/go-hclog"
+	"github.com/0xPolygon/polygon-edge/validate"
+	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"
@@ -133,7 +136,7 @@ func NewServer(config *Config) (*Server, error) {
 		logger:             logger.Named("server"),
 		config:             config,
 		chain:              config.Chain,
-		grpcServer:         grpc.NewServer(),
+		grpcServer:         grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
@@ -227,6 +230,7 @@ func NewServer(config *Config) (*Server, error) {
 		genesisRoot, err = m.executor.WriteGenesis(config.Chain.Genesis.Alloc, types.ZeroHash)
 	}
 
+	//check write genesis error
 	if err != nil {
 		return nil, err
 	}
@@ -331,6 +335,20 @@ func NewServer(config *Config) (*Server, error) {
 	m.txpool.Start()
 
 	return m, nil
+}
+
+func unaryInterceptor(
+	ctx context.Context,
+	req interface{},
+	_ *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	// Validate request
+	if err := validate.ValidateRequest(req); err != nil {
+		return nil, err
+	}
+
+	return handler(ctx, req)
 }
 
 func (s *Server) restoreChain() error {
@@ -459,16 +477,17 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.Params{
-			Context:        context.Background(),
-			Config:         config,
-			TxPool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:               context.Background(),
+			Config:                config,
+			TxPool:                s.txpool,
+			Network:               s.network,
+			Blockchain:            s.blockchain,
+			Executor:              s.executor,
+			Grpc:                  s.grpcServer,
+			Logger:                s.logger,
+			SecretsManager:        s.secretsManager,
+			BlockTime:             s.config.BlockTime,
+			NumBlockConfirmations: s.config.NumBlockConfirmations,
 		},
 	)
 
@@ -488,12 +507,23 @@ func (s *Server) setupRelayer() error {
 		return fmt.Errorf("failed to create account from secret: %w", err)
 	}
 
+	polyBFTConfig, err := polybft.GetPolyBFTConfig(s.config.Chain)
+	if err != nil {
+		return fmt.Errorf("failed to extract polybft config: %w", err)
+	}
+
+	trackerStartBlockConfig := map[types.Address]uint64{}
+	if polyBFTConfig.Bridge != nil {
+		trackerStartBlockConfig = polyBFTConfig.Bridge.EventTrackerStartBlocks
+	}
+
 	relayer := statesyncrelayer.NewRelayer(
 		s.config.DataDir,
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
+		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
-		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
 	)
 
 	// start relayer

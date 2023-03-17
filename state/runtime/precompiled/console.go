@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"regexp"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -29,7 +30,7 @@ func init() {
 		// objects are defined without bytes (i.e. 256).
 		typ, err := abi.NewType("tuple" + signature)
 		if err != nil {
-			panic(fmt.Errorf("BUG: Failed to parse %s", signature))
+			log.Fatal(fmt.Errorf("BUG: Failed to parse %s", signature))
 		}
 
 		// signature of the call. Use the version without the bytes in 'uint'.

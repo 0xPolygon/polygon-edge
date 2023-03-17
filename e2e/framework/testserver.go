@@ -653,14 +653,14 @@ func (t *Txn) sendImpl() error {
 	return nil
 }
 
-func (t *Txn) Send() *Txn {
+func (t *Txn) Send() (*Txn, error) {
 	if t.hash != nil {
-		panic("BUG: txn already sent")
+		return nil, errors.New("txn already sent")
 	}
 
 	t.sendErr = t.sendImpl()
 
-	return t
+	return t, nil
 }
 
 func (t *Txn) Receipt() *ethgo.Receipt {

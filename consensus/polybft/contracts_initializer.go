@@ -1,12 +1,10 @@
 package polybft
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -20,59 +18,73 @@ const (
 )
 
 var (
-	nativeTokenName   = "Polygon"
-	nativeTokenSymbol = "MATIC"
+	nativeTokenName     = "Polygon"
+	nativeTokenSymbol   = "MATIC"
+	nativeTokenDecimals = uint8(18)
 )
 
+// getInitChildValidatorSetInput builds input parameters for ChildValidatorSet SC initialization
 func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
-	validatorAddresses := make([]types.Address, len(polyBFTConfig.InitialValidatorSet))
-	validatorPubkeys := make([][4]*big.Int, len(polyBFTConfig.InitialValidatorSet))
-	validatorStakes := make([]*big.Int, len(polyBFTConfig.InitialValidatorSet))
+	apiValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
 
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
-		blsKey, err := hex.DecodeString(validator.BlsKey)
+		validatorData, err := validator.ToValidatorInitAPIBinding()
 		if err != nil {
 			return nil, err
 		}
 
-		pubKey, err := bls.UnmarshalPublicKey(blsKey)
-		if err != nil {
-			return nil, err
-		}
-
-		pubKeyBig := pubKey.ToBigInt()
-
-		validatorPubkeys[i] = pubKeyBig
-		validatorAddresses[i] = validator.Address
-		validatorStakes[i] = new(big.Int).Set(validator.Balance)
+		apiValidators[i] = validatorData
 	}
 
-	registerMessage, err := bls.MarshalMessageToBigInt([]byte(contracts.PolyBFTRegisterMessage))
-	if err != nil {
-		return nil, err
-	}
-
-	params := map[string]interface{}{
-		"init": map[string]interface{}{
-			"epochReward":   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
-			"minStake":      big.NewInt(minStake),
-			"minDelegation": big.NewInt(minDelegation),
-			"epochSize":     new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+	params := &contractsapi.InitializeChildValidatorSetFunction{
+		Init: &contractsapi.InitStruct{
+			EpochReward:   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
+			MinStake:      big.NewInt(minStake),
+			MinDelegation: big.NewInt(minDelegation),
+			EpochSize:     new(big.Int).SetUint64(polyBFTConfig.EpochSize),
 		},
-		"validatorAddresses": validatorAddresses,
-		"validatorPubkeys":   validatorPubkeys,
-		"validatorStakes":    validatorStakes,
-		"newBls":             contracts.BLSContract, // address of the deployed BLS contract
-		"newMessage":         registerMessage,
-		"governance":         polyBFTConfig.Governance,
+		NewBls:     contracts.BLSContract,
+		Governance: polyBFTConfig.Governance,
+		Validators: apiValidators,
 	}
 
-	input, err := contractsapi.ChildValidatorSet.Abi.Methods["initialize"].Encode(params)
-	if err != nil {
-		return nil, err
+	return params.EncodeAbi()
+}
+
+// getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
+func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
+	// TODO: @Stefan-Ethernal Temporary workaround just to be able to run cluster in non-bridge mode, until SC is fixed
+	rootERC20PredicateAddr := types.StringToAddress("0xDEAD")
+	rootERC20Addr := types.ZeroAddress
+
+	if config != nil {
+		rootERC20PredicateAddr = config.RootERC20PredicateAddr
+		rootERC20Addr = config.RootNativeERC20Addr
 	}
 
-	return input, nil
+	params := &contractsapi.InitializeChildERC20PredicateFunction{
+		NewL2StateSender:          contracts.L2StateSenderContract,
+		NewStateReceiver:          contracts.StateReceiverContract,
+		NewRootERC20Predicate:     rootERC20PredicateAddr,
+		NewChildTokenTemplate:     contracts.ChildERC20Contract,
+		NewNativeTokenRootAddress: rootERC20Addr,
+	}
+
+	return params.EncodeAbi()
+}
+
+// getInitNativeERC20Input builds input parameters for NativeERC20 SC initialization
+func getInitNativeERC20Input(nativeTokenName, nativeTokenSymbol string, nativeTokenDecimals uint8,
+	rootTokenAddr, childPredicateAddr types.Address) ([]byte, error) {
+	params := &contractsapi.InitializeNativeERC20Function{
+		Name_:      nativeTokenName,
+		Symbol_:    nativeTokenSymbol,
+		Decimals_:  nativeTokenDecimals,
+		RootToken_: rootTokenAddr,
+		Predicate_: childPredicateAddr,
+	}
+
+	return params.EncodeAbi()
 }
 
 func initContract(to types.Address, input []byte, contractName string, transition *state.Transition) error {
@@ -87,7 +99,7 @@ func initContract(to types.Address, input []byte, contractName string, transitio
 			}
 		}
 
-		return result.Err
+		return fmt.Errorf("failed to initialize %s contract. Reason: %w", contractName, result.Err)
 	}
 
 	return nil

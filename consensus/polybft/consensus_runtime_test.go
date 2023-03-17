@@ -11,15 +11,14 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
@@ -184,7 +183,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	)
 
 	currentEpochNumber := getEpochNumber(t, epochSize, epochSize)
-	validatorSet := newTestValidators(validatorsCount).getPublicIdentities()
+	validatorSet := newTestValidators(t, validatorsCount).getPublicIdentities()
 	header, headerMap := createTestBlocks(t, epochSize, epochSize, validatorSet)
 	builtBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: header,
@@ -230,7 +229,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
-	require.True(t, runtime.state.isEpochInserted(currentEpochNumber+1))
+	require.True(t, runtime.state.EpochStore.isEpochInserted(currentEpochNumber+1))
 	require.Equal(t, newEpochNumber, runtime.epoch.Number)
 
 	blockchainMock.AssertExpectations(t)
@@ -290,7 +289,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
 
 	snapshot := NewProposerSnapshot(1, nil)
 	config := &runtimeConfig{
@@ -325,7 +324,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 	}
 
-	validators := newTestValidators(3)
+	validators := newTestValidators(t, 3)
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
@@ -335,7 +334,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			EpochSize:  10,
 			SprintSize: 5,
 		},
-		Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+		Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
 		blockchain: blockchainMock,
 	}
 	runtime := &consensusRuntime{
@@ -383,7 +382,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		toIndex           = uint64(9)
 	)
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	validators := validatorAccounts.getPublicIdentities()
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
@@ -393,7 +392,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
-	require.NoError(t, state.insertEpoch(epoch))
+	require.NoError(t, state.EpochStore.insertEpoch(epoch))
 
 	metadata := &epochMetadata{
 		Validators:        validators,
@@ -451,7 +450,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		BlockTime:        2 * time.Second,
 	}
 
-	validators := newTestValidators(3).getPublicIdentities()
+	validators := newTestValidators(t, 3).getPublicIdentities()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1)).Once()
@@ -498,7 +497,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	const originalBlockNumber = uint64(5)
 
 	newCurrentHeader := &types.Header{Number: originalBlockNumber + 1}
-	validatorSet := newTestValidators(3).getPublicIdentities()
+	validatorSet := newTestValidators(t, 3).getPublicIdentities()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1), nil).Once()
@@ -548,7 +547,7 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		sprintSize      = 5
 	)
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	polybftConfig := &PolyBFTConfig{
 		ValidatorSetAddr: contracts.ValidatorSetContract,
 		EpochSize:        epochSize,
@@ -591,30 +590,13 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 	polybftBackendMock.AssertExpectations(t)
 }
 
-func TestConsensusRuntime_validateVote_VoteSentFromUnknownValidator(t *testing.T) {
-	t.Parallel()
-
-	epoch := &epochMetadata{Validators: newTestValidators(5).getPublicIdentities()}
-	nonValidatorAccount := createTestKey(t)
-	hash := crypto.Keccak256Hash(generateRandomBytes(t)).Bytes()
-	// Sign content by non validator account
-	signature, err := nonValidatorAccount.Sign(hash)
-	require.NoError(t, err)
-
-	vote := &MessageSignature{
-		From:      nonValidatorAccount.String(),
-		Signature: signature}
-	assert.ErrorContains(t, validateVote(vote, epoch),
-		fmt.Sprintf("message is received from sender %s, which is not in current validator set", vote.From))
-}
-
 func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 	t.Parallel()
 
 	setupFn := func(t *testing.T) (*consensusRuntime, *testValidators) {
 		t.Helper()
 
-		validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+		validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 		epoch := &epochMetadata{
 			Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 		}
@@ -672,7 +654,7 @@ func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 	t.Parallel()
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	epoch := &epochMetadata{
 		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 	}
@@ -694,7 +676,7 @@ func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 	t.Parallel()
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	epoch := &epochMetadata{
 		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
 	}
@@ -856,7 +838,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	const round = 5
 
-	validatorAccounts := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 
 	extra := &Extra{
 		Checkpoint: &CheckpointData{},
@@ -1084,17 +1066,6 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
 }
 
-func createTestTransportMessage(hash []byte, epochNumber uint64, key *wallet.Key) *TransportMessage {
-	signature, _ := key.Sign(hash)
-
-	return &TransportMessage{
-		Hash:        hash,
-		Signature:   signature,
-		NodeID:      key.String(),
-		EpochNumber: epochNumber,
-	}
-}
-
 func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {
 	t.Helper()
 
@@ -1199,25 +1170,16 @@ func createTestExtraForAccounts(t *testing.T, epoch uint64, validators AccountSe
 	return result
 }
 
-func setupExitEventsForProofVerification(t *testing.T, state *State,
-	numOfBlocks, numOfEventsPerBlock uint64) [][]byte {
+func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 	t.Helper()
 
-	encodedEvents := make([][]byte, numOfBlocks*numOfEventsPerBlock)
-	index := uint64(0)
+	encodedEvents := make([][]byte, len(exitEvents))
 
-	for i := uint64(1); i <= numOfBlocks; i++ {
-		for j := uint64(1); j <= numOfEventsPerBlock; j++ {
-			e := &ExitEvent{index, ethgo.ZeroAddress, ethgo.ZeroAddress, []byte{0, 1}, 1, i}
-			require.NoError(t, state.insertExitEvent(e))
+	for i, e := range exitEvents {
+		encodedEvent, err := ExitEventInputsABIType.Encode(e)
+		require.NoError(t, err)
 
-			b, err := ExitEventABIType.Encode(e)
-
-			require.NoError(t, err)
-
-			encodedEvents[index] = b
-			index++
-		}
+		encodedEvents[i] = encodedEvent
 	}
 
 	return encodedEvents

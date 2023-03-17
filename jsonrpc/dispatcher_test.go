@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -62,7 +63,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		t.Parallel()
 
 		store := newMockStore()
-		dispatcher := newDispatcher(
+		dispatcher := newTestDispatcher(t,
 			hclog.NewNullLogger(),
 			store,
 			&dispatcherParams{
@@ -72,7 +73,6 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 				blockRangeLimit:         1000,
 			},
 		)
-
 		mockConnection, msgCh := newMockWsConnWithMsgCh()
 
 		req := []byte(`{
@@ -103,7 +103,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 
 func TestDispatcher_WebsocketConnection_RequestFormats(t *testing.T) {
 	store := newMockStore()
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		store,
 		&dispatcherParams{
@@ -214,7 +214,7 @@ func (m *mockService) Filter(f LogQuery) (interface{}, error) {
 func TestDispatcherFuncDecode(t *testing.T) {
 	srv := &mockService{msgCh: make(chan interface{}, 10)}
 
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		newMockStore(),
 		&dispatcherParams{
@@ -224,7 +224,8 @@ func TestDispatcherFuncDecode(t *testing.T) {
 			blockRangeLimit:         1000,
 		},
 	)
-	dispatcher.registerService("mock", srv)
+
+	require.NoError(t, dispatcher.registerService("mock", srv))
 
 	handleReq := func(typ string, msg string) interface{} {
 		_, err := dispatcher.handleReq(Request{
@@ -306,7 +307,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 		{
 			"leading-whitespace",
 			"test with leading whitespace (\"  \\t\\n\\n\\r\\)",
-			newDispatcher(
+			newTestDispatcher(t,
 				hclog.NewNullLogger(),
 				newMockStore(),
 				&dispatcherParams{
@@ -331,7 +332,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 		{
 			"valid-batch-req",
 			"test with batch req length within batchRequestLengthLimit",
-			newDispatcher(
+			newTestDispatcher(t,
 				hclog.NewNullLogger(),
 				newMockStore(),
 				&dispatcherParams{
@@ -360,7 +361,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 		{
 			"invalid-batch-req",
 			"test with batch req length exceeding batchRequestLengthLimit",
-			newDispatcher(
+			newTestDispatcher(t,
 				hclog.NewNullLogger(),
 				newMockStore(),
 				&dispatcherParams{
@@ -383,7 +384,7 @@ func TestDispatcherBatchRequest(t *testing.T) {
 		{
 			"no-limits",
 			"test when limits are not set",
-			newDispatcher(
+			newTestDispatcher(t,
 				hclog.NewNullLogger(),
 				newMockStore(),
 				&dispatcherParams{
@@ -454,4 +455,13 @@ func TestDispatcherBatchRequest(t *testing.T) {
 			}
 		}
 	}
+}
+
+func newTestDispatcher(t *testing.T, logger hclog.Logger, store JSONRPCStore, params *dispatcherParams) *Dispatcher {
+	t.Helper()
+
+	d, err := newDispatcher(logger, store, params)
+	require.NoError(t, err)
+
+	return d
 }

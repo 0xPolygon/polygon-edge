@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 
@@ -144,7 +145,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 // ValidateFinalizedData contains extra data validations for finalized headers
 func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header, parents []*types.Header,
-	chainID uint64, consensusBackend polybftBackend, logger hclog.Logger) error {
+	chainID uint64, consensusBackend polybftBackend, domain []byte, logger hclog.Logger) error {
 	// validate committed signatures
 	blockNumber := header.Number
 	if i.Committed == nil {
@@ -166,7 +167,7 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 		return fmt.Errorf("failed to validate header for block %d. could not retrieve block validators:%w", blockNumber, err)
 	}
 
-	if err := i.Committed.Verify(validators, checkpointHash, logger); err != nil {
+	if err := i.Committed.Verify(validators, checkpointHash, domain, logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d (proposal hash %s): %w",
 			blockNumber, checkpointHash, err)
 	}
@@ -178,16 +179,31 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 
 	// validate parent signatures
 	if err := i.ValidateParentSignatures(blockNumber, consensusBackend, parents,
-		parent, parentExtra, chainID, logger); err != nil {
+		parent, parentExtra, chainID, domain, logger); err != nil {
 		return err
 	}
 
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
+// ValidateDelta validates validator set delta provided in the Extra
+// with the one being calculated by the validator itself
+func (i *Extra) ValidateDelta(oldValidators AccountSet, newValidators AccountSet) error {
+	delta, err := createValidatorSetDelta(oldValidators, newValidators)
+	if err != nil {
+		return err
+	}
+
+	if !i.Validators.Equals(delta) {
+		return fmt.Errorf("validator set delta is invalid")
+	}
+
+	return nil
+}
+
 // ValidateParentSignatures validates signatures for parent block
 func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
-	parent *types.Header, parentExtra *Extra, chainID uint64, logger hclog.Logger) error {
+	parent *types.Header, parentExtra *Extra, chainID uint64, domain []byte, logger hclog.Logger) error {
 	// skip block 1 because genesis does not have committed signatures
 	if blockNumber <= 1 {
 		return nil
@@ -212,7 +228,7 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 		return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 	}
 
-	if err := i.Parent.Verify(parentValidators, parentCheckpointHash, logger); err != nil {
+	if err := i.Parent.Verify(parentValidators, parentCheckpointHash, domain, logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for parent of block %d (proposal hash: %s): %w",
 			blockNumber, parentCheckpointHash, err)
 	}
@@ -277,6 +293,17 @@ type ValidatorSetDelta struct {
 	Updated AccountSet
 	// Removed is a bitmap of the validators removed from the set
 	Removed bitmap.Bitmap
+}
+
+// Equals checks validator set delta equality
+func (d *ValidatorSetDelta) Equals(other *ValidatorSetDelta) bool {
+	if other == nil {
+		return false
+	}
+
+	return d.Added.Equals(other.Added) &&
+		d.Updated.Equals(other.Updated) &&
+		bytes.Equal(d.Removed, other.Removed)
 }
 
 // MarshalRLPWith marshals ValidatorSetDelta to RLP format
@@ -443,8 +470,8 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 	return nil
 }
 
-// Verify is checking for consensus proof in the header
-func (s *Signature) Verify(validators AccountSet, hash types.Hash, logger hclog.Logger) error {
+// Verify is used to verify aggregated signature based on current validator set, message hash and domain
+func (s *Signature) Verify(validators AccountSet, hash types.Hash, domain []byte, logger hclog.Logger) error {
 	signers, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
@@ -466,7 +493,7 @@ func (s *Signature) Verify(validators AccountSet, hash types.Hash, logger hclog.
 		return err
 	}
 
-	if !aggs.VerifyAggregated(blsPublicKeys, hash[:]) {
+	if !aggs.VerifyAggregated(blsPublicKeys, hash[:], domain) {
 		return fmt.Errorf("could not verify aggregated signature")
 	}
 

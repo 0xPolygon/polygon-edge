@@ -9,7 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -22,11 +22,9 @@ import (
 )
 
 const (
-	minSyncPeers      = 2
-	pbftProto         = "/pbft/0.2"
-	bridgeProto       = "/bridge/0.2"
-	DisclaimerMessage = "**** POLYBFT CONSENSUS PROTOCOL IS IN EXPERIMENTAL PHASE AND IS NOT FULLY PRODUCTION READY. " +
-		"YOU ARE USING IT AT YOUR OWN RISK. ****"
+	minSyncPeers = 2
+	pbftProto    = "/pbft/0.2"
+	bridgeProto  = "/bridge/0.2"
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -119,7 +117,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// Initialize child validator set
+		// initialize ChildValidatorSet SC
 		input, err := getInitChildValidatorSetInput(polyBFTConfig)
 		if err != nil {
 			return err
@@ -129,22 +127,33 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		if err != nil {
-			return fmt.Errorf("failed loading rootchain manifest: %w", err)
-		}
-
-		rootchainAdmin := types.ZeroAddress
-		if polyBFTConfig.IsBridgeEnabled() {
-			rootchainAdmin = polyBFTConfig.Bridge.AdminAddress
-		}
-
-		input, err = contractsapi.MRC20.Abi.Methods["initialize"].Encode(
-			[]interface{}{rootchainAdmin, nativeTokenName, nativeTokenSymbol})
+		// initialize ChildERC20Predicate SC
+		input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
 		if err != nil {
 			return err
 		}
 
-		return initContract(contracts.NativeTokenContract, input, "MRC20", transition)
+		if err = initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition); err != nil {
+			return err
+		}
+
+		rootNativeERC20Token := types.ZeroAddress
+		if polyBFTConfig.Bridge != nil {
+			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
+		}
+
+		// initialize NativeERC20 SC
+		input, err = getInitNativeERC20Input(
+			nativeTokenName,
+			nativeTokenSymbol,
+			nativeTokenDecimals,
+			rootNativeERC20Token,
+			contracts.ChildERC20PredicateContract)
+		if err != nil {
+			return err
+		}
+
+		return initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition)
 	}
 }
 
@@ -159,7 +168,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// set key
-	p.key = wallet.NewKey(account)
+	p.key = wallet.NewKey(account, bls.DomainCheckpointManager)
 
 	// create and set syncer
 	p.syncer = syncer.NewSyncer(
@@ -214,7 +223,6 @@ func (p *Polybft) Initialize() error {
 
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
-	p.logger.Warn(DisclaimerMessage)
 	p.logger.Info("starting polybft consensus", "signer", p.key.String())
 
 	// start syncer (also initializes peer map)
@@ -249,14 +257,15 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		PolyBFTConfig:  p.consensusConfig,
-		Key:            p.key,
-		DataDir:        p.dataDir,
-		State:          p.state,
-		blockchain:     p.blockchain,
-		polybftBackend: p,
-		txPool:         p.txPool,
-		bridgeTopic:    p.bridgeTopic,
+		PolyBFTConfig:         p.consensusConfig,
+		Key:                   p.key,
+		DataDir:               p.dataDir,
+		State:                 p.state,
+		blockchain:            p.blockchain,
+		polybftBackend:        p,
+		txPool:                p.txPool,
+		bridgeTopic:           p.bridgeTopic,
+		numBlockConfirmations: p.config.NumBlockConfirmations,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
@@ -422,7 +431,8 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 	}
 
 	// validate extra data
-	return extra.ValidateFinalizedData(header, parent, parents, p.blockchain.GetChainID(), p, p.logger)
+	return extra.ValidateFinalizedData(
+		header, parent, parents, p.blockchain.GetChainID(), p, bls.DomainCheckpointManager, p.logger)
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {

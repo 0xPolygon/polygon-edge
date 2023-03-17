@@ -14,7 +14,7 @@ func TestAccount(t *testing.T) {
 
 	secretsManager := newSecretsManagerMock()
 
-	key := GenerateAccount()
+	key := generateTestAccount(t)
 	pubKeyMarshalled := key.Bls.PublicKey().Marshal()
 	privKeyMarshalled, err := key.Bls.Marshal()
 	require.NoError(t, err)
@@ -35,6 +35,15 @@ func TestAccount(t *testing.T) {
 
 func newSecretsManagerMock() secrets.SecretsManager {
 	return &secretsManagerMock{cache: make(map[string][]byte)}
+}
+
+func generateTestAccount(t *testing.T) *Account {
+	t.Helper()
+
+	acc, err := GenerateAccount()
+	require.NoError(t, err)
+
+	return acc
 }
 
 type secretsManagerMock struct {

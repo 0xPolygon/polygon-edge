@@ -26,31 +26,38 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	cc.AddCallback(func() string {
 		return `
 
-		struct Validator {
-			uint256[4] blsKey;
-			uint256 stake;
-			uint256 totalStake;
-			uint256 commission;
-			uint256 withdrawableRewards;
-			bool active;
-		}
-
 		function getCurrentValidatorSet() public returns (address[] memory) {
 			address[] memory addresses = new address[](1);
 			addresses[0] = address(1);
 			return addresses;
 		}
 
-		function getValidator(address) public returns (Validator memory){
-			uint[4] memory key = [
+		function getValidator(
+			address validator
+		)
+			external
+			view
+			returns (
+				uint256[4] memory blsKey,
+				uint256 stake,
+				uint256 totalStake,
+				uint256 commission,
+				uint256 withdrawableRewards,
+				bool active
+			)
+		{
+			blsKey = [
 				1708568697487735112380375954529256823287318886168633341382922712646533763844,
 				14713639476280042449606484361428781226013866637570951139712205035697871856089,
 				16798350082249088544573448433070681576641749462807627179536437108134609634615,
 				21427200503135995176566340351867145775962083994845221446131416289459495591422
 			];
-			return Validator(key, 10, 10, 0, 0, true);
+			stake = 10;
+			totalStake = 15;
+			commission = 20;
+			withdrawableRewards = 30;
+			active = true;
 		}
-
 		`
 	})
 
@@ -74,7 +81,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 	validators, err := st.GetValidatorSet()
 	assert.NoError(t, err)
 	assert.Equal(t, types.Address(ethgo.HexToAddress("1")), validators[0].Address)
-	assert.Equal(t, new(big.Int).SetUint64(10), validators[0].VotingPower)
+	assert.Equal(t, new(big.Int).SetUint64(15), validators[0].VotingPower)
 }
 
 func TestSystemState_GetNextCommittedIndex(t *testing.T) {
@@ -180,8 +187,8 @@ func TestStateProvider_Txn_NotSupported(t *testing.T) {
 		transition: transition,
 	}
 
-	require.PanicsWithError(t, errSendTxnUnsupported.Error(),
-		func() { _, _ = provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1}) })
+	_, err := provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1})
+	require.ErrorIs(t, err, errSendTxnUnsupported)
 }
 
 func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
@@ -194,9 +201,7 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 	}, st, hclog.NewNullLogger())
 
 	rootHash, err := ex.WriteGenesis(alloc, types.Hash{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {

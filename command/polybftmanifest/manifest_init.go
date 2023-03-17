@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
 )
 
@@ -21,13 +22,14 @@ const (
 	validatorsFlag        = "validators"
 	validatorsPathFlag    = "validators-path"
 	validatorsPrefixFlag  = "validators-prefix"
+	chainIDFlag           = "chain-id"
 
 	defaultValidatorPrefixPath = "test-chain-"
 	defaultManifestPath        = "./manifest.json"
 
-	nodeIDLength       = 53
-	ecdsaAddressLength = 42
-	blsKeyLength       = 2
+	ecdsaAddressLength = 40
+	blsKeyLength       = 256
+	blsSignatureLength = 128
 )
 
 var (
@@ -77,7 +79,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.validators,
 		validatorsFlag,
 		[]string{},
-		"validators defined by user (format: <node id>:<ECDSA address>:<public BLS key>)",
+		"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
 	cmd.Flags().StringVar(
@@ -85,6 +87,13 @@ func setFlags(cmd *cobra.Command) {
 		premineValidatorsFlag,
 		command.DefaultPremineBalance,
 		"the amount which will be pre-mined to all the validators",
+	)
+
+	cmd.Flags().Int64Var(
+		&params.chainID,
+		chainIDFlag,
+		command.DefaultChainID,
+		"the ID of the chain",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
@@ -102,7 +111,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	manifest := &polybft.Manifest{GenesisValidators: validators}
+	manifest := &polybft.Manifest{GenesisValidators: validators, ChainID: params.chainID}
 	if err = manifest.Save(params.manifestPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save manifest file '%s': %w", params.manifestPath, err))
 
@@ -118,6 +127,7 @@ type manifestInitParams struct {
 	validatorsPrefixPath string
 	premineValidators    string
 	validators           []string
+	chainID              int64
 }
 
 func (p *manifestInitParams) validateFlags() error {
@@ -143,30 +153,36 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 		validators := make([]*polybft.Validator, len(p.validators))
 		for i, validator := range p.validators {
 			parts := strings.Split(validator, ":")
-
-			if len(parts) != 3 {
-				return nil, fmt.Errorf("expected 3 parts provided in the following format "+
-					"<nodeId:ECDSA address:blsKey>, but got %d part(s)",
+			if len(parts) != 4 {
+				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
+					"<P2P multi address:ECDSA address:public BLS key:BLS signature>, but got %d part(s)",
 					len(parts))
 			}
 
-			if len(parts[0]) != nodeIDLength {
-				return nil, fmt.Errorf("invalid node id: %s", parts[0])
+			if _, err := multiaddr.NewMultiaddr(parts[0]); err != nil {
+				return nil, fmt.Errorf("invalid P2P multi address '%s' provided: %w ", parts[0], err)
 			}
 
-			if len(parts[1]) != ecdsaAddressLength {
-				return nil, fmt.Errorf("invalid address: %s", parts[1])
+			trimmedAddress := strings.TrimPrefix(parts[1], "0x")
+			if len(trimmedAddress) != ecdsaAddressLength {
+				return nil, fmt.Errorf("invalid ECDSA address: %s", parts[1])
 			}
 
-			if len(parts[2]) < blsKeyLength {
-				return nil, fmt.Errorf("invalid bls key: %s", parts[2])
+			trimmedBLSKey := strings.TrimPrefix(parts[2], "0x")
+			if len(trimmedBLSKey) != blsKeyLength {
+				return nil, fmt.Errorf("invalid BLS key: %s", parts[2])
+			}
+
+			if len(parts[3]) != blsSignatureLength {
+				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
 			}
 
 			validators[i] = &polybft.Validator{
-				NodeID:  parts[0],
-				Address: types.StringToAddress(parts[1]),
-				BlsKey:  parts[2],
-				Balance: balance,
+				MultiAddr:    parts[0],
+				Address:      types.StringToAddress(trimmedAddress),
+				BlsKey:       trimmedBLSKey,
+				BlsSignature: parts[3],
+				Balance:      balance,
 			}
 		}
 

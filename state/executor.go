@@ -106,7 +106,7 @@ func (e *Executor) WriteGenesis(
 
 	if e.GenesisPostHook != nil {
 		if err := e.GenesisPostHook(transition); err != nil {
-			panic(fmt.Errorf("Error writing genesis block: %w", err))
+			return types.Hash{}, fmt.Errorf("Error writing genesis block: %w", err)
 		}
 	}
 

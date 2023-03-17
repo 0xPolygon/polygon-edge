@@ -282,9 +282,7 @@ func newTestTransition(
 	}, st, hclog.NewNullLogger())
 
 	rootHash, err := ex.WriteGenesis(nil, types.Hash{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {

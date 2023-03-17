@@ -37,6 +37,8 @@ linters:
     - dupl # Code clone detection
     - errname # Checks that sentinel errors are prefixed with the Err and error types are suffixed with the Error
     - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13
+    - gocritic
+    - errcheck # Errcheck is a go lint rule for checking for unchecked errors in go programs. These unchecked errors can be critical bugs in some cases
 
 linters-settings:
   gofmt:
@@ -44,6 +46,12 @@ linters-settings:
   goconst:
     min-len: 3
     min-occurrences: 3
+  gocritic:
+    enabled-checks:
+      - ruleguard
+    settings:
+      ruleguard:
+        rules: "./gorules/rules.go"
 
 issues:
   new-from-rev: origin/develop # report only new issues with reference to develop branch

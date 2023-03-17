@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/spf13/cobra"
@@ -31,10 +32,19 @@ func GetCommand() *cobra.Command {
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.accountDir,
-		sidechainHelper.AccountDirFlag,
+		polybftsecrets.AccountDirFlag,
 		"",
-		"the directory path where validator key is stored",
+		polybftsecrets.AccountDirFlagDesc,
 	)
+
+	cmd.Flags().StringVar(
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
+		"",
+		polybftsecrets.AccountConfigFlagDesc,
+	)
+
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -47,7 +57,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	validatorAccount, err := sidechainHelper.GetAccountFromDir(params.accountDir)
+	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.accountConfig)
 	if err != nil {
 		return err
 	}

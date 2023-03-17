@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -64,10 +65,12 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain bridge configuration
 type BridgeConfig struct {
-	BridgeAddr      types.Address `json:"stateSenderAddr"`
-	CheckpointAddr  types.Address `json:"checkpointAddr"`
-	AdminAddress    types.Address `json:"adminAddress"`
-	JSONRPCEndpoint string        `json:"jsonRPCEndpoint"`
+	BridgeAddr              types.Address            `json:"stateSenderAddr"`
+	CheckpointAddr          types.Address            `json:"checkpointAddr"`
+	RootERC20PredicateAddr  types.Address            `json:"rootERC20PredicateAddr"`
+	RootNativeERC20Addr     types.Address            `json:"rootNativeERC20Addr"`
+	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
+	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
 }
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
@@ -76,21 +79,24 @@ func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 
 // Validator represents public information about validator accounts which are the part of genesis
 type Validator struct {
-	Address types.Address
-	BlsKey  string
-	Balance *big.Int
-	NodeID  string
+	Address       types.Address
+	BlsPrivateKey *bls.PrivateKey
+	BlsKey        string
+	BlsSignature  string
+	Balance       *big.Int
+	MultiAddr     string
 }
 
 type validatorRaw struct {
-	Address types.Address `json:"address"`
-	BlsKey  string        `json:"blsKey"`
-	Balance *string       `json:"balance"`
-	NodeID  string        `json:"nodeId"`
+	Address      types.Address `json:"address"`
+	BlsKey       string        `json:"blsKey"`
+	BlsSignature string        `json:"blsSignature"`
+	Balance      *string       `json:"balance"`
+	MultiAddr    string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, NodeID: v.NodeID}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 
 	return json.Marshal(raw)
@@ -107,7 +113,8 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
-	v.NodeID = raw.NodeID
+	v.BlsSignature = raw.BlsSignature
+	v.MultiAddr = raw.MultiAddr
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
 	if err != nil {
@@ -125,6 +132,41 @@ func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
 	}
 
 	return bls.UnmarshalPublicKey(decoded)
+}
+
+// UnmarshalBLSSignature unmarshals the hex encoded BLS signature
+func (v *Validator) UnmarshalBLSSignature() (*bls.Signature, error) {
+	decoded, err := hex.DecodeString(v.BlsSignature)
+	if err != nil {
+		return nil, err
+	}
+
+	return bls.UnmarshalSignature(decoded)
+}
+
+// ToValidatorInitAPIBinding converts Validator to instance of contractsapi.ValidatorInit
+func (v Validator) ToValidatorInitAPIBinding() (*contractsapi.ValidatorInit, error) {
+	blsSignature, err := v.UnmarshalBLSSignature()
+	if err != nil {
+		return nil, err
+	}
+
+	signBigInts, err := blsSignature.ToBigInt()
+	if err != nil {
+		return nil, err
+	}
+
+	pubKey, err := v.UnmarshalBLSPublicKey()
+	if err != nil {
+		return nil, err
+	}
+
+	return &contractsapi.ValidatorInit{
+		Addr:      v.Address,
+		Pubkey:    pubKey.ToBigInt(),
+		Signature: signBigInts,
+		Stake:     new(big.Int).Set(v.Balance),
+	}, nil
 }
 
 // ToValidatorMetadata creates ValidatorMetadata instance
@@ -146,20 +188,23 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 // RootchainConfig contains information about rootchain contract addresses
 // as well as rootchain admin account address
 type RootchainConfig struct {
-	StateSenderAddress       types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress types.Address `json:"checkpointManagerAddress"`
-	BLSAddress               types.Address `json:"blsAddress"`
-	BN256G2Address           types.Address `json:"bn256G2Address"`
-	ExitHelperAddress        types.Address `json:"exitHelperAddress"`
-	AdminAddress             types.Address `json:"adminAddress"`
+	StateSenderAddress        types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress  types.Address `json:"checkpointManagerAddress"`
+	BLSAddress                types.Address `json:"blsAddress"`
+	BN256G2Address            types.Address `json:"bn256G2Address"`
+	ExitHelperAddress         types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
+	RootNativeERC20Address    types.Address `json:"rootNativeERC20Address"`
+	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance
 func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
-		BridgeAddr:     r.StateSenderAddress,
-		CheckpointAddr: r.CheckpointManagerAddress,
-		AdminAddress:   r.AdminAddress,
+		BridgeAddr:             r.StateSenderAddress,
+		CheckpointAddr:         r.CheckpointManagerAddress,
+		RootERC20PredicateAddr: r.RootERC20PredicateAddress,
+		RootNativeERC20Addr:    r.RootNativeERC20Address,
 	}
 }
 
@@ -167,6 +212,7 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 type Manifest struct {
 	GenesisValidators []*Validator     `json:"validators"`
 	RootchainConfig   *RootchainConfig `json:"rootchain"`
+	ChainID           int64            `json:"chainID"`
 }
 
 // LoadManifest deserializes Manifest instance

@@ -10,15 +10,6 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-func ReadArtifact(rootFolder, contractPath, contractName string) (*Artifact, error) {
-	data, err := ReadArtifactData(rootFolder, contractPath, contractName)
-	if err != nil {
-		return nil, err
-	}
-
-	return DecodeArtifact(data)
-}
-
 func ReadArtifactData(rootFolder, contractPath, contractName string) ([]byte, error) {
 	fileName := filepath.Join(rootFolder, contractPath, fmt.Sprintf("%s.json", contractName))
 

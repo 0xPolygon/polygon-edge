@@ -42,11 +42,6 @@ func (g *GenesisGenError) GetType() string {
 	return g.errorType
 }
 
-type premineInfo struct {
-	address types.Address
-	balance *big.Int
-}
-
 // verifyGenesisExistence checks if the genesis file at the specified path is present
 func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	_, err := os.Stat(genesisPath)
@@ -65,6 +60,11 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	}
 
 	return nil
+}
+
+type premineInfo struct {
+	address types.Address
+	balance *big.Int
 }
 
 // parsePremineInfo parses provided premine information and returns premine address and premine balance
@@ -86,6 +86,33 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 	}
 
 	return &premineInfo{address: address, balance: amount}, nil
+}
+
+// parseTrackerStartBlocks parses provided event tracker start blocks configuration.
+// It is set in a following format: <contractAddress>:<startBlock>.
+// In case smart contract address isn't provided in the string, it is assumed its starting block is 0 implicitly.
+func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]uint64, error) {
+	trackerStartBlocksConfig := make(map[types.Address]uint64, len(trackerStartBlocksRaw))
+
+	for _, startBlockRaw := range trackerStartBlocksRaw {
+		delimiterIdx := strings.Index(startBlockRaw, ":")
+		if delimiterIdx == -1 {
+			return nil, fmt.Errorf("invalid event tracker start block configuration provided: %s", trackerStartBlocksRaw)
+		}
+
+		// <contractAddress>:<startBlock>
+		address := types.StringToAddress(startBlockRaw[:delimiterIdx])
+		startBlockRaw := startBlockRaw[delimiterIdx+1:]
+
+		startBlock, err := strconv.ParseUint(startBlockRaw, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse provided start block %s: %w", startBlockRaw, err)
+		}
+
+		trackerStartBlocksConfig[address] = startBlock
+	}
+
+	return trackerStartBlocksConfig, nil
 }
 
 // GetValidatorKeyFiles returns file names which has validator secrets
@@ -137,23 +164,24 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 	for i, file := range validatorKeyFiles {
 		path := filepath.Join(dir, file)
 
-		account, nodeID, err := getSecrets(path)
+		account, nodeID, blsSignature, err := getSecrets(path)
 		if err != nil {
 			return nil, err
 		}
 
-		validator := &polybft.Validator{
-			Address: types.Address(account.Ecdsa.Address()),
-			BlsKey:  hex.EncodeToString(account.Bls.PublicKey().Marshal()),
-			NodeID:  nodeID,
+		validators[i] = &polybft.Validator{
+			Address:       types.Address(account.Ecdsa.Address()),
+			BlsPrivateKey: account.Bls,
+			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			BlsSignature:  blsSignature,
+			MultiAddr:     fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
 		}
-		validators[i] = validator
 	}
 
 	return validators, nil
 }
 
-func getSecrets(directory string) (*wallet.Account, string, error) {
+func getSecrets(directory string) (*wallet.Account, string, string, error) {
 	baseConfig := &secrets.SecretsManagerParams{
 		Logger: hclog.NewNullLogger(),
 		Extra: map[string]interface{}{
@@ -163,18 +191,20 @@ func getSecrets(directory string) (*wallet.Account, string, error) {
 
 	localManager, err := local.SecretsManagerFactory(nil, baseConfig)
 	if err != nil {
-		return nil, "", fmt.Errorf("unable to instantiate local secrets manager, %w", err)
+		return nil, "", "", fmt.Errorf("unable to instantiate local secrets manager, %w", err)
 	}
 
 	nodeID, err := helper.LoadNodeID(localManager)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 
 	account, err := wallet.NewAccountFromSecret(localManager)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
 
-	return account, nodeID, nil
+	blsSignature, err := helper.LoadBLSSignature(localManager)
+
+	return account, nodeID, blsSignature, err
 }

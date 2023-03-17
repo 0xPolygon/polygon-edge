@@ -6,7 +6,7 @@ import (
 
 // bridgeStore interface provides access to the methods needed by bridge endpoint
 type bridgeStore interface {
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error)
+	GenerateExitProof(exitID uint64) (types.Proof, error)
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 }
 
@@ -16,8 +16,8 @@ type Bridge struct {
 }
 
 // GenerateExitProof generates exit proof for given exit event
-func (b *Bridge) GenerateExitProof(exitID, epoch, checkpointBlock argUint64) (interface{}, error) {
-	return b.store.GenerateExitProof(uint64(exitID), uint64(epoch), uint64(checkpointBlock))
+func (b *Bridge) GenerateExitProof(exitID argUint64) (interface{}, error) {
+	return b.store.GenerateExitProof(uint64(exitID))
 }
 
 // GetStateSyncProof retrieves the StateSync proof

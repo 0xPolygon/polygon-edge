@@ -75,11 +75,11 @@ func (h *hasher) Hash(data []byte) []byte {
 	n, err := h.hash.Read(h.tmp[:])
 
 	if err != nil {
-		panic(err)
+		panic(err) //nolint:gocritic
 	}
 
 	if n != 32 {
-		panic("incorrect length")
+		panic("incorrect length") //nolint:gocritic
 	}
 
 	return h.tmp[:]
@@ -176,7 +176,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		}
 
 	default:
-		panic(fmt.Sprintf("unknown node type %v", n))
+		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic
 	}
 
 	if val.Len() < 32 {

@@ -6,6 +6,7 @@ option go_package = "/txpool/proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/empty.proto";
+import "validate/validate.proto";
 
 service TxnPoolOperator {
   // Status returns the current status of the pool
@@ -19,8 +20,8 @@ service TxnPoolOperator {
 }
 
 message AddTxnReq {
-  google.protobuf.Any raw = 1;
-  string from = 2;
+  google.protobuf.Any raw = 1[(validate.rules).any.required = true];
+  string from = 2[(validate.rules).string = {ignore_empty: true, pattern: "^0x[a-fA-F0-9]{40}$"}];
 }
 
 message AddTxnResp {
@@ -33,7 +34,7 @@ message TxnPoolStatusResp {
 
 message SubscribeRequest {
   // Requested event types
-  repeated EventType types = 1;
+  repeated EventType types = 1[(validate.rules).repeated = {unique : true, min_items: 1, items: {enum: {defined_only: true}}}];
 }
 
 enum EventType {

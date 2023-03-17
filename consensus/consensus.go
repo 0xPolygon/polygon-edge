@@ -73,6 +73,8 @@ type Params struct {
 	Logger         hclog.Logger
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
+
+	NumBlockConfirmations uint64
 }
 
 // Factory is the factory function to create a discovery consensus
@@ -81,7 +83,7 @@ type Factory func(*Params) (Consensus, error)
 // BridgeDataProvider is an interface providing bridge related functions
 type BridgeDataProvider interface {
 	// GenerateExit proof generates proof of exit for given exit event
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error)
+	GenerateExitProof(exitID uint64) (types.Proof, error)
 
 	// GetStateSyncProof retrieves the StateSync proof
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)

@@ -99,7 +99,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 			if len(obj.Storage) != 0 {
 				trie, err := s.state.newTrieAt(obj.Root)
 				if err != nil {
-					panic(err)
+					panic(err) //nolint:gocritic
 				}
 
 				localTxn := trie.Txn(s.state.storage)

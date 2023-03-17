@@ -21,7 +21,7 @@ func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
 		epochSize        = uint64(10)
 	)
 
-	allValidators := newTestValidators(totalValidators).getPublicIdentities()
+	allValidators := newTestValidators(t, totalValidators).getPublicIdentities()
 
 	var oddValidators, evenValidators AccountSet
 
@@ -98,7 +98,7 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 		validatorSetSize = 5
 	)
 
-	allValidators := newTestValidators(totalValidators).getPublicIdentities()
+	allValidators := newTestValidators(t, totalValidators).getPublicIdentities()
 	epochOneValidators := AccountSet{allValidators[0], allValidators[len(allValidators)-1]}
 	epochTwoValidators := allValidators[1 : len(allValidators)-2]
 
@@ -124,7 +124,7 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 
 	// Invalidate in memory cache
 	testValidatorsCache.snapshots = map[uint64]*validatorSnapshot{}
-	require.NoError(testValidatorsCache.state.removeAllValidatorSnapshots())
+	require.NoError(testValidatorsCache.state.EpochStore.removeAllValidatorSnapshots())
 	// Fetch snapshot from database
 	snapshot, err = testValidatorsCache.GetSnapshot(10, nil)
 	require.NoError(err)
@@ -143,7 +143,7 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 	cache := &testValidatorsCache{
 		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
 	}
-	snapshot := newTestValidators(3).getPublicIdentities()
+	snapshot := newTestValidators(t, 3).getPublicIdentities()
 	maxEpoch := uint64(0)
 
 	for i := uint64(0); i < validatorSnapshotLimit; i++ {
@@ -165,14 +165,17 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 		require.Equal(snapshot, currentSnapshot.Snapshot, fmt.Sprintf("snapshots for epoch %d are not equal", currentEpoch))
 	}
 
+	stats, err := cache.state.EpochStore.validatorSnapshotsDBStats()
+	require.NoError(err)
+
 	// assertions for remaining snapshots in database
-	require.Equal(cache.state.validatorSnapshotsDBStats().KeyN, numberOfSnapshotsToLeaveInDB)
+	require.Equal(stats.KeyN, numberOfSnapshotsToLeaveInDB)
 
 	currentEpoch = maxEpoch
 
 	for i := 0; i < numberOfSnapshotsToLeaveInDB; i++ {
 		currentEpoch--
-		currentSnapshot, err := cache.state.getValidatorSnapshot(currentEpoch)
+		currentSnapshot, err := cache.state.EpochStore.getValidatorSnapshot(currentEpoch)
 		require.NoError(err, fmt.Sprintf("failed to fetch database snapshot for epoch %d", currentEpoch))
 		require.Equal(snapshot, currentSnapshot.Snapshot, fmt.Sprintf("snapshots for epoch %d are not equal", currentEpoch))
 	}
@@ -188,7 +191,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_UnknownBlock(t *testing.T) {
 		epochSize        = uint64(10)
 	)
 
-	allValidators := newTestValidators(totalValidators).getPublicIdentities()
+	allValidators := newTestValidators(t, totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
 	headersMap.addHeader(createValidatorDeltaHeader(t, 0, 0, nil, allValidators[:validatorSetSize]))
 	headersMap.addHeader(createValidatorDeltaHeader(t, 1*epochSize, 1, allValidators[:validatorSetSize], allValidators[validatorSetSize:]))
@@ -215,7 +218,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_IncorrectExtra(t *testing.T) {
 		epochSize        = uint64(10)
 	)
 
-	allValidators := newTestValidators(totalValidators).getPublicIdentities()
+	allValidators := newTestValidators(t, totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
 	invalidHeader := createValidatorDeltaHeader(t, 1*epochSize, 1, allValidators[:validatorSetSize], allValidators[validatorSetSize:])
 	invalidHeader.ExtraData = []byte{0x2, 0x7}
@@ -243,7 +246,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 		epochSize        = uint64(10)
 	)
 
-	allValidators := newTestValidators(totalValidators).getPublicIdentities()
+	allValidators := newTestValidators(t, totalValidators).getPublicIdentities()
 	headersMap := &testHeadersMap{}
 	headersMap.addHeader(createValidatorDeltaHeader(t, 0, 0, nil, allValidators[:validatorSetSize]))
 	headersMap.addHeader(createValidatorDeltaHeader(t, 1*epochSize, 1, nil, allValidators[:validatorSetSize]))
@@ -290,5 +293,5 @@ type testValidatorsCache struct {
 func (c *testValidatorsCache) cleanValidatorsCache() error {
 	c.snapshots = make(map[uint64]*validatorSnapshot)
 
-	return c.state.removeAllValidatorSnapshots()
+	return c.state.EpochStore.removeAllValidatorSnapshots()
 }

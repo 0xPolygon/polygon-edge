@@ -2,7 +2,6 @@ package framework
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -38,14 +37,11 @@ const (
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
 
-	// property based tests enabled
-	envPropertyBaseTestEnabled = "E2E_PROPERTY_TESTS"
+	// envE2ETestsType used just to display type of test if skipped
+	envE2ETestsType = "E2E_TESTS_TYPE"
 )
 
 const (
-	// path to core contracts
-	defaultContractsPath = "./../core-contracts/artifacts/contracts/"
-
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
 )
@@ -79,14 +75,14 @@ type TestClusterConfig struct {
 	LogsDir           string
 	TmpDir            string
 	BlockGasLimit     uint64
-	ContractsDir      string
 	ValidatorPrefix   string
 	Binary            string
 	ValidatorSetSize  uint64
 	EpochSize         int
 	EpochReward       int
-	PropertyBaseTests bool
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
+
+	NumBlockConfirmations uint64
 
 	InitialTrieDB    string
 	InitialStateRoot types.Hash
@@ -137,7 +133,7 @@ func (c *TestClusterConfig) GetStdout(name string, custom ...io.Writer) io.Write
 }
 
 func (c *TestClusterConfig) initLogsDir() {
-	logsDir := path.Join("..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
+	logsDir := path.Join("../..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
 
 	if err := common.CreateDirSafe(logsDir, 0750); err != nil {
 		c.t.Fatal(err)
@@ -229,9 +225,9 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithPropertyBaseTests(propertyBaseTests bool) ClusterOption {
+func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.PropertyBaseTests = propertyBaseTests
+		h.NumBlockConfirmations = numBlockConfirmations
 	}
 }
 
@@ -255,10 +251,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		PremineValidators: command.DefaultPremineBalance,
 	}
 
-	if config.ContractsDir == "" {
-		config.ContractsDir = defaultContractsPath
-	}
-
 	if config.ValidatorPrefix == "" {
 		config.ValidatorPrefix = defaultValidatorPrefix
 	}
@@ -267,9 +259,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		opt(config)
 	}
 
-	if !config.PropertyBaseTests && !isTrueEnv(envE2ETestsEnabled) ||
-		config.PropertyBaseTests && !isTrueEnv(envPropertyBaseTestEnabled) {
-		t.Skip("Integration tests are disabled.")
+	if !isTrueEnv(envE2ETestsEnabled) {
+		testType := os.Getenv(envE2ETestsType)
+		if testType == "" {
+			testType = "integration"
+		}
+
+		t.Skip(fmt.Sprintf("%s tests are disabled.", testType))
 	}
 
 	config.TmpDir, err = os.MkdirTemp("/tmp", "e2e-polybft-")
@@ -319,7 +315,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(manifestPath)
 		require.NoError(t, err)
 
-		err = cluster.Bridge.fundValidators()
+		err = cluster.Bridge.fundRootchainValidators()
 		require.NoError(t, err)
 	}
 
@@ -330,7 +326,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--manifest", manifestPath,
 			"--consensus", "polybft",
 			"--dir", path.Join(config.TmpDir, "genesis.json"),
-			"--contracts-path", defaultContractsPath,
 			"--block-gas-limit", strconv.FormatUint(cluster.Config.BlockGasLimit, 10),
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
@@ -350,19 +345,18 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge-json-rpc", rootchainIP)
 		}
 
-		validators, err := genesis.ReadValidatorsByPrefix(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
+		validators, err := genesis.ReadValidatorsByPrefix(
+			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 		require.NoError(t, err)
 
 		if cluster.Config.BootnodeCount > 0 {
-			cnt := cluster.Config.BootnodeCount
-			if len(validators) < cnt {
-				cnt = len(validators)
+			bootNodesCnt := cluster.Config.BootnodeCount
+			if len(validators) < bootNodesCnt {
+				bootNodesCnt = len(validators)
 			}
 
-			for i := 0; i < cnt; i++ {
-				maddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s",
-					"127.0.0.1", cluster.initialPort+int64(i+1), validators[i].NodeID)
-				args = append(args, "--bootnode", maddr)
+			for i := 0; i < bootNodesCnt; i++ {
+				args = append(args, "--bootnode", validators[i].MultiAddr)
 			}
 		}
 
@@ -408,6 +402,7 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
 		config.Relayer = relayer
+		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 	})
 
 	// watch the server for stop signals. It is important to fix the specific
@@ -425,29 +420,6 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 
 func (c *TestCluster) cmdRun(args ...string) error {
 	return runCommand(c.Config.Binary, args, c.Config.GetStdout(args[0]))
-}
-
-// EmitTransfer function is used to invoke e2e rootchain emit command
-// with appropriately created wallets and amounts for test transactions
-func (c *TestCluster) EmitTransfer(contractAddress, walletAddresses, amounts string) error {
-	if len(contractAddress) == 0 {
-		return errors.New("provide contractAddress value")
-	}
-
-	if len(walletAddresses) == 0 {
-		return errors.New("provide at least one wallet address value")
-	}
-
-	if len(amounts) == 0 {
-		return errors.New("provide at least one amount value")
-	}
-
-	return c.cmdRun("rootchain",
-		"emit",
-		"--manifest", path.Join(c.Config.TmpDir, "manifest.json"),
-		"--contract", contractAddress,
-		"--wallets", walletAddresses,
-		"--amounts", amounts)
 }
 
 func (c *TestCluster) Fail(err error) {

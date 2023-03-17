@@ -4,27 +4,30 @@ import (
 	"errors"
 	"fmt"
 	"os"
+
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 )
 
 const (
-	contractsPathFlag = "path"
-	manifestPathFlag  = "manifest"
-	jsonRPCFlag       = "json-rpc"
-	adminKeyFlag      = "admin-key"
+	manifestPathFlag   = "manifest"
+	jsonRPCFlag        = "json-rpc"
+	rootchainERC20Flag = "rootchain-erc20"
 
 	defaultManifestPath = "./manifest.json"
 )
 
 type initContractsParams struct {
-	contractsPath  string
-	manifestPath   string
-	adminKey       string
-	jsonRPCAddress string
+	manifestPath       string
+	accountDir         string
+	accountConfig      string
+	jsonRPCAddress     string
+	rootERC20TokenAddr string
+	isTestMode         bool
 }
 
 func (ip *initContractsParams) validateFlags() error {
-	if _, err := os.Stat(ip.contractsPath); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("provided smart contracts directory '%s' doesn't exist", ip.contractsPath)
+	if err := helper.ValidateSecretFlags(ip.isTestMode, ip.accountDir, ip.accountConfig); err != nil {
+		return err
 	}
 
 	if _, err := os.Stat(ip.manifestPath); errors.Is(err, os.ErrNotExist) {

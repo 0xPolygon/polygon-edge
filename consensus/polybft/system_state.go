@@ -79,12 +79,12 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to call getValidator function: %w", err)
 		}
 
-		output, isOk = output["0"].(map[string]interface{})
-		if !isOk {
-			return nil, fmt.Errorf("failed to decode validator data")
+		blsKey, ok := output["blsKey"].([4]*big.Int)
+		if !ok {
+			return nil, fmt.Errorf("failed to decode blskey")
 		}
 
-		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["blsKey"].([4]*big.Int))
+		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(blsKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to unmarshal BLS public key: %w", err)
 		}
@@ -94,13 +94,11 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to decode total stake")
 		}
 
-		val := &ValidatorMetadata{
+		return &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
 			VotingPower: new(big.Int).Set(totalStake),
-		}
-
-		return val, nil
+		}, nil
 	}
 
 	for _, index := range addresses {

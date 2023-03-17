@@ -107,3 +107,15 @@ func TestSimpleGossip(t *testing.T) {
 		}
 	}
 }
+
+func Test_RepeatedClose(t *testing.T) {
+	topic := &Topic{
+		closeCh: make(chan struct{}),
+		closed:  new(uint64),
+	}
+
+	// Call Close() twice to ensure that underlying logic (e.g. channel close) is
+	// only executed once.
+	topic.Close()
+	topic.Close()
+}

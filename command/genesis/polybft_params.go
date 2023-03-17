@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -22,12 +23,12 @@ import (
 )
 
 const (
-	smartContractsRootPathFlag = "contracts-path"
-	manifestPathFlag           = "manifest"
-	validatorSetSizeFlag       = "validator-set-size"
-	sprintSizeFlag             = "sprint-size"
-	blockTimeFlag              = "block-time"
-	bridgeFlag                 = "bridge-json-rpc"
+	manifestPathFlag       = "manifest"
+	validatorSetSizeFlag   = "validator-set-size"
+	sprintSizeFlag         = "sprint-size"
+	blockTimeFlag          = "block-time"
+	bridgeFlag             = "bridge-json-rpc"
+	trackerStartBlocksFlag = "tracker-start-blocks"
 
 	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)
@@ -56,12 +57,18 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		return errNoGenesisValidators
 	}
 
+	eventTrackerStartBlock, err := parseTrackerStartBlocks(params.eventTrackerStartBlocks)
+	if err != nil {
+		return err
+	}
+
 	var bridge *polybft.BridgeConfig
 
 	// populate bridge configuration
 	if p.bridgeJSONRPCAddr != "" && manifest.RootchainConfig != nil {
 		bridge = manifest.RootchainConfig.ToBridgeConfig()
 		bridge.JSONRPCEndpoint = p.bridgeJSONRPCAddr
+		bridge.EventTrackerStartBlocks = eventTrackerStartBlock
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{
@@ -153,8 +160,7 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 
 		// set genesis validators as boot nodes if boot nodes not provided via CLI
 		if len(p.bootnodes) == 0 {
-			bootNodeMultiAddr := fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+i, validator.NodeID)
-			chainConfig.Bootnodes = append(chainConfig.Bootnodes, bootNodeMultiAddr)
+			chainConfig.Bootnodes = append(chainConfig.Bootnodes, validator.MultiAddr)
 		}
 	}
 
@@ -178,59 +184,57 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 
 func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
 	genesisContracts := []struct {
-		name         string
-		relativePath string
-		address      types.Address
+		artifact *artifact.Artifact
+		address  types.Address
 	}{
 		{
-			// Validator contract
-			name:         "ChildValidatorSet",
-			relativePath: "child/ChildValidatorSet.sol",
-			address:      contracts.ValidatorSetContract,
+			// ChildValidatorSet contract
+			artifact: contractsapi.ChildValidatorSet,
+			address:  contracts.ValidatorSetContract,
 		},
 		{
 			// State receiver contract
-			name:         "StateReceiver",
-			relativePath: "child/StateReceiver.sol",
-			address:      contracts.StateReceiverContract,
+			artifact: contractsapi.StateReceiver,
+			address:  contracts.StateReceiverContract,
 		},
 		{
-			// Native Token contract (Matic ERC-20)
-			name:         "MRC20",
-			relativePath: "child/MRC20.sol",
-			address:      contracts.NativeTokenContract,
+			// NativeERC20 Token contract
+			artifact: contractsapi.NativeERC20,
+			address:  contracts.NativeERC20TokenContract,
+		},
+		{
+			// ChildERC20 token contract
+			artifact: contractsapi.ChildERC20,
+			address:  contracts.ChildERC20Contract,
+		},
+		{
+			// ChildERC20Predicate contract
+			artifact: contractsapi.ChildERC20Predicate,
+			address:  contracts.ChildERC20PredicateContract,
 		},
 		{
 			// BLS contract
-			name:         "BLS",
-			relativePath: "common/BLS.sol",
-			address:      contracts.BLSContract,
+			artifact: contractsapi.BLS,
+			address:  contracts.BLSContract,
 		},
 		{
 			// Merkle contract
-			name:         "Merkle",
-			relativePath: "common/Merkle.sol",
-			address:      contracts.MerkleContract,
+			artifact: contractsapi.Merkle,
+			address:  contracts.MerkleContract,
 		},
 		{
 			// L2StateSender contract
-			name:         "L2StateSender",
-			relativePath: "child/L2StateSender.sol",
-			address:      contracts.L2StateSenderContract,
+			artifact: contractsapi.L2StateSender,
+			address:  contracts.L2StateSenderContract,
 		},
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
-		artifact, err := artifact.ReadArtifact(p.smartContractsRootPath, contract.relativePath, contract.name)
-		if err != nil {
-			return nil, err
-		}
-
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
-			Code:    artifact.DeployedBytecode,
+			Code:    contract.artifact.DeployedBytecode,
 		}
 	}
 

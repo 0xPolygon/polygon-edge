@@ -62,7 +62,7 @@ func newDispatcher(
 	logger hclog.Logger,
 	store JSONRPCStore,
 	params *dispatcherParams,
-) *Dispatcher {
+) (*Dispatcher, error) {
 	d := &Dispatcher{
 		logger: logger.Named("dispatcher"),
 		params: params,
@@ -73,12 +73,14 @@ func newDispatcher(
 		go d.filterManager.Run()
 	}
 
-	d.registerEndpoints(store)
+	if err := d.registerEndpoints(store); err != nil {
+		return nil, err
+	}
 
-	return d
+	return d, nil
 }
 
-func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
+func (d *Dispatcher) registerEndpoints(store JSONRPCStore) error {
 	d.endpoints.Eth = &Eth{
 		d.logger,
 		store,
@@ -104,12 +106,29 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) {
 		store,
 	}
 
-	d.registerService("eth", d.endpoints.Eth)
-	d.registerService("net", d.endpoints.Net)
-	d.registerService("web3", d.endpoints.Web3)
-	d.registerService("txpool", d.endpoints.TxPool)
-	d.registerService("bridge", d.endpoints.Bridge)
-	d.registerService("debug", d.endpoints.Debug)
+	var err error
+
+	if err = d.registerService("eth", d.endpoints.Eth); err != nil {
+		return err
+	}
+
+	if err = d.registerService("net", d.endpoints.Net); err != nil {
+		return err
+	}
+
+	if err = d.registerService("web3", d.endpoints.Web3); err != nil {
+		return err
+	}
+
+	if err = d.registerService("txpool", d.endpoints.TxPool); err != nil {
+		return err
+	}
+
+	if err = d.registerService("bridge", d.endpoints.Bridge); err != nil {
+		return err
+	}
+
+	return d.registerService("debug", d.endpoints.Debug)
 }
 
 func (d *Dispatcher) getFnHandler(req Request) (*serviceData, *funcData, Error) {
@@ -380,18 +399,18 @@ func (d *Dispatcher) logInternalError(method string, err error) {
 	d.logger.Error("failed to dispatch", "method", method, "err", err)
 }
 
-func (d *Dispatcher) registerService(serviceName string, service interface{}) {
+func (d *Dispatcher) registerService(serviceName string, service interface{}) error {
 	if d.serviceMap == nil {
 		d.serviceMap = map[string]*serviceData{}
 	}
 
 	if serviceName == "" {
-		panic("jsonrpc: serviceName cannot be empty")
+		return errors.New("jsonrpc: serviceName cannot be empty")
 	}
 
 	st := reflect.TypeOf(service)
 	if st.Kind() == reflect.Struct {
-		panic(fmt.Sprintf("jsonrpc: service '%s' must be a pointer to struct", serviceName))
+		return errors.New(fmt.Sprintf("jsonrpc: service '%s' must be a pointer to struct", serviceName))
 	}
 
 	funcMap := make(map[string]*funcData)
@@ -412,7 +431,7 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		var err error
 
 		if fd.inNum, fd.reqt, err = validateFunc(funcName, fd.fv, true); err != nil {
-			panic(fmt.Sprintf("jsonrpc: %s", err))
+			return fmt.Errorf("jsonrpc: %w", err)
 		}
 		// check if last item is a pointer
 		if fd.numParams() != 0 {
@@ -429,6 +448,8 @@ func (d *Dispatcher) registerService(serviceName string, service interface{}) {
 		sv:      reflect.ValueOf(service),
 		funcMap: funcMap,
 	}
+
+	return nil
 }
 
 func validateFunc(funcName string, fv reflect.Value, _ bool) (inNum int, reqt []reflect.Type, err error) {
