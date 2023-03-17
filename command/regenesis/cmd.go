@@ -85,7 +85,7 @@ func GetCommand() *cobra.Command {
 
 	genesisCmd.Flags().StringVar(
 		&params.SnapshotTrieDBPath,
-		"snapshotPath",
+		"target-path",
 		"",
 		"the directory of trie data of trie copy",
 	)
