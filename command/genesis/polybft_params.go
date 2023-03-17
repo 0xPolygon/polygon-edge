@@ -1,11 +1,9 @@
 package genesis
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
-	"sort"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -254,11 +252,6 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 		Added:   validators,
 		Removed: bitmap.Bitmap{},
 	}
-
-	// Order validators based on its addresses
-	sort.Slice(delta.Added, func(i, j int) bool {
-		return bytes.Compare(delta.Added[i].Address[:], delta.Added[j].Address[:]) < 0
-	})
 
 	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
