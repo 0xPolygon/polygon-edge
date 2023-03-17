@@ -24,7 +24,7 @@ func Test_validateFlags_ErrorValidateIPPort(t *testing.T) {
 func Test_validateFlags_InvokerAddressNotSpecified(t *testing.T) {
 	t.Parallel()
 
-	tmpFilePath, err := os.MkdirTemp("/tmp", "aa_test_test_happy_path")
+	tmpFilePath, err := os.MkdirTemp("", "aa_test_test_happy_path")
 	require.NoError(t, err)
 
 	defer os.RemoveAll(tmpFilePath)
@@ -40,7 +40,7 @@ func Test_validateFlags_InvokerAddressNotSpecified(t *testing.T) {
 func Test_validateFlags_SecretsError(t *testing.T) {
 	t.Parallel()
 
-	tmpFilePath, err := os.MkdirTemp("/tmp", "aa_test_test_happy_path")
+	tmpFilePath, err := os.MkdirTemp("", "aa_test_test_happy_path")
 	require.NoError(t, err)
 
 	defer os.RemoveAll(tmpFilePath)
@@ -58,7 +58,7 @@ func Test_validateFlags_ErrorValidateDbPath(t *testing.T) {
 	t.Parallel()
 
 	p := aarelayerParams{
-		dbPath: "/tmp/non_existing_path_to/non_existing_file.db",
+		dbPath: "/non_existing_path_to/non_existing_file.db",
 		addr:   "127.0.0.1:8289",
 	}
 
@@ -71,7 +71,7 @@ func Test_validateFlags_ErrorValidateDbPath(t *testing.T) {
 func Test_validateFlags_HappyPath(t *testing.T) {
 	t.Parallel()
 
-	tmpFilePath, err := os.MkdirTemp("/tmp", "aa_test_test_happy_path")
+	tmpFilePath, err := os.MkdirTemp("", "aa_test_test_happy_path")
 	require.NoError(t, err)
 
 	defer os.RemoveAll(tmpFilePath)
