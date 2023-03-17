@@ -21,7 +21,7 @@ func Test_AAConfig(t *testing.T) {
 
 		config := AAConfig{DenyList: []string{"0000000000000000000000000000000000000000"}}
 
-		assert.False(t, config.IsValidAddress(types.ZeroAddress))
+		assert.False(t, config.IsAddressAllowed(types.ZeroAddress))
 	})
 
 	t.Run("WhiteListEmpty", func(t *testing.T) {
@@ -30,7 +30,7 @@ func Test_AAConfig(t *testing.T) {
 		config := AAConfig{DenyList: []string{"0000000000000000000000000000000000000000"}}
 
 		address := types.Address{1, 2}
-		assert.True(t, config.IsValidAddress(address))
+		assert.True(t, config.IsAddressAllowed(address))
 	})
 
 	t.Run("NotInWhiteList", func(t *testing.T) {
@@ -39,7 +39,7 @@ func Test_AAConfig(t *testing.T) {
 		config := AAConfig{AllowList: []string{"1000000000000000000000000000000000000000"}}
 
 		address := types.Address{1, 2}
-		assert.False(t, config.IsValidAddress(address))
+		assert.False(t, config.IsAddressAllowed(address))
 	})
 
 	t.Run("InWhiteList", func(t *testing.T) {
@@ -48,7 +48,7 @@ func Test_AAConfig(t *testing.T) {
 		config := AAConfig{AllowList: []string{"0101000000000000000000000000000000000000"}}
 
 		address := types.Address{1, 1}
-		assert.True(t, config.IsValidAddress(address))
+		assert.True(t, config.IsAddressAllowed(address))
 	})
 
 	t.Run("JSONConfig", func(t *testing.T) {
@@ -65,7 +65,7 @@ func Test_AAConfig(t *testing.T) {
 		address1 := types.StringToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976F")
 		address2 := types.StringToAddress("0x71C7656EC7ab88b098defB751B7401B5f6d8976C")
 
-		assert.True(t, config.IsValidAddress(address1))
-		assert.False(t, config.IsValidAddress(address2))
+		assert.True(t, config.IsAddressAllowed(address1))
+		assert.False(t, config.IsAddressAllowed(address2))
 	})
 }

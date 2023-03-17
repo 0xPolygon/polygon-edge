@@ -37,8 +37,8 @@ var (
 		"tuple(bytes32 typeHash, bytes32 name, bytes32 version, uint256 chainId, address verifyingContract)",
 	)
 
-	// default address of invoker smart contract
-	DefaultAAInvokerAddress = types.StringToAddress("3001")
+	//  aaInvokerNoncesAbiType is mapping(address => uint256) public nonces;
+	aaInvokerNoncesAbiType = abi.MustNewMethod("function nonces(address) returns (uint256)")
 )
 
 // AATransaction represents an AA transaction
