@@ -206,8 +206,6 @@ func setFlags(cmd *cobra.Command) {
 			"",
 			"path to trie root from corresponding triedb",
 		)
-
-		cmd.Flags().Lookup(bridgeFlag).NoOptDefVal = "http://127.0.0.1:8545"
 	}
 }
 

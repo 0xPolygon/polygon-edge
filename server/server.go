@@ -203,8 +203,8 @@ func NewServer(config *Config) (*Server, error) {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
 
-	var genesisRoot types.Hash
-	//todo handle non-first blocks
+	var initialStateRoot = types.ZeroHash
+
 	if ConsensusType(engineName) == PolyBFTConsensus {
 		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
 		if err != nil {
@@ -222,14 +222,11 @@ func NewServer(config *Config) (*Server, error) {
 			}
 
 			logger.Warn("Initial state root checked and correct")
-
-			genesisRoot, err = m.executor.WriteGenesis(config.Chain.Genesis.Alloc, polyBFTConfig.InitialTrieRoot)
+			initialStateRoot = polyBFTConfig.InitialTrieRoot
 		}
-	} else {
-		genesisRoot, err = m.executor.WriteGenesis(config.Chain.Genesis.Alloc, types.ZeroHash)
 	}
 
-	//check write genesis error
+	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
 	if err != nil {
 		return nil, err
 	}

@@ -194,10 +194,10 @@ func TestMigration(t *testing.T) {
 	cluster.Servers[6].Start()
 	require.NoError(t, cluster.WaitForBlock(20, time.Minute))
 
+	//stop all nodes
 	for i := range cluster.Servers {
 		cluster.Servers[i].Stop()
 	}
-
 	time.Sleep(time.Second)
 
 	for i := range cluster.Servers {
@@ -206,6 +206,7 @@ func TestMigration(t *testing.T) {
 
 	require.NoError(t, cluster.WaitForBlock(25, time.Minute))
 
+	// add new node
 	_, err = cluster.InitSecrets("test-chain-8", 1)
 	require.NoError(t, err)
 
