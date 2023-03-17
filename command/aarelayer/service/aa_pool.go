@@ -13,6 +13,8 @@ type AAPool interface {
 	Push(*AAStateTransaction)
 	// Pop removes the next transaction from the pool and returns it
 	Pop() *AAStateTransaction
+	// Update performs pool update for given address if needed
+	Update(types.Address)
 	// Init initializes the pool with a set of existing AA transactions. Used on client startup
 	Init([]*AAStateTransaction)
 	// Len returns number of items in pool
@@ -25,10 +27,13 @@ type aaPool struct {
 	// mutex is used for synchronization
 	mutex sync.Mutex
 	// perAddress keeps for each address binary heap where txs are sorted by nonce
-	perAddress map[types.Address]aaPoolAddressData
-	// timeHeap is a binary heap where txs are sorted by time.
-	// The top tx from each key in the perAddress map is placed into this heap.
-	// This allows for efficient retrieval of the oldest tx in the entire pool.
+	perAddressNonceHeap map[types.Address]*aaPoolNonceHeap
+	// perAddressItem keeps item from timeHeap for each address
+	perAddressItem map[types.Address]*aaPoolTimeHeapItem
+	// timeHeap is a binary heap where txs are sorted by time
+	// only one tx from same address can be inside timeHeap
+	// that tx corresponds to the first one from perAddressNonceHeap[address]
+	// this allows for efficient retrieval of the oldest tx with lowest nonce in the entire pool
 	timeHeap aaPoolTimeHeap
 	// count is count of all txs
 	count int
@@ -39,9 +44,10 @@ func NewAAPool() *aaPool {
 	heap.Init(&timeHeap)
 
 	return &aaPool{
-		perAddress: make(map[types.Address]aaPoolAddressData),
-		timeHeap:   timeHeap,
-		count:      0,
+		perAddressNonceHeap: map[types.Address]*aaPoolNonceHeap{},
+		perAddressItem:      map[types.Address]*aaPoolTimeHeapItem{},
+		timeHeap:            timeHeap,
+		count:               0,
 	}
 }
 
@@ -53,21 +59,28 @@ func (p *aaPool) Push(stateTx *AAStateTransaction) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	from := stateTx.Tx.Transaction.From
-	timeHeapItem := &aaPoolTimeHeapItem{stateTx: stateTx}
+	address := stateTx.Tx.Transaction.From
 
-	cont, exists := p.perAddress[from]
+	nonceHeap, exists := p.perAddressNonceHeap[address]
 	if !exists {
+		// this is the first stateTx from address - simple update of binary heaps and perAddressItem map
+		timeHeapItem := &aaPoolTimeHeapItem{stateTx: stateTx}
+		p.perAddressNonceHeap[address] = &aaPoolNonceHeap{stateTx}
+		p.perAddressItem[address] = timeHeapItem
 		heap.Push(&p.timeHeap, timeHeapItem)
-		p.perAddress[from] = aaPoolAddressData{
-			pool: &aaPoolNonceHeap{stateTx},
-			item: timeHeapItem,
-		}
 	} else {
-		heap.Push(cont.pool, stateTx)
-		cont.item.stateTx = cont.pool.Peek() // new timeHeap item should be first from nonce heap
-		heap.Fix(&p.timeHeap, cont.item.index)
-		p.perAddress[from] = cont // update map
+		heap.Push(nonceHeap, stateTx)
+
+		if prevTimeHeapItem, exists := p.perAddressItem[address]; exists {
+			// timeHeap already contains item from address - get one with the smallest nonce and update position
+			prevTimeHeapItem.stateTx = nonceHeap.Peek()
+			heap.Fix(&p.timeHeap, prevTimeHeapItem.index)
+		} else {
+			// timeHeap does not contain item from address - add one with the smallest nonce to the timeHeap
+			timeHeapItem := &aaPoolTimeHeapItem{stateTx: nonceHeap.Peek()}
+			p.perAddressItem[address] = timeHeapItem
+			heap.Push(&p.timeHeap, timeHeapItem)
+		}
 	}
 
 	p.count++
@@ -81,64 +94,75 @@ func (p *aaPool) Pop() *AAStateTransaction {
 		return nil
 	}
 
-	el := heap.Pop(&p.timeHeap).(*aaPoolTimeHeapItem) //nolint
-	cont := p.perAddress[el.stateTx.Tx.Transaction.From]
-	_ = heap.Pop(cont.pool) // remove from perAddress also
-
-	if cont.pool.Len() > 0 {
-		el := &aaPoolTimeHeapItem{
-			stateTx: cont.pool.Peek(),
-		}
-		// push first from nonce heap to the time heap
-		heap.Push(&p.timeHeap, el)
-		// update map
-		p.perAddress[el.stateTx.Tx.Transaction.From] = aaPoolAddressData{
-			item: el,
-			pool: cont.pool,
-		}
-	} else {
-		// remove binary heap and item cache from perAddress map
-		delete(p.perAddress, el.stateTx.Tx.Transaction.From)
-	}
+	timeHeapItem := heap.Pop(&p.timeHeap).(*aaPoolTimeHeapItem) //nolint
+	address := timeHeapItem.stateTx.Tx.Transaction.From
+	//  also remove first item from perAddress
+	_ = heap.Pop(p.perAddressNonceHeap[address])
+	// delete item from perAddressItem. timeHeap will not contain item from address until Update is called
+	delete(p.perAddressItem, address)
 
 	p.count--
 
-	return el.stateTx
+	return timeHeapItem.stateTx
+}
+
+func (p *aaPool) Update(address types.Address) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
+
+	if p.perAddressItem[address] != nil { // perAddressItem is already populated
+		return
+	}
+
+	nonceHeap := p.perAddressNonceHeap[address]
+
+	if nonceHeap != nil && nonceHeap.Len() > 0 {
+		timeHeapItem := &aaPoolTimeHeapItem{stateTx: nonceHeap.Peek()}
+		heap.Push(&p.timeHeap, timeHeapItem)     // push first item from nonce heap to the time heap
+		p.perAddressItem[address] = timeHeapItem // update perAddressItem
+	} else {
+		// delete binary heap for address if binary heap is empty
+		delete(p.perAddressNonceHeap, address)
+	}
 }
 
 func (p *aaPool) Init(txs []*AAStateTransaction) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
-	p.perAddress = make(map[types.Address]aaPoolAddressData)
+	p.perAddressNonceHeap = map[types.Address]*aaPoolNonceHeap{}
+	p.perAddressItem = map[types.Address]*aaPoolTimeHeapItem{}
 	p.timeHeap = aaPoolTimeHeap{}
 	p.count = len(txs)
 
-	for _, tx := range txs {
-		if cont, exists := p.perAddress[tx.Tx.Transaction.From]; exists {
-			*cont.pool = append(*cont.pool, tx)
+	for _, stateTx := range txs {
+		address := stateTx.Tx.Transaction.From
+
+		// put each stateTx into appropriate nonceHeap binary heap
+		if nonceHeap, exists := p.perAddressNonceHeap[address]; exists {
+			*nonceHeap = append(*nonceHeap, stateTx)
 		} else {
-			p.perAddress[tx.Tx.Transaction.From] = aaPoolAddressData{
-				pool: &aaPoolNonceHeap{tx},
-			}
+			p.perAddressNonceHeap[address] = &aaPoolNonceHeap{stateTx}
 		}
 	}
 
-	for _, cont := range p.perAddress {
-		heap.Init(cont.pool)
+	for _, nonceHeap := range p.perAddressNonceHeap {
+		heap.Init(nonceHeap) // init each nonceHeap binary heap
 
+		// populate timeHeap with all the first items from the each nonceHeap
 		p.timeHeap = append(p.timeHeap, &aaPoolTimeHeapItem{
-			stateTx: cont.pool.Peek(),
+			stateTx: nonceHeap.Peek(),
 			index:   len(p.timeHeap),
 		})
 	}
 
-	heap.Init(&p.timeHeap)
+	heap.Init(&p.timeHeap) // init timeHeap binary heap
 
-	for _, el := range p.timeHeap {
-		cont := p.perAddress[el.stateTx.Tx.Transaction.From]
-		cont.item = el
-		p.perAddress[el.stateTx.Tx.Transaction.From] = cont
+	// update perAddressItem
+	for _, timeHeapItem := range p.timeHeap {
+		address := timeHeapItem.stateTx.Tx.Transaction.From
+
+		p.perAddressItem[address] = timeHeapItem
 	}
 }
 
@@ -173,11 +197,6 @@ func (h *aaPoolTimeHeap) Pop() interface{} {
 	*h = (*h)[0:n]
 
 	return x
-}
-
-type aaPoolAddressData struct {
-	item *aaPoolTimeHeapItem
-	pool *aaPoolNonceHeap
 }
 
 type aaPoolNonceHeap []*AAStateTransaction

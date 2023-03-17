@@ -7,7 +7,6 @@ import (
 	"path"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/aarelayer/service"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -46,6 +45,10 @@ func (rp *aarelayerParams) validateFlags() error {
 
 	if fn == "" {
 		return errors.New("file name for boltdb not specified")
+	}
+
+	if rp.invokerAddr == "" {
+		return errors.New("address of invoker smart contract not specified")
 	}
 
 	return sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.configPath)
@@ -90,7 +93,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.invokerAddr,
 		invokerAddrFlag,
-		service.DefaultAAInvokerAddress.String(),
+		"",
 		"address of invoker smart contract",
 	)
 

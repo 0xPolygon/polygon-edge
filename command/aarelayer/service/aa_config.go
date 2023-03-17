@@ -16,7 +16,7 @@ type AAConfig struct {
 	ReceiptNumRetries     int           `json:"receiptNumRetries"`
 }
 
-func (c *AAConfig) IsValidAddress(address types.Address) bool {
+func (c *AAConfig) IsAddressAllowed(address types.Address) bool {
 	addressStr := strings.TrimPrefix(address.String(), "0x")
 
 	for _, v := range c.DenyList {
