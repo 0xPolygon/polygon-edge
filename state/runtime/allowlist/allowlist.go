@@ -10,7 +10,6 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-// TODO: This is a placeholder, to be decided
 var (
 	AllowListContractsAddr = types.StringToAddress("0x0200000000000000000000000000000000000000")
 )
@@ -23,7 +22,7 @@ var (
 	ReadAllowListFunc       = abi.MustNewMethod("function readAllowList(address) returns (uint256)")
 )
 
-// list of gas costs
+// list of gas costs for the operations
 var (
 	writeAllowListCost = uint64(20000)
 	readAllowListCost  = uint64(5000)
@@ -45,8 +44,6 @@ func (a *AllowList) Addr() types.Address {
 func (a *AllowList) Run(c *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) *runtime.ExecutionResult {
 	ret, gasUsed, err := a.runInputCall(c.Caller, c.Input, c.Gas, c.Static)
 
-	fmt.Println("- err == -", err)
-
 	res := &runtime.ExecutionResult{
 		ReturnValue: ret,
 		GasUsed:     gasUsed,
@@ -57,13 +54,18 @@ func (a *AllowList) Run(c *runtime.Contract, host runtime.Host, _ *chain.ForksIn
 	return res
 }
 
+var (
+	errNoFunctionSignature = fmt.Errorf("input is too short for a function call")
+	errInputTooShort       = fmt.Errorf("wrong input size, expected 32")
+	errFunctionNotFound    = fmt.Errorf("function not found")
+	errWriteProtection     = fmt.Errorf("write protection")
+	errNotAuth             = fmt.Errorf("not auth")
+)
+
 func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64, isStatic bool) ([]byte, uint64, error) {
-
-	fmt.Println("-- input --", caller, input, gas, isStatic)
-
 	// decode the function signature from the input
 	if len(input) < 4 {
-		return nil, 0, fmt.Errorf("input is too short for a function call")
+		return nil, 0, errNoFunctionSignature
 	}
 
 	sig, inputBytes := input[:4], input[4:]
@@ -72,13 +74,13 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64,
 	// in abi gets codified as a 32 bytes array with the first 20 bytes
 	// encoding the address
 	if len(inputBytes) != 32 {
-		return nil, 0, fmt.Errorf("wrong input size, expected 32 but found %d", len(inputBytes))
+		return nil, 0, errInputTooShort
 	}
 
 	var gasUsed uint64
 	consumeGas := func(gasConsume uint64) error {
 		if gas < gasConsume {
-			return fmt.Errorf("out of gas")
+			return runtime.ErrOutOfGas
 		}
 		gasUsed = gasConsume
 		return nil
@@ -86,10 +88,7 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64,
 
 	inputAddr := types.BytesToAddress(inputBytes)
 
-	fmt.Println("A1")
 	if bytes.Equal(sig, ReadAllowListFunc.ID()) {
-		fmt.Println("=> READ ALLOW LIST! <=")
-
 		if err := consumeGas(readAllowListCost); err != nil {
 			return nil, 0, err
 		}
@@ -97,12 +96,9 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64,
 		// read operation
 		role := a.GetRole(inputAddr)
 
-		fmt.Println("- role --", a.addr, inputAddr, role)
-
-		return role.Bytes(), 0, nil
+		return role.Bytes(), gasUsed, nil
 	}
 
-	fmt.Println("A2")
 	// write operation
 	var updateRole Role
 	if bytes.Equal(sig, SetAdminFunc.ID()) {
@@ -112,32 +108,25 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte, gas uint64,
 	} else if bytes.Equal(sig, SetNoneFunc.ID()) {
 		updateRole = NoRole
 	} else {
-		return nil, gasUsed, fmt.Errorf("function not found")
+		return nil, 0, errFunctionNotFound
 	}
 
-	fmt.Println("A3")
 	if err := consumeGas(writeAllowListCost); err != nil {
 		return nil, gasUsed, err
 	}
 
-	fmt.Println("A4")
 	// we cannot perform any write operation if the call is static
 	if isStatic {
-		return nil, gasUsed, fmt.Errorf("write protection for static calls")
+		return nil, gasUsed, errWriteProtection
 	}
 
-	fmt.Println("A5")
 	// Only Admin accounts can modify the role of other accounts
 	addrRole := a.GetRole(caller)
 	if addrRole != AdminRole {
-		return nil, gasUsed, fmt.Errorf("not an admin")
+		return nil, gasUsed, errNotAuth
 	}
 
-	fmt.Println("_ SET ROLE _", a.addr, inputAddr, updateRole)
-
 	a.SetRole(inputAddr, updateRole)
-
-	fmt.Println(a.GetRole(inputAddr))
 
 	return nil, gasUsed, nil
 }
@@ -174,7 +163,6 @@ func (r Role) Bytes() []byte {
 	return types.Hash(r).Bytes()
 }
 
-// TODO: Test
 func (r Role) Enabled() bool {
 	return r == AdminRole || r == EnabledRole
 }

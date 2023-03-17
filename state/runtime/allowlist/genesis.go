@@ -1,7 +1,6 @@
 package allowlist
 
 import (
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -43,7 +42,6 @@ func (g *genesisState) SetState(addr types.Address, key, value types.Hash) {
 	if alloc.Storage == nil {
 		alloc.Storage = map[types.Hash]types.Hash{}
 	}
-	fmt.Println("- write -", addr, key, value)
 	alloc.Storage[key] = value
 }
 
