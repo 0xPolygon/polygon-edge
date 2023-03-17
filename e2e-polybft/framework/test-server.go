@@ -149,6 +149,8 @@ func (t *TestServer) Start() {
 
 	if len(config.LogLevel) > 0 {
 		args = append(args, "--log-level", config.LogLevel)
+	} else {
+		args = append(args, "--log-level", "DEBUG")
 	}
 
 	if config.Seal {
