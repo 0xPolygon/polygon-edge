@@ -206,6 +206,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	approveTxn, err := createApproveERC20PredicateTxn(aggregateAmount,
 		types.StringToAddress(dp.rootPredicateAddr),
 		types.StringToAddress(dp.rootTokenAddr))
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to create root erc20 approve transaction: %w", err))
+
+		return
+	}
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {

@@ -19,6 +19,8 @@ func Test_initKeys(t *testing.T) {
 
 	// Creates test directory
 	dir, err := os.MkdirTemp("", "test")
+	require.NoError(t, err)
+
 	defer os.RemoveAll(dir)
 
 	sm, err := helper.SetupLocalSecretsManager(dir)
@@ -70,6 +72,8 @@ func Test_getResult(t *testing.T) {
 
 	// Creates test directory
 	dir, err := os.MkdirTemp("", "test")
+	require.NoError(t, err)
+
 	defer os.RemoveAll(dir)
 
 	sm, err := helper.SetupLocalSecretsManager(dir)

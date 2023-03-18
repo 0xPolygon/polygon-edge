@@ -1228,6 +1228,8 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 
 	extra := createTestExtraObject(validatorsMetadata, AccountSet{}, 4, signaturesCount, signaturesCount)
 	validatorsHash, err := validatorsMetadata.Hash()
+	require.NoError(t, err)
+
 	extra.Checkpoint = &CheckpointData{CurrentValidatorsHash: validatorsHash, NextValidatorsHash: validatorsHash}
 	parent := &types.Header{
 		Number:    parentBlockNumber,

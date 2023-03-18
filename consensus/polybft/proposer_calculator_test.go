@@ -422,7 +422,7 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 	_, err := snapshot.GetLatestProposer(0, 0)
 	assert.Error(t, err)
 
-	address, err := snapshot.CalcProposer(0, 0)
+	_, err = snapshot.CalcProposer(0, 0)
 	assert.NoError(t, err)
 
 	// wrong round
@@ -434,7 +434,7 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 	assert.Error(t, err)
 
 	// ok
-	address, err = snapshot.GetLatestProposer(0, 0)
+	address, err := snapshot.GetLatestProposer(0, 0)
 	assert.NoError(t, err)
 
 	proposerAddress := validatorSet[bestIdx].Address

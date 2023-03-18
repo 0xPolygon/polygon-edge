@@ -86,6 +86,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	encoded, err := whitelistFn.Encode([]interface{}{
 		[]types.Address{types.StringToAddress(params.newValidatorAddress)},
 	})
+	if err != nil {
+		return fmt.Errorf("enlist validator failed: %w", err)
+	}
 
 	txn := &ethgo.Transaction{
 		From:     ownerAccount.Ecdsa.Address(),
