@@ -141,6 +141,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
 
 		// apply delta to the current validators, as ChildValidatorSet SC returns validators in different order
+		// than the one kept on the Edge
 		nextValidators, err = f.validators.Accounts().ApplyDelta(validatorsDelta)
 		if err != nil {
 			return nil, err
@@ -301,6 +302,8 @@ func (f *fsm) Validate(proposal []byte) error {
 			return err
 		}
 
+		// apply delta to the current validators, as ChildValidatorSet SC returns validators in different order
+		// than the one kept on the Edge
 		nextValidators, err = f.validators.Accounts().ApplyDelta(extra.Validators)
 		if err != nil {
 			return err
