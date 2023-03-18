@@ -139,6 +139,12 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
+
+		// apply delta to the current validators, as ChildValidatorSet SC returns validators in different order
+		nextValidators, err = f.validators.Accounts().ApplyDelta(validatorsDelta)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
@@ -292,6 +298,11 @@ func (f *fsm) Validate(proposal []byte) error {
 		}
 
 		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
+			return err
+		}
+
+		nextValidators, err = f.validators.Accounts().ApplyDelta(extra.Validators)
+		if err != nil {
 			return err
 		}
 

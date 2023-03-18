@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -111,11 +110,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		return
 	}
-
-	// sort validators by addresses
-	sort.Slice(validators, func(i, j int) bool {
-		return bytes.Compare(validators[i].Address[:], validators[j].Address[:]) < 0
-	})
 
 	manifest := &polybft.Manifest{GenesisValidators: validators, ChainID: params.chainID}
 	if err = manifest.Save(params.manifestPath); err != nil {
