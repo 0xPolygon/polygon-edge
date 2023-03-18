@@ -329,7 +329,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	// init CheckpointManager
-	if err := initializeCheckpointManager(outputter, txRelayer, manifest, deployerKey); err != nil {
+	if err := initializeCheckpointManager(txRelayer, manifest, deployerKey); err != nil {
 		return err
 	}
 
@@ -360,22 +360,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 // initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
 func initializeCheckpointManager(
-	outputter command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer,
 	manifest *polybft.Manifest,
 	deployerKey ethgo.Key) error {
 	validatorSet, err := validatorSetToABISlice(manifest.GenesisValidators)
-
-	if _, err := outputter.Write([]byte(fmt.Sprintf("%s [VALIDATORS]\n", contractsDeploymentTitle))); err != nil {
-		return err
-	}
-
-	for _, v := range manifest.GenesisValidators {
-		if _, err := outputter.Write([]byte(fmt.Sprintf("%v\n", v))); err != nil {
-			return err
-		}
-	}
-
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
