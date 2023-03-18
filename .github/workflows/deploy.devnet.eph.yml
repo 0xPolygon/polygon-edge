@@ -211,11 +211,12 @@ jobs:
             }
 
   loadtest:
+    needs: deploy_eph_devnet
     uses: ./.github/workflows/loadtest.yml
     name: Load Test
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+      LOADTEST_RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
@@ -229,7 +230,7 @@ jobs:
     name: Load Test
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+      LOADTEST_RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:

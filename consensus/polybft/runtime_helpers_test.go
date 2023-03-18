@@ -13,7 +13,7 @@ import (
 func TestHelpers_isEpochEndingBlock_DeltaNotEmpty(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidators(3).getPublicIdentities()
+	validators := newTestValidators(t, 3).getPublicIdentities()
 	bitmap := bitmap.Bitmap{}
 	bitmap.Set(0)
 

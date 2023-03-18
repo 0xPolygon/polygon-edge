@@ -11,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -157,12 +156,14 @@ func (c *consensusRuntime) close() {
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
+		stateSenderAddr := c.config.PolyBFTConfig.Bridge.BridgeAddr
 		stateSyncManager, err := NewStateSyncManager(
 			logger,
 			c.config.State,
 			&stateSyncConfig{
 				key:                   c.config.Key,
-				stateSenderAddr:       c.config.PolyBFTConfig.Bridge.BridgeAddr,
+				stateSenderAddr:       stateSenderAddr,
+				stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
 				jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
 				dataDir:               c.config.DataDir,
 				topic:                 c.config.bridgeTopic,
@@ -483,6 +484,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
@@ -499,6 +503,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 			}
 
 			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -536,8 +543,8 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
-func (c *consensusRuntime) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
-	return c.checkpointManager.GenerateExitProof(exitID, epoch, checkpointBlock)
+func (c *consensusRuntime) GenerateExitProof(exitID uint64) (types.Proof, error) {
+	return c.checkpointManager.GenerateExitProof(exitID)
 }
 
 // GetStateSyncProof returns the proof for the state sync
@@ -942,23 +949,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	}
 
 	return firstBlockInEpoch, nil
-}
-
-// createExitTree creates an exit event merkle tree from provided exit events
-func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
-	numOfEvents := len(exitEvents)
-	data := make([][]byte, numOfEvents)
-
-	for i := 0; i < numOfEvents; i++ {
-		b, err := ExitEventInputsABIType.Encode(exitEvents[i])
-		if err != nil {
-			return nil, err
-		}
-
-		data[i] = b
-	}
-
-	return merkle.NewMerkleTree(data)
 }
 
 // getSealersForBlock checks who sealed a given block and updates the counter

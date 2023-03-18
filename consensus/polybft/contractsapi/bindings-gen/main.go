@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/format"
 	"io/ioutil"
+	"log"
 	"strconv"
 	"strings"
 	"text/template"
@@ -79,6 +81,7 @@ func main() {
 			[]string{
 				"submit",
 				"initialize",
+				"getCheckpointBlock",
 			},
 			[]string{},
 		},
@@ -131,11 +134,15 @@ func main() {
 
 	for _, c := range cases {
 		for _, method := range c.functions {
-			generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method])
+			if err := generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method]); err != nil {
+				log.Fatal(err)
+			}
 		}
 
 		for _, event := range c.events {
-			generateEvent(generatedData, c.contractName, c.artifact.Abi.Events[event])
+			if err := generateEvent(generatedData, c.contractName, c.artifact.Abi.Events[event]); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
@@ -156,11 +163,11 @@ import (
 	output, err := format.Source([]byte(str))
 	if err != nil {
 		fmt.Println(str)
-		panic(err)
+		log.Fatal(err)
 	}
 
 	if err := ioutil.WriteFile("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }
 
@@ -182,9 +189,9 @@ func getInternalType(paramName string, paramAbiType *abi.Type) string {
 }
 
 // generateType generates code for structs used in smart contract functions and events
-func generateType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
+func generateType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) (string, error) {
 	if obj.Kind() != abi.KindTuple {
-		panic("BUG: Not expected")
+		return "", errors.New("type not expected")
 	}
 
 	internalType := getInternalType(name, obj)
@@ -201,14 +208,28 @@ func generateType(generatedData *generatedData, name string, obj *abi.Type, res 
 
 		if elem.Kind() == abi.KindTuple {
 			// Struct
-			typ = generateNestedType(generatedData, tupleElem.Name, elem, res)
+			nestedType, err := generateNestedType(generatedData, tupleElem.Name, elem, res)
+			if err != nil {
+				return "", err
+			}
+
+			typ = nestedType
 		} else if elem.Kind() == abi.KindSlice && elem.Elem().Kind() == abi.KindTuple {
 			// []Struct
-			typ = "[]" + generateNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			nestedType, err := generateNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			if err != nil {
+				return "", err
+			}
+
+			typ = "[]" + nestedType
 		} else if elem.Kind() == abi.KindArray && elem.Elem().Kind() == abi.KindTuple {
 			// [n]Struct
-			typ = "[" + strconv.Itoa(elem.Size()) + "]" +
-				generateNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			nestedType, err := generateNestedType(generatedData, getInternalType(tupleElem.Name, elem), elem.Elem(), res)
+			if err != nil {
+				return "", err
+			}
+
+			typ = "[" + strconv.Itoa(elem.Size()) + "]" + nestedType
 		} else if elem.Kind() == abi.KindAddress {
 			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
 			// this only works for simple types and not for []address inputs. This is good enough since
@@ -238,28 +259,38 @@ func generateType(generatedData *generatedData, name string, obj *abi.Type, res 
 	str = append(str, "}")
 	*res = append(*res, strings.Join(str, "\n"))
 
-	return internalType
+	return internalType, nil
 }
 
 // generateNestedType generates code for nested types found in smart contracts structs
-func generateNestedType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) string {
+func generateNestedType(generatedData *generatedData, name string, obj *abi.Type, res *[]string) (string, error) {
 	for _, s := range generatedData.structs {
 		if s == name {
 			// do not generate the same type again if it's already generated
 			// this happens when two functions use the same struct type as one of its parameters
-			return "*" + name
+			return "*" + name, nil
 		}
 	}
 
-	result := generateType(generatedData, name, obj, res)
-	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, result, obj.Format(true)))
-	*res = append(*res, generateAbiFuncsForNestedType(result))
+	result, err := generateType(generatedData, name, obj, res)
+	if err != nil {
+		return "", err
+	}
 
-	return "*" + result
+	*res = append(*res, fmt.Sprintf(abiTypeNameFormat, result, obj.Format(true)))
+
+	nestedTypeFunctions, err := generateAbiFuncsForNestedType(result)
+	if err != nil {
+		return "", err
+	}
+
+	*res = append(*res, nestedTypeFunctions)
+
+	return "*" + result, nil
 }
 
 // generateAbiFuncsForNestedType generates necessary functions for nested types smart contracts interaction
-func generateAbiFuncsForNestedType(name string) string {
+func generateAbiFuncsForNestedType(name string) (string, error) {
 	tmpl := `func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
 		return {{.Name}}ABIType.Encode({{.Sig}})
 	}
@@ -280,11 +311,14 @@ func generateAbiFuncsForNestedType(name string) string {
 }
 
 // generateEvent generates code for smart contract events
-func generateEvent(generatedData *generatedData, contractName string, event *abi.Event) {
+func generateEvent(generatedData *generatedData, contractName string, event *abi.Event) error {
 	name := fmt.Sprintf(eventNameFormat, event.Name)
-
 	res := []string{}
-	generateType(generatedData, name, event.Inputs, &res)
+
+	_, err := generateType(generatedData, name, event.Inputs, &res)
+	if err != nil {
+		return err
+	}
 
 	// write encode/decode functions
 	tmplStr := `
@@ -304,11 +338,18 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 		"ContractName": contractName,
 	}
 
-	generatedData.resultString = append(generatedData.resultString, renderTmpl(tmplStr, inputs))
+	renderedString, err := renderTmpl(tmplStr, inputs)
+	if err != nil {
+		return err
+	}
+
+	generatedData.resultString = append(generatedData.resultString, renderedString)
+
+	return nil
 }
 
 // generateFunction generates code for smart contract function and its parameters
-func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) {
+func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) error {
 	methodName := method.Name
 	if methodName == "initialize" {
 		// most of the contracts have initialize function, which differ in params
@@ -319,7 +360,11 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 	methodName = fmt.Sprintf(functionNameFormat, methodName)
 
 	res := []string{}
-	generateType(generatedData, methodName, method.Inputs, &res)
+
+	_, err := generateType(generatedData, methodName, method.Inputs, &res)
+	if err != nil {
+		return err
+	}
 
 	// write encode/decode functions
 	tmplStr := `
@@ -335,51 +380,34 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 	return decodeMethod({{.ContractName}}.Abi.Methods["{{.Name}}"], buf, {{.Sig}})
 }`
 
-	methodType := "function " + method.Name + "("
-	if len(method.Inputs.TupleElems()) != 0 {
-		methodType += encodeFuncTuple(method.Inputs)
-	}
-
-	methodType += ")"
-
-	if len(method.Outputs.TupleElems()) != 0 {
-		methodType += "(" + encodeFuncTuple(method.Outputs) + ")"
-	}
-
 	inputs := map[string]interface{}{
 		"Structs":      res,
-		"Type":         methodType,
 		"Sig":          strings.ToLower(string(methodName[0])),
 		"Name":         method.Name,
 		"ContractName": contractName,
 		"TName":        strings.Title(methodName),
 	}
 
-	generatedData.resultString = append(generatedData.resultString, renderTmpl(tmplStr, inputs))
+	renderedString, err := renderTmpl(tmplStr, inputs)
+	if err != nil {
+		return err
+	}
+
+	generatedData.resultString = append(generatedData.resultString, renderedString)
+
+	return nil
 }
 
-func renderTmpl(tmplStr string, inputs map[string]interface{}) string {
+func renderTmpl(tmplStr string, inputs map[string]interface{}) (string, error) {
 	tmpl, err := template.New("name").Parse(tmplStr)
 	if err != nil {
-		panic(fmt.Sprintf("BUG: Failed to load template: %v", err))
+		return "", fmt.Errorf("failed to load template: %w", err)
 	}
 
 	var tpl bytes.Buffer
 	if err = tmpl.Execute(&tpl, inputs); err != nil {
-		panic(fmt.Sprintf("BUG: Failed to render template: %v", err))
+		return "", fmt.Errorf("failed to render template: %w", err)
 	}
 
-	return tpl.String()
-}
-
-func encodeFuncTuple(t *abi.Type) string {
-	if t.Kind() != abi.KindTuple {
-		panic("BUG: Kind different than tuple not expected")
-	}
-
-	str := t.Format(true)
-	str = strings.TrimPrefix(str, "tuple(")
-	str = strings.TrimSuffix(str, ")")
-
-	return str
+	return tpl.String(), nil
 }

@@ -1,8 +1,14 @@
 package target
 
-import "os"
+import (
+	"errors"
+	"fmt"
+	"os"
+)
 
 func testLintError() {
+	err := errors.New("test")
+
 	os.Mkdir("test", 0777)              // want `OsFilePermissionRule: os.Mkdir called with file mode`
 	os.Mkdir("test", os.ModePerm)       // want `OsFilePermissionRule: os.Mkdir called with file mode`
 	os.MkdirAll("test", 0777)           // want `OsFilePermissionRule: os.MkdirAll called with file mode`
@@ -11,6 +17,9 @@ func testLintError() {
 	os.Chmod("test", os.ModePerm)       // want `OsFilePermissionRule: os.Chmod called with file mode`
 	os.OpenFile("test", 0, 0777)        // want `OsFilePermissionRule: os.OpenFile called with file mode`
 	os.OpenFile("test", 0, os.ModePerm) // want `OsFilePermissionRule: os.OpenFile called with file mode`
+	panic("test")                       // want `ForbidPanicsRule: panics should not be manually used`
+	panic(fmt.Sprintf("test error"))    // want `ForbidPanicsRule: panics should not be manually used`
+	panic(err)                          // want `ForbidPanicsRule: panics should not be manually used`
 }
 
 func testNoLintError() {

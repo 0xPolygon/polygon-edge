@@ -10,6 +10,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	metrics "github.com/armon/go-metrics"
@@ -28,7 +30,7 @@ var (
 type CheckpointManager interface {
 	PostBlock(req *PostBlockRequest) error
 	BuildEventRoot(epoch uint64) (types.Hash, error)
-	GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error)
+	GenerateExitProof(exitID uint64) (types.Proof, error)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
@@ -39,7 +41,7 @@ func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return
 func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return types.ZeroHash, nil
 }
-func (d *dummyCheckpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
+func (d *dummyCheckpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
 }
 
@@ -53,8 +55,8 @@ type checkpointManager struct {
 	blockchain blockchainBackend
 	// consensusBackend is abstraction for polybft consensus specific functions
 	consensusBackend polybftBackend
-	// txRelayer abstracts rootchain interaction logic (Call and SendTransaction invocations to the rootchain)
-	txRelayer txrelayer.TxRelayer
+	// rootChainRelayer abstracts rootchain interaction logic (Call and SendTransaction invocations to the rootchain)
+	rootChainRelayer txrelayer.TxRelayer
 	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
 	checkpointsOffset uint64
 	// checkpointManagerAddr is address of CheckpointManager smart contract
@@ -76,7 +78,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		key:                   key,
 		blockchain:            blockchain,
 		consensusBackend:      backend,
-		txRelayer:             txRelayer,
+		rootChainRelayer:      txRelayer,
 		checkpointsOffset:     checkpointOffset,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
@@ -91,7 +93,7 @@ func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
 		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
 	}
 
-	latestCheckpointBlockRaw, err := c.txRelayer.Call(
+	latestCheckpointBlockRaw, err := c.rootChainRelayer.Call(
 		c.key.Address(),
 		ethgo.Address(c.checkpointManagerAddr),
 		checkpointBlockNumMethodEncoded)
@@ -213,7 +215,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	txn.Input = input
 
-	receipt, err := c.txRelayer.SendTransaction(txn, c.key)
+	receipt, err := c.rootChainRelayer.SendTransaction(txn, c.key)
 	if err != nil {
 		return err
 	}
@@ -271,17 +273,27 @@ func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingB
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
 func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
-	epoch := req.Epoch
+	var (
+		epoch = req.Epoch
+		block = req.FullBlock.Block.Number()
+	)
+
 	if req.IsEpochEndingBlock {
 		// exit events that happened in epoch ending blocks,
 		// should be added to the tree of the next epoch
 		epoch++
+		block++
 	}
 
 	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(epoch, req.FullBlock.Block.Number(), req.FullBlock.Receipts)
+	events, err := getExitEventsFromReceipts(epoch, block, req.FullBlock.Receipts)
 	if err != nil {
 		return err
+	}
+
+	if len(events) > 0 {
+		c.logger.Debug("Gotten exit events from logs on block",
+			"eventsNum", len(events), "block", req.FullBlock.Block.Number())
 	}
 
 	if err := c.state.CheckpointStore.insertExitEvents(events); err != nil {
@@ -324,11 +336,65 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return tree.Hash(), nil
 }
 
-// GenerateExitProof generates proof of exit
-func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uint64) (types.Proof, error) {
-	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID, epoch)
+// GenerateExitProof generates proof of exit event
+func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
+	c.logger.Debug("Generating proof for exit", "exitID", exitID)
+
+	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID)
 	if err != nil {
 		return types.Proof{}, err
+	}
+
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+		BlockNumber: new(big.Int).SetUint64(exitEvent.BlockNumber),
+	}
+
+	input, err := getCheckpointBlockFn.EncodeAbi()
+	if err != nil {
+		return types.Proof{}, fmt.Errorf("failed to encode get checkpoint block input: %w", err)
+	}
+
+	getCheckpointBlockResp, err := c.rootChainRelayer.Call(
+		ethgo.ZeroAddress,
+		ethgo.Address(c.checkpointManagerAddr),
+		input)
+	if err != nil {
+		return types.Proof{}, fmt.Errorf("failed to retrieve checkpoint block for exit ID %d: %w", exitID, err)
+	}
+
+	getCheckpointBlockRespRaw, err := hex.DecodeHex(getCheckpointBlockResp)
+	if err != nil {
+		return types.Proof{}, fmt.Errorf("failed to decode hex response for exit ID %d: %w", exitID, err)
+	}
+
+	getCheckpointBlockGeneric, err := contractsapi.GetCheckpointBlockABIResponse.Decode(getCheckpointBlockRespRaw)
+	if err != nil {
+		return types.Proof{}, fmt.Errorf("failed to decode checkpoint block response for exit ID %d: %w", exitID, err)
+	}
+
+	checkpointBlockMap, ok := getCheckpointBlockGeneric.(map[string]interface{})
+	if !ok {
+		return types.Proof{}, fmt.Errorf("failed to convert for checkpoint block response exit ID %d", exitID)
+	}
+
+	isFoundGeneric, ok := checkpointBlockMap["isFound"]
+	if !ok {
+		return types.Proof{}, fmt.Errorf("invalid response for exit ID %d", exitID)
+	}
+
+	isCheckpointFound, ok := isFoundGeneric.(bool)
+	if !ok || !isCheckpointFound {
+		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
+	}
+
+	checkpointBlockGeneric, ok := checkpointBlockMap["checkpointBlock"]
+	if !ok {
+		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
+	}
+
+	checkpointBlock, ok := checkpointBlockGeneric.(*big.Int)
+	if !ok {
+		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
 	}
 
 	e, err := ExitEventInputsABIType.Encode(exitEvent)
@@ -336,7 +402,7 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(epoch, checkpointBlock)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock.Uint64())
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -356,11 +422,14 @@ func (c *checkpointManager) GenerateExitProof(exitID, epoch, checkpointBlock uin
 		return types.Proof{}, err
 	}
 
+	c.logger.Debug("Generated proof for exit", "exitID", exitID, "leafIndex", leafIndex, "proofLen", len(proof))
+
 	return types.Proof{
 		Data: proof,
 		Metadata: map[string]interface{}{
-			"LeafIndex": leafIndex,
-			"ExitEvent": exitEvent,
+			"LeafIndex":       leafIndex,
+			"ExitEvent":       exitEvent,
+			"CheckpointBlock": checkpointBlock,
 		},
 	}, nil
 }
@@ -399,4 +468,21 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 	})
 
 	return events, nil
+}
+
+// createExitTree creates an exit event merkle tree from provided exit events
+func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
+	numOfEvents := len(exitEvents)
+	data := make([][]byte, numOfEvents)
+
+	for i := 0; i < numOfEvents; i++ {
+		b, err := ExitEventInputsABIType.Encode(exitEvents[i])
+		if err != nil {
+			return nil, err
+		}
+
+		data[i] = b
+	}
+
+	return merkle.NewMerkleTree(data)
 }

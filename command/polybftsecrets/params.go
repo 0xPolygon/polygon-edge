@@ -27,8 +27,8 @@ const (
 )
 
 type initParams struct {
-	dataPath   string
-	configPath string
+	accountDir    string
+	accountConfig string
 
 	generatesAccount bool
 	generatesNetwork bool
@@ -49,7 +49,7 @@ func (ip *initParams) validateFlags() error {
 		return ErrInvalidNum
 	}
 
-	if ip.dataPath == "" && ip.configPath == "" {
+	if ip.accountDir == "" && ip.accountConfig == "" {
 		return ErrInvalidParams
 	}
 
@@ -58,17 +58,17 @@ func (ip *initParams) validateFlags() error {
 
 func (ip *initParams) setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&ip.dataPath,
-		DataPathFlag,
+		&ip.accountDir,
+		AccountDirFlag,
 		"",
-		DataPathFlagDesc,
+		AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&ip.configPath,
-		ConfigFlag,
+		&ip.accountConfig,
+		AccountConfigFlag,
 		"",
-		ConfigFlagDesc,
+		AccountConfigFlagDesc,
 	)
 
 	cmd.Flags().IntVar(
@@ -80,10 +80,10 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 
 	// Don't accept data-dir and config flags because they are related to different secrets managers.
 	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
-	cmd.MarkFlagsMutuallyExclusive(DataPathFlag, ConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(AccountDirFlag, AccountConfigFlag)
 
 	// num flag should be used with data-dir flag only so it should not be used with config flag.
-	cmd.MarkFlagsMutuallyExclusive(numFlag, ConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(numFlag, AccountConfigFlag)
 
 	cmd.Flags().BoolVar(
 		&ip.generatesAccount,
@@ -132,14 +132,14 @@ func (ip *initParams) Execute() (Results, error) {
 	results := make(Results, ip.numberOfSecrets)
 
 	for i := 0; i < ip.numberOfSecrets; i++ {
-		configDir, dataDir := ip.configPath, ip.dataPath
+		configDir, dataDir := ip.accountConfig, ip.accountDir
 
 		if ip.numberOfSecrets > 1 {
-			dataDir = fmt.Sprintf("%s%d", ip.dataPath, i+1)
+			dataDir = fmt.Sprintf("%s%d", ip.accountDir, i+1)
 		}
 
 		if configDir != "" && ip.numberOfSecrets > 1 {
-			configDir = fmt.Sprintf("%s%d", ip.configPath, i+1)
+			configDir = fmt.Sprintf("%s%d", ip.accountConfig, i+1)
 		}
 
 		secretManager, err := GetSecretsManager(dataDir, configDir, ip.insecureLocalStore)
@@ -186,7 +186,11 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 		)
 
 		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			a = wallet.GenerateAccount()
+			a, err = wallet.GenerateAccount()
+			if err != nil {
+				return generated, fmt.Errorf("error generating account: %w", err)
+			}
+
 			if err = a.Save(secretsManager); err != nil {
 				return generated, fmt.Errorf("error saving account: %w", err)
 			}

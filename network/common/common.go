@@ -57,10 +57,10 @@ var (
 )
 
 // AddrInfoToString converts an AddrInfo into a string representation that can be dialed from another node
-func AddrInfoToString(addr *peer.AddrInfo) string {
+func AddrInfoToString(addr *peer.AddrInfo) (string, error) {
 	// Safety check
 	if len(addr.Addrs) == 0 {
-		panic("No dial addresses found")
+		return "", errors.New("no dial addresses found")
 	}
 
 	dialAddress := addr.Addrs[0].String()
@@ -79,7 +79,7 @@ func AddrInfoToString(addr *peer.AddrInfo) string {
 	}
 
 	// Format output and return
-	return dialAddress + "/p2p/" + addr.ID.String()
+	return dialAddress + "/p2p/" + addr.ID.String(), nil
 }
 
 // MultiAddrFromDNS constructs a multiAddr from the passed in DNS address and port combination

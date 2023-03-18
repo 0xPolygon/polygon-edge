@@ -3,16 +3,21 @@ import exec from 'k6/execution';
 import { fundTestAccounts } from '../helpers/init.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.2/index.js';
 
+let duration = __ENV.LOADTEST_DURATION;
+if (duration == undefined) {
+    duration = "2m";
+}
+
 export const options = {
   setupTimeout: '220s',
   scenarios: {
     constant_request_rate: {
       executor: 'constant-arrival-rate',
-      rate: 200,
+      rate: 300,
       timeUnit: '1s',
-      duration: '1m',
-      preAllocatedVUs: 10,
-      maxVUs: 10,
+      duration: duration,
+      preAllocatedVUs: 20,
+      maxVUs: 20,
     },
   },
 };
@@ -50,7 +55,7 @@ export default function (data) {
 
   const tx = {
     to: "0xDEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF",
-    value: Number(0.0001 * 1e18),
+    value: Number(0.00000001 * 1e18),
     gas_price: client.gasPrice(),
     nonce: nonce,
   };

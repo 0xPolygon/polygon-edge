@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -40,7 +41,6 @@ func (t *TestBridge) Start() error {
 		"rootchain",
 		"server",
 		"--data-dir", t.clusterConfig.Dir("test-rootchain"),
-		"--no-console",
 	}
 
 	stdout := t.clusterConfig.GetStdout("bridge")
@@ -107,6 +107,7 @@ func (t *TestBridge) DepositERC20(rootTokenAddr, rootPredicateAddr types.Address
 	return t.cmdRun(
 		"bridge",
 		"deposit-erc20",
+		"--test",
 		"--root-token", rootTokenAddr.String(),
 		"--root-predicate", rootPredicateAddr.String(),
 		"--receivers", receivers,
@@ -115,9 +116,9 @@ func (t *TestBridge) DepositERC20(rootTokenAddr, rootPredicateAddr types.Address
 
 // WithdrawERC20 function is used to invoke bridge withdraw ERC20 tokens (from the child to the root chain)
 // with given receivers and amounts
-func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoint string) error {
-	if senderKey == "" {
-		return errors.New("provide a hex-encoded sender private key")
+func (t *TestBridge) WithdrawERC20(secretsDataDir, receivers, amounts, jsonRPCEndpoint string) error {
+	if secretsDataDir == "" {
+		return errors.New("provide a data directory which holds sender secrets")
 	}
 
 	if receivers == "" {
@@ -135,7 +136,7 @@ func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoin
 	return t.cmdRun(
 		"bridge",
 		"withdraw-erc20",
-		"--sender-key", senderKey,
+		"--"+polybftsecrets.AccountDirFlag, secretsDataDir,
 		"--receivers", receivers,
 		"--amounts", amounts,
 		"--json-rpc", jsonRPCEndpoint,
@@ -143,7 +144,7 @@ func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoin
 }
 
 // SendExitTransaction sends exit transaction to the root chain
-func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID, epoch, checkpointBlock uint64,
+func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64,
 	rootJSONRPCAddr, childJSONRPCAddr string) error {
 	if rootJSONRPCAddr == "" {
 		return errors.New("provide a root JSON RPC endpoint URL")
@@ -157,11 +158,10 @@ func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID, epoch
 		"bridge",
 		"exit",
 		"--exit-helper", exitHelper.String(),
-		"--event-id", strconv.FormatUint(exitID, 10),
-		"--epoch", strconv.FormatUint(epoch, 10),
-		"--checkpoint-block", strconv.FormatUint(checkpointBlock, 10),
+		"--exit-id", strconv.FormatUint(exitID, 10),
 		"--root-json-rpc", rootJSONRPCAddr,
 		"--child-json-rpc", childJSONRPCAddr,
+		"--test",
 	)
 }
 
@@ -176,6 +176,7 @@ func (t *TestBridge) deployRootchainContracts(manifestPath string) error {
 		"rootchain",
 		"init-contracts",
 		"--manifest", manifestPath,
+		"--test",
 	}
 
 	if err := t.cmdRun(args...); err != nil {

@@ -141,7 +141,12 @@ func TestDiscoveryService_BootnodePeerDiscovery(t *testing.T) {
 
 					for i, peerInfo := range randomPeers {
 						// The peer info needs to be formatted as a MultiAddr
-						peers[i] = common.AddrInfoToString(peerInfo)
+						addr, err := common.AddrInfoToString(peerInfo)
+						if err != nil {
+							return nil, err
+						}
+
+						peers[i] = addr
 					}
 
 					return &proto.FindPeersResp{

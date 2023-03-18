@@ -6,6 +6,7 @@ on:  # yamllint disable-line rule:truthy
       - main
       - develop
   pull_request:
+  workflow_call:
 
 jobs:
   build:
@@ -13,11 +14,10 @@ jobs:
     env:
       E2E_TESTS: true
       E2E_LOGS: true
+      E2E_TESTS_TYPE: 'integration'
       CI_VERBOSE: true
     steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: recursive
+      - uses: actions/checkout@v3        
       - name: Install Go
         uses: actions/setup-go@v3
         with:

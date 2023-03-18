@@ -406,6 +406,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 		})
 
 		for humanIndex := range group.people {
+			humanIndex := humanIndex
 			t.Run(fmt.Sprintf("groups[%d].people[%d] is set correctly", groupIndex, humanIndex), func(t *testing.T) {
 				t.Parallel()
 
@@ -415,6 +416,7 @@ func TestGenesis_Predeployment(t *testing.T) {
 	}
 
 	for idx := range groups {
+		idx := idx
 		t.Run(fmt.Sprintf("groups[%d] is set correctly", idx), func(t *testing.T) {
 			t.Parallel()
 

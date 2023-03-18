@@ -187,8 +187,8 @@ func TestStateProvider_Txn_NotSupported(t *testing.T) {
 		transition: transition,
 	}
 
-	require.PanicsWithError(t, errSendTxnUnsupported.Error(),
-		func() { _, _ = provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1}) })
+	_, err := provider.Txn(ethgo.ZeroAddress, createTestKey(t), []byte{0x1})
+	require.ErrorIs(t, err, errSendTxnUnsupported)
 }
 
 func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount) *state.Transition {
@@ -200,7 +200,8 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash := ex.WriteGenesis(alloc)
+	rootHash, err := ex.WriteGenesis(alloc)
+	require.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {

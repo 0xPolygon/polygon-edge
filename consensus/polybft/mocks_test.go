@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -86,7 +87,7 @@ func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) 
 		return args.Get(0).(*types.Header), args.Get(1).(bool) //nolint:forcetypeassert
 	}
 
-	panic("Unsupported mock for GetHeaderByNumber")
+	panic("Unsupported mock for GetHeaderByNumber") //nolint:gocritic
 }
 
 func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
@@ -104,7 +105,7 @@ func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 		return h, h != nil
 	}
 
-	panic("Unsupported mock for GetHeaderByHash")
+	panic("Unsupported mock for GetHeaderByHash") //nolint:gocritic
 }
 
 func (m *blockchainMock) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
@@ -144,7 +145,7 @@ func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.
 		return accountSet, args.Error(1)
 	}
 
-	panic("polybftBackendMock.GetValidators doesn't support such combination of arguments")
+	panic("polybftBackendMock.GetValidators doesn't support such combination of arguments") //nolint:gocritic
 }
 
 var _ blockBuilder = (*blockBuilderMock)(nil)
@@ -215,7 +216,7 @@ func (m *systemStateMock) GetValidatorSet() (AccountSet, error) {
 		return accountSet, args.Error(1)
 	}
 
-	panic("systemStateMock.GetValidatorSet doesn't support such combination of arguments")
+	panic("systemStateMock.GetValidatorSet doesn't support such combination of arguments") //nolint:gocritic
 }
 
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {
@@ -281,16 +282,20 @@ type testValidators struct {
 	validators map[string]*testValidator
 }
 
-func newTestValidators(validatorsCount int) *testValidators {
+func newTestValidators(t *testing.T, validatorsCount int) *testValidators {
+	t.Helper()
+
 	aliases := make([]string, validatorsCount)
 	for i := 0; i < validatorsCount; i++ {
 		aliases[i] = strconv.Itoa(i)
 	}
 
-	return newTestValidatorsWithAliases(aliases)
+	return newTestValidatorsWithAliases(t, aliases)
 }
 
-func newTestValidatorsWithAliases(aliases []string, votingPowers ...[]uint64) *testValidators {
+func newTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers ...[]uint64) *testValidators {
+	t.Helper()
+
 	validators := map[string]*testValidator{}
 
 	for i, alias := range aliases {
@@ -299,15 +304,17 @@ func newTestValidatorsWithAliases(aliases []string, votingPowers ...[]uint64) *t
 			votingPower = votingPowers[0][i]
 		}
 
-		validators[alias] = newTestValidator(alias, votingPower)
+		validators[alias] = newTestValidator(t, alias, votingPower)
 	}
 
 	return &testValidators{validators: validators}
 }
 
-func (v *testValidators) create(alias string, votingPower uint64) {
+func (v *testValidators) create(t *testing.T, alias string, votingPower uint64) {
+	t.Helper()
+
 	if _, ok := v.validators[alias]; !ok {
-		v.validators[alias] = newTestValidator(alias, votingPower)
+		v.validators[alias] = newTestValidator(t, alias, votingPower)
 	}
 }
 
@@ -361,7 +368,7 @@ func (v *testValidators) getPrivateIdentities(aliases ...string) (res []*wallet.
 func (v *testValidators) getValidator(alias string) *testValidator {
 	vv, ok := v.validators[alias]
 	if !ok {
-		panic(fmt.Sprintf("BUG: validator %s does not exist", alias))
+		panic(fmt.Sprintf("Validator %s does not exist", alias)) //nolint:gocritic
 	}
 
 	return vv
@@ -394,11 +401,13 @@ type testValidator struct {
 	votingPower uint64
 }
 
-func newTestValidator(alias string, votingPower uint64) *testValidator {
+func newTestValidator(t *testing.T, alias string, votingPower uint64) *testValidator {
+	t.Helper()
+
 	return &testValidator{
 		alias:       alias,
 		votingPower: votingPower,
-		account:     wallet.GenerateAccount(),
+		account:     generateTestAccount(t),
 	}
 }
 
@@ -431,7 +440,7 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 func (v *testValidator) mustSign(hash []byte) *bls.Signature {
 	signature, err := v.account.Bls.Sign(hash, bls.DomainCheckpointManager)
 	if err != nil {
-		panic(fmt.Sprintf("BUG: failed to sign: %v", err))
+		panic(fmt.Sprintf("BUG: failed to sign: %v", err)) //nolint:gocritic
 	}
 
 	return signature

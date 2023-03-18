@@ -12,7 +12,7 @@ import (
 func Test_RecoverAddressFromSignature(t *testing.T) {
 	t.Parallel()
 
-	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
+	for _, account := range []*Account{generateTestAccount(t), generateTestAccount(t), generateTestAccount(t)} {
 		key := NewKey(account, bls.DomainCheckpointManager)
 		msgNoSig := &proto.Message{
 			From:    key.Address().Bytes(),
@@ -37,7 +37,7 @@ func Test_Sign(t *testing.T) {
 
 	msg := []byte("some message")
 
-	for _, account := range []*Account{GenerateAccount(), GenerateAccount()} {
+	for _, account := range []*Account{generateTestAccount(t), generateTestAccount(t)} {
 		key := NewKey(account, bls.DomainCheckpointManager)
 		ser, err := key.Sign(msg)
 
@@ -53,7 +53,7 @@ func Test_Sign(t *testing.T) {
 func Test_String(t *testing.T) {
 	t.Parallel()
 
-	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
+	for _, account := range []*Account{generateTestAccount(t), generateTestAccount(t), generateTestAccount(t)} {
 		key := NewKey(account, bls.DomainCheckpointManager)
 		assert.Equal(t, key.Address().String(), key.String())
 	}

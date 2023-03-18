@@ -10,11 +10,11 @@ import (
 
 // common flags for all polybft commands
 const (
-	DataPathFlag = "data-dir"
-	ConfigFlag   = "config"
+	AccountDirFlag    = "data-dir"
+	AccountConfigFlag = "config"
 
-	DataPathFlagDesc = "the directory for the Polygon Edge data if the local FS is used"
-	ConfigFlagDesc   = "the path to the SecretsManager config file, if omitted, the local FS secrets manager is used"
+	AccountDirFlagDesc    = "the directory for the Polygon Edge data if the local FS is used"
+	AccountConfigFlagDesc = "the path to the SecretsManager config file, if omitted, the local FS secrets manager is used"
 )
 
 // common errors for all polybft commands
@@ -35,7 +35,9 @@ func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (se
 	if configPath != "" {
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			return nil, errors.New(ErrInvalidConfig.Error() + ": " + readErr.Error())
+			invalidConfigErr := ErrInvalidConfig.Error()
+
+			return nil, fmt.Errorf("%s: %w", invalidConfigErr, readErr)
 		}
 
 		if !secrets.SupportedServiceManager(secretsConfig.Type) {

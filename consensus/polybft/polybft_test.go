@@ -62,7 +62,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create all validators
-	validators := newTestValidators(allValidatorsSize)
+	validators := newTestValidators(t, allValidatorsSize)
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{

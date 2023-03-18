@@ -560,7 +560,7 @@ func TestAddGossipTx(t *testing.T) {
 
 		signedTx, err := signer.SignTx(tx, key)
 		if err != nil {
-			t.Fatalf("cannot sign transction - err: %v", err)
+			t.Fatalf("cannot sign transaction - err: %v", err)
 		}
 
 		// send tx
@@ -1833,11 +1833,11 @@ func (e *eoa) create(t *testing.T) *eoa {
 	return e
 }
 
-func (e *eoa) signTx(tx *types.Transaction, signer crypto.TxSigner) *types.Transaction {
+func (e *eoa) signTx(t *testing.T, tx *types.Transaction, signer crypto.TxSigner) *types.Transaction {
+	t.Helper()
+
 	signedTx, err := signer.SignTx(tx, e.PrivateKey)
-	if err != nil {
-		panic("signTx failed")
-	}
+	require.NoError(t, err)
 
 	return signedTx
 }
@@ -1862,30 +1862,30 @@ func TestResetAccounts_Promoted(t *testing.T) {
 	allTxs :=
 		map[types.Address][]*types.Transaction{
 			addr1: {
-				eoa1.signTx(newTx(addr1, 0, 1), signerEIP155), // will be pruned
-				eoa1.signTx(newTx(addr1, 1, 1), signerEIP155), // will be pruned
-				eoa1.signTx(newTx(addr1, 2, 1), signerEIP155), // will be pruned
-				eoa1.signTx(newTx(addr1, 3, 1), signerEIP155), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155), // will be pruned
+				eoa1.signTx(t, newTx(addr1, 3, 1), signerEIP155), // will be pruned
 			},
 
 			addr2: {
-				eoa2.signTx(newTx(addr2, 0, 1), signerEIP155), // will be pruned
-				eoa2.signTx(newTx(addr2, 1, 1), signerEIP155), // will be pruned
+				eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155), // will be pruned
+				eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155), // will be pruned
 			},
 
 			addr3: {
-				eoa3.signTx(newTx(addr3, 0, 1), signerEIP155), // will be pruned
-				eoa3.signTx(newTx(addr3, 1, 1), signerEIP155), // will be pruned
-				eoa3.signTx(newTx(addr3, 2, 1), signerEIP155), // will be pruned
+				eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155), // will be pruned
+				eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155), // will be pruned
+				eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155), // will be pruned
 			},
 
 			addr4: {
 				// all txs will be pruned
-				eoa4.signTx(newTx(addr4, 0, 1), signerEIP155), // will be pruned
-				eoa4.signTx(newTx(addr4, 1, 1), signerEIP155), // will be pruned
-				eoa4.signTx(newTx(addr4, 2, 1), signerEIP155), // will be pruned
-				eoa4.signTx(newTx(addr4, 3, 1), signerEIP155), // will be pruned
-				eoa4.signTx(newTx(addr4, 4, 1), signerEIP155), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 0, 1), signerEIP155), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 1, 1), signerEIP155), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 2, 1), signerEIP155), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 3, 1), signerEIP155), // will be pruned
+				eoa4.signTx(t, newTx(addr4, 4, 1), signerEIP155), // will be pruned
 			},
 		}
 
@@ -1993,22 +1993,22 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 
 		allTxs := map[types.Address][]*types.Transaction{
 			addr1: {
-				eoa1.signTx(newTx(addr1, 3, 1), signerEIP155),
-				eoa1.signTx(newTx(addr1, 4, 1), signerEIP155),
-				eoa1.signTx(newTx(addr1, 5, 1), signerEIP155),
+				eoa1.signTx(t, newTx(addr1, 3, 1), signerEIP155),
+				eoa1.signTx(t, newTx(addr1, 4, 1), signerEIP155),
+				eoa1.signTx(t, newTx(addr1, 5, 1), signerEIP155),
 			},
 			addr2: {
-				eoa2.signTx(newTx(addr2, 2, 1), signerEIP155),
-				eoa2.signTx(newTx(addr2, 3, 1), signerEIP155),
-				eoa2.signTx(newTx(addr2, 4, 1), signerEIP155),
-				eoa2.signTx(newTx(addr2, 5, 1), signerEIP155),
-				eoa2.signTx(newTx(addr2, 6, 1), signerEIP155),
-				eoa2.signTx(newTx(addr2, 7, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 3, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 4, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 5, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 6, 1), signerEIP155),
+				eoa2.signTx(t, newTx(addr2, 7, 1), signerEIP155),
 			},
 			addr3: {
-				eoa3.signTx(newTx(addr3, 7, 1), signerEIP155),
-				eoa3.signTx(newTx(addr3, 8, 1), signerEIP155),
-				eoa3.signTx(newTx(addr3, 9, 1), signerEIP155),
+				eoa3.signTx(t, newTx(addr3, 7, 1), signerEIP155),
+				eoa3.signTx(t, newTx(addr3, 8, 1), signerEIP155),
+				eoa3.signTx(t, newTx(addr3, 9, 1), signerEIP155),
 			},
 		}
 		newNonces := map[types.Address]uint64{
@@ -2540,40 +2540,40 @@ func TestGetTxs(t *testing.T) {
 			name: "get promoted txs",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
 				},
 
 				addr2: {
-					eoa2.signTx(newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
 				},
 
 				addr3: {
-					eoa3.signTx(newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
 				},
 			},
 			expectedPromoted: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
 				},
 
 				addr2: {
-					eoa2.signTx(newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
 				},
 
 				addr3: {
-					eoa3.signTx(newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
 				},
 			},
 		},
@@ -2581,73 +2581,73 @@ func TestGetTxs(t *testing.T) {
 			name: "get all txs",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
 					// enqueued
-					eoa1.signTx(newTx(addr1, 10, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 11, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 12, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 10, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 11, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 12, 1), signerEIP155),
 				},
 
 				addr2: {
-					eoa2.signTx(newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
 
 					// enqueued
-					eoa2.signTx(newTx(addr2, 10, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 11, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 12, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 10, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 11, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 12, 1), signerEIP155),
 				},
 
 				addr3: {
-					eoa3.signTx(newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
 
 					// enqueued
-					eoa3.signTx(newTx(addr3, 10, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 11, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 12, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 10, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 11, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 12, 1), signerEIP155),
 				},
 			},
 			expectedPromoted: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(newTx(addr1, 0, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 1, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 2, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 0, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 1, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 2, 1), signerEIP155),
 				},
 
 				addr2: {
-					eoa2.signTx(newTx(addr2, 0, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 1, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 2, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 0, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 1, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 2, 1), signerEIP155),
 				},
 
 				addr3: {
-					eoa3.signTx(newTx(addr3, 0, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 1, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 2, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 0, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 1, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 2, 1), signerEIP155),
 				},
 			},
 			expectedEnqueued: map[types.Address][]*types.Transaction{
 				addr1: {
-					eoa1.signTx(newTx(addr1, 10, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 11, 1), signerEIP155),
-					eoa1.signTx(newTx(addr1, 12, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 10, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 11, 1), signerEIP155),
+					eoa1.signTx(t, newTx(addr1, 12, 1), signerEIP155),
 				},
 
 				addr2: {
-					eoa2.signTx(newTx(addr2, 10, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 11, 1), signerEIP155),
-					eoa2.signTx(newTx(addr2, 12, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 10, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 11, 1), signerEIP155),
+					eoa2.signTx(t, newTx(addr2, 12, 1), signerEIP155),
 				},
 
 				addr3: {
-					eoa3.signTx(newTx(addr3, 10, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 11, 1), signerEIP155),
-					eoa3.signTx(newTx(addr3, 12, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 10, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 11, 1), signerEIP155),
+					eoa3.signTx(t, newTx(addr3, 12, 1), signerEIP155),
 				},
 			},
 		},
@@ -2841,7 +2841,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 			mux.Unlock()
 
 			// submit transaction to pool
-			pool.addTx(local, tx)
+			assert.NoError(t, pool.addTx(local, tx))
 		}(uint64(i))
 	}
 

@@ -211,16 +211,17 @@ jobs:
             }
 
   loadtest:
+    needs: deploy_devnet
     uses: ./.github/workflows/loadtest.yml
     name: Load Test
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+      LOADTEST_RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
       runner: devnet
-      environment: devnet-ephemeral
+      environment: devnet
       scenario: multiple_EOA
   
   loadtestERC20:
@@ -229,10 +230,10 @@ jobs:
     name: Load Test
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+      LOADTEST_RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
       runner: devnet
-      environment: devnet-ephemeral
+      environment: devnet
       scenario: multiple_ERC20  

@@ -1,0 +1,32 @@
+---
+name: PolyBFT Property tests
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop  
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      E2E_TESTS: true
+      E2E_LOGS: true
+      E2E_TESTS_TYPE: 'property'
+      CI_VERBOSE: true
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18.x
+      - name: Run tests
+        run: make test-property-polybft
+      - name: Archive test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: property-logs
+          path: property-logs-*/
+          retention-days: 30

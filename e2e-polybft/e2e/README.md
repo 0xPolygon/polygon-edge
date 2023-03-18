@@ -16,7 +16,7 @@ In this case we expect that $GOPATH is set and $GOPATH/bin is defined in $PATH a
 ## Step 2: Run the tests
 
 ```bash
-export E2E_TESTS=TRUE && go test -v ./e2e-polybft/...
+export E2E_TESTS=TRUE && go test -v ./e2e-polybft/e2e/...
 ```
 
 To enable logs in the e2e test set `E2E_LOGS=true`.
