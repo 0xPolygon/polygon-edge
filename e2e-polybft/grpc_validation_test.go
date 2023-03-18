@@ -25,7 +25,7 @@ func TestE2E_GRPCRequestValidationTriggering(t *testing.T) {
 	defer cluster.Stop()
 
 	ctx := context.Background()
-	err := cluster.WaitUntil(testTimeout, func() bool {
+	err := cluster.WaitUntil(testTimeout, 2*time.Second, func() bool {
 		peerList, err := cluster.Servers[0].Conn().PeersList(ctx, &emptypb.Empty{})
 
 		return err == nil && len(peerList.GetPeers()) > 0
