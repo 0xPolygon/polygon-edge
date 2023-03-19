@@ -521,16 +521,13 @@ func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {
 		commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10),
 		logger:           hclog.NewNullLogger(),
 	}
-	txs := fsm.stateTransactions()
 
-	// add commit epoch tx to the end of transactions list
-	tx, err := fsm.createCommitEpochTx()
-	assert.NoError(t, err)
+	// add commit epoch commitEpochTx to the end of transactions list
+	commitEpochTx, err := fsm.createCommitEpochTx()
+	require.NoError(t, err)
 
-	txs = append([]*types.Transaction{tx}, txs...)
-
-	err = fsm.VerifyStateTransactions(txs)
-	assert.NoError(t, err)
+	err = fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx})
+	require.NoError(t, err)
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing.T) {
@@ -555,16 +552,16 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	txs := fsm.stateTransactions()
+	bridgeCommitmentTx := fsm.getBridgeCommitmentTx()
 
-	// add commit epoch tx to the end of transactions list
-	tx, err := fsm.createCommitEpochTx()
-	assert.NoError(t, err)
+	// add commit epoch commitEpochTx to the end of transactions list
+	commitEpochTx, err := fsm.createCommitEpochTx()
+	require.NoError(t, err)
 
-	txs = append([]*types.Transaction{tx}, txs...)
+	stateTxs := []*types.Transaction{commitEpochTx, bridgeCommitmentTx}
 
-	err = fsm.VerifyStateTransactions(txs)
-	assert.ErrorContains(t, err, "quorum size not reached")
+	err = fsm.VerifyStateTransactions(stateTxs)
+	require.ErrorContains(t, err, "quorum size not reached")
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing.T) {
@@ -596,16 +593,14 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	txs := fsm.stateTransactions()
+	bridgeCommitmentTx := fsm.getBridgeCommitmentTx()
 
 	// add commit epoch tx to the end of transactions list
 	tx, err := fsm.createCommitEpochTx()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	txs = append([]*types.Transaction{tx}, txs...)
-
-	err = fsm.VerifyStateTransactions(txs)
-	assert.ErrorContains(t, err, "invalid signature")
+	err = fsm.VerifyStateTransactions([]*types.Transaction{tx, bridgeCommitmentTx})
+	require.ErrorContains(t, err, "invalid signature")
 }
 
 func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
@@ -657,7 +652,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 		validators: validators.toValidatorSet(), exitEventRootHash: types.ZeroHash, logger: hclog.NewNullLogger()}
 
 	_, err := fsm.BuildProposal(0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	nonValidatorAcc := newTestValidator(t, "non_validator", 1)
 	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
@@ -1018,15 +1013,14 @@ func TestFSM_DecodeCommitmentStateTxs(t *testing.T) {
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	for i, tx := range f.stateTransactions() {
-		decodedData, err := decodeStateTransaction(tx.Input)
-		require.NoError(t, err)
+	bridgeCommitmentTx := f.getBridgeCommitmentTx()
 
-		decodedCommitmentMsg, ok := decodedData.(*CommitmentMessageSigned)
-		require.True(t, ok)
-		require.Equal(t, 0, i, "failed for tx number %d", i)
-		require.Equal(t, signedCommitment, decodedCommitmentMsg, "failed for tx number %d", i)
-	}
+	decodedData, err := decodeStateTransaction(bridgeCommitmentTx.Input)
+	require.NoError(t, err)
+
+	decodedCommitmentMsg, ok := decodedData.(*CommitmentMessageSigned)
+	require.True(t, ok)
+	require.Equal(t, signedCommitment, decodedCommitmentMsg)
 }
 
 func TestFSM_DecodeCommitEpochStateTx(t *testing.T) {

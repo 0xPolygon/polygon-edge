@@ -114,9 +114,9 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.WriteTx(tx); err != nil {
-				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
+		if bridgeCommitmentTx := f.getBridgeCommitmentTx(); bridgeCommitmentTx != nil {
+			if err := f.blockBuilder.WriteTx(bridgeCommitmentTx); err != nil {
+				return nil, fmt.Errorf("failed to apply commitment state sync state transaction. Error: %w", err)
 			}
 		}
 	}
@@ -192,25 +192,20 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	return stateBlock.Block.MarshalRLP(), nil
 }
 
-func (f *fsm) stateTransactions() []*types.Transaction {
-	var txns []*types.Transaction
-
+// getBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
+func (f *fsm) getBridgeCommitmentTx() *types.Transaction {
 	if f.proposerCommitmentToRegister != nil {
-		// add register commitment transaction
 		inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
 		if err != nil {
-			f.logger.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
+			f.logger.Error("failed to encode input data for bridge commitment registration", "Error", err)
 
 			return nil
 		}
 
-		txns = append(txns,
-			createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		return createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
 	}
 
-	f.logger.Debug("Apply state transaction", "num", len(txns))
-
-	return txns
+	return nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
