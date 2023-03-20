@@ -112,6 +112,9 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 
 func HashChecker(stateRoot []byte, storage Storage) (types.Hash, error) {
 	node, _, err := GetNode(stateRoot, storage)
+	if err != nil {
+		return types.Hash{}, err
+	}
 
 	h, ok := hasherPool.Get().(*hasher)
 	if !ok {

@@ -57,5 +57,8 @@ func TestCompareModelOfTrieCopy(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if stateRoot != result {
+			t.Fatal("Hashes are not equal", stateRoot, result)
+		}
 	})
 }

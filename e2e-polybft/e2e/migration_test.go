@@ -54,11 +54,6 @@ func TestMigration(t *testing.T) {
 		t.Fatal("balanceReceiver is not 0")
 	}
 
-	block, err := rpcClient.Eth().GetBlockByNumber(ethgo.Latest, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(rpcClient))
 	require.NoError(t, err)
 
@@ -107,7 +102,7 @@ func TestMigration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, sendAmount, balanceReceiver)
 
-	block, err = rpcClient.Eth().GetBlockByNumber(ethgo.Latest, true)
+	block, err := rpcClient.Eth().GetBlockByNumber(ethgo.Latest, true)
 	if err != nil {
 		t.Fatal(err)
 	}
