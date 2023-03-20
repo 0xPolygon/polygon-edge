@@ -121,7 +121,7 @@ func TestAllowList_WriteOp_OnlyAdminCanUpdate(t *testing.T) {
 
 	_, gasCost, err := a.runInputCall(types.Address{}, input, writeAllowListCost, false)
 	require.Equal(t, writeAllowListCost, gasCost)
-	require.Equal(t, err, errNotAuth)
+	require.Equal(t, err, runtime.ErrNotAuth)
 }
 
 func TestAllowList_WriteOp_Full(t *testing.T) {

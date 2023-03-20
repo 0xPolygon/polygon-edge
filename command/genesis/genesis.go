@@ -206,14 +206,14 @@ func setFlags(cmd *cobra.Command) {
 			&params.contractDeployerAllowListAdmin,
 			contractDeployedAllowListAdminFlag,
 			[]string{},
-			"",
+			"list of addresses to use as admin accounts in the contract deployer allow list",
 		)
 
 		cmd.Flags().StringArrayVar(
 			&params.contractDeployerAllowListEnabled,
 			contractDeployedAllowListEnabledFlag,
 			[]string{},
-			"",
+			"list of addresses to enable by default in the contract deployer allow list",
 		)
 	}
 }

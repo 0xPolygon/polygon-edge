@@ -378,12 +378,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
 			args = append(args, "--contract-deployer-allow-list-admin",
-				strings.Join(sliceArrayToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
+				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
 		}
 
 		if len(cluster.Config.ContractDeployerAllowListEnabled) != 0 {
 			args = append(args, "--contract-deployer-allow-list-enabled",
-				strings.Join(sliceArrayToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
+				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
 		}
 
 		// run cmd init-genesis with all the arguments
@@ -728,34 +728,26 @@ func (t *TestTxn) Receipt() *ethgo.Receipt {
 	return t.receipt
 }
 
-const (
-	statusFailed  = uint64(0)
-	statusSucceed = uint64(1)
-)
-
 // Succeed returns whether the transaction succeed and it was not reverted
 func (t *TestTxn) Succeed() bool {
-	return t.receipt.Status == statusSucceed
+	return t.receipt.Status == uint64(types.ReceiptSuccess)
 }
 
 // Failed returns whether the transaction failed
 func (t *TestTxn) Failed() bool {
-	return t.receipt.Status == statusFailed
+	return t.receipt.Status == uint64(types.ReceiptFailed)
 }
 
 // Reverted returns whether the transaction failed and was reverted consuming
 // all the gas from the call
 func (t *TestTxn) Reverted() bool {
-	return t.receipt.Status == statusFailed && t.txn.Gas == t.receipt.GasUsed
+	return t.receipt.Status == uint64(types.ReceiptFailed) && t.txn.Gas == t.receipt.GasUsed
 }
 
 // Wait waits for the transaction to be executed
 func (t *TestTxn) Wait() error {
-	return t.WaitWithDuration(1 * time.Minute)
-}
+	tt := time.NewTimer(1 * time.Minute)
 
-// WaitWithDuration waits for the transaction to be executed with a given timeout
-func (t *TestTxn) WaitWithDuration(timeout time.Duration) error {
 	for {
 		select {
 		case <-time.After(100 * time.Millisecond):
@@ -772,13 +764,13 @@ func (t *TestTxn) WaitWithDuration(timeout time.Duration) error {
 				return nil
 			}
 
-		case <-time.After(timeout):
+		case <-tt.C:
 			return fmt.Errorf("timeout")
 		}
 	}
 }
 
-func sliceArrayToSliceString(addrs []types.Address) []string {
+func sliceAddressToSliceString(addrs []types.Address) []string {
 	res := make([]string, len(addrs))
 	for indx, addr := range addrs {
 		res[indx] = addr.String()

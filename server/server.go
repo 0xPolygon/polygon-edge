@@ -204,7 +204,7 @@ func NewServer(config *Config) (*Server, error) {
 
 	// apply allow list genesis data
 	if m.config.Chain.Params.ContractDeployerAllowList != nil {
-		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, allowlist.AllowListContractsAddr,
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
 			m.config.Chain.Params.ContractDeployerAllowList)
 	}
 

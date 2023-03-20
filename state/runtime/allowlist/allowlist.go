@@ -10,10 +10,6 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-var (
-	AllowListContractsAddr = types.StringToAddress("0x0200000000000000000000000000000000000000")
-)
-
 // list of function methods for the allow list functionality
 var (
 	SetAdminFunc            = abi.MustNewMethod("function setAdmin(address)")
@@ -59,13 +55,12 @@ var (
 	errInputTooShort       = fmt.Errorf("wrong input size, expected 32")
 	errFunctionNotFound    = fmt.Errorf("function not found")
 	errWriteProtection     = fmt.Errorf("write protection")
-	errNotAuth             = fmt.Errorf("not auth")
 )
 
 func (a *AllowList) runInputCall(caller types.Address, input []byte,
 	gas uint64, isStatic bool) ([]byte, uint64, error) {
 	// decode the function signature from the input
-	if len(input) < 4 {
+	if len(input) < types.SignatureSize {
 		return nil, 0, errNoFunctionSignature
 	}
 
@@ -127,7 +122,7 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte,
 	// Only Admin accounts can modify the role of other accounts
 	addrRole := a.GetRole(caller)
 	if addrRole != AdminRole {
-		return nil, gasUsed, errNotAuth
+		return nil, gasUsed, runtime.ErrNotAuth
 	}
 
 	a.SetRole(inputAddr, updateRole)

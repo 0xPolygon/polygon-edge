@@ -4,6 +4,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
@@ -37,7 +38,7 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 	bytecode, _ := hex.DecodeString("6080604052348015600f57600080fd5b50603e80601d6000396000f3fe6080604052600080fdfea265627a7a7231582027748e4afe5ee282a786005d286f4427f13dac1b62e03f9aed311c2db7e8245364736f6c63430005110032")
 
 	expectRole := func(addr types.Address, role allowlist.Role) {
-		out := cluster.Call(t, allowlist.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
+		out := cluster.Call(t, contracts.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
 
 		num, ok := out["0"].(*big.Int)
 		if !ok {
@@ -82,7 +83,7 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
 		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
 
-		adminSetTxn := cluster.MethodTxn(t, admin, allowlist.AllowListContractsAddr, input)
+		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListContractsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
 		expectRole(targetAddr, allowlist.EnabledRole)
 	}
@@ -100,7 +101,7 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 		// (The transaction fails)
 		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
 
-		adminSetFailTxn := cluster.MethodTxn(t, target, allowlist.AllowListContractsAddr, input)
+		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListContractsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
 		require.True(t, adminSetFailTxn.Failed())
 		expectRole(types.ZeroAddress, allowlist.NoRole)

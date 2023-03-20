@@ -47,5 +47,7 @@ func (g *genesisState) SetState(addr types.Address, key, value types.Hash) {
 }
 
 func (g *genesisState) GetStorage(addr types.Address, key types.Hash) types.Hash {
-	panic("not used")
+	// since `genesisState` is used only as part of `ApplyGenesisAllocs` to set the initial
+	// roles in the contract. It never calls this `GetStorage` function.
+	return types.Hash{}
 }

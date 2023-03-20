@@ -193,7 +193,7 @@ func (e *Executor) BeginTxn(
 
 	// enable contract deployment allow list (if any)
 	if e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowlist = allowlist.NewAllowList(txn, allowlist.AllowListContractsAddr)
+		txn.deploymentAllowlist = allowlist.NewAllowList(txn, contracts.AllowListContractsAddr)
 	}
 
 	return txn, nil
