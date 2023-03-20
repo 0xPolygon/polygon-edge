@@ -1,10 +1,8 @@
 package initcontracts
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -331,7 +329,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	// init CheckpointManager
-	if err := initializeCheckpointManager(txRelayer, manifest, deployerKey); err != nil {
+	if err := initializeCheckpointManager(outputter, txRelayer, manifest, deployerKey); err != nil {
 		return err
 	}
 
@@ -362,10 +360,11 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 // initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
 func initializeCheckpointManager(
+	o command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer,
 	manifest *polybft.Manifest,
 	deployerKey ethgo.Key) error {
-	validatorSet, err := validatorSetToABISlice(manifest.GenesisValidators)
+	validatorSet, err := validatorSetToABISlice(o, manifest.GenesisValidators)
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
@@ -451,26 +450,38 @@ func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, cont
 
 // validatorSetToABISlice converts given validators to generic map
 // which is used for ABI encoding validator set being sent to the rootchain contract
-func validatorSetToABISlice(validators []*polybft.Validator) ([]*contractsapi.Validator, error) {
-	genesisValidators := make([]*polybft.Validator, len(validators))
-	copy(genesisValidators, validators)
-	sort.Slice(genesisValidators, func(i, j int) bool {
-		return bytes.Compare(genesisValidators[i].Address.Bytes(), genesisValidators[j].Address.Bytes()) < 0
-	})
+func validatorSetToABISlice(o command.OutputFormatter,
+	validators []*polybft.Validator) ([]*contractsapi.Validator, error) {
+	accSet := make(polybft.AccountSet, len(validators))
 
-	accSet := make(polybft.AccountSet, len(genesisValidators))
+	if _, err := o.Write([]byte(fmt.Sprintf("%s [VALIDATORS]\n", contractsDeploymentTitle))); err != nil {
+		return nil, err
+	}
 
-	for i, validatorInfo := range genesisValidators {
-		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
+	for i, validator := range validators {
+		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", validator))); err != nil {
+			return nil, err
+		}
+
+		blsKey, err := validator.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}
 
 		accSet[i] = &polybft.ValidatorMetadata{
-			Address:     validatorInfo.Address,
+			Address:     validator.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(validatorInfo.Balance),
+			VotingPower: new(big.Int).Set(validator.Balance),
 		}
+	}
+
+	hash, err := accSet.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := o.Write([]byte(fmt.Sprintf("%s Validators hash: %s\n", contractsDeploymentTitle, hash))); err != nil {
+		return nil, err
 	}
 
 	return accSet.ToAPIBinding(), nil

@@ -249,7 +249,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var err error
 
 	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftChainConfig()
+		err = params.generatePolyBftChainConfig(outputter)
 	} else {
 		err = params.generateGenesis()
 	}

@@ -468,8 +468,8 @@ func (c *TestCluster) Stats(t *testing.T) {
 	}
 }
 
-func (c *TestCluster) WaitUntil(dur time.Duration, handler func() bool) error {
-	timer := time.NewTimer(dur)
+func (c *TestCluster) WaitUntil(timeout, pollFrequency time.Duration, handler func() bool) error {
+	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
 	for {
@@ -478,7 +478,7 @@ func (c *TestCluster) WaitUntil(dur time.Duration, handler func() bool) error {
 			return fmt.Errorf("timeout")
 		case <-c.failCh:
 			return c.executionErr
-		case <-time.After(2 * time.Second):
+		case <-time.After(pollFrequency):
 		}
 
 		if handler() {
@@ -526,7 +526,7 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 
 // WaitForGeneric waits until all running servers returns true from fn callback or timeout defined by dur occurs
 func (c *TestCluster) WaitForGeneric(dur time.Duration, fn func(*TestServer) bool) error {
-	return c.WaitUntil(dur, func() bool {
+	return c.WaitUntil(dur, 2*time.Second, func() bool {
 		for _, srv := range c.Servers {
 			// query only running servers
 			if srv.isRunning() && !fn(srv) {
