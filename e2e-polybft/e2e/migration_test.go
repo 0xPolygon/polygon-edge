@@ -27,9 +27,10 @@ func TestMigration(t *testing.T) {
 	userKey2, _ := wallet.GenerateKey()
 	userAddr2 := userKey2.Address()
 
+	initialBalance := ethgo.Ether(10)
 	srvs := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
 		config.SetConsensus(framework.ConsensusDev)
-		config.Premine(types.Address(userAddr), ethgo.Ether(10))
+		config.Premine(types.Address(userAddr), initialBalance)
 	})
 	srv := srvs[0]
 
@@ -41,6 +42,7 @@ func TestMigration(t *testing.T) {
 		ethgo.Latest,
 	)
 	assert.NoError(t, err)
+	assert.Equal(t, balanceSender.Cmp(initialBalance), 0)
 
 	balanceReceiver, err := rpcClient.Eth().GetBalance(
 		userAddr2,
