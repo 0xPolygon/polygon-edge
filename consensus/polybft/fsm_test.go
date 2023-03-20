@@ -552,7 +552,8 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	bridgeCommitmentTx := fsm.getBridgeCommitmentTx()
+	bridgeCommitmentTx, err := fsm.createBridgeCommitmentTx()
+	require.NoError(t, err)
 
 	// add commit epoch commitEpochTx to the end of transactions list
 	commitEpochTx, err := fsm.createCommitEpochTx()
@@ -593,13 +594,14 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	bridgeCommitmentTx := fsm.getBridgeCommitmentTx()
-
-	// add commit epoch tx to the end of transactions list
-	tx, err := fsm.createCommitEpochTx()
+	bridgeCommitmentTx, err := fsm.createBridgeCommitmentTx()
 	require.NoError(t, err)
 
-	err = fsm.VerifyStateTransactions([]*types.Transaction{tx, bridgeCommitmentTx})
+	// add commit epoch commitEpochTx to the end of transactions list
+	commitEpochTx, err := fsm.createCommitEpochTx()
+	require.NoError(t, err)
+
+	err = fsm.VerifyStateTransactions([]*types.Transaction{commitEpochTx, bridgeCommitmentTx})
 	require.ErrorContains(t, err, "invalid signature")
 }
 
@@ -1013,7 +1015,8 @@ func TestFSM_DecodeCommitmentStateTxs(t *testing.T) {
 		logger:                       hclog.NewNullLogger(),
 	}
 
-	bridgeCommitmentTx := f.getBridgeCommitmentTx()
+	bridgeCommitmentTx, err := f.createBridgeCommitmentTx()
+	require.NoError(t, err)
 
 	decodedData, err := decodeStateTransaction(bridgeCommitmentTx.Input)
 	require.NoError(t, err)

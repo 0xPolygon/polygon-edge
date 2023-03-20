@@ -114,10 +114,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		if bridgeCommitmentTx := f.getBridgeCommitmentTx(); bridgeCommitmentTx != nil {
-			if err := f.blockBuilder.WriteTx(bridgeCommitmentTx); err != nil {
-				return nil, fmt.Errorf("failed to apply commitment state sync state transaction. Error: %w", err)
-			}
+		if err := f.applyBridgeCommitmentTx(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -192,20 +190,34 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	return stateBlock.Block.MarshalRLP(), nil
 }
 
-// getBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
-func (f *fsm) getBridgeCommitmentTx() *types.Transaction {
+// applyBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
+func (f *fsm) applyBridgeCommitmentTx() error {
 	if f.proposerCommitmentToRegister != nil {
-		inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
+		bridgeCommitmentTx, err := f.createBridgeCommitmentTx()
 		if err != nil {
-			f.logger.Error("failed to encode input data for bridge commitment registration", "Error", err)
-
-			return nil
+			return err
 		}
 
-		return createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
+		if err := f.blockBuilder.WriteTx(bridgeCommitmentTx); err != nil {
+			return fmt.Errorf("failed to apply bridge commitment state transaction. Error: %w", err)
+		}
 	}
 
 	return nil
+}
+
+// createBridgeCommitmentTx builds bridge commitment registration transaction
+func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
+	if f.proposerCommitmentToRegister == nil {
+		return nil, errors.New("unable to create bridge commitment transaction, since commitment instance is undefined")
+	}
+
+	inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
+	}
+
+	return createStateTransactionWithData(f.config.StateReceiverAddr, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
