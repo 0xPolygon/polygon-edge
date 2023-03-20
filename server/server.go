@@ -31,6 +31,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -200,6 +201,12 @@ func NewServer(config *Config) (*Server, error) {
 	engineName := m.config.Chain.Params.GetEngine()
 	if factory, exists := genesisCreationFactory[ConsensusType(engineName)]; exists {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
+	}
+
+	// apply allow list genesis data
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+			m.config.Chain.Params.ContractDeployerAllowList)
 	}
 
 	// compute the genesis root state

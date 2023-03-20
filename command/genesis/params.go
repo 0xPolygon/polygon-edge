@@ -84,6 +84,10 @@ type genesisParams struct {
 	bridgeJSONRPCAddr       string
 	epochReward             uint64
 	eventTrackerStartBlocks []string
+
+	// allowlist
+	contractDeployerAllowListAdmin   []string
+	contractDeployerAllowListEnabled []string
 }
 
 func (p *genesisParams) validateFlags() error {

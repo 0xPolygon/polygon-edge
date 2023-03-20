@@ -2,8 +2,10 @@ package framework
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"os/exec"
 	"path"
@@ -19,8 +21,13 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
+	"github.com/umbracle/ethgo/wallet"
 )
 
 const (
@@ -80,6 +87,9 @@ type TestClusterConfig struct {
 	EpochSize         int
 	EpochReward       int
 	SecretsCallback   func([]types.Address, *TestClusterConfig)
+
+	ContractDeployerAllowListAdmin   []types.Address
+	ContractDeployerAllowListEnabled []types.Address
 
 	NumBlockConfirmations uint64
 
@@ -148,6 +158,8 @@ type TestCluster struct {
 	once         sync.Once
 	failCh       chan struct{}
 	executionErr error
+
+	sendTxnLock sync.Mutex
 }
 
 type ClusterOption func(*TestClusterConfig)
@@ -217,6 +229,18 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.NumBlockConfirmations = numBlockConfirmations
+	}
+}
+
+func WithContractDeployerAllowListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ContractDeployerAllowListAdmin = append(h.ContractDeployerAllowListAdmin, addr)
+	}
+}
+
+func WithContractDeployerAllowListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ContractDeployerAllowListEnabled = append(h.ContractDeployerAllowListEnabled, addr)
 	}
 }
 
@@ -352,6 +376,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
 		}
 
+		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
+			args = append(args, "--contract-deployer-allow-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
+		}
+
+		if len(cluster.Config.ContractDeployerAllowListEnabled) != 0 {
+			args = append(args, "--contract-deployer-allow-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
+		}
+
 		// run cmd init-genesis with all the arguments
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
@@ -451,6 +485,12 @@ func (c *TestCluster) WaitUntil(dur time.Duration, handler func() bool) error {
 			return nil
 		}
 	}
+}
+
+func (c *TestCluster) WaitForReady(t *testing.T) {
+	t.Helper()
+
+	require.NoError(t, c.WaitForBlock(3, 1*time.Minute))
 }
 
 func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
@@ -553,4 +593,188 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 	}
 
 	return result, nil
+}
+
+func (c *TestCluster) ExistsCode(t *testing.T, addr ethgo.Address) bool {
+	t.Helper()
+
+	client, err := jsonrpc.NewClient(c.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
+
+	code, err := client.Eth().GetCode(addr, ethgo.Latest)
+	if err != nil {
+		return false
+	}
+
+	return code != "0x"
+}
+
+func (c *TestCluster) Call(t *testing.T, to types.Address, method *abi.Method,
+	args ...interface{}) map[string]interface{} {
+	t.Helper()
+
+	client, err := jsonrpc.NewClient(c.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
+
+	input, err := method.Encode(args)
+	require.NoError(t, err)
+
+	toAddr := ethgo.Address(to)
+
+	msg := &ethgo.CallMsg{
+		To:   &toAddr,
+		Data: input,
+	}
+	resp, err := client.Eth().Call(msg, ethgo.Latest)
+	require.NoError(t, err)
+
+	data, err := hex.DecodeString(resp[2:])
+	require.NoError(t, err)
+
+	output, err := method.Decode(data)
+	require.NoError(t, err)
+
+	return output
+}
+
+func (c *TestCluster) Deploy(t *testing.T, sender ethgo.Key, bytecode []byte) *TestTxn {
+	t.Helper()
+
+	return c.SendTxn(t, sender, &ethgo.Transaction{Input: bytecode})
+}
+
+func (c *TestCluster) Transfer(t *testing.T, sender ethgo.Key, target types.Address, value *big.Int) *TestTxn {
+	t.Helper()
+
+	targetAddr := ethgo.Address(target)
+
+	return c.SendTxn(t, sender, &ethgo.Transaction{To: &targetAddr, Value: value})
+}
+
+func (c *TestCluster) MethodTxn(t *testing.T, sender ethgo.Key, target types.Address, input []byte) *TestTxn {
+	t.Helper()
+
+	targetAddr := ethgo.Address(target)
+
+	return c.SendTxn(t, sender, &ethgo.Transaction{To: &targetAddr, Input: input})
+}
+
+// SendTxn sends a transaction
+func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transaction) *TestTxn {
+	t.Helper()
+
+	// since we might use get nonce to query the latest nonce and that value is only
+	// updated if the transaction is on the pool, it is recommended to lock the whole
+	// execution in case we send multiple transactions from the same account and we expect
+	// to get a sequential nonce order.
+	c.sendTxnLock.Lock()
+	defer c.sendTxnLock.Unlock()
+
+	client, err := jsonrpc.NewClient(c.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
+
+	// initialize transaction values if not set
+	if txn.Nonce == 0 {
+		nonce, err := client.Eth().GetNonce(sender.Address(), ethgo.Latest)
+		require.NoError(t, err)
+
+		txn.Nonce = nonce
+	}
+
+	if txn.GasPrice == 0 {
+		txn.GasPrice = txrelayer.DefaultGasPrice
+	}
+
+	if txn.Gas == 0 {
+		txn.Gas = txrelayer.DefaultGasLimit
+	}
+
+	chainID, err := client.Eth().ChainID()
+	require.NoError(t, err)
+
+	signer := wallet.NewEIP155Signer(chainID.Uint64())
+	signedTxn, err := signer.SignTx(txn, sender)
+	require.NoError(t, err)
+
+	txnRaw, err := signedTxn.MarshalRLPTo(nil)
+	require.NoError(t, err)
+
+	hash, err := client.Eth().SendRawTransaction(txnRaw)
+	require.NoError(t, err)
+
+	tTxn := &TestTxn{
+		client: client.Eth(),
+		txn:    txn,
+		hash:   hash,
+	}
+
+	return tTxn
+}
+
+type TestTxn struct {
+	client  *jsonrpc.Eth
+	hash    ethgo.Hash
+	txn     *ethgo.Transaction
+	receipt *ethgo.Receipt
+}
+
+// Txn returns the raw transaction that was sent
+func (t *TestTxn) Txn() *ethgo.Transaction {
+	return t.txn
+}
+
+// Receipt returns the receipt of the transaction
+func (t *TestTxn) Receipt() *ethgo.Receipt {
+	return t.receipt
+}
+
+// Succeed returns whether the transaction succeed and it was not reverted
+func (t *TestTxn) Succeed() bool {
+	return t.receipt.Status == uint64(types.ReceiptSuccess)
+}
+
+// Failed returns whether the transaction failed
+func (t *TestTxn) Failed() bool {
+	return t.receipt.Status == uint64(types.ReceiptFailed)
+}
+
+// Reverted returns whether the transaction failed and was reverted consuming
+// all the gas from the call
+func (t *TestTxn) Reverted() bool {
+	return t.receipt.Status == uint64(types.ReceiptFailed) && t.txn.Gas == t.receipt.GasUsed
+}
+
+// Wait waits for the transaction to be executed
+func (t *TestTxn) Wait() error {
+	tt := time.NewTimer(1 * time.Minute)
+
+	for {
+		select {
+		case <-time.After(100 * time.Millisecond):
+			receipt, err := t.client.GetTransactionReceipt(t.hash)
+			if err != nil {
+				if err.Error() != "not found" {
+					return err
+				}
+			}
+
+			if receipt != nil {
+				t.receipt = receipt
+
+				return nil
+			}
+
+		case <-tt.C:
+			return fmt.Errorf("timeout")
+		}
+	}
+}
+
+func sliceAddressToSliceString(addrs []types.Address) []string {
+	res := make([]string, len(addrs))
+	for indx, addr := range addrs {
+		res[indx] = addr.String()
+	}
+
+	return res
 }

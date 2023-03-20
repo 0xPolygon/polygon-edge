@@ -17,6 +17,8 @@ const (
 	AddressLength = 20
 )
 
+const SignatureSize = 4
+
 type Hash [HashLength]byte
 
 type Address [AddressLength]byte

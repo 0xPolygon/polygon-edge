@@ -38,6 +38,9 @@ const (
 	defaultBridge           = false
 	defaultEpochReward      = 1
 
+	contractDeployedAllowListAdminFlag   = "contract-deployer-allow-list-admin"
+	contractDeployedAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+
 	bootnodePortStart = 30301
 )
 
@@ -178,6 +181,15 @@ func (p *genesisParams) generatePolyBftChainConfig() error {
 		Mixhash:    polybft.PolyBFTMixDigest,
 	}
 
+	if len(p.contractDeployerAllowListAdmin) != 0 {
+		// only enable allow list if there is at least one address as **admin**, otherwise
+		// the allow list could never be updated
+		chainConfig.Params.ContractDeployerAllowList = &chain.AllowListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.contractDeployerAllowListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.contractDeployerAllowListEnabled),
+		}
+	}
+
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
@@ -258,4 +270,13 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
 	return append(make([]byte, polybft.ExtraVanity), extra.MarshalRLPTo(nil)...), nil
+}
+
+func stringSliceToAddressSlice(addrs []string) []types.Address {
+	res := make([]types.Address, len(addrs))
+	for indx, addr := range addrs {
+		res[indx] = types.StringToAddress(addr)
+	}
+
+	return res
 }
