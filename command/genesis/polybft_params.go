@@ -28,6 +28,7 @@ const (
 	blockTimeFlag          = "block-time"
 	bridgeFlag             = "bridge-json-rpc"
 	trackerStartBlocksFlag = "tracker-start-blocks"
+	trieRootFlag           = "trieroot"
 
 	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)

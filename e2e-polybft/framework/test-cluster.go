@@ -807,7 +807,7 @@ func CopyDir(source, destination string) error {
 		return err
 	}
 
-	err = filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
 		relPath := strings.Replace(path, source, "", 1)
 		if relPath == "" {
 			return nil
@@ -820,6 +820,4 @@ func CopyDir(source, destination string) error {
 
 		return ioutil.WriteFile(filepath.Join(destination, relPath), data, 0600)
 	})
-
-	return err
 }

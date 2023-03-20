@@ -202,7 +202,7 @@ func setFlags(cmd *cobra.Command) {
 		//Regenesis flag that allows to start from non-empty database
 		cmd.Flags().StringVar(
 			&params.initialStateRoot,
-			"trieroot",
+			trieRootFlag,
 			"",
 			"trie root from the corresponding triedb",
 		)
