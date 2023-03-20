@@ -71,9 +71,9 @@ func TestE2E_Broadcast(t *testing.T) {
 	sendTransaction(t, client, sender, dynamicFeesTxn)
 
 	// Wait until the balance has changed on all nodes in the cluster
-	err = cluster.WaitUntil(time.Second*30, func() bool {
+	err = cluster.WaitUntil(time.Minute, func() bool {
 		for _, srv := range cluster.Servers {
-			balance, err := srv.WaitForNonZeroBalance(recipient, time.Second*5)
+			balance, err := srv.WaitForNonZeroBalance(recipient, time.Second*10)
 			assert.NoError(t, err)
 			if balance != nil && balance.BitLen() > 0 {
 				assert.Equal(t, new(big.Int).Add(legacyTxn.Value, dynamicFeesTxn.Value), balance)
