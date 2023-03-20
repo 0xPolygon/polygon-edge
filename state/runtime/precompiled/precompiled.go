@@ -77,7 +77,7 @@ func (p *Precompiled) setupContracts() {
 	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
 
 	// Console precompile
-	p.register(contracts.ConsolePrecompile.String(), &console{})
+	// p.register(contracts.ConsolePrecompile.String(), &console{})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {
