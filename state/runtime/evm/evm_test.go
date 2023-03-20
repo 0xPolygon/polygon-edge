@@ -42,7 +42,7 @@ func (m *mockHost) SetState(
 	key types.Hash,
 	value types.Hash,
 ) {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) SetStorage(

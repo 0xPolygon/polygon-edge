@@ -121,7 +121,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster := framework.NewTestCluster(t, validatorSize,
 		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(epochReward),
-		framework.WithPremineValidators(premineBalance))
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for _, a := range addresses {
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+			}
+		}),
+	)
 	defer cluster.Stop()
 
 	// first validator is the owner of ChildValidator set smart contract
@@ -327,8 +332,13 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
-		framework.WithPremineValidators(premineBalance),
-		framework.WithEpochSize(epochSize))
+		framework.WithEpochSize(epochSize),
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for _, a := range addresses {
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+			}
+		}),
+	)
 	defer cluster.Stop()
 
 	// init delegator account
@@ -428,11 +438,18 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 }
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
+	const premineAmount = "10000000000000000000" // 10 native tokens
+
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithEpochReward(10000),
 		framework.WithEpochSize(5),
-		framework.WithPremineValidators("10000000000000000000")) // 10 native tokens
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for _, a := range addresses {
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineAmount))
+			}
+		}),
+	)
 	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
 	srv := cluster.Servers[0]
 
@@ -532,7 +549,6 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 
 	cluster := framework.NewTestCluster(t, validatorCount,
 		framework.WithEpochReward(100000),
-		framework.WithPremineValidators(premineBalance),
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 

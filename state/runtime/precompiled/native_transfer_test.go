@@ -93,7 +93,7 @@ func (d dummyHost) SetState(
 	key types.Hash,
 	value types.Hash,
 ) {
-	panic("Not implemented in tests")
+	d.t.Fatalf("SetState is not implemented")
 }
 
 func (d dummyHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
