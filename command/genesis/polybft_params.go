@@ -269,6 +269,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
+
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {

@@ -162,7 +162,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			if err = initContract(contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
 				return err
 			}
-
 		} else {
 			// initialize NativeERC20 SC
 			params := &contractsapi.InitializeNativeERC20Function{
