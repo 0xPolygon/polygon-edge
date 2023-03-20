@@ -62,13 +62,13 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	return nil
 }
 
-type premineInfo struct {
-	address types.Address
-	balance *big.Int
+type PremineInfo struct {
+	Address types.Address
+	Balance *big.Int
 }
 
-// parsePremineInfo parses provided premine information and returns premine address and premine balance
-func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
+// ParsePremineInfo parses provided premine information and returns premine address and premine balance
+func ParsePremineInfo(premineInfoRaw string) (*PremineInfo, error) {
 	var (
 		address types.Address
 		val     = command.DefaultPremineBalance
@@ -87,7 +87,7 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
 	}
 
-	return &premineInfo{address: address, balance: amount}, nil
+	return &PremineInfo{Address: address, Balance: amount}, nil
 }
 
 // parseTrackerStartBlocks parses provided event tracker start blocks configuration.

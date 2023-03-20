@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -107,15 +108,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	premineInfos := make([]*premineInfo, len(manifest.GenesisValidators))
-	validatorPreminesMap := make(map[types.Address]int, len(manifest.GenesisValidators))
+	genesisValidators := make(map[types.Address]struct{}, len(manifest.GenesisValidators))
 	totalStake := big.NewInt(0)
 
-	for i, validator := range manifest.GenesisValidators {
+	for _, validator := range manifest.GenesisValidators {
 		// populate premine info for validator accounts
-		premineInfo := &premineInfo{address: validator.Address, balance: validator.Balance}
-		premineInfos[i] = premineInfo
-		validatorPreminesMap[premineInfo.address] = i
+		genesisValidators[validator.Address] = struct{}{}
 
 		// TODO: @Stefan-Ethernal change this to Stake when https://github.com/0xPolygon/polygon-edge/pull/1137 gets merged
 		// increment total stake
@@ -128,24 +126,41 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return err
 	}
 
-	// either premine non-validator or override validator accounts balance
-	for _, premine := range p.premine {
-		premineInfo, err := parsePremineInfo(premine)
+	premineInfos := make([]*PremineInfo, len(p.premine))
+	premineValidatorsAddrs := []string{}
+	// premine non-validator
+	for i, premine := range p.premine {
+		premineInfo, err := ParsePremineInfo(premine)
 		if err != nil {
 			return err
 		}
 
-		if i, ok := validatorPreminesMap[premineInfo.address]; ok {
-			premineInfos[i] = premineInfo
-		} else {
-			premineInfos = append(premineInfos, premineInfo) //nolint:makezero
+		// collect validators addresses which got premined, as it is an error
+		// genesis validators balances must be defined in manifest file and should not be changed in the genesis
+		if _, ok := genesisValidators[premineInfo.Address]; ok {
+			premineValidatorsAddrs = append(premineValidatorsAddrs, premineInfo.Address.String())
+		}
+
+		premineInfos[i] = premineInfo
+	}
+
+	// if there are any premined validators in the genesis command, consider it as an error
+	if len(premineValidatorsAddrs) > 0 {
+		return fmt.Errorf("it is not allowed to override genesis validators balance outside from the manifest definition. "+
+			"Validators which got premined: (%s)", strings.Join(premineValidatorsAddrs, ", "))
+	}
+
+	// populate genesis validators balances
+	for _, validator := range manifest.GenesisValidators {
+		allocs[validator.Address] = &chain.GenesisAccount{
+			Balance: validator.Balance,
 		}
 	}
 
-	// premine accounts
+	// premine non-validator accounts
 	for _, premine := range premineInfos {
-		allocs[premine.address] = &chain.GenesisAccount{
-			Balance: premine.balance,
+		allocs[premine.Address] = &chain.GenesisAccount{
+			Balance: premine.Balance,
 		}
 	}
 

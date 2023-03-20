@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"strings"
@@ -82,11 +83,14 @@ func setFlags(cmd *cobra.Command) {
 		"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
-	cmd.Flags().StringVar(
+	cmd.Flags().StringArrayVar(
 		&params.premineValidators,
 		premineValidatorsFlag,
-		command.DefaultPremineBalance,
-		"the amount which will be pre-mined to all the validators",
+		[]string{},
+		fmt.Sprintf(
+			"the premined validators and balances (format: <address>:<balance>). Default premined balance: %s",
+			command.DefaultPremineBalance,
+		),
 	)
 
 	cmd.Flags().Int64Var(
@@ -125,7 +129,7 @@ type manifestInitParams struct {
 	manifestPath         string
 	validatorsPath       string
 	validatorsPrefixPath string
-	premineValidators    string
+	premineValidators    []string
 	validators           []string
 	chainID              int64
 }
@@ -135,18 +139,29 @@ func (p *manifestInitParams) validateFlags() error {
 		return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
 	}
 
-	if _, err := types.ParseUint256orHex(&p.premineValidators); err != nil {
-		return fmt.Errorf("invalid premine validators balance provided '%s': %w", p.premineValidators, err)
-	}
-
 	return nil
 }
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
 func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error) {
-	balance, err := types.ParseUint256orHex(&params.premineValidators)
+	// populate validators premine info
+	premineMap := make(map[types.Address]*genesis.PremineInfo, len(p.premineValidators))
+
+	for _, premine := range p.premineValidators {
+		premineInfo, err := genesis.ParsePremineInfo(premine)
+		if err != nil {
+			return nil, err
+		}
+
+		premineMap[premineInfo.Address] = premineInfo
+	}
+
+	// parse default validators' balance
+	defaultBalanceRaw := command.DefaultPremineBalance
+
+	defaultBalance, err := types.ParseUint256orHex(&defaultBalanceRaw)
 	if err != nil {
-		return nil, fmt.Errorf("provided invalid premine validators balance: %s", params.premineValidators)
+		return nil, fmt.Errorf("provided invalid premine validators balance: %s", defaultBalanceRaw)
 	}
 
 	if len(p.validators) > 0 {
@@ -177,12 +192,13 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
 			}
 
+			addr := types.StringToAddress(trimmedAddress)
 			validators[i] = &polybft.Validator{
 				MultiAddr:    parts[0],
-				Address:      types.StringToAddress(trimmedAddress),
+				Address:      addr,
 				BlsKey:       trimmedBLSKey,
 				BlsSignature: parts[3],
-				Balance:      balance,
+				Balance:      getBalance(addr, premineMap, defaultBalance),
 			}
 		}
 
@@ -200,10 +216,21 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		v.Balance = balance
+		v.Balance = getBalance(v.Address, premineMap, defaultBalance)
 	}
 
 	return validators, nil
+}
+
+// getBalance retrieves balance from the premine map or if not provided, returns default balance
+func getBalance(addr types.Address, premineMap map[types.Address]*genesis.PremineInfo,
+	defaultBalance *big.Int) *big.Int {
+	balance := defaultBalance
+	if premine, exists := premineMap[addr]; exists {
+		balance = premine.Balance
+	}
+
+	return balance
 }
 
 func (p *manifestInitParams) getResult() command.CommandResult {

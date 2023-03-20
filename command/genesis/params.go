@@ -341,13 +341,13 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineRaw := range p.premine {
-		premineInfo, err := parsePremineInfo(premineRaw)
+		premineInfo, err := ParsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
-			Balance: premineInfo.balance,
+		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
+			Balance: premineInfo.Balance,
 		}
 	}
 
