@@ -171,7 +171,7 @@ func (m *memBatch) Write() {
 // GetNode retrieves a node from storage
 func GetNode(root []byte, storage Storage) (Node, bool, error) {
 	data, ok := storage.Get(root)
-	if !ok {
+	if !ok || len(data) == 0 {
 		return nil, false, nil
 	}
 

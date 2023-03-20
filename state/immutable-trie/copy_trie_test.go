@@ -55,10 +55,10 @@ func TestCompareModelOfTrieCopy(t *testing.T) {
 
 		result, err = HashChecker(stateRoot.Bytes(), newKV)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		if stateRoot != result {
-			t.Fatal("Hashes are not equal", stateRoot, result)
+			t.Error("Hashes are not equal", stateRoot, result)
 		}
 	})
 }
