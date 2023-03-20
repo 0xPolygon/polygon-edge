@@ -458,22 +458,20 @@ func validatorSetToABISlice(o command.OutputFormatter,
 		return nil, err
 	}
 
-	for _, v := range validators {
-		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", v))); err != nil {
+	for i, validator := range validators {
+		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", validator))); err != nil {
 			return nil, err
 		}
-	}
 
-	for i, validatorInfo := range validators {
-		blsKey, err := validatorInfo.UnmarshalBLSPublicKey()
+		blsKey, err := validator.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}
 
 		accSet[i] = &polybft.ValidatorMetadata{
-			Address:     validatorInfo.Address,
+			Address:     validator.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(validatorInfo.Balance),
+			VotingPower: new(big.Int).Set(validator.Balance),
 		}
 	}
 
