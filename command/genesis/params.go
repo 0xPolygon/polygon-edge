@@ -85,6 +85,8 @@ type genesisParams struct {
 	epochReward             uint64
 	eventTrackerStartBlocks []string
 
+	initialStateRoot string
+
 	// allowlist
 	contractDeployerAllowListAdmin   []string
 	contractDeployerAllowListEnabled []string

@@ -198,6 +198,14 @@ func setFlags(cmd *cobra.Command) {
 			"event tracker starting block configuration, which is specified per contract address "+
 				"(format: <contract address>:<start block>)",
 		)
+
+		//Regenesis flag that allows to start from non-empty database
+		cmd.Flags().StringVar(
+			&params.initialStateRoot,
+			trieRootFlag,
+			"",
+			"trie root from the corresponding triedb",
+		)
 	}
 
 	// Allow list

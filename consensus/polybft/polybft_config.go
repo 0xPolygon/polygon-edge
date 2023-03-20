@@ -43,6 +43,7 @@ type PolyBFTConfig struct {
 	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
 	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
 	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
+	InitialTrieRoot   types.Hash    `json:"initialTrieRoot"`
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig

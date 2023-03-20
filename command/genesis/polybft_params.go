@@ -28,6 +28,7 @@ const (
 	blockTimeFlag          = "block-time"
 	bridgeFlag             = "bridge-json-rpc"
 	trackerStartBlocksFlag = "tracker-start-blocks"
+	trieRootFlag           = "trieroot"
 
 	defaultManifestPath     = "./manifest.json"
 	defaultEpochSize        = uint64(10)
@@ -94,6 +95,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bridge:            bridge,
 		ValidatorSetAddr:  contracts.ValidatorSetContract,
 		StateReceiverAddr: contracts.StateReceiverContract,
+		InitialTrieRoot:   types.StringToHash(p.initialStateRoot),
 	}
 
 	chainConfig := &chain.Chain{

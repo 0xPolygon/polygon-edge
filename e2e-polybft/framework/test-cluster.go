@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/big"
 	"os"
 	"os/exec"
@@ -91,6 +92,9 @@ type TestClusterConfig struct {
 	ContractDeployerAllowListEnabled []types.Address
 
 	NumBlockConfirmations uint64
+
+	InitialTrieDB    string
+	InitialStateRoot types.Hash
 
 	logsDirOnce sync.Once
 }
@@ -192,6 +196,13 @@ func WithNonValidators(num int) ClusterOption {
 func WithValidatorSnapshot(validatorsLen uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ValidatorSetSize = validatorsLen
+	}
+}
+
+func WithGenesisState(databasePath string, stateRoot types.Hash) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.InitialTrieDB = databasePath
+		h.InitialStateRoot = stateRoot
 	}
 }
 
@@ -341,6 +352,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
+			"--trieroot", cluster.Config.InitialStateRoot.String(),
 		}
 
 		if len(cluster.Config.Premine) != 0 {
@@ -405,7 +417,14 @@ func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, rela
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
+
 	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
+	if c.Config.InitialTrieDB != "" {
+		err := CopyDir(c.Config.InitialTrieDB, filepath.Join(dataDir, "trie"))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
 		config.DataDir = dataDir
@@ -563,6 +582,11 @@ func runCommand(binary string, args []string, stdout io.Writer) error {
 	}
 
 	return nil
+}
+
+// RunEdgeCommand - calls a command line edge function
+func RunEdgeCommand(args []string, stdout io.Writer) error {
+	return runCommand(resolveBinary(), args, stdout)
 }
 
 // InitSecrets initializes account(s) secrets with given prefix.
@@ -775,4 +799,25 @@ func sliceAddressToSliceString(addrs []types.Address) []string {
 	}
 
 	return res
+}
+
+func CopyDir(source, destination string) error {
+	err := os.Mkdir(destination, 0755)
+	if err != nil {
+		return err
+	}
+
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		relPath := strings.Replace(path, source, "", 1)
+		if relPath == "" {
+			return nil
+		}
+
+		data, err := ioutil.ReadFile(filepath.Join(source, relPath))
+		if err != nil {
+			return err
+		}
+
+		return ioutil.WriteFile(filepath.Join(destination, relPath), data, 0600)
+	})
 }

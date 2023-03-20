@@ -382,12 +382,12 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 
 	systemState, err := c.getSystemState(header)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get system state: %w", err)
 	}
 
 	epochNumber, err := systemState.GetEpoch()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get epoch: %w", err)
 	}
 
 	if lastEpoch != nil {

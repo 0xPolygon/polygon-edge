@@ -52,8 +52,24 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	}
 }
 
-func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) (types.Hash, error) {
-	snap := e.state.NewSnapshot()
+func (e *Executor) WriteGenesis(
+	alloc map[types.Address]*chain.GenesisAccount,
+	initialStateRoot types.Hash) (types.Hash, error) {
+	var (
+		snap Snapshot
+		err  error
+	)
+
+	if initialStateRoot == types.ZeroHash {
+		snap = e.state.NewSnapshot()
+	} else {
+		snap, err = e.state.NewSnapshotAt(initialStateRoot)
+	}
+
+	if err != nil {
+		return types.Hash{}, err
+	}
+
 	txn := NewTxn(snap)
 	config := e.config.Forks.At(0)
 
