@@ -209,7 +209,7 @@ func setLegacyFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,
-		"the ID of the chain",
+		"the ID of the chain (not-applicable for Polybft consensus protocol as chain id is defined in manifest.json)",
 	)
 
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
