@@ -204,7 +204,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.initialStateRoot,
 			"trieroot",
 			"",
-			"path to trie root from corresponding triedb",
+			"trie root from the corresponding triedb",
 		)
 	}
 }
