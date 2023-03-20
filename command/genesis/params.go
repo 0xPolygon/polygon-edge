@@ -86,6 +86,10 @@ type genesisParams struct {
 	eventTrackerStartBlocks []string
 
 	initialStateRoot string
+
+	// allowlist
+	contractDeployerAllowListAdmin   []string
+	contractDeployerAllowListEnabled []string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -339,13 +343,13 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineRaw := range p.premine {
-		premineInfo, err := parsePremineInfo(premineRaw)
+		premineInfo, err := ParsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
-			Balance: premineInfo.balance,
+		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
+			Balance: premineInfo.Balance,
 		}
 	}
 

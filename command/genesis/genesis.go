@@ -207,6 +207,23 @@ func setFlags(cmd *cobra.Command) {
 			"path to trie root from corresponding triedb",
 		)
 	}
+
+	// Allow list
+	{
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListAdmin,
+			contractDeployedAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the contract deployer allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListEnabled,
+			contractDeployedAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the contract deployer allow list",
+		)
+	}
 }
 
 // setLegacyFlags sets the legacy flags to preserve backwards compatibility
@@ -217,7 +234,7 @@ func setLegacyFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,
-		"the ID of the chain",
+		"the ID of the chain (not-applicable for Polybft consensus protocol as chain id is defined in manifest.json)",
 	)
 
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
@@ -240,7 +257,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var err error
 
 	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftChainConfig()
+		err = params.generatePolyBftChainConfig(outputter)
 	} else {
 		err = params.generateGenesis()
 	}

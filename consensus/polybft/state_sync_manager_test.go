@@ -23,6 +23,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 	t.Helper()
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")
+	require.NoError(t, err)
 
 	state := newTestState(t)
 	require.NoError(t, state.EpochStore.insertEpoch(0))

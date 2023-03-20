@@ -1,11 +1,9 @@
 package polybft
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -109,12 +107,6 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 
 		res = append(res, val)
 	}
-
-	// It is important to keep validator ordered by addresses, because of internal storage on SC
-	// which changes original ordering of sent validators
-	sort.Slice(res, func(i, j int) bool {
-		return bytes.Compare(res[i].Address[:], res[j].Address[:]) < 0
-	})
 
 	return res, nil
 }

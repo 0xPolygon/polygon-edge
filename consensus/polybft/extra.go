@@ -417,7 +417,7 @@ func (d *ValidatorSetDelta) Copy() *ValidatorSetDelta {
 
 // fmt.Stringer interface implementation
 func (d *ValidatorSetDelta) String() string {
-	return fmt.Sprintf("Added %v Removed %v Updated %v", d.Added, d.Removed, d.Updated)
+	return fmt.Sprintf("Added: \n%v Removed: %v\n Updated: \n%v", d.Added, d.Removed, d.Updated)
 }
 
 // Signature represents aggregated signatures of signers accompanied with a bitmap

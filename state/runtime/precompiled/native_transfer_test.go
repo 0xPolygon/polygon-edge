@@ -88,6 +88,14 @@ func (d dummyHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	return types.ZeroHash
 }
 
+func (d dummyHost) SetState(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+) {
+	d.t.Fatalf("SetState is not implemented")
+}
+
 func (d dummyHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
 	d.t.Fatalf("SetStorage is not implemented")
 

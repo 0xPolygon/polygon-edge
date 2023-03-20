@@ -28,4 +28,6 @@ var (
 	BLSAggSigsVerificationPrecompile = types.StringToAddress("0x2030")
 	// ConsolePrecompile is and address of Hardhat console precompile
 	ConsolePrecompile = types.StringToAddress("0x000000000000000000636F6e736F6c652e6c6f67")
+	// AllowListContractsAddr is the address of the contract deployer allow list
+	AllowListContractsAddr = types.StringToAddress("0x0200000000000000000000000000000000000000")
 )
