@@ -139,9 +139,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// genesis validators balances must be defined in manifest file and should not be changed in the genesis
 		if _, ok := genesisValidators[premineInfo.Address]; ok {
 			premineValidatorsAddrs = append(premineValidatorsAddrs, premineInfo.Address.String())
+		} else {
+			premineInfos[i] = premineInfo
 		}
-
-		premineInfos[i] = premineInfo
 	}
 
 	// if there are any premined validators in the genesis command, consider it as an error
