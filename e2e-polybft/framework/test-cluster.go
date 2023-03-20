@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -72,7 +71,7 @@ type TestClusterConfig struct {
 
 	Name              string
 	Premine           []string // address[:amount]
-	PremineValidators string
+	PremineValidators []string // address:[amount]
 	HasBridge         bool
 	BootnodeCount     int
 	NonValidatorCount int
@@ -172,12 +171,6 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 	}
 }
 
-func WithPremineValidators(premineBalance string) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.PremineValidators = premineBalance
-	}
-}
-
 func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.SecretsCallback = fn
@@ -261,7 +254,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochSize:         10,
 		EpochReward:       1,
 		BlockGasLimit:     1e7, // 10M
-		PremineValidators: command.DefaultPremineBalance,
+		PremineValidators: []string{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -308,8 +301,13 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		"--path", manifestPath,
 		"--validators-path", config.TmpDir,
 		"--validators-prefix", cluster.Config.ValidatorPrefix,
-		"--premine-validators", cluster.Config.PremineValidators,
 	}
+
+	// premine validators
+	for _, premineValidator := range cluster.Config.PremineValidators {
+		args = append(args, "--premine-validators", premineValidator)
+	}
+
 	// run manifest file creation
 	require.NoError(t, cluster.cmdRun(args...))
 
