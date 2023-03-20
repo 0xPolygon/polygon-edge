@@ -1197,8 +1197,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 
 	var extValue *big.Int
 	if op == AUTHCALL {
-		extValue = c.pop() // todo: propagate the extValue
-		_ = extValue       // ignore for now
+		extValue = c.pop()
 	}
 
 	// input range
@@ -1269,6 +1268,14 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 
 	// Consume gas cost
 	if !c.consumeGas(gasCost) {
+		return nil, 0, 0, nil
+	}
+
+	// If extValue is not nil that means op == AUTHCALL
+	// If valueExt is not zero, the instruction immediately returns 0. In this case the gas that would
+	// have been passed into the call is refunded, but not the gas consumed by the AUTHCALL opcode itself.
+	// In the future, this restriction may be relaxed to externally transfer value out of the authorized account.
+	if extValue != nil && extValue.BitLen() != 0 {
 		return nil, 0, 0, nil
 	}
 
