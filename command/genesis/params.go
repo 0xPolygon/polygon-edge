@@ -86,7 +86,6 @@ type genesisParams struct {
 	eventTrackerStartBlocks []string
 
 	initialStateRoot string
-	initialTrie      string
 }
 
 func (p *genesisParams) validateFlags() error {

@@ -1,15 +1,20 @@
 package itrie
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
+
+	"github.com/0xPolygon/polygon-edge/crypto"
 
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/fastrlp"
 )
+
+var emptyCodeHash = crypto.Keccak256(nil)
 
 func getCustomNode(hash []byte, storage Storage) (Node, []byte, error) {
 	data, ok := storage.Get(hash)
@@ -42,6 +47,7 @@ func CopyTrie(nodeHash []byte, storage Storage, newStorage Storage, agg []byte, 
 		return err
 	}
 
+	//copy whole bytes of nodes
 	newStorage.Put(nodeHash, data)
 
 	return copyTrie(node, storage, newStorage, agg, isStorage)
@@ -52,6 +58,10 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 	case nil:
 		return nil
 	case *FullNode:
+		if len(n.hash) > 0 {
+			return CopyTrie(n.hash, storage, newStorage, agg, isStorage)
+		}
+
 		for i := range n.children {
 			if n.children[i] == nil {
 				continue
@@ -64,6 +74,7 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 		}
 
 	case *ValueNode:
+		//if node represens stored value, then we need to copy it
 		if n.hash {
 			return CopyTrie(n.buf, storage, newStorage, agg, isStorage)
 		}
@@ -71,12 +82,14 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 		if !isStorage {
 			var account state.Account
 			if err := account.UnmarshalRlp(n.buf); err != nil {
-				fmt.Println("cant parse", err, len(n.buf), hex.EncodeToString(encodeCompact(agg)))
+				return fmt.Errorf("cant parse account %s: %w", hex.EncodeToString(encodeCompact(agg)), err)
 			} else {
-				if account.CodeHash != nil {
+				if account.CodeHash != nil && bytes.Equal(account.CodeHash, emptyCodeHash) == false {
 					code, ok := storage.GetCode(types.BytesToHash(account.CodeHash))
 					if ok {
 						newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
+					} else {
+						return fmt.Errorf("cant find code %s", hex.EncodeToString(account.CodeHash))
 					}
 				}
 
@@ -87,10 +100,11 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 		}
 
 	case *ShortNode:
-		err := copyTrie(n.child, storage, newStorage, append(agg, n.key...), isStorage)
-		if err != nil {
-			return err
+		if len(n.hash) > 0 {
+			return CopyTrie(n.hash, storage, newStorage, agg, isStorage)
 		}
+
+		return copyTrie(n.child, storage, newStorage, append(agg, n.key...), isStorage)
 	}
 
 	return nil

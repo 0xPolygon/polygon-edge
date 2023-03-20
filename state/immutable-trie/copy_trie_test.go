@@ -31,10 +31,10 @@ func TestCompareModelOfTrieCopy(t *testing.T) {
 		trie := state.newTrie()
 		tx := trie.Txn(kv)
 
-		n := rapid.IntRange(1, 100).Draw(tt, "n")
+		n := rapid.IntRange(1, 1000).Draw(tt, "n")
 		for i := 0; i < n; i++ {
 			key := rapid.SliceOfN(rapid.Byte(), 32, 32).Draw(tt, "key")
-			value := rapid.SliceOfN(rapid.Byte(), 10, 80).Draw(tt, "key")
+			value := rapid.SliceOfN(rapid.Byte(), 10, 80).Draw(tt, "value")
 			tx.Insert(key, value)
 		}
 
