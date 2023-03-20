@@ -26,7 +26,9 @@ func TestE2E_Broadcast(t *testing.T) {
 	// Create recipient key
 	key, err := wallet.GenerateKey()
 	assert.NoError(t, err)
+
 	recipient := key.Address()
+
 	t.Logf("Receipient %s\n", recipient)
 
 	// Create pre-mined balance for sender
