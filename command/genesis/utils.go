@@ -69,8 +69,10 @@ type premineInfo struct {
 
 // parsePremineInfo parses provided premine information and returns premine address and premine balance
 func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
-	address := types.ZeroAddress
-	val := command.DefaultPremineBalance
+	var (
+		address types.Address
+		val     = command.DefaultPremineBalance
+	)
 
 	if delimiterIdx := strings.Index(premineInfoRaw, ":"); delimiterIdx != -1 {
 		// <addr>:<balance>
