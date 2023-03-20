@@ -122,7 +122,11 @@ func HashChecker(stateRoot []byte, storage Storage) (types.Hash, error) {
 }
 
 func hashChecker(node Node, h *hasher, a *fastrlp.Arena, d int, storage Storage) (*fastrlp.Value, error) {
-	var val *fastrlp.Value
+	var(
+              val *fastrlp.Value
+              aa *fastrlp.Arena
+              idx int
+        )
 
 	var aa *fastrlp.Arena
 
