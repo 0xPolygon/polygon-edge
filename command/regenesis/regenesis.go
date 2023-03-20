@@ -42,16 +42,18 @@ func RegenesisCMD() *cobra.Command {
 		"block state root of old chain",
 	)
 
-	genesisCmd.Run = func(cmd *cobra.Command, args []string) {
-		outputter := command.InitializeOutputter(genesisCmd)
-		defer outputter.WriteOutput()
+	outputter := command.InitializeOutputter(genesisCmd)
+	defer outputter.WriteOutput()
 
+	genesisCmd.PreRun = func(cmd *cobra.Command, args []string) {
 		if params.SnapshotTrieDBPath == "" || params.TrieDBPath == "" || params.TrieRoot == "" {
 			outputter.SetError(fmt.Errorf("not enough arguments"))
 
 			return
 		}
+	}
 
+	genesisCmd.Run = func(cmd *cobra.Command, args []string) {
 		trieDB, err := leveldb.OpenFile(params.TrieDBPath, &opt.Options{ReadOnly: true})
 		if err != nil {
 			outputter.SetError(fmt.Errorf("open trie trieDB error:%w", err))
