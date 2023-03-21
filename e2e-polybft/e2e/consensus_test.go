@@ -101,21 +101,17 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	const (
-		validatorSize  = 5
-		epochSize      = 5
-		epochReward    = 1000000000
-		premineBalance = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough balance to fund new validator)
+		validatorSize = 5
+		epochSize     = 5
+		epochReward   = 1000000000
 	)
 
 	var (
-		firstValidatorDataDir   = fmt.Sprintf("test-chain-%d", validatorSize+1) // directory where the first validator secrets will be stored
-		secondValidatorDataDir  = fmt.Sprintf("test-chain-%d", validatorSize+2) // directory where the second validator secrets will be stored
-		newValidatorInitBalance = "500000000000000000000000"                    // 500k - balance which will be transferred to the new validator
-		newValidatorStakeRaw    = "0x8AC7230489E80000"                          // 10 native tokens  - amount which will be staked by the new validator
-	)
+		firstValidatorDataDir  = fmt.Sprintf("test-chain-%d", validatorSize+1) // directory where the first validator secrets will be stored
+		secondValidatorDataDir = fmt.Sprintf("test-chain-%d", validatorSize+2) // directory where the second validator secrets will be stored
 
-	newValidatorStake, err := types.ParseUint256orHex(&newValidatorStakeRaw)
-	require.NoError(t, err)
+		premineBalance = ethgo.Ether(2e6) // 2M native tokens (so that we have enough balance to fund new validator)
+	)
 
 	// start cluster with 'validatorSize' validators
 	cluster := framework.NewTestCluster(t, validatorSize,
@@ -184,8 +180,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// get the initial balance of the new validator
-	initialBalance, ok := new(big.Int).SetString(newValidatorInitBalance, 10)
-	require.True(t, ok)
+	initialBalance := ethgo.Ether(500000)
 
 	// send some tokens from the owner to the first validator so that the first validator can register and stake
 	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
@@ -219,8 +214,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("Second validator balance=%d\n", secondBalance)
 
+	newValidatorStake := ethgo.Ether(10)
+
 	// register the first validator with stake
-	require.NoError(t, firstValidator.RegisterValidator(firstValidatorDataDir, newValidatorStakeRaw))
+	require.NoError(t, firstValidator.RegisterValidator(firstValidatorDataDir, newValidatorStake.String()))
 
 	// register the second validator without stake
 	require.NoError(t, secondValidator.RegisterValidator(secondValidatorDataDir, ""))
@@ -322,13 +319,11 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	const (
 		validatorSecrets = "test-chain-1"
 		delegatorSecrets = "test-chain-6"
-		premineBalance   = "0x1B1AE4D6E2EF500000" // 500 native tokens (so that we have enough funds to fund delegator)
 		epochSize        = 5
 	)
 
-	fundAmountRaw := "0xD8D726B7177A80000" // 250 native tokens
-	fundAmount, err := types.ParseUint256orHex(&fundAmountRaw)
-	require.NoError(t, err)
+	premineBalance := ethgo.Ether(500) // 500 native tokens (so that we have enough funds to fund delegator)
+	fundAmount := ethgo.Ether(250)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
@@ -342,7 +337,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	defer cluster.Stop()
 
 	// init delegator account
-	_, err = cluster.InitSecrets(delegatorSecrets, 1)
+	_, err := cluster.InitSecrets(delegatorSecrets, 1)
 	require.NoError(t, err)
 
 	srv := cluster.Servers[0]
@@ -438,7 +433,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 }
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
-	const premineAmount = "10000000000000000000" // 10 native tokens
+	premineAmount := ethgo.Ether(10)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
@@ -446,7 +441,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		framework.WithEpochSize(5),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineAmount))
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", a, premineAmount))
 			}
 		}),
 	)
@@ -541,7 +536,6 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 	const (
 		validatorSecrets = "test-chain-1"
 		delegatorSecrets = "test-chain-delegator"
-		premineBalance   = "0x1B1AE4D6E2EF500000" // 500 native tokens (so that we have enough funds to fund delegator)
 		epochSize        = 5
 		validatorCount   = 4
 		blockTime        = 2 * time.Second
@@ -577,9 +571,7 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 
 	validatorAddr := validatorAcc.Ecdsa.Address()
 
-	fundAmountRaw := "0xD8D726B7177A80000" // 250 native tokens
-	fundAmount, err := types.ParseUint256orHex(&fundAmountRaw)
-	require.NoError(t, err)
+	fundAmount := ethgo.Ether(250)
 
 	// fund delegator
 	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
