@@ -21,6 +21,7 @@ func TestE2E_Broadcast(t *testing.T) {
 
 	const (
 		sendAmount = int64(1)
+		txNum      = 10
 	)
 
 	// Create recipient key
@@ -46,29 +47,30 @@ func TestE2E_Broadcast(t *testing.T) {
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
-	gasPrice, err := client.GasPrice()
-	require.NoError(t, err)
+	sentAmount := new(big.Int)
+	nonce := uint64(0)
+	for i := 0; i < txNum; i++ {
+		txn := &ethgo.Transaction{
+			Value: big.NewInt(sendAmount),
+			To:    &recipient,
+			Gas:   21000,
+			Nonce: nonce,
+		}
 
-	// Send legacy transaction
-	legacyTxn := &ethgo.Transaction{
-		Value:    big.NewInt(sendAmount),
-		To:       &recipient,
-		GasPrice: gasPrice,
-		Gas:      21000,
-		Nonce:    0,
-	}
-	sendTransaction(t, client, sender, legacyTxn)
+		if i%2 == 0 {
+			txn.MaxFeePerGas = big.NewInt(1000000000)
+			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+		} else {
+			gasPrice, err := client.GasPrice()
+			require.NoError(t, err)
 
-	// Send dynamic fees transaction
-	dynamicFeesTxn := &ethgo.Transaction{
-		Value:                big.NewInt(sendAmount),
-		To:                   &recipient,
-		Gas:                  21000,
-		Nonce:                1,
-		MaxFeePerGas:         big.NewInt(1000000000),
-		MaxPriorityFeePerGas: big.NewInt(100000000),
+			txn.GasPrice = gasPrice
+		}
+
+		sendTransaction(t, client, sender, txn)
+		sentAmount = sentAmount.Add(sentAmount, txn.Value)
+		nonce++
 	}
-	sendTransaction(t, client, sender, dynamicFeesTxn)
 
 	// Wait until the balance has changed on all nodes in the cluster
 	err = cluster.WaitUntil(time.Minute, func() bool {
@@ -76,7 +78,7 @@ func TestE2E_Broadcast(t *testing.T) {
 			balance, err := srv.WaitForNonZeroBalance(recipient, time.Second*10)
 			assert.NoError(t, err)
 			if balance != nil && balance.BitLen() > 0 {
-				assert.Equal(t, new(big.Int).Add(legacyTxn.Value, dynamicFeesTxn.Value), balance)
+				assert.Equal(t, sentAmount, balance)
 			} else {
 				return false
 			}
