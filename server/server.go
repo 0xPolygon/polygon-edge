@@ -11,6 +11,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 
 	"github.com/0xPolygon/polygon-edge/archive"
@@ -245,8 +248,27 @@ func NewServer(config *Config) (*Server, error) {
 	// use the eip155 signer
 	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
 
+	// create storage instance for blockchain
+	var db storage.Storage
+	{
+		if m.config.DataDir == "" {
+			db, err = memory.NewMemoryStorage(nil)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			db, err = leveldb.NewLevelDBStorage(
+				filepath.Join(m.config.DataDir, "blockchain"),
+				m.logger,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}

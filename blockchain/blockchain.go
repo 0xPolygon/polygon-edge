@@ -4,13 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -187,7 +184,7 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 // NewBlockchain creates a new blockchain object
 func NewBlockchain(
 	logger hclog.Logger,
-	dataDir string,
+	db storage.Storage,
 	config *chain.Chain,
 	consensus Verifier,
 	executor Executor,
@@ -197,6 +194,7 @@ func NewBlockchain(
 		logger:    logger.Named("blockchain"),
 		config:    config,
 		consensus: consensus,
+		db:        db,
 		executor:  executor,
 		txSigner:  txSigner,
 		stream:    &eventStream{},
@@ -205,26 +203,6 @@ func NewBlockchain(
 			count: big.NewInt(0),
 		},
 	}
-
-	var (
-		db  storage.Storage
-		err error
-	)
-
-	if dataDir == "" {
-		if db, err = memory.NewMemoryStorage(nil); err != nil {
-			return nil, err
-		}
-	} else {
-		if db, err = leveldb.NewLevelDBStorage(
-			filepath.Join(dataDir, "blockchain"),
-			logger,
-		); err != nil {
-			return nil, err
-		}
-	}
-
-	b.db = db
 
 	if err := b.initCaches(defaultCacheSize); err != nil {
 		return nil, err
