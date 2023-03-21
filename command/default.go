@@ -9,10 +9,14 @@ const (
 	DefaultGenesisFileName = "genesis.json"
 	DefaultChainName       = "polygon-edge"
 	DefaultChainID         = 100
-	DefaultPremineBalance  = "0xD3C21BCECCEDA1000000" // 1 million units of native network currency
 	DefaultConsensus       = server.PolyBFTConsensus
 	DefaultGenesisGasUsed  = 458752  // 0x70000
 	DefaultGenesisGasLimit = 5242880 // 0x500000
+)
+
+var (
+	DefaultStake          = ethgo.Ether(1e6)
+	DefaultPremineBalance = ethgo.Ether(1e6)
 )
 
 const (
@@ -25,8 +29,4 @@ const (
 // compatibility with running clients
 const (
 	GRPCAddressFlagLEGACY = "grpc"
-)
-
-var (
-	DefaultStake = ethgo.Ether(1e6)
 )

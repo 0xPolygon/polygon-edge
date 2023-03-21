@@ -89,7 +89,7 @@ func setFlags(cmd *cobra.Command) {
 		premineValidatorsFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined validators and balances (format: <address>[:<balance>]). Default premined balance: %s",
+			"the premined validators and balances (format: <address>[:<balance>]). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)
@@ -178,14 +178,6 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 		stakeMap[stakeInfo.Address] = stakeInfo
 	}
 
-	// parse default validators' balance
-	defaultBalanceRaw := command.DefaultPremineBalance
-
-	defaultBalance, err := types.ParseUint256orHex(&defaultBalanceRaw)
-	if err != nil {
-		return nil, fmt.Errorf("provided invalid premine validators balance: %s", defaultBalanceRaw)
-	}
-
 	if len(p.validators) > 0 {
 		validators := make([]*polybft.Validator, len(p.validators))
 		for i, validator := range p.validators {
@@ -220,7 +212,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				Address:      addr,
 				BlsKey:       trimmedBLSKey,
 				BlsSignature: parts[3],
-				Balance:      getPremineAmount(addr, premineMap, defaultBalance),
+				Balance:      getPremineAmount(addr, premineMap, command.DefaultPremineBalance),
 				Stake:        getPremineAmount(addr, stakeMap, command.DefaultStake),
 			}
 		}
@@ -239,7 +231,7 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		v.Balance = getPremineAmount(v.Address, premineMap, defaultBalance)
+		v.Balance = getPremineAmount(v.Address, premineMap, command.DefaultPremineBalance)
 		v.Stake = getPremineAmount(v.Address, stakeMap, command.DefaultStake)
 	}
 
