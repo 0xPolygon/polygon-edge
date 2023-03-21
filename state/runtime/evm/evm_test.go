@@ -115,25 +115,6 @@ func (m *mockHost) GetRefund() uint64 {
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	// for AUTH test ...
-	// r: 0x8b1b4920a872ff8fdd66a35ef370a9d9113af4234b91ab0087c51e8362287073
-	// s: 0x68da649ea8d0444671dc2e3ed9b40ab9b0eee08d745a5527bdb92f0dff746d9c
-	// v: false
-	// commit: 0x6ca2b29e76ec69ab132c23acdafc5650de9f0ee2aa6ada70031962b37e24b026
-	// user: 0x3D09c91F44C87C30901dDB742D99f168F5AEEf01
-	// invoker: 0xC66298c7a6aDE36b928d6e9598Af7804611AbDC0
-
-	authCode := new(bytes.Buffer)
-	authCode.WriteByte(PUSH32)
-	authCode.Write(hex.MustDecodeHex("0x68da649ea8d0444671dc2e3ed9b40ab9b0eee08d745a5527bdb92f0dff746d9c"))
-	authCode.WriteByte(PUSH32)
-	authCode.Write(hex.MustDecodeHex("0x8b1b4920a872ff8fdd66a35ef370a9d9113af4234b91ab0087c51e8362287073"))
-	authCode.WriteByte(PUSH1)
-	authCode.WriteByte(0x00)
-	authCode.WriteByte(PUSH32)
-	authCode.Write(hex.MustDecodeHex("0x6ca2b29e76ec69ab132c23acdafc5650de9f0ee2aa6ada70031962b37e24b026"))
-	authCode.WriteByte(AUTH)
-
 	tests := []struct {
 		name     string
 		value    *big.Int
@@ -202,18 +183,16 @@ func TestRun(t *testing.T) {
 			name:  "should succeed and return value of auth signer",
 			value: big.NewInt(0),
 			gas:   3100 + 4*3,
-			code:  authCode.Bytes(),
+			code:  getAuthTestCode(),
 			to:    types.StringToAddress("0xC66298c7a6aDE36b928d6e9598Af7804611AbDC0"),
 			config: &chain.ForksInTime{
 				Byzantium: true,
 			},
 			expected: &runtime.ExecutionResult{
-				ReturnValue: []uint8{
-					0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x39, 0x11, 0x78, 0xe6, 0x5, 0xe, 0xd3, 0x97, 0x53, 0xac, 0x65, 0x3b, 0x63, 0x60, 0x67, 0x33, 0x3f, 0xe5, 0xa7, 0xe6,
-				},
-				GasLeft: 0x0,
-				GasUsed: 0xc28, // 3100 + 4*3
-				Err:     nil,
+				ReturnValue: nil,
+				GasLeft:     0x0,
+				GasUsed:     0xc28, // 3100 + 4*3
+				Err:         nil,
 			},
 		},
 	}
@@ -421,4 +400,25 @@ func TestRunWithTracer(t *testing.T) {
 			assert.Equal(t, tt.expected, tracer.calls, "failed for %s", tt.name)
 		})
 	}
+}
+
+func getAuthTestCode() []byte {
+	// r: 0x8b1b4920a872ff8fdd66a35ef370a9d9113af4234b91ab0087c51e8362287073
+	// s: 0x68da649ea8d0444671dc2e3ed9b40ab9b0eee08d745a5527bdb92f0dff746d9c
+	// v: false
+	// commit: 0x6ca2b29e76ec69ab132c23acdafc5650de9f0ee2aa6ada70031962b37e24b026
+	// user: 0x3D09c91F44C87C30901dDB742D99f168F5AEEf01
+	// invoker: 0xC66298c7a6aDE36b928d6e9598Af7804611AbDC0
+	authCode := new(bytes.Buffer)
+	authCode.WriteByte(PUSH32)
+	authCode.Write(hex.MustDecodeHex("0x68da649ea8d0444671dc2e3ed9b40ab9b0eee08d745a5527bdb92f0dff746d9c"))
+	authCode.WriteByte(PUSH32)
+	authCode.Write(hex.MustDecodeHex("0x8b1b4920a872ff8fdd66a35ef370a9d9113af4234b91ab0087c51e8362287073"))
+	authCode.WriteByte(PUSH1)
+	authCode.WriteByte(0x00)
+	authCode.WriteByte(PUSH32)
+	authCode.Write(hex.MustDecodeHex("0x6ca2b29e76ec69ab132c23acdafc5650de9f0ee2aa6ada70031962b37e24b026"))
+	authCode.WriteByte(AUTH)
+
+	return authCode.Bytes()
 }

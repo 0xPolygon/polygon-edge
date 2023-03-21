@@ -1460,9 +1460,6 @@ func opAuth(c *state) {
 	signAddr := crypto.PubKeyToAddress(pubKey)
 	c.authorized = &signAddr
 
-	c.ret = make([]byte, 12)
-	c.ret = append(c.ret, signAddr.Bytes()...)
-
 	c.push1().SetBytes(signAddr.Bytes())
 
 	return
