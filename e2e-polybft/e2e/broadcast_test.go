@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// TestE2E_Broadcast sends two transactions (legacy and dynamic fees) to the cluster with the 1 amount of eth
+// TestE2E_Broadcast sends several transactions (legacy and dynamic fees) to the cluster with the 1 amount of eth
 // and checks that all cluster nodes have the recipient balance updated.
 func TestE2E_Broadcast(t *testing.T) {
 	t.Parallel()
