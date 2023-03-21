@@ -111,6 +111,9 @@ type consensusRuntime struct {
 	// manager for state sync bridge transactions
 	stateSyncManager StateSyncManager
 
+	// burntFeesManager is needed to withdraw burnt fees and sync it with the rootchain
+	burntFeesManager BurntFeesManager
+
 	// logger instance
 	logger hcf.Logger
 }
@@ -135,6 +138,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if err := runtime.initCheckpointManager(log); err != nil {
+		return nil, err
+	}
+
+	if err := runtime.initBurntFeesManager(log); err != nil {
 		return nil, err
 	}
 
@@ -210,6 +217,24 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	return nil
 }
 
+// initBurntFeesManager initializes burnts fees manager
+// if bridge is not enabled, then a dummy burnt fees manager will be used
+func (c *consensusRuntime) initBurntFeesManager(logger hcf.Logger) error {
+	if c.IsBridgeEnabled() {
+		// enable burnt fees manager
+		c.burntFeesManager = newBurntFeesManager(
+			wallet.NewEcdsaSigner(c.config.Key),
+			defaultBurntFeesWithdrawalOffset,
+			c.config.PolyBFTConfig.Bridge.EIP1559BurnAddr,
+			logger.Named("burnt_fees_manager"),
+		)
+	} else {
+		c.burntFeesManager = &dummyBurntFeesManager{}
+	}
+
+	return nil
+}
+
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
@@ -276,6 +301,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 		c.logger.Error("Could not update proposer calculator", "err", err)
+	}
+
+	// withdraw burnt fees and sync with the rootchain
+	if err := c.burntFeesManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in burnt fees manager", "err", err)
 	}
 
 	if isEndOfEpoch {

@@ -19,12 +19,15 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
+const (
+	// frequency at which checkpoints are sent to the rootchain (in blocks count)
+	defaultCheckpointsOffset = uint64(900)
+)
+
 var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
-	// frequency at which checkpoints are sent to the rootchain (in blocks count)
-	defaultCheckpointsOffset = uint64(900)
 )
 
 type CheckpointManager interface {
