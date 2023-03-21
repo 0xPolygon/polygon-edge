@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -608,4 +609,95 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 
 	close(endCh)
 	<-waitCh
+}
+
+func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
+	const (
+		validatorCount = 5
+		epochSize      = 5
+		minterPath     = "test-chain-1"
+	)
+
+	validatorsAddrs := make([]types.Address, validatorCount)
+	initialBalance := ethgo.Gwei(1)
+
+	cluster := framework.NewTestCluster(t,
+		validatorCount,
+		framework.WithMintableNativeToken(true),
+		framework.WithEpochSize(epochSize),
+		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
+			for i, addr := range addrs {
+				// first one is the owner of the NativeERC20Mintable SC
+				// and it should have premine set to default 1M tokens
+				// (it is going to send mint transactions to all the other validators)
+				if i > 0 {
+					// premine other validators with as minimum amount as possible just to ensure liveness of consensus protocol
+					config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", addr, initialBalance))
+				}
+				validatorsAddrs[i] = addr
+			}
+		}))
+	defer cluster.Stop()
+
+	minterSrv := cluster.Servers[0]
+	targetJSONRPC := minterSrv.JSONRPC()
+
+	minterAcc, err := sidechain.GetAccountFromDir(minterSrv.DataDir())
+	require.NoError(t, err)
+
+	cluster.WaitForReady(t)
+
+	// send mint transactions
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(targetJSONRPC))
+	require.NoError(t, err)
+
+	mintFn, exists := contractsapi.NativeERC20Mintable.Abi.Methods["mint"]
+	require.True(t, exists)
+
+	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
+	mintAmount := ethgo.Ether(10)
+
+	// make sure minter account can mint tokens
+	// (first account, which is minter sends mint transactions to all the other validators)
+	for _, addr := range validatorsAddrs[1:] {
+		balance, err := targetJSONRPC.Eth().GetBalance(ethgo.Address(addr), ethgo.Latest)
+		require.NoError(t, err)
+		t.Logf("Pre-mint balance: %v=%d\n", addr, balance)
+
+		mintInput, err := mintFn.Encode([]interface{}{addr, mintAmount})
+		require.NoError(t, err)
+
+		receipt, err := relayer.SendTransaction(
+			&ethgo.Transaction{
+				To:    &nativeTokenAddr,
+				Input: mintInput,
+			}, minterAcc.Ecdsa)
+		require.NoError(t, err)
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
+
+		balance, err = targetJSONRPC.Eth().GetBalance(ethgo.Address(addr), ethgo.Latest)
+		require.NoError(t, err)
+
+		t.Logf("Post-mint balance: %v=%d\n", addr, balance)
+		require.Equal(t, new(big.Int).Add(mintAmount, initialBalance), balance)
+	}
+
+	minterBalance, err := targetJSONRPC.Eth().GetBalance(minterAcc.Ecdsa.Address(), ethgo.Latest)
+	require.NoError(t, err)
+	require.Equal(t, ethgo.Ether(1e6), minterBalance)
+
+	// try sending mint transaction from non minter account and make sure it would fail
+	nonMinterAcc, err := sidechain.GetAccountFromDir(cluster.Servers[1].DataDir())
+	require.NoError(t, err)
+
+	mintInput, err := mintFn.Encode([]interface{}{validatorsAddrs[2], ethgo.Ether(1)})
+	require.NoError(t, err)
+
+	receipt, err := relayer.SendTransaction(
+		&ethgo.Transaction{
+			To:    &nativeTokenAddr,
+			Input: mintInput,
+		}, nonMinterAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptFailed), receipt.Status)
 }
