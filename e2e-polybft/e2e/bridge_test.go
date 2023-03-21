@@ -591,8 +591,9 @@ func sendExitTransaction(
 	exitHelperAddr ethgo.Address,
 	l1TxRelayer txrelayer.TxRelayer,
 	exitEventID uint64) (bool, error) {
-	var exitEventApi contractsapi.L2StateSyncedEvent
-	proofExitEventEncoded, err := exitEventApi.Encode(&polybft.ExitEvent{
+	var exitEventAPI contractsapi.L2StateSyncedEvent
+
+	proofExitEventEncoded, err := exitEventAPI.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,

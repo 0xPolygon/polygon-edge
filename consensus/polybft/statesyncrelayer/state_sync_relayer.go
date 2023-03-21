@@ -111,6 +111,7 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 	r.logger.Debug("Received a log", "log", log)
 
 	var commitEvent contractsapi.NewCommitmentEvent
+
 	doesMatch, err := commitEvent.ParseLog(log)
 	if !doesMatch {
 		return

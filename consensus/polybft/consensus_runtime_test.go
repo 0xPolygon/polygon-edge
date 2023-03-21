@@ -1176,9 +1176,9 @@ func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 
 	encodedEvents := make([][]byte, len(exitEvents))
 
-	var exitEventApi contractsapi.L2StateSyncedEvent
+	var exitEventAPI contractsapi.L2StateSyncedEvent
 	for i, e := range exitEvents {
-		encodedEvent, err := exitEventApi.Encode(e)
+		encodedEvent, err := exitEventAPI.Encode(e)
 		require.NoError(t, err)
 
 		encodedEvents[i] = encodedEvent

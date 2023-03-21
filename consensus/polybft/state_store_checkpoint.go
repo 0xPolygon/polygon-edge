@@ -171,6 +171,7 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 // decodeExitEvent tries to decode exit event from the provided log
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	var l2StateSyncedEvent contractsapi.L2StateSyncedEvent
+
 	doesMatch, err := l2StateSyncedEvent.ParseLog(log)
 	if !doesMatch {
 		return nil, nil

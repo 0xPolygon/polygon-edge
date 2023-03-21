@@ -233,8 +233,9 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 		return nil, nil, fmt.Errorf("failed to unmarshal exit event from JSON. Error: %w", err)
 	}
 
-	var exitEventApi contractsapi.L2StateSyncedEvent
-	exitEventEncoded, err := exitEventApi.Encode(exitEvent)
+	var exitEventAPI contractsapi.L2StateSyncedEvent
+
+	exitEventEncoded, err := exitEventAPI.Encode(exitEvent)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encode exit event: %w", err)
 	}
