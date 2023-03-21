@@ -17,11 +17,12 @@ import (
 // TestE2E_Broadcast sends several transactions (legacy and dynamic fees) to the cluster with the 1 amount of eth
 // and checks that all cluster nodes have the recipient balance updated.
 func TestE2E_Broadcast(t *testing.T) {
-	t.Parallel()
+	var (
+		sendAmount = ethgo.Ether(1)
+	)
 
 	const (
-		sendAmount = int64(1)
-		txNum      = 10
+		txNum = 10
 	)
 
 	// Create recipient key
@@ -30,7 +31,7 @@ func TestE2E_Broadcast(t *testing.T) {
 
 	recipient := key.Address()
 
-	t.Logf("Receipient %s\n", recipient)
+	t.Logf("Recipient %s\n", recipient)
 
 	// Create pre-mined balance for sender
 	sender, err := wallet.GenerateKey()
@@ -43,7 +44,7 @@ func TestE2E_Broadcast(t *testing.T) {
 	defer cluster.Stop()
 
 	// Wait until the cluster is up and running
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
@@ -52,19 +53,21 @@ func TestE2E_Broadcast(t *testing.T) {
 
 	for i := 0; i < txNum; i++ {
 		txn := &ethgo.Transaction{
-			Value: big.NewInt(sendAmount),
+			Value: sendAmount,
 			To:    &recipient,
 			Gas:   21000,
 			Nonce: nonce,
 		}
 
 		if i%2 == 0 {
+			txn.Type = ethgo.TransactionDynamicFee
 			txn.MaxFeePerGas = big.NewInt(1000000000)
 			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
 		} else {
 			gasPrice, err := client.GasPrice()
 			require.NoError(t, err)
 
+			txn.Type = ethgo.TransactionLegacy
 			txn.GasPrice = gasPrice
 		}
 
