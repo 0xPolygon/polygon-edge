@@ -74,7 +74,7 @@ func TestE2E_Broadcast(t *testing.T) {
 	}
 
 	// Wait until the balance has changed on all nodes in the cluster
-	err = cluster.WaitUntil(time.Minute, func() bool {
+	err = cluster.WaitUntil(time.Minute, time.Second*3, func() bool {
 		for _, srv := range cluster.Servers {
 			balance, err := srv.WaitForNonZeroBalance(recipient, time.Second*10)
 			assert.NoError(t, err)
