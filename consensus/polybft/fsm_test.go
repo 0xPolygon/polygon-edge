@@ -774,7 +774,7 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, 3, 3),
-		Timestamp: uint64(time.Now().Unix()),
+		Timestamp: uint64(time.Now().UTC().Unix()),
 	}
 	parent.ComputeHash()
 

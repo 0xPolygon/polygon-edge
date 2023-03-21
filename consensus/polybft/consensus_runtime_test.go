@@ -1126,7 +1126,7 @@ func createTestBitmaps(t *testing.T, validators AccountSet, numberOfBlocks uint6
 
 	bitmaps := make(map[uint64]bitmap.Bitmap, numberOfBlocks)
 
-	rand.Seed(time.Now().Unix())
+	rand.Seed(time.Now().UTC().Unix())
 
 	for i := numberOfBlocks; i > 1; i-- {
 		bitmap := bitmap.Bitmap{}

@@ -67,8 +67,8 @@ func (b *BlockBuilder) Reset() error {
 	parentTime := time.Unix(int64(b.params.Parent.Timestamp), 0)
 	headerTime := parentTime.Add(b.params.BlockTime)
 
-	if headerTime.Before(time.Now()) {
-		headerTime = time.Now()
+	if headerTime.Before(time.Now().UTC()) {
+		headerTime = time.Now().UTC()
 	}
 
 	b.header = &types.Header{

@@ -106,7 +106,7 @@ func HistoryTestCmd() *cobra.Command {
 			}
 
 			tmpStorage := itrie.NewKV(tmpDB)
-			tt := time.Now()
+			tt := time.Now().UTC()
 
 			err = itrie.CopyTrie(header.StateRoot.Bytes(), itrie.NewKV(trieDB), tmpStorage, []byte{}, false)
 			if err != nil {

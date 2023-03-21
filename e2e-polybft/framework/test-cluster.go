@@ -55,7 +55,7 @@ const (
 var startTime int64
 
 func init() {
-	startTime = time.Now().UnixMilli()
+	startTime = time.Now().UTC().UnixMilli()
 }
 
 func resolveBinary() string {

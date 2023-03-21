@@ -542,7 +542,7 @@ func TestHeadStream_Concurrent(t *testing.T) {
 
 	// Write co-routine with jitter
 	go func() {
-		seed := time.Now().UnixNano()
+		seed := time.Now().UTC().UnixNano()
 		t.Logf("Using seed %d", seed)
 
 		z := rand.NewZipf(rand.New(rand.NewSource(seed)), 1.5, 1.5, 50)
