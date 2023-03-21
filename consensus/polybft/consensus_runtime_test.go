@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -1175,8 +1176,9 @@ func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 
 	encodedEvents := make([][]byte, len(exitEvents))
 
+	var exitEventApi contractsapi.L2StateSyncedEvent
 	for i, e := range exitEvents {
-		encodedEvent, err := ExitEventInputsABIType.Encode(e)
+		encodedEvent, err := exitEventApi.Encode(e)
 		require.NoError(t, err)
 
 		encodedEvents[i] = encodedEvent

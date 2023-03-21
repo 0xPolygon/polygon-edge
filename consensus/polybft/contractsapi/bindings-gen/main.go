@@ -55,7 +55,15 @@ func main() {
 				"addToWhitelist",
 				"register",
 			},
-			[]string{},
+			[]string{
+				"NewValidator",
+				"Staked",
+				"Delegated",
+				"Unstaked",
+				"Undelegated",
+				"AddedToWhitelist",
+				"Withdrawal",
+			},
 		},
 		{
 			"StateSender",
@@ -334,8 +342,16 @@ func generateEvent(generatedData *generatedData, contractName string, event *abi
 	{{.}}
 {{ end }}
 
-func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
-	return decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
+func ({{.Sig}} *{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
+}
+
+func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
+	if (!{{.ContractName}}.Abi.Events["{{.Name}}"].Match(log)) {
+		return false, nil
+	}
+
+	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
 }`
 
 	inputs := map[string]interface{}{

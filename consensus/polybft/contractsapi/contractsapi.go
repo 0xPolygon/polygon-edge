@@ -75,8 +75,16 @@ type StateSyncResultEvent struct {
 	Message []byte   `abi:"message"`
 }
 
-func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
+func (s *StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.Encode(inputs)
+}
+
+func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StateReceiver.Abi.Events["StateSyncResult"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
 }
 
 type NewCommitmentEvent struct {
@@ -85,8 +93,16 @@ type NewCommitmentEvent struct {
 	Root    types.Hash `abi:"root"`
 }
 
-func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
+func (n *NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StateReceiver.Abi.Events["NewCommitment"].Inputs.Encode(inputs)
+}
+
+func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StateReceiver.Abi.Events["NewCommitment"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
 }
 
 type Epoch struct {
@@ -244,8 +260,16 @@ type StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
+func (s *StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StateSender.Abi.Events["StateSynced"].Inputs.Encode(inputs)
+}
+
+func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StateSender.Abi.Events["StateSynced"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
 }
 
 type L2StateSyncedEvent struct {
@@ -255,8 +279,16 @@ type L2StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
+func (l *L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return L2StateSender.Abi.Events["L2StateSynced"].Inputs.Encode(inputs)
+}
+
+func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !L2StateSender.Abi.Events["L2StateSynced"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
 }
 
 type CheckpointMetadata struct {

@@ -45,9 +45,11 @@ func checkStateSyncResultLogs(
 	t.Helper()
 	require.Len(t, logs, expectedCount)
 
+	var stateSyncResultEvent contractsapi.StateSyncResultEvent
 	for _, log := range logs {
-		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
-		require.NoError(t, stateSyncResultEvent.ParseLog(log))
+		doesMatch, err := stateSyncResultEvent.ParseLog(log)
+		require.True(t, doesMatch)
+		require.NoError(t, err)
 
 		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
 
@@ -589,7 +591,8 @@ func sendExitTransaction(
 	exitHelperAddr ethgo.Address,
 	l1TxRelayer txrelayer.TxRelayer,
 	exitEventID uint64) (bool, error) {
-	proofExitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(&polybft.ExitEvent{
+	var exitEventApi contractsapi.L2StateSyncedEvent
+	proofExitEventEncoded, err := exitEventApi.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,

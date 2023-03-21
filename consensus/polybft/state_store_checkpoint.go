@@ -17,9 +17,6 @@ var (
 	// bucket to store exit contract events
 	exitEventsBucket             = []byte("exitEvent")
 	exitEventToEpochLookupBucket = []byte("exitIdToEpochLookup")
-
-	ExitEventABI           = contractsapi.L2StateSender.Abi.Events["L2StateSynced"]
-	ExitEventInputsABIType = ExitEventABI.Inputs
 )
 
 type exitEventNotFoundError struct {
@@ -173,13 +170,13 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 
 // decodeExitEvent tries to decode exit event from the provided log
 func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
-	if !ExitEventABI.Match(log) {
-		// valid case, not an exit event
+	var l2StateSyncedEvent contractsapi.L2StateSyncedEvent
+	doesMatch, err := l2StateSyncedEvent.ParseLog(log)
+	if !doesMatch {
 		return nil, nil
 	}
 
-	l2StateSyncedEvent := &contractsapi.L2StateSyncedEvent{}
-	if err := l2StateSyncedEvent.ParseLog(log); err != nil {
+	if err != nil {
 		return nil, err
 	}
 

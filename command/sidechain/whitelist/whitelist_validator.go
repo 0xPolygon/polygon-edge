@@ -16,11 +16,6 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var (
-	whitelistFn       = contractsapi.ChildValidatorSet.Abi.Methods["addToWhitelist"]
-	whitelistEventABI = contractsapi.ChildValidatorSet.Abi.Events["AddedToWhitelist"]
-)
-
 var params whitelistParams
 
 func GetCommand() *cobra.Command {
@@ -83,9 +78,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	encoded, err := whitelistFn.Encode([]interface{}{
-		[]types.Address{types.StringToAddress(params.newValidatorAddress)},
-	})
+	whitelistFn := &contractsapi.AddToWhitelistFunction{
+		WhitelistAddreses: []ethgo.Address{ethgo.Address(types.StringToAddress(params.newValidatorAddress))},
+	}
+
+	encoded, err := whitelistFn.EncodeAbi()
 	if err != nil {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
@@ -106,21 +103,26 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator transaction failed on block %d", receipt.BlockNumber)
 	}
 
-	result := &enlistResult{}
-	foundLog := false
+	var (
+		whitelistEvent contractsapi.AddedToWhitelistEvent
+		result         = &enlistResult{}
+		foundLog       = false
+	)
 
 	for _, log := range receipt.Logs {
-		if whitelistEventABI.Match(log) {
-			event, err := whitelistEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
-
-			result.newValidatorAddress = event["validator"].(ethgo.Address).String() //nolint:forcetypeassert
-			foundLog = true
-
-			break
+		doesMatch, err := whitelistEvent.ParseLog(log)
+		if !doesMatch {
+			continue
 		}
+
+		if err != nil {
+			return err
+		}
+
+		result.newValidatorAddress = whitelistEvent.Validator.String()
+		foundLog = true
+
+		break
 	}
 
 	if !foundLog {

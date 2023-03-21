@@ -2,7 +2,6 @@ package unstaking
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -17,11 +16,7 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var (
-	params             unstakeParams
-	unstakeEventABI    = contractsapi.ChildValidatorSet.Abi.Events["Unstaked"]
-	undelegateEventABI = contractsapi.ChildValidatorSet.Abi.Events["Undelegated"]
-)
+var params unstakeParams
 
 func GetCommand() *cobra.Command {
 	unstakeCmd := &cobra.Command{
@@ -132,31 +127,35 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
-	foundLog := false
+	var (
+		unstakedEvent    contractsapi.UnstakedEvent
+		undelegatedEvent contractsapi.UndelegatedEvent
+		foundLog         bool
+	)
 
 	// check the logs to check for the result
 	for _, log := range receipt.Logs {
-		if unstakeEventABI.Match(log) {
-			event, err := unstakeEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
+		doesMatch, err := unstakedEvent.ParseLog(log)
+		if err != nil {
+			return err
+		}
 
+		if doesMatch { // its an unstake function call
 			result.isSelfUnstake = true
-			result.amount = event["amount"].(*big.Int).Uint64() //nolint:forcetypeassert
-
+			result.amount = unstakedEvent.Amount.Uint64()
 			foundLog = true
 
 			break
-		} else if undelegateEventABI.Match(log) {
-			event, err := undelegateEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
+		}
 
-			result.amount = event["amount"].(*big.Int).Uint64()                  //nolint:forcetypeassert
-			result.undelegatedFrom = event["validator"].(ethgo.Address).String() //nolint:forcetypeassert
+		doesMatch, err = undelegatedEvent.ParseLog(log)
+		if err != nil {
+			return err
+		}
 
+		if doesMatch {
+			result.amount = undelegatedEvent.Amount.Uint64()
+			result.undelegatedFrom = undelegatedEvent.Validator.String()
 			foundLog = true
 
 			break
