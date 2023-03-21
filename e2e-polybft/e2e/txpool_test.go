@@ -207,9 +207,9 @@ func TestE2E_TxPool_TransactionWithHeaderInstuctions(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
 }
 
-// TestE2E_TxPool_Broadcast sends several transactions (legacy and dynamic fees) to the cluster with the 1 amount of eth
-// and checks that all cluster nodes have the recipient balance updated.
-func TestE2E_TxPool_Broadcast(t *testing.T) {
+// TestE2E_TxPool_BroadcastTransactions sends several transactions (legacy and dynamic fees) to the cluster
+// with the 1 amount of eth and checks that all cluster nodes have the recipient balance updated.
+func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 	var (
 		sendAmount = ethgo.Ether(1)
 	)
