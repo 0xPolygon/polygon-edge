@@ -28,7 +28,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	t.Parallel()
 
 	// create validator set
-	currentValidators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
+	currentValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
 	accSet := currentValidators.getPublicIdentities()
 
 	senderAddress := types.Address{1}
@@ -216,7 +216,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			vps[j] = intialBalance
 		}
 
-		validatorSets[i] = newTestValidatorsWithAliases(aliases, vps)
+		validatorSets[i] = newTestValidatorsWithAliases(t, aliases, vps)
 	}
 
 	// iterate through the validator set and do the test for each of them

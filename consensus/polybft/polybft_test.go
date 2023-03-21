@@ -62,7 +62,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create all validators
-	validators := newTestValidators(allValidatorsSize)
+	validators := newTestValidators(t, allValidatorsSize)
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{
@@ -127,7 +127,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	parentHeader := &types.Header{
 		Number:    polyBftConfig.EpochSize,
-		Timestamp: uint64(time.Now().UnixMilli()),
+		Timestamp: uint64(time.Now().UTC().UnixMilli()),
 	}
 	parentCommitment := updateHeaderExtra(parentHeader, parentDelta, nil, &CheckpointData{EpochNumber: 1}, accountSetParent)
 

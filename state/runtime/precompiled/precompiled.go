@@ -2,6 +2,7 @@ package precompiled
 
 import (
 	"encoding/binary"
+	"log"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -14,11 +15,26 @@ import (
 var _ runtime.Runtime = &Precompiled{}
 
 var (
-	// abiBoolTrue is ABI encoded true boolean value
-	abiBoolTrue = abiBoolMustEncode(true)
-	// abiBoolFalse is ABI encoded false boolean value
-	abiBoolFalse = abiBoolMustEncode(false)
+	abiBoolTrue, abiBoolFalse []byte
 )
+
+func init() {
+	// abiBoolTrue is ABI encoded true boolean value
+	encodedBool, err := abi.MustNewType("bool").Encode(true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	abiBoolTrue = encodedBool
+
+	// abiBoolFalse is ABI encoded false boolean value
+	encodedBool, err = abi.MustNewType("bool").Encode(false)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	abiBoolFalse = encodedBool
+}
 
 type contract interface {
 	gas(input []byte, config *chain.ForksInTime) uint64
@@ -57,11 +73,11 @@ func (p *Precompiled) setupContracts() {
 	// Native transfer precompile
 	p.register(contracts.NativeTransferPrecompile.String(), &nativeTransfer{})
 
+	// Console precompile
+	// p.register(contracts.ConsolePrecompile.String(), &console{})
+
 	// BLS aggregated signatures verification precompile
 	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
-
-	// Console precompile
-	p.register(contracts.ConsolePrecompile.String(), &console{})
 }
 
 func (p *Precompiled) register(addrStr string, b contract) {
@@ -186,15 +202,4 @@ func (p *Precompiled) getUint64(input []byte) (uint64, []byte) {
 	num := binary.BigEndian.Uint64(p.buf[24:32])
 
 	return num, input
-}
-
-// abiBoolMustEncode encodes the given value using the given ABI type.
-// panics if there is an error occurred.
-func abiBoolMustEncode(v bool) []byte {
-	raw, err := abi.MustNewType("bool").Encode(v)
-	if err != nil {
-		panic(err)
-	}
-
-	return raw
 }

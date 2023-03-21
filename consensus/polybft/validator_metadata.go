@@ -1,13 +1,13 @@
 package polybft
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -142,12 +142,12 @@ func (as AccountSet) Equals(other AccountSet) bool {
 
 // fmt.Stringer implementation
 func (as AccountSet) String() string {
-	metadataString := make([]string, len(as))
-	for i, v := range as {
-		metadataString[i] = v.String()
+	var buf bytes.Buffer
+	for _, v := range as {
+		buf.WriteString(fmt.Sprintf("%s\n", v.String()))
 	}
 
-	return strings.Join(metadataString, "\n")
+	return buf.String()
 }
 
 // GetAddresses aggregates addresses for given AccountSet

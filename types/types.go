@@ -12,6 +12,8 @@ import (
 const (
 	HashLength    = 32
 	AddressLength = 20
+
+	SignatureSize = 4
 )
 
 var (

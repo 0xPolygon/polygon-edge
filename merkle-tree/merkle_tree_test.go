@@ -51,7 +51,7 @@ func TestMerkleTree_VerifyProofs(t *testing.T) {
 			dataCopy := make([]byte, len(data[i]))
 			copy(dataCopy, data[i])
 			dataCopy[0] = dataCopy[0] + 1
-			proof, err = tree.GenerateProof(dataCopy)
+			_, err = tree.GenerateProof(dataCopy)
 			require.ErrorContains(t, err, "data not in merkle tree")
 		}
 	}
@@ -76,6 +76,7 @@ func TestMerkleTree_VerifyProof_TreeWithOneNode(t *testing.T) {
 	require.Empty(t, proof) // since tree contains one node, there is no proof, it's proof is rootHash == hashOfLeaf
 
 	index, err := tree.LeafIndex(leafData)
+	require.NoError(t, err)
 	require.Equal(t, uint64(0), index) // should be 0 since tree only has one node
 	require.NoError(t, VerifyProof(index, leafData, proof, tree.Hash()))
 

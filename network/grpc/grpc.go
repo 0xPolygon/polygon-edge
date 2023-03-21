@@ -10,6 +10,7 @@ import (
 
 	manet "github.com/multiformats/go-multiaddr/net"
 
+	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/grpc"
@@ -44,6 +45,11 @@ func interceptor(
 	_ *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (interface{}, error) {
+	// Validate request
+	if err := validate.ValidateRequest(req); err != nil {
+		return nil, err
+	}
+
 	// Grab the peer info from the connection
 	contextPeer, ok := grpcPeer.FromContext(ctx)
 	if !ok {
@@ -126,7 +132,7 @@ func WrapClient(s network.Stream) *grpc.ClientConn {
 
 	if err != nil {
 		// TODO: this should not fail at all
-		panic(err)
+		panic(err) //nolint:gocritic
 	}
 
 	return conn

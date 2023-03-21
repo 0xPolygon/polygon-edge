@@ -38,11 +38,11 @@ func Test_NativeTransferPrecompile(t *testing.T) {
 		require.ErrorIs(t, err, runtime.ErrUnauthorizedCaller)
 	})
 	t.Run("Insufficient balance", func(t *testing.T) {
-		err := run(contracts.NativeERC20TokenContract, sender, receiver, big.NewInt(10), newDummyHost())
+		err := run(contracts.NativeERC20TokenContract, sender, receiver, big.NewInt(10), newDummyHost(t))
 		require.ErrorIs(t, err, runtime.ErrInsufficientBalance)
 	})
 	t.Run("Correct transfer", func(t *testing.T) {
-		host := newDummyHost()
+		host := newDummyHost(t)
 		host.AddBalance(sender, big.NewInt(1000))
 
 		err := run(contracts.NativeERC20TokenContract, sender, receiver, big.NewInt(100), host)
@@ -56,11 +56,16 @@ func Test_NativeTransferPrecompile(t *testing.T) {
 var _ runtime.Host = (*dummyHost)(nil)
 
 type dummyHost struct {
+	t *testing.T
+
 	balances map[types.Address]*big.Int
 }
 
-func newDummyHost() *dummyHost {
+func newDummyHost(t *testing.T) *dummyHost {
+	t.Helper()
+
 	return &dummyHost{
+		t:        t,
 		balances: map[types.Address]*big.Int{},
 	}
 }
@@ -72,15 +77,29 @@ func (d dummyHost) AddBalance(addr types.Address, balance *big.Int) {
 }
 
 func (d dummyHost) AccountExists(addr types.Address) bool {
-	panic("not implemented")
+	d.t.Fatalf("AccountExists is not implemented")
+
+	return false
 }
 
 func (d dummyHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
-	panic("not implemented")
+	d.t.Fatalf("GetStorage is not implemented")
+
+	return types.ZeroHash
+}
+
+func (d dummyHost) SetState(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+) {
+	d.t.Fatalf("SetState is not implemented")
 }
 
 func (d dummyHost) SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) runtime.StorageStatus {
-	panic("not implemented")
+	d.t.Fatalf("SetStorage is not implemented")
+
+	return runtime.StorageAdded
 }
 
 func (d dummyHost) GetBalance(addr types.Address) *big.Int {
@@ -93,43 +112,59 @@ func (d dummyHost) GetBalance(addr types.Address) *big.Int {
 }
 
 func (d dummyHost) GetCodeSize(addr types.Address) int {
-	panic("not implemented")
+	d.t.Fatalf("GetCodeSize is not implemented")
+
+	return -1
 }
 
 func (d dummyHost) GetCodeHash(addr types.Address) types.Hash {
-	panic("not implemented")
+	d.t.Fatalf("GetCodeHash is not implemented")
+
+	return types.ZeroHash
 }
 
 func (d dummyHost) GetCode(addr types.Address) []byte {
-	panic("not implemented")
+	d.t.Fatalf("GetCode is not implemented")
+
+	return nil
 }
 
 func (d dummyHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	panic("not implemented")
+	d.t.Fatalf("Selfdestruct is not implemented")
 }
 
 func (d dummyHost) GetTxContext() runtime.TxContext {
-	panic("not implemented")
+	d.t.Fatalf("GetTxContext is not implemented")
+
+	return runtime.TxContext{}
 }
 
 func (d dummyHost) GetBlockHash(number int64) types.Hash {
-	panic("not implemented")
+	d.t.Fatalf("GetTxContext is not implemented")
+
+	return types.ZeroHash
 }
 
 func (d dummyHost) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
-	panic("not implemented")
+	d.t.Fatalf("EmitLog is not implemented")
 }
 
 func (d dummyHost) Callx(_ *runtime.Contract, _ runtime.Host) *runtime.ExecutionResult {
-	panic("not implemented")
+	d.t.Fatalf("Callx is not implemented")
+
+	return nil
 }
 
 func (d dummyHost) Empty(addr types.Address) bool {
-	panic("not implemented")
+	d.t.Fatalf("Callx is not implemented")
+
+	return true
 }
 
 func (d dummyHost) GetNonce(addr types.Address) uint64 {
-	panic("not implemented")
+	d.t.Fatalf("GetNonce is not implemented")
+
+	return 0
 }
 
 func (d dummyHost) Transfer(from types.Address, to types.Address, amount *big.Int) error {

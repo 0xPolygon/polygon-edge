@@ -30,11 +30,19 @@ type mockHost struct {
 }
 
 func (m *mockHost) AccountExists(addr types.Address) bool {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetStorage(addr types.Address, key types.Hash) types.Hash {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
+}
+
+func (m *mockHost) SetState(
+	addr types.Address,
+	key types.Hash,
+	value types.Hash,
+) {
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) SetStorage(
@@ -43,55 +51,55 @@ func (m *mockHost) SetStorage(
 	value types.Hash,
 	config *chain.ForksInTime,
 ) runtime.StorageStatus {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetBalance(addr types.Address) *big.Int {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetCodeSize(addr types.Address) int {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetCodeHash(addr types.Address) types.Hash {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetCode(addr types.Address) []byte {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetTxContext() runtime.TxContext {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetBlockHash(number int64) types.Hash {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) Callx(*runtime.Contract, runtime.Host) *runtime.ExecutionResult {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) Empty(addr types.Address) bool {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetNonce(addr types.Address) uint64 {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) Transfer(from types.Address, to types.Address, amount *big.Int) error {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func (m *mockHost) GetTracer() runtime.VMTracer {
@@ -99,7 +107,7 @@ func (m *mockHost) GetTracer() runtime.VMTracer {
 }
 
 func (m *mockHost) GetRefund() uint64 {
-	panic("Not implemented in tests")
+	panic("Not implemented in tests") //nolint:gocritic
 }
 
 func TestRun(t *testing.T) {

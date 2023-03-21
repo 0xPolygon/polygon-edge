@@ -38,7 +38,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			framework.WithEpochSize(epochSize),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i, a := range adresses {
-					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premine[i]))
+					config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", a, premine[i]))
 				}
 			}))
 		defer cluster.Stop()

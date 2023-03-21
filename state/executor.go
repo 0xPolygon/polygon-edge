@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
@@ -53,8 +54,24 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	}
 }
 
-func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
-	snap := e.state.NewSnapshot()
+func (e *Executor) WriteGenesis(
+	alloc map[types.Address]*chain.GenesisAccount,
+	initialStateRoot types.Hash) (types.Hash, error) {
+	var (
+		snap Snapshot
+		err  error
+	)
+
+	if initialStateRoot == types.ZeroHash {
+		snap = e.state.NewSnapshot()
+	} else {
+		snap, err = e.state.NewSnapshotAt(initialStateRoot)
+	}
+
+	if err != nil {
+		return types.Hash{}, err
+	}
+
 	txn := NewTxn(snap)
 	config := e.config.Forks.At(0)
 
@@ -92,14 +109,14 @@ func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) t
 
 	if e.GenesisPostHook != nil {
 		if err := e.GenesisPostHook(transition); err != nil {
-			panic(fmt.Errorf("Error writing genesis block: %w", err))
+			return types.Hash{}, fmt.Errorf("Error writing genesis block: %w", err)
 		}
 	}
 
 	objs := txn.Commit(false)
 	_, root := snap.Commit(objs)
 
-	return types.BytesToHash(root)
+	return types.BytesToHash(root), nil
 }
 
 type BlockResult struct {
@@ -202,6 +219,11 @@ func (e *Executor) BeginTxn(
 		PostHook:    e.PostHook,
 	}
 
+	// enable contract deployment allow list (if any)
+	if e.config.ContractDeployerAllowList != nil {
+		txn.deploymentAllowlist = allowlist.NewAllowList(txn, contracts.AllowListContractsAddr)
+	}
+
 	return txn, nil
 }
 
@@ -227,6 +249,10 @@ type Transition struct {
 	// runtimes
 	evm         *evm.EVM
 	precompiles *precompiled.Precompiled
+
+	// allow list runtimes
+	deploymentAllowlist *allowlist.AllowList
+	txnAllowList        *allowlist.AllowList
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -627,6 +653,11 @@ func (t *Transition) Call2(
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
+	// check allow list (if any)
+	if t.deploymentAllowlist != nil && t.deploymentAllowlist.Addr() == contract.CodeAddress {
+		return t.deploymentAllowlist.Run(contract, host, &t.config)
+	}
+
 	// check the precompiles
 	if t.precompiles.CanRun(contract, host, &t.config) {
 		return t.precompiles.Run(contract, host, &t.config)
@@ -762,6 +793,18 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		t.captureCallEnd(c, result)
 	}()
 
+	// check if contract creation allow list is enabled
+	if t.deploymentAllowlist != nil {
+		role := t.deploymentAllowlist.GetRole(c.Caller)
+
+		if !role.Enabled() {
+			return &runtime.ExecutionResult{
+				GasLeft: 0,
+				Err:     runtime.ErrNotAuth,
+			}
+		}
+	}
+
 	result = t.run(c, host)
 	if result.Failed() {
 		t.state.RevertToSnapshot(snapshot)
@@ -800,6 +843,10 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	t.state.SetCode(c.Address, result.ReturnValue)
 
 	return result
+}
+
+func (t *Transition) SetState(addr types.Address, key types.Hash, value types.Hash) {
+	t.state.SetState(addr, key, value)
 }
 
 func (t *Transition) SetStorage(

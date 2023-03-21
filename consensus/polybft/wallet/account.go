@@ -17,21 +17,21 @@ type Account struct {
 }
 
 // GenerateAccount generates a new random account
-func GenerateAccount() *Account {
+func GenerateAccount() (*Account, error) {
 	key, err := wallet.GenerateKey()
 	if err != nil {
-		panic("Cannot generate key")
+		return nil, fmt.Errorf("cannot generate key. error: %w", err)
 	}
 
 	blsKey, err := bls.GenerateBlsKey()
 	if err != nil {
-		panic("Cannot generate bls key")
+		return nil, fmt.Errorf("cannot generate bls key. error: %w", err)
 	}
 
 	return &Account{
 		Ecdsa: key,
 		Bls:   blsKey,
-	}
+	}, nil
 }
 
 // NewAccountFromSecret creates new account by using provided secretsManager

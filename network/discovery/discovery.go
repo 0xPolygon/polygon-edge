@@ -424,7 +424,12 @@ func (d *DiscoveryService) FindPeers(
 		}
 
 		if info := d.baseServer.GetPeerInfo(id); len(info.Addrs) > 0 {
-			filteredPeers = append(filteredPeers, common.AddrInfoToString(info))
+			addr, err := common.AddrInfoToString(info)
+			if err != nil {
+				return nil, err
+			}
+
+			filteredPeers = append(filteredPeers, addr)
 		}
 	}
 

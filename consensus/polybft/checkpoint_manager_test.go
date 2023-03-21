@@ -36,7 +36,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	var aliases = []string{"A", "B", "C", "D", "E"}
 
-	validators := newTestValidatorsWithAliases(aliases)
+	validators := newTestValidatorsWithAliases(t, aliases)
 	validatorsMetadata := validators.getPublicIdentities()
 	txRelayerMock := newDummyTxRelayer(t)
 	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
@@ -122,8 +122,8 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 
 	const epochSize = uint64(10)
 
-	currentValidators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
-	nextValidators := newTestValidatorsWithAliases([]string{"E", "F", "G", "H"})
+	currentValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
+	nextValidators := newTestValidatorsWithAliases(t, []string{"E", "F", "G", "H"})
 	header := &types.Header{Number: 50}
 	checkpoint := &CheckpointData{
 		BlockRound:  1,
@@ -213,10 +213,12 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 				Return(c.checkpointID, c.returnError).
 				Once()
+			acc, err := wallet.GenerateAccount()
+			require.NoError(t, err)
 
 			checkpointMgr := &checkpointManager{
 				rootChainRelayer: txRelayerMock,
-				key:              wallet.GenerateAccount().Ecdsa,
+				key:              acc.Ecdsa,
 				logger:           hclog.NewNullLogger(),
 			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
@@ -325,11 +327,12 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		require.NoError(t, checkpointManager.PostBlock(req))
 
 		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
-			return exitEvent.BlockNumber == block
+			return exitEvent.BlockNumber == block+1
 		})
 
 		require.NoError(t, err)
 		require.Len(t, exitEvents, numOfReceipts)
+		require.Equal(t, uint64(block+1), exitEvents[0].BlockNumber)
 		require.Equal(t, uint64(epoch+1), exitEvents[0].EpochNumber)
 	})
 }

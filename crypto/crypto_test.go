@@ -405,7 +405,7 @@ func TestPrivateKeyRead(t *testing.T) {
 }
 
 func TestPrivateKeyGeneration(t *testing.T) {
-	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().Unix(), 10) + ".key"
+	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().UTC().Unix(), 10) + ".key"
 
 	t.Cleanup(func() {
 		_ = os.Remove(tempFile)

@@ -15,7 +15,7 @@ import (
 func TestProposerCalculator_SetIndex(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"}, []uint64{10, 100, 1, 50, 30})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"}, []uint64{10, 100, 1, 50, 30})
 	metadata := validators.getPublicIdentities()
 
 	vs := validators.toValidatorSet()
@@ -39,7 +39,7 @@ func TestProposerCalculator_SetIndex(t *testing.T) {
 func TestProposerCalculator_RegularFlow(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E"}, []uint64{1, 2, 3, 4, 5})
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"}, []uint64{1, 2, 3, 4, 5})
 	metadata := validators.getPublicIdentities()
 
 	snapshot := NewProposerSnapshot(0, metadata)
@@ -414,7 +414,7 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 		count   = 10
 	)
 
-	validatorSet := newTestValidators(count).getPublicIdentities()
+	validatorSet := newTestValidators(t, count).getPublicIdentities()
 	snapshot := NewProposerSnapshot(0, validatorSet)
 	snapshot.Validators[bestIdx].ProposerPriority = big.NewInt(1000000)
 
@@ -422,7 +422,7 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 	_, err := snapshot.GetLatestProposer(0, 0)
 	assert.Error(t, err)
 
-	address, err := snapshot.CalcProposer(0, 0)
+	_, err = snapshot.CalcProposer(0, 0)
 	assert.NoError(t, err)
 
 	// wrong round
@@ -434,7 +434,7 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 	assert.Error(t, err)
 
 	// ok
-	address, err = snapshot.GetLatestProposer(0, 0)
+	address, err := snapshot.GetLatestProposer(0, 0)
 	assert.NoError(t, err)
 
 	proposerAddress := validatorSet[bestIdx].Address

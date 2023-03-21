@@ -53,7 +53,7 @@ func (s StorageStatus) String() string {
 	case StorageDeleted:
 		return "StorageDeleted"
 	default:
-		panic("BUG: storage status not found")
+		panic("BUG: storage status not found") //nolint:gocritic
 	}
 }
 
@@ -62,6 +62,7 @@ type Host interface {
 	AccountExists(addr types.Address) bool
 	GetStorage(addr types.Address, key types.Hash) types.Hash
 	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
+	SetState(addr types.Address, key types.Hash, value types.Hash)
 	GetBalance(addr types.Address) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
@@ -140,6 +141,7 @@ var (
 	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
 	ErrUnauthorizedCaller       = errors.New("unauthorized caller")
 	ErrInvalidInputData         = errors.New("invalid input data")
+	ErrNotAuth                  = errors.New("not in allow list")
 )
 
 type CallType int

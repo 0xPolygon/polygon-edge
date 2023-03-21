@@ -209,7 +209,9 @@ func TestEncodingPeerAddr(t *testing.T) {
 		Addrs: []multiaddr.Multiaddr{addr},
 	}
 
-	str := common.AddrInfoToString(info)
+	str, err := common.AddrInfoToString(info)
+	assert.NoError(t, err)
+
 	info2, err := common.StringToAddrInfo(str)
 	assert.NoError(t, err)
 	assert.Equal(t, info, info2)
@@ -287,11 +289,12 @@ func TestAddrInfoToString(t *testing.T) {
 				t.Fatalf("Unable to construct multiaddrs, %v", constructErr)
 			}
 
-			dialAddress := common.AddrInfoToString(&peer.AddrInfo{
+			dialAddress, err := common.AddrInfoToString(&peer.AddrInfo{
 				ID:    defaultPeerID,
 				Addrs: multiAddrs,
 			})
 
+			assert.NoError(t, err)
 			assert.Equal(t, testCase.expected, dialAddress)
 		})
 	}
@@ -394,10 +397,13 @@ func TestPeerReconnection(t *testing.T) {
 			c.NoDiscover = false
 		},
 		ServerCallback: func(server *Server) {
-			server.config.Chain.Bootnodes = []string{
-				common.AddrInfoToString(bootnodes[0].AddrInfo()),
-				common.AddrInfoToString(bootnodes[1].AddrInfo()),
-			}
+			addr1, err := common.AddrInfoToString(bootnodes[0].AddrInfo())
+			assert.NoError(t, err)
+
+			addr2, err := common.AddrInfoToString(bootnodes[1].AddrInfo())
+			assert.NoError(t, err)
+
+			server.config.Chain.Bootnodes = []string{addr1, addr2}
 		},
 	}
 

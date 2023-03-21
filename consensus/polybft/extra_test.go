@@ -27,7 +27,7 @@ func TestExtra_Encoding(t *testing.T) {
 	committedStr := []byte("Here is the committed signature")
 	bitmapStr := []byte("Here are the bitmap bytes")
 
-	addedValidators := newTestValidatorsWithAliases([]string{"A", "B", "C"}).getPublicIdentities()
+	addedValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C"}).getPublicIdentities()
 
 	removedValidators := bitmap.Bitmap{}
 	removedValidators.Set(2)
@@ -186,7 +186,9 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		extraMarshalled.Set(ar.NewBytes([]byte{})) // Seal
 
 		// Parent
-		key := wallet.GenerateAccount()
+		key, err := wallet.GenerateAccount()
+		require.NoError(t, err)
+
 		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash([]byte("This is test hash")))
 		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
 
@@ -207,7 +209,9 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		extraMarshalled.Set(ar.NewBytes([]byte{})) // Seal
 
 		// Parent
-		key := wallet.GenerateAccount()
+		key, err := wallet.GenerateAccount()
+		require.NoError(t, err)
+
 		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)))
 		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
 
@@ -242,7 +246,7 @@ func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 		Hash:   types.BytesToHash(generateRandomBytes(t)),
 	}
 
-	validators := newTestValidators(6)
+	validators := newTestValidators(t, 6)
 
 	polyBackendMock := new(polybftBackendMock)
 	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(nil, errors.New("validators not found"))
@@ -317,7 +321,7 @@ func TestExtra_ValidateParentSignatures(t *testing.T) {
 	require.ErrorContains(t, err, fmt.Sprintf("failed to verify signatures for parent of block %d because signatures are not present", headerNum))
 
 	// validators not found
-	validators := newTestValidators(5)
+	validators := newTestValidators(t, 5)
 	incorrectHash := types.BytesToHash([]byte("Hello World"))
 	invalidSig := createSignature(t, validators.getPrivateIdentities(), incorrectHash)
 	extra = &Extra{Parent: invalidSig}
@@ -359,7 +363,7 @@ func TestSignature_Verify(t *testing.T) {
 		numValidators := 100
 		msgHash := types.Hash{0x1}
 
-		vals := newTestValidators(numValidators)
+		vals := newTestValidators(t, numValidators)
 		validatorsMetadata := vals.getPublicIdentities()
 		validatorSet := vals.toValidatorSet()
 
@@ -396,7 +400,7 @@ func TestSignature_Verify(t *testing.T) {
 	t.Run("Invalid bitmap provided", func(t *testing.T) {
 		t.Parallel()
 
-		validatorSet := newTestValidators(3).getPublicIdentities()
+		validatorSet := newTestValidators(t, 3).getPublicIdentities()
 		bmp := bitmap.Bitmap{}
 
 		// Make bitmap invalid, by setting some flag larger than length of validator set to 1
@@ -444,7 +448,7 @@ func TestSignature_VerifyRandom(t *testing.T) {
 	t.Parallel()
 
 	numValidators := 100
-	vals := newTestValidators(numValidators)
+	vals := newTestValidators(t, numValidators)
 	msgHash := types.Hash{0x1}
 
 	var signature bls.Signatures
@@ -501,13 +505,13 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			vals := newTestValidatorsWithAliases([]string{})
+			vals := newTestValidatorsWithAliases(t, []string{})
 
 			for _, name := range c.oldSet {
-				vals.create(name, 1)
+				vals.create(t, name, 1)
 			}
 			for _, name := range c.newSet {
-				vals.create(name, 1)
+				vals.create(t, name, 1)
 			}
 
 			oldValidatorSet := vals.getPublicIdentities(c.oldSet...)
@@ -548,7 +552,7 @@ func TestExtra_CreateValidatorSetDelta_Cases(t *testing.T) {
 func TestExtra_CreateValidatorSetDelta_BlsDiffer(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+	vals := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	oldValidatorSet := vals.getPublicIdentities("A", "B", "C", "D")
 
 	// change the public bls key of 'B'
@@ -608,7 +612,7 @@ func TestExtra_ValidateDelta(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			vals := newTestValidatorsWithAliases([]string{"A", "B", "C", "D", "E", "F"})
+			vals := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 			oldValidators := vals.getPublicIdentities(c.oldValidators...)
 			newValidators := vals.getPublicIdentities(c.originalNewValidators...)
 			for i, votingPower := range c.updatedVotingPowers {
@@ -639,7 +643,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 		t.Parallel()
 
 		const validatorsCount = 7
-		vals := newTestValidators(validatorsCount)
+		vals := newTestValidators(t, validatorsCount)
 
 		polyBftConfig := PolyBFTConfig{InitialValidatorSet: vals.getParamValidators()}
 
@@ -676,7 +680,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 	t.Run("Invalid Extra data", func(t *testing.T) {
 		t.Parallel()
 
-		validators := newTestValidators(5)
+		validators := newTestValidators(t, 5)
 		polyBftConfig := PolyBFTConfig{InitialValidatorSet: validators.getParamValidators()}
 
 		genesis := &chain.Genesis{
@@ -700,7 +704,7 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 		addedValidatorsCount    = 2
 	)
 
-	oldValidatorSet := newTestValidators(originalValidatorsCount).getPublicIdentities()
+	oldValidatorSet := newTestValidators(t, originalValidatorsCount).getPublicIdentities()
 	newValidatorSet := oldValidatorSet[:len(oldValidatorSet)-2]
 	originalDelta, err := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	require.NoError(t, err)
@@ -714,7 +718,7 @@ func TestValidatorSetDelta_Copy(t *testing.T) {
 	require.Empty(t, copiedDelta.Added)
 	require.Equal(t, copiedDelta.Removed.Len(), originalDelta.Removed.Len())
 
-	newValidators := newTestValidators(addedValidatorsCount).getPublicIdentities()
+	newValidators := newTestValidators(t, addedValidatorsCount).getPublicIdentities()
 	copiedDelta.Added = append(copiedDelta.Added, newValidators...)
 	require.Empty(t, originalDelta.Added)
 	require.Len(t, copiedDelta.Added, addedValidatorsCount)
@@ -784,7 +788,7 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 
 		ar := &fastrlp.Arena{}
 		deltaMarshalled := ar.NewArray()
-		addedValidators := newTestValidators(3).getPublicIdentities()
+		addedValidators := newTestValidators(t, 3).getPublicIdentities()
 		addedArray := ar.NewArray()
 		updatedArray := ar.NewArray()
 		for _, validator := range addedValidators {
@@ -872,8 +876,8 @@ func TestCheckpointData_Hash(t *testing.T) {
 func TestCheckpointData_Validate(t *testing.T) {
 	t.Parallel()
 
-	currentValidators := newTestValidators(5).getPublicIdentities()
-	nextValidators := newTestValidators(3).getPublicIdentities()
+	currentValidators := newTestValidators(t, 5).getPublicIdentities()
+	nextValidators := newTestValidators(t, 3).getPublicIdentities()
 
 	currentValidatorsHash, err := currentValidators.Hash()
 	require.NoError(t, err)
@@ -982,7 +986,7 @@ func TestCheckpointData_Validate(t *testing.T) {
 func TestCheckpointData_Copy(t *testing.T) {
 	t.Parallel()
 
-	validatorAccs := newTestValidators(5)
+	validatorAccs := newTestValidators(t, 5)
 	currentValidatorsHash, err := validatorAccs.getPublicIdentities("0", "1", "2").Hash()
 	require.NoError(t, err)
 

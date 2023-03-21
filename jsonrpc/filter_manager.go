@@ -570,7 +570,7 @@ func (f *FilterManager) refreshFilterTimeout(filter *filterBase) {
 
 // addFilterTimeout set timeout and add to heap
 func (f *FilterManager) addFilterTimeout(filter *filterBase) {
-	filter.expiresAt = time.Now().Add(f.timeout)
+	filter.expiresAt = time.Now().UTC().Add(f.timeout)
 	f.timeouts.addFilter(filter)
 	f.emitSignalToUpdateCh()
 }
