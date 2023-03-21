@@ -21,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
@@ -56,7 +55,7 @@ const (
 var startTime int64
 
 func init() {
-	startTime = timeutils.UnixMilliNow()
+	startTime = time.Now().UTC().UnixMilli()
 }
 
 func resolveBinary() string {

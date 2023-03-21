@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -571,7 +570,7 @@ func (f *FilterManager) refreshFilterTimeout(filter *filterBase) {
 
 // addFilterTimeout set timeout and add to heap
 func (f *FilterManager) addFilterTimeout(filter *filterBase) {
-	filter.expiresAt = timeutils.Now().Add(f.timeout)
+	filter.expiresAt = time.Now().UTC().Add(f.timeout)
 	f.timeouts.addFilter(filter)
 	f.emitSignalToUpdateCh()
 }

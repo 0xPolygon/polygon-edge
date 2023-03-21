@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -543,7 +542,7 @@ func TestHeadStream_Concurrent(t *testing.T) {
 
 	// Write co-routine with jitter
 	go func() {
-		seed := timeutils.UnixNanoNow()
+		seed := time.Now().UTC().UnixNano()
 		t.Logf("Using seed %d", seed)
 
 		z := rand.NewZipf(rand.New(rand.NewSource(seed)), 1.5, 1.5, 50)

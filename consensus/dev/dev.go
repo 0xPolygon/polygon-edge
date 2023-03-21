@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -159,7 +158,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		ParentHash: parent.Hash,
 		Number:     num + 1,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-		Timestamp:  uint64(timeutils.Now().Unix()),
+		Timestamp:  uint64(time.Now().UTC().Unix()),
 	}
 
 	// calculate gas limit based on parent header

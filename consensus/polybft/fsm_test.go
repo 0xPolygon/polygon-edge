@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -16,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -774,7 +774,7 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 	parent := &types.Header{
 		Number:    parentBlockNumber,
 		ExtraData: createTestExtra(validators.getPublicIdentities(), AccountSet{}, 4, 3, 3),
-		Timestamp: uint64(timeutils.UnixNow()),
+		Timestamp: uint64(time.Now().UTC().Unix()),
 	}
 	parent.ComputeHash()
 

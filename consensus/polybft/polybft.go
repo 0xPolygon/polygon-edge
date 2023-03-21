@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
-	"github.com/0xPolygon/polygon-edge/timeutils"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
@@ -345,7 +344,7 @@ func (p *Polybft) startConsensusProtocol() {
 			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		}
 
-		now := timeutils.Now()
+		now := time.Now().UTC()
 
 		select {
 		case <-syncerBlockCh:
