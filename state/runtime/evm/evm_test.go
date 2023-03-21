@@ -187,6 +187,7 @@ func TestRun(t *testing.T) {
 			to:    types.StringToAddress("0xC66298c7a6aDE36b928d6e9598Af7804611AbDC0"),
 			config: &chain.ForksInTime{
 				Byzantium: true,
+				EIP3074:   true,
 			},
 			expected: &runtime.ExecutionResult{
 				ReturnValue: nil,

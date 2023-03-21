@@ -1129,6 +1129,12 @@ func opCall(op OpCode) instruction {
 			return
 		}
 
+		if op == AUTHCALL && !c.config.EIP3074 {
+			c.exit(errOpCodeNotFound)
+
+			return
+		}
+
 		var callType runtime.CallType
 
 		switch op {
@@ -1427,6 +1433,12 @@ func opHalt(op OpCode) instruction {
 }
 
 func opAuth(c *state) {
+	if !c.config.EIP3074 {
+		c.exit(errOpCodeNotFound)
+
+		return
+	}
+
 	c.authorized = nil
 
 	commit := c.pop()

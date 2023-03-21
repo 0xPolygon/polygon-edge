@@ -51,6 +51,7 @@ type Forks struct {
 	EIP150         *Fork `json:"EIP150,omitempty"`
 	EIP158         *Fork `json:"EIP158,omitempty"`
 	EIP155         *Fork `json:"EIP155,omitempty"`
+	EIP3074        *Fork `json:"EIP3074,omitempty"`
 }
 
 func (f *Forks) active(ff *Fork, block uint64) bool {
@@ -93,6 +94,10 @@ func (f *Forks) IsEIP155(block uint64) bool {
 	return f.active(f.EIP155, block)
 }
 
+func (f *Forks) IsEIP3074(block uint64) bool {
+	return f.active(f.EIP3074, block)
+}
+
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
 		Homestead:      f.active(f.Homestead, block),
@@ -104,6 +109,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		EIP150:         f.active(f.EIP150, block),
 		EIP158:         f.active(f.EIP158, block),
 		EIP155:         f.active(f.EIP155, block),
+		EIP3074:        f.active(f.EIP3074, block),
 	}
 }
 
@@ -132,7 +138,8 @@ type ForksInTime struct {
 	London,
 	EIP150,
 	EIP158,
-	EIP155 bool
+	EIP155,
+	EIP3074 bool
 }
 
 var AllForksEnabled = &Forks{
@@ -140,6 +147,7 @@ var AllForksEnabled = &Forks{
 	EIP150:         NewFork(0),
 	EIP155:         NewFork(0),
 	EIP158:         NewFork(0),
+	EIP3074:        NewFork(0),
 	Byzantium:      NewFork(0),
 	Constantinople: NewFork(0),
 	Petersburg:     NewFork(0),
