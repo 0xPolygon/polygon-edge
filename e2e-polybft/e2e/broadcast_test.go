@@ -49,6 +49,7 @@ func TestE2E_Broadcast(t *testing.T) {
 
 	sentAmount := new(big.Int)
 	nonce := uint64(0)
+
 	for i := 0; i < txNum; i++ {
 		txn := &ethgo.Transaction{
 			Value: big.NewInt(sendAmount),
