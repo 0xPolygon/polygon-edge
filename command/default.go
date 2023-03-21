@@ -1,6 +1,9 @@
 package command
 
-import "github.com/0xPolygon/polygon-edge/server"
+import (
+	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/umbracle/ethgo"
+)
 
 const (
 	DefaultGenesisFileName = "genesis.json"
@@ -22,4 +25,8 @@ const (
 // compatibility with running clients
 const (
 	GRPCAddressFlagLEGACY = "grpc"
+)
+
+var (
+	DefaultStake = ethgo.Ether(1e6)
 )

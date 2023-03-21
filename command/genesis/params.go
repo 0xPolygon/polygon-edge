@@ -349,7 +349,7 @@ func (p *genesisParams) initGenesisConfig() error {
 		}
 
 		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
-			Balance: premineInfo.Balance,
+			Balance: premineInfo.Amount,
 		}
 	}
 

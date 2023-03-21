@@ -73,7 +73,7 @@ type TestClusterConfig struct {
 	Name              string
 	Premine           []string // address[:amount]
 	PremineValidators []string // address[:amount]
-	StakeAmount       string
+	StakeAmounts      []string // address[:amount]
 	HasBridge         bool
 	BootnodeCount     int
 	NonValidatorCount int
@@ -182,12 +182,6 @@ func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOp
 	}
 }
 
-func WithValidatorsStake(stakeAmount string) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.StakeAmount = stakeAmount
-	}
-}
-
 func WithBridge() ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.HasBridge = true
@@ -273,6 +267,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochReward:       1,
 		BlockGasLimit:     1e7, // 10M
 		PremineValidators: []string{},
+		StakeAmounts:      []string{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -326,8 +321,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		args = append(args, "--premine-validators", premineValidator)
 	}
 
-	if cluster.Config.StakeAmount != "" {
-		args = append(args, "--stake", cluster.Config.StakeAmount)
+	for _, validatorStake := range cluster.Config.StakeAmounts {
+		args = append(args, "--stake", validatorStake)
 	}
 
 	// run manifest file creation

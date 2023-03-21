@@ -161,7 +161,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// premine non-validator accounts
 	for _, premine := range premineInfos {
 		allocs[premine.Address] = &chain.GenesisAccount{
-			Balance: premine.Balance,
+			Balance: premine.Amount,
 		}
 	}
 

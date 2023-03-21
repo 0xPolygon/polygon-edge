@@ -331,6 +331,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
 				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
 		}),
 	)
@@ -442,6 +443,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
 				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", a, premineAmount))
+				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", a, premineAmount))
 			}
 		}),
 	)
