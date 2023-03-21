@@ -928,6 +928,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 		"txs", len(block.Transactions),
 		"hash", header.Hash,
 		"parent", header.ParentHash,
+		"source", source,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
@@ -992,6 +993,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 		"txs", len(block.Transactions),
 		"hash", header.Hash,
 		"parent", header.ParentHash,
+		"source", source,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {

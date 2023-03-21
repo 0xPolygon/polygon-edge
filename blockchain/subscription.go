@@ -19,28 +19,51 @@ type Subscription interface {
 // FOR TESTING PURPOSES //
 
 type MockSubscription struct {
-	eventCh chan *Event
+	updateCh chan *Event // Channel for update information
+	closeCh  chan void   // Channel for close signals
 }
 
 func NewMockSubscription() *MockSubscription {
-	return &MockSubscription{eventCh: make(chan *Event)}
+	return &MockSubscription{
+		updateCh: make(chan *Event),
+		closeCh:  make(chan void),
+	}
 }
 
 func (m *MockSubscription) Push(e *Event) {
-	m.eventCh <- e
+	m.updateCh <- e
 }
 
 func (m *MockSubscription) GetEventCh() chan *Event {
-	return m.eventCh
+	eventCh := make(chan *Event)
+
+	go func() {
+		for {
+			evnt := m.GetEvent()
+			if evnt == nil {
+				return
+			}
+			eventCh <- evnt
+		}
+	}()
+
+	return eventCh
 }
 
 func (m *MockSubscription) GetEvent() *Event {
-	evnt := <-m.eventCh
-
-	return evnt
+	for {
+		// Wait for an update
+		select {
+		case ev := <-m.updateCh:
+			return ev
+		case <-m.closeCh:
+			return nil
+		}
+	}
 }
 
 func (m *MockSubscription) Close() {
+	close(m.closeCh)
 }
 
 // subscription is the Blockchain event subscription object
