@@ -107,11 +107,13 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		premineBalance = "0x1A784379D99DB42000000" // 2M native tokens (so that we have enough balance to fund new validator)
 	)
 
-	// new validator data
-	firstValidatorDataDir := fmt.Sprintf("test-chain-%d", validatorSize+1)  // directory where the first validator secrets will be stored
-	secondValidatorDataDir := fmt.Sprintf("test-chain-%d", validatorSize+2) // directory where the second validator secrets will be stored
-	newValidatorInitBalance := "500000000000000000000000"                   // 500k - balance which will be transferred to the new validator
-	newValidatorStakeRaw := "0x8AC7230489E80000"                            // 10 native tokens  - amout which will be staked by the new validator
+	var (
+		firstValidatorDataDir   = fmt.Sprintf("test-chain-%d", validatorSize+1) // directory where the first validator secrets will be stored
+		secondValidatorDataDir  = fmt.Sprintf("test-chain-%d", validatorSize+2) // directory where the second validator secrets will be stored
+		newValidatorInitBalance = "500000000000000000000000"                    // 500k - balance which will be transferred to the new validator
+		newValidatorStakeRaw    = "0x8AC7230489E80000"                          // 10 native tokens  - amount which will be staked by the new validator
+	)
+
 	newValidatorStake, err := types.ParseUint256orHex(&newValidatorStakeRaw)
 	require.NoError(t, err)
 
@@ -119,7 +121,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster := framework.NewTestCluster(t, validatorSize,
 		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(epochReward),
-		framework.WithPremineValidators(premineBalance))
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for _, a := range addresses {
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+			}
+		}),
+	)
 	defer cluster.Stop()
 
 	// first validator is the owner of ChildValidator set smart contract
@@ -156,7 +163,16 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// wait for consensus to start
 	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
 
-	// owner enlists both new validators
+	genesisBlock, err := owner.JSONRPC().Eth().GetBlockByNumber(0, false)
+	require.NoError(t, err)
+
+	extra, err := polybft.GetIbftExtra(genesisBlock.ExtraData)
+	require.NoError(t, err)
+
+	// on genesis block all validators are marked as added, which makes initial validator set
+	initialValidators := extra.Validators.Added
+
+	// owner whitelists both new validators
 	require.NoError(t, owner.WhitelistValidator(firstValidatorAddr.String(), ownerSecrets))
 	require.NoError(t, owner.WhitelistValidator(secondValidatorAddr.String(), ownerSecrets))
 
@@ -172,22 +188,22 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.True(t, ok)
 
 	// send some tokens from the owner to the first validator so that the first validator can register and stake
-	receipt1, err := txRelayer.SendTransaction(&ethgo.Transaction{
+	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
 		From:  ownerAcc.Ecdsa.Address(),
 		To:    &firstValidatorAddr,
 		Value: initialBalance,
 	}, ownerAcc.Ecdsa)
 	require.NoError(t, err)
-	require.Equal(t, uint64(types.ReceiptSuccess), receipt1.Status)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	// send some tokens from the owner to the second validator so that the second validator can register and stake
-	receipt2, err := txRelayer.SendTransaction(&ethgo.Transaction{
+	receipt, err = txRelayer.SendTransaction(&ethgo.Transaction{
 		From:  ownerAcc.Ecdsa.Address(),
 		To:    &secondValidatorAddr,
 		Value: initialBalance,
 	}, ownerAcc.Ecdsa)
 	require.NoError(t, err)
-	require.Equal(t, uint64(types.ReceiptSuccess), receipt2.Status)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	// collect the first and the second validator from the cluster
 	firstValidator := cluster.Servers[validatorSize]
@@ -213,30 +229,44 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, secondValidator.Stake(newValidatorStake.Uint64()))
 
 	validators := polybft.AccountSet{}
-
 	// assert that new validator is among validator set
-	require.NoError(t, cluster.WaitUntil(20*time.Second, func() bool {
+	require.NoError(t, cluster.WaitUntil(20*time.Second, 1*time.Second, func() bool {
 		// query validators
 		validators, err = systemState.GetValidatorSet()
 		require.NoError(t, err)
 
-		return validators.ContainsAddress((types.Address(firstValidatorAddr))) && validators.ContainsAddress((types.Address(secondValidatorAddr)))
+		return validators.ContainsAddress((types.Address(firstValidatorAddr))) &&
+			validators.ContainsAddress((types.Address(secondValidatorAddr)))
 	}))
 
-	// assert that validators hash is correct
+	// assert that next validators hash is correct
 	block, err := owner.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 	t.Logf("Block Number=%d\n", block.Number)
 
-	// unmarshal header extra data
-	extra, err := polybft.GetIbftExtra(block.ExtraData)
-	require.NoError(t, err)
-	require.NotNil(t, extra.Checkpoint)
+	// apply all deltas from epoch ending blocks
+	nextValidators := initialValidators
+
+	// apply all the deltas to the initial validator set
+	latestEpochEndBlock := block.Number - (block.Number % epochSize)
+	for blockNum := uint64(epochSize); blockNum <= latestEpochEndBlock; blockNum += epochSize {
+		block, err = owner.JSONRPC().Eth().GetBlockByNumber(ethgo.BlockNumber(blockNum), false)
+		require.NoError(t, err)
+
+		extra, err = polybft.GetIbftExtra(block.ExtraData)
+		require.NoError(t, err)
+		require.NotNil(t, extra.Checkpoint)
+
+		t.Logf("Block Number: %d, Delta: %v\n", blockNum, extra.Validators)
+
+		nextValidators, err = nextValidators.ApplyDelta(extra.Validators)
+		require.NoError(t, err)
+	}
 
 	// assert that correct validators hash gets submitted
-	validatorsHash, err := validators.Hash()
+	nextValidatorsHash, err := nextValidators.Hash()
 	require.NoError(t, err)
-	require.Equal(t, extra.Checkpoint.NextValidatorsHash, validatorsHash)
+	require.Equal(t, extra.Checkpoint.NextValidatorsHash, nextValidatorsHash)
 
 	// query the first validator
 	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr, txRelayer)
@@ -264,7 +294,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// check if the first validator has signed any prposals
-	firstSealed, err := firstValidator.HasValidatorSealed(currentBlock, currentBlock+3*epochSize, validators, firstValidatorAddr)
+	firstSealed, err := firstValidator.HasValidatorSealed(currentBlock, currentBlock+3*epochSize, nextValidators, firstValidatorAddr)
 	require.NoError(t, err)
 
 	if firstSealed {
@@ -278,7 +308,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// check if the second validator has signed any prposals
-	secondSealed, err := secondValidator.HasValidatorSealed(currentBlock, currentBlock+3*epochSize, validators, secondValidatorAddr)
+	secondSealed, err := secondValidator.HasValidatorSealed(currentBlock, currentBlock+3*epochSize, nextValidators, secondValidatorAddr)
 	require.NoError(t, err)
 
 	if secondSealed {
@@ -302,8 +332,13 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(100000),
-		framework.WithPremineValidators(premineBalance),
-		framework.WithEpochSize(epochSize))
+		framework.WithEpochSize(epochSize),
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for _, a := range addresses {
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+			}
+		}),
+	)
 	defer cluster.Stop()
 
 	// init delegator account
@@ -403,11 +438,18 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 }
 
 func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
+	const premineAmount = "10000000000000000000" // 10 native tokens
+
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithEpochReward(10000),
 		framework.WithEpochSize(5),
-		framework.WithPremineValidators("10000000000000000000")) // 10 native tokens
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			for _, a := range addresses {
+				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineAmount))
+			}
+		}),
+	)
 	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
 	srv := cluster.Servers[0]
 
@@ -507,7 +549,6 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 
 	cluster := framework.NewTestCluster(t, validatorCount,
 		framework.WithEpochReward(100000),
-		framework.WithPremineValidators(premineBalance),
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 

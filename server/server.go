@@ -11,11 +11,12 @@ import (
 	"path/filepath"
 	"time"
 
+	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -31,9 +32,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -79,11 +82,6 @@ type Server struct {
 
 	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
 	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
-}
-
-var dirPaths = []string{
-	"blockchain",
-	"trie",
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -138,11 +136,16 @@ func NewServer(config *Config) (*Server, error) {
 		logger:             logger.Named("server"),
 		config:             config,
 		chain:              config.Chain,
-		grpcServer:         grpc.NewServer(),
+		grpcServer:         grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
+
+	var dirPaths = []string{
+		"blockchain",
+		"trie",
+	}
 
 	// Generate all the paths in the dataDir
 	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
@@ -201,8 +204,42 @@ func NewServer(config *Config) (*Server, error) {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
 
+	// apply allow list genesis data
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+			m.config.Chain.Params.ContractDeployerAllowList)
+	}
+
+	var initialStateRoot = types.ZeroHash
+
+	if ConsensusType(engineName) == PolyBFTConsensus {
+		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
+		if err != nil {
+			return nil, err
+		}
+
+		if polyBFTConfig.InitialTrieRoot != types.ZeroHash {
+			checkedInitialTrieRoot, err := itrie.HashChecker(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
+			if err != nil {
+				return nil, fmt.Errorf("error on state root verification %w", err)
+			}
+
+			if checkedInitialTrieRoot != polyBFTConfig.InitialTrieRoot {
+				return nil, errors.New("invalid initial state root")
+			}
+
+			logger.Info("Initial state root checked and correct")
+
+			initialStateRoot = polyBFTConfig.InitialTrieRoot
+		}
+	}
+
+	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
+	if err != nil {
+		return nil, err
+	}
+
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the london signer with eip-155 as a fallback one
@@ -317,6 +354,20 @@ func NewServer(config *Config) (*Server, error) {
 	m.txpool.Start()
 
 	return m, nil
+}
+
+func unaryInterceptor(
+	ctx context.Context,
+	req interface{},
+	_ *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	// Validate request
+	if err := validate.ValidateRequest(req); err != nil {
+		return nil, err
+	}
+
+	return handler(ctx, req)
 }
 
 func (s *Server) restoreChain() error {
@@ -475,7 +526,7 @@ func (s *Server) setupRelayer() error {
 		return fmt.Errorf("failed to create account from secret: %w", err)
 	}
 
-	polyBFTConfig, err := polybft.GetPolyBFTConfig(s.config.Chain)
+	polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(s.config.Chain)
 	if err != nil {
 		return fmt.Errorf("failed to extract polybft config: %w", err)
 	}

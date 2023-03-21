@@ -52,6 +52,10 @@ func (p *TxPool) Subscribe(
 	request *proto.SubscribeRequest,
 	stream proto.TxnPoolOperator_SubscribeServer,
 ) error {
+	if err := request.ValidateAll(); err != nil {
+		return err
+	}
+
 	subscription := p.eventManager.subscribe(request.Types)
 
 	cancel := func() {

@@ -22,7 +22,7 @@ type IBFTServerConfigCallback func(index int, config *TestServerConfig)
 var startTime int64
 
 func init() {
-	startTime = time.Now().UnixMilli()
+	startTime = time.Now().UTC().UnixMilli()
 }
 
 func NewIBFTServersManager(

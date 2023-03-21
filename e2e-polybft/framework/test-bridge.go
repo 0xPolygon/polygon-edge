@@ -41,7 +41,6 @@ func (t *TestBridge) Start() error {
 		"rootchain",
 		"server",
 		"--data-dir", t.clusterConfig.Dir("test-rootchain"),
-		"--no-console",
 	}
 
 	stdout := t.clusterConfig.GetStdout("bridge")

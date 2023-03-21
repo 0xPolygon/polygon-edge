@@ -139,6 +139,11 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 		extra.Validators = validatorsDelta
 		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
+
+		nextValidators, err = f.getValidatorsTransition(validatorsDelta)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
@@ -158,6 +163,9 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		NextValidatorsHash:    nextValidatorsHash,
 		EventRoot:             f.exitEventRootHash,
 	}
+
+	f.logger.Debug("[Build Proposal]", "Current validators hash", currentValidatorsHash,
+		"Next validators hash", nextValidatorsHash)
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
 		h.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
@@ -203,6 +211,28 @@ func (f *fsm) stateTransactions() []*types.Transaction {
 	f.logger.Debug("Apply state transaction", "num", len(txns))
 
 	return txns
+}
+
+// getValidatorsTransition applies delta to the current validators,
+// as ChildValidatorSet SC returns validators in different order than the one kept on the Edge
+func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, error) {
+	nextValidators, err := f.validators.Accounts().ApplyDelta(delta)
+	if err != nil {
+		return nil, err
+	}
+
+	if f.logger.IsDebug() {
+		var buf bytes.Buffer
+		for _, v := range nextValidators {
+			if _, err := buf.WriteString(fmt.Sprintf("%s\n", v.String())); err != nil {
+				return nil, err
+			}
+		}
+
+		f.logger.Debug("getValidatorsTransition", "Next validators", buf.String())
+	}
+
+	return nextValidators, nil
 }
 
 // createCommitEpochTx create a StateTransaction, which invokes ValidatorSet smart contract
@@ -292,6 +322,11 @@ func (f *fsm) Validate(proposal []byte) error {
 		}
 
 		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
+			return err
+		}
+
+		nextValidators, err = f.getValidatorsTransition(extra.Validators)
+		if err != nil {
 			return err
 		}
 
@@ -520,10 +555,6 @@ func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (Account
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
-	}
-
-	if f.logger.IsDebug() {
-		f.logger.Debug("getCurrentValidators", "Validator set", newValidators.String())
 	}
 
 	return newValidators, nil

@@ -11,7 +11,7 @@ import (
 func TestBridgeEndpoint(t *testing.T) {
 	store := newMockStore()
 
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		store,
 		&dispatcherParams{

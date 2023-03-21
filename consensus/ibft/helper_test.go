@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
+	"github.com/stretchr/testify/require"
 )
 
 type testerAccount struct {
@@ -55,9 +56,7 @@ func (ap *testerAccountPool) add(accounts ...string) {
 		}
 
 		priv, err := crypto.GenerateECDSAKey()
-		if err != nil {
-			panic("BUG: Failed to generate crypto key")
-		}
+		require.NoError(ap.t, err)
 
 		ap.accounts = append(ap.accounts, &testerAccount{
 			alias: account,

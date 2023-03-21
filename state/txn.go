@@ -70,7 +70,7 @@ func (txn *Txn) Snapshot() int {
 // RevertToSnapshot reverts to a given snapshot
 func (txn *Txn) RevertToSnapshot(id int) {
 	if id > len(txn.snapshots) {
-		panic("")
+		panic("") //nolint:gocritic
 	}
 
 	tree := txn.snapshots[id]
@@ -551,13 +551,13 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	for _, k := range remove {
 		v, ok := txn.txn.Get(k)
 		if !ok {
-			panic("it should not happen")
+			panic("it should not happen") //nolint:gocritic
 		}
 
 		obj, ok := v.(*StateObject)
 
 		if !ok {
-			panic("it should not happen")
+			panic("it should not happen") //nolint:gocritic
 		}
 
 		obj2 := obj.Copy()

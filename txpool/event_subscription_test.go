@@ -70,7 +70,7 @@ func shuffleTxPoolEvents(
 	}
 
 	// Shuffle the events
-	mathRand.Seed(time.Now().UnixNano())
+	mathRand.Seed(time.Now().UTC().UnixNano())
 	mathRand.Shuffle(len(events), func(i, j int) {
 		events[i], events[j] = events[j], events[i]
 	})

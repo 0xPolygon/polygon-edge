@@ -195,9 +195,9 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		return nil, fmt.Errorf("failed to apply delta to the validators snapshot, block#%d: %w", header.Number, err)
 	}
 
-	v.logger.Trace("Computed snapshot",
+	v.logger.Debug("Computed snapshot",
 		"blockNumber", nextEpochEndBlockNumber,
-		"snapshot", snapshot,
+		"snapshot", snapshot.String(),
 		"delta", extra.Validators)
 
 	return &validatorSnapshot{

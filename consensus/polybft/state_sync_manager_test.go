@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"fmt"
 	"math/big"
 	"math/rand"
 	"os"
@@ -24,6 +23,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 	t.Helper()
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")
+	require.NoError(t, err)
 
 	state := newTestState(t)
 	require.NoError(t, state.EpochStore.insertEpoch(0))
@@ -50,7 +50,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 }
 
 func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
 	// there are no state syncs
@@ -86,7 +86,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 }
 
 func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 	s.epoch = 1
@@ -116,10 +116,10 @@ func (m *mockMsg) WithHash(hash []byte) *mockMsg {
 	return m
 }
 
-func (m *mockMsg) sign(val *testValidator) *TransportMessage {
+func (m *mockMsg) sign(val *testValidator) (*TransportMessage, error) {
 	signature, err := val.mustSign(m.hash).Marshal()
 	if err != nil {
-		panic(fmt.Errorf("BUG: %w", err))
+		return nil, err
 	}
 
 	return &TransportMessage{
@@ -127,36 +127,37 @@ func (m *mockMsg) sign(val *testValidator) *TransportMessage {
 		Signature:   signature,
 		From:        val.Address().String(),
 		EpochNumber: m.epoch,
-	}
+	}, nil
 }
 
 func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 	s.validatorSet = vals.toValidatorSet()
 
-	badVal := newTestValidator("a", 0)
-	msg := newMockMsg().sign(badVal)
+	badVal := newTestValidator(t, "a", 0)
+	msg, err := newMockMsg().sign(badVal)
+	require.NoError(t, err)
 
-	err := s.saveVote(msg)
-	require.Error(t, err)
+	require.Error(t, s.saveVote(msg))
 }
 
 func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 	s.validatorSet = vals.toValidatorSet()
 
 	val := newMockMsg()
-	msg := val.sign(vals.getValidator("0"))
+	msg, err := val.sign(vals.getValidator("0"))
+	require.NoError(t, err)
+
 	msg.EpochNumber = 1
 
-	err := s.saveVote(msg)
-	require.NoError(t, err)
+	require.NoError(t, s.saveVote(msg))
 
 	// no votes for the current epoch
 	votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.Hash)
@@ -171,35 +172,40 @@ func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 	s.validatorSet = vals.toValidatorSet()
 
 	// validator signs the msg in behalf of another validator
 	val := newMockMsg()
-	msg := val.sign(vals.getValidator("0"))
+	msg, err := val.sign(vals.getValidator("0"))
+	require.NoError(t, err)
+
 	msg.From = vals.getValidator("1").Address().String()
-	err := s.saveVote(msg)
-	require.Error(t, err)
+	require.Error(t, s.saveVote(msg))
 
 	// non validator signs the msg in behalf of a validator
-	badVal := newTestValidator("a", 0)
-	msg = newMockMsg().sign(badVal)
+	badVal := newTestValidator(t, "a", 0)
+	msg, err = newMockMsg().sign(badVal)
+	require.NoError(t, err)
+
 	msg.From = vals.getValidator("1").Address().String()
-	err = s.saveVote(msg)
-	require.Error(t, err)
+	require.Error(t, s.saveVote(msg))
 }
 
 func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 	s.validatorSet = vals.toValidatorSet()
 
 	msg := newMockMsg()
-	val1signed := msg.sign(vals.getValidator("1"))
-	val2signed := msg.sign(vals.getValidator("2"))
+	val1signed, err := msg.sign(vals.getValidator("1"))
+	require.NoError(t, err)
+
+	val2signed, err := msg.sign(vals.getValidator("2"))
+	require.NoError(t, err)
 
 	// vote with validator 1
 	require.NoError(t, s.saveVote(val1signed))
@@ -220,7 +226,7 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 }
 
 func TestStateSyncManager_BuildCommitment(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 	s.validatorSet = vals.toValidatorSet()
@@ -251,16 +257,29 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validators 0 and 1 vote for the proposal, there is not enough
 	// voting power for the proposal
-	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("0"))))
-	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("1"))))
+	signedMsg1, err := msg.sign(vals.getValidator("0"))
+	require.NoError(t, err)
+
+	signedMsg2, err := msg.sign(vals.getValidator("1"))
+	require.NoError(t, err)
+
+	require.NoError(t, s.saveVote(signedMsg1))
+	require.NoError(t, s.saveVote(signedMsg2))
 
 	commitment, err = s.Commitment()
 	require.NoError(t, err) // there is no error if quorum is not met, since its a valid case
 	require.Nil(t, commitment)
 
 	// validator 2 and 3 vote for the proposal, there is enough voting power now
-	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("2"))))
-	require.NoError(t, s.saveVote(msg.sign(vals.getValidator("3"))))
+
+	signedMsg1, err = msg.sign(vals.getValidator("2"))
+	require.NoError(t, err)
+
+	signedMsg2, err = msg.sign(vals.getValidator("3"))
+	require.NoError(t, err)
+
+	require.NoError(t, s.saveVote(signedMsg1))
+	require.NoError(t, s.saveVote(signedMsg2))
 
 	commitment, err = s.Commitment()
 	require.NoError(t, err)
@@ -268,7 +287,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 }
 
 func TestStateSyncerManager_BuildProofs(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
@@ -310,7 +329,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 }
 
 func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
@@ -375,7 +394,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidators(5)
+	vals := newTestValidators(t, 5)
 	s := newTestStateSyncManager(t, vals.getValidator("0"))
 
 	server := testutil.DeployTestServer(t, nil)
@@ -419,7 +438,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 func TestStateSyncManager_Close(t *testing.T) {
 	t.Parallel()
 
-	mgr := newTestStateSyncManager(t, newTestValidator("A", 100))
+	mgr := newTestStateSyncManager(t, newTestValidator(t, "A", 100))
 	require.NotPanics(t, func() { mgr.Close() })
 }
 

@@ -186,7 +186,11 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 		)
 
 		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			a = wallet.GenerateAccount()
+			a, err = wallet.GenerateAccount()
+			if err != nil {
+				return generated, fmt.Errorf("error generating account: %w", err)
+			}
+
 			if err = a.Save(secretsManager); err != nil {
 				return generated, fmt.Errorf("error saving account: %w", err)
 			}

@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/server/proto"
+	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -82,6 +83,15 @@ func (t *TestServer) DataDir() string {
 	return t.config.DataDir
 }
 
+func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
+	conn, err := grpc.Dial(t.GrpcAddr(), grpc.WithInsecure())
+	if err != nil {
+		t.t.Fatal(err)
+	}
+
+	return txpoolProto.NewTxnPoolOperatorClient(conn)
+}
+
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
@@ -139,6 +149,8 @@ func (t *TestServer) Start() {
 
 	if len(config.LogLevel) > 0 {
 		args = append(args, "--log-level", config.LogLevel)
+	} else {
+		args = append(args, "--log-level", "DEBUG")
 	}
 
 	if config.Seal {

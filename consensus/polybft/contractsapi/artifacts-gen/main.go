@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"runtime"
@@ -91,7 +92,7 @@ func main() {
 	for _, v := range readContracts {
 		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, v.Name)
 		if err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 
 		f.Var().Id(v.Name + "Artifact").String().Op("=").Lit(string(artifactBytes))
@@ -99,11 +100,11 @@ func main() {
 
 	fl, err := os.Create(currentPath + "/../gen_sc_data.go")
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	_, err = fmt.Fprintf(fl, "%#v", f)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 }

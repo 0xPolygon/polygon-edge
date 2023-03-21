@@ -23,8 +23,19 @@ type Params struct {
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
+	// AllowList configuration
+	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowListConfig,omitempty"`
+
 	// Governance contract where the token will be sent to and burn in london fork
 	BurnContract map[string]string `json:"burnContract"`
+}
+
+type AllowListConfig struct {
+	// AdminAddresses is the list of the initial admin addresses
+	AdminAddresses []types.Address `json:"adminAddresses,omitempty"`
+
+	// EnabledAddresses is the list of the initial enabled addresses
+	EnabledAddresses []types.Address `json:"enabledAddresses,omitempty"`
 }
 
 // CalculateBurnContract calculates burn contract address for the given block number

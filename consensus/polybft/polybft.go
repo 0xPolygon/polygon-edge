@@ -344,7 +344,7 @@ func (p *Polybft) startConsensusProtocol() {
 			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		}
 
-		now := time.Now()
+		now := time.Now().UTC()
 
 		select {
 		case <-syncerBlockCh:

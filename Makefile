@@ -10,12 +10,12 @@ bindata:
 
 .PHONY: protoc
 protoc:
-	protoc --go_out=. --go-grpc_out=. ./server/proto/*.proto
-	#protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./network/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
-	protoc --go_out=. --go-grpc_out=. ./consensus/polybft/**/*.proto
+	protoc --go_out=. --go-grpc_out=. -I . -I=./validate --validate_out="lang=go:." \
+	 ./server/proto/*.proto \
+	 ./network/proto/*.proto \
+	 ./txpool/proto/*.proto	\
+	 ./consensus/ibft/**/*.proto \
+	 ./consensus/polybft/**/*.proto
 
 .PHONY: build
 build:

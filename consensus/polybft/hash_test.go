@@ -12,7 +12,7 @@ import (
 func Test_setupHeaderHashFunc(t *testing.T) {
 	extra := &Extra{
 		Validators: &ValidatorSetDelta{Removed: bitmap.Bitmap{1}},
-		Parent:     createSignature(t, []*wallet.Account{wallet.GenerateAccount()}, types.ZeroHash),
+		Parent:     createSignature(t, []*wallet.Account{generateTestAccount(t)}, types.ZeroHash),
 		Checkpoint: &CheckpointData{},
 		Seal:       []byte{},
 		Committed:  &Signature{},
@@ -28,7 +28,7 @@ func Test_setupHeaderHashFunc(t *testing.T) {
 	notFullExtraHash := types.HeaderHash(header)
 
 	extra.Seal = []byte{1, 2, 3, 255}
-	extra.Committed = createSignature(t, []*wallet.Account{wallet.GenerateAccount()}, types.ZeroHash)
+	extra.Committed = createSignature(t, []*wallet.Account{generateTestAccount(t)}, types.ZeroHash)
 	header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 	fullExtraHash := types.HeaderHash(header)
 

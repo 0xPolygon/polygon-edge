@@ -8,7 +8,7 @@ import (
 )
 
 func TestNetEndpoint_PeerCount(t *testing.T) {
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		newMockStore(),
 		&dispatcherParams{
