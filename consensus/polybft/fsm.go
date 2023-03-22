@@ -208,10 +208,6 @@ func (f *fsm) applyBridgeCommitmentTx() error {
 
 // createBridgeCommitmentTx builds bridge commitment registration transaction
 func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
-	if f.proposerCommitmentToRegister == nil {
-		return nil, errors.New("unable to create bridge commitment transaction, since commitment instance is undefined")
-	}
-
 	inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
