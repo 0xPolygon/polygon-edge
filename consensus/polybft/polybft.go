@@ -308,6 +308,8 @@ func (p *Polybft) startConsensusProtocol() {
 				// The blockchain notification system can eventually deliver
 				// stale block notifications. These should be ignored
 				if ev.Source == "syncer" && ev.NewChain[0].Number >= p.blockchain.CurrentHeader().Number {
+					p.logger.Info("sync block notification received", "block height", ev.NewChain[0].Number,
+						"current height", p.blockchain.CurrentHeader().Number)
 					syncerBlockCh <- struct{}{}
 				}
 			}
