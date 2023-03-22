@@ -114,10 +114,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	if f.config.IsBridgeEnabled() {
-		for _, tx := range f.stateTransactions() {
-			if err := f.blockBuilder.WriteTx(tx); err != nil {
-				return nil, fmt.Errorf("failed to apply state transaction. Error: %w", err)
-			}
+		if err := f.applyBridgeCommitmentTx(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -192,25 +190,30 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	return stateBlock.Block.MarshalRLP(), nil
 }
 
-func (f *fsm) stateTransactions() []*types.Transaction {
-	var txns []*types.Transaction
-
+// applyBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
+func (f *fsm) applyBridgeCommitmentTx() error {
 	if f.proposerCommitmentToRegister != nil {
-		// add register commitment transaction
-		inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
+		bridgeCommitmentTx, err := f.createBridgeCommitmentTx()
 		if err != nil {
-			f.logger.Error("StateTransactions failed to encode input data for state sync commitment registration", "Error", err)
-
-			return nil
+			return fmt.Errorf("creation of bridge commitment transaction failed: %w", err)
 		}
 
-		txns = append(txns,
-			createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		if err := f.blockBuilder.WriteTx(bridgeCommitmentTx); err != nil {
+			return fmt.Errorf("failed to apply bridge commitment state transaction. Error: %w", err)
+		}
 	}
 
-	f.logger.Debug("Apply state transaction", "num", len(txns))
+	return nil
+}
 
-	return txns
+// createBridgeCommitmentTx builds bridge commitment registration transaction
+func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
+	inputData, err := f.proposerCommitmentToRegister.EncodeAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
+	}
+
+	return createStateTransactionWithData(f.config.StateReceiverAddr, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
