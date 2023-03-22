@@ -346,8 +346,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	// wait for consensus to start
-	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
+	cluster.WaitForReady(t)
 
 	// extract delegator's secrets
 	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
@@ -555,8 +554,7 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 	_, err = cluster.InitSecrets(delegatorSecrets, 1)
 	require.NoError(t, err)
 
-	// wait for consensus to start
-	require.NoError(t, cluster.WaitForBlock(2, 20*time.Second))
+	cluster.WaitForReady(t)
 
 	// extract delegator's secrets
 	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
