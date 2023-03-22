@@ -29,7 +29,7 @@ var (
 type EventTrackerStore struct {
 	conn                  *bolt.DB
 	numBlockConfirmations uint64
-	subscriber            eventSubscription
+	subscriber            EventSubscription
 	logger                hcf.Logger
 }
 
@@ -37,7 +37,7 @@ type EventTrackerStore struct {
 func NewEventTrackerStore(
 	path string,
 	numBlockConfirmations uint64,
-	subscriber eventSubscription,
+	subscriber EventSubscription,
 	logger hcf.Logger) (*EventTrackerStore, error) {
 	db, err := bolt.Open(path, 0600, nil)
 	if err != nil {

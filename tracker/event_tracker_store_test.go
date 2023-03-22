@@ -15,7 +15,7 @@ import (
 	"github.com/umbracle/ethgo/tracker/store"
 )
 
-func createSetupDB(subscriber eventSubscription, numBlockConfirmations uint64) store.SetupDB {
+func createSetupDB(subscriber EventSubscription, numBlockConfirmations uint64) store.SetupDB {
 	return func(t *testing.T) (store.Store, func()) {
 		t.Helper()
 

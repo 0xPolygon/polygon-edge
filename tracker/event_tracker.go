@@ -9,7 +9,7 @@ import (
 	"github.com/umbracle/ethgo/tracker"
 )
 
-type eventSubscription interface {
+type EventSubscription interface {
 	AddLog(log *ethgo.Log)
 }
 
@@ -18,7 +18,7 @@ type EventTracker struct {
 	rpcEndpoint           string
 	contractAddr          ethgo.Address
 	startBlock            uint64
-	subscriber            eventSubscription
+	subscriber            EventSubscription
 	logger                hcf.Logger
 	numBlockConfirmations uint64 // minimal number of child blocks required for the parent block to be considered final
 }
@@ -27,7 +27,7 @@ func NewEventTracker(
 	dbPath string,
 	rpcEndpoint string,
 	contractAddr ethgo.Address,
-	subscriber eventSubscription,
+	subscriber EventSubscription,
 	numBlockConfirmations uint64,
 	startBlock uint64,
 	logger hcf.Logger,
