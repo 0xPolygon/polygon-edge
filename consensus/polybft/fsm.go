@@ -195,7 +195,7 @@ func (f *fsm) applyBridgeCommitmentTx() error {
 	if f.proposerCommitmentToRegister != nil {
 		bridgeCommitmentTx, err := f.createBridgeCommitmentTx()
 		if err != nil {
-			return err
+			return fmt.Errorf("creation of bridge commitment transaction failed: %w", err)
 		}
 
 		if err := f.blockBuilder.WriteTx(bridgeCommitmentTx); err != nil {
