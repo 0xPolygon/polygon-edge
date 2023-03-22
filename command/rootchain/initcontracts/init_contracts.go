@@ -21,14 +21,18 @@ import (
 const (
 	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
 
-	stateSenderName        = "StateSender"
-	checkpointManagerName  = "CheckpointManager"
-	blsName                = "BLS"
-	bn256G2Name            = "BN256G2"
-	exitHelperName         = "ExitHelper"
-	rootERC20PredicateName = "RootERC20Predicate"
-	rootERC20Name          = "RootERC20"
-	erc20TemplateName      = "ERC20Template"
+	stateSenderName          = "StateSender"
+	checkpointManagerName    = "CheckpointManager"
+	blsName                  = "BLS"
+	bn256G2Name              = "BN256G2"
+	exitHelperName           = "ExitHelper"
+	rootERC20PredicateName   = "RootERC20Predicate"
+	rootERC20Name            = "RootERC20"
+	erc20TemplateName        = "ERC20Template"
+	rootERC721PredicateName  = "RootERC721Predicate"
+	rootERC721Name           = "RootERC721"
+	rootERC1155PredicateName = "RootERC1155Predicate"
+	rootERC1155Name          = "RootERC1155"
 )
 
 var (
@@ -60,6 +64,18 @@ var (
 		},
 		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ERC20TemplateAddress = addr
+		},
+		rootERC721PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.RootERC721PredicateAddress = addr
+		},
+		rootERC721Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.RootERC721Address = addr
+		},
+		rootERC1155PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.RootERC1155PredicateAddress = addr
+		},
+		rootERC1155Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.RootERC1155Address = addr
 		},
 	}
 )
@@ -198,32 +214,40 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	deployContracts := []*contractInfo{
 		{
-			name:     "StateSender",
+			name:     stateSenderName,
 			artifact: contractsapi.StateSender,
 		},
 		{
-			name:     "CheckpointManager",
+			name:     checkpointManagerName,
 			artifact: contractsapi.CheckpointManager,
 		},
 		{
-			name:     "BLS",
+			name:     blsName,
 			artifact: contractsapi.BLS,
 		},
 		{
-			name:     "BN256G2",
+			name:     bn256G2Name,
 			artifact: contractsapi.BLS256,
 		},
 		{
-			name:     "ExitHelper",
+			name:     exitHelperName,
 			artifact: contractsapi.ExitHelper,
 		},
 		{
-			name:     "RootERC20Predicate",
+			name:     rootERC20PredicateName,
 			artifact: contractsapi.RootERC20Predicate,
 		},
 		{
-			name:     "ERC20Template",
+			name:     erc20TemplateName,
 			artifact: contractsapi.ChildERC20,
+		},
+		{
+			name:     rootERC721PredicateName,
+			artifact: contractsapi.RootERC721Predicate,
+		},
+		{
+			name:     rootERC1155PredicateName,
+			artifact: contractsapi.RootERC1155Predicate,
 		},
 	}
 	rootchainConfig := &polybft.RootchainConfig{}
@@ -247,9 +271,13 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 		populatorFn(manifest.RootchainConfig, addr)
 	} else {
-		// deploy MockERC20 as default root chain ERC20 token
+		// deploy MockERC20 as a default root chain ERC20 token
 		deployContracts = append(deployContracts, &contractInfo{name: "RootERC20", artifact: contractsapi.RootERC20})
 	}
+
+	// TODO: @Stefan-Ethernal add flags for RootERC721 and RootERC1155 addresses (support existing tokens)
+	deployContracts = append(deployContracts, &contractInfo{name: "RootERC721", artifact: contractsapi.RootERC721})
+	deployContracts = append(deployContracts, &contractInfo{name: "RootERC1155", artifact: contractsapi.RootERC1155})
 
 	for _, contract := range deployContracts {
 		txn := &ethgo.Transaction{
