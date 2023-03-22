@@ -619,7 +619,8 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	)
 
 	validatorsAddrs := make([]types.Address, validatorCount)
-	initialBalance := ethgo.Gwei(1)
+	initialStake := ethgo.Gwei(1)
+	initialBalance := int64(0)
 
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
@@ -631,7 +632,8 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 				// and it should have premine set to default 1M tokens
 				// (it is going to send mint transactions to all the other validators)
 				if i > 0 {
-					// premine other validators with as minimum amount as possible just to ensure liveness of consensus protocol
+					// premine other validators with as minimum stake as possible just to ensure liveness of consensus protocol
+					config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", addr, initialStake))
 					config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", addr, initialBalance))
 				}
 				validatorsAddrs[i] = addr
@@ -679,7 +681,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Logf("Post-mint balance: %v=%d\n", addr, balance)
-		require.Equal(t, new(big.Int).Add(mintAmount, initialBalance), balance)
+		require.Equal(t, new(big.Int).Add(mintAmount, big.NewInt(initialBalance)), balance)
 	}
 
 	minterBalance, err := targetJSONRPC.Eth().GetBalance(minterAcc.Ecdsa.Address(), ethgo.Latest)
