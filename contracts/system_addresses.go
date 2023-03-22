@@ -19,6 +19,8 @@ var (
 	ChildERC20Contract = types.StringToAddress("0x1003")
 	// ChildERC20PredicateContract is an address of child ERC20 predicate contract on the child chain
 	ChildERC20PredicateContract = types.StringToAddress("0x1004")
+	// EIP1559BurnContract is an address of EIP-1559 burn contract on the child chain
+	EIP1559BurnContract = types.StringToAddress("0x1005")
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
 
