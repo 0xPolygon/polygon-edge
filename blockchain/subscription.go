@@ -51,14 +51,12 @@ func (m *MockSubscription) GetEventCh() chan *Event {
 }
 
 func (m *MockSubscription) GetEvent() *Event {
-	for {
-		// Wait for an update
-		select {
-		case ev := <-m.updateCh:
-			return ev
-		case <-m.closeCh:
-			return nil
-		}
+	// Wait for an update
+	select {
+	case ev := <-m.updateCh:
+		return ev
+	case <-m.closeCh:
+		return nil
 	}
 }
 
@@ -91,14 +89,12 @@ func (s *subscription) GetEventCh() chan *Event {
 
 // GetEvent returns the event from the subscription (BLOCKING)
 func (s *subscription) GetEvent() *Event {
-	for {
-		// Wait for an update
-		select {
-		case ev := <-s.updateCh:
-			return ev
-		case <-s.closeCh:
-			return nil
-		}
+	// Wait for an update
+	select {
+	case ev := <-s.updateCh:
+		return ev
+	case <-s.closeCh:
+		return nil
 	}
 }
 
