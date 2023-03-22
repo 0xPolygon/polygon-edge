@@ -60,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
+			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)

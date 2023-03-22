@@ -117,9 +117,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// populate premine info for validator accounts
 		genesisValidators[validator.Address] = struct{}{}
 
-		// TODO: @Stefan-Ethernal change this to Stake when https://github.com/0xPolygon/polygon-edge/pull/1137 gets merged
 		// increment total stake
-		totalStake.Add(totalStake, validator.Balance)
+		totalStake.Add(totalStake, validator.Stake)
 	}
 
 	// deploy genesis contracts
@@ -162,7 +161,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// premine non-validator accounts
 	for _, premine := range premineInfos {
 		allocs[premine.Address] = &chain.GenesisAccount{
-			Balance: premine.Balance,
+			Balance: premine.Amount,
 		}
 	}
 

@@ -222,7 +222,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		// fund account
 		deployerAddress := deployerKey.Address()
 
-		txn := &ethgo.Transaction{To: &deployerAddress, Value: ethgo.Ether(1e6)}
+		txn := &ethgo.Transaction{To: &deployerAddress, Value: command.DefaultPremineBalance}
 		if _, err := txRelayer.SendTransactionLocal(txn); err != nil {
 			return err
 		}
@@ -463,7 +463,7 @@ func validatorSetToABISlice(o command.OutputFormatter,
 		accSet[i] = &polybft.ValidatorMetadata{
 			Address:     validator.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(validator.Balance),
+			VotingPower: new(big.Int).Set(validator.Stake),
 		}
 	}
 
