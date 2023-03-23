@@ -2,6 +2,7 @@ package withdraw
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -107,7 +108,14 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	senderAccount, err := wallet.NewWalletFromPrivKey([]byte(wp.SenderKey))
+	senderKeyRaw, err := hex.DecodeString(wp.SenderKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to decode sender private key: %w", err))
+
+		return
+	}
+
+	senderAccount, err := wallet.NewWalletFromPrivKey(senderKeyRaw)
 	if err != nil {
 		outputter.SetError(err)
 
