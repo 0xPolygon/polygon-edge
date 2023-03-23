@@ -2,10 +2,11 @@
 name: Ephemeral DevNet Workflow
 
 on:  # yamllint disable-line rule:truthy
+  # TOPOS: deactivated for now, replaced with workflow_dispatch
   workflow_dispatch:
-  push:
-    branches:
-      - develop
+  # push:
+  #   branches:
+  #     - develop
 
 permissions:
   id-token: write

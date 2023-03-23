@@ -1,10 +1,11 @@
 ---
 name: TestNet Workflow
 on:  # yamllint disable-line rule:truthy
+  # TOPOS: deactivated for now, replaced with workflow_dispatch
   workflow_dispatch:
-  push:
-    branches:
-      - 'release/**'
+  # push:
+  #   branches:
+  #     - 'release/**'
 
 permissions:
   id-token: write
