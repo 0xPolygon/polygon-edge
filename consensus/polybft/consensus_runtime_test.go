@@ -445,10 +445,9 @@ func Test_NewConsensusRuntime(t *testing.T) {
 			CheckpointAddr:  types.Address{0x10},
 			JSONRPCEndpoint: "testEndpoint",
 		},
-		ValidatorSetAddr: types.Address{0x11},
-		EpochSize:        10,
-		SprintSize:       10,
-		BlockTime:        2 * time.Second,
+		EpochSize:  10,
+		SprintSize: 10,
+		BlockTime:  2 * time.Second,
 	}
 
 	validators := newTestValidators(t, 3).getPublicIdentities()
@@ -483,7 +482,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
-	assert.Equal(t, "0x1100000000000000000000000000000000000000", runtime.config.PolyBFTConfig.ValidatorSetAddr.String())
+	assert.Equal(t, "0x0000000000000000000000000000000000000101", contracts.ValidatorSetContract.String())
 	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
 	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointAddr.String())
 	assert.True(t, runtime.IsBridgeEnabled())
@@ -550,9 +549,8 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 
 	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	polybftConfig := &PolyBFTConfig{
-		ValidatorSetAddr: contracts.ValidatorSetContract,
-		EpochSize:        epochSize,
-		SprintSize:       sprintSize,
+		EpochSize:  epochSize,
+		SprintSize: sprintSize,
 	}
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 19, epochSize, validators.getPublicIdentities())

@@ -62,7 +62,7 @@ func TestFSM_verifyCommitEpochTx(t *testing.T) {
 	t.Parallel()
 
 	fsm := &fsm{
-		config:           &PolyBFTConfig{ValidatorSetAddr: contracts.ValidatorSetContract},
+		config:           &PolyBFTConfig{},
 		isEndOfEpoch:     true,
 		commitEpochInput: createTestCommitEpochInput(t, 0, nil, 10),
 	}
@@ -76,7 +76,7 @@ func TestFSM_verifyCommitEpochTx(t *testing.T) {
 
 	// submit tampered commit epoch transaction to the epoch ending block
 	alteredCommitEpochTx := &types.Transaction{
-		To:    &fsm.config.ValidatorSetAddr,
+		To:    &contracts.ValidatorSetContract,
 		Input: []byte{},
 		Gas:   0,
 		Type:  types.StateTx,
@@ -1083,7 +1083,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 			require.NoError(t, err)
 
 			if i == 0 {
-				tx := createStateTransactionWithData(f.config.StateReceiverAddr, inputData)
+				tx := createStateTransactionWithData(contracts.StateReceiverContract, inputData)
 				txns = append(txns, tx)
 			}
 		}
@@ -1105,7 +1105,7 @@ func TestFSM_VerifyStateTransaction_InvalidTypeOfStateTransactions(t *testing.T)
 
 	var txns []*types.Transaction
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, []byte{9, 3, 1, 1}))
+		createStateTransactionWithData(contracts.StateReceiverContract, []byte{9, 3, 1, 1}))
 
 	require.ErrorContains(t, f.VerifyStateTransactions(txns), "unknown state transaction")
 }
@@ -1133,7 +1133,7 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "quorum size not reached for state tx")
@@ -1169,7 +1169,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "invalid signature for tx")
@@ -1201,12 +1201,12 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 	inputData, err = commitmentMessageSigned.EncodeAbi()
 	require.NoError(t, err)
 
 	txns = append(txns,
-		createStateTransactionWithData(f.config.StateReceiverAddr, inputData))
+		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 	err = f.VerifyStateTransactions(txns)
 	require.ErrorContains(t, err, "only one commitment tx is allowed per block")
 }

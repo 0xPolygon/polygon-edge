@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -77,7 +78,7 @@ func TestSystemState_GetValidatorSet(t *testing.T) {
 		transition: transition,
 	}
 
-	st := NewSystemState(&PolyBFTConfig{ValidatorSetAddr: result.Address}, provider)
+	st := NewSystemState(result.Address, contracts.StateReceiverContract, provider)
 	validators, err := st.GetValidatorSet()
 	assert.NoError(t, err)
 	assert.Equal(t, types.Address(ethgo.HexToAddress("1")), validators[0].Address)
@@ -117,7 +118,7 @@ func TestSystemState_GetNextCommittedIndex(t *testing.T) {
 		transition: transition,
 	}
 
-	systemState := NewSystemState(&PolyBFTConfig{StateReceiverAddr: result.Address}, provider)
+	systemState := NewSystemState(contracts.ValidatorSetContract, result.Address, provider)
 
 	expectedNextCommittedIndex := uint64(45)
 	input, err := sideChainBridgeABI.Encode([1]interface{}{expectedNextCommittedIndex})
@@ -164,7 +165,7 @@ func TestSystemState_GetEpoch(t *testing.T) {
 		transition: transition,
 	}
 
-	systemState := NewSystemState(&PolyBFTConfig{ValidatorSetAddr: result.Address}, provider)
+	systemState := NewSystemState(result.Address, contracts.StateReceiverContract, provider)
 
 	expectedEpoch := uint64(50)
 	input, err := setEpochMethod.Encode([1]interface{}{expectedEpoch})

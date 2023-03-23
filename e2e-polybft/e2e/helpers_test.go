@@ -6,6 +6,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -97,4 +98,25 @@ func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr e
 	}
 
 	return validators, nil
+}
+
+func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractAddress ethgo.Address, senderAddr ethgo.Address, method string, params ...interface{}) (string, error) {
+	input, err := artifact.Abi.GetMethod(method).Encode(params)
+	if err != nil {
+		return "", err
+	}
+
+	return relayer.Call(senderAddr, contractAddress, input)
+}
+
+func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifact.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
+	input, err := artifact.Abi.GetMethod(method).Encode(params)
+	if err != nil {
+		return nil, err
+	}
+
+	return relayer.SendTransaction(&ethgo.Transaction{
+		To:    &contractAddress,
+		Input: input,
+	}, key)
 }

@@ -23,7 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 
@@ -669,28 +668,6 @@ func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
 	}
 
 	return rspProof.Result, nil
-}
-
-// TODO: Move this to some separate file, containing helper functions?
-func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractAddress ethgo.Address, senderAddr ethgo.Address, method string, params ...interface{}) (string, error) {
-	input, err := artifact.Abi.GetMethod(method).Encode(params)
-	if err != nil {
-		return "", err
-	}
-
-	return relayer.Call(senderAddr, contractAddress, input)
-}
-
-func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifact.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
-	input, err := artifact.Abi.GetMethod(method).Encode(params)
-	if err != nil {
-		return nil, err
-	}
-
-	return relayer.SendTransaction(&ethgo.Transaction{
-		To:    &contractAddress,
-		Input: input,
-	}, key)
 }
 
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {

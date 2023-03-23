@@ -186,8 +186,9 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	txn := newTxn(snap)
 	txn.SetState(addr1, hash1, hash0)
 
-	// TODO, test with false (should not be deleted)
-	// TODO, test with balance on the account and nonce
+	//nolint:godox
+	// TODO, test with false (should not be deleted) (to be fixed in EVM-528)
+	// TODO, test with balance on the account and nonce (to be fixed in EVM-528)
 	snap, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)

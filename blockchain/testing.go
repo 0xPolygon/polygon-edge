@@ -125,8 +125,6 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		}
 	}
 
-	// TODO, find a way to add the snapshot, this will fail until that is fixed.
-	// snap, _ := state.NewSnapshot(types.Hash{})
 	return b
 }
 
