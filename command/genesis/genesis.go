@@ -206,6 +206,13 @@ func setFlags(cmd *cobra.Command) {
 			"",
 			"trie root from the corresponding triedb",
 		)
+
+		cmd.Flags().BoolVar(
+			&params.mintableNativeToken,
+			mintableTokenFlag,
+			false,
+			"flag indicate whether mintable or non-mintable native ERC20 token is deployed",
+		)
 	}
 
 	// Allow list

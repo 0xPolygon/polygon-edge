@@ -91,11 +91,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:        manifest.GenesisValidators[0].Address,
-		Bridge:            bridge,
-		ValidatorSetAddr:  contracts.ValidatorSetContract,
-		StateReceiverAddr: contracts.StateReceiverContract,
-		InitialTrieRoot:   types.StringToHash(p.initialStateRoot),
+		Governance:         manifest.GenesisValidators[0].Address,
+		Bridge:             bridge,
+		ValidatorSetAddr:   contracts.ValidatorSetContract,
+		StateReceiverAddr:  contracts.StateReceiverContract,
+		InitialTrieRoot:    types.StringToHash(p.initialStateRoot),
+		MintableERC20Token: p.mintableNativeToken,
 	}
 
 	chainConfig := &chain.Chain{
@@ -218,10 +219,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 }
 
 func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
-	genesisContracts := []struct {
+	type contractInfo struct {
 		artifact *artifact.Artifact
 		address  types.Address
-	}{
+	}
+
+	genesisContracts := []*contractInfo{
 		{
 			// ChildValidatorSet contract
 			artifact: contractsapi.ChildValidatorSet,
@@ -231,11 +234,6 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			// State receiver contract
 			artifact: contractsapi.StateReceiver,
 			address:  contracts.StateReceiverContract,
-		},
-		{
-			// NativeERC20 Token contract
-			artifact: contractsapi.NativeERC20,
-			address:  contracts.NativeERC20TokenContract,
 		},
 		{
 			// ChildERC20 token contract
@@ -262,6 +260,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			artifact: contractsapi.L2StateSender,
 			address:  contracts.L2StateSenderContract,
 		},
+	}
+
+	if !params.mintableNativeToken {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))

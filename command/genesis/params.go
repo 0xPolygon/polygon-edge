@@ -29,6 +29,7 @@ const (
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
+	mintableTokenFlag = "mintable-native-token"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -90,6 +91,7 @@ type genesisParams struct {
 	// allowlist
 	contractDeployerAllowListAdmin   []string
 	contractDeployerAllowListEnabled []string
+	mintableNativeToken              bool
 }
 
 func (p *genesisParams) validateFlags() error {
