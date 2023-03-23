@@ -2,7 +2,6 @@ package exit
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
-	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -109,14 +107,7 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ecdsaRaw, err := hex.DecodeString(ep.senderKey)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to decode private key: %w", err))
-
-		return
-	}
-
-	key, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
+	senderKey, err := helper.GetRootchainPrivateKey(ep.senderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create wallet from private key: %w", err))
 
@@ -148,7 +139,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	// create exit transaction
-	txn, exitEvent, err := createExitTxn(key.Address(), proof)
+	txn, exitEvent, err := createExitTxn(senderKey.Address(), proof)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
@@ -156,7 +147,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	// send exit transaction
-	receipt, err := rootTxRelayer.SendTransaction(txn, key)
+	receipt, err := rootTxRelayer.SendTransaction(txn, senderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to send exit transaction (exit id=%d): %w", ep.exitID, err))
 
