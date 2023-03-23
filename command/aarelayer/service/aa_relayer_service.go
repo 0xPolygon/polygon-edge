@@ -13,6 +13,8 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
+const receiptSuccess = 1
+
 // AARelayerService pulls transaction from pool one at the time and sends it to relayer
 type AARelayerService struct {
 	pool         AAPool
@@ -142,17 +144,7 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 			"nonce", stateTx.Tx.Transaction.Nonce,
 			"err", errstr)
 	} else {
-		populateStateTx(stateTx, receipt)
-		if receipt.Status == 1 { // Status == 1 is ReceiptSuccess status
-			stateTx.Status = StatusCompleted
-		} else {
-			stateTx.Status = StatusFailed
-
-			rs.logger.Warn("transaction receipt status failed",
-				"id", stateTx.ID,
-				"from", stateTx.Tx.Transaction.From,
-				"nonce", stateTx.Tx.Transaction.Nonce)
-		}
+		rs.populateStateTx(stateTx, receipt)
 	}
 
 	if err := rs.state.Update(stateTx); err != nil {
@@ -163,10 +155,10 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 }
 
 func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) (*ethgo.Transaction, error) {
-	// TODO: encode stateTx to input
 	return &ethgo.Transaction{
 		From:  rs.key.Address(),
-		Input: nil,
+		To:    (*ethgo.Address)(&rs.invokerAddr),
+		Input: nil, // TODO: encode stateTx to input
 		Nonce: atomic.LoadUint64(&rs.currentNonce),
 	}, nil
 }
@@ -219,7 +211,7 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 	return stateTx
 }
 
-func populateStateTx(stateTx *AAStateTransaction, receipt *ethgo.Receipt) {
+func (rs *AARelayerService) populateStateTx(stateTx *AAStateTransaction, receipt *ethgo.Receipt) {
 	stateTx.Gas = receipt.GasUsed
 	stateTx.Mined = &Mined{
 		BlockHash:   types.Hash(receipt.BlockHash),
@@ -241,6 +233,17 @@ func populateStateTx(stateTx *AAStateTransaction, receipt *ethgo.Receipt) {
 			Data:    log.Data,
 			Topics:  topics,
 		}
+	}
+
+	if receipt.Status == receiptSuccess {
+		stateTx.Status = StatusCompleted
+	} else {
+		stateTx.Status = StatusFailed
+
+		rs.logger.Warn("transaction receipt status failed",
+			"id", stateTx.ID,
+			"from", stateTx.Tx.Transaction.From,
+			"nonce", stateTx.Tx.Transaction.Nonce)
 	}
 }
 

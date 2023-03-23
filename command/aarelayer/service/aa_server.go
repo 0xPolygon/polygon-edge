@@ -37,7 +37,7 @@ func NewAARelayerRestServer(
 // SendTransaction handles the /v1/sendTransaction endpoint
 func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeMessage(w, http.StatusMethodNotAllowed, fmt.Sprintf("method %s not allowed", r.Method))
 
 		return
 	}
@@ -45,7 +45,7 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 	var tx AATransaction
 
 	if err := json.NewDecoder(r.Body).Decode(&tx); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		writeMessage(w, http.StatusBadRequest, "failed to decode transaction")
 
 		return
 	}
@@ -80,7 +80,7 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 // GetTransactionReceipt handles the /v1/getTransactionReceipt/{uuid} endpoint
 func (s *AARelayerRestServer) getTransactionReceipt(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeMessage(w, http.StatusMethodNotAllowed, fmt.Sprintf("method %s not allowed", r.Method))
 
 		return
 	}
@@ -122,6 +122,27 @@ func (s *AARelayerRestServer) ListenAndServe(addr string) error {
 
 	http.HandleFunc(sendTransactionURL, s.sendTransaction)
 	http.HandleFunc(getTransactionReceiptURL, s.getTransactionReceipt)
+
+	// Set up CORS middleware.
+	corsMiddleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Set the CORS headers.
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+			// If the request method is OPTIONS, return immediately.
+			if r.Method == "OPTIONS" {
+				return
+			}
+
+			// Call the next handler.
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	// Wrap the server's handler with the CORS middleware.
+	s.server.Handler = corsMiddleware(http.DefaultServeMux)
 
 	return s.server.ListenAndServe()
 }
