@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 
@@ -76,9 +77,25 @@ func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address
 		return types.ZeroAddress, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorKey)
 	}
 
-	validatorKey, validatorKeyEncoded, err := crypto.GenerateAndEncodeECDSAPrivateKey()
-	if err != nil {
-		return types.ZeroAddress, err
+	// As a temporary workaround until sequencer switches to FROST signatures,
+	// it expects even secp256k1 public keys (when compressed starting with 0x02)
+	// Generate private keys until you get even public key
+	var (
+		validatorKey        *ecdsa.PrivateKey
+		validatorKeyEncoded []byte
+		err                 error
+	)
+
+	for {
+		validatorKey, validatorKeyEncoded, err = crypto.GenerateAndEncodeECDSAPrivateKey()
+		if err != nil {
+			return types.ZeroAddress, err
+		}
+
+		y := validatorKey.PublicKey.Y.Bytes()
+		if y[31]%2 == 0 {
+			break
+		}
 	}
 
 	address := crypto.PubKeyToAddress(&validatorKey.PublicKey)
