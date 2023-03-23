@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -555,10 +556,10 @@ func Test_EmitMultipleBlocks(t *testing.T) {
 		peerSrv,
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// start gossip
-	assert.NoError(t, client.startGossip())
+	require.NoError(t, client.startGossip())
 
 	// start to subscribe blockchain events
 	go client.startNewBlockProcess()
@@ -599,7 +600,7 @@ func Test_EmitMultipleBlocks(t *testing.T) {
 
 		wgForGossip.Add(blocksNum)
 
-		assert.NoError(t, topic.Subscribe(func(_ interface{}, id peer.ID) {
+		require.NoError(t, topic.Subscribe(func(_ interface{}, _ peer.ID) {
 			wgForGossip.Done()
 		}))
 
@@ -615,7 +616,7 @@ func Test_EmitMultipleBlocks(t *testing.T) {
 
 		gossiped := waitForGossip(&wgForGossip)
 
-		assert.Equal(t, true, gossiped)
+		require.Equal(t, true, gossiped)
 	}
 
 	t.Run("should receive all blocks", func(t *testing.T) {
