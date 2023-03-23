@@ -69,6 +69,7 @@ func (a *AwsSsmManager) Setup() error {
 	if a.endpoint != "" {
 		cfg = cfg.WithEndpoint(a.endpoint)
 	}
+
 	sess, err := session.NewSessionWithOptions(session.Options{
 		Config:            *cfg,
 		SharedConfigState: session.SharedConfigEnable,
