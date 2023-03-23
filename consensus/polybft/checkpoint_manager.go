@@ -243,7 +243,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 		return nil, err
 	}
 
-	submit := &contractsapi.SubmitFunction{
+	submit := &contractsapi.SubmitCheckpointManagerFn{
 		CheckpointMetadata: &contractsapi.CheckpointMetadata{
 			BlockHash:               blockHash,
 			BlockRound:              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
@@ -344,7 +344,7 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
-	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockCheckpointManagerFn{
 		BlockNumber: new(big.Int).SetUint64(exitEvent.BlockNumber),
 	}
 

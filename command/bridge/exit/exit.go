@@ -248,7 +248,7 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 		return nil, nil, errors.New("failed to convert proof checkpoint block")
 	}
 
-	exitFn := &contractsapi.ExitFunction{
+	exitFn := &contractsapi.ExitExitHelperFn{
 		BlockNumber:  new(big.Int).SetUint64(uint64(checkpointBlock)),
 		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
 		UnhashedLeaf: exitEventEncoded,

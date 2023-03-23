@@ -190,7 +190,7 @@ func run(cmd *cobra.Command, _ []string) {
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
 func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	withdrawToFn := &contractsapi.WithdrawToFunction{
+	withdrawToFn := &contractsapi.WithdrawToChildERC20PredicateFn{
 		ChildToken: types.StringToAddress(wp.childTokenAddr),
 		Receiver:   receiver,
 		Amount:     amount,

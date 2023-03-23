@@ -19,7 +19,7 @@ import (
 const (
 	abiTypeNameFormat  = "var %sABIType = abi.MustNewType(\"%s\")"
 	eventNameFormat    = "%sEvent"
-	functionNameFormat = "%sFunction"
+	functionNameFormat = "%sFn"
 )
 
 type generatedData struct {
@@ -358,15 +358,7 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 
 // generateFunction generates code for smart contract function and its parameters
 func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) error {
-	methodName := method.Name
-	if methodName == "initialize" {
-		// most of the contracts have initialize function, which differ in params
-		// so make them unique somehow
-		methodName = strings.Title(methodName + contractName)
-	}
-
-	methodName = fmt.Sprintf(functionNameFormat, methodName)
-
+	methodName := fmt.Sprintf(functionNameFormat, strings.Title(method.Name+contractName))
 	res := []string{}
 
 	_, err := generateType(generatedData, methodName, method.Inputs, &res)

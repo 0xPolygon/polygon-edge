@@ -107,7 +107,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		return nil, err
 	}
 
-	commit := &contractsapi.CommitFunction{
+	commit := &contractsapi.CommitStateReceiverFn{
 		Commitment: cm.Message,
 		Signature:  cm.AggSignature.AggregatedSignature,
 		Bitmap:     blsVerificationPart,
@@ -122,7 +122,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
-	commit := contractsapi.CommitFunction{}
+	commit := contractsapi.CommitStateReceiverFn{}
 
 	err := commit.DecodeAbi(txData)
 	if err != nil {
@@ -175,7 +175,7 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 		obj = &CommitmentMessageSigned{}
 	} else if bytes.Equal(sig, contractsapi.ChildValidatorSet.Abi.Methods["commitEpoch"].ID()) {
 		// commit epoch
-		obj = &contractsapi.CommitEpochFunction{}
+		obj = &contractsapi.CommitEpochChildValidatorSetFn{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}

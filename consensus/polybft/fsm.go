@@ -63,7 +63,7 @@ type fsm struct {
 	// commitEpochInput holds info about validators performance during single epoch
 	// (namely how many times each validator signed block during epoch).
 	// It is populated only for epoch-ending blocks.
-	commitEpochInput *contractsapi.CommitEpochFunction
+	commitEpochInput *contractsapi.CommitEpochChildValidatorSetFn
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -440,7 +440,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
-		case *contractsapi.CommitEpochFunction:
+		case *contractsapi.CommitEpochChildValidatorSetFn:
 			if commitEpochTxExists {
 				// if we already validated commit epoch tx,
 				// that means someone added more than one commit epoch tx to block,

@@ -219,7 +219,7 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 		return nil, fmt.Errorf("register validator failed: %w", err)
 	}
 
-	registerFn := &contractsapi.RegisterFunction{
+	registerFn := &contractsapi.RegisterChildValidatorSetFn{
 		Signature: sigMarshal,
 		Pubkey:    account.Bls.PublicKey().ToBigInt(),
 	}

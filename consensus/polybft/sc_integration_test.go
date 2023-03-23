@@ -56,7 +56,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}
 
 	checkpointManagerInit := func() ([]byte, error) {
-		initialize := contractsapi.InitializeCheckpointManagerFunction{
+		initialize := contractsapi.InitializeCheckpointManagerFn{
 			NewBls:          contracts.BLSContract,
 			NewBn256G2:      bn256Addr,
 			NewValidatorSet: accSet.ToAPIBinding(),
