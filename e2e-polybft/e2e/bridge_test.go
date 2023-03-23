@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"path"
@@ -116,9 +117,12 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 
 	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
 
+	rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
+	require.NoError(t, err)
+
 	// send withdraw transaction
 	err = cluster.Bridge.WithdrawERC20(
-		cluster.Servers[0].DataDir(),
+		hex.EncodeToString(rawKey),
 		strings.Join(receivers[:], ","),
 		strings.Join(amounts[:], ","),
 		cluster.Servers[0].JSONRPCAddr())
