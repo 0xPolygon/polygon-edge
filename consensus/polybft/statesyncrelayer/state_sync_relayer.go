@@ -111,52 +111,54 @@ func (r *StateSyncRelayer) Stop() {
 }
 
 func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
-	r.logger.Info("Received a log", "log", log)
+	r.logger.Debug("Received a log", "log", log)
 
-	if commitEvent.Match(log) {
-		vals, err := commitEvent.ParseLog(log)
+	if !commitEvent.Match(log) {
+		return
+	}
+
+	vals, err := commitEvent.ParseLog(log)
+	if err != nil {
+		r.logger.Error("Failed to parse log", "err", err)
+
+		return
+	}
+
+	var (
+		startID, endID *big.Int
+		ok             bool
+	)
+
+	if startID, ok = vals["startId"].(*big.Int); !ok {
+		r.logger.Error("Failed to parse startId")
+
+		return
+	}
+
+	if endID, ok = vals["endId"].(*big.Int); !ok {
+		r.logger.Error("Failed to parse endId")
+
+		return
+	}
+
+	r.logger.Info("Execute commitment", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
+
+	for i := startID.Uint64(); i <= endID.Uint64(); i++ {
+		// query the state sync proof
+		stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
 		if err != nil {
-			r.logger.Error("Failed to parse log", "err", err)
+			r.logger.Error("Failed to query state sync proof", "err", err)
 
-			return
+			continue
 		}
 
-		var (
-			startID, endID *big.Int
-			ok             bool
-		)
+		if err := r.executeStateSync(stateSyncProof); err != nil {
+			r.logger.Error("Failed to execute state sync", "err", err)
 
-		if startID, ok = vals["startId"].(*big.Int); !ok {
-			r.logger.Error("Failed to parse startId")
-
-			return
+			continue
 		}
 
-		if endID, ok = vals["endId"].(*big.Int); !ok {
-			r.logger.Error("Failed to parse endId")
-
-			return
-		}
-
-		r.logger.Info("Commit", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
-
-		for i := startID.Uint64(); i <= endID.Uint64(); i++ {
-			// query the state sync proof
-			stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
-			if err != nil {
-				r.logger.Error("Failed to query state sync proof", "err", err)
-
-				continue
-			}
-
-			if err := r.executeStateSync(stateSyncProof); err != nil {
-				r.logger.Error("Failed to execute state sync", "err", err)
-
-				continue
-			}
-
-			r.logger.Info("State sync executed", "stateSyncID", i)
-		}
+		r.logger.Info("State sync executed", "ID", i)
 	}
 }
 

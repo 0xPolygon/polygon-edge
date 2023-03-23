@@ -746,7 +746,9 @@ func (c *consensusRuntime) HasQuorum(
 
 		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, height)
 		if err != nil {
-			c.logger.Warn("HasQuorum has been called but proposer is not set", "error", err)
+			// This can happen if e.g. node runs sequence on lower height and proposer calculator updated
+			// to a newer count as a consequence of inserting block from syncer
+			c.logger.Debug("HasQuorum has been called but proposer could not be retrieved", "error", err)
 
 			return false
 		}

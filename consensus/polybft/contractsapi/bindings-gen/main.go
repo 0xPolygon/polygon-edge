@@ -111,6 +111,14 @@ func main() {
 			[]string{},
 		},
 		{
+			"NativeERC20Mintable",
+			gensc.NativeERC20Mintable,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
 			"RootERC20Predicate",
 			gensc.RootERC20Predicate,
 			[]string{

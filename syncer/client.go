@@ -226,6 +226,7 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 // startNewBlockProcess starts blockchain event subscription
 func (m *syncPeerClient) startNewBlockProcess() {
 	m.subscription = m.blockchain.SubscribeEvents()
+	eventCh := m.subscription.GetEventCh()
 
 	for {
 		var event *blockchain.Event
@@ -233,7 +234,7 @@ func (m *syncPeerClient) startNewBlockProcess() {
 		select {
 		case <-m.closeCh:
 			return
-		case event = <-m.subscription.GetEventCh():
+		case event = <-eventCh:
 		}
 
 		if !m.shouldEmitBlocks {

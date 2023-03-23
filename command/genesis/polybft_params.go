@@ -89,11 +89,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:        manifest.GenesisValidators[0].Address,
-		Bridge:            bridge,
-		ValidatorSetAddr:  contracts.ValidatorSetContract,
-		StateReceiverAddr: contracts.StateReceiverContract,
-		InitialTrieRoot:   types.StringToHash(p.initialStateRoot),
+		Governance:         manifest.GenesisValidators[0].Address,
+		Bridge:             bridge,
+		ValidatorSetAddr:   contracts.ValidatorSetContract,
+		StateReceiverAddr:  contracts.StateReceiverContract,
+		InitialTrieRoot:    types.StringToHash(p.initialStateRoot),
+		MintableERC20Token: p.mintableNativeToken,
 	}
 
 	chainConfig := &chain.Chain{
@@ -116,9 +117,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// populate premine info for validator accounts
 		genesisValidators[validator.Address] = struct{}{}
 
-		// TODO: @Stefan-Ethernal change this to Stake when https://github.com/0xPolygon/polygon-edge/pull/1137 gets merged
 		// increment total stake
-		totalStake.Add(totalStake, validator.Balance)
+		totalStake.Add(totalStake, validator.Stake)
 	}
 
 	// deploy genesis contracts
@@ -170,7 +170,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// premine non-validator accounts
 	for _, premine := range premineInfos {
 		allocs[premine.Address] = &chain.GenesisAccount{
-			Balance: premine.Balance,
+			Balance: premine.Amount,
 		}
 	}
 
@@ -228,10 +228,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 }
 
 func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
-	genesisContracts := []struct {
+	type contractInfo struct {
 		artifact *artifact.Artifact
 		address  types.Address
-	}{
+	}
+
+	genesisContracts := []*contractInfo{
 		{
 			// ChildValidatorSet contract
 			artifact: contractsapi.ChildValidatorSet,
@@ -241,11 +243,6 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			// State receiver contract
 			artifact: contractsapi.StateReceiver,
 			address:  contracts.StateReceiverContract,
-		},
-		{
-			// NativeERC20 Token contract
-			artifact: contractsapi.NativeERC20,
-			address:  contracts.NativeERC20TokenContract,
 		},
 		{
 			// ChildERC20 token contract
@@ -277,6 +274,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			artifact: contractsapi.EIP1559Burn,
 			address:  contracts.EIP1559BurnContract,
 		},
+	}
+
+	if !params.mintableNativeToken {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
