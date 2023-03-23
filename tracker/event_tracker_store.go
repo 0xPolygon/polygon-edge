@@ -171,7 +171,7 @@ func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 		b.subscriber.AddLog(log)
 	}
 
-	b.logger.Info("event logs have been notified to a subscriber", "len", len(logs), "next", nextToProcessIdx)
+	b.logger.Debug("Event logs have been notified to a subscriber", "len", len(logs), "next", nextToProcessIdx)
 
 	return nil
 }

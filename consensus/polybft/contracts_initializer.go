@@ -73,20 +73,6 @@ func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	return params.EncodeAbi()
 }
 
-// getInitNativeERC20Input builds input parameters for NativeERC20 SC initialization
-func getInitNativeERC20Input(nativeTokenName, nativeTokenSymbol string, nativeTokenDecimals uint8,
-	rootTokenAddr, childPredicateAddr types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeNativeERC20Function{
-		Name_:      nativeTokenName,
-		Symbol_:    nativeTokenSymbol,
-		Decimals_:  nativeTokenDecimals,
-		RootToken_: rootTokenAddr,
-		Predicate_: childPredicateAddr,
-	}
-
-	return params.EncodeAbi()
-}
-
 func initContract(to types.Address, input []byte, contractName string, transition *state.Transition) error {
 	result := transition.Call2(contracts.SystemCaller, to, input,
 		big.NewInt(0), 100_000_000)

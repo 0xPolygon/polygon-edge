@@ -24,6 +24,7 @@ var (
 	Merkle              *artifact.Artifact
 	ChildValidatorSet   *artifact.Artifact
 	NativeERC20         *artifact.Artifact
+	NativeERC20Mintable *artifact.Artifact
 	StateReceiver       *artifact.Artifact
 	ChildERC20          *artifact.Artifact
 	ChildERC20Predicate *artifact.Artifact
@@ -107,6 +108,11 @@ func init() {
 	}
 
 	NativeERC20, err = artifact.DecodeArtifact([]byte(NativeERC20Artifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	NativeERC20Mintable, err = artifact.DecodeArtifact([]byte(NativeERC20MintableArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

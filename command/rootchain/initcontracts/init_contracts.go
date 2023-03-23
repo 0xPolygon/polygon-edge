@@ -3,7 +3,6 @@ package initcontracts
 import (
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -220,17 +219,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	// if running in test mode, we need to fund deployer account
 	if params.isTestMode {
-		fundAmountRaw := strings.TrimPrefix(command.DefaultPremineBalance, "0x")
-
-		fundAmount, ok := new(big.Int).SetString(fundAmountRaw, 16)
-		if !ok {
-			return fmt.Errorf("failed to parse provided fund amount: %s", fundAmountRaw)
-		}
-
 		// fund account
 		deployerAddress := deployerKey.Address()
 
-		txn := &ethgo.Transaction{To: &deployerAddress, Value: fundAmount}
+		txn := &ethgo.Transaction{To: &deployerAddress, Value: command.DefaultPremineBalance}
 		if _, err := txRelayer.SendTransactionLocal(txn); err != nil {
 			return err
 		}
@@ -471,7 +463,7 @@ func validatorSetToABISlice(o command.OutputFormatter,
 		accSet[i] = &polybft.ValidatorMetadata{
 			Address:     validator.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(validator.Balance),
+			VotingPower: new(big.Int).Set(validator.Stake),
 		}
 	}
 

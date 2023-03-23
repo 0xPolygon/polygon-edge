@@ -60,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
+			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)
@@ -212,6 +212,13 @@ func setFlags(cmd *cobra.Command) {
 			trieRootFlag,
 			"",
 			"trie root from the corresponding triedb",
+		)
+
+		cmd.Flags().BoolVar(
+			&params.mintableNativeToken,
+			mintableTokenFlag,
+			false,
+			"flag indicate whether mintable or non-mintable native ERC20 token is deployed",
 		)
 	}
 
