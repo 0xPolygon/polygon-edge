@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -19,13 +21,16 @@ type AARelayerRestServer struct {
 	state        AATxState
 	verification AAVerification
 	server       *http.Server
+	logger       hclog.Logger
 }
 
-func NewAARelayerRestServer(pool AAPool, state AATxState, verification AAVerification) *AARelayerRestServer {
+func NewAARelayerRestServer(
+	pool AAPool, state AATxState, verification AAVerification, logger hclog.Logger) *AARelayerRestServer {
 	return &AARelayerRestServer{
 		pool:         pool,
 		state:        state,
 		verification: verification,
+		logger:       logger.Named("server"),
 	}
 }
 
@@ -47,6 +52,8 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 
 	if err := s.verification.Validate(&tx); err != nil {
 		writeMessage(w, http.StatusBadRequest, err.Error())
+		s.logger.Error("failed to validate transaction",
+			"id", tx.Transaction.From, "nonce", tx.Transaction.Nonce, "err", err)
 
 		return
 	}
@@ -55,12 +62,17 @@ func (s *AARelayerRestServer) sendTransaction(w http.ResponseWriter, r *http.Req
 	stateTx, err := s.state.Add(&tx)
 	if err != nil {
 		writeMessage(w, http.StatusInternalServerError, err.Error())
+		s.logger.Error("failed to add transaction to the state",
+			"from", stateTx.Tx.Transaction.From, "nonce", stateTx.Tx.Transaction.Nonce, "err", err)
 
 		return
 	}
 
 	// push state tx to the pool
 	s.pool.Push(stateTx)
+
+	s.logger.Debug("transaction has been successfully submitted to aa relayer",
+		"id", stateTx.ID, "from", stateTx.Tx.Transaction.From, "nonce", stateTx.Tx.Transaction.Nonce)
 
 	writeOutput(w, http.StatusOK, map[string]string{"uuid": stateTx.ID})
 }
@@ -85,6 +97,7 @@ func (s *AARelayerRestServer) getTransactionReceipt(w http.ResponseWriter, r *ht
 
 	if stateTx == nil {
 		writeMessage(w, http.StatusNotFound, fmt.Sprintf("tx with uuid = %s does not exist", uuid))
+		s.logger.Debug("/v1/getTransactionReceipt - transaction does not exist", " id", uuid)
 
 		return
 	}

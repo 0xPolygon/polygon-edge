@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
 
@@ -23,6 +24,7 @@ type AARelayerService struct {
 	pullTime     time.Duration // pull from txpool every `pullTime` second/millisecond
 	receiptDelay time.Duration
 	numRetries   int
+	logger       hclog.Logger
 }
 
 func NewAARelayerService(
@@ -30,7 +32,7 @@ func NewAARelayerService(
 	pool AAPool,
 	state AATxState,
 	key ethgo.Key,
-	invokerAddr types.Address,
+	invokerAddr types.Address, logger hclog.Logger,
 	opts ...TxRelayerOption) (*AARelayerService, error) {
 	nonce, err := txSender.GetNonce(key.Address())
 	if err != nil {
@@ -47,6 +49,7 @@ func NewAARelayerService(
 		pullTime:     time.Millisecond * 5000,
 		receiptDelay: time.Millisecond * 500,
 		numRetries:   100,
+		logger:       logger.Named("service"),
 	}
 
 	for _, opt := range opts {
@@ -70,8 +73,12 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 			if stateTx != nil { // there is something to process
 				go func() {
 					if err := rs.executeJob(ctx, stateTx); err != nil {
-						// TODO: log error in file not just fmt.Println
-						fmt.Println(err)
+						rs.logger.Error(
+							"transaction execution has been failed",
+							"id", stateTx.ID,
+							"from", stateTx.Tx.Transaction.From,
+							"nonce", stateTx.Tx.Transaction.Nonce,
+							"err", err)
 					}
 				}()
 			}
@@ -82,8 +89,10 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTransaction) error {
 	var netErr net.Error
 
-	fmt.Printf("executing transaction (%s, %s) with nonce = %d\n",
-		stateTx.ID, stateTx.Tx.Transaction.From.String(), stateTx.Tx.Transaction.Nonce)
+	rs.logger.Info("transaction execution has been started",
+		"id", stateTx.ID,
+		"from", stateTx.Tx.Transaction.From,
+		"nonce", stateTx.Tx.Transaction.Nonce)
 
 	tx, err := rs.makeEthgoTransaction(stateTx)
 	if err != nil {
@@ -106,40 +115,48 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 		if errUpdate := rs.state.Update(stateTx); errUpdate != nil {
 			errstr = errUpdate.Error()
 
-			return fmt.Errorf("error while getting nonce for state tx = %s, err = %w, update error = %s",
-				stateTx.ID, err, errstr)
+			return fmt.Errorf("err = %w, update error = %s", err, errstr)
 		}
 
-		return fmt.Errorf("error while getting nonce for state tx = %s, err = %w", stateTx.ID, err)
+		return err
 	}
 
 	atomic.AddUint64(&rs.currentNonce, 1) // increment global nonce for this relayer
 
 	stateTx.Status = StatusQueued
 	if err := rs.state.Update(stateTx); err != nil {
-		// TODO: log error but do not return
-		fmt.Printf("error while updating state tx = %s after sending it, err = %v\n", stateTx.ID, err)
+		rs.logger.Error("error while updating tx state to queued", "id", stateTx.ID, "err", err)
 	}
 
-	fmt.Printf("transaction (%s, %s) with nonce = %d has been sent to the invoker\n",
-		stateTx.ID, stateTx.Tx.Transaction.From.String(), stateTx.Tx.Transaction.Nonce)
+	rs.logger.Info("transaction has been sent to the invoker", "id", stateTx.ID)
 
 	receipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay, rs.numRetries)
 	if err != nil {
 		errstr := err.Error()
 		stateTx.Error = &errstr
 		stateTx.Status = StatusFailed
+
+		rs.logger.Warn("transaction receipt error",
+			"id", stateTx.ID,
+			"from", stateTx.Tx.Transaction.From,
+			"nonce", stateTx.Tx.Transaction.Nonce,
+			"err", errstr)
 	} else {
 		populateStateTx(stateTx, receipt)
 		if receipt.Status == 1 { // Status == 1 is ReceiptSuccess status
 			stateTx.Status = StatusCompleted
 		} else {
 			stateTx.Status = StatusFailed
+
+			rs.logger.Warn("transaction receipt status failed",
+				"id", stateTx.ID,
+				"from", stateTx.Tx.Transaction.From,
+				"nonce", stateTx.Tx.Transaction.Nonce)
 		}
 	}
 
 	if err := rs.state.Update(stateTx); err != nil {
-		return fmt.Errorf("error while updating state tx = %s, err = %w", stateTx.ID, err)
+		return fmt.Errorf("error while updating tx state to %s, err = %w", stateTx.Status, err)
 	}
 
 	return nil
@@ -171,8 +188,8 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 
 		nonce, err := rs.txSender.GetAANonce(ethgo.Address(rs.invokerAddr), ethgo.Address(address))
 		if err != nil {
-			// TODO: log
-			fmt.Printf("failed to retrieve nonce for tx (%s, %s): %v", poppedTx.ID, address.String(), err)
+			rs.logger.Warn("transaction retrieving nonce failed",
+				"tx", poppedTx.ID, "from", address, "err", err)
 
 			pushBackList = append(pushBackList, poppedTx)
 
@@ -180,9 +197,9 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 		}
 
 		if nonce != poppedTx.Tx.Transaction.Nonce {
-			// TODO: log
-			fmt.Printf("transaction can not be sent to invoker - different nonces %d vs %d: %s \n",
-				poppedTx.Tx.Transaction.Nonce, nonce, poppedTx.ID)
+			rs.logger.Debug("transaction nonce mismatch",
+				"tx", poppedTx.ID, "from", address,
+				"nonce", poppedTx.Tx.Transaction.Nonce, "expected", nonce)
 
 			pushBackList = append(pushBackList, poppedTx)
 		} else {

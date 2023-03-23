@@ -16,6 +16,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -268,7 +269,7 @@ func getServer(t *testing.T, address types.Address, dbpath string) *AARelayerRes
 		return nil
 	})
 
-	return NewAARelayerRestServer(pool, state, verification)
+	return NewAARelayerRestServer(pool, state, verification, hclog.NewNullLogger())
 }
 
 func makeRequest(t *testing.T, httpMethod, endpoint string, obj interface{}) *http.Request {
