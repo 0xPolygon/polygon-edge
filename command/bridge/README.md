@@ -8,7 +8,7 @@ This is a helper command which deposits ERC20 tokens from the root chain to the 
 
 ```bash
 $ polygon-edge bridge deposit-erc20
-    --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>]
+    --sender-key <hex_encoded_depositor_private_key>
     --receivers <receivers_addresses>
     --amounts <amounts>
     --root-token <root_erc20_token_address>
@@ -38,7 +38,7 @@ This is a helper command which qeuries child chain for exit event proof and send
 
 ```bash
 $ polygon-edge bridge exit
-    --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>]
+    --sender-key <hex_encoded_txn_sender_private_key>
     --exit-helper <exit_helper_address>
     --exit-id <exit_event_id>
     --root-json-rpc <root_chain_json_rpc_endpoint>

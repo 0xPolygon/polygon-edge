@@ -371,7 +371,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	}
 
 	// use test account for rootchain
-	rootchainKey, err := rootchainHelper.GetRootchainTestPrivKey()
+	rootchainKey, err := rootchainHelper.GetRootchainPrivateKey("")
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
@@ -470,7 +470,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 
 	// use test account for rootchain
-	rootchainKey, err := rootchainHelper.GetRootchainTestPrivKey()
+	rootchainKey, err := rootchainHelper.GetRootchainPrivateKey("")
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,

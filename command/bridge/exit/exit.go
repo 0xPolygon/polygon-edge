@@ -2,6 +2,7 @@ package exit
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,14 +12,14 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
+	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -35,18 +36,12 @@ const (
 )
 
 type exitParams struct {
-	accountDir        string
-	accountConfig     string
+	senderKey         string
 	exitHelperAddrRaw string
 	exitID            uint64
 	rootJSONRPCAddr   string
 	childJSONRPCAddr  string
 	isTestMode        bool
-}
-
-// validateFlags validates input values
-func (ep *exitParams) validateFlags() error {
-	return helper.ValidateSecretFlags(ep.isTestMode, ep.accountDir, ep.accountConfig)
 }
 
 var (
@@ -57,24 +52,16 @@ var (
 // GetCommand returns the bridge exit command
 func GetCommand() *cobra.Command {
 	exitCmd := &cobra.Command{
-		Use:     "exit",
-		Short:   "Sends exit transaction to the Exit helper contract on the root chain",
-		PreRunE: preRun,
-		Run:     run,
+		Use:   "exit",
+		Short: "Sends exit transaction to the Exit helper contract on the root chain",
+		Run:   run,
 	}
 
 	exitCmd.Flags().StringVar(
-		&ep.accountDir,
-		polybftsecrets.AccountDirFlag,
+		&ep.senderKey,
+		common.SenderKeyFlag,
 		"",
-		polybftsecrets.AccountDirFlagDesc,
-	)
-
-	exitCmd.Flags().StringVar(
-		&ep.accountConfig,
-		polybftsecrets.AccountConfigFlag,
-		"",
-		polybftsecrets.AccountConfigFlagDesc,
+		"hex encoded private key of the account which sends exit transaction to the root chain",
 	)
 
 	exitCmd.Flags().StringVar(
@@ -112,11 +99,8 @@ func GetCommand() *cobra.Command {
 		"test indicates whether exit transaction sender is hardcoded test account",
 	)
 
-	exitCmd.MarkFlagRequired(exitHelperFlag) //nolint:errcheck
-	exitCmd.MarkFlagsMutuallyExclusive(
-		helper.TestModeFlag,
-		polybftsecrets.AccountDirFlag,
-		polybftsecrets.AccountConfigFlag)
+	_ = exitCmd.MarkFlagRequired(exitHelperFlag)
+	exitCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
 
 	return exitCmd
 }
@@ -125,33 +109,18 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var senderKey ethgo.Key
+	ecdsaRaw, err := hex.DecodeString(ep.senderKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to decode private key: %w", err))
 
-	if !ep.isTestMode {
-		secretsManager, err := polybftsecrets.GetSecretsManager(ep.accountDir, ep.accountConfig, true)
-		if err != nil {
-			outputter.SetError(err)
+		return
+	}
 
-			return
-		}
+	key, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to create wallet from private key: %w", err))
 
-		senderAccount, err := wallet.NewAccountFromSecret(secretsManager)
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		senderKey = senderAccount.Ecdsa
-	} else {
-		rootchainKey, err := helper.GetRootchainTestPrivKey()
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
-
-			return
-		}
-
-		senderKey = rootchainKey
+		return
 	}
 
 	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr))
@@ -179,7 +148,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	// create exit transaction
-	txn, exitEvent, err := createExitTxn(senderKey.Address(), proof)
+	txn, exitEvent, err := createExitTxn(key.Address(), proof)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
@@ -187,7 +156,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	// send exit transaction
-	receipt, err := rootTxRelayer.SendTransaction(txn, senderKey)
+	receipt, err := rootTxRelayer.SendTransaction(txn, key)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to send exit transaction (exit id=%d): %w", ep.exitID, err))
 
@@ -205,15 +174,6 @@ func run(cmd *cobra.Command, _ []string) {
 		Sender:   exitEvent.Sender.String(),
 		Receiver: exitEvent.Receiver.String(),
 	})
-}
-
-// preRun is used to validate input values
-func preRun(_ *cobra.Command, _ []string) error {
-	if err := ep.validateFlags(); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 // createExitTxn encodes parameters for exit function on root chain ExitHelper contract
