@@ -140,8 +140,6 @@ func main() {
 			"EIP1559Burn",
 			gensc.EIP1559Burn,
 			[]string{
-				"receive",
-				"initialize",
 				"withdraw",
 			},
 			[]string{
@@ -370,7 +368,6 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 
 // generateFunction generates code for smart contract function and its parameters
 func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) error {
-	fmt.Println(contractName, method)
 	methodName := method.Name
 	if methodName == "initialize" {
 		// most of the contracts have initialize function, which differ in params
