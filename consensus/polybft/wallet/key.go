@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -11,14 +12,12 @@ import (
 )
 
 type Key struct {
-	raw    *Account
-	domain []byte
+	raw *Account
 }
 
-func NewKey(raw *Account, domain []byte) *Key {
+func NewKey(raw *Account) *Key {
 	return &Key{
-		raw:    raw,
-		domain: domain,
+		raw: raw,
 	}
 }
 
@@ -33,8 +32,14 @@ func (k *Key) Address() ethgo.Address {
 }
 
 // Sign signs the provided digest with BLS key
+// Used only to sign transactions
 func (k *Key) Sign(digest []byte) ([]byte, error) {
-	signature, err := k.raw.Bls.Sign(digest, k.domain)
+	return k.SignWithDomain(digest, bls.DomainTransactionSigning)
+}
+
+// SignWithDomain signs the provided digest with BLS key and provided domain
+func (k *Key) SignWithDomain(digest, domain []byte) ([]byte, error) {
+	signature, err := k.raw.Bls.Sign(digest, domain)
 	if err != nil {
 		return nil, err
 	}

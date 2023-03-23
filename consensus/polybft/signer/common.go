@@ -26,6 +26,9 @@ var (
 
 	// domain used to map hash to G1 used by child checkpoint manager
 	DomainCheckpointManager = pcrypto.Keccak256([]byte("DOMAIN_CHECKPOINT_MANAGER"))
+
+	DomainTransactionSigning = pcrypto.Keccak256([]byte("DOMAIN_TRANSACTIONS"))
+	DomainStateReceiver      = pcrypto.Keccak256([]byte("DOMAIN_STATE_RECEIVER"))
 )
 
 func mustG2Point(str string) *bn256.G2 {

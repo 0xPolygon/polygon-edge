@@ -217,7 +217,7 @@ func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types
 		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signer.String(), err)
 	}
 
-	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainCheckpointManager) {
+	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainStateReceiver) {
 		return fmt.Errorf("incorrect signature from %s", signer)
 	}
 
@@ -534,7 +534,7 @@ func (s *stateSyncManager) buildCommitment() error {
 
 	hashBytes := hash.Bytes()
 
-	signature, err := s.config.key.Sign(hashBytes)
+	signature, err := s.config.key.SignWithDomain(hashBytes, bls.DomainStateReceiver)
 	if err != nil {
 		return fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
