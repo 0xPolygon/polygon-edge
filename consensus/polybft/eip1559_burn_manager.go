@@ -5,12 +5,17 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+
 	"github.com/0xPolygon/polygon-edge/types"
 
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+)
+
+var (
+	nativeTokenBurntEventABI = contractsapi.EIP1559Burn.Abi.Events["NativeTokenBurnt"]
 )
 
 var _ EIP1559BurnManager = (*eip1559BurnManager)(nil)
@@ -24,13 +29,10 @@ type EIP1559BurnManager interface {
 
 // eip1559BurnConfig holds the configuration data of eip1559 burn manager
 type eip1559BurnConfig struct {
-	stateSenderAddr       types.Address
-	stateSenderStartBlock uint64
+	eip1559BurnAddr       types.Address
 	jsonrpcAddr           string
+	startBlock            uint64
 	dataDir               string
-	topic                 topic
-	key                   *wallet.Key
-	maxCommitmentSize     uint64
 	numBlockConfirmations uint64
 }
 
@@ -70,10 +72,10 @@ func (m *eip1559BurnManager) initTracker() error {
 	evtTracker := tracker.NewEventTracker(
 		path.Join(m.config.dataDir, "/eip1559burn.db"),
 		m.config.jsonrpcAddr,
-		ethgo.Address(m.config.stateSenderAddr),
+		ethgo.Address(m.config.eip1559BurnAddr),
 		m,
 		m.config.numBlockConfirmations,
-		m.config.stateSenderStartBlock,
+		m.config.startBlock,
 		m.logger,
 	)
 
@@ -85,8 +87,19 @@ func (m *eip1559BurnManager) initTracker() error {
 	return evtTracker.Start(ctx)
 }
 
-func (m *eip1559BurnManager) AddLog(log *ethgo.Log) {
+func (m *eip1559BurnManager) AddLog(eventLog *ethgo.Log) {
+	if !nativeTokenBurntEventABI.Match(eventLog) {
+		return
+	}
 
+	m.logger.Info(
+		"Add native token burnt event",
+		"block", eventLog.BlockNumber,
+		"hash", eventLog.TransactionHash,
+		"index", eventLog.LogIndex,
+	)
+
+	// event := &contractsapi.StateSyncedEvent{}
 }
 
 func (m *eip1559BurnManager) PostBlock(req *PostBlockRequest) error {
