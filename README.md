@@ -25,6 +25,7 @@ As this project evolves, the Polygon Labs developer team will focus on the lates
 ---
 
 Copyright 2022 Polygon Technology
+Copyright 2022-2023 zk Foundation
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
