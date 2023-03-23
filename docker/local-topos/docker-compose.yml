@@ -1,0 +1,116 @@
+version: '3.9'
+
+services:
+  contracts-init:
+    image: ghcr.io/toposware/topos-smart-contracts:${TOPOS_MESSAGING_PROTOCOL_CONTRACTS_VERSION}
+    container_name: contracts-init
+    volumes:
+      - contracts:/usr/src/app/brownie/build/contracts
+
+  ## INITIALIZE GENESIS AND SECRETS
+  init:
+    build:
+      context: ../../
+      dockerfile: docker/local/Dockerfile
+    image: local/polygon-edge
+    container_name: polygon-edge-bootstrapper
+    command: [ "init", "${EDGE_CONSENSUS:-ibft}" ]
+    environment:
+      - CHAIN_ID=${CHAIN_ID}
+    volumes:
+      - data:/data
+      - contracts:/contracts
+    depends_on:
+      - contracts-init
+
+  ## RUN NODES
+  node-1:
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-1
+    command: ["server", "--data-dir", "/data/data-1", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - '10000:9632'
+      - '10002:8545'
+      - '10003:5001'
+    volumes:
+      - data:/data
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+
+  node-2:
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-2
+    command: ["server", "--data-dir", "/data/data-2", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - '20000:9632'
+      - '20002:8545'
+      - '20003:5001'
+    volumes:
+      - data:/data
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+
+  node-3:
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-3
+    command: ["server", "--data-dir", "/data/data-3", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - '30000:9632'
+      - '30002:8545'
+      - '30003:5001'
+    volumes:
+      - data:/data
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+
+  node-4:
+    image: local/polygon-edge
+    container_name: polygon-edge-validator-4
+    command: ["server", "--data-dir", "/data/data-4", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - '40000:9632'
+      - '40002:8545'
+      - '40003:5001'
+    volumes:
+      - data:/data
+    networks:
+      - polygon-edge-docker
+    restart: on-failure
+
+  contracts:
+    image: ghcr.io/toposware/topos-smart-contracts:${TOPOS_MESSAGING_PROTOCOL_CONTRACTS_VERSION}
+    container_name: contracts
+    init: true
+    environment:
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - TOKEN_DEPLOYER_SALT=${TOKEN_DEPLOYER_SALT}
+      - TOPOS_CORE_SALT=${TOPOS_CORE_SALT}
+      - TOPOS_CORE_PROXY_SALT=${TOPOS_CORE_PROXY_SALT}
+      - SUBNET_REGISTRATOR_SALT=${SUBNET_REGISTRATOR_SALT}
+    command: bash -c "
+      sleep 15 &&
+      npm run deploy2:topos-msg-protocol http://node-1:8545 $$(cat /data/data-1/consensus/validator.key)
+      "
+    volumes:
+      - data:/data
+    depends_on:
+      - node-1
+
+volumes:
+  contracts:
+  data:
