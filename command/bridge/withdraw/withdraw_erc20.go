@@ -36,7 +36,9 @@ type withdrawParams struct {
 }
 
 var (
-	wp *withdrawParams = &withdrawParams{ERC20BridgeParams: &common.ERC20BridgeParams{}}
+	wp *withdrawParams = &withdrawParams{
+		ERC20BridgeParams: &common.ERC20BridgeParams{},
+	}
 )
 
 // GetCommand returns the bridge withdraw command
@@ -90,8 +92,8 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
-	withdrawCmd.MarkFlagRequired(common.ReceiversFlag) //nolint:errcheck
-	withdrawCmd.MarkFlagRequired(common.AmountsFlag)   //nolint:errcheck
+	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
+	_ = withdrawCmd.MarkFlagRequired(common.AmountsFlag)
 
 	return withdrawCmd
 }

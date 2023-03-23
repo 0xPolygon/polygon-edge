@@ -21,7 +21,6 @@ type ERC20BridgeParams struct {
 }
 
 func (bp *ERC20BridgeParams) ValidateFlags() error {
-	// in case of test mode test rootchain account is being used as the rootchain transactions sender
 	if len(bp.Receivers) != len(bp.Amounts) {
 		return errInconsistentAccounts
 	}
