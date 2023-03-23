@@ -146,6 +146,41 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"RootERC1155Predicate",
+			gensc.RootERC1155Predicate,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootERC1155",
+			gensc.RootERC1155,
+			[]string{
+				"setApprovalForAll",
+				"mint",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC1155Predicate",
+			gensc.ChildERC1155Predicate,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC1155",
+			gensc.ChildERC1155,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}
