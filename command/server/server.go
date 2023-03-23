@@ -214,6 +214,13 @@ func setFlags(cmd *cobra.Command) {
 		"write all logs to the file at specified location instead of writing them to console",
 	)
 
+	cmd.Flags().StringVar(
+		&params.toposSequencerAddr,
+		toposSequencerFlag,
+		defaultConfig.ToposSequencerAddr,
+		"grpc address of the topos-sequencer",
+	)
+
 	cmd.Flags().BoolVar(
 		&params.rawConfig.Relayer,
 		relayerFlag,

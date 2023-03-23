@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/frost"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -27,7 +28,8 @@ const (
 	IbftKeyName      = "validator.key"
 	KeyEpochSize     = "epochSize"
 
-	ibftProto = "/ibft/0.2"
+	ibftProto  = "/ibft/0.2"
+	frostProto = "/frost/0.1"
 
 	// consensusMetrics is a prefix used for consensus-related metrics
 	consensusMetrics = "consensus"
@@ -82,6 +84,7 @@ type backendIBFT struct {
 	currentSigner     signer.Signer         // Signer at current sequence
 	currentValidators validators.Validators // signer at current sequence
 	currentHooks      fork.HooksInterface   // Hooks at current sequence
+	frostBackend      *frost.FrostBackend   // Reference to Frost messages gossip mechanism
 
 	// Configurations
 	config             *consensus.Config // Consensus configuration
@@ -137,6 +140,15 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		return nil, err
 	}
 
+	frostBackend, err := frost.NewFrostBackend(
+		params.ToposSequencerAddr,
+		logger.Named("frost"),
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
 	p := &backendIBFT{
 		// References
 		logger:     logger,
@@ -153,6 +165,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		secretsManager: params.SecretsManager,
 		Grpc:           params.Grpc,
 		forkManager:    forkManager,
+		frostBackend:   frostBackend,
 
 		// Configurations
 		config:             params.Config,
@@ -198,6 +211,14 @@ func (i *backendIBFT) Initialize() error {
 		i,
 		i,
 	)
+
+	// Initialize frost backend if topos sequencer address is set
+	if i.frostBackend.GetToposSequencerAddr() != "" {
+		if err := i.frostBackend.Initialize(i.frostBackend.GetToposSequencerAddr(),
+			i.currentSigner.Address().String(), i); err != nil {
+			return err
+		}
+	}
 
 	// Ensure consensus takes into account user configured block production time
 	i.consensus.ExtendRoundTimeout(i.blockTime)

@@ -37,6 +37,7 @@ const (
 	devFlag                      = "dev"
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
+	toposSequencerFlag           = "topos-sequencer"
 
 	relayerFlag               = "relayer"
 	numBlockConfirmationsFlag = "num-block-confirmations"
@@ -89,6 +90,8 @@ type serverParams struct {
 	secretsConfig *secrets.SecretsManagerConfig
 
 	logFileLocation string
+
+	toposSequencerAddr string
 
 	relayer bool
 }
@@ -182,6 +185,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
 		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,
+		ToposSequencerAddr: p.toposSequencerAddr,
 
 		Relayer:               p.relayer,
 		NumBlockConfirmations: p.rawConfig.NumBlockConfirmations,

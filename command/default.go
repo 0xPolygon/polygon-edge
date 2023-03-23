@@ -24,9 +24,10 @@ var (
 )
 
 const (
-	JSONOutputFlag  = "json"
-	GRPCAddressFlag = "grpc-address"
-	JSONRPCFlag     = "jsonrpc"
+	JSONOutputFlag     = "json"
+	GRPCAddressFlag    = "grpc-address"
+	JSONRPCFlag        = "jsonrpc"
+	FrostSequencerFlag = "frost-sequencer"
 )
 
 // GRPCAddressFlagLEGACY Legacy flag that needs to be present to preserve backwards
