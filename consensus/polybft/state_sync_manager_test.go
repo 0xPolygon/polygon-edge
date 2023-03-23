@@ -340,7 +340,9 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 0)
 
-	stateSyncEventID := contractsapi.StateSender.Abi.Events["StateSynced"].ID()
+	var stateSyncedEvent contractsapi.StateSyncedEvent
+
+	stateSyncEventID := stateSyncedEvent.Sig()
 
 	// log with the state sync topic but incorrect content
 	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateSyncEventID}})

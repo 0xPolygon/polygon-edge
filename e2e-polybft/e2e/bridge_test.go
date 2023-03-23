@@ -106,7 +106,9 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are processed and there should be a success events
-	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	id := stateSyncedResult.Sig()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -292,7 +294,9 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
-	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	id := stateSyncedResult.Sig()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},

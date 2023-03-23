@@ -90,8 +90,13 @@ func TestEncoding_Struct(t *testing.T) {
 func TestEncodingAndParsingEvent(t *testing.T) {
 	t.Parallel()
 
+	var (
+		exitEventAPI      L2StateSyncedEvent
+		stateSyncEventAPI StateSyncedEvent
+	)
+
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = L2StateSender.Abi.Events["L2StateSynced"].ID()
+	topics[0] = exitEventAPI.Sig()
 	topics[1] = ethgo.BytesToHash(common.EncodeUint64ToBytes(11))
 	topics[2] = ethgo.BytesToHash(types.StringToAddress("0x1111").Bytes())
 	topics[3] = ethgo.BytesToHash(types.StringToAddress("0x2222").Bytes())
@@ -121,13 +126,13 @@ func TestEncodingAndParsingEvent(t *testing.T) {
 	require.Equal(t, uint64(22), exitEvent.ID.Uint64())
 
 	// log does not match event
-	log.Topics[0] = StateSender.Abi.Events["StateSynced"].ID()
+	log.Topics[0] = stateSyncEventAPI.Sig()
 	doesMatch, err = exitEvent.ParseLog(log)
 	require.False(t, doesMatch)
 	require.NoError(t, err)
 
 	// error on parsing log
-	log.Topics[0] = L2StateSender.Abi.Events["L2StateSynced"].ID()
+	log.Topics[0] = exitEventAPI.Sig()
 	log.Topics = log.Topics[:3]
 	doesMatch, err = exitEvent.ParseLog(log)
 	require.True(t, doesMatch)

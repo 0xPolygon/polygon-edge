@@ -342,6 +342,10 @@ func generateEvent(generatedData *generatedData, contractName string, event *abi
 	{{.}}
 {{ end }}
 
+func ({{.Sig}} *{{.TName}}) Sig() ethgo.Hash {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].ID()
+}
+
 func ({{.Sig}} *{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
 	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
 }
@@ -387,6 +391,10 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 {{range .Structs}}
 	{{.}}
 {{ end }}
+
+func ({{.Sig}} *{{.TName}}) Sig() []byte {
+	return {{.ContractName}}.Abi.Methods["{{.Name}}"].ID()
+}
 
 func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
 	return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})

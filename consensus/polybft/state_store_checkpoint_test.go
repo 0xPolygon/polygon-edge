@@ -122,8 +122,10 @@ func TestState_decodeExitEvent(t *testing.T) {
 
 	state := newTestState(t)
 
+	var exitEvent contractsapi.L2StateSyncedEvent
+
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = contractsapi.L2StateSender.Abi.Events["L2StateSynced"].ID()
+	topics[0] = exitEvent.Sig()
 	topics[1] = ethgo.BytesToHash([]byte{exitID})
 	topics[2] = ethgo.BytesToHash(ethgo.HexToAddress("0x1111").Bytes())
 	topics[3] = ethgo.BytesToHash(ethgo.HexToAddress("0x2222").Bytes())
@@ -149,8 +151,10 @@ func TestState_decodeExitEvent(t *testing.T) {
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	t.Parallel()
 
+	var stateSyncedEvent contractsapi.StateSyncedEvent
+
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = contractsapi.StateSender.Abi.Events["StateSynced"].ID()
+	topics[0] = stateSyncedEvent.Sig()
 
 	log := &ethgo.Log{
 		Address: ethgo.ZeroAddress,

@@ -75,6 +75,10 @@ type StateSyncResultEvent struct {
 	Message []byte   `abi:"message"`
 }
 
+func (s *StateSyncResultEvent) Sig() ethgo.Hash {
+	return StateReceiver.Abi.Events["StateSyncResult"].ID()
+}
+
 func (s *StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
 	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.Encode(inputs)
 }
@@ -91,6 +95,10 @@ type NewCommitmentEvent struct {
 	StartID *big.Int   `abi:"startId"`
 	EndID   *big.Int   `abi:"endId"`
 	Root    types.Hash `abi:"root"`
+}
+
+func (n *NewCommitmentEvent) Sig() ethgo.Hash {
+	return StateReceiver.Abi.Events["NewCommitment"].ID()
 }
 
 func (n *NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
@@ -260,6 +268,10 @@ type StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
+func (s *StateSyncedEvent) Sig() ethgo.Hash {
+	return StateSender.Abi.Events["StateSynced"].ID()
+}
+
 func (s *StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return StateSender.Abi.Events["StateSynced"].Inputs.Encode(inputs)
 }
@@ -277,6 +289,10 @@ type L2StateSyncedEvent struct {
 	Sender   types.Address `abi:"sender"`
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`
+}
+
+func (l *L2StateSyncedEvent) Sig() ethgo.Hash {
+	return L2StateSender.Abi.Events["L2StateSynced"].ID()
 }
 
 func (l *L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
