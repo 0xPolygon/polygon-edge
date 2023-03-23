@@ -40,6 +40,10 @@ func main() {
 			"NativeERC20",
 		},
 		{
+			"child/NativeERC20Mintable.sol",
+			"NativeERC20Mintable",
+		},
+		{
 			"child/ChildERC20.sol",
 			"ChildERC20",
 		},
