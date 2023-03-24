@@ -4,7 +4,7 @@ set -e
 
 POLYGON_EDGE_BIN=./polygon-edge
 CONTRACTS_PATH=/contracts
-GENESIS_PATH=/data/genesis/genesis.json
+GENESIS_PATH=/data/genesis.json
 CHAIN_ID="${CHAIN_ID:-100}" # 100 is Edge's default value
 NUMBER_OF_NODES="${NUMBER_OF_NODES:-4}" # Number of subnet nodes in the consensus
 BOOTNODE_DOMAIN_NAME="${BOOTNODE_DOMAIN_NAME:-node-1}"
@@ -22,9 +22,9 @@ EOL
 case "$1" in
 
     "init")
-        data_dir="data-"
+        data_dir="/data/data-"
         if [ "$NUMBER_OF_NODES" -eq "1" ]; then
-            data_dir="data-1"
+            data_dir="/data/data-1"
         fi
 
         case "$2" in 
@@ -41,8 +41,9 @@ case "$1" in
                     BOOTNODE_ADDRESS=$(echo $secrets | jq -r '.[0] | .address')
 
                     echo "Generating IBFT Genesis file..."
-                    cd /data && /polygon-edge/polygon-edge genesis $CHAIN_CUSTOM_OPTIONS \
-                      --dir genesis.json \
+                    ls -la "$POLYGON_EDGE_BIN"
+                    "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
+                      --dir "$GENESIS_PATH" \
                       --consensus ibft \
                       --ibft-validators-prefix-path data- \
                       --validator-set-size=$NUMBER_OF_NODES \
@@ -57,35 +58,34 @@ case "$1" in
                 else
                     echo "Generating PolyBFT secrets..."
                     secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num "$NUMBER_OF_NODES" --data-dir "$data_dir" --json)
+                    chmod -R 755 /data # TOPOS: To make secret readable from the sequencer
                     echo "Secrets have been successfully generated"
 
                     BOOTNODE_ID=$(echo $secrets | jq -r '.[0] | .node_id')
                     BOOTNODE_ADDRESS=$(echo $secrets | jq -r '.[0] | .address')
 
                     echo "Generating manifest..."
-                    "$POLYGON_EDGE_BIN" manifest --path /data/manifest.json --validators-path /data --validators-prefix "$data_dir"
+                    "$POLYGON_EDGE_BIN" manifest --path /data/manifest.json --validators-path /data --validators-prefix data-
 
                     echo "Generating PolyBFT Genesis file..."
                     "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
-                      --dir /data/genesis.json \
+                      --dir "$GENESIS_PATH" \
                       --consensus polybft \
                       --manifest /data/manifest.json \
                       --validator-set-size=$NUMBER_OF_NODES \
-                      --bootnode /dns4/"$BOOTNODE_DOMAIN_NAME"/tcp/1478/p2p/$BOOTNODE_ID \
-                      --premine=$BOOTNODE_ADDRESS:1000000000000000000000
+                      --bootnode /dns4/"$BOOTNODE_DOMAIN_NAME"/tcp/1478/p2p/$BOOTNODE_ID
                 fi
             ;;
-
-            *)
-                echo "Predeploying ConstAddressDeployer contract..."
-                CONST_ADDRESS_DEPLOYER_ADDRESS=0x0000000000000000000000000000000000001110
-                "$POLYGON_EDGE_BIN" genesis predeploy \
-                --chain "$GENESIS_PATH" \
-                --artifacts-path "$CONTRACTS_PATH"/ConstAddressDeployer.json \
-                --predeploy-address "$CONST_ADDRESS_DEPLOYER_ADDRESS"
-                echo "ConstAddressDeployer has been successfully predeployed!"
-            ;;
         esac
+
+        echo "Predeploying ConstAddressDeployer contract..."
+        CONST_ADDRESS_DEPLOYER_ADDRESS=0x0000000000000000000000000000000000001110
+        ls -la "$POLYGON_EDGE_BIN"
+        "$POLYGON_EDGE_BIN" genesis predeploy \
+        --chain "$GENESIS_PATH" \
+        --artifacts-path "$CONTRACTS_PATH"/ConstAddressDeployer.json \
+        --predeploy-address "$CONST_ADDRESS_DEPLOYER_ADDRESS"
+        echo "ConstAddressDeployer has been successfully predeployed!"
     ;;
 
     *)

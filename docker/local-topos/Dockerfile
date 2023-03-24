@@ -20,7 +20,7 @@ RUN apk --no-cache add ca-certificates jq
 WORKDIR /polygon-edge
 
 COPY --from=builder /polygon-edge/polygon-edge ./
-COPY ./docker/local/polygon-edge.sh ./
+COPY ./docker/local-topos/polygon-edge.sh ./
 COPY ./core-contracts/artifacts ./core-contracts/artifacts
 
 # Expose json-rpc, libp2p and grpc ports
