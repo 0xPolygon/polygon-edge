@@ -5,18 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"net"
 	"sort"
 	"sync"
 	"sync/atomic"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
-	"github.com/0xPolygon/polygon-edge/types"
-
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	hcf "github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo/jsonrpc"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/helper/config"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
@@ -77,6 +80,7 @@ type runtimeConfig struct {
 	txPool                txPoolInterface
 	bridgeTopic           topic
 	numBlockConfirmations uint64
+	jsonrpcAddr           *net.TCPAddr
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -164,7 +168,7 @@ func (c *consensusRuntime) close() {
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		stateSenderAddr := c.config.PolyBFTConfig.Bridge.BridgeAddr
-		stateSyncManager, err := NewStateSyncManager(
+		c.stateSyncManager = newStateSyncManager(
 			logger,
 			c.config.State,
 			&stateSyncConfig{
@@ -178,12 +182,6 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				numBlockConfirmations: c.config.numBlockConfirmations,
 			},
 		)
-
-		if err != nil {
-			return err
-		}
-
-		c.stateSyncManager = stateSyncManager
 	} else {
 		c.stateSyncManager = &dummyStateSyncManager{}
 	}
@@ -221,9 +219,23 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 // if bridge is not enabled, then a dummy burnt fees manager will be used
 func (c *consensusRuntime) initBurntFeesManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
+		// create the JSON RPC client
+		client, err := jsonrpc.NewClient(config.SanitizeRPCEndpoint(
+			c.config.jsonrpcAddr.String(),
+		))
+		if err != nil {
+			return err
+		}
+
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
+		if err != nil {
+			return err
+		}
+
 		// enable burnt fees manager
 		c.burntFeesManager = newBurntFeesManager(
 			wallet.NewEcdsaSigner(c.config.Key),
+			txRelayer,
 			defaultBurntFeesWithdrawalOffset,
 			c.config.PolyBFTConfig.Bridge.EIP1559BurnAddr,
 			logger.Named("burnt_fees_manager"),

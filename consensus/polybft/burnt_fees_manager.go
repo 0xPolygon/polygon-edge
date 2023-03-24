@@ -1,10 +1,14 @@
 package polybft
 
 import (
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/types"
+	"fmt"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
@@ -27,6 +31,9 @@ type burntFeesManager struct {
 	// key is the identity of the node submitting a checkpoint
 	key ethgo.Key
 
+	// txRelayer is the abstraction on the child chain interaction logic.
+	txRelayer txrelayer.TxRelayer
+
 	// burntFeesManagerAddr is the address of EIP-1599 burnt contract
 	burntFeesManagerAddr types.Address
 
@@ -42,12 +49,14 @@ type burntFeesManager struct {
 
 func newBurntFeesManager(
 	key ethgo.Key,
+	txRelayer txrelayer.TxRelayer,
 	withdrawalOffset uint64,
 	burntFeesManagerAddr types.Address,
 	logger hclog.Logger,
 ) *burntFeesManager {
 	return &burntFeesManager{
 		key:                  key,
+		txRelayer:            txRelayer,
 		burntFeesManagerAddr: burntFeesManagerAddr,
 		withdrawalOffset:     withdrawalOffset,
 		logger:               logger,
@@ -55,16 +64,18 @@ func newBurntFeesManager(
 }
 
 func (m *burntFeesManager) PostBlock(req *PostBlockRequest) error {
+	latestHeader := req.FullBlock.Block.Header
+
 	m.logger.Debug("burnt fees withdrawal invoked...",
-		"latest withdrawal block", lastCheckpointBlockNumber,
 		"withdrawal block", latestHeader.Number)
 
-	checkpointManagerAddr := ethgo.Address(m.burntFeesManagerAddr)
+	burntFeesManagerAddr := ethgo.Address(m.burntFeesManagerAddr)
 	txn := &ethgo.Transaction{
-		To:   &checkpointManagerAddr,
+		To:   &burntFeesManagerAddr,
 		From: m.key.Address(),
 	}
 
+	// Encode transaction input
 	input, err := contractsapi.EIP1559Burn.Abi.GetMethod("withdraw").Encode([]interface{}{})
 	if err != nil {
 		return err
@@ -72,7 +83,21 @@ func (m *burntFeesManager) PostBlock(req *PostBlockRequest) error {
 
 	txn.Input = input
 
-	panic("not implemented yet")
+	// Send withdrawal transaction
+	receipt, err := m.txRelayer.SendTransaction(txn, m.key)
+	if err != nil {
+		return err
+	}
+
+	if receipt.Status == uint64(types.ReceiptFailed) {
+		return fmt.Errorf("burnt fees withdrawal transaction failed for block %d", latestHeader.Number)
+	}
+
+	// update burnt fees withdrawal block number metrics
+	// metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
+	// m.logger.Debug("successfully sent burnt fees withdrawal tx", "block number", header.Number)
+
+	return nil
 }
 
 // isCheckpointBlock returns true for blocks in the middle of the epoch

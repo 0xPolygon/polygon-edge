@@ -6,19 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net"
 	"path"
-	"strings"
-
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/tracker"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
-	"github.com/0xPolygon/polygon-edge/types"
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/config"
+	"github.com/0xPolygon/polygon-edge/tracker"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var commitEvent = contractsapi.StateReceiver.Abi.Events["NewCommitment"]
@@ -35,19 +34,6 @@ type StateSyncRelayer struct {
 	closeCh                chan struct{}
 }
 
-func sanitizeRPCEndpoint(rpcEndpoint string) string {
-	if rpcEndpoint == "" || strings.Contains(rpcEndpoint, "0.0.0.0") {
-		_, port, err := net.SplitHostPort(rpcEndpoint)
-		if err == nil {
-			rpcEndpoint = fmt.Sprintf("http://%s:%s", "127.0.0.1", port)
-		} else {
-			rpcEndpoint = "http://127.0.0.1:8545"
-		}
-	}
-
-	return rpcEndpoint
-}
-
 func NewRelayer(
 	dataDir string,
 	rpcEndpoint string,
@@ -56,7 +42,7 @@ func NewRelayer(
 	logger hcf.Logger,
 	key ethgo.Key,
 ) *StateSyncRelayer {
-	endpoint := sanitizeRPCEndpoint(rpcEndpoint)
+	endpoint := config.SanitizeRPCEndpoint(rpcEndpoint)
 
 	// create the JSON RPC client
 	client, err := jsonrpc.NewClient(endpoint)

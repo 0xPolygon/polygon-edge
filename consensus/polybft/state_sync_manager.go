@@ -94,16 +94,14 @@ type topic interface {
 	Subscribe(handler func(obj interface{}, from peer.ID)) error
 }
 
-// NewStateSyncManager creates a new instance of state sync manager
-func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
-	s := &stateSyncManager{
+// newStateSyncManager creates a new instance of state sync manager
+func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) *stateSyncManager {
+	return &stateSyncManager{
 		logger:  logger.Named("state-sync-manager"),
 		state:   state,
 		config:  config,
 		closeCh: make(chan struct{}),
 	}
-
-	return s, nil
 }
 
 // Init subscribes to bridge topics (getting votes) and start the event tracker routine

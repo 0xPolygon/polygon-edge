@@ -122,9 +122,6 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 
 // parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
 func parseBurnContractInfo(burnContractInfoRaw string) (*big.Int, types.Address, error) {
-	block := new(big.Int)
-	address := types.ZeroAddress
-
 	// <block>:<address>
 	burnContractParts := strings.Split(burnContractInfoRaw, ":")
 	if len(burnContractParts) != 2 {
@@ -133,12 +130,12 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*big.Int, types.Address,
 
 	blockRaw := burnContractParts[0]
 
-	var err error
-	if block, err = types.ParseUint256orHex(&blockRaw); err != nil {
+	block, err := types.ParseUint256orHex(&blockRaw)
+	if err != nil {
 		return nil, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
 	}
 
-	address = types.StringToAddress(burnContractParts[1])
+	address := types.StringToAddress(burnContractParts[1])
 
 	return block, address, nil
 }

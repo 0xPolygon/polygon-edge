@@ -483,3 +483,23 @@ func (m *MintFunction) EncodeAbi() ([]byte, error) {
 func (m *MintFunction) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }
+
+type WithdrawFunction struct {
+}
+
+func (w *WithdrawFunction) EncodeAbi() ([]byte, error) {
+	return EIP1559Burn.Abi.Methods["withdraw"].Encode(w)
+}
+
+func (w *WithdrawFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(EIP1559Burn.Abi.Methods["withdraw"], buf, w)
+}
+
+type NativeTokenBurntEvent struct {
+	Burner types.Address `abi:"burner"`
+	Amount *big.Int      `abi:"amount"`
+}
+
+func (n *NativeTokenBurntEvent) ParseLog(log *ethgo.Log) error {
+	return decodeEvent(EIP1559Burn.Abi.Events["NativeTokenBurnt"], log, n)
+}

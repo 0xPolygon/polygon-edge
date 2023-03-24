@@ -136,6 +136,16 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"EIP1559Burn",
+			gensc.EIP1559Burn,
+			[]string{
+				"withdraw",
+			},
+			[]string{
+				"NativeTokenBurnt",
+			},
+		},
 	}
 
 	generatedData := &generatedData{}

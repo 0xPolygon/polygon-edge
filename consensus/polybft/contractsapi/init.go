@@ -124,7 +124,7 @@ func init() {
 
 	EIP1559Burn, err = artifact.DecodeArtifact([]byte(EIP1559BurnArtifact))
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))

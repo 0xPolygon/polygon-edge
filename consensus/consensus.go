@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"log"
+	"net"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -60,6 +61,9 @@ type Config struct {
 
 	// Path is the directory path for the consensus protocol to store information
 	Path string
+
+	// JSONRPCAddr is the address of JSONRPC server running within the node
+	JSONRPCAddr *net.TCPAddr
 }
 
 type Params struct {
@@ -82,7 +86,7 @@ type Factory func(*Params) (Consensus, error)
 
 // BridgeDataProvider is an interface providing bridge related functions
 type BridgeDataProvider interface {
-	// GenerateExit proof generates proof of exit for given exit event
+	// GenerateExitProof proof generates proof of exit for given exit event
 	GenerateExitProof(exitID uint64) (types.Proof, error)
 
 	// GetStateSyncProof retrieves the StateSync proof
