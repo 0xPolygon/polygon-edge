@@ -54,7 +54,7 @@ type blockchainBackend interface {
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
 	// GetSystemState creates a new instance of SystemState interface
-	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
+	GetSystemState(provider contract.Provider) SystemState
 
 	SubscribeEvents() blockchain.Subscription
 
@@ -171,7 +171,7 @@ func (p *blockchainWrapper) NewBlockBuilder(
 }
 
 // GetSystemState is an implementation of blockchainBackend interface
-func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
+func (p *blockchainWrapper) GetSystemState(provider contract.Provider) SystemState {
 	return NewSystemState(contracts.ValidatorSetContract, contracts.StateReceiverContract, provider)
 }
 

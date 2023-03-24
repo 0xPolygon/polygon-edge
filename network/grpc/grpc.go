@@ -128,11 +128,8 @@ func WrapClient(s network.Stream) (*grpc.ClientConn, error) {
 	opts := grpc.WithContextDialer(func(ctx context.Context, peerIdStr string) (net.Conn, error) {
 		return &streamConn{s}, nil
 	})
-	if conn, err := grpc.Dial("", grpc.WithTransportCredentials(insecure.NewCredentials()), opts); err != nil {
-		return nil, err
-	} else {
-		return conn, nil
-	}
+
+	return grpc.Dial("", grpc.WithTransportCredentials(insecure.NewCredentials()), opts)
 }
 
 // streamConn represents a net.Conn wrapped to be compatible with net.conn

@@ -618,11 +618,7 @@ func (s *Server) NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.C
 		return nil, err
 	}
 
-	if clentConn, err := p.Client(stream); err != nil {
-		return nil, err
-	} else {
-		return clentConn, nil
-	}
+	return p.Client(stream)
 }
 
 func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {

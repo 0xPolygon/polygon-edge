@@ -586,7 +586,7 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 		return nil, err
 	}
 
-	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
+	return c.config.blockchain.GetSystemState(provider), nil
 }
 
 func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {
