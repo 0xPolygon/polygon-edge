@@ -15,6 +15,8 @@ const (
 	// safe numbers for the test
 	minStake      = 1
 	minDelegation = 1
+
+	disabledBridgeRootPredicateAddr = "0xDEAD"
 )
 
 // getInitChildValidatorSetInput builds input parameters for ChildValidatorSet SC initialization
@@ -45,12 +47,12 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 	return params.EncodeAbi()
 }
 
-// getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
+// getInitChildERC20PredicateInput builds input parameters for ChildERC20Predicate SC initialization
 func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	//nolint:godox
 	// to be fixed with EVM-541
 	// TODO: @Stefan-Ethernal Temporary workaround just to be able to run cluster in non-bridge mode, until SC is fixed
-	rootERC20PredicateAddr := types.StringToAddress("0xDEAD")
+	rootERC20PredicateAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)
 	rootERC20Addr := types.ZeroAddress
 
 	if config != nil {
@@ -64,6 +66,24 @@ func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 		NewRootERC20Predicate:     rootERC20PredicateAddr,
 		NewChildTokenTemplate:     contracts.ChildERC20Contract,
 		NewNativeTokenRootAddress: rootERC20Addr,
+	}
+
+	return params.EncodeAbi()
+}
+
+// getInitChildERC1155PredicateInput builds input parameters for ChildERC1155Predicate SC initialization
+func getInitChildERC1155PredicateInput(config *BridgeConfig) ([]byte, error) {
+	rootERC1155PredicateAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)
+
+	if config != nil {
+		rootERC1155PredicateAddr = config.RootERC1155PredicateAddr
+	}
+
+	params := &contractsapi.InitializeChildERC1155PredicateFn{
+		NewL2StateSender:        contracts.L2StateSenderContract,
+		NewStateReceiver:        contracts.StateReceiverContract,
+		NewRootERC1155Predicate: rootERC1155PredicateAddr,
+		NewChildTokenTemplate:   contracts.ChildERC1155Contract,
 	}
 
 	return params.EncodeAbi()

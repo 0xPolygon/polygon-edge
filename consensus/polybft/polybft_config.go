@@ -230,6 +230,7 @@ type RootchainConfig struct {
 	RootERC721Address           types.Address
 	RootERC1155PredicateAddress types.Address
 	RootERC1155Address          types.Address
+	ERC1155TemplateAddress      types.Address
 }
 
 // ToBridgeConfig creates BridgeConfig instance
