@@ -75,7 +75,7 @@ func Test_AAServer(t *testing.T) {
 
 		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa))
 
-		require.True(t, tx.Transaction.IsFromValid(aaInvokerAddress, chainID, tx.Signature))
+		require.Equal(t, tx.Transaction.From, tx.GetAddressFromSignature(aaInvokerAddress, chainID))
 
 		req := makeRequest(t, "POST", "sendTransaction", tx)
 
