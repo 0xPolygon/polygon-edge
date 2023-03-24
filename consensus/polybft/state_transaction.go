@@ -169,8 +169,8 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 	sig := txData[:abiMethodIDLength]
 
 	var (
-		commitFn      contractsapi.CommitFunction
-		commitEpochFn contractsapi.CommitEpochFunction
+		commitFn      contractsapi.CommitStateReceiverFn
+		commitEpochFn contractsapi.CommitEpochChildValidatorSetFn
 		obj           contractsapi.StateTransactionInput
 	)
 
@@ -192,7 +192,7 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 }
 
 func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageSigned, error) {
-	var commitFn contractsapi.CommitFunction
+	var commitFn contractsapi.CommitStateReceiverFn
 	for _, tx := range txs {
 		// skip non state CommitmentMessageSigned transactions
 		if tx.Type != types.StateTx ||
