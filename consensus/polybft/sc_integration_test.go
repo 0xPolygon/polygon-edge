@@ -254,6 +254,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			initValidators[i] = &Validator{
 				Address:      validator.Address,
 				Balance:      validator.VotingPower,
+				Stake:        validator.VotingPower,
 				BlsKey:       hex.EncodeToString(validator.BlsKey.Marshal()),
 				BlsSignature: hex.EncodeToString(signatureBytes),
 			}

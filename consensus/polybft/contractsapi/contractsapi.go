@@ -411,6 +411,23 @@ func (i *InitializeNativeERC20Function) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
 }
 
+type InitializeNativeERC20MintableFunction struct {
+	Predicate_ types.Address `abi:"predicate_"`
+	Owner_     types.Address `abi:"owner_"`
+	RootToken_ types.Address `abi:"rootToken_"`
+	Name_      string        `abi:"name_"`
+	Symbol_    string        `abi:"symbol_"`
+	Decimals_  uint8         `abi:"decimals_"`
+}
+
+func (i *InitializeNativeERC20MintableFunction) EncodeAbi() ([]byte, error) {
+	return NativeERC20Mintable.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeNativeERC20MintableFunction) DecodeAbi(buf []byte) error {
+	return decodeMethod(NativeERC20Mintable.Abi.Methods["initialize"], buf, i)
+}
+
 type InitializeRootERC20PredicateFunction struct {
 	NewStateSender         types.Address `abi:"newStateSender"`
 	NewExitHelper          types.Address `abi:"newExitHelper"`

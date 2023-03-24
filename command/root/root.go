@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybft"
 	"github.com/0xPolygon/polygon-edge/command/polybftmanifest"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/command/regenesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
@@ -63,6 +64,7 @@ func (rc *RootCommand) registerSubCommands() {
 		polybft.GetCommand(),
 		polybftmanifest.GetCommand(),
 		bridge.GetCommand(),
+		regenesis.GetCommand(),
 	)
 }
 

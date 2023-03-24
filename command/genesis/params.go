@@ -29,6 +29,7 @@ const (
 	posFlag           = "pos"
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
+	mintableTokenFlag = "mintable-native-token"
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -84,6 +85,13 @@ type genesisParams struct {
 	bridgeJSONRPCAddr       string
 	epochReward             uint64
 	eventTrackerStartBlocks []string
+
+	initialStateRoot string
+
+	// allowlist
+	contractDeployerAllowListAdmin   []string
+	contractDeployerAllowListEnabled []string
+	mintableNativeToken              bool
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -337,13 +345,13 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineRaw := range p.premine {
-		premineInfo, err := parsePremineInfo(premineRaw)
+		premineInfo, err := ParsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
-			Balance: premineInfo.balance,
+		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
+			Balance: premineInfo.Amount,
 		}
 	}
 

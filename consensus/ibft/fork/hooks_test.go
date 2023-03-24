@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type mockHeaderModifierStore struct {
@@ -282,8 +281,8 @@ func newTestTransition(
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash, err := ex.WriteGenesis(nil)
-	require.NoError(t, err)
+	rootHash, err := ex.WriteGenesis(nil, types.Hash{})
+	assert.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {

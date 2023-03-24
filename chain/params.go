@@ -13,6 +13,17 @@ type Params struct {
 	Engine         map[string]interface{} `json:"engine"`
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
+
+	// AllowList configuration
+	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowListConfig,omitempty"`
+}
+
+type AllowListConfig struct {
+	// AdminAddresses is the list of the initial admin addresses
+	AdminAddresses []types.Address `json:"adminAddresses,omitempty"`
+
+	// EnabledAddresses is the list of the initial enabled addresses
+	EnabledAddresses []types.Address `json:"enabledAddresses,omitempty"`
 }
 
 func (p *Params) GetEngine() string {

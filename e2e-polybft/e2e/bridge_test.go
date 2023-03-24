@@ -83,8 +83,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
+	cluster.WaitForReady(t)
 
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
@@ -235,8 +234,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
@@ -412,8 +410,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
+	cluster.WaitForReady(t)
 
 	// init rpc clients
 	l1TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(txrelayer.DefaultRPCAddress))
@@ -511,8 +508,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
+	cluster.WaitForReady(t)
 
 	// init rpc clients
 	l1TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(txrelayer.DefaultRPCAddress))

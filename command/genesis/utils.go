@@ -62,30 +62,35 @@ func verifyGenesisExistence(genesisPath string) *GenesisGenError {
 	return nil
 }
 
-type premineInfo struct {
-	address types.Address
-	balance *big.Int
+type PremineInfo struct {
+	Address types.Address
+	Amount  *big.Int
 }
 
-// parsePremineInfo parses provided premine information and returns premine address and premine balance
-func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
-	address := types.ZeroAddress
-	val := command.DefaultPremineBalance
+// ParsePremineInfo parses provided premine information and returns premine address and amount
+func ParsePremineInfo(premineInfoRaw string) (*PremineInfo, error) {
+	var (
+		address types.Address
+		amount  = command.DefaultPremineBalance
+		err     error
+	)
 
 	if delimiterIdx := strings.Index(premineInfoRaw, ":"); delimiterIdx != -1 {
 		// <addr>:<balance>
-		address, val = types.StringToAddress(premineInfoRaw[:delimiterIdx]), premineInfoRaw[delimiterIdx+1:]
+		valueRaw := premineInfoRaw[delimiterIdx+1:]
+
+		amount, err = types.ParseUint256orHex(&valueRaw)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse amount %s: %w", valueRaw, err)
+		}
+
+		address = types.StringToAddress(premineInfoRaw[:delimiterIdx])
 	} else {
 		// <addr>
 		address = types.StringToAddress(premineInfoRaw)
 	}
 
-	amount, err := types.ParseUint256orHex(&val)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount %s: %w", val, err)
-	}
-
-	return &premineInfo{address: address, balance: amount}, nil
+	return &PremineInfo{Address: address, Amount: amount}, nil
 }
 
 // parseTrackerStartBlocks parses provided event tracker start blocks configuration.

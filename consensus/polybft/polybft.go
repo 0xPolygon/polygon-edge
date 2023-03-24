@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -142,18 +143,46 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
 		}
 
-		// initialize NativeERC20 SC
-		input, err = getInitNativeERC20Input(
-			nativeTokenName,
-			nativeTokenSymbol,
-			nativeTokenDecimals,
-			rootNativeERC20Token,
-			contracts.ChildERC20PredicateContract)
-		if err != nil {
-			return err
+		if polyBFTConfig.MintableERC20Token {
+			// initialize NativeERC20Mintable SC
+			params := &contractsapi.InitializeNativeERC20MintableFunction{
+				Predicate_: contracts.ChildERC20PredicateContract,
+				Owner_:     polyBFTConfig.Governance,
+				RootToken_: rootNativeERC20Token,
+				Name_:      nativeTokenName,
+				Symbol_:    nativeTokenSymbol,
+				Decimals_:  nativeTokenDecimals,
+			}
+
+			input, err := params.EncodeAbi()
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
+				return err
+			}
+		} else {
+			// initialize NativeERC20 SC
+			params := &contractsapi.InitializeNativeERC20Function{
+				Name_:      nativeTokenName,
+				Symbol_:    nativeTokenSymbol,
+				Decimals_:  nativeTokenDecimals,
+				RootToken_: rootNativeERC20Token,
+				Predicate_: contracts.ChildERC20PredicateContract,
+			}
+
+			input, err := params.EncodeAbi()
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
+				return err
+			}
 		}
 
-		return initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition)
+		return nil
 	}
 }
 
@@ -308,6 +337,8 @@ func (p *Polybft) startConsensusProtocol() {
 				// The blockchain notification system can eventually deliver
 				// stale block notifications. These should be ignored
 				if ev.Source == "syncer" && ev.NewChain[0].Number >= p.blockchain.CurrentHeader().Number {
+					p.logger.Info("sync block notification received", "block height", ev.NewChain[0].Number,
+						"current height", p.blockchain.CurrentHeader().Number)
 					syncerBlockCh <- struct{}{}
 				}
 			}
@@ -344,7 +375,7 @@ func (p *Polybft) startConsensusProtocol() {
 			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
 		}
 
-		now := time.Now()
+		now := time.Now().UTC()
 
 		select {
 		case <-syncerBlockCh:

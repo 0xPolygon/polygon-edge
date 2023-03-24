@@ -200,7 +200,7 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 		Forks: chain.AllForksEnabled,
 	}, st, hclog.NewNullLogger())
 
-	rootHash, err := ex.WriteGenesis(alloc)
+	rootHash, err := ex.WriteGenesis(alloc, types.Hash{})
 	require.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {

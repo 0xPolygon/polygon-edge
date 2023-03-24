@@ -132,12 +132,11 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		parentExtra  *Extra
 		parentHeader *types.Header
 		currentExtra *Extra
+		found        bool
 	)
 
 	if initialBlockNumber < latestHeader.Number {
-		found := false
 		parentHeader, found = c.blockchain.GetHeaderByNumber(initialBlockNumber)
-
 		if !found {
 			return fmt.Errorf("block %d was not found", initialBlockNumber)
 		}

@@ -158,7 +158,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		ParentHash: parent.Hash,
 		Number:     num + 1,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-		Timestamp:  uint64(time.Now().Unix()),
+		Timestamp:  uint64(time.Now().UTC().Unix()),
 	}
 
 	// calculate gas limit based on parent header

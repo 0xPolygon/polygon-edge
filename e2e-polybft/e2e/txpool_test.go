@@ -25,7 +25,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(sender.Address())))
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
@@ -65,7 +65,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 
 	wg.Wait()
 
-	err = cluster.WaitUntil(2*time.Minute, func() bool {
+	err = cluster.WaitUntil(2*time.Minute, 2*time.Second, func() bool {
 		for _, receiver := range receivers {
 			balance, err := client.GetBalance(receiver, ethgo.Latest)
 			if err != nil {
@@ -91,7 +91,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(premine.Address())))
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
@@ -100,7 +100,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	require.NoError(t, err)
 
 	waitUntilBalancesChanged := func(acct ethgo.Address) error {
-		err := cluster.WaitUntil(30*time.Second, func() bool {
+		err := cluster.WaitUntil(30*time.Second, 2*time.Second, func() bool {
 			balance, err := client.GetBalance(acct, ethgo.Latest)
 			if err != nil {
 				return true

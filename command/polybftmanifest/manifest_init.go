@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 	"strings"
@@ -19,6 +20,7 @@ import (
 const (
 	manifestPathFlag      = "path"
 	premineValidatorsFlag = "premine-validators"
+	stakeFlag             = "stake"
 	validatorsFlag        = "validators"
 	validatorsPathFlag    = "validators-path"
 	validatorsPrefixFlag  = "validators-prefix"
@@ -82,11 +84,14 @@ func setFlags(cmd *cobra.Command) {
 		"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
 	)
 
-	cmd.Flags().StringVar(
+	cmd.Flags().StringArrayVar(
 		&params.premineValidators,
 		premineValidatorsFlag,
-		command.DefaultPremineBalance,
-		"the amount which will be pre-mined to all the validators",
+		[]string{},
+		fmt.Sprintf(
+			"the premined validators and balances (format: <address>[:<balance>]). Default premined balance: %d",
+			command.DefaultPremineBalance,
+		),
 	)
 
 	cmd.Flags().Int64Var(
@@ -94,6 +99,16 @@ func setFlags(cmd *cobra.Command) {
 		chainIDFlag,
 		command.DefaultChainID,
 		"the ID of the chain",
+	)
+
+	cmd.Flags().StringArrayVar(
+		&params.stakes,
+		stakeFlag,
+		[]string{},
+		fmt.Sprintf(
+			"validators staked amount (format: <address>[:<amount>]). Default stake amount: %d",
+			command.DefaultStake,
+		),
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
@@ -125,7 +140,8 @@ type manifestInitParams struct {
 	manifestPath         string
 	validatorsPath       string
 	validatorsPrefixPath string
-	premineValidators    string
+	premineValidators    []string
+	stakes               []string
 	validators           []string
 	chainID              int64
 }
@@ -135,18 +151,31 @@ func (p *manifestInitParams) validateFlags() error {
 		return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
 	}
 
-	if _, err := types.ParseUint256orHex(&p.premineValidators); err != nil {
-		return fmt.Errorf("invalid premine validators balance provided '%s': %w", p.premineValidators, err)
-	}
-
 	return nil
 }
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
 func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error) {
-	balance, err := types.ParseUint256orHex(&params.premineValidators)
-	if err != nil {
-		return nil, fmt.Errorf("provided invalid premine validators balance: %s", params.premineValidators)
+	// populate validators premine info
+	premineMap := make(map[types.Address]*genesis.PremineInfo, len(p.premineValidators))
+	stakeMap := make(map[types.Address]*genesis.PremineInfo, len(p.stakes))
+
+	for _, premine := range p.premineValidators {
+		premineInfo, err := genesis.ParsePremineInfo(premine)
+		if err != nil {
+			return nil, err
+		}
+
+		premineMap[premineInfo.Address] = premineInfo
+	}
+
+	for _, stake := range p.stakes {
+		stakeInfo, err := genesis.ParsePremineInfo(stake)
+		if err != nil {
+			return nil, fmt.Errorf("invalid stake amount provided '%s' : %w", stake, err)
+		}
+
+		stakeMap[stakeInfo.Address] = stakeInfo
 	}
 
 	if len(p.validators) > 0 {
@@ -177,12 +206,14 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
 			}
 
+			addr := types.StringToAddress(trimmedAddress)
 			validators[i] = &polybft.Validator{
 				MultiAddr:    parts[0],
-				Address:      types.StringToAddress(trimmedAddress),
+				Address:      addr,
 				BlsKey:       trimmedBLSKey,
 				BlsSignature: parts[3],
-				Balance:      balance,
+				Balance:      getPremineAmount(addr, premineMap, command.DefaultPremineBalance),
+				Stake:        getPremineAmount(addr, stakeMap, command.DefaultStake),
 			}
 		}
 
@@ -200,10 +231,21 @@ func (p *manifestInitParams) getValidatorAccounts() ([]*polybft.Validator, error
 	}
 
 	for _, v := range validators {
-		v.Balance = balance
+		v.Balance = getPremineAmount(v.Address, premineMap, command.DefaultPremineBalance)
+		v.Stake = getPremineAmount(v.Address, stakeMap, command.DefaultStake)
 	}
 
 	return validators, nil
+}
+
+// getPremineAmount retrieves amount from the premine map or if not provided, returns default amount
+func getPremineAmount(addr types.Address, premineMap map[types.Address]*genesis.PremineInfo,
+	defaultAmount *big.Int) *big.Int {
+	if premine, exists := premineMap[addr]; exists {
+		return premine.Amount
+	}
+
+	return defaultAmount
 }
 
 func (p *manifestInitParams) getResult() command.CommandResult {

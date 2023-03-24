@@ -39,10 +39,14 @@ type PolyBFTConfig struct {
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
 
+	// MintableERC20Token denotes whether mintable ERC20 token is used
+	MintableERC20Token bool `json:"mintableERC20"`
+
 	// TODO: Remove these two addresses as they are hardcoded and known in advance
 	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
 	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
 	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
+	InitialTrieRoot   types.Hash    `json:"initialTrieRoot"`
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
@@ -83,6 +87,7 @@ type Validator struct {
 	BlsKey        string
 	BlsSignature  string
 	Balance       *big.Int
+	Stake         *big.Int
 	MultiAddr     string
 }
 
@@ -91,20 +96,23 @@ type validatorRaw struct {
 	BlsKey       string        `json:"blsKey"`
 	BlsSignature string        `json:"blsSignature"`
 	Balance      *string       `json:"balance"`
+	Stake        *string       `json:"stake"`
 	MultiAddr    string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
 	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
 	raw.Balance = types.EncodeBigInt(v.Balance)
+	raw.Stake = types.EncodeBigInt(v.Stake)
 
 	return json.Marshal(raw)
 }
 
 func (v *Validator) UnmarshalJSON(data []byte) error {
-	var raw validatorRaw
-
-	var err error
+	var (
+		raw validatorRaw
+		err error
+	)
 
 	if err = json.Unmarshal(data, &raw); err != nil {
 		return err
@@ -114,8 +122,13 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 	v.BlsKey = raw.BlsKey
 	v.BlsSignature = raw.BlsSignature
 	v.MultiAddr = raw.MultiAddr
-	v.Balance, err = types.ParseUint256orHex(raw.Balance)
 
+	v.Balance, err = types.ParseUint256orHex(raw.Balance)
+	if err != nil {
+		return err
+	}
+
+	v.Stake, err = types.ParseUint256orHex(raw.Stake)
 	if err != nil {
 		return err
 	}
@@ -164,7 +177,7 @@ func (v Validator) ToValidatorInitAPIBinding() (*contractsapi.ValidatorInit, err
 		Addr:      v.Address,
 		Pubkey:    pubKey.ToBigInt(),
 		Signature: signBigInts,
-		Stake:     new(big.Int).Set(v.Balance),
+		Stake:     new(big.Int).Set(v.Stake),
 	}, nil
 }
 
@@ -178,10 +191,16 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 	metadata := &ValidatorMetadata{
 		Address:     v.Address,
 		BlsKey:      blsKey,
-		VotingPower: new(big.Int).Set(v.Balance),
+		VotingPower: new(big.Int).Set(v.Stake),
 	}
 
 	return metadata, nil
+}
+
+// String implements fmt.Stringer interface
+func (v *Validator) String() string {
+	return fmt.Sprintf("Address=%s; Balance=%d; P2P Multi addr=%s; BLS Key=%s;",
+		v.Address, v.Balance, v.MultiAddr, v.BlsKey)
 }
 
 // RootchainConfig contains information about rootchain contract addresses

@@ -60,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
+			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)
@@ -198,6 +198,38 @@ func setFlags(cmd *cobra.Command) {
 			"event tracker starting block configuration, which is specified per contract address "+
 				"(format: <contract address>:<start block>)",
 		)
+
+		//Regenesis flag that allows to start from non-empty database
+		cmd.Flags().StringVar(
+			&params.initialStateRoot,
+			trieRootFlag,
+			"",
+			"trie root from the corresponding triedb",
+		)
+
+		cmd.Flags().BoolVar(
+			&params.mintableNativeToken,
+			mintableTokenFlag,
+			false,
+			"flag indicate whether mintable or non-mintable native ERC20 token is deployed",
+		)
+	}
+
+	// Allow list
+	{
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListAdmin,
+			contractDeployedAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the contract deployer allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListEnabled,
+			contractDeployedAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the contract deployer allow list",
+		)
 	}
 }
 
@@ -209,7 +241,7 @@ func setLegacyFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,
-		"the ID of the chain",
+		"the ID of the chain (not-applicable for Polybft consensus protocol as chain id is defined in manifest.json)",
 	)
 
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
@@ -232,7 +264,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var err error
 
 	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftChainConfig()
+		err = params.generatePolyBftChainConfig(outputter)
 	} else {
 		err = params.generateGenesis()
 	}
