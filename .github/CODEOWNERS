@@ -6,4 +6,4 @@
 
 # Docker
 
-/docker/local @topos-network/protocol @topos-network/tools
+/docker @topos-network/protocol @topos-network/tools
