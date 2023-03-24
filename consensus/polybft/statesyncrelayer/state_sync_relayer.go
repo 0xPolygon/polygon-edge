@@ -199,7 +199,7 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 		return fmt.Errorf("failed to unmarshal state sync event from JSON. Error: %w", err)
 	}
 
-	execute := &contractsapi.ExecuteFunction{
+	execute := &contractsapi.ExecuteStateReceiverFn{
 		Proof: proof.Data,
 		Obj:   sse,
 	}

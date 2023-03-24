@@ -36,7 +36,7 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 		apiValidators[i] = validatorData
 	}
 
-	params := &contractsapi.InitializeChildValidatorSetFunction{
+	params := &contractsapi.InitializeChildValidatorSetFn{
 		Init: &contractsapi.InitStruct{
 			EpochReward:   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
 			MinStake:      big.NewInt(minStake),
@@ -62,7 +62,7 @@ func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 		rootERC20Addr = config.RootNativeERC20Addr
 	}
 
-	params := &contractsapi.InitializeChildERC20PredicateFunction{
+	params := &contractsapi.InitializeChildERC20PredicateFn{
 		NewL2StateSender:          contracts.L2StateSenderContract,
 		NewStateReceiver:          contracts.StateReceiverContract,
 		NewRootERC20Predicate:     rootERC20PredicateAddr,

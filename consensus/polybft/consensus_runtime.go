@@ -451,7 +451,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 // in the current epoch, and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
-	epoch *epochMetadata) (*contractsapi.CommitEpochFunction, error) {
+	epoch *epochMetadata) (*contractsapi.CommitEpochChildValidatorSetFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -529,7 +529,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
 	}
 
-	commitEpoch := &contractsapi.CommitEpochFunction{
+	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),

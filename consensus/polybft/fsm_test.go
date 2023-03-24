@@ -1038,7 +1038,7 @@ func TestFSM_DecodeCommitEpochStateTx(t *testing.T) {
 	decodedInputData, err := decodeStateTransaction(tx.Input)
 	require.NoError(t, err)
 
-	decodedCommitEpoch, ok := decodedInputData.(*contractsapi.CommitEpochFunction)
+	decodedCommitEpoch, ok := decodedInputData.(*contractsapi.CommitEpochChildValidatorSetFn)
 	require.True(t, ok)
 	require.True(t, commitEpoch.ID.Cmp(decodedCommitEpoch.ID) == 0)
 	require.NotNil(t, decodedCommitEpoch.Epoch)
