@@ -72,7 +72,6 @@ type BridgeConfig struct {
 	CheckpointAddr          types.Address            `json:"checkpointAddr"`
 	RootERC20PredicateAddr  types.Address            `json:"rootERC20PredicateAddr"`
 	RootNativeERC20Addr     types.Address            `json:"rootNativeERC20Addr"`
-	EIP1559BurnAddr         types.Address            `json:"eip1559BurnAddr"`
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
 	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
 }
@@ -215,7 +214,6 @@ type RootchainConfig struct {
 	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
 	RootNativeERC20Address    types.Address `json:"rootNativeERC20Address"`
 	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
-	EIP1559BurnAddress        types.Address `json:"eip1559BurnAddress"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance
@@ -225,7 +223,6 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		CheckpointAddr:         r.CheckpointManagerAddress,
 		RootERC20PredicateAddr: r.RootERC20PredicateAddress,
 		RootNativeERC20Addr:    r.RootNativeERC20Address,
-		EIP1559BurnAddr:        r.EIP1559BurnAddress,
 	}
 }
 

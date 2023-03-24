@@ -81,6 +81,7 @@ type runtimeConfig struct {
 	bridgeTopic           topic
 	numBlockConfirmations uint64
 	jsonrpcAddr           *net.TCPAddr
+	calculateBurnContract func(block uint64) (types.Address, error)
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -237,7 +238,7 @@ func (c *consensusRuntime) initBurntFeesManager(logger hcf.Logger) error {
 			wallet.NewEcdsaSigner(c.config.Key),
 			txRelayer,
 			defaultBurntFeesWithdrawalOffset,
-			c.config.PolyBFTConfig.Bridge.EIP1559BurnAddr,
+			c.config.calculateBurnContract,
 			logger.Named("burnt_fees_manager"),
 		)
 	} else {

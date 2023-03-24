@@ -40,8 +40,8 @@ type burntFeesManager struct {
 	// txRelayer is the abstraction on the child chain interaction logic.
 	txRelayer txrelayer.TxRelayer
 
-	// burntFeesManagerAddr is the address of EIP-1599 burnt contract
-	burntFeesManagerAddr types.Address
+	// calculateBurnContract returns burnt contract address based on the given block
+	calculateBurnContract func(block uint64) (types.Address, error)
 
 	// checkpointsOffset represents offset between withdrawal blocks (applicable only for non-epoch ending blocks)
 	withdrawalOffset uint64
@@ -58,15 +58,15 @@ func newBurntFeesManager(
 	key ethgo.Key,
 	txRelayer txrelayer.TxRelayer,
 	withdrawalOffset uint64,
-	burntFeesManagerAddr types.Address,
+	calculateBurnContract func(block uint64) (types.Address, error),
 	logger hclog.Logger,
 ) *burntFeesManager {
 	return &burntFeesManager{
-		key:                  key,
-		txRelayer:            txRelayer,
-		burntFeesManagerAddr: burntFeesManagerAddr,
-		withdrawalOffset:     withdrawalOffset,
-		logger:               logger,
+		key:                   key,
+		txRelayer:             txRelayer,
+		calculateBurnContract: calculateBurnContract,
+		withdrawalOffset:      withdrawalOffset,
+		logger:                logger,
 	}
 }
 
@@ -82,9 +82,15 @@ func (m *burntFeesManager) PostBlock(req *PostBlockRequest) error {
 	m.logger.Debug("burnt fees withdrawal invoked...",
 		"withdrawal block", latestHeader.Number)
 
-	burntFeesManagerAddr := ethgo.Address(m.burntFeesManagerAddr)
+	// Get burn contract address based on the given header
+	burnContractAddr, err := m.calculateBurnContract(latestHeader.Number)
+	if err != nil {
+		return err
+	}
+
+	burnContractAddrPtr := ethgo.Address(burnContractAddr)
 	txn := &ethgo.Transaction{
-		To:   &burntFeesManagerAddr,
+		To:   &burnContractAddrPtr,
 		From: m.key.Address(),
 	}
 
