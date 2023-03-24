@@ -112,21 +112,21 @@ func GetCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(
 		&params.rootERC20TokenAddr,
-		rootERC20TokenFlag,
+		erc20AddrFlag,
 		"",
 		"existing root chain ERC 20 token address",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rootERC721TokenAddr,
-		rootERC721TokenFlag,
+		erc721AddrFlag,
 		"",
 		"existing root chain ERC 721 token address",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rootERC1155TokenAddr,
-		rootERC1155TokenFlag,
+		erc1155AddrFlag,
 		"",
 		"existing root chain ERC 1155 token address",
 	)
@@ -269,7 +269,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	if params.rootERC20TokenAddr != "" {
 		// use existing root chain ERC20 token
-		if err := populateExistingTokenAddr(client.Eth(), params.rootERC20TokenAddr, rootERC20Name, manifest); err != nil {
+		if err := populateExistingTokenAddr(client.Eth(),
+			params.rootERC20TokenAddr, rootERC20Name, manifest); err != nil {
 			return err
 		}
 	} else {
@@ -280,7 +281,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	if params.rootERC721TokenAddr != "" {
 		// use existing root chain ERC721 token
-		if err := populateExistingTokenAddr(client.Eth(), params.rootERC721TokenAddr, rootERC721Name, manifest); err != nil {
+		if err := populateExistingTokenAddr(client.Eth(),
+			params.rootERC721TokenAddr, rootERC721Name, manifest); err != nil {
 			return err
 		}
 	} else {
@@ -291,7 +293,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	if params.rootERC1155TokenAddr != "" {
 		// use existing root chain ERC1155 token
-		if err := populateExistingTokenAddr(client.Eth(), params.rootERC1155TokenAddr, rootERC1155Name, manifest); err != nil {
+		if err := populateExistingTokenAddr(client.Eth(),
+			params.rootERC1155TokenAddr, rootERC1155Name, manifest); err != nil {
 			return err
 		}
 	} else {

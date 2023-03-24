@@ -7,13 +7,12 @@ import (
 )
 
 const (
-	manifestPathFlag     = "manifest"
-	deployerKeyFlag      = "deployer-key"
-	jsonRPCFlag          = "json-rpc"
-	rootchainERC20Flag   = "rootchain-erc20"
-	rootERC20TokenFlag   = "erc20-token"
-	rootERC721TokenFlag  = "erc721-token"
-	rootERC1155TokenFlag = "erc1155-token"
+	manifestPathFlag = "manifest"
+	deployerKeyFlag  = "deployer-key"
+	jsonRPCFlag      = "json-rpc"
+	erc20AddrFlag    = "erc20-token"
+	erc721AddrFlag   = "erc721-token"
+	erc1155AddrFlag  = "erc1155-token"
 
 	defaultManifestPath = "./manifest.json"
 )
