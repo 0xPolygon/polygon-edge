@@ -83,11 +83,11 @@ type StateSyncResultEvent struct {
 	Message []byte   `abi:"message"`
 }
 
-func (s *StateSyncResultEvent) Sig() ethgo.Hash {
+func (*StateSyncResultEvent) Sig() ethgo.Hash {
 	return StateReceiver.Abi.Events["StateSyncResult"].ID()
 }
 
-func (s *StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
 	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.Encode(inputs)
 }
 
@@ -105,11 +105,11 @@ type NewCommitmentEvent struct {
 	Root    types.Hash `abi:"root"`
 }
 
-func (n *NewCommitmentEvent) Sig() ethgo.Hash {
+func (*NewCommitmentEvent) Sig() ethgo.Hash {
 	return StateReceiver.Abi.Events["NewCommitment"].ID()
 }
 
-func (n *NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
 	return StateReceiver.Abi.Events["NewCommitment"].Inputs.Encode(inputs)
 }
 
@@ -277,11 +277,11 @@ type NewValidatorEvent struct {
 	BlsKey    [4]*big.Int   `abi:"blsKey"`
 }
 
-func (n *NewValidatorEvent) Sig() ethgo.Hash {
+func (*NewValidatorEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["NewValidator"].ID()
 }
 
-func (n *NewValidatorEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*NewValidatorEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["NewValidator"].Inputs.Encode(inputs)
 }
 
@@ -298,11 +298,11 @@ type StakedEvent struct {
 	Amount    *big.Int      `abi:"amount"`
 }
 
-func (s *StakedEvent) Sig() ethgo.Hash {
+func (*StakedEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["Staked"].ID()
 }
 
-func (s *StakedEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*StakedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["Staked"].Inputs.Encode(inputs)
 }
 
@@ -320,11 +320,11 @@ type DelegatedEvent struct {
 	Amount    *big.Int      `abi:"amount"`
 }
 
-func (d *DelegatedEvent) Sig() ethgo.Hash {
+func (*DelegatedEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["Delegated"].ID()
 }
 
-func (d *DelegatedEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*DelegatedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["Delegated"].Inputs.Encode(inputs)
 }
 
@@ -341,11 +341,11 @@ type UnstakedEvent struct {
 	Amount    *big.Int      `abi:"amount"`
 }
 
-func (u *UnstakedEvent) Sig() ethgo.Hash {
+func (*UnstakedEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["Unstaked"].ID()
 }
 
-func (u *UnstakedEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*UnstakedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["Unstaked"].Inputs.Encode(inputs)
 }
 
@@ -363,11 +363,11 @@ type UndelegatedEvent struct {
 	Amount    *big.Int      `abi:"amount"`
 }
 
-func (u *UndelegatedEvent) Sig() ethgo.Hash {
+func (*UndelegatedEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["Undelegated"].ID()
 }
 
-func (u *UndelegatedEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*UndelegatedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["Undelegated"].Inputs.Encode(inputs)
 }
 
@@ -383,11 +383,11 @@ type AddedToWhitelistEvent struct {
 	Validator types.Address `abi:"validator"`
 }
 
-func (a *AddedToWhitelistEvent) Sig() ethgo.Hash {
+func (*AddedToWhitelistEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["AddedToWhitelist"].ID()
 }
 
-func (a *AddedToWhitelistEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*AddedToWhitelistEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["AddedToWhitelist"].Inputs.Encode(inputs)
 }
 
@@ -405,11 +405,11 @@ type WithdrawalEvent struct {
 	Amount  *big.Int      `abi:"amount"`
 }
 
-func (w *WithdrawalEvent) Sig() ethgo.Hash {
+func (*WithdrawalEvent) Sig() ethgo.Hash {
 	return ChildValidatorSet.Abi.Events["Withdrawal"].ID()
 }
 
-func (w *WithdrawalEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*WithdrawalEvent) Encode(inputs interface{}) ([]byte, error) {
 	return ChildValidatorSet.Abi.Events["Withdrawal"].Inputs.Encode(inputs)
 }
 
@@ -445,11 +445,11 @@ type StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (s *StateSyncedEvent) Sig() ethgo.Hash {
+func (*StateSyncedEvent) Sig() ethgo.Hash {
 	return StateSender.Abi.Events["StateSynced"].ID()
 }
 
-func (s *StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return StateSender.Abi.Events["StateSynced"].Inputs.Encode(inputs)
 }
 
@@ -468,11 +468,11 @@ type L2StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (l *L2StateSyncedEvent) Sig() ethgo.Hash {
+func (*L2StateSyncedEvent) Sig() ethgo.Hash {
 	return L2StateSender.Abi.Events["L2StateSynced"].ID()
 }
 
-func (l *L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
+func (*L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
 	return L2StateSender.Abi.Events["L2StateSynced"].Inputs.Encode(inputs)
 }
 

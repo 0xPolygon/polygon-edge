@@ -342,11 +342,11 @@ func generateEvent(generatedData *generatedData, contractName string, event *abi
 	{{.}}
 {{ end }}
 
-func ({{.Sig}} *{{.TName}}) Sig() ethgo.Hash {
+func (*{{.TName}}) Sig() ethgo.Hash {
 	return {{.ContractName}}.Abi.Events["{{.Name}}"].ID()
 }
 
-func ({{.Sig}} *{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
+func (*{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
 	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
 }
 
