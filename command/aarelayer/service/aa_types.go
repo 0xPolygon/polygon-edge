@@ -1,8 +1,10 @@
 package service
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -45,11 +47,16 @@ var (
 
 // AATransaction represents an AA transaction
 type AATransaction struct {
-	Signature   []byte      `json:"signature"`
+	Signature   string      `json:"signature"`
 	Transaction Transaction `json:"transaction"`
 }
 
 func (t *AATransaction) GetAddressFromSignature(address types.Address, chainID int64) types.Address {
+	signatureBytes, err := hex.DecodeString(strings.TrimPrefix(t.Signature, "0x"))
+	if err != nil {
+		return types.ZeroAddress
+	}
+
 	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
 	if err != nil {
 		return types.ZeroAddress
@@ -60,7 +67,7 @@ func (t *AATransaction) GetAddressFromSignature(address types.Address, chainID i
 		return types.ZeroAddress
 	}
 
-	recoveredAddress, err := ethgowallet.Ecrecover(Make3074Hash(chainID, address, hash[:]), t.Signature)
+	recoveredAddress, err := ethgowallet.Ecrecover(Make3074Hash(chainID, address, hash[:]), signatureBytes)
 	if err != nil {
 		return types.ZeroAddress
 	}
@@ -79,12 +86,12 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 		return err
 	}
 
-	sig, err := key.Sign(Make3074Hash(chainID, address, hash[:]))
+	signatureBytes, err := key.Sign(Make3074Hash(chainID, address, hash[:]))
 	if err != nil {
 		return err
 	}
 
-	t.Signature = sig
+	t.Signature = hex.EncodeToString(signatureBytes)
 
 	return nil
 }

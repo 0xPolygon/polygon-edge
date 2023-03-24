@@ -54,7 +54,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: "",
 			Transaction: Transaction{
 				From:  types.Address(userAccount.Ecdsa.Address()),
 				Nonce: 0,
@@ -183,7 +183,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: "",
 			Transaction: Transaction{
 				Nonce: 0,
 				Payload: []Payload{
@@ -211,7 +211,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: "",
 			Transaction: Transaction{
 				Nonce: 0,
 				Payload: []Payload{
@@ -237,7 +237,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: "",
 			Transaction: Transaction{
 				Nonce: 0,
 				Payload: []Payload{

@@ -132,7 +132,7 @@ func (s *AARelayerRestServer) ListenAndServe(addr string) error {
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 			// If the request method is OPTIONS, return immediately.
-			if r.Method == "OPTIONS" {
+			if r.Method == http.MethodOptions {
 				return
 			}
 
