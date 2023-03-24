@@ -297,6 +297,7 @@ func (p *Polybft) initRuntime() error {
 		numBlockConfirmations: p.config.NumBlockConfirmations,
 		jsonrpcAddr:           p.config.Config.JSONRPCAddr,
 		calculateBurnContract: p.config.Config.Params.CalculateBurnContract,
+		forks:                 p.config.Config.Params.Forks,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

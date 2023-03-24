@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	hcf "github.com/hashicorp/go-hclog"
@@ -82,6 +84,7 @@ type runtimeConfig struct {
 	numBlockConfirmations uint64
 	jsonrpcAddr           *net.TCPAddr
 	calculateBurnContract func(block uint64) (types.Address, error)
+	forks                 *chain.Forks
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -239,6 +242,7 @@ func (c *consensusRuntime) initBurntFeesManager(logger hcf.Logger) error {
 			txRelayer,
 			defaultBurntFeesWithdrawalOffset,
 			c.config.calculateBurnContract,
+			c.config.forks,
 			logger.Named("burnt_fees_manager"),
 		)
 	} else {

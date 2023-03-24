@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -43,6 +45,9 @@ type burntFeesManager struct {
 	// calculateBurnContract returns burnt contract address based on the given block
 	calculateBurnContract func(block uint64) (types.Address, error)
 
+	// forks is needed to check if london hardfork is enabled for the given block
+	forks *chain.Forks
+
 	// checkpointsOffset represents offset between withdrawal blocks (applicable only for non-epoch ending blocks)
 	withdrawalOffset uint64
 
@@ -59,12 +64,14 @@ func newBurntFeesManager(
 	txRelayer txrelayer.TxRelayer,
 	withdrawalOffset uint64,
 	calculateBurnContract func(block uint64) (types.Address, error),
+	forks *chain.Forks,
 	logger hclog.Logger,
 ) *burntFeesManager {
 	return &burntFeesManager{
 		key:                   key,
 		txRelayer:             txRelayer,
 		calculateBurnContract: calculateBurnContract,
+		forks:                 forks,
 		withdrawalOffset:      withdrawalOffset,
 		logger:                logger,
 	}
@@ -72,6 +79,11 @@ func newBurntFeesManager(
 
 func (m *burntFeesManager) PostBlock(req *PostBlockRequest) error {
 	latestHeader := req.FullBlock.Block.Header
+
+	// Check if london hardfork is enabled
+	if !m.forks.IsLondon(latestHeader.Number) {
+		return nil
+	}
 
 	// Check if withdrawal is needed by the current miner
 	if !m.isWithdrawalBlock(latestHeader.Number, req.IsEpochEndingBlock) ||
