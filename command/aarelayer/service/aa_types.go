@@ -15,6 +15,7 @@ import (
 )
 
 const (
+	signatureLength        = 65
 	domainSeparatorName    = "Account Abstraction Invoker"
 	domainSeparatorVersion = "1.0.0"
 
@@ -47,16 +48,11 @@ var (
 
 // AATransaction represents an AA transaction
 type AATransaction struct {
-	Signature   string      `json:"signature"`
+	Signature   aaSignature `json:"signature"`
 	Transaction Transaction `json:"transaction"`
 }
 
 func (t *AATransaction) GetAddressFromSignature(address types.Address, chainID int64) types.Address {
-	signatureBytes, err := hex.DecodeString(strings.TrimPrefix(t.Signature, "0x"))
-	if err != nil {
-		return types.ZeroAddress
-	}
-
 	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
 	if err != nil {
 		return types.ZeroAddress
@@ -67,7 +63,7 @@ func (t *AATransaction) GetAddressFromSignature(address types.Address, chainID i
 		return types.ZeroAddress
 	}
 
-	recoveredAddress, err := ethgowallet.Ecrecover(Make3074Hash(chainID, address, hash[:]), signatureBytes)
+	recoveredAddress, err := ethgowallet.Ecrecover(Make3074Hash(chainID, address, hash[:]), t.Signature)
 	if err != nil {
 		return types.ZeroAddress
 	}
@@ -86,12 +82,10 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 		return err
 	}
 
-	signatureBytes, err := key.Sign(Make3074Hash(chainID, address, hash[:]))
+	t.Signature, err = key.Sign(Make3074Hash(chainID, address, hash[:]))
 	if err != nil {
 		return err
 	}
-
-	t.Signature = hex.EncodeToString(signatureBytes)
 
 	return nil
 }
@@ -248,4 +242,20 @@ func Make3074Hash(chainID int64, invokerAddr types.Address, commit []byte) []byt
 	copy(msg[65:], commit)
 
 	return ethgo.Keccak256(msg[:])
+}
+
+type aaSignature []byte
+
+func (sig *aaSignature) UnmarshalText(text []byte) (err error) {
+	*sig, err = hex.DecodeString(strings.TrimPrefix(string(text), "0x"))
+
+	return err
+}
+
+func (sig aaSignature) MarshalText() ([]byte, error) {
+	return []byte(hex.EncodeToString(sig)), nil
+}
+
+func (sig aaSignature) IsValid() bool {
+	return len(sig) == signatureLength
 }

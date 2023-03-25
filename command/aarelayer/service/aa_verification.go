@@ -41,6 +41,10 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 		return fmt.Errorf("tx from %s does not have any payload", tx.Transaction.From)
 	}
 
+	if !tx.Signature.IsValid() {
+		return errors.New("invalid signature")
+	}
+
 	for _, payload := range tx.Transaction.Payload {
 		if payload.GasLimit == nil {
 			return fmt.Errorf("tx has invalid payload - gas limit not specified: %s", tx.Transaction.From)
