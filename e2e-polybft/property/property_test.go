@@ -41,9 +41,11 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 					config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", a, premine[i]))
 				}
 			}))
-		defer cluster.Stop()
 
 		// wait for single epoch to process withdrawal
 		require.NoError(t, cluster.WaitForBlock(numBlocks, blockTime*time.Duration(numBlocks)))
+
+		// stop cluster, since it is going to be started again with a next run
+		cluster.Stop()
 	})
 }
