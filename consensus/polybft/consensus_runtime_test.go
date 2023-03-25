@@ -1065,18 +1065,6 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
 }
 
-func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {
-	t.Helper()
-
-	signature, err := validator.mustSign(hash).Marshal()
-	require.NoError(t, err)
-
-	return &MessageSignature{
-		From:      validator.Key().String(),
-		Signature: signature,
-	}
-}
-
 func createTestBlocks(t *testing.T, numberOfBlocks, defaultEpochSize uint64,
 	validatorSet AccountSet) (*types.Header, *testHeadersMap) {
 	t.Helper()

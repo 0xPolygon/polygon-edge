@@ -438,8 +438,8 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 	}
 }
 
-func (v *testValidator) mustSign(hash []byte) *bls.Signature {
-	signature, err := v.account.Bls.Sign(hash, bls.DomainCheckpointManager)
+func (v *testValidator) mustSign(hash, domain []byte) *bls.Signature {
+	signature, err := v.account.Bls.Sign(hash, domain)
 	if err != nil {
 		panic(fmt.Sprintf("BUG: failed to sign: %v", err)) //nolint:gocritic
 	}

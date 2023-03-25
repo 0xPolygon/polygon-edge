@@ -61,7 +61,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	validators.iterAcct(aliases, func(t *testValidator) {
 		bitmap.Set(idx)
-		signatures = append(signatures, t.mustSign(dummyMsg))
+		signatures = append(signatures, t.mustSign(dummyMsg, bls.DomainStateReceiver))
 		idx++
 	})
 
@@ -139,7 +139,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	var signatures bls.Signatures
 
 	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signatures = append(signatures, v.mustSign(proposalHash))
+		signatures = append(signatures, v.mustSign(proposalHash, bls.DomainCheckpointManager))
 		bmp.Set(i)
 		i++
 	})

@@ -36,7 +36,7 @@ func createRandomTestKeys(t *testing.T, numberOfKeys int) []*wallet.Key {
 	return result
 }
 
-func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) *Signature {
+func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash, domain []byte) *Signature {
 	t.Helper()
 
 	var signatures bls.Signatures
@@ -45,7 +45,7 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	for i, x := range accounts {
 		bmp.Set(uint64(i))
 
-		src, err := x.Bls.Sign(hash[:], bls.DomainCheckpointManager)
+		src, err := x.Bls.Sign(hash[:], domain)
 		require.NoError(t, err)
 
 		signatures = append(signatures, src)
