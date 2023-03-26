@@ -41,7 +41,6 @@ case "$1" in
                     BOOTNODE_ADDRESS=$(echo $secrets | jq -r '.[0] | .address')
 
                     echo "Generating IBFT Genesis file..."
-                    ls -la "$POLYGON_EDGE_BIN"
                     "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
                       --dir "$GENESIS_PATH" \
                       --consensus ibft \
@@ -80,12 +79,12 @@ case "$1" in
 
         echo "Predeploying ConstAddressDeployer contract..."
         CONST_ADDRESS_DEPLOYER_ADDRESS=0x0000000000000000000000000000000000001110
-        ls -la "$POLYGON_EDGE_BIN"
         "$POLYGON_EDGE_BIN" genesis predeploy \
-        --chain "$GENESIS_PATH" \
-        --artifacts-path "$CONTRACTS_PATH"/ConstAddressDeployer.json \
-        --predeploy-address "$CONST_ADDRESS_DEPLOYER_ADDRESS"
-        echo "ConstAddressDeployer has been successfully predeployed!"
+          --chain "$GENESIS_PATH" \
+          --artifacts-path "$CONTRACTS_PATH"/ConstAddressDeployer.json \
+          --predeploy-address "$CONST_ADDRESS_DEPLOYER_ADDRESS" \
+          2>&1 >/dev/null && echo "ConstAddressDeployer has been successfully predeployed!" \
+          || echo "Predeployment of ConstAddressDeployer failed with error code $?"
     ;;
 
     *)
