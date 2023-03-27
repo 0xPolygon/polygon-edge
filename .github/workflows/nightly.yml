@@ -27,4 +27,42 @@ jobs:
     name: Polybft Property Tests
     uses: ./.github/workflows/property-polybft.yml
     needs: build
+
+  slack-notification:
+    name: Notify Slack
+    uses: slackapi/slack-github-action@v1.23.0
+    needs: [build, test, e2e, property]
+          env:
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
+            SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          with:
+            payload: |
+              {
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "Nightly Build Results"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "Build details: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                    }
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                    }
+                  },                  
+                ]
+              }
   
