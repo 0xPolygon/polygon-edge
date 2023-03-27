@@ -112,6 +112,10 @@ type StateObject struct {
 	Deleted   bool
 	DirtyCode bool
 	Txn       *iradix.Txn
+
+	// withFakeStorage signals whether the state object
+	// is using the override full state
+	withFakeStorage bool
 }
 
 func (s *StateObject) Empty() bool {
@@ -129,6 +133,7 @@ func (s *StateObject) Copy() *StateObject {
 	ss.Deleted = s.Deleted
 	ss.DirtyCode = s.DirtyCode
 	ss.Code = s.Code
+	ss.withFakeStorage = s.withFakeStorage
 
 	if s.Txn != nil {
 		ss.Txn = s.Txn.CommitOnly().Txn()

@@ -840,7 +840,7 @@ func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime 
 	return chain.ForksInTime{}
 }
 
-func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction, overrides types.StateOverride) (*runtime.ExecutionResult, error) {
 	if m.applyTxnHook != nil {
 		return m.applyTxnHook(header, txn)
 	}

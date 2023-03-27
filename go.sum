@@ -742,6 +742,8 @@ github.com/tyler-smith/go-bip39 v1.1.0 h1:5eUemwrMargf3BSLRRCalXT93Ns6pQJIjYQN2n
 github.com/tyler-smith/go-bip39 v1.1.0/go.mod h1:gUYDtqQw1JS3ZJ8UWVcGTGqqr6YIN3CWg+kkNaLt55U=
 github.com/umbracle/ethgo v0.1.4-0.20230126112511-6a4d02533af6 h1:WqlyYNdrBECgDwDIEMxa4mLUSH/FfPdAuOnniUqNpJs=
 github.com/umbracle/ethgo v0.1.4-0.20230126112511-6a4d02533af6/go.mod h1:8QIHEG/YfGnW4I5AND2Znl9W0LU3tXR9IGqgmSieiGo=
+github.com/umbracle/ethgo v0.1.4-0.20230326234627-15b1df435098 h1:OXYAHR6AKpV2A/BjQNECXod9rR8r5XOT2QCakD2r0YQ=
+github.com/umbracle/ethgo v0.1.4-0.20230326234627-15b1df435098/go.mod h1:bjxSp984qsxCStKoKjqz5fgugi4uWj6+/tFkSEpjk3A=
 github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722 h1:10Nbw6cACsnQm7r34zlpJky+IzxVLRk6MKTS2d3Vp0E=
 github.com/umbracle/fastrlp v0.0.0-20220527094140-59d5dd30e722/go.mod h1:c8J0h9aULj2i3umrfyestM6jCq0LK0U6ly6bWy96nd4=
 github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b h1:5/xofhZiOG0I9DQXqDSPxqYObk6QI7mBGMJI+ngyIgc=

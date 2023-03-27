@@ -606,6 +606,7 @@ func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error
 func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
+	override types.StateOverride,
 ) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
@@ -615,6 +616,10 @@ func (j *jsonRPCHub) ApplyTxn(
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 	if err != nil {
 		return
+	}
+
+	if override != nil {
+		transition.WithStateOverride(override)
 	}
 
 	result, err = transition.Apply(txn)

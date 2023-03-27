@@ -304,7 +304,7 @@ func TestEth_Call(t *testing.T) {
 			Nonce:    argUintPtr(0),
 		}
 
-		res, err := eth.Call(contractCall, BlockNumberOrHash{})
+		res, err := eth.Call(contractCall, BlockNumberOrHash{}, nil)
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), store.ethCallError.Error())
@@ -328,7 +328,7 @@ func TestEth_Call(t *testing.T) {
 			Nonce:    argUintPtr(0),
 		}
 
-		res, err := eth.Call(contractCall, BlockNumberOrHash{})
+		res, err := eth.Call(contractCall, BlockNumberOrHash{}, nil)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
@@ -517,7 +517,7 @@ func (m *mockBlockStore) GetAvgGasPrice() *big.Int {
 	return big.NewInt(m.averageGasPrice)
 }
 
-func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction, overrides types.StateOverride) (*runtime.ExecutionResult, error) {
 	return &runtime.ExecutionResult{Err: m.ethCallError}, nil
 }
 
