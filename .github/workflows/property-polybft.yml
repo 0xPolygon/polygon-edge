@@ -4,7 +4,7 @@ on:  # yamllint disable-line rule:truthy
   push:
     branches:
       - main
-      - develop  
+      - develop
   workflow_call:
 
 jobs:
@@ -27,6 +27,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: property-logs
-          path: property-logs-*/
+          name: e2e-logs
+          path: e2e-logs-*/
           retention-days: 30
