@@ -160,7 +160,7 @@ func main() {
 			gensc.RootERC1155,
 			[]string{
 				"setApprovalForAll",
-				"mint",
+				"mintBatch",
 			},
 			[]string{},
 		},

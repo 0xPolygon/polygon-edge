@@ -3,7 +3,7 @@ package bridge
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/polygon-edge/command/bridge/deposit"
+	"github.com/0xPolygon/polygon-edge/command/bridge/deposit/erc20"
 	"github.com/0xPolygon/polygon-edge/command/bridge/exit"
 	"github.com/0xPolygon/polygon-edge/command/bridge/withdraw"
 )
@@ -23,7 +23,7 @@ func GetCommand() *cobra.Command {
 func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
 		// bridge deposit
-		deposit.GetCommand(),
+		erc20.GetCommand(),
 		// bridge withdraw
 		withdraw.GetCommand(),
 		// bridge exit

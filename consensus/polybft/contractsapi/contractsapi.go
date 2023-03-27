@@ -832,19 +832,19 @@ func (s *SetApprovalForAllRootERC1155Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC1155.Abi.Methods["setApprovalForAll"], buf, s)
 }
 
-type MintRootERC1155Fn struct {
-	To     types.Address `abi:"to"`
-	ID     *big.Int      `abi:"id"`
-	Amount *big.Int      `abi:"amount"`
-	Data   []byte        `abi:"data"`
+type MintBatchRootERC1155Fn struct {
+	To      types.Address `abi:"to"`
+	IDs     []*big.Int    `abi:"ids"`
+	Amounts []*big.Int    `abi:"amounts"`
+	Data    []byte        `abi:"data"`
 }
 
-func (m *MintRootERC1155Fn) EncodeAbi() ([]byte, error) {
-	return RootERC1155.Abi.Methods["mint"].Encode(m)
+func (m *MintBatchRootERC1155Fn) EncodeAbi() ([]byte, error) {
+	return RootERC1155.Abi.Methods["mintBatch"].Encode(m)
 }
 
-func (m *MintRootERC1155Fn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RootERC1155.Abi.Methods["mint"], buf, m)
+func (m *MintBatchRootERC1155Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC1155.Abi.Methods["mintBatch"], buf, m)
 }
 
 type InitializeChildERC1155PredicateFn struct {
