@@ -10,7 +10,8 @@ import (
 	hcf "github.com/hashicorp/go-hclog"
 )
 
-// TODO: Add opentracing
+//nolint:godox
+// TODO: Add opentracing (to be fixed in EVM-540)
 
 // BlockBuilderParams are fields for the block that cannot be changed
 type BlockBuilderParams struct {

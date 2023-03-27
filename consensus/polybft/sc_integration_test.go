@@ -283,8 +283,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			SprintSize:          5,
 			EpochReward:         reward,
 			// use 1st account as governance address
-			Governance:       currentValidators.toValidatorSet().validators.GetAddresses()[0],
-			ValidatorSetAddr: contracts.ValidatorSetContract,
+			Governance: currentValidators.toValidatorSet().validators.GetAddresses()[0],
 		}
 
 		// get data for ChildValidatorSet initialization

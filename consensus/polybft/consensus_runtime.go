@@ -257,7 +257,8 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
-		// TODO - this will need to take inconsideration if slashing occurred
+		//nolint:godox
+		// TODO - this will need to take inconsideration if slashing occurred (to be fixed in EVM-519)
 		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
@@ -316,7 +317,8 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
 
-	// TODO - recognize slashing occurred
+	//nolint:godox
+	// TODO - recognize slashing occurred (to be fixed in EVM-519)
 	slash := false
 
 	pendingBlockNumber := parent.Number + 1
@@ -584,7 +586,7 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 		return nil, err
 	}
 
-	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
+	return c.config.blockchain.GetSystemState(provider), nil
 }
 
 func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {

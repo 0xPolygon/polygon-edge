@@ -53,6 +53,8 @@ func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) 
 
 // getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
 func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
+	//nolint:godox
+	// to be fixed with EVM-541
 	// TODO: @Stefan-Ethernal Temporary workaround just to be able to run cluster in non-bridge mode, until SC is fixed
 	rootERC20PredicateAddr := types.StringToAddress("0xDEAD")
 	rootERC20Addr := types.ZeroAddress

@@ -132,9 +132,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	systemState := polybft.NewSystemState(
-		&polybft.PolyBFTConfig{
-			StateReceiverAddr: contracts.StateReceiverContract,
-			ValidatorSetAddr:  contracts.ValidatorSetContract},
+		contracts.ValidatorSetContract,
+		contracts.StateReceiverContract,
 		&e2eStateProvider{txRelayer: txRelayer})
 
 	// create the first account and extract the address
@@ -454,9 +453,8 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, err)
 
 	systemState := polybft.NewSystemState(
-		&polybft.PolyBFTConfig{
-			StateReceiverAddr: contracts.StateReceiverContract,
-			ValidatorSetAddr:  contracts.ValidatorSetContract},
+		contracts.ValidatorSetContract,
+		contracts.StateReceiverContract,
 		&e2eStateProvider{txRelayer: txRelayer})
 
 	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecrets)

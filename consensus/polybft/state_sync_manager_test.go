@@ -403,7 +403,8 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	// TODO: Deploy local artifacts
+	//nolint:godox
+	// TODO: Deploy local artifacts (to be fixed in EVM-542)
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `

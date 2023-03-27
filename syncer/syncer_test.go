@@ -544,7 +544,8 @@ func TestSync(t *testing.T) {
 				}
 			},
 			blocks: blocks[:10],
-			// TODO: need to fix implementation?
+			//nolint:godox
+			// TODO: need to fix implementation? (to be fixed in EVM-529)
 			progressionStart:   0,
 			progressionHighest: 0,
 			err:                nil,
@@ -590,7 +591,8 @@ func TestSync(t *testing.T) {
 				}
 			},
 			blocks: blocks[:10],
-			// TODO: need to fix implementation?
+			//nolint:godox
+			// TODO: need to fix implementation? (to be fixed in EVM-529)
 			progressionStart:   0,
 			progressionHighest: 0,
 			err:                nil,

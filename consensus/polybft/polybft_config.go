@@ -42,11 +42,7 @@ type PolyBFTConfig struct {
 	// MintableERC20Token denotes whether mintable ERC20 token is used
 	MintableERC20Token bool `json:"mintableERC20"`
 
-	// TODO: Remove these two addresses as they are hardcoded and known in advance
-	// Address of the system contracts, as of now (testing) this is populated automatically during genesis
-	ValidatorSetAddr  types.Address `json:"validatorSetAddr"`
-	StateReceiverAddr types.Address `json:"stateReceiverAddr"`
-	InitialTrieRoot   types.Hash    `json:"initialTrieRoot"`
+	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
