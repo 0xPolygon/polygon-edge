@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/hashicorp/go-hclog"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +19,11 @@ const (
 	dbPathFlag      = "db-path"
 	chainIDFlag     = "chain-id"
 	invokerAddrFlag = "invoker-addr"
+	logPathFlag     = "log-path"
+	logLevelFlag    = "log-level"
 
-	defaultPort = 8198
+	defaultLogLevel = "info"
+	defaultPort     = 8198
 )
 
 type aarelayerParams struct {
@@ -29,6 +33,8 @@ type aarelayerParams struct {
 	configPath  string
 	chainID     int64
 	invokerAddr string
+	logPath     string
+	logLevel    string
 }
 
 func (rp *aarelayerParams) validateFlags() error {
@@ -52,6 +58,28 @@ func (rp *aarelayerParams) validateFlags() error {
 	}
 
 	return sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.configPath)
+}
+
+func (rp *aarelayerParams) getLogger() (hclog.Logger, error) {
+	if rp.logPath != "" {
+		logFileWriter, err := os.Create(rp.logPath)
+		if err != nil {
+			return nil, fmt.Errorf("could not create log file, %w", err)
+		}
+
+		return hclog.New(&hclog.LoggerOptions{
+			Name:       "aarelayer",
+			Output:     logFileWriter,
+			Level:      hclog.LevelFromString(rp.logLevel),
+			JSONFormat: false,
+		}), nil
+	}
+
+	return hclog.New(&hclog.LoggerOptions{
+		Name:       "aarelayer",
+		Level:      hclog.LevelFromString(rp.logLevel),
+		JSONFormat: false,
+	}), nil
 }
 
 func setFlags(cmd *cobra.Command) {
@@ -95,6 +123,20 @@ func setFlags(cmd *cobra.Command) {
 		invokerAddrFlag,
 		"",
 		"address of invoker smart contract",
+	)
+
+	cmd.Flags().StringVar(
+		&params.logPath,
+		logPathFlag,
+		"",
+		"path for file logger",
+	)
+
+	cmd.Flags().StringVar(
+		&params.logLevel,
+		logLevelFlag,
+		defaultLogLevel,
+		"logger log level",
 	)
 
 	helper.RegisterJSONRPCFlag(cmd)

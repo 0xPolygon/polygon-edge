@@ -72,17 +72,22 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	pool := service.NewAAPool()
-	pool.Init(pending)
+	logger, err := params.getLogger()
+	if err != nil {
+		return err
+	}
 
 	invokerAddress := types.StringToAddress(params.invokerAddr)
+
+	pool := service.NewAAPool()
+	pool.Init(pending)
 
 	verification := service.NewAAVerification(
 		config,
 		invokerAddress,
 		params.chainID,
 		func(a *service.AATransaction) error { return nil })
-	restService := service.NewAARelayerRestServer(pool, state, verification)
+	restService := service.NewAARelayerRestServer(pool, state, verification, logger)
 
 	relayerService, err := service.NewAARelayerService(
 		txSender,
@@ -90,6 +95,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		state,
 		account.Ecdsa,
 		invokerAddress,
+		logger,
 		service.WithPullTime(config.PullTime),
 		service.WithReceiptDelay(config.ReceiptRetryDelay),
 		service.WithNumRetries(config.ReceiptNumRetries))

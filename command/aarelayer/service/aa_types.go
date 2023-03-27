@@ -1,16 +1,21 @@
 package service
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	ethgowallet "github.com/umbracle/ethgo/wallet"
 )
 
 const (
+	signatureLength        = 65
 	domainSeparatorName    = "Account Abstraction Invoker"
 	domainSeparatorVersion = "1.0.0"
 
@@ -43,8 +48,27 @@ var (
 
 // AATransaction represents an AA transaction
 type AATransaction struct {
-	Signature   []byte      `json:"signature"`
+	Signature   aaSignature `json:"signature"`
 	Transaction Transaction `json:"transaction"`
+}
+
+func (t *AATransaction) GetAddressFromSignature(address types.Address, chainID int64) types.Address {
+	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
+	if err != nil {
+		return types.ZeroAddress
+	}
+
+	hash, err := t.Transaction.ComputeEip712Hash(domainSeparator)
+	if err != nil {
+		return types.ZeroAddress
+	}
+
+	recoveredAddress, err := ethgowallet.Ecrecover(Make3074Hash(chainID, address, hash[:]), t.Signature)
+	if err != nil {
+		return types.ZeroAddress
+	}
+
+	return types.Address(recoveredAddress)
 }
 
 func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key ethgo.Key) error {
@@ -58,12 +82,10 @@ func (t *AATransaction) MakeSignature(address types.Address, chainID int64, key 
 		return err
 	}
 
-	sig, err := key.Sign(Eip3074Magic(hash[:], address))
+	t.Signature, err = key.Sign(Make3074Hash(chainID, address, hash[:]))
 	if err != nil {
 		return err
 	}
-
-	t.Signature = sig
 
 	return nil
 }
@@ -73,25 +95,6 @@ type Transaction struct {
 	From    types.Address `json:"from"`
 	Nonce   uint64        `json:"nonce"`
 	Payload []Payload     `json:"payload"`
-}
-
-func (t *Transaction) IsFromValid(address types.Address, chainID int64, signature []byte) bool {
-	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
-	if err != nil {
-		return false
-	}
-
-	hash, err := t.ComputeEip712Hash(domainSeparator)
-	if err != nil {
-		return false
-	}
-
-	pubKey, err := crypto.Ecrecover(Eip3074Magic(hash[:], address), signature)
-	if err != nil {
-		return false
-	}
-
-	return t.From == types.BytesToAddress(crypto.Keccak256(pubKey[1:])[12:])
 }
 
 func (t *Transaction) ComputeEip712Hash(domainSeparator types.Hash) (types.Hash, error) {
@@ -230,14 +233,29 @@ func GetDomainSeperatorHash(address types.Address, chainID int64) (types.Hash, e
 	return types.BytesToHash(crypto.Keccak256(bytes)), nil
 }
 
-// Eip3074Magic serialize EIP-3074 messages in form
-// keccak256(type ++ invoker ++ commit)
-func Eip3074Magic(commit []byte, invokerAddr types.Address) []byte {
-	var msg [64]byte
-
+// Make3074Hash serialize EIP-3074 messages in form keccak256(type ++ invoker ++ commit)
+func Make3074Hash(chainID int64, invokerAddr types.Address, commit []byte) []byte {
+	var msg [97]byte
 	msg[0] = 0x03
-	copy(msg[13:33], invokerAddr.Bytes())
-	copy(msg[33:], commit)
+	copy(msg[1:], common.PadLeftOrTrim(big.NewInt(chainID).Bytes(), 32))
+	copy(msg[45:65], invokerAddr.Bytes())
+	copy(msg[65:], commit)
 
 	return ethgo.Keccak256(msg[:])
+}
+
+type aaSignature []byte
+
+func (sig *aaSignature) UnmarshalText(text []byte) (err error) {
+	*sig, err = hex.DecodeString(strings.TrimPrefix(string(text), "0x"))
+
+	return err
+}
+
+func (sig aaSignature) MarshalText() ([]byte, error) {
+	return []byte(hex.EncodeToString(sig)), nil
+}
+
+func (sig aaSignature) IsValid() bool {
+	return len(sig) == signatureLength
 }

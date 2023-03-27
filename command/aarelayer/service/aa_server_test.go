@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,6 +25,8 @@ const (
 	baseURL = "127.0.0.1:8289"
 	chainID = 100
 )
+
+var dummySignature, _ = hex.DecodeString("41b5bb4e1eab25b9d8f09f40d8ce91fa8c8d23084ee9a533841cbe42074eb7cc2f0674a1c5abba9d0cf05aeb39f340dcaf42aff68b3e63a8d5cf7514dcd940e600")
 
 func Test_AAServer(t *testing.T) {
 	t.Parallel()
@@ -53,7 +57,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: dummySignature,
 			Transaction: Transaction{
 				From:  types.Address(userAccount.Ecdsa.Address()),
 				Nonce: 0,
@@ -74,7 +78,7 @@ func Test_AAServer(t *testing.T) {
 
 		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa))
 
-		require.True(t, tx.Transaction.IsFromValid(aaInvokerAddress, chainID, tx.Signature))
+		require.Equal(t, tx.Transaction.From, tx.GetAddressFromSignature(aaInvokerAddress, chainID))
 
 		req := makeRequest(t, "POST", "sendTransaction", tx)
 
@@ -177,12 +181,34 @@ func Test_AAServer(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 
+	t.Run("sendTransaction_EmptySignature", func(t *testing.T) {
+		t.Parallel()
+
+		client := &http.Client{}
+		tx := &AATransaction{
+			Transaction: Transaction{
+				Nonce:   0,
+				Payload: []Payload{{}},
+			},
+		}
+
+		for _, sig := range [][]byte{nil, {}, {1}} {
+			tx.Signature = sig
+			req := makeRequest(t, "POST", "sendTransaction", &tx)
+
+			res, err := client.Do(req)
+			require.NoError(t, err)
+
+			require.Equal(t, http.StatusBadRequest, res.StatusCode)
+		}
+	})
+
 	t.Run("sendTransaction_WrongFrom", func(t *testing.T) {
 		t.Parallel()
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: dummySignature,
 			Transaction: Transaction{
 				Nonce: 0,
 				Payload: []Payload{
@@ -203,6 +229,14 @@ func Test_AAServer(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, http.StatusBadRequest, res.StatusCode)
+
+		tx.Transaction.From = types.Address{1, 2}
+		req = makeRequest(t, "POST", "sendTransaction", &tx)
+
+		res, err = client.Do(req)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusBadRequest, res.StatusCode)
 	})
 
 	t.Run("sendTransaction_EmptyValue", func(t *testing.T) {
@@ -210,7 +244,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: dummySignature,
 			Transaction: Transaction{
 				Nonce: 0,
 				Payload: []Payload{
@@ -236,7 +270,7 @@ func Test_AAServer(t *testing.T) {
 
 		client := &http.Client{}
 		tx := &AATransaction{
-			Signature: nil,
+			Signature: dummySignature,
 			Transaction: Transaction{
 				Nonce: 0,
 				Payload: []Payload{
@@ -268,7 +302,9 @@ func getServer(t *testing.T, address types.Address, dbpath string) *AARelayerRes
 		return nil
 	})
 
-	return NewAARelayerRestServer(pool, state, verification)
+	config.DenyList = []string{types.ZeroAddress.String()}
+
+	return NewAARelayerRestServer(pool, state, verification, hclog.NewNullLogger())
 }
 
 func makeRequest(t *testing.T, httpMethod, endpoint string, obj interface{}) *http.Request {

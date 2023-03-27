@@ -41,6 +41,10 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 		return fmt.Errorf("tx from %s does not have any payload", tx.Transaction.From)
 	}
 
+	if !tx.Signature.IsValid() {
+		return errors.New("invalid signature")
+	}
+
 	for _, payload := range tx.Transaction.Payload {
 		if payload.GasLimit == nil {
 			return fmt.Errorf("tx has invalid payload - gas limit not specified: %s", tx.Transaction.From)
@@ -59,9 +63,9 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 		return fmt.Errorf("tx has from which is not allowed: %s", tx.Transaction.From)
 	}
 
-	// TODO: full validation will be implemented in another PR/task
-	if !tx.Transaction.IsFromValid(p.invokerAddress, p.chainID, tx.Signature) {
-		return fmt.Errorf("tx has invalid from: %s", tx.Transaction.From)
+	address := tx.GetAddressFromSignature(p.invokerAddress, p.chainID)
+	if tx.Transaction.From != address {
+		return fmt.Errorf("invalid tx: expected sender %s but got %s", tx.Transaction.From, address)
 	}
 
 	if p.validationFn != nil {
