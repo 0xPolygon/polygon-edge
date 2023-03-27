@@ -41,7 +41,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 		bytecode, _ := hex.DecodeString(simpleCallContract)
 
 		deployTxn := cluster.Deploy(t, acct, bytecode)
-		deployTxn.Wait()
+		require.NoError(t, deployTxn.Wait())
 		require.True(t, deployTxn.Succeed())
 
 		target := deployTxn.Receipt().ContractAddress

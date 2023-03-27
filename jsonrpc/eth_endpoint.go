@@ -401,18 +401,23 @@ func (o *overrideAccount) ToType() types.OverrideAccount {
 	if o.Nonce != nil {
 		res.Nonce = (*uint64)(o.Nonce)
 	}
+
 	if o.Code != nil {
 		res.Code = *o.Code
 	}
+
 	if o.Balance != nil {
 		res.Balance = new(big.Int).SetUint64(*(*uint64)(o.Balance))
 	}
+
 	if o.State != nil {
 		res.State = *o.State
 	}
+
 	if o.StateDiff != nil {
 		res.StateDiff = *o.StateDiff
 	}
+
 	return res
 }
 

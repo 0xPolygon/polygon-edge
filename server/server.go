@@ -619,7 +619,9 @@ func (j *jsonRPCHub) ApplyTxn(
 	}
 
 	if override != nil {
-		transition.WithStateOverride(override)
+		if err = transition.WithStateOverride(override); err != nil {
+			return
+		}
 	}
 
 	result, err = transition.Apply(txn)
