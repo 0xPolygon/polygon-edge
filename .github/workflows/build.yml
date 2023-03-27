@@ -3,13 +3,16 @@ name: Build
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+   # Map the workflow outputs to job outputs
+    outputs:
+      build_output: ${{ jobs.go_build.outputs.build_output }}        
 
 jobs:
   go_build:
     name: Polygon Edge
     runs-on: ubuntu-latest
     outputs:
-      build-output: ${{ steps.edge_build.outputs.build-output }}
+      build_output: ${{ steps.edge_build.outputs.build_output }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -23,7 +26,7 @@ jobs:
 
       - name: Build Polygon Edge
       - id: edge_build       
-        run: echo "build-output=$(go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge)\n" >> $GITHUB_OUTPUT
+        run: echo "build_output=$(go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge)\n" >> $GITHUB_OUTPUT
         env:
           CC: gcc
           CXX: g++

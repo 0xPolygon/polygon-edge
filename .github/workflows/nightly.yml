@@ -50,7 +50,7 @@ jobs:
                     "type": "section",
                     "text": {
                       "type": "mrkdwn",
-                      "text": "Build details: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                      "text": "Build details: ${{ needs.build.outputs.build_output }}"
                     }
                   },
                   {
