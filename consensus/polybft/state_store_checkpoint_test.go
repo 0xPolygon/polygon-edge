@@ -3,6 +3,7 @@ package polybft
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,8 +122,10 @@ func TestState_decodeExitEvent(t *testing.T) {
 
 	state := newTestState(t)
 
+	var exitEvent contractsapi.L2StateSyncedEvent
+
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = ExitEventABI.ID()
+	topics[0] = exitEvent.Sig()
 	topics[1] = ethgo.BytesToHash([]byte{exitID})
 	topics[2] = ethgo.BytesToHash(ethgo.HexToAddress("0x1111").Bytes())
 	topics[3] = ethgo.BytesToHash(ethgo.HexToAddress("0x2222").Bytes())
@@ -148,8 +151,10 @@ func TestState_decodeExitEvent(t *testing.T) {
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	t.Parallel()
 
+	var stateSyncedEvent contractsapi.StateSyncedEvent
+
 	topics := make([]ethgo.Hash, 4)
-	topics[0] = stateTransferEventABI.ID()
+	topics[0] = stateSyncedEvent.Sig()
 
 	log := &ethgo.Log{
 		Address: ethgo.ZeroAddress,

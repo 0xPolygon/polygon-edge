@@ -45,9 +45,11 @@ func checkStateSyncResultLogs(
 	t.Helper()
 	require.Len(t, logs, expectedCount)
 
+	var stateSyncResultEvent contractsapi.StateSyncResultEvent
 	for _, log := range logs {
-		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
-		require.NoError(t, stateSyncResultEvent.ParseLog(log))
+		doesMatch, err := stateSyncResultEvent.ParseLog(log)
+		require.True(t, doesMatch)
+		require.NoError(t, err)
 
 		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
 
@@ -104,7 +106,9 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are processed and there should be a success events
-	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	id := stateSyncedResult.Sig()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -290,7 +294,9 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
-	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	id := stateSyncedResult.Sig()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -589,7 +595,9 @@ func sendExitTransaction(
 	exitHelperAddr ethgo.Address,
 	l1TxRelayer txrelayer.TxRelayer,
 	exitEventID uint64) (bool, error) {
-	proofExitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(&polybft.ExitEvent{
+	var exitEventAPI contractsapi.L2StateSyncedEvent
+
+	proofExitEventEncoded, err := exitEventAPI.Encode(&polybft.ExitEvent{
 		ID:       exitEventID,
 		Sender:   sidechainKey.Address(),
 		Receiver: l1ExitTestAddr,

@@ -5,8 +5,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 type method interface {
@@ -75,10 +79,62 @@ func TestEncoding_Struct(t *testing.T) {
 	encoding, err := commitment.EncodeAbi()
 	require.NoError(t, err)
 
-	commitmentDecoded := &StateSyncCommitment{}
+	var commitmentDecoded StateSyncCommitment
 
 	require.NoError(t, commitmentDecoded.DecodeAbi(encoding))
 	require.Equal(t, commitment.StartID, commitmentDecoded.StartID)
 	require.Equal(t, commitment.EndID, commitmentDecoded.EndID)
 	require.Equal(t, commitment.Root, commitmentDecoded.Root)
+}
+
+func TestEncodingAndParsingEvent(t *testing.T) {
+	t.Parallel()
+
+	var (
+		exitEventAPI      L2StateSyncedEvent
+		stateSyncEventAPI StateSyncedEvent
+	)
+
+	topics := make([]ethgo.Hash, 4)
+	topics[0] = exitEventAPI.Sig()
+	topics[1] = ethgo.BytesToHash(common.EncodeUint64ToBytes(11))
+	topics[2] = ethgo.BytesToHash(types.StringToAddress("0x1111").Bytes())
+	topics[3] = ethgo.BytesToHash(types.StringToAddress("0x2222").Bytes())
+	someType := abi.MustNewType("tuple(string firstName, string lastName)")
+	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+	require.NoError(t, err)
+
+	log := &ethgo.Log{
+		Address: ethgo.Address(contracts.L2StateSenderContract),
+		Topics:  topics,
+		Data:    encodedData,
+	}
+
+	var exitEvent L2StateSyncedEvent
+
+	// log matches event
+	doesMatch, err := exitEvent.ParseLog(log)
+	require.True(t, doesMatch)
+	require.NoError(t, err)
+	require.Equal(t, uint64(11), exitEvent.ID.Uint64())
+
+	// change exit event id
+	log.Topics[1] = ethgo.BytesToHash(common.EncodeUint64ToBytes(22))
+	doesMatch, err = exitEvent.ParseLog(log)
+	require.True(t, doesMatch)
+	require.NoError(t, err)
+	require.Equal(t, uint64(22), exitEvent.ID.Uint64())
+
+	// log does not match event
+	log.Topics[0] = stateSyncEventAPI.Sig()
+	doesMatch, err = exitEvent.ParseLog(log)
+	require.False(t, doesMatch)
+	require.NoError(t, err)
+
+	// error on parsing log
+	log.Topics[0] = exitEventAPI.Sig()
+	log.Topics = log.Topics[:3]
+	doesMatch, err = exitEvent.ParseLog(log)
+	require.True(t, doesMatch)
+	require.Error(t, err)
 }

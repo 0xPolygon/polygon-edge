@@ -168,12 +168,16 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 
 	sig := txData[:abiMethodIDLength]
 
-	var obj contractsapi.StateTransactionInput
+	var (
+		commitFn      contractsapi.CommitStateReceiverFn
+		commitEpochFn contractsapi.CommitEpochChildValidatorSetFn
+		obj           contractsapi.StateTransactionInput
+	)
 
-	if bytes.Equal(sig, contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
+	if bytes.Equal(sig, commitFn.Sig()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
-	} else if bytes.Equal(sig, contractsapi.ChildValidatorSet.Abi.Methods["commitEpoch"].ID()) {
+	} else if bytes.Equal(sig, commitEpochFn.Sig()) {
 		// commit epoch
 		obj = &contractsapi.CommitEpochChildValidatorSetFn{}
 	} else {
@@ -188,11 +192,12 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 }
 
 func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageSigned, error) {
+	var commitFn contractsapi.CommitStateReceiverFn
 	for _, tx := range txs {
 		// skip non state CommitmentMessageSigned transactions
 		if tx.Type != types.StateTx ||
 			len(tx.Input) < abiMethodIDLength ||
-			!bytes.Equal(tx.Input[:abiMethodIDLength], contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
+			!bytes.Equal(tx.Input[:abiMethodIDLength], commitFn.Sig()) {
 			continue
 		}
 

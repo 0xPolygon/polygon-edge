@@ -55,7 +55,15 @@ func main() {
 				"addToWhitelist",
 				"register",
 			},
-			[]string{},
+			[]string{
+				"NewValidator",
+				"Staked",
+				"Delegated",
+				"Unstaked",
+				"Undelegated",
+				"AddedToWhitelist",
+				"Withdrawal",
+			},
 		},
 		{
 			"StateSender",
@@ -334,8 +342,20 @@ func generateEvent(generatedData *generatedData, contractName string, event *abi
 	{{.}}
 {{ end }}
 
-func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
-	return decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
+func (*{{.TName}}) Sig() ethgo.Hash {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].ID()
+}
+
+func (*{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
+}
+
+func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
+	if (!{{.ContractName}}.Abi.Events["{{.Name}}"].Match(log)) {
+		return false, nil
+	}
+
+	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
 }`
 
 	inputs := map[string]interface{}{
@@ -371,6 +391,10 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 {{range .Structs}}
 	{{.}}
 {{ end }}
+
+func ({{.Sig}} *{{.TName}}) Sig() []byte {
+	return {{.ContractName}}.Abi.Methods["{{.Name}}"].ID()
+}
 
 func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
 	return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})
