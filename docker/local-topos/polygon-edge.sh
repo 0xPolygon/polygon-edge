@@ -87,6 +87,25 @@ case "$1" in
           || echo "Predeployment of ConstAddressDeployer failed with error code $?"
     ;;
 
+    "standalone-test")
+        echo "Cleaning up previous execution..."
+        rm -rf genesis.json data-1
+        echo "Generating node secrets..."
+        NODE_ID=`$POLYGON_EDGE_BIN secrets init --insecure --num 1 --data-dir data-1 | grep Node | awk '{ print $4}'`
+        echo "Boot node id: " $NODE_ID
+        echo "Validator private key:" `cat data-1/consensus/validator.key`
+        echo "Generating genesis script..."
+        "$POLYGON_EDGE_BIN" genesis --dir genesis.json \
+         --consensus ibft \
+         --ibft-validators-prefix-path data- \
+         --validator-set-size=1 \
+         --premine=0x4AAb25B4fAd0Beaac466050f3A7142A502f4Cf0a:1000000000000000000000 \
+         --bootnode /ip4/127.0.0.1/tcp/10001/p2p/$NODE_ID
+
+        echo "Executing polygon-edge standalone node..."
+        exec "$POLYGON_EDGE_BIN" server --data-dir ./data-1 --chain genesis.json
+    ;;    
+
     *)
         echo "Executing polygon-edge..."
         exec "$POLYGON_EDGE_BIN" "$@"
