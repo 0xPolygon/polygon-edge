@@ -58,7 +58,7 @@ func (s *aaTxState) Add(tx *AATransaction) (*AAStateTransaction, error) {
 		ID:     uuid.NewString(),
 		Tx:     tx,
 		Status: StatusPending,
-		Time:   time.Now().Unix(),
+		Time:   time.Now().UTC().Unix(),
 	}
 
 	value, err := json.Marshal(ntx)
@@ -119,9 +119,9 @@ func (s *aaTxState) Update(stateTx *AAStateTransaction) error {
 					// update time
 					switch stateTx.Status {
 					case StatusQueued:
-						stateTx.TimeQueued = time.Now().Unix()
+						stateTx.TimeQueued = time.Now().UTC().Unix()
 					case StatusCompleted, StatusFailed:
-						stateTx.TimeFinished = time.Now().Unix()
+						stateTx.TimeFinished = time.Now().UTC().Unix()
 					}
 
 					break
