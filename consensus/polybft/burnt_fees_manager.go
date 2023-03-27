@@ -127,7 +127,7 @@ func (m *burntFeesManager) PostBlock(req *PostBlockRequest) error {
 	m.lastWithdrawalBlock = req.FullBlock.Block.Number()
 
 	// update burnt fees withdrawal block number metrics
-	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(latestHeader.Number))
+	metrics.SetGauge([]string{"bridge", "burnt_fees_withdrawal_block_number"}, float32(latestHeader.Number))
 	m.logger.Debug("successfully sent burnt fees withdrawal tx", "block number", latestHeader.Number)
 
 	return nil
