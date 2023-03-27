@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -42,7 +43,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender.On("GetNonce", mock.Anything).
 			Return(uint64(0), error(nil)).Once()
 
-		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress,
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger(),
 			WithPullTime(2*time.Second), WithReceiptDelay(time.Second*3), WithNumRetries(5))
 		require.NoError(t, err)
 
@@ -71,7 +72,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender.On("GetNonce", mock.Anything).
 			Return(uint64(0), error(nil)).Once()
 
-		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.NoError(t, err)
 
 		tx := getDummyTxs()[1]
@@ -99,7 +100,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender.On("GetNonce", mock.Anything).
 			Return(uint64(0), error(nil)).Once()
 
-		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.NoError(t, err)
 
 		tx := getDummyTxs()[2]
@@ -127,7 +128,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender.On("GetNonce", mock.Anything).
 			Return(uint64(0), error(nil)).Once()
 
-		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.NoError(t, err)
 
 		tx := getDummyTxs()[3]
@@ -156,7 +157,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender.On("GetNonce", mock.Anything).
 			Return(uint64(0), error(nil)).Once()
 
-		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.NoError(t, err)
 
 		tx := getDummyTxs()[4]
@@ -189,7 +190,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		tx := getDummyTxs()[0]
 
-		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress)
+		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.NoError(t, err)
 
 		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
@@ -207,7 +208,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaTxSender := new(dummyAATxSender)
 		aaTxSender.On("GetNonce", mock.Anything).Return(uint64(0), targetErr).Once()
 
-		_, err = NewAARelayerService(aaTxSender, nil, nil, account.Ecdsa, aaInvokerAddress)
+		_, err = NewAARelayerService(aaTxSender, nil, nil, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.ErrorIs(t, err, targetErr)
 	})
 }
