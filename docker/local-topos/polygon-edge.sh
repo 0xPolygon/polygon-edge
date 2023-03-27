@@ -34,20 +34,23 @@ case "$1" in
                     echo "Secrets have already been generated."
                 else
                     echo "Generating secrets..."
-                    secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num "$NUMBER_OF_NODES" --data-dir "$data_dir" --json)
+                    secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure \
+                    --num "$NUMBER_OF_NODES" --data-dir "$data_dir" --json)
+                    chmod -R 755 /data # TOPOS: To make secret readable from the sequencer
                     echo "Secrets have been successfully generated"
 
                     BOOTNODE_ID=$(echo $secrets | jq -r '.[0] | .node_id')
                     BOOTNODE_ADDRESS=$(echo $secrets | jq -r '.[0] | .address')
 
                     echo "Generating IBFT Genesis file..."
-                    "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
-                      --dir "$GENESIS_PATH" \
+                    cd /data && /polygon-edge/polygon-edge genesis $CHAIN_CUSTOM_OPTIONS \
+                      --dir genesis.json \
                       --consensus ibft \
                       --ibft-validators-prefix-path data- \
                       --validator-set-size=$NUMBER_OF_NODES \
                       --bootnode /dns4/"$BOOTNODE_DOMAIN_NAME"/tcp/1478/p2p/$BOOTNODE_ID \
-                      --premine=$BOOTNODE_ADDRESS:1000000000000000000000
+                      --premine=$BOOTNODE_ADDRESS:1000000000000000000000 \
+                    && cd /polygon-edge
                 fi    
             ;;
 
@@ -56,7 +59,8 @@ case "$1" in
                     echo "Secrets have already been generated."
                 else
                     echo "Generating PolyBFT secrets..."
-                    secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num "$NUMBER_OF_NODES" --data-dir "$data_dir" --json)
+                    secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure \
+                    --num "$NUMBER_OF_NODES" --data-dir "$data_dir" --json)
                     chmod -R 755 /data # TOPOS: To make secret readable from the sequencer
                     echo "Secrets have been successfully generated"
 
@@ -64,7 +68,8 @@ case "$1" in
                     BOOTNODE_ADDRESS=$(echo $secrets | jq -r '.[0] | .address')
 
                     echo "Generating manifest..."
-                    "$POLYGON_EDGE_BIN" manifest --path /data/manifest.json --validators-path /data --validators-prefix data-
+                    "$POLYGON_EDGE_BIN" manifest --path /data/manifest.json --validators-path /data \
+                    --validators-prefix data- --chain-id "$CHAIN_ID"
 
                     echo "Generating PolyBFT Genesis file..."
                     "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \

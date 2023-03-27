@@ -9,8 +9,6 @@ RUN go mod download
 
 COPY . .
 
-RUN go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
-
 RUN go build -o polygon-edge main.go
 
 FROM alpine:latest AS runner
@@ -21,7 +19,6 @@ WORKDIR /polygon-edge
 
 COPY --from=builder /polygon-edge/polygon-edge ./
 COPY ./docker/local-topos/polygon-edge.sh ./
-COPY ./core-contracts/artifacts ./core-contracts/artifacts
 
 # Expose json-rpc, libp2p and grpc ports
 EXPOSE 8545 9632 1478 5001
