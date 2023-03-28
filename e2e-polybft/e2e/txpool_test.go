@@ -123,6 +123,17 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		return err
 	}
 
+	populateTxFees := func(txn *ethgo.Transaction, i int) {
+		if i%2 == 0 {
+			txn.Type = ethgo.TransactionDynamicFee
+			txn.MaxFeePerGas = big.NewInt(1000000000)
+			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+		} else {
+			txn.Type = ethgo.TransactionLegacy
+			txn.GasPrice = gasPrice
+		}
+	}
+
 	num := 4
 	receivers := []*wallet.Key{
 		premine,
@@ -135,11 +146,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		receivers = append(receivers, key)
 	}
 
-	// Gas cost is always the same since value transfers are deterministic (21k gas).
-	// Then, the total gas cost required to make a transfer is 21k multiplied by
-	// the selected gas price.
-	gasCost := int(21000 * gasPrice)
-	sendAmount := 3000000
+	const sendAmount = 3000000
 
 	// We are going to fund the accounts in linear fashion:
 	// A (premined account) -> B -> C -> D -> E
@@ -150,23 +157,21 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		// its child i+1 (cover costs + send amounts).
 		// This means that since gasCost and sendAmount are fixed, account C must receive gasCost * 2
 		// (to cover two more transfers C->D and D->E) + sendAmount * 3 (one bundle for each C,D and E).
-		amount := gasCost*(num-i-1) + sendAmount*(num-i)
 		recipient := receivers[i].Address()
 		txn := &ethgo.Transaction{
-			Value: big.NewInt(int64(amount)),
+			Value: big.NewInt(int64(sendAmount * (num - i))),
 			To:    &recipient,
 			Gas:   21000,
-			Nonce: 0,
 		}
 
-		// Send every second transaction as a dynamic fees one
-		if i%2 == 0 {
-			txn.Type = ethgo.TransactionDynamicFee
-			txn.MaxFeePerGas = big.NewInt(1000000000)
-			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
-		} else {
-			txn.Type = ethgo.TransactionLegacy
-			txn.GasPrice = gasPrice
+		// Populate fees fields for the current transaction
+		populateTxFees(txn, i-1)
+
+		// Add remaining fees to finish the cycle
+		for j := i; j < num; j++ {
+			copyTxn := txn.Copy()
+			populateTxFees(copyTxn, j)
+			txn.Value = txn.Value.Add(txn.Value, txCost(copyTxn))
 		}
 
 		sendTransaction(t, client, receivers[i-1], txn)
@@ -306,4 +311,16 @@ func sendTransaction(t *testing.T, client *jsonrpc.Eth, sender *wallet.Key, txn 
 
 	_, err = client.SendRawTransaction(txnRaw)
 	require.NoError(t, err)
+}
+
+func txCost(t *ethgo.Transaction) *big.Int {
+	var factor *big.Int
+
+	if t.Type == ethgo.TransactionDynamicFee {
+		factor = new(big.Int).Set(t.MaxFeePerGas)
+	} else {
+		factor = new(big.Int).SetUint64(t.GasPrice)
+	}
+
+	return new(big.Int).Mul(factor, new(big.Int).SetUint64(t.Gas))
 }
