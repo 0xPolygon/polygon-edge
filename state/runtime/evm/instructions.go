@@ -1446,12 +1446,6 @@ func opAuth(c *state) {
 	r := c.pop()
 	s := c.pop()
 
-	if !crypto.ValidateSignatureValues(v, r, s, c.config.Homestead) {
-		c.exit(errors.New("invalid signature values"))
-
-		return
-	}
-
 	// create signature and validate
 	signature, err := crypto.EncodeSignature(r, s, v, c.config.Homestead)
 	if err != nil {
