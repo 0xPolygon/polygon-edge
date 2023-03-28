@@ -21,8 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/contract"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
