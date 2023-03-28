@@ -93,8 +93,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// use 1st account as governance address
 		Governance:         manifest.GenesisValidators[0].Address,
 		Bridge:             bridge,
-		ValidatorSetAddr:   contracts.ValidatorSetContract,
-		StateReceiverAddr:  contracts.StateReceiverContract,
 		InitialTrieRoot:    types.StringToHash(p.initialStateRoot),
 		MintableERC20Token: p.mintableNativeToken,
 	}

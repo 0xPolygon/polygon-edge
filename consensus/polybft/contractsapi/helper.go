@@ -38,4 +38,4 @@ func (u *Uptime) AddValidatorUptime(address types.Address, count int64) {
 	})
 }
 
-var _ StateTransactionInput = &CommitEpochFunction{}
+var _ StateTransactionInput = &CommitEpochChildValidatorSetFn{}

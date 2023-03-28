@@ -166,7 +166,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
-	submit := &contractsapi.SubmitFunction{}
+	submit := &contractsapi.SubmitCheckpointManagerFn{}
 	require.NoError(t, submit.DecodeAbi(checkpointDataEncoded))
 
 	require.Equal(t, new(big.Int).SetUint64(checkpoint.EpochNumber), submit.Checkpoint.Epoch)
@@ -389,7 +389,7 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockCheckpointManagerFn{
 		BlockNumber: new(big.Int).SetUint64(correctBlockToGetExit),
 	}
 
@@ -510,7 +510,7 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 	t.Helper()
 
-	submit := &contractsapi.SubmitFunction{}
+	submit := &contractsapi.SubmitCheckpointManagerFn{}
 	require.NoError(t, submit.DecodeAbi(input))
 
 	return submit.Checkpoint.BlockNumber.Uint64()
@@ -519,8 +519,10 @@ func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	t.Helper()
 
+	var exitEvent contractsapi.L2StateSyncedEvent
+
 	topics := make([]types.Hash, 4)
-	topics[0] = types.Hash(ExitEventABI.ID())
+	topics[0] = types.Hash(exitEvent.Sig())
 	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
 	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
 	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())

@@ -57,7 +57,8 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash) 
 	return &Signature{AggregatedSignature: aggs, Bitmap: bmp}
 }
 
-func createTestCommitEpochInput(t *testing.T, epochID uint64, validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochFunction {
+func createTestCommitEpochInput(t *testing.T, epochID uint64,
+	validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochChildValidatorSetFn {
 	t.Helper()
 
 	if validatorSet == nil {
@@ -75,7 +76,7 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64, validatorSet Accou
 		TotalBlocks: new(big.Int).SetUint64(epochSize),
 	}
 
-	commitEpoch := &contractsapi.CommitEpochFunction{
+	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
 		ID: uptime.EpochID,
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(startBlock + 1),

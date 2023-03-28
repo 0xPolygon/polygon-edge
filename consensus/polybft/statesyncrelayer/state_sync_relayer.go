@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"net"
 	"path"
 	"strings"
@@ -20,8 +19,6 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 )
-
-var commitEvent = contractsapi.StateReceiver.Abi.Events["NewCommitment"]
 
 type StateSyncRelayer struct {
 	dataDir                string
@@ -113,37 +110,25 @@ func (r *StateSyncRelayer) Stop() {
 func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 	r.logger.Debug("Received a log", "log", log)
 
-	if !commitEvent.Match(log) {
+	var commitEvent contractsapi.NewCommitmentEvent
+
+	doesMatch, err := commitEvent.ParseLog(log)
+	if !doesMatch {
 		return
 	}
 
-	vals, err := commitEvent.ParseLog(log)
 	if err != nil {
 		r.logger.Error("Failed to parse log", "err", err)
 
 		return
 	}
 
-	var (
-		startID, endID *big.Int
-		ok             bool
-	)
-
-	if startID, ok = vals["startId"].(*big.Int); !ok {
-		r.logger.Error("Failed to parse startId")
-
-		return
-	}
-
-	if endID, ok = vals["endId"].(*big.Int); !ok {
-		r.logger.Error("Failed to parse endId")
-
-		return
-	}
+	startID := commitEvent.StartID.Uint64()
+	endID := commitEvent.EndID.Uint64()
 
 	r.logger.Info("Execute commitment", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
-	for i := startID.Uint64(); i <= endID.Uint64(); i++ {
+	for i := startID; i <= endID; i++ {
 		// query the state sync proof
 		stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
 		if err != nil {
@@ -199,7 +184,7 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 		return fmt.Errorf("failed to unmarshal state sync event from JSON. Error: %w", err)
 	}
 
-	execute := &contractsapi.ExecuteFunction{
+	execute := &contractsapi.ExecuteStateReceiverFn{
 		Proof: proof.Data,
 		Obj:   sse,
 	}

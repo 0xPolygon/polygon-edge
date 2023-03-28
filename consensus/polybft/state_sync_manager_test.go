@@ -30,7 +30,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 
 	topic := &mockTopic{}
 
-	s, err := NewStateSyncManager(hclog.NewNullLogger(), state,
+	s, err := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
 			jsonrpcAddr:       "",
@@ -340,8 +340,12 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 0)
 
+	var stateSyncedEvent contractsapi.StateSyncedEvent
+
+	stateSyncEventID := stateSyncedEvent.Sig()
+
 	// log with the state sync topic but incorrect content
-	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateTransferEventABI.ID()}})
+	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateSyncEventID}})
 	stateSyncs, err = s.state.StateSyncStore.list()
 
 	require.NoError(t, err)
@@ -353,7 +357,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 	goodLog := &ethgo.Log{
 		Topics: []ethgo.Hash{
-			stateTransferEventABI.ID(),
+			stateSyncEventID,
 			ethgo.BytesToHash([]byte{0x0}), // state sync index 0
 			ethgo.ZeroHash,
 			ethgo.ZeroHash,
@@ -399,7 +403,8 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	// TODO: Deploy local artifacts
+	//nolint:godox
+	// TODO: Deploy local artifacts (to be fixed in EVM-542)
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `

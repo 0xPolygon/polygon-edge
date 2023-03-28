@@ -361,7 +361,7 @@ func initializeCheckpointManager(
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
 
-	initialize := contractsapi.InitializeCheckpointManagerFunction{
+	initialize := contractsapi.InitializeCheckpointManagerFn{
 		ChainID_:        big.NewInt(manifest.ChainID),
 		NewBls:          manifest.RootchainConfig.BLSAddress,
 		NewBn256G2:      manifest.RootchainConfig.BN256G2Address,
@@ -403,7 +403,7 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
 func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
-	rootERC20PredicateParams := &contractsapi.InitializeRootERC20PredicateFunction{
+	rootERC20PredicateParams := &contractsapi.InitializeRootERC20PredicateFn{
 		NewStateSender:         rootchainConfig.StateSenderAddress,
 		NewExitHelper:          rootchainConfig.ExitHelperAddress,
 		NewChildERC20Predicate: contracts.ChildERC20PredicateContract,

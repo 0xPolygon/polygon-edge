@@ -146,7 +146,8 @@ type Object struct {
 	Nonce    uint64
 	Deleted  bool
 
-	// TODO: Move this to executor
+	//nolint:godox
+	// TODO: Move this to executor (to be fixed in EVM-527)
 	DirtyCode bool
 	Code      []byte
 

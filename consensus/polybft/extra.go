@@ -487,7 +487,6 @@ func (s *Signature) Verify(validators AccountSet, hash types.Hash, domain []byte
 		blsPublicKeys[i] = validator.BlsKey
 	}
 
-	// TODO: refactor AggregatedSignature
 	aggs, err := bls.UnmarshalSignature(s.AggregatedSignature)
 	if err != nil {
 		return err

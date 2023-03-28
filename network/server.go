@@ -397,9 +397,10 @@ func (s *Server) runDial() {
 	}
 
 	for {
+		//nolint:godox
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently
+		// maxDials requests concurrently (to be fixed in EVM-541)
 		for s.connectionCounts.HasFreeOutboundConn() {
 			tt := s.dialQueue.PopTask()
 			if tt == nil {
@@ -617,7 +618,7 @@ func (s *Server) NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.C
 		return nil, err
 	}
 
-	return p.Client(stream), nil
+	return p.Client(stream)
 }
 
 func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
@@ -625,7 +626,7 @@ func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
 }
 
 type Protocol interface {
-	Client(network.Stream) *rawGrpc.ClientConn
+	Client(network.Stream) (*rawGrpc.ClientConn, error)
 	Handler() func(network.Stream)
 }
 

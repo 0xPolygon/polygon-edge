@@ -39,6 +39,7 @@ linters:
     - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13
     - gocritic
     - errcheck # Errcheck is a go lint rule for checking for unchecked errors in go programs. These unchecked errors can be critical bugs in some cases
+    - godox # Godox is a linter for TODOs and FIXMEs left in the code
 
 linters-settings:
   gofmt:

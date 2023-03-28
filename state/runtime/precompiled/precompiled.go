@@ -161,7 +161,8 @@ func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.
 var zeroPadding = make([]byte, 64)
 
 func (p *Precompiled) leftPad(buf []byte, n int) []byte {
-	// TODO, avoid buffer allocation
+	//nolint:godox
+	// TODO, avoid buffer allocation (to be fixed in EVM-528)
 	l := len(buf)
 	if l > n {
 		return buf

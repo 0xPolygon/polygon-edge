@@ -18,7 +18,8 @@ var (
 )
 
 func TestJsonRPC(t *testing.T) {
-	// TODO: Reuse the same tests for websockets and IPC.
+	//nolint:godox
+	// TODO: Reuse the same tests for websockets and IPC. (to be fixed in EVM-521)
 	fund, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
@@ -58,14 +59,16 @@ func TestJsonRPC(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, balance1, newBalance)
 
+		//nolint:godox
 		// Test. return 0 if the balance of an existing account is empty
-		// TODO
+		// TODO (to be fixed in EVM-521)
 	})
 
 	t.Run("eth_getTransactionCount", func(t *testing.T) {
 		key1, _ := wallet.GenerateKey()
 
-		// TODO. return zero if the account does not exists in the state (Does not work)
+		//nolint:godox
+		// TODO. return zero if the account does not exists in the state (Does not work) (to be fixed in EVM-521)
 		_, err := client.GetNonce(key1.Address(), ethgo.Latest)
 		require.NoError(t, err)
 
@@ -88,7 +91,7 @@ func TestJsonRPC(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, nonce1, uint64(0))
 
-		// Test. TODO. you can query the nonce at any block hash in time
+		// Test. TODO. you can query the nonce at any block hash in time (to be fixed in EVM-521) //nolint:godox
 		block, err := client.GetBlockByNumber(ethgo.BlockNumber(txn.Receipt().BlockNumber)-1, false)
 		require.NoError(t, err)
 
@@ -132,7 +135,7 @@ func TestJsonRPC(t *testing.T) {
 		cases := []ethgo.BlockNumberOrHash{
 			ethgo.Latest,
 			ethgo.BlockNumber(receipt.BlockNumber),
-			// receipt.BlockHash, TODO: It does not work
+			// receipt.BlockHash, TODO: It does not work (to be fixed in EVM-521) //nolint:godox
 		}
 		for _, c := range cases {
 			code, err = client.GetCode(codeAddr, c)

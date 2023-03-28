@@ -2,7 +2,6 @@ package withdraw
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -17,10 +16,7 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var (
-	params           withdrawParams
-	withdrawEventABI = contractsapi.ChildValidatorSet.Abi.Events["Withdrawal"]
-)
+var params withdrawParams
 
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
@@ -108,21 +104,26 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
-	foundLog := false
+	var (
+		withdrawalEvent contractsapi.WithdrawalEvent
+		foundLog        bool
+	)
 
 	for _, log := range receipt.Logs {
-		if withdrawEventABI.Match(log) {
-			event, err := withdrawEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
-
-			result.amount = event["amount"].(*big.Int).Uint64()       //nolint:forcetypeassert
-			result.withdrawnTo = event["to"].(ethgo.Address).String() //nolint:forcetypeassert
-			foundLog = true
-
-			break
+		doesMatch, err := withdrawalEvent.ParseLog(log)
+		if !doesMatch {
+			continue
 		}
+
+		if err != nil {
+			return err
+		}
+
+		result.amount = withdrawalEvent.Amount.Uint64()
+		result.withdrawnTo = withdrawalEvent.To.String()
+		foundLog = true
+
+		break
 	}
 
 	if !foundLog {

@@ -243,7 +243,7 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 		return nil, err
 	}
 
-	submit := &contractsapi.SubmitFunction{
+	submit := &contractsapi.SubmitCheckpointManagerFn{
 		CheckpointMetadata: &contractsapi.CheckpointMetadata{
 			BlockHash:               blockHash,
 			BlockRound:              new(big.Int).SetUint64(extra.Checkpoint.BlockRound),
@@ -344,7 +344,7 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
-	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockFunction{
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockCheckpointManagerFn{
 		BlockNumber: new(big.Int).SetUint64(exitEvent.BlockNumber),
 	}
 
@@ -396,7 +396,9 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
 	}
 
-	e, err := ExitEventInputsABIType.Encode(exitEvent)
+	var exitEventAPI contractsapi.L2StateSyncedEvent
+
+	e, err := exitEventAPI.Encode(exitEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -474,8 +476,9 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	numOfEvents := len(exitEvents)
 	data := make([][]byte, numOfEvents)
 
+	var exitEventAPI contractsapi.L2StateSyncedEvent
 	for i := 0; i < numOfEvents; i++ {
-		b, err := ExitEventInputsABIType.Encode(exitEvents[i])
+		b, err := exitEventAPI.Encode(exitEvents[i])
 		if err != nil {
 			return nil, err
 		}

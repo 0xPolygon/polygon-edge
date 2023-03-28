@@ -271,7 +271,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	depositToFn := &contractsapi.DepositToFunction{
+	depositToFn := &contractsapi.DepositToRootERC20PredicateFn{
 		RootToken: types.StringToAddress(dp.rootTokenAddr),
 		Receiver:  receiver,
 		Amount:    amount,
@@ -293,7 +293,7 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
 func createMintTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	mintFn := &contractsapi.MintFunction{
+	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     receiver,
 		Amount: amount,
 	}
@@ -316,7 +316,7 @@ func createMintTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Tran
 // to ERC20 token for ERC20 predicate so that it is able to spend given tokens
 func createApproveERC20PredicateTxn(amount *big.Int,
 	rootERC20Predicate, rootERC20Token types.Address) (*ethgo.Transaction, error) {
-	approveFnParams := &contractsapi.ApproveFunction{
+	approveFnParams := &contractsapi.ApproveRootERC20Fn{
 		Spender: rootERC20Predicate,
 		Amount:  amount,
 	}

@@ -19,7 +19,7 @@ import (
 const (
 	abiTypeNameFormat  = "var %sABIType = abi.MustNewType(\"%s\")"
 	eventNameFormat    = "%sEvent"
-	functionNameFormat = "%sFunction"
+	functionNameFormat = "%sFn"
 )
 
 type generatedData struct {
@@ -55,7 +55,15 @@ func main() {
 				"addToWhitelist",
 				"register",
 			},
-			[]string{},
+			[]string{
+				"NewValidator",
+				"Staked",
+				"Delegated",
+				"Unstaked",
+				"Undelegated",
+				"AddedToWhitelist",
+				"Withdrawal",
+			},
 		},
 		{
 			"StateSender",
@@ -334,8 +342,20 @@ func generateEvent(generatedData *generatedData, contractName string, event *abi
 	{{.}}
 {{ end }}
 
-func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
-	return decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
+func (*{{.TName}}) Sig() ethgo.Hash {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].ID()
+}
+
+func (*{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
+}
+
+func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
+	if (!{{.ContractName}}.Abi.Events["{{.Name}}"].Match(log)) {
+		return false, nil
+	}
+
+	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
 }`
 
 	inputs := map[string]interface{}{
@@ -358,15 +378,7 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) error {
 
 // generateFunction generates code for smart contract function and its parameters
 func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) error {
-	methodName := method.Name
-	if methodName == "initialize" {
-		// most of the contracts have initialize function, which differ in params
-		// so make them unique somehow
-		methodName = strings.Title(methodName + contractName)
-	}
-
-	methodName = fmt.Sprintf(functionNameFormat, methodName)
-
+	methodName := fmt.Sprintf(functionNameFormat, strings.Title(method.Name+contractName))
 	res := []string{}
 
 	_, err := generateType(generatedData, methodName, method.Inputs, &res)
@@ -379,6 +391,10 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 {{range .Structs}}
 	{{.}}
 {{ end }}
+
+func ({{.Sig}} *{{.TName}}) Sig() []byte {
+	return {{.ContractName}}.Abi.Methods["{{.Name}}"].ID()
+}
 
 func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
 	return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})
