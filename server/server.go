@@ -245,8 +245,7 @@ func NewServer(config *Config) (*Server, error) {
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
-	// use the london signer with eip-155 as a fallback one
-	// TODO: Determine crypto signer based on the latest head
+	// Use the london signer with eip-155 as a fallback one
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
 		chain.AllForksEnabled.At(0).Homestead,
