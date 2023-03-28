@@ -1,13 +1,8 @@
 package e2e
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"path"
 	"strconv"
 	"strings"
@@ -23,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 
@@ -34,26 +28,6 @@ import (
 const (
 	manifestFileName = "manifest.json"
 )
-
-// checkStateSyncResultLogs is helper function which parses given StateSyncResultEvent event's logs,
-// extracts status topic value and makes assertions against it.
-func checkStateSyncResultLogs(
-	t *testing.T,
-	logs []*ethgo.Log,
-	expectedCount int,
-) {
-	t.Helper()
-	require.Len(t, logs, expectedCount)
-
-	for _, log := range logs {
-		stateSyncResultEvent := &contractsapi.StateSyncResultEvent{}
-		require.NoError(t, stateSyncResultEvent.ParseLog(log))
-
-		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
-
-		require.True(t, stateSyncResultEvent.Status)
-	}
-}
 
 func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	const (
@@ -83,8 +57,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(1, 10*time.Second))
+	cluster.WaitForReady(t)
 
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
@@ -105,7 +78,9 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
 
 	// the transactions are processed and there should be a success events
-	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	id := stateSyncedResult.Sig()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -235,8 +210,7 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
 	require.NoError(t, err)
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
@@ -292,7 +266,9 @@ func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
-	id := contractsapi.StateReceiver.Abi.Events["StateSyncResult"].ID()
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	id := stateSyncedResult.Sig()
 	filter := &ethgo.LogFilter{
 		Topics: [][]*ethgo.Hash{
 			{&id},
@@ -412,8 +388,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
+	cluster.WaitForReady(t)
 
 	// init rpc clients
 	l1TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(txrelayer.DefaultRPCAddress))
@@ -511,8 +486,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
 	exitHelperAddr := ethgo.Address(manifest.RootchainConfig.ExitHelperAddress)
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(2, 2*time.Minute))
+	cluster.WaitForReady(t)
 
 	// init rpc clients
 	l1TxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(txrelayer.DefaultRPCAddress))
@@ -581,112 +555,6 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 			require.True(t, isProcessed)
 		}
 	}
-}
-
-func sendExitTransaction(
-	sidechainKey *ethgow.Key,
-	rootchainKey ethgo.Key,
-	proof types.Proof,
-	checkpointBlock uint64,
-	stateSenderData []byte,
-	l1ExitTestAddr,
-	exitHelperAddr ethgo.Address,
-	l1TxRelayer txrelayer.TxRelayer,
-	exitEventID uint64) (bool, error) {
-	proofExitEventEncoded, err := polybft.ExitEventInputsABIType.Encode(&polybft.ExitEvent{
-		ID:       exitEventID,
-		Sender:   sidechainKey.Address(),
-		Receiver: l1ExitTestAddr,
-		Data:     stateSenderData,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
-	if !ok {
-		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
-	}
-
-	receipt, err := ABITransaction(l1TxRelayer, rootchainKey, contractsapi.ExitHelper, exitHelperAddr,
-		"exit",
-		big.NewInt(int64(checkpointBlock)),
-		uint64(leafIndex),
-		proofExitEventEncoded,
-		proof.Data,
-	)
-
-	if err != nil {
-		return false, err
-	}
-
-	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return false, errors.New("transaction execution failed")
-	}
-
-	return isExitEventProcessed(exitEventID, exitHelperAddr, l1TxRelayer)
-}
-
-func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
-	query := struct {
-		Jsonrpc string   `json:"jsonrpc"`
-		Method  string   `json:"method"`
-		Params  []string `json:"params"`
-		ID      int      `json:"id"`
-	}{
-		"2.0",
-		"bridge_generateExitProof",
-		[]string{fmt.Sprintf("0x%x", exitID)},
-		1,
-	}
-
-	d, err := json.Marshal(query)
-	if err != nil {
-		return types.Proof{}, err
-	}
-
-	resp, err := http.Post(rpcAddress, "application/json", bytes.NewReader(d))
-	if err != nil {
-		return types.Proof{}, err
-	}
-
-	s, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return types.Proof{}, err
-	}
-
-	rspProof := struct {
-		Result types.Proof `json:"result"`
-	}{}
-
-	err = json.Unmarshal(s, &rspProof)
-	if err != nil {
-		return types.Proof{}, err
-	}
-
-	return rspProof.Result, nil
-}
-
-// TODO: Move this to some separate file, containing helper functions?
-func ABICall(relayer txrelayer.TxRelayer, artifact *artifact.Artifact, contractAddress ethgo.Address, senderAddr ethgo.Address, method string, params ...interface{}) (string, error) {
-	input, err := artifact.Abi.GetMethod(method).Encode(params)
-	if err != nil {
-		return "", err
-	}
-
-	return relayer.Call(senderAddr, contractAddress, input)
-}
-
-func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifact.Artifact, contractAddress ethgo.Address, method string, params ...interface{}) (*ethgo.Receipt, error) {
-	input, err := artifact.Abi.GetMethod(method).Encode(params)
-	if err != nil {
-		return nil, err
-	}
-
-	return relayer.SendTransaction(&ethgo.Transaction{
-		To:    &contractAddress,
-		Input: input,
-	}, key)
 }
 
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {

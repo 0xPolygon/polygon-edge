@@ -265,7 +265,8 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 	// start blockstream with the current header
 	header := store.Header()
 
-	// TODO: Make Header return jsonrpc.block object directly
+	//nolint:godox
+	// TODO: Make Header return jsonrpc.block object directly (to be fixed in EVM-524)
 	block := toBlock(&types.Block{Header: header}, false)
 	m.blockStream = newBlockStream(block)
 

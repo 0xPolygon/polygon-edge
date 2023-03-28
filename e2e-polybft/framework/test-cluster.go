@@ -544,7 +544,7 @@ func (c *TestCluster) WaitUntil(timeout, pollFrequency time.Duration, handler fu
 func (c *TestCluster) WaitForReady(t *testing.T) {
 	t.Helper()
 
-	require.NoError(t, c.WaitForBlock(3, 1*time.Minute))
+	require.NoError(t, c.WaitForBlock(1, 30*time.Second))
 }
 
 func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {

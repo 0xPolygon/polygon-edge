@@ -16,7 +16,6 @@ import (
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -190,7 +189,7 @@ func run(cmd *cobra.Command, _ []string) {
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
 func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	withdrawToFn := &contractsapi.WithdrawToFunction{
+	withdrawToFn := &contractsapi.WithdrawToChildERC20PredicateFn{
 		ChildToken: types.StringToAddress(wp.childTokenAddr),
 		Receiver:   receiver,
 		Amount:     amount,
@@ -211,13 +210,14 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 
 // extractExitEventID tries to extract exit event id from provided receipt
 func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
+	var exitEvent contractsapi.L2StateSyncedEvent
 	for _, log := range receipt.Logs {
-		if !polybft.ExitEventABI.Match(log) {
+		doesMatch, err := exitEvent.ParseLog(log)
+		if !doesMatch {
 			continue
 		}
 
-		exitEvent := &contractsapi.L2StateSyncedEvent{}
-		if err := exitEvent.ParseLog(log); err != nil {
+		if err != nil {
 			return nil, err
 		}
 

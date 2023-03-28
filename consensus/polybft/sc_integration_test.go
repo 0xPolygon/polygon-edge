@@ -56,7 +56,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}
 
 	checkpointManagerInit := func() ([]byte, error) {
-		initialize := contractsapi.InitializeCheckpointManagerFunction{
+		initialize := contractsapi.InitializeCheckpointManagerFn{
 			NewBls:          contracts.BLSContract,
 			NewBn256G2:      bn256Addr,
 			NewValidatorSet: accSet.ToAPIBinding(),
@@ -156,7 +156,8 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
 	require.Equal(t, int(res[31]), 0)
 
-	proofExitEvent, err := ExitEventInputsABIType.Encode(exits[0])
+	var exitEventAPI contractsapi.L2StateSyncedEvent
+	proofExitEvent, err := exitEventAPI.Encode(exits[0])
 	require.NoError(t, err)
 
 	proof, err := exitTrie.GenerateProof(proofExitEvent)
@@ -282,8 +283,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			SprintSize:          5,
 			EpochReward:         reward,
 			// use 1st account as governance address
-			Governance:       currentValidators.toValidatorSet().validators.GetAddresses()[0],
-			ValidatorSetAddr: contracts.ValidatorSetContract,
+			Governance: currentValidators.toValidatorSet().validators.GetAddresses()[0],
 		}
 
 		// get data for ChildValidatorSet initialization

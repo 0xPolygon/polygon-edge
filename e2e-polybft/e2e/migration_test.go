@@ -153,7 +153,7 @@ func TestMigration(t *testing.T) {
 	)
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(5, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	senderBalanceAfterMigration, err := cluster.Servers[0].JSONRPC().Eth().GetBalance(userAddr, ethgo.Latest)
 	if err != nil {

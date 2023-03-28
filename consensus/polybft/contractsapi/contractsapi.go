@@ -25,17 +25,21 @@ func (s *StateSyncCommitment) DecodeAbi(buf []byte) error {
 	return decodeStruct(StateSyncCommitmentABIType, buf, &s)
 }
 
-type CommitFunction struct {
+type CommitStateReceiverFn struct {
 	Commitment *StateSyncCommitment `abi:"commitment"`
 	Signature  []byte               `abi:"signature"`
 	Bitmap     []byte               `abi:"bitmap"`
 }
 
-func (c *CommitFunction) EncodeAbi() ([]byte, error) {
+func (c *CommitStateReceiverFn) Sig() []byte {
+	return StateReceiver.Abi.Methods["commit"].ID()
+}
+
+func (c *CommitStateReceiverFn) EncodeAbi() ([]byte, error) {
 	return StateReceiver.Abi.Methods["commit"].Encode(c)
 }
 
-func (c *CommitFunction) DecodeAbi(buf []byte) error {
+func (c *CommitStateReceiverFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateReceiver.Abi.Methods["commit"], buf, c)
 }
 
@@ -56,16 +60,20 @@ func (s *StateSync) DecodeAbi(buf []byte) error {
 	return decodeStruct(StateSyncABIType, buf, &s)
 }
 
-type ExecuteFunction struct {
+type ExecuteStateReceiverFn struct {
 	Proof []types.Hash `abi:"proof"`
 	Obj   *StateSync   `abi:"obj"`
 }
 
-func (e *ExecuteFunction) EncodeAbi() ([]byte, error) {
+func (e *ExecuteStateReceiverFn) Sig() []byte {
+	return StateReceiver.Abi.Methods["execute"].ID()
+}
+
+func (e *ExecuteStateReceiverFn) EncodeAbi() ([]byte, error) {
 	return StateReceiver.Abi.Methods["execute"].Encode(e)
 }
 
-func (e *ExecuteFunction) DecodeAbi(buf []byte) error {
+func (e *ExecuteStateReceiverFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateReceiver.Abi.Methods["execute"], buf, e)
 }
 
@@ -75,8 +83,20 @@ type StateSyncResultEvent struct {
 	Message []byte   `abi:"message"`
 }
 
-func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
+func (*StateSyncResultEvent) Sig() ethgo.Hash {
+	return StateReceiver.Abi.Events["StateSyncResult"].ID()
+}
+
+func (*StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.Encode(inputs)
+}
+
+func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StateReceiver.Abi.Events["StateSyncResult"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
 }
 
 type NewCommitmentEvent struct {
@@ -85,8 +105,20 @@ type NewCommitmentEvent struct {
 	Root    types.Hash `abi:"root"`
 }
 
-func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
+func (*NewCommitmentEvent) Sig() ethgo.Hash {
+	return StateReceiver.Abi.Events["NewCommitment"].ID()
+}
+
+func (*NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StateReceiver.Abi.Events["NewCommitment"].Inputs.Encode(inputs)
+}
+
+func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StateReceiver.Abi.Events["NewCommitment"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
 }
 
 type Epoch struct {
@@ -136,17 +168,21 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 	return decodeStruct(UptimeABIType, buf, &u)
 }
 
-type CommitEpochFunction struct {
+type CommitEpochChildValidatorSetFn struct {
 	ID     *big.Int `abi:"id"`
 	Epoch  *Epoch   `abi:"epoch"`
 	Uptime *Uptime  `abi:"uptime"`
 }
 
-func (c *CommitEpochFunction) EncodeAbi() ([]byte, error) {
+func (c *CommitEpochChildValidatorSetFn) Sig() []byte {
+	return ChildValidatorSet.Abi.Methods["commitEpoch"].ID()
+}
+
+func (c *CommitEpochChildValidatorSetFn) EncodeAbi() ([]byte, error) {
 	return ChildValidatorSet.Abi.Methods["commitEpoch"].Encode(c)
 }
 
-func (c *CommitEpochFunction) DecodeAbi(buf []byte) error {
+func (c *CommitEpochChildValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
 
@@ -184,56 +220,221 @@ func (v *ValidatorInit) DecodeAbi(buf []byte) error {
 	return decodeStruct(ValidatorInitABIType, buf, &v)
 }
 
-type InitializeChildValidatorSetFunction struct {
+type InitializeChildValidatorSetFn struct {
 	Init       *InitStruct      `abi:"init"`
 	Validators []*ValidatorInit `abi:"validators"`
 	NewBls     types.Address    `abi:"newBls"`
 	Governance types.Address    `abi:"governance"`
 }
 
-func (i *InitializeChildValidatorSetFunction) EncodeAbi() ([]byte, error) {
+func (i *InitializeChildValidatorSetFn) Sig() []byte {
+	return ChildValidatorSet.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildValidatorSetFn) EncodeAbi() ([]byte, error) {
 	return ChildValidatorSet.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeChildValidatorSetFunction) DecodeAbi(buf []byte) error {
+func (i *InitializeChildValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["initialize"], buf, i)
 }
 
-type AddToWhitelistFunction struct {
+type AddToWhitelistChildValidatorSetFn struct {
 	WhitelistAddreses []ethgo.Address `abi:"whitelistAddreses"`
 }
 
-func (a *AddToWhitelistFunction) EncodeAbi() ([]byte, error) {
+func (a *AddToWhitelistChildValidatorSetFn) Sig() []byte {
+	return ChildValidatorSet.Abi.Methods["addToWhitelist"].ID()
+}
+
+func (a *AddToWhitelistChildValidatorSetFn) EncodeAbi() ([]byte, error) {
 	return ChildValidatorSet.Abi.Methods["addToWhitelist"].Encode(a)
 }
 
-func (a *AddToWhitelistFunction) DecodeAbi(buf []byte) error {
+func (a *AddToWhitelistChildValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["addToWhitelist"], buf, a)
 }
 
-type RegisterFunction struct {
+type RegisterChildValidatorSetFn struct {
 	Signature [2]*big.Int `abi:"signature"`
 	Pubkey    [4]*big.Int `abi:"pubkey"`
 }
 
-func (r *RegisterFunction) EncodeAbi() ([]byte, error) {
+func (r *RegisterChildValidatorSetFn) Sig() []byte {
+	return ChildValidatorSet.Abi.Methods["register"].ID()
+}
+
+func (r *RegisterChildValidatorSetFn) EncodeAbi() ([]byte, error) {
 	return ChildValidatorSet.Abi.Methods["register"].Encode(r)
 }
 
-func (r *RegisterFunction) DecodeAbi(buf []byte) error {
+func (r *RegisterChildValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildValidatorSet.Abi.Methods["register"], buf, r)
 }
 
-type SyncStateFunction struct {
+type NewValidatorEvent struct {
+	Validator types.Address `abi:"validator"`
+	BlsKey    [4]*big.Int   `abi:"blsKey"`
+}
+
+func (*NewValidatorEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["NewValidator"].ID()
+}
+
+func (*NewValidatorEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["NewValidator"].Inputs.Encode(inputs)
+}
+
+func (n *NewValidatorEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["NewValidator"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["NewValidator"], log, n)
+}
+
+type StakedEvent struct {
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*StakedEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["Staked"].ID()
+}
+
+func (*StakedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["Staked"].Inputs.Encode(inputs)
+}
+
+func (s *StakedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["Staked"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["Staked"], log, s)
+}
+
+type DelegatedEvent struct {
+	Delegator types.Address `abi:"delegator"`
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*DelegatedEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["Delegated"].ID()
+}
+
+func (*DelegatedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["Delegated"].Inputs.Encode(inputs)
+}
+
+func (d *DelegatedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["Delegated"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["Delegated"], log, d)
+}
+
+type UnstakedEvent struct {
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*UnstakedEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["Unstaked"].ID()
+}
+
+func (*UnstakedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["Unstaked"].Inputs.Encode(inputs)
+}
+
+func (u *UnstakedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["Unstaked"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["Unstaked"], log, u)
+}
+
+type UndelegatedEvent struct {
+	Delegator types.Address `abi:"delegator"`
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*UndelegatedEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["Undelegated"].ID()
+}
+
+func (*UndelegatedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["Undelegated"].Inputs.Encode(inputs)
+}
+
+func (u *UndelegatedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["Undelegated"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["Undelegated"], log, u)
+}
+
+type AddedToWhitelistEvent struct {
+	Validator types.Address `abi:"validator"`
+}
+
+func (*AddedToWhitelistEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["AddedToWhitelist"].ID()
+}
+
+func (*AddedToWhitelistEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["AddedToWhitelist"].Inputs.Encode(inputs)
+}
+
+func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["AddedToWhitelist"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["AddedToWhitelist"], log, a)
+}
+
+type WithdrawalEvent struct {
+	Account types.Address `abi:"account"`
+	To      types.Address `abi:"to"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (*WithdrawalEvent) Sig() ethgo.Hash {
+	return ChildValidatorSet.Abi.Events["Withdrawal"].ID()
+}
+
+func (*WithdrawalEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildValidatorSet.Abi.Events["Withdrawal"].Inputs.Encode(inputs)
+}
+
+func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildValidatorSet.Abi.Events["Withdrawal"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildValidatorSet.Abi.Events["Withdrawal"], log, w)
+}
+
+type SyncStateStateSenderFn struct {
 	Receiver types.Address `abi:"receiver"`
 	Data     []byte        `abi:"data"`
 }
 
-func (s *SyncStateFunction) EncodeAbi() ([]byte, error) {
+func (s *SyncStateStateSenderFn) Sig() []byte {
+	return StateSender.Abi.Methods["syncState"].ID()
+}
+
+func (s *SyncStateStateSenderFn) EncodeAbi() ([]byte, error) {
 	return StateSender.Abi.Methods["syncState"].Encode(s)
 }
 
-func (s *SyncStateFunction) DecodeAbi(buf []byte) error {
+func (s *SyncStateStateSenderFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StateSender.Abi.Methods["syncState"], buf, s)
 }
 
@@ -244,8 +445,20 @@ type StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
+func (*StateSyncedEvent) Sig() ethgo.Hash {
+	return StateSender.Abi.Events["StateSynced"].ID()
+}
+
+func (*StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StateSender.Abi.Events["StateSynced"].Inputs.Encode(inputs)
+}
+
+func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StateSender.Abi.Events["StateSynced"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
 }
 
 type L2StateSyncedEvent struct {
@@ -255,8 +468,20 @@ type L2StateSyncedEvent struct {
 	Data     []byte        `abi:"data"`
 }
 
-func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) error {
-	return decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
+func (*L2StateSyncedEvent) Sig() ethgo.Hash {
+	return L2StateSender.Abi.Events["L2StateSynced"].ID()
+}
+
+func (*L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return L2StateSender.Abi.Events["L2StateSynced"].Inputs.Encode(inputs)
+}
+
+func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !L2StateSender.Abi.Events["L2StateSynced"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
 }
 
 type CheckpointMetadata struct {
@@ -307,7 +532,7 @@ func (v *Validator) DecodeAbi(buf []byte) error {
 	return decodeStruct(ValidatorABIType, buf, &v)
 }
 
-type SubmitFunction struct {
+type SubmitCheckpointManagerFn struct {
 	CheckpointMetadata *CheckpointMetadata `abi:"checkpointMetadata"`
 	Checkpoint         *Checkpoint         `abi:"checkpoint"`
 	Signature          [2]*big.Int         `abi:"signature"`
@@ -315,57 +540,73 @@ type SubmitFunction struct {
 	Bitmap             []byte              `abi:"bitmap"`
 }
 
-func (s *SubmitFunction) EncodeAbi() ([]byte, error) {
+func (s *SubmitCheckpointManagerFn) Sig() []byte {
+	return CheckpointManager.Abi.Methods["submit"].ID()
+}
+
+func (s *SubmitCheckpointManagerFn) EncodeAbi() ([]byte, error) {
 	return CheckpointManager.Abi.Methods["submit"].Encode(s)
 }
 
-func (s *SubmitFunction) DecodeAbi(buf []byte) error {
+func (s *SubmitCheckpointManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["submit"], buf, s)
 }
 
-type InitializeCheckpointManagerFunction struct {
+type InitializeCheckpointManagerFn struct {
 	NewBls          types.Address `abi:"newBls"`
 	NewBn256G2      types.Address `abi:"newBn256G2"`
 	ChainID_        *big.Int      `abi:"chainId_"`
 	NewValidatorSet []*Validator  `abi:"newValidatorSet"`
 }
 
-func (i *InitializeCheckpointManagerFunction) EncodeAbi() ([]byte, error) {
+func (i *InitializeCheckpointManagerFn) Sig() []byte {
+	return CheckpointManager.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeCheckpointManagerFn) EncodeAbi() ([]byte, error) {
 	return CheckpointManager.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeCheckpointManagerFunction) DecodeAbi(buf []byte) error {
+func (i *InitializeCheckpointManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["initialize"], buf, i)
 }
 
-type GetCheckpointBlockFunction struct {
+type GetCheckpointBlockCheckpointManagerFn struct {
 	BlockNumber *big.Int `abi:"blockNumber"`
 }
 
-func (g *GetCheckpointBlockFunction) EncodeAbi() ([]byte, error) {
+func (g *GetCheckpointBlockCheckpointManagerFn) Sig() []byte {
+	return CheckpointManager.Abi.Methods["getCheckpointBlock"].ID()
+}
+
+func (g *GetCheckpointBlockCheckpointManagerFn) EncodeAbi() ([]byte, error) {
 	return CheckpointManager.Abi.Methods["getCheckpointBlock"].Encode(g)
 }
 
-func (g *GetCheckpointBlockFunction) DecodeAbi(buf []byte) error {
+func (g *GetCheckpointBlockCheckpointManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["getCheckpointBlock"], buf, g)
 }
 
-type ExitFunction struct {
+type ExitExitHelperFn struct {
 	BlockNumber  *big.Int     `abi:"blockNumber"`
 	LeafIndex    *big.Int     `abi:"leafIndex"`
 	UnhashedLeaf []byte       `abi:"unhashedLeaf"`
 	Proof        []types.Hash `abi:"proof"`
 }
 
-func (e *ExitFunction) EncodeAbi() ([]byte, error) {
+func (e *ExitExitHelperFn) Sig() []byte {
+	return ExitHelper.Abi.Methods["exit"].ID()
+}
+
+func (e *ExitExitHelperFn) EncodeAbi() ([]byte, error) {
 	return ExitHelper.Abi.Methods["exit"].Encode(e)
 }
 
-func (e *ExitFunction) DecodeAbi(buf []byte) error {
+func (e *ExitExitHelperFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ExitHelper.Abi.Methods["exit"], buf, e)
 }
 
-type InitializeChildERC20PredicateFunction struct {
+type InitializeChildERC20PredicateFn struct {
 	NewL2StateSender          types.Address `abi:"newL2StateSender"`
 	NewStateReceiver          types.Address `abi:"newStateReceiver"`
 	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
@@ -373,29 +614,37 @@ type InitializeChildERC20PredicateFunction struct {
 	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
 }
 
-func (i *InitializeChildERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+func (i *InitializeChildERC20PredicateFn) Sig() []byte {
+	return ChildERC20Predicate.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildERC20PredicateFn) EncodeAbi() ([]byte, error) {
 	return ChildERC20Predicate.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeChildERC20PredicateFunction) DecodeAbi(buf []byte) error {
+func (i *InitializeChildERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC20Predicate.Abi.Methods["initialize"], buf, i)
 }
 
-type WithdrawToFunction struct {
+type WithdrawToChildERC20PredicateFn struct {
 	ChildToken types.Address `abi:"childToken"`
 	Receiver   types.Address `abi:"receiver"`
 	Amount     *big.Int      `abi:"amount"`
 }
 
-func (w *WithdrawToFunction) EncodeAbi() ([]byte, error) {
+func (w *WithdrawToChildERC20PredicateFn) Sig() []byte {
+	return ChildERC20Predicate.Abi.Methods["withdrawTo"].ID()
+}
+
+func (w *WithdrawToChildERC20PredicateFn) EncodeAbi() ([]byte, error) {
 	return ChildERC20Predicate.Abi.Methods["withdrawTo"].Encode(w)
 }
 
-func (w *WithdrawToFunction) DecodeAbi(buf []byte) error {
+func (w *WithdrawToChildERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
 }
 
-type InitializeNativeERC20Function struct {
+type InitializeNativeERC20Fn struct {
 	Predicate_ types.Address `abi:"predicate_"`
 	RootToken_ types.Address `abi:"rootToken_"`
 	Name_      string        `abi:"name_"`
@@ -403,15 +652,19 @@ type InitializeNativeERC20Function struct {
 	Decimals_  uint8         `abi:"decimals_"`
 }
 
-func (i *InitializeNativeERC20Function) EncodeAbi() ([]byte, error) {
+func (i *InitializeNativeERC20Fn) Sig() []byte {
+	return NativeERC20.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeNativeERC20Fn) EncodeAbi() ([]byte, error) {
 	return NativeERC20.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeNativeERC20Function) DecodeAbi(buf []byte) error {
+func (i *InitializeNativeERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20.Abi.Methods["initialize"], buf, i)
 }
 
-type InitializeNativeERC20MintableFunction struct {
+type InitializeNativeERC20MintableFn struct {
 	Predicate_ types.Address `abi:"predicate_"`
 	Owner_     types.Address `abi:"owner_"`
 	RootToken_ types.Address `abi:"rootToken_"`
@@ -420,15 +673,19 @@ type InitializeNativeERC20MintableFunction struct {
 	Decimals_  uint8         `abi:"decimals_"`
 }
 
-func (i *InitializeNativeERC20MintableFunction) EncodeAbi() ([]byte, error) {
+func (i *InitializeNativeERC20MintableFn) Sig() []byte {
+	return NativeERC20Mintable.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeNativeERC20MintableFn) EncodeAbi() ([]byte, error) {
 	return NativeERC20Mintable.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeNativeERC20MintableFunction) DecodeAbi(buf []byte) error {
+func (i *InitializeNativeERC20MintableFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20Mintable.Abi.Methods["initialize"], buf, i)
 }
 
-type InitializeRootERC20PredicateFunction struct {
+type InitializeRootERC20PredicateFn struct {
 	NewStateSender         types.Address `abi:"newStateSender"`
 	NewExitHelper          types.Address `abi:"newExitHelper"`
 	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
@@ -436,50 +693,66 @@ type InitializeRootERC20PredicateFunction struct {
 	NativeTokenRootAddress types.Address `abi:"nativeTokenRootAddress"`
 }
 
-func (i *InitializeRootERC20PredicateFunction) EncodeAbi() ([]byte, error) {
+func (i *InitializeRootERC20PredicateFn) Sig() []byte {
+	return RootERC20Predicate.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeRootERC20PredicateFn) EncodeAbi() ([]byte, error) {
 	return RootERC20Predicate.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeRootERC20PredicateFunction) DecodeAbi(buf []byte) error {
+func (i *InitializeRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["initialize"], buf, i)
 }
 
-type DepositToFunction struct {
+type DepositToRootERC20PredicateFn struct {
 	RootToken types.Address `abi:"rootToken"`
 	Receiver  types.Address `abi:"receiver"`
 	Amount    *big.Int      `abi:"amount"`
 }
 
-func (d *DepositToFunction) EncodeAbi() ([]byte, error) {
+func (d *DepositToRootERC20PredicateFn) Sig() []byte {
+	return RootERC20Predicate.Abi.Methods["depositTo"].ID()
+}
+
+func (d *DepositToRootERC20PredicateFn) EncodeAbi() ([]byte, error) {
 	return RootERC20Predicate.Abi.Methods["depositTo"].Encode(d)
 }
 
-func (d *DepositToFunction) DecodeAbi(buf []byte) error {
+func (d *DepositToRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
 }
 
-type ApproveFunction struct {
+type ApproveRootERC20Fn struct {
 	Spender types.Address `abi:"spender"`
 	Amount  *big.Int      `abi:"amount"`
 }
 
-func (a *ApproveFunction) EncodeAbi() ([]byte, error) {
+func (a *ApproveRootERC20Fn) Sig() []byte {
+	return RootERC20.Abi.Methods["approve"].ID()
+}
+
+func (a *ApproveRootERC20Fn) EncodeAbi() ([]byte, error) {
 	return RootERC20.Abi.Methods["approve"].Encode(a)
 }
 
-func (a *ApproveFunction) DecodeAbi(buf []byte) error {
+func (a *ApproveRootERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["approve"], buf, a)
 }
 
-type MintFunction struct {
+type MintRootERC20Fn struct {
 	To     types.Address `abi:"to"`
 	Amount *big.Int      `abi:"amount"`
 }
 
-func (m *MintFunction) EncodeAbi() ([]byte, error) {
+func (m *MintRootERC20Fn) Sig() []byte {
+	return RootERC20.Abi.Methods["mint"].ID()
+}
+
+func (m *MintRootERC20Fn) EncodeAbi() ([]byte, error) {
 	return RootERC20.Abi.Methods["mint"].Encode(m)
 }
 
-func (m *MintFunction) DecodeAbi(buf []byte) error {
+func (m *MintRootERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }

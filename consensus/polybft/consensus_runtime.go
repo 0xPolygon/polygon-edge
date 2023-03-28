@@ -157,8 +157,8 @@ func (c *consensusRuntime) close() {
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		stateSenderAddr := c.config.PolyBFTConfig.Bridge.BridgeAddr
-		stateSyncManager, err := NewStateSyncManager(
-			logger,
+		stateSyncManager, err := newStateSyncManager(
+			logger.Named("state-sync-manager"),
 			c.config.State,
 			&stateSyncConfig{
 				key:                   c.config.Key,
@@ -257,7 +257,8 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
-		// TODO - this will need to take inconsideration if slashing occurred
+		//nolint:godox
+		// TODO - this will need to take inconsideration if slashing occurred (to be fixed in EVM-519)
 		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
@@ -316,7 +317,8 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
 
-	// TODO - recognize slashing occurred
+	//nolint:godox
+	// TODO - recognize slashing occurred (to be fixed in EVM-519)
 	slash := false
 
 	pendingBlockNumber := parent.Number + 1
@@ -451,7 +453,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 // in the current epoch, and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
-	epoch *epochMetadata) (*contractsapi.CommitEpochFunction, error) {
+	epoch *epochMetadata) (*contractsapi.CommitEpochChildValidatorSetFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -529,7 +531,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
 	}
 
-	commitEpoch := &contractsapi.CommitEpochFunction{
+	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
@@ -584,7 +586,7 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 		return nil, err
 	}
 
-	return c.config.blockchain.GetSystemState(c.config.PolyBFTConfig, provider), nil
+	return c.config.blockchain.GetSystemState(provider), nil
 }
 
 func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {
