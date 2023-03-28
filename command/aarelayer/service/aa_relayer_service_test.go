@@ -49,7 +49,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		tx := getDummyTxs()[0]
 
-		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
+		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa, nil))
 		require.NoError(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
 
@@ -77,7 +77,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		tx := getDummyTxs()[1]
 
-		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
+		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa, nil))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
 
@@ -105,7 +105,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		tx := getDummyTxs()[2]
 
-		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
+		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa, nil))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
 
@@ -133,7 +133,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		tx := getDummyTxs()[3]
 
-		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
+		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa, nil))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
 
@@ -162,7 +162,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 		tx := getDummyTxs()[4]
 
-		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
+		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa, nil))
 		require.Error(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
 
@@ -193,7 +193,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 		aaRelayerService, err := NewAARelayerService(aaTxSender, pool, state, account.Ecdsa, aaInvokerAddress, hclog.NewNullLogger())
 		require.NoError(t, err)
 
-		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa))
+		require.NoError(t, tx.Tx.MakeSignature(aaInvokerAddress, chainID, account.Ecdsa, nil))
 		require.NoError(t, aaRelayerService.executeJob(context.Background(), tx))
 	})
 

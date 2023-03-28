@@ -76,9 +76,9 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa))
+		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa, nil))
 
-		require.Equal(t, tx.Transaction.From, tx.GetAddressFromSignature(aaInvokerAddress, chainID))
+		require.Equal(t, tx.Transaction.From, tx.GetAddressFromSignature(aaInvokerAddress, chainID, nil))
 
 		req := makeRequest(t, "POST", "sendTransaction", tx)
 
@@ -221,7 +221,7 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa))
+		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa, nil))
 
 		req := makeRequest(t, "POST", "sendTransaction", &tx)
 
@@ -298,9 +298,7 @@ func getServer(t *testing.T, address types.Address, dbpath string) *AARelayerRes
 
 	config := DefaultConfig()
 	pool := NewAAPool()
-	verification := NewAAVerification(config, address, chainID, func(a *AATransaction) error {
-		return nil
-	})
+	verification := NewAAVerification(config, address, chainID)
 
 	config.DenyList = []string{types.ZeroAddress.String()}
 

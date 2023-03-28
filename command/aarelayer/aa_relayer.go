@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -88,7 +89,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		config,
 		invokerAddress,
 		params.chainID,
-		func(a *service.AATransaction) error { return nil })
+		service.WithMagicHashFn(crypto.Make3074Hash))
 	restService := service.NewAARelayerRestServer(pool, state, verification, logger)
 
 	relayerService, err := service.NewAARelayerService(

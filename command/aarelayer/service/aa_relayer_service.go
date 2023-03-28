@@ -197,8 +197,10 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 			rs.logger.Debug("transaction nonce mismatch",
 				"tx", poppedTx.ID, "from", address,
 				"nonce", poppedTx.Tx.Transaction.Nonce, "expected", nonce)
-
-			pushBackList = append(pushBackList, poppedTx)
+			// if less then it should not be processed at all
+			if poppedTx.Tx.Transaction.Nonce > nonce {
+				pushBackList = append(pushBackList, poppedTx)
+			}
 		} else {
 			stateTx = poppedTx
 			// update pool -> put statetx with next nonce to the timeHeap
@@ -242,6 +244,11 @@ func (rs *AARelayerService) populateStateTx(stateTx *AAStateTransaction, receipt
 
 	if receipt.Status == receiptSuccess {
 		stateTx.Status = StatusCompleted
+
+		rs.logger.Debug("transaction has been executed successfully",
+			"id", stateTx.ID,
+			"from", stateTx.Tx.Transaction.From,
+			"nonce", stateTx.Tx.Transaction.Nonce)
 	} else {
 		stateTx.Status = StatusFailed
 

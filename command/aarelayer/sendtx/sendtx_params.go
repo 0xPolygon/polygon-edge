@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -116,7 +117,7 @@ func (rp *aarelayerSendTxParams) createAATransaction(key ethgo.Key) (*service.AA
 
 	invokerAddress := types.StringToAddress(rp.invokerAddr)
 
-	if err := aaTx.MakeSignature(invokerAddress, rp.chainID, key); err != nil {
+	if err := aaTx.MakeSignature(invokerAddress, rp.chainID, key, crypto.Make3074Hash); err != nil {
 		return nil, err
 	}
 
