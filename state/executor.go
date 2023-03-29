@@ -20,6 +20,7 @@ import (
 
 const (
 	SpuriousDragonMaxCodeSize = 24576
+	TxPoolMaxInitCodeSize     = 2 * SpuriousDragonMaxCodeSize
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract

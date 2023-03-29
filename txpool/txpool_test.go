@@ -1774,7 +1774,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		pool := setupPool()
 		pool.forks.EIP158 = true
 
-		input := make([]byte, state.SpuriousDragonMaxCodeSize)
+		input := make([]byte, state.TxPoolMaxInitCodeSize)
 		_, err := rand.Read(input)
 		require.NoError(t, err)
 
