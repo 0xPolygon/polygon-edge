@@ -34,7 +34,7 @@ func (k *Key) Address() ethgo.Address {
 // Sign signs the provided digest with BLS key
 // Used only to sign transactions
 func (k *Key) Sign(digest []byte) ([]byte, error) {
-	return k.SignWithDomain(digest, bls.DomainTransactionSigning)
+	return k.SignWithDomain(digest, bls.DomainCommonSigning)
 }
 
 // SignWithDomain signs the provided digest with BLS key and provided domain

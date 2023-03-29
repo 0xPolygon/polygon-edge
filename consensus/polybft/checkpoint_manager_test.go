@@ -61,7 +61,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	validators.iterAcct(aliases, func(t *testValidator) {
 		bitmap.Set(idx)
-		signatures = append(signatures, t.mustSign(dummyMsg, bls.DomainStateReceiver))
+		signatures = append(signatures, t.mustSign(dummyMsg, bls.DomainCheckpointManager))
 		idx++
 	})
 
