@@ -28,7 +28,8 @@ jobs:
 
       - name: Build Polygon Edge
         id: edge_build       
-        run: echo "build_output=$(go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge)\n" >> $GITHUB_OUTPUT
+        run: |
+          echo "build_output=$(go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge)" >> $GITHUB_OUTPUT
         env:
           CC: gcc
           CXX: g++

@@ -27,15 +27,16 @@ jobs:
     name: Polybft Property Tests
     uses: ./.github/workflows/property-polybft.yml
     needs: build
-
+ 
   notification:
     name: Nightly Notifications
-    needs: [build, test, e2e, property]    
+    runs-on: ubuntu-latest
+    needs: [build, test, e2e, property]
     steps:      
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_TEST_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
         with:
           payload: |
@@ -52,9 +53,9 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Build details: ${{ needs.build.outputs.workflow_build_output.value }}"
+                    "text": "Build output: ${{ needs.build.outputs.workflow_build_output }}"
                     }
-                },
+                },                
                 {
                   "type": "divider"
                 },   
@@ -64,6 +65,6 @@ jobs:
                     "type": "mrkdwn",
                     "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
                   }
-                },                  
+                }               
               ]
             }
