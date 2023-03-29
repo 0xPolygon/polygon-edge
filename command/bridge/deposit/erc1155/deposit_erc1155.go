@@ -121,7 +121,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
-	if err := dp.ValidateFlags(dp.testMode); err != nil {
+	if err := dp.ValidateFlags(); err != nil {
 		return err
 	}
 

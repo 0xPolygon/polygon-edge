@@ -8,14 +8,13 @@ const (
 	SenderKeyFlag = "sender-key"
 	ReceiversFlag = "receivers"
 	AmountsFlag   = "amounts"
+	TokenIDsFlag  = "token-ids"
 )
 
 var (
 	errInconsistentAccounts = errors.New("receivers and amounts must be equal length")
 )
 
-// TODO: Rename to BridgeParams and make separate struct for erc 20 params
-// (everything except Amounts remains here)
 type ERC20BridgeParams struct {
 	SenderKey string
 	Receivers []string

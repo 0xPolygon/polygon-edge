@@ -1,4 +1,4 @@
-package withdraw
+package erc20
 
 import (
 	"bytes"
