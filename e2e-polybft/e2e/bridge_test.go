@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"path"
@@ -116,9 +117,12 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 
 	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
 
+	rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
+	require.NoError(t, err)
+
 	// send withdraw transaction
 	err = cluster.Bridge.WithdrawERC20(
-		cluster.Servers[0].DataDir(),
+		hex.EncodeToString(rawKey),
 		strings.Join(receivers[:], ","),
 		strings.Join(amounts[:], ","),
 		cluster.Servers[0].JSONRPCAddr())
@@ -371,7 +375,7 @@ func TestE2E_Bridge_L2toL1Exit(t *testing.T) {
 	}
 
 	// use test account for rootchain
-	rootchainKey, err := rootchainHelper.GetRootchainTestPrivKey()
+	rootchainKey, err := rootchainHelper.GetRootchainPrivateKey("")
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,
@@ -470,7 +474,7 @@ func TestE2E_Bridge_L2toL1ExitMultiple(t *testing.T) {
 	}
 
 	// use test account for rootchain
-	rootchainKey, err := rootchainHelper.GetRootchainTestPrivKey()
+	rootchainKey, err := rootchainHelper.GetRootchainPrivateKey("")
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 5,

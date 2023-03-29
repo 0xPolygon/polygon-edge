@@ -555,8 +555,8 @@ func (f *fsm) ValidatorSet() ValidatorSet {
 func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
 	systemState := f.backend.GetSystemState(provider)
-	newValidators, err := systemState.GetValidatorSet()
 
+	newValidators, err := systemState.GetValidatorSet()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
 	}

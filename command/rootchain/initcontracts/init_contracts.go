@@ -9,12 +9,10 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -83,17 +81,10 @@ func GetCommand() *cobra.Command {
 	)
 
 	cmd.Flags().StringVar(
-		&params.accountDir,
-		polybftsecrets.AccountDirFlag,
+		&params.deployerKey,
+		deployerKeyFlag,
 		"",
-		polybftsecrets.AccountDirFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.accountConfig,
-		polybftsecrets.AccountConfigFlag,
-		"",
-		polybftsecrets.AccountConfigFlagDesc,
+		"Hex encoded private key of the account which deploys rootchain contracts",
 	)
 
 	cmd.Flags().StringVar(
@@ -118,10 +109,7 @@ func GetCommand() *cobra.Command {
 			" (otherwise provided secrets are used to resolve deployer account)",
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(
-		helper.TestModeFlag,
-		polybftsecrets.AccountDirFlag,
-		polybftsecrets.AccountConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
 
 	return cmd
 }
@@ -137,35 +125,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter.WriteCommandResult(&messageResult{
 		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
 	})
-
-	var deployerKey ethgo.Key
-
-	if !params.isTestMode {
-		secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.accountConfig, true)
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		deployerAccount, err := wallet.NewAccountFromSecret(secretsManager)
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		deployerKey = deployerAccount.Ecdsa
-	} else {
-		rootchainKey, err := helper.GetRootchainTestPrivKey()
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
-
-			return
-		}
-
-		deployerKey = rootchainKey
-	}
 
 	client, err := jsonrpc.NewClient(params.jsonRPCAddress)
 	if err != nil {
@@ -197,7 +156,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	if err := deployContracts(outputter, client, manifest, deployerKey); err != nil {
+	if err := deployContracts(outputter, client, manifest); err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
 		return
@@ -210,26 +169,27 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
-	manifest *polybft.Manifest, deployerKey ethgo.Key) error {
+	manifest *polybft.Manifest) error {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
-	// if running in test mode, we need to fund deployer account
-	if params.isTestMode {
-		// fund account
-		deployerAddress := deployerKey.Address()
+	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerKey)
+	if err != nil {
+		return fmt.Errorf("failed to initialize deployer key: %w", err)
+	}
 
-		txn := &ethgo.Transaction{To: &deployerAddress, Value: command.DefaultPremineBalance}
-		if _, err := txRelayer.SendTransactionLocal(txn); err != nil {
+	if params.isTestMode {
+		deployerAddr := deployerKey.Address()
+		txn := &ethgo.Transaction{To: &deployerAddr, Value: big.NewInt(1000000000000000000)}
+
+		_, err = txRelayer.SendTransactionLocal(txn)
+		if err != nil {
 			return err
 		}
 	}
-
-	rootchainConfig := &polybft.RootchainConfig{}
-	manifest.RootchainConfig = rootchainConfig
 
 	type contractInfo struct {
 		name     string
@@ -266,6 +226,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			artifact: contractsapi.ChildERC20,
 		},
 	}
+	rootchainConfig := &polybft.RootchainConfig{}
+	manifest.RootchainConfig = rootchainConfig
 
 	if params.rootERC20TokenAddr != "" {
 		// use existing root chain ERC20 token

@@ -188,6 +188,7 @@ func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 		Address:     v.Address,
 		BlsKey:      blsKey,
 		VotingPower: new(big.Int).Set(v.Stake),
+		IsActive:    true,
 	}
 
 	return metadata, nil
