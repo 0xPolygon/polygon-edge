@@ -26,7 +26,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	client, err := jsonrpc.NewClient(server.HTTPAddr())
 	require.NoError(t, err)
 
-	testKey, err := helper.GetRootchainTestPrivKey()
+	testKey, err := helper.GetRootchainPrivateKey("")
 	require.NoError(t, err)
 
 	receipt, err := server.Fund(testKey.Address())
@@ -36,7 +36,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	outputter := command.InitializeOutputter(GetCommand())
 
 	require.NotPanics(t, func() {
-		err = deployContracts(outputter, client, &polybft.Manifest{}, testKey)
+		err = deployContracts(outputter, client, &polybft.Manifest{})
 	})
 	require.NoError(t, err)
 }

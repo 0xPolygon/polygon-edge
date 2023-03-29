@@ -92,17 +92,28 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to decode total stake")
 		}
 
+		isActive, ok := output["active"].(bool)
+		if !ok {
+			return nil, fmt.Errorf("failed to decode active field")
+		}
+
 		return &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
 			VotingPower: new(big.Int).Set(totalStake),
+			IsActive:    isActive,
 		}, nil
 	}
 
-	for _, index := range addresses {
-		val, err := queryValidator(index)
+	for _, addr := range addresses {
+		val, err := queryValidator(addr)
 		if err != nil {
 			return nil, err
+		}
+
+		// filter out non active validators
+		if !val.IsActive {
+			continue
 		}
 
 		res = append(res, val)
