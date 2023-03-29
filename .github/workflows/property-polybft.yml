@@ -6,6 +6,10 @@ on:  # yamllint disable-line rule:truthy
       - main
       - develop
   workflow_call:
+outputs:
+  workflow_output:
+    description: "Property output"
+    value: ${{ jobs.build.outputs.property_output }} 
 
 jobs:
   build:
@@ -15,6 +19,8 @@ jobs:
       E2E_LOGS: true
       E2E_TESTS_TYPE: 'property'
       CI_VERBOSE: true
+    outputs:
+      property_output: ${{ steps.run_property.outputs.property_output }}
     steps:
       - uses: actions/checkout@v3
       - name: Install Go
@@ -22,7 +28,8 @@ jobs:
         with:
           go-version: 1.18.x
       - name: Run tests
-        run: make test-property-polybft
+        id: run_property
+        run: echo "property_output=$(make test-property-polybft)" >> $GITHUB_OUTPUT
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@v3

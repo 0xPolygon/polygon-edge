@@ -8,11 +8,17 @@ on:  # yamllint disable-line rule:truthy
         required: false
       SONAR_HOST_URL:
         required: false
+outputs:
+  workflow_output:
+    description: "Unit tests output"
+    value: ${{ jobs.go_test.outputs.test_output }}         
 
 jobs:
   go_test:
     name: Polygon Edge
     runs-on: ubuntu-latest
+    outputs:
+      test_output: ${{ steps.run_tests.outputs.test_output }}
     steps:
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -28,7 +34,8 @@ jobs:
         run: ./setup-ci.sh
 
       - name: Run Go Test
-        run: go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+        id: run_tests
+        run: echo "test_output=$(go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`)" >> $GITHUB_OUTPUT        
       
       # Triggering SonarQube analysis as results of it are required by Quality Gate check.
       - name: SonarQube Scan

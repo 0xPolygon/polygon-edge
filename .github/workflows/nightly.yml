@@ -59,14 +59,14 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Unit tests output: ${{ needs.build.outputs.workflow_output }}"
+                    "text": "Unit tests output: ${{ needs.test.outputs.workflow_output }}"
                     }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Property tests output: ${{ needs.build.outputs.workflow_output }}"
+                    "text": "Property tests output: ${{ needs.property.outputs.workflow_output }}"
                     }
                 },
                 {
