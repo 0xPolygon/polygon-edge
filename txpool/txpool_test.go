@@ -1769,7 +1769,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		)
 	})
 
-	t.Run("Input the same as MaxInitCodeSize", func(t *testing.T) {
+	t.Run("Input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.EIP158 = true
