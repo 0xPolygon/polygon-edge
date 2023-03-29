@@ -1,9 +1,8 @@
 ---
 name: Nightly Build
 on:  # yamllint disable-line rule:truthy
-  schedule:
-    # * is a special character in YAML so you have to quote this string
-    - cron: '0 0 * * *'
+  pull_request:
+
 
 jobs:
   build:
@@ -53,9 +52,30 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Build output: ${{ needs.build.outputs.workflow_build_output }}"
+                    "text": "Build output: ${{ needs.build.outputs.workflow_output }}"
                     }
-                },                
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Unit tests output: ${{ needs.build.outputs.workflow_output }}"
+                    }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Property tests output: ${{ needs.build.outputs.workflow_output }}"
+                    }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "E2E tests output: ${{ needs.e2e.outputs.workflow_output }}"
+                    }
+                },                 
                 {
                   "type": "divider"
                 },   

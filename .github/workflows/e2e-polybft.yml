@@ -7,6 +7,10 @@ on:  # yamllint disable-line rule:truthy
       - develop
   pull_request:
   workflow_call:
+      outputs:
+      workflow_e2e_output:
+        description: "E2E output"
+        value: ${{ jobs.build.outputs.e2e_output }} 
 
 jobs:
   build:
@@ -16,6 +20,8 @@ jobs:
       E2E_LOGS: true
       E2E_TESTS_TYPE: 'integration'
       CI_VERBOSE: true
+    outputs:
+      e2e_output: ${{ steps.run_tests.outputs.e2e_output }}
     steps:
       - uses: actions/checkout@v3        
       - name: Install Go
@@ -23,7 +29,8 @@ jobs:
         with:
           go-version: 1.18.x
       - name: Run tests
-        run: make test-e2e-polybft
+        id: run_tests  
+        run: echo "e2e_output=$(make test-e2e-polybft)" >> $GITHUB_OUTPUT
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@v3
