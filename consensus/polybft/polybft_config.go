@@ -80,6 +80,7 @@ type BridgeConfig struct {
 	RootERC20PredicateAddr   types.Address `json:"erc20PredicateAddress"`
 	RootNativeERC20Addr      types.Address `json:"nativeERC20Address"`
 	RootERC721PredicateAddr  types.Address `json:"erc721PredicateAddress"`
+	RootERC1155Addr          types.Address `json:"erc1155Address"`
 	RootERC1155PredicateAddr types.Address `json:"erc1155PredicateAddress"`
 
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
@@ -244,6 +245,7 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		RootERC20PredicateAddr:   r.RootERC20PredicateAddress,
 		RootNativeERC20Addr:      r.RootNativeERC20Address,
 		RootERC721PredicateAddr:  r.RootERC721PredicateAddress,
+		RootERC1155Addr:          r.RootERC1155Address,
 		RootERC1155PredicateAddr: r.RootERC1155PredicateAddress,
 	}
 }

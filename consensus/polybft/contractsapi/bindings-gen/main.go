@@ -143,6 +143,7 @@ func main() {
 				"balanceOf",
 				"approve",
 				"mint",
+				"balanceOf",
 			},
 			[]string{},
 		},
@@ -161,6 +162,7 @@ func main() {
 			[]string{
 				"setApprovalForAll",
 				"mintBatch",
+				"balanceOf",
 			},
 			[]string{},
 		},
@@ -178,6 +180,7 @@ func main() {
 			gensc.ChildERC1155,
 			[]string{
 				"initialize",
+				"balanceOf",
 			},
 			[]string{},
 		},

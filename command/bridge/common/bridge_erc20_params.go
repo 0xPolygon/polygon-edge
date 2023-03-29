@@ -4,6 +4,14 @@ import (
 	"errors"
 )
 
+type TokenType int
+
+const (
+	ERC20 TokenType = iota
+	ERC721
+	ERC1155
+)
+
 const (
 	SenderKeyFlag = "sender-key"
 	ReceiversFlag = "receivers"
