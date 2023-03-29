@@ -8,10 +8,10 @@ on:  # yamllint disable-line rule:truthy
         required: false
       SONAR_HOST_URL:
         required: false
-outputs:
-  workflow_output:
-    description: "Unit tests output"
-    value: ${{ jobs.go_test.outputs.test_output }}         
+    outputs:
+      workflow_output:
+        description: "Unit tests output"
+        value: ${{ jobs.go_test.outputs.test_output }}         
 
 jobs:
   go_test:

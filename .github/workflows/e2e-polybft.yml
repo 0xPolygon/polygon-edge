@@ -7,10 +7,10 @@ on:  # yamllint disable-line rule:truthy
       - develop
   pull_request:
   workflow_call:
-outputs:
-  workflow_output:
-    description: "E2E output"
-    value: ${{ jobs.build.outputs.e2e_output }} 
+    outputs:
+      workflow_output:
+        description: "E2E output"
+        value: ${{ jobs.build.outputs.e2e_output }} 
 
 jobs:
   build:

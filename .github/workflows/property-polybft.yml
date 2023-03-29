@@ -6,10 +6,10 @@ on:  # yamllint disable-line rule:truthy
       - main
       - develop
   workflow_call:
-outputs:
-  workflow_output:
-    description: "Property output"
-    value: ${{ jobs.build.outputs.property_output }} 
+    outputs:
+      workflow_output:
+        description: "Property output"
+        value: ${{ jobs.build.outputs.property_output }} 
 
 jobs:
   build:

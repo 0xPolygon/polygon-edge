@@ -4,10 +4,10 @@ on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
    # Map the workflow outputs to job outputs
-outputs:
-  workflow_output:
-    description: "Build output"
-    value: ${{ jobs.go_build.outputs.build_output }} 
+    outputs:
+      workflow_output:
+        description: "Build output"
+        value: ${{ jobs.go_build.outputs.build_output }} 
 
 jobs:
   go_build:
