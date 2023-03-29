@@ -30,7 +30,8 @@ jobs:
   notification:
     name: Nightly Notifications
     runs-on: ubuntu-latest
-    needs: [build, test, e2e, property]
+    #  needs: [build, test, e2e, property]
+    needs: build
     steps:      
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0
@@ -59,21 +60,21 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Unit tests output: ${{ needs.test.outputs.workflow_output }}"
+                    "text": "Unit tests output: ${{ needs.build.outputs.workflow_output }}"
                     }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Property tests output: ${{ needs.property.outputs.workflow_output }}"
+                    "text": "Property tests output: ${{ needs.build.outputs.workflow_output }}"
                     }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "E2E tests output: ${{ needs.e2e.outputs.workflow_output }}"
+                    "text": "E2E tests output: ${{ needs.build.outputs.workflow_output }}"
                     }
                 },                 
                 {
