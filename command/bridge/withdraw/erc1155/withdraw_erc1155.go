@@ -45,7 +45,7 @@ var (
 // GetCommand returns the bridge withdraw command
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
-		Use:     "withdraw-erc20",
+		Use:     "withdraw-erc1155",
 		Short:   "Withdraws tokens from the child chain to the root chain",
 		PreRunE: preRun,
 		Run:     run,
@@ -82,7 +82,7 @@ func GetCommand() *cobra.Command {
 	withdrawCmd.Flags().StringVar(
 		&wp.childPredicateAddr,
 		childPredicateFlag,
-		contracts.ChildERC20PredicateContract.String(),
+		contracts.ChildERC1155PredicateContract.String(),
 		"ERC1155 child chain predicate address",
 	)
 

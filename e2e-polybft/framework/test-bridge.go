@@ -153,7 +153,7 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 	senderKey, receivers,
-	amounts, tokenIDs, jsonRPCEndpoint string) error {
+	amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error {
 	if senderKey == "" {
 		return errors.New("provide hex-encoded sender private key")
 	}
@@ -206,7 +206,8 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint)
+			"--json-rpc", jsonRPCEndpoint,
+			"--child-token", childToken.String())
 	}
 
 	return t.cmdRun(args...)

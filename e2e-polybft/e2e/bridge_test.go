@@ -131,7 +131,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 			"",
-			validatorSrv.JSONRPCAddr())
+			validatorSrv.JSONRPCAddr(),
+			contracts.NativeERC20TokenContract)
 		require.NoError(t, err)
 
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
@@ -275,22 +276,29 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	const (
-		num                   = 10
+		txnCount              = 10
 		amount                = 100
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
 		epochSize = 30
 	)
 
-	receivers := make([]string, num)
-	amounts := make([]string, num)
-	tokenIDs := make([]string, num)
+	receiverKeys := make([]string, txnCount)
+	receivers := make([]string, txnCount)
+	receiversAddrs := make([]types.Address, txnCount)
+	amounts := make([]string, txnCount)
+	tokenIDs := make([]string, txnCount)
 
-	for i := 0; i < num; i++ {
+	for i := 0; i < txnCount; i++ {
 		key, err := ethgow.GenerateKey()
 		require.NoError(t, err)
 
+		rawKey, err := key.MarshallPrivateKey()
+		require.NoError(t, err)
+
+		receiverKeys[i] = hex.EncodeToString(rawKey)
 		receivers[i] = types.Address(key.Address()).String()
+		receiversAddrs[i] = types.Address(key.Address())
 		amounts[i] = fmt.Sprintf("%d", amount)
 		tokenIDs[i] = fmt.Sprintf("%d", i+1)
 
@@ -300,7 +308,8 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
-		framework.WithEpochSize(epochSize))
+		framework.WithEpochSize(epochSize),
+		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -323,7 +332,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -338,16 +347,30 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	filter.SetFromUint64(0)
 	filter.SetToUint64(100)
 
-	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+	validatorSrv := cluster.Servers[0]
+	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
 	require.NoError(t, err)
 
 	logs, err := childEthEndpoint.GetLogs(filter)
 	require.NoError(t, err)
 
-	// assert that all deposits are executed successfully
-	checkStateSyncResultLogs(t, logs, num)
+	// assert that all deposits are executed successfully.
+	// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
+	// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
+	checkStateSyncResultLogs(t, logs, 2)
+
+	// retrieve child token address
+	rootToChildTokenFn := contractsapi.ChildERC1155Predicate.Abi.Methods["rootTokenToChildToken"]
+	input, err := rootToChildTokenFn.Encode([]interface{}{polybftCfg.Bridge.RootERC1155Addr})
+	require.NoError(t, err)
+
+	childTokenRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC1155PredicateContract), input)
+	require.NoError(t, err)
+
+	childTokenAddr := types.StringToAddress(childTokenRaw)
+	t.Logf("Child token addr: %s\n", childTokenAddr)
 
 	// check receivers balances got increased by deposited amount
 	for i, receiver := range receivers {
@@ -359,7 +382,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 		balanceInput, err := balanceOfFn.EncodeAbi()
 		require.NoError(t, err)
 
-		balanceRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC1155Contract), balanceInput)
+		balanceRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(childTokenAddr), balanceInput)
 		require.NoError(t, err)
 
 		balance, err := types.ParseUint256orHex(&balanceRaw)
@@ -388,7 +411,8 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 		strings.Join(receivers[:], ","),
 		strings.Join(amounts[:], ","),
 		strings.Join(tokenIDs[:], ","),
-		cluster.Servers[0].JSONRPCAddr())
+		cluster.Servers[0].JSONRPCAddr(),
+		contracts.ChildERC1155Contract)
 	require.NoError(t, err)
 
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
@@ -425,11 +449,9 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 
 	exitHelper := polybftCfg.Bridge.ExitHelperAddr
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
-	childJSONRPC := cluster.Servers[0].JSONRPCAddr()
+	childJSONRPC := validatorSrv.JSONRPCAddr()
 
-	for i := uint64(0); i < num; i++ {
-		exitEventID := i + 1
-
+	for exitEventID := uint64(1); exitEventID <= txnCount; exitEventID++ {
 		// send exit transaction to exit helper
 		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
