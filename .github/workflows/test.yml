@@ -37,7 +37,7 @@ jobs:
         id: run_tests
         run: |
           echo "before response" 
-          echo "response=$(go test -coverprofile coverage.out -timeout 1m `go list ./... | grep -v e2e`)" >> $GITHUB_OUTPUT
+          echo "response=$(go test -coverprofile coverage.out -timeout 1m `go list ./... | grep -v e2e`)"
           echo "after response line"
           echo $response          
           echo "after echo response"
