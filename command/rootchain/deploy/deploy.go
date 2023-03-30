@@ -515,7 +515,7 @@ func initializeRootERC1155Predicate(cmdOutput command.OutputFormatter, txRelayer
 	rootERC1155PredicateParams := &contractsapi.InitializeRootERC1155PredicateFn{
 		NewStateSender:           rootchainConfig.StateSenderAddress,
 		NewExitHelper:            rootchainConfig.ExitHelperAddress,
-		NewChildERC1155Predicate: contracts.ChildERC1155Contract,
+		NewChildERC1155Predicate: contracts.ChildERC1155PredicateContract,
 		NewChildTokenTemplate:    rootchainConfig.ERC1155TemplateAddress,
 	}
 

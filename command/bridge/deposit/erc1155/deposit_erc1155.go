@@ -260,14 +260,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 	amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
-	depositToFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
+	depositBatchFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
 		RootToken: types.StringToAddress(dp.rootTokenAddr),
 		Receivers: receivers,
 		Amounts:   amounts,
 		TokenIDs:  tokenIDs,
 	}
 
-	input, err := depositToFn.EncodeAbi()
+	input, err := depositBatchFn.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
