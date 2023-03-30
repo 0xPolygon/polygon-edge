@@ -197,10 +197,11 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(
-		&withdrawERC20Result{
+		&withdrawResult{
 			Sender:      senderAccount.Address().String(),
 			Receivers:   wp.Receivers,
 			Amounts:     wp.Amounts,
+			TokenIDs:    wp.tokenIDs,
 			ExitEventID: strconv.FormatUint(exitEventID.Uint64(), 10),
 			BlockNumber: strconv.FormatUint(receipt.BlockNumber, 10),
 		})
@@ -247,7 +248,7 @@ func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	return nil, errors.New("failed to find exit event log")
 }
 
-type withdrawERC20Result struct {
+type withdrawResult struct {
 	Sender      string   `json:"sender"`
 	Receivers   []string `json:"receivers"`
 	Amounts     []string `json:"amounts"`
@@ -256,13 +257,14 @@ type withdrawERC20Result struct {
 	BlockNumber string   `json:"blockNumber"`
 }
 
-func (r *withdrawERC20Result) GetOutput() string {
+func (r *withdrawResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	vals := make([]string, 0, 5)
+	vals := make([]string, 0, 6)
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
+	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 	vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
 	vals = append(vals, fmt.Sprintf("Inclusion Block Number|%s", r.BlockNumber))
 

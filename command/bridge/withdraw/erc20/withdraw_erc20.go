@@ -179,7 +179,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(
-		&withdrawERC20Result{
+		&withdrawResult{
 			Sender:       senderAccount.Address().String(),
 			Receivers:    wp.Receivers,
 			Amounts:      wp.Amounts,
@@ -228,7 +228,7 @@ func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	return nil, errors.New("failed to find exit event log")
 }
 
-type withdrawERC20Result struct {
+type withdrawResult struct {
 	Sender       string   `json:"sender"`
 	Receivers    []string `json:"receivers"`
 	Amounts      []string `json:"amounts"`
@@ -236,7 +236,7 @@ type withdrawERC20Result struct {
 	BlockNumbers []string `json:"blockNumbers"`
 }
 
-func (r *withdrawERC20Result) GetOutput() string {
+func (r *withdrawResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 5)
