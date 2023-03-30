@@ -117,7 +117,7 @@ func TestFSM_BuildProposal_WithoutCommitEpochTxGood(t *testing.T) {
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		config: &runtimeConfig{
-			Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
 			blockchain: blockchainMock,
 		},
 	}
@@ -192,7 +192,7 @@ func TestFSM_BuildProposal_WithCommitEpochTxGood(t *testing.T) {
 	runtime := &consensusRuntime{
 		logger: hclog.NewNullLogger(),
 		config: &runtimeConfig{
-			Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
+			Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
 			blockchain: blockChainMock,
 		},
 	}
@@ -571,7 +571,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 	aggregatedSigs := bls.Signatures{}
 
 	nonValidators.iterAcct(nil, func(t *testValidator) {
-		aggregatedSigs = append(aggregatedSigs, t.mustSign([]byte("dummyHash")))
+		aggregatedSigs = append(aggregatedSigs, t.mustSign([]byte("dummyHash"), bls.DomainStateReceiver))
 	})
 
 	sig, err := aggregatedSigs.Aggregate().Marshal()
@@ -653,7 +653,7 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	require.NoError(t, err)
 
 	nonValidatorAcc := newTestValidator(t, "non_validator", 1)
-	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo")).Marshal()
+	wrongSignature, err := nonValidatorAcc.mustSign([]byte("Foo"), bls.DomainCheckpointManager).Marshal()
 	require.NoError(t, err)
 
 	err = fsm.ValidateCommit(validators.getValidator("0").Address().Bytes(), wrongSignature, []byte{})
@@ -687,7 +687,7 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	require.NoError(t, block.UnmarshalRLP(proposal))
 
 	validator := validators.getValidator("A")
-	seal, err := validator.mustSign(block.Hash().Bytes()).Marshal()
+	seal, err := validator.mustSign(block.Hash().Bytes(), bls.DomainCheckpointManager).Marshal()
 	require.NoError(t, err)
 	err = fsm.ValidateCommit(validator.Key().Address().Bytes(), seal, block.Hash().Bytes())
 	require.NoError(t, err)
@@ -875,7 +875,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 		seals := make([]*messages.CommittedSeal, signaturesCount)
 
 		for i := 0; i < signaturesCount; i++ {
-			sign, err := allAccounts[i].Bls.Sign(builtBlock.Block.Hash().Bytes(), bls.DomainValidatorSet)
+			sign, err := allAccounts[i].Bls.Sign(builtBlock.Block.Hash().Bytes(), bls.DomainCheckpointManager)
 			require.NoError(t, err)
 			sigRaw, err := sign.Marshal()
 			require.NoError(t, err)
@@ -959,15 +959,15 @@ func TestFSM_Insert_InvalidNode(t *testing.T) {
 	validatorA := validators.getValidator("A")
 	validatorB := validators.getValidator("B")
 	proposalHash := buildBlock.Block.Hash().Bytes()
-	sigA, err := validatorA.mustSign(proposalHash).Marshal()
+	sigA, err := validatorA.mustSign(proposalHash, bls.DomainCheckpointManager).Marshal()
 	require.NoError(t, err)
 
-	sigB, err := validatorB.mustSign(proposalHash).Marshal()
+	sigB, err := validatorB.mustSign(proposalHash, bls.DomainCheckpointManager).Marshal()
 	require.NoError(t, err)
 
 	// create test account outside of validator set
 	nonValidatorAccount := newTestValidator(t, "non_validator", 1)
-	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash).Marshal()
+	nonValidatorSignature, err := nonValidatorAccount.mustSign(proposalHash, bls.DomainCheckpointManager).Marshal()
 	require.NoError(t, err)
 
 	commitedSeals := []*messages.CommittedSeal{
@@ -1059,7 +1059,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 			// add register commitment state transaction
 			hash, err := sc.Hash()
 			require.NoError(t, err)
-			signature := createSignature(t, validators.getPrivateIdentities(aliases...), hash)
+			signature := createSignature(t, validators.getPrivateIdentities(aliases...), hash, bls.DomainStateReceiver)
 			sc.AggSignature = *signature
 		}
 
@@ -1116,7 +1116,7 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 
 	var txns []*types.Transaction
 
-	signature := createSignature(t, validators.getPrivateIdentities("A", "B"), hash)
+	signature := createSignature(t, validators.getPrivateIdentities("A", "B"), hash, bls.DomainStateReceiver)
 	commitmentMessageSigned.AggSignature = *signature
 
 	inputData, err := commitmentMessageSigned.EncodeAbi()
@@ -1144,9 +1144,9 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 
 	var txns []*types.Transaction
 
-	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
+	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash, bls.DomainStateReceiver)
 	invalidValidator := newTestValidator(t, "G", 1)
-	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message")).Marshal()
+	invalidSignature, err := invalidValidator.mustSign([]byte("malicious message"), bls.DomainStateReceiver).Marshal()
 	require.NoError(t, err)
 
 	commitmentMessageSigned.AggSignature = Signature{
@@ -1182,7 +1182,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 
 	var txns []*types.Transaction
 
-	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash)
+	signature := createSignature(t, validators.getPrivateIdentities("A", "B", "C", "D"), hash, bls.DomainStateReceiver)
 	commitmentMessageSigned.AggSignature = *signature
 
 	inputData, err := commitmentMessageSigned.EncodeAbi()
@@ -1311,7 +1311,7 @@ func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentM
 	var signatures bls.Signatures
 
 	for _, a := range accounts {
-		signature, err := a.Bls.Sign(hash.Bytes(), bls.DomainValidatorSet)
+		signature, err := a.Bls.Sign(hash.Bytes(), bls.DomainStateReceiver)
 		assert.NoError(t, err)
 
 		signatures = append(signatures, signature)
