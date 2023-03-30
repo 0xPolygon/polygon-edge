@@ -125,7 +125,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	var signatures bls.Signatures
 
 	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signatures = append(signatures, v.mustSign(checkpointHash[:]))
+		signatures = append(signatures, v.mustSign(checkpointHash[:], bls.DomainCheckpointManager))
 		bmp.Set(i)
 		i++
 	})

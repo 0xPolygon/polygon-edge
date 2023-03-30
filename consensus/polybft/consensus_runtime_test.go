@@ -335,7 +335,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			EpochSize:  10,
 			SprintSize: 5,
 		},
-		Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
+		Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
 		blockchain: blockchainMock,
 	}
 	runtime := &consensusRuntime{
@@ -686,7 +686,7 @@ func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 	}
 	sender := validatorAccounts.getValidator("A")
 	proposalHash := []byte{2, 4, 6, 8, 10}
-	proposalSignature, err := sender.Key().Sign(proposalHash)
+	proposalSignature, err := sender.Key().SignWithDomain(proposalHash, bls.DomainCheckpointManager)
 	require.NoError(t, err)
 
 	msg := &proto.Message{
@@ -999,7 +999,7 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 		},
 	}
 
-	committedSeal, err := key.Sign(proposalHash)
+	committedSeal, err := key.SignWithDomain(proposalHash, bls.DomainCheckpointManager)
 	require.NoError(t, err)
 
 	expected := proto.Message{
@@ -1063,18 +1063,6 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
-}
-
-func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {
-	t.Helper()
-
-	signature, err := validator.mustSign(hash).Marshal()
-	require.NoError(t, err)
-
-	return &MessageSignature{
-		From:      validator.Key().String(),
-		Signature: signature,
-	}
 }
 
 func createTestBlocks(t *testing.T, numberOfBlocks, defaultEpochSize uint64,

@@ -197,7 +197,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	// set key
-	p.key = wallet.NewKey(account, bls.DomainCheckpointManager)
+	p.key = wallet.NewKey(account)
 
 	// create and set syncer
 	p.syncer = syncer.NewSyncer(
