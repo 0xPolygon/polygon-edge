@@ -36,7 +36,12 @@ jobs:
       - name: Run Go Test
         id: run_tests
         run: |
-          echo "test_output=$(go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`)" >> $GITHUB_OUTPUT        
+          echo "before response" 
+          echo "response=$(go test -coverprofile coverage.out -timeout 1m `go list ./... | grep -v e2e`)" >> $GITHUB_OUTPUT
+          echo "after response line"
+          echo $response          
+          echo "after echo response"
+          echo "test_output=$($response | tail -n 1)" >> $GITHUB_OUTPUT
       
       # Triggering SonarQube analysis as results of it are required by Quality Gate check.
       - name: SonarQube Scan
