@@ -21,15 +21,8 @@ import (
 	"github.com/umbracle/ethgo/wallet"
 )
 
-type withdrawERC721Params struct {
-	*common.ERC721BridgeParams
-	childPredicateAddr string
-	childTokenAddr     string
-	jsonRPCAddress     string
-}
-
 var (
-	wp *withdrawERC721Params = &withdrawERC721Params{ERC721BridgeParams: common.NewERC721BridgeParams()}
+	wp *common.ERC721BridgeParams = common.NewERC721BridgeParams()
 )
 
 func GetCommand() *cobra.Command {
@@ -62,21 +55,21 @@ func GetCommand() *cobra.Command {
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childPredicateAddr,
+		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC721PredicateContract.String(),
 		"ERC 721 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childTokenAddr,
+		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.ChildERC721Contract.String(),
 		"ERC 721 child chain token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.jsonRPCAddress,
+		&wp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
@@ -110,7 +103,7 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
 
@@ -180,7 +173,7 @@ func run(cmd *cobra.Command, _ []string) {
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
 func createWithdrawTxn(receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	withdrawToFn := &contractsapi.WithdrawBatchChildERC721PredicateFn{
-		ChildToken: types.StringToAddress(wp.childTokenAddr),
+		ChildToken: types.StringToAddress(wp.TokenAddr),
 		Receivers:  receivers,
 		TokenIDs:   tokenIDs,
 	}
@@ -190,7 +183,7 @@ func createWithdrawTxn(receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.T
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(wp.childPredicateAddr))
+	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
 	return &ethgo.Transaction{
 		To:    &addr,
@@ -235,7 +228,7 @@ func (r *withdrawERC721Result) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", r.ExitEventID))
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", r.BlockNumber))
 
-	buffer.WriteString("\n[WITHDRAW ERC20]\n")
+	buffer.WriteString("\n[WITHDRAW ERC 721]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 
