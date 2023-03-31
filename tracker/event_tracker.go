@@ -81,6 +81,12 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	}
 
 	go func() {
+		if err := blockTracker.Init(); err != nil {
+			e.logger.Error("failed to init blocktracker", "error", err)
+
+			return
+		}
+
 		if err := blockTracker.Start(); err != nil {
 			e.logger.Error("failed to start blocktracker", "error", err)
 		}
@@ -93,7 +99,6 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	}()
 
 	go func() {
-		// Sync method will also call blocktracker.Init(), so no need to call that method here
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
 		}
