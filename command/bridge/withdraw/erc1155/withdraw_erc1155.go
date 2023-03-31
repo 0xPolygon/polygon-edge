@@ -22,15 +22,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type withdrawParams struct {
-	*common.ERC1155BridgeParams
-	childPredicateAddr string
-	childTokenAddr     string
-	jsonRPCAddress     string
-}
-
 var (
-	wp *withdrawParams = &withdrawParams{ERC1155BridgeParams: common.NewERC1155BridgeParams()}
+	wp *common.ERC1155BridgeParams = common.NewERC1155BridgeParams()
 )
 
 // GetCommand returns the bridge withdraw command
@@ -71,21 +64,21 @@ func GetCommand() *cobra.Command {
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childPredicateAddr,
+		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC1155PredicateContract.String(),
 		"ERC 1155 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childTokenAddr,
+		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.ChildERC1155Contract.String(),
 		"ERC 1155 child chain token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.jsonRPCAddress,
+		&wp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
@@ -93,6 +86,7 @@ func GetCommand() *cobra.Command {
 
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = withdrawCmd.MarkFlagRequired(common.AmountsFlag)
+	_ = withdrawCmd.MarkFlagRequired(common.TokenIDsFlag)
 
 	return withdrawCmd
 }
@@ -123,7 +117,7 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
 
@@ -201,7 +195,7 @@ func run(cmd *cobra.Command, _ []string) {
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
 func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	withdrawFn := &contractsapi.WithdrawBatchChildERC1155PredicateFn{
-		ChildToken: types.StringToAddress(wp.childTokenAddr),
+		ChildToken: types.StringToAddress(wp.TokenAddr),
 		Receivers:  receivers,
 		Amounts:    amounts,
 		TokenIDs:   TokenIDs,
@@ -212,7 +206,7 @@ func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) 
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(wp.childPredicateAddr))
+	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
 	return &ethgo.Transaction{
 		To:    &addr,

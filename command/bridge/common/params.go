@@ -31,8 +31,11 @@ var (
 )
 
 type BridgeParams struct {
-	SenderKey string
-	Receivers []string
+	SenderKey     string
+	Receivers     []string
+	TokenAddr     string
+	PredicateAddr string
+	JSONRPCAddr   string
 }
 
 type ERC20BridgeParams struct {

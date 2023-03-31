@@ -20,10 +20,7 @@ import (
 
 type depositERC1155Params struct {
 	*common.ERC1155BridgeParams
-	rootTokenAddr     string
-	rootPredicateAddr string
-	jsonRPCAddress    string
-	testMode          bool
+	testMode bool
 }
 
 var (
@@ -36,7 +33,7 @@ func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc1155",
 		Short:   "Deposits ERC 1155 tokens from the root chain to the child chain",
-		PreRunE: runPreRun,
+		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
@@ -69,21 +66,21 @@ func GetCommand() *cobra.Command {
 	)
 
 	depositCmd.Flags().StringVar(
-		&dp.rootTokenAddr,
+		&dp.TokenAddr,
 		common.RootTokenFlag,
 		"",
 		"root ERC 1155 token address",
 	)
 
 	depositCmd.Flags().StringVar(
-		&dp.rootPredicateAddr,
+		&dp.PredicateAddr,
 		common.RootPredicateFlag,
 		"",
 		"root ERC 1155 token predicate address",
 	)
 
 	depositCmd.Flags().StringVar(
-		&dp.jsonRPCAddress,
+		&dp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		"http://127.0.0.1:8545",
 		"the JSON RPC root chain endpoint",
@@ -108,7 +105,7 @@ func GetCommand() *cobra.Command {
 	return depositCmd
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func preRunCommand(_ *cobra.Command, _ []string) error {
 	return dp.Validate()
 }
 
@@ -123,7 +120,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	depositorAddr := depositorKey.Address()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize rootchain tx relayer: %w", err))
 
@@ -181,8 +178,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	// approve root erc1155 predicate
 	approveTxn, err := createApproveERC1155PredicateTxn(
-		types.StringToAddress(dp.rootPredicateAddr),
-		types.StringToAddress(dp.rootTokenAddr))
+		types.StringToAddress(dp.PredicateAddr),
+		types.StringToAddress(dp.TokenAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create root erc1155 approve transaction: %w", err))
 
@@ -243,7 +240,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 	amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	depositBatchFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
-		RootToken: types.StringToAddress(dp.rootTokenAddr),
+		RootToken: types.StringToAddress(dp.TokenAddr),
 		Receivers: receivers,
 		Amounts:   amounts,
 		TokenIDs:  tokenIDs,
@@ -254,7 +251,7 @@ func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(dp.rootPredicateAddr))
+	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
 	return &ethgo.Transaction{
 		From:  sender,
@@ -276,7 +273,7 @@ func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int)
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(dp.rootTokenAddr))
+	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
 
 	return &ethgo.Transaction{
 		From:  ethgo.Address(sender),
