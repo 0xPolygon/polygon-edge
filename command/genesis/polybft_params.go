@@ -38,8 +38,10 @@ const (
 	defaultBridge           = false
 	defaultEpochReward      = 1
 
-	contractDeployedAllowListAdminFlag   = "contract-deployer-allow-list-admin"
-	contractDeployedAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
+	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	transactionsAllowListAdminFlag       = "transactions-allow-list-admin"
+	transactionsAllowListEnabledFlag     = "transactions-allow-list-enabled"
 
 	bootnodePortStart = 30301
 )
@@ -210,6 +212,15 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		chainConfig.Params.ContractDeployerAllowList = &chain.AllowListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.contractDeployerAllowListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.contractDeployerAllowListEnabled),
+		}
+	}
+
+	if len(p.transactionsAllowListAdmin) != 0 {
+		// only enable allow list if there is at least one address as **admin**, otherwise
+		// the allow list could never be updated
+		chainConfig.Params.TransactionsAllowList = &chain.AllowListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.transactionsAllowListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.transactionsAllowListEnabled),
 		}
 	}
 

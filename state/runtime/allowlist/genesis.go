@@ -1,6 +1,7 @@
 package allowlist
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -22,6 +23,7 @@ func ApplyGenesisAllocs(chain *chain.Genesis, allowListAddr types.Address, confi
 	for _, addr := range config.AdminAddresses {
 		allocList.SetRole(addr, AdminRole)
 	}
+	fmt.Println("ApplyGenesisAllocs: ", allocList)
 }
 
 type genesisState struct {

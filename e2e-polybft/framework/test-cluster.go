@@ -92,6 +92,8 @@ type TestClusterConfig struct {
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
+	TransactionsAllowListAdmin       []types.Address
+	TransactionsAllowListEnabled     []types.Address
 
 	NumBlockConfirmations uint64
 
@@ -256,6 +258,18 @@ func WithContractDeployerAllowListEnabled(addr types.Address) ClusterOption {
 	}
 }
 
+func WithTransactionsAllowListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TransactionsAllowListAdmin = append(h.TransactionsAllowListAdmin, addr)
+	}
+}
+
+func WithTransactionsAllowListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TransactionsAllowListEnabled = append(h.TransactionsAllowListEnabled, addr)
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -411,6 +425,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		if len(cluster.Config.ContractDeployerAllowListEnabled) != 0 {
 			args = append(args, "--contract-deployer-allow-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
+		}
+
+		if len(cluster.Config.TransactionsAllowListAdmin) != 0 {
+			args = append(args, "--transactions-allow-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsAllowListAdmin), ","))
+		}
+
+		if len(cluster.Config.TransactionsAllowListEnabled) != 0 {
+			args = append(args, "--transactions-allow-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsAllowListEnabled), ","))
 		}
 
 		// run cmd init-genesis with all the arguments

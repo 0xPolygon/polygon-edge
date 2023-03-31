@@ -16,6 +16,7 @@ type Params struct {
 
 	// AllowList configuration
 	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowListConfig,omitempty"`
+	TransactionsAllowList     *AllowListConfig `json:"transactionsAllowListConfig,omitempty"`
 }
 
 type AllowListConfig struct {

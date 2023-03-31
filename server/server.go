@@ -212,6 +212,12 @@ func NewServer(config *Config) (*Server, error) {
 			m.config.Chain.Params.ContractDeployerAllowList)
 	}
 
+	// apply allow list genesis data
+	if m.config.Chain.Params.TransactionsAllowList != nil {
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+			m.config.Chain.Params.TransactionsAllowList)
+	}
+
 	var initialStateRoot = types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {
