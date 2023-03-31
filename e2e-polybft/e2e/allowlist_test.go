@@ -114,14 +114,14 @@ func TestAllowList_Transactions(t *testing.T) {
 	// both enabled and non-enabled roles.
 	admin, _ := wallet.GenerateKey()
 	target, _ := wallet.GenerateKey()
+	other, _ := wallet.GenerateKey()
 
 	adminAddr := types.Address(admin.Address())
 	targetAddr := types.Address(target.Address())
-
-	otherAddr := types.Address{0x1}
+	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 3,
-		framework.WithPremine(adminAddr, targetAddr),
+		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithTransactionsAllowListAdmin(adminAddr),
 		framework.WithTransactionsAllowListEnabled(otherAddr),
 	)
@@ -148,15 +148,15 @@ func TestAllowList_Transactions(t *testing.T) {
 	}
 
 	{
-		// Step 1. 'targetAddr' can send a normal transaction (non-contract creation).
-		err := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1)).Wait()
+		// Step 1. 'otherAddr' can send a normal transaction (non-contract creation).
+		err := cluster.Transfer(t, other, types.ZeroAddress, big.NewInt(1)).Wait()
 		require.NoError(t, err)
 	}
 
 	{
 		// Step 2. 'targetAddr' **cannot** send a normal transaction because it is not whitelisted.
 		err := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1)).Wait()
-		require.NoError(t, err)
+		require.Error(t, err)
 	}
 
 	{

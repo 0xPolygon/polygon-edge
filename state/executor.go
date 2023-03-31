@@ -567,8 +567,19 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 		return t.deploymentAllowlist.Run(contract, host, &t.config)
 	}
 
-	if t.txnAllowList != nil && t.txnAllowList.Addr() == contract.CodeAddress {
-		return t.txnAllowList.Run(contract, host, &t.config)
+	if t.txnAllowList != nil {
+		if t.txnAllowList.Addr() == contract.CodeAddress {
+			return t.txnAllowList.Run(contract, host, &t.config)
+		}
+
+		if contract.Caller != contracts.SystemCaller {
+			txnAllowListRole := t.txnAllowList.GetRole(contract.Caller)
+			if !txnAllowListRole.Enabled() {
+				return &runtime.ExecutionResult{
+					Err: fmt.Errorf("caller not authorized"),
+				}
+			}
+		}
 	}
 
 	// check the precompiles
