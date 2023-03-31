@@ -207,7 +207,8 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint)
+			"--json-rpc", jsonRPCEndpoint,
+			"--child-token", childToken.String())
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {
