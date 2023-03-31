@@ -356,7 +356,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
 	checkStateSyncResultLogs(t, logs, 2)
 
-	//retrive child token address
+	// retrive child token address
 	rootToChildTokenFn := contractsapi.ChildERC721Predicate.Abi.Methods["rootTokenToChildToken"]
 	input, err := rootToChildTokenFn.Encode([]interface{}{polybftCfg.Bridge.RootERC721Addr})
 	require.NoError(t, err)
@@ -366,10 +366,9 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 
 	childToken := types.StringToAddress(childTokenRaw)
 
-	for i, receiver := range receivers {
-		tokenIDBig := big.NewInt(int64(i))
+	for i, receiver := range receiversAddrs {
 		ownerOfFn := &contractsapi.OwnerOfChildERC721Fn{
-			TokenID: tokenIDBig,
+			TokenID: big.NewInt(int64(i)),
 		}
 
 		ownerInput, err := ownerOfFn.EncodeAbi()
@@ -378,7 +377,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 		addressRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC721Contract), ownerInput)
 		require.NoError(t, err)
 
-		require.Equal(t, addressRaw, receiver)
+		require.Equal(t, receiver, types.StringToAddress(addressRaw))
 	}
 
 	t.Log("Deposits were successfully processed")
@@ -395,7 +394,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
 	require.NoError(t, err)
 
-	//send withdraw transaction
+	// send withdraw transaction
 	err = cluster.Bridge.Withdraw(
 		common.ERC721,
 		hex.EncodeToString(rawKey),

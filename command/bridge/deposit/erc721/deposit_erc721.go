@@ -130,7 +130,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 
 		receivers[i] = ethgo.Address(types.StringToAddress(dp.Receivers[i]))
-
 		tokenIDs[i] = tokenID
 	}
 
@@ -180,7 +179,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	//deposit tokens
+	// deposit tokens
 	depositTxn, err := createDepositTxn(depositorAddr, receivers, tokenIDs)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))

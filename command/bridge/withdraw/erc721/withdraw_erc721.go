@@ -75,6 +75,7 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC child chain endpoint",
 	)
 
+	_ = withdrawCmd.MarkFlagRequired(common.SenderKeyFlag)
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = withdrawCmd.MarkFlagRequired(common.TokenIDsFlag)
 
@@ -124,7 +125,6 @@ func run(cmd *cobra.Command, _ []string) {
 		}
 
 		receivers[i] = ethgo.Address(types.StringToAddress(wp.Receivers[i]))
-
 		tokenIDs[i] = tokenID
 	}
 
@@ -196,12 +196,12 @@ func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	var exitEvent contractsapi.L2StateSyncedEvent
 	for _, log := range receipt.Logs {
 		doesMatch, err := exitEvent.ParseLog(log)
-		if !doesMatch {
-			continue
-		}
-
 		if err != nil {
 			return nil, err
+		}
+
+		if !doesMatch {
+			continue
 		}
 
 		return exitEvent.ID, nil
