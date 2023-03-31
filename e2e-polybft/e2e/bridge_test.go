@@ -343,9 +343,10 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	filter.SetFromUint64(0)
 	filter.SetToUint64(100)
 
-	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+	validatorSrv := cluster.Servers[0]
+	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
 	require.NoError(t, err)
 
 	logs, err := childEthEndpoint.GetLogs(filter)
@@ -356,7 +357,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
 	checkStateSyncResultLogs(t, logs, 2)
 
-	// retrive child token address
+	// retrieve child token address
 	rootToChildTokenFn := contractsapi.ChildERC721Predicate.Abi.Methods["rootTokenToChildToken"]
 	input, err := rootToChildTokenFn.Encode([]interface{}{polybftCfg.Bridge.RootERC721Addr})
 	require.NoError(t, err)
@@ -364,7 +365,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	childTokenRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC721PredicateContract), input)
 	require.NoError(t, err)
 
-	childToken := types.StringToAddress(childTokenRaw)
+	childTokenAddr := types.StringToAddress(childTokenRaw)
 
 	for i, receiver := range receiversAddrs {
 		ownerOfFn := &contractsapi.OwnerOfChildERC721Fn{
@@ -374,7 +375,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 		ownerInput, err := ownerOfFn.EncodeAbi()
 		require.NoError(t, err)
 
-		addressRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC721Contract), ownerInput)
+		addressRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(childTokenAddr), ownerInput)
 		require.NoError(t, err)
 
 		require.Equal(t, receiver, types.StringToAddress(addressRaw))
@@ -386,25 +387,18 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	senderAccount, err := sidechain.GetAccountFromDir(cluster.Servers[0].DataDir())
-	require.NoError(t, err)
-
-	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
-
-	rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
-	require.NoError(t, err)
-
-	// send withdraw transaction
-	err = cluster.Bridge.Withdraw(
-		common.ERC721,
-		hex.EncodeToString(rawKey),
-		strings.Join(receivers[:], ","),
-		"",
-		strings.Join(tokenIDs[:], ","),
-		cluster.Servers[0].JSONRPCAddr(),
-		childToken,
-	)
-	require.NoError(t, err)
+	for i, receiverKey := range receiverKeys {
+		// send withdraw transactions
+		err = cluster.Bridge.Withdraw(
+			common.ERC721,
+			receiverKey,
+			receivers[i],
+			"",
+			tokenIDs[i],
+			validatorSrv.JSONRPCAddr(),
+			childTokenAddr)
+		require.NoError(t, err)
+	}
 
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
@@ -419,19 +413,17 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 
 	exitHelper := polybftCfg.Bridge.ExitHelperAddr
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
-	childJSONRPC := cluster.Servers[0].JSONRPCAddr()
+	childJSONRPC := validatorSrv.JSONRPCAddr()
 
-	for i := uint64(0); i < txnCount; i++ {
-		exitEventID := i + 1
-
+	for i := uint64(1); i <= txnCount; i++ {
 		// send exit transaction to exit helper
-		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
+		err = cluster.Bridge.SendExitTransaction(exitHelper, i, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
 		// make sure exit event is processed successfully
-		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
+		isProcessed, err := isExitEventProcessed(i, ethgo.Address(exitHelper), rootchainTxRelayer)
 		require.NoError(t, err)
-		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
+		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", i))
 	}
 }
 

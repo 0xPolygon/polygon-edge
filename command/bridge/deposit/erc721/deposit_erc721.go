@@ -133,8 +133,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		tokenIDs[i] = tokenID
 	}
 
-	for _, tokenID := range tokenIDs {
-		if dp.testMode {
+	if dp.testMode {
+		for i := 0; i < len(tokenIDs); i++ {
 			mintTxn, err := createMintTxn(types.Address(depositorAddr), types.Address(depositorAddr))
 			if err != nil {
 				outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
@@ -155,28 +155,27 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				return
 			}
 		}
+	}
 
-		approveTxn, err := createApproveERC721PredicateTxn(tokenID,
-			types.StringToAddress(dp.PredicateAddr),
-			types.StringToAddress(dp.TokenAddr))
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to approve predicate %w", err))
+	approveTxn, err := createApproveERC721PredicateTxn(types.StringToAddress(dp.PredicateAddr),
+		types.StringToAddress(dp.TokenAddr))
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to approve predicate: %w", err))
 
-			return
-		}
+		return
+	}
 
-		receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to send root erc20 approve transaction"))
+	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to send root erc 721 approve transaction"))
 
-			return
-		}
+		return
+	}
 
-		if receipt.Status == uint64(types.ReceiptFailed) {
-			outputter.SetError(fmt.Errorf("failed to approve root erc20 predicate %d", tokenID))
+	if receipt.Status == uint64(types.ReceiptFailed) {
+		outputter.SetError(fmt.Errorf("failed to approve root erc 721 predicate"))
 
-			return
-		}
+		return
 	}
 
 	// deposit tokens
@@ -187,7 +186,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	receipt, err := txRelayer.SendTransaction(depositTxn, depositorKey)
+	receipt, err = txRelayer.SendTransaction(depositTxn, depositorKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("sending deposit transactions failed (receivers: %s, tokenIDs: %s): %w",
 			strings.Join(dp.Receivers, ", "), strings.Join(dp.TokenIDs, ", "), err))
@@ -254,11 +253,10 @@ func createMintTxn(sender, receiver types.Address) (*ethgo.Transaction, error) {
 }
 
 // createApproveERC721PredicateTxn sends approve transaction
-func createApproveERC721PredicateTxn(tokenID *big.Int,
-	rootERC721Predicate, rootERC721Token types.Address) (*ethgo.Transaction, error) {
-	approveFnParams := &contractsapi.ApproveRootERC721Fn{
-		To:      rootERC721Predicate,
-		TokenID: tokenID,
+func createApproveERC721PredicateTxn(rootERC721Predicate, rootERC721Token types.Address) (*ethgo.Transaction, error) {
+	approveFnParams := &contractsapi.SetApprovalForAllRootERC721Fn{
+		Operator: rootERC721Predicate,
+		Approved: true,
 	}
 
 	input, err := approveFnParams.EncodeAbi()

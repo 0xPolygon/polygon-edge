@@ -196,7 +196,7 @@ func main() {
 			"RootERC721",
 			gensc.RootERC721,
 			[]string{
-				"approve",
+				"setApprovalForAll",
 				"mint",
 			},
 			[]string{},

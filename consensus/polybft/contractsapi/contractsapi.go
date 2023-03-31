@@ -989,21 +989,21 @@ func (d *DepositBatchRootERC721PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC721Predicate.Abi.Methods["depositBatch"], buf, d)
 }
 
-type ApproveRootERC721Fn struct {
-	To      types.Address `abi:"to"`
-	TokenID *big.Int      `abi:"tokenId"`
+type SetApprovalForAllRootERC721Fn struct {
+	Operator types.Address `abi:"operator"`
+	Approved bool          `abi:"approved"`
 }
 
-func (a *ApproveRootERC721Fn) Sig() []byte {
-	return RootERC721.Abi.Methods["approve"].ID()
+func (s *SetApprovalForAllRootERC721Fn) Sig() []byte {
+	return RootERC721.Abi.Methods["setApprovalForAll"].ID()
 }
 
-func (a *ApproveRootERC721Fn) EncodeAbi() ([]byte, error) {
-	return RootERC721.Abi.Methods["approve"].Encode(a)
+func (s *SetApprovalForAllRootERC721Fn) EncodeAbi() ([]byte, error) {
+	return RootERC721.Abi.Methods["setApprovalForAll"].Encode(s)
 }
 
-func (a *ApproveRootERC721Fn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RootERC721.Abi.Methods["approve"], buf, a)
+func (s *SetApprovalForAllRootERC721Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC721.Abi.Methods["setApprovalForAll"], buf, s)
 }
 
 type MintRootERC721Fn struct {
