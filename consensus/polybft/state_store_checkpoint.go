@@ -173,12 +173,12 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	var l2StateSyncedEvent contractsapi.L2StateSyncedEvent
 
 	doesMatch, err := l2StateSyncedEvent.ParseLog(log)
-	if !doesMatch {
-		return nil, nil
-	}
-
 	if err != nil {
 		return nil, err
+	}
+
+	if !doesMatch {
+		return nil, nil
 	}
 
 	return &ExitEvent{

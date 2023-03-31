@@ -181,20 +181,20 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		types.StringToAddress(dp.PredicateAddr),
 		types.StringToAddress(dp.TokenAddr))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to create root erc1155 approve transaction: %w", err))
+		outputter.SetError(fmt.Errorf("failed to create root erc 1155 approve transaction: %w", err))
 
 		return
 	}
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send root erc1155 approve transaction"))
+		outputter.SetError(fmt.Errorf("failed to send root erc 1155 approve transaction"))
 
 		return
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		outputter.SetError(fmt.Errorf("failed to approve root erc1155 predicate"))
+		outputter.SetError(fmt.Errorf("failed to approve root erc 1155 predicate"))
 
 		return
 	}
