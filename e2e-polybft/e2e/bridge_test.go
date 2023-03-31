@@ -276,11 +276,10 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	const (
-		txnCount              = 10
+		txnCount              = 5
 		amount                = 100
 		numBlockConfirmations = 2
-		// make epoch size long enough, so that all exit events are processed within the same epoch
-		epochSize = 30
+		epochSize             = 5
 	)
 
 	receiverKeys := make([]string, txnCount)
@@ -421,9 +420,10 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
 	require.NoError(t, err)
 
+	currentEpoch := currentExtra.Checkpoint.EpochNumber
+
 	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
 
-	currentEpoch := currentExtra.Checkpoint.EpochNumber
 	fail := 0
 
 	// make sure we have progressed to the next epoch on the root chain

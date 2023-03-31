@@ -19,12 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const (
-	rootTokenFlag     = "root-token"
-	rootPredicateFlag = "root-predicate"
-	jsonRPCFlag       = "json-rpc"
-)
-
 type depositERC20Params struct {
 	*common.ERC20BridgeParams
 	rootTokenAddr     string
@@ -35,14 +29,14 @@ type depositERC20Params struct {
 
 var (
 	// depositParams is abstraction for provided bridge parameter values
-	dp *depositERC20Params = &depositERC20Params{ERC20BridgeParams: &common.ERC20BridgeParams{}}
+	dp *depositERC20Params = &depositERC20Params{ERC20BridgeParams: common.NewERC20BridgeParams()}
 )
 
 // GetCommand returns the bridge deposit command
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc20",
-		Short:   "Deposits ERC20 tokens from the root chain to the child chain",
+		Short:   "Deposits ERC 20 tokens from the root chain to the child chain",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
@@ -70,21 +64,21 @@ func GetCommand() *cobra.Command {
 
 	depositCmd.Flags().StringVar(
 		&dp.rootTokenAddr,
-		rootTokenFlag,
+		common.RootTokenFlag,
 		"",
-		"root ERC20 token address",
+		"root ERC 20 token address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.rootPredicateAddr,
-		rootPredicateFlag,
+		common.RootPredicateFlag,
 		"",
-		"root ERC20 token predicate address",
+		"root ERC 20 token predicate address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.jsonRPCAddress,
-		jsonRPCFlag,
+		common.JSONRPCFlag,
 		"http://127.0.0.1:8545",
 		"the JSON RPC root chain endpoint",
 	)
@@ -99,8 +93,8 @@ func GetCommand() *cobra.Command {
 
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = depositCmd.MarkFlagRequired(common.AmountsFlag)
-	_ = depositCmd.MarkFlagRequired(rootTokenFlag)
-	_ = depositCmd.MarkFlagRequired(rootPredicateFlag)
+	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
+	_ = depositCmd.MarkFlagRequired(common.RootPredicateFlag)
 
 	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
 
@@ -108,7 +102,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
-	if err := dp.ValidateFlags(); err != nil {
+	if err := dp.Validate(); err != nil {
 		return err
 	}
 

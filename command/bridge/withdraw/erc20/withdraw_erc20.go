@@ -22,12 +22,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const (
-	jsonRPCFlag        = "json-rpc"
-	childPredicateFlag = "child-predicate"
-	childTokenFlag     = "child-token"
-)
-
 type withdrawParams struct {
 	*common.ERC20BridgeParams
 	childPredicateAddr string
@@ -36,16 +30,14 @@ type withdrawParams struct {
 }
 
 var (
-	wp *withdrawParams = &withdrawParams{
-		ERC20BridgeParams: &common.ERC20BridgeParams{},
-	}
+	wp *withdrawParams = &withdrawParams{ERC20BridgeParams: common.NewERC20BridgeParams()}
 )
 
 // GetCommand returns the bridge withdraw command
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc20",
-		Short:   "Withdraws tokens from the child chain to the root chain",
+		Short:   "Withdraws ERC 20 tokens from the child chain to the root chain",
 		PreRunE: preRun,
 		Run:     run,
 	}
@@ -73,21 +65,21 @@ func GetCommand() *cobra.Command {
 
 	withdrawCmd.Flags().StringVar(
 		&wp.childPredicateAddr,
-		childPredicateFlag,
+		common.ChildPredicateFlag,
 		contracts.ChildERC20PredicateContract.String(),
 		"ERC20 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.childTokenAddr,
-		childTokenFlag,
+		common.ChildTokenFlag,
 		contracts.NativeERC20TokenContract.String(),
 		"ERC20 child chain token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.jsonRPCAddress,
-		jsonRPCFlag,
+		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
 	)
@@ -99,7 +91,7 @@ func GetCommand() *cobra.Command {
 }
 
 func preRun(cmd *cobra.Command, _ []string) error {
-	if err := wp.ValidateFlags(); err != nil {
+	if err := wp.Validate(); err != nil {
 		return err
 	}
 

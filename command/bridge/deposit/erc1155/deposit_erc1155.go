@@ -2,7 +2,6 @@ package erc1155
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -19,19 +18,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const (
-	rootTokenFlag     = "root-token"
-	rootPredicateFlag = "root-predicate"
-	jsonRPCFlag       = "json-rpc"
-)
-
-var (
-	errInconsistentTokenIds = errors.New("receivers and token ids must be equal length")
-)
-
 type depositERC1155Params struct {
-	*common.ERC20BridgeParams
-	tokenIDs          []string
+	*common.ERC1155BridgeParams
 	rootTokenAddr     string
 	rootPredicateAddr string
 	jsonRPCAddress    string
@@ -40,14 +28,14 @@ type depositERC1155Params struct {
 
 var (
 	// depositParams is abstraction for provided bridge parameter values
-	dp *depositERC1155Params = &depositERC1155Params{ERC20BridgeParams: &common.ERC20BridgeParams{}}
+	dp *depositERC1155Params = &depositERC1155Params{ERC1155BridgeParams: common.NewERC1155BridgeParams()}
 )
 
 // GetCommand returns the bridge deposit command
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc1155",
-		Short:   "Deposits ERC1155 tokens from the root chain to the child chain",
+		Short:   "Deposits ERC 1155 tokens from the root chain to the child chain",
 		PreRunE: runPreRun,
 		Run:     runCommand,
 	}
@@ -74,7 +62,7 @@ func GetCommand() *cobra.Command {
 	)
 
 	depositCmd.Flags().StringSliceVar(
-		&dp.tokenIDs,
+		&dp.TokenIDs,
 		common.TokenIDsFlag,
 		nil,
 		"token ids that are sent to the receivers accounts",
@@ -82,21 +70,21 @@ func GetCommand() *cobra.Command {
 
 	depositCmd.Flags().StringVar(
 		&dp.rootTokenAddr,
-		rootTokenFlag,
+		common.RootTokenFlag,
 		"",
-		"root ERC20 token address",
+		"root ERC 1155 token address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.rootPredicateAddr,
-		rootPredicateFlag,
+		common.RootPredicateFlag,
 		"",
-		"root ERC20 token predicate address",
+		"root ERC 1155 token predicate address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.jsonRPCAddress,
-		jsonRPCFlag,
+		common.JSONRPCFlag,
 		"http://127.0.0.1:8545",
 		"the JSON RPC root chain endpoint",
 	)
@@ -112,8 +100,8 @@ func GetCommand() *cobra.Command {
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = depositCmd.MarkFlagRequired(common.AmountsFlag)
 	_ = depositCmd.MarkFlagRequired(common.TokenIDsFlag)
-	_ = depositCmd.MarkFlagRequired(rootTokenFlag)
-	_ = depositCmd.MarkFlagRequired(rootPredicateFlag)
+	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
+	_ = depositCmd.MarkFlagRequired(common.RootPredicateFlag)
 
 	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
 
@@ -121,15 +109,7 @@ func GetCommand() *cobra.Command {
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
-	if err := dp.ValidateFlags(); err != nil {
-		return err
-	}
-
-	if len(dp.Receivers) != len(dp.tokenIDs) {
-		return errInconsistentTokenIds
-	}
-
-	return nil
+	return dp.Validate()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
@@ -151,11 +131,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	amounts := make([]*big.Int, len(dp.Amounts))
-	tokenIDs := make([]*big.Int, len(dp.tokenIDs))
+	tokenIDs := make([]*big.Int, len(dp.TokenIDs))
 
 	for i := range dp.Receivers {
 		amountRaw := dp.Amounts[i]
-		tokenIDRaw := dp.tokenIDs[i]
+		tokenIDRaw := dp.TokenIDs[i]
 
 		amount, err := types.ParseUint256orHex(&amountRaw)
 		if err != nil {
@@ -200,7 +180,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// approve root erc1155 predicate
-	approveTxn, err := createApproveERC1155PredicateTxn(types.StringToAddress(dp.rootPredicateAddr),
+	approveTxn, err := createApproveERC1155PredicateTxn(
+		types.StringToAddress(dp.rootPredicateAddr),
 		types.StringToAddress(dp.rootTokenAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create root erc1155 approve transaction: %w", err))
@@ -249,12 +230,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(&depositERC1155Result{
-		Sender:    depositorAddr.String(),
-		Receivers: dp.Receivers,
-		Amounts:   dp.Amounts,
-		TokenIDs:  dp.tokenIDs,
-	})
+	outputter.SetCommandResult(
+		&depositERC1155Result{
+			Sender:    depositorAddr.String(),
+			Receivers: dp.Receivers,
+			Amounts:   dp.Amounts,
+			TokenIDs:  dp.TokenIDs,
+		})
 }
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract

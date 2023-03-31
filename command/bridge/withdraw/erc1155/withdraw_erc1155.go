@@ -22,31 +22,22 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const (
-	jsonRPCFlag        = "json-rpc"
-	childPredicateFlag = "child-predicate"
-	childTokenFlag     = "child-token"
-)
-
 type withdrawParams struct {
-	*common.ERC20BridgeParams
-	tokenIDs           []string
+	*common.ERC1155BridgeParams
 	childPredicateAddr string
 	childTokenAddr     string
 	jsonRPCAddress     string
 }
 
 var (
-	wp *withdrawParams = &withdrawParams{
-		ERC20BridgeParams: &common.ERC20BridgeParams{},
-	}
+	wp *withdrawParams = &withdrawParams{ERC1155BridgeParams: common.NewERC1155BridgeParams()}
 )
 
 // GetCommand returns the bridge withdraw command
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc1155",
-		Short:   "Withdraws tokens from the child chain to the root chain",
+		Short:   "Withdraws ERC 1155 tokens from the child chain to the root chain",
 		PreRunE: preRun,
 		Run:     run,
 	}
@@ -73,7 +64,7 @@ func GetCommand() *cobra.Command {
 	)
 
 	withdrawCmd.Flags().StringSliceVar(
-		&wp.tokenIDs,
+		&wp.TokenIDs,
 		common.TokenIDsFlag,
 		nil,
 		"token ids that are sent to the receivers accounts",
@@ -81,21 +72,21 @@ func GetCommand() *cobra.Command {
 
 	withdrawCmd.Flags().StringVar(
 		&wp.childPredicateAddr,
-		childPredicateFlag,
+		common.ChildPredicateFlag,
 		contracts.ChildERC1155PredicateContract.String(),
-		"ERC1155 child chain predicate address",
+		"ERC 1155 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.childTokenAddr,
-		childTokenFlag,
+		common.ChildTokenFlag,
 		contracts.ChildERC1155Contract.String(),
-		"ERC1155 child chain token address",
+		"ERC 1155 child chain token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.jsonRPCAddress,
-		jsonRPCFlag,
+		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
 	)
@@ -107,7 +98,7 @@ func GetCommand() *cobra.Command {
 }
 
 func preRun(_ *cobra.Command, _ []string) error {
-	if err := wp.ValidateFlags(); err != nil {
+	if err := wp.Validate(); err != nil {
 		return err
 	}
 
@@ -141,12 +132,12 @@ func run(cmd *cobra.Command, _ []string) {
 
 	receivers := make([]ethgo.Address, len(wp.Receivers))
 	amounts := make([]*big.Int, len(wp.Receivers))
-	tokenIDs := make([]*big.Int, len(wp.Receivers))
+	TokenIDs := make([]*big.Int, len(wp.Receivers))
 
 	for i, receiverRaw := range wp.Receivers {
 		receivers[i] = ethgo.Address(types.StringToAddress(receiverRaw))
 		amountRaw := wp.Amounts[i]
-		tokenIDRaw := wp.tokenIDs[i]
+		tokenIDRaw := wp.TokenIDs[i]
 
 		amount, err := types.ParseUint256orHex(&amountRaw)
 		if err != nil {
@@ -163,11 +154,11 @@ func run(cmd *cobra.Command, _ []string) {
 		}
 
 		amounts[i] = amount
-		tokenIDs[i] = tokenID
+		TokenIDs[i] = tokenID
 	}
 
 	// withdraw tokens transaction
-	txn, err := createWithdrawTxn(receivers, amounts, tokenIDs)
+	txn, err := createWithdrawTxn(receivers, amounts, TokenIDs)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
@@ -177,14 +168,14 @@ func run(cmd *cobra.Command, _ []string) {
 	receipt, err := txRelayer.SendTransaction(txn, senderAccount)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to send withdrawal transaction (receivers: %s, amounts: %s, token ids: %s): %w",
-			strings.Join(wp.Receivers, ", "), strings.Join(wp.Amounts, ", "), strings.Join(wp.tokenIDs, ", "), err))
+			strings.Join(wp.Receivers, ", "), strings.Join(wp.Amounts, ", "), strings.Join(wp.TokenIDs, ", "), err))
 
 		return
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
 		outputter.SetError(fmt.Errorf("failed to execute withdrawal transaction (receivers: %s, amounts: %s, token ids: %s)",
-			strings.Join(wp.Receivers, ", "), strings.Join(wp.Amounts, ", "), strings.Join(wp.tokenIDs, ", ")))
+			strings.Join(wp.Receivers, ", "), strings.Join(wp.Amounts, ", "), strings.Join(wp.TokenIDs, ", ")))
 
 		return
 	}
@@ -201,19 +192,19 @@ func run(cmd *cobra.Command, _ []string) {
 			Sender:      senderAccount.Address().String(),
 			Receivers:   wp.Receivers,
 			Amounts:     wp.Amounts,
-			TokenIDs:    wp.tokenIDs,
+			TokenIDs:    wp.TokenIDs,
 			ExitEventID: strconv.FormatUint(exitEventID.Uint64(), 10),
 			BlockNumber: strconv.FormatUint(receipt.BlockNumber, 10),
 		})
 }
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
-func createWithdrawTxn(receivers []ethgo.Address, amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
+func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	withdrawFn := &contractsapi.WithdrawBatchChildERC1155PredicateFn{
 		ChildToken: types.StringToAddress(wp.childTokenAddr),
 		Receivers:  receivers,
 		Amounts:    amounts,
-		TokenIDs:   tokenIDs,
+		TokenIDs:   TokenIDs,
 	}
 
 	input, err := withdrawFn.EncodeAbi()
@@ -252,7 +243,7 @@ type withdrawResult struct {
 	Sender      string   `json:"sender"`
 	Receivers   []string `json:"receivers"`
 	Amounts     []string `json:"amounts"`
-	TokenIDs    []string `json:"tokenIDs"`
+	TokenIDs    []string `json:"TokenIDs"`
 	ExitEventID string   `json:"exitEventID"`
 	BlockNumber string   `json:"blockNumber"`
 }
