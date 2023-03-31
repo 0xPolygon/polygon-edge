@@ -155,8 +155,9 @@ func TestAllowList_Transactions(t *testing.T) {
 
 	{
 		// Step 2. 'targetAddr' **cannot** send a normal transaction because it is not whitelisted.
-		err := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1)).Wait()
-		require.Error(t, err)
+		targetTxn := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, targetTxn.Wait())
+		require.True(t, targetTxn.Reverted())
 	}
 
 	{
