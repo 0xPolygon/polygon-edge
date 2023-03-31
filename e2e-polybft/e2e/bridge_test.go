@@ -276,9 +276,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	const (
-		txnCount              = 4
-		numBlockConfirmations = 2
-		epochSize             = 30
+		txnCount  = 4
+		epochSize = 5
 	)
 
 	receiverKeys := make([]string, txnCount)
@@ -303,7 +302,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
-		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithEpochSize(epochSize),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
@@ -328,7 +326,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -424,6 +422,21 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 		isProcessed, err := isExitEventProcessed(i, ethgo.Address(exitHelper), rootchainTxRelayer)
 		require.NoError(t, err)
 		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", i))
+	}
+
+	// assert that owners of given token ids are the accounts on the root chain ERC 721 token
+	for i, receiver := range receiversAddrs {
+		ownerOfFn := &contractsapi.OwnerOfChildERC721Fn{
+			TokenID: big.NewInt(int64(i)),
+		}
+
+		ownerInput, err := ownerOfFn.EncodeAbi()
+		require.NoError(t, err)
+
+		addressRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(manifest.RootchainConfig.RootERC721Address), ownerInput)
+		require.NoError(t, err)
+
+		require.Equal(t, receiver, types.StringToAddress(addressRaw))
 	}
 }
 
