@@ -183,6 +183,42 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"RootERC721Predicate",
+			gensc.RootERC721Predicate,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootERC721",
+			gensc.RootERC721,
+			[]string{
+				"approve",
+				"mint",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC721Predicate",
+			gensc.ChildERC721Predicate,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC721",
+			gensc.ChildERC721,
+			[]string{
+				"initialize",
+				"ownerOf",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

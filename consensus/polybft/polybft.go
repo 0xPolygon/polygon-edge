@@ -182,6 +182,12 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		}
 
+		// initialize ChildERC721Predicate SC
+		input, err = getInitChildERC721PredicateInput(polyBFTConfig.Bridge)
+		if err != nil {
+			return err
+		}
+
 		// initialize ChildERC1155Predicate SC
 		input, err = getInitChildERC1155PredicateInput(polyBFTConfig.Bridge)
 		if err != nil {

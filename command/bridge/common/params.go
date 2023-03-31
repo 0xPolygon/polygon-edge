@@ -55,6 +55,23 @@ func (bp *ERC20BridgeParams) Validate() error {
 	return nil
 }
 
+type ERC721BridgeParams struct {
+	*BridgeParams
+	TokenIDs []string
+}
+
+func NewERC721BridgeParams() *ERC721BridgeParams {
+	return &ERC721BridgeParams{BridgeParams: &BridgeParams{}}
+}
+
+func (bp *ERC721BridgeParams) Validate() error {
+	if len(bp.Receivers) != len(bp.TokenIDs) {
+		return errInconsistentTokenIds
+	}
+
+	return nil
+}
+
 type ERC1155BridgeParams struct {
 	*BridgeParams
 	Amounts  []string
