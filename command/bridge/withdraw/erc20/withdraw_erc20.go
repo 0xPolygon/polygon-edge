@@ -22,15 +22,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type withdrawParams struct {
-	*common.ERC20BridgeParams
-	childPredicateAddr string
-	childTokenAddr     string
-	jsonRPCAddress     string
-}
-
 var (
-	wp *withdrawParams = &withdrawParams{ERC20BridgeParams: common.NewERC20BridgeParams()}
+	wp *common.ERC20BridgeParams = common.NewERC20BridgeParams()
 )
 
 // GetCommand returns the bridge withdraw command
@@ -64,21 +57,21 @@ func GetCommand() *cobra.Command {
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childPredicateAddr,
+		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC20PredicateContract.String(),
 		"ERC20 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childTokenAddr,
+		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.NativeERC20TokenContract.String(),
 		"ERC20 child chain token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.jsonRPCAddress,
+		&wp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
@@ -116,7 +109,7 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
 
@@ -183,7 +176,7 @@ func run(cmd *cobra.Command, _ []string) {
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
 func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	withdrawToFn := &contractsapi.WithdrawToChildERC20PredicateFn{
-		ChildToken: types.StringToAddress(wp.childTokenAddr),
+		ChildToken: types.StringToAddress(wp.TokenAddr),
 		Receiver:   receiver,
 		Amount:     amount,
 	}
@@ -193,7 +186,7 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(wp.childPredicateAddr))
+	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
 	return &ethgo.Transaction{
 		To:    &addr,
@@ -206,12 +199,12 @@ func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	var exitEvent contractsapi.L2StateSyncedEvent
 	for _, log := range receipt.Logs {
 		doesMatch, err := exitEvent.ParseLog(log)
-		if !doesMatch {
-			continue
-		}
-
 		if err != nil {
 			return nil, err
+		}
+
+		if !doesMatch {
+			continue
 		}
 
 		return exitEvent.ID, nil
@@ -238,7 +231,7 @@ func (r *withdrawResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))
 
-	buffer.WriteString("\n[WITHDRAW ERC20]\n")
+	buffer.WriteString("\n[WITHDRAW ERC 20]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 
