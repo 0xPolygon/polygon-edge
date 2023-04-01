@@ -10,7 +10,7 @@ on:  # yamllint disable-line rule:truthy
     outputs:
       workflow_output:
         description: "E2E output"
-        value: ${{ jobs.build.outputs.e2e_output }} 
+        value: ${{ jobs.build.outputs.e2e_output_success || jobs.build.outputs.e2e_output_failure }} 
 
 jobs:
   build:
@@ -21,16 +21,28 @@ jobs:
       E2E_TESTS_TYPE: 'integration'
       CI_VERBOSE: true
     outputs:
-      e2e_output: ${{ steps.run_e2e.outputs.e2e_output }}
+      e2e_output_success: ${{ steps.run_e2e_success.outputs.test_output }}
+      e2e_output_failure: ${{ steps.run_e2e_failure.outputs.test_output }}
     steps:
-      - uses: actions/checkout@v3        
+      - uses: actions/checkout@v3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.18.x
+
       - name: Run tests
-        id: run_e2e  
-        run: echo "e2e_output=$(make test-e2e-polybft)" >> $GITHUB_OUTPUT
+        run: make test-e2e-polybft
+
+      - name: Run tests succeeded
+        if: success()
+        id: run_e2e_success
+        run: echo "test_output=PASSED" >> $GITHUB_OUTPUT
+
+      - name: Run tests failed
+        if: failure()
+        id: run_e2e_failure
+        run: echo "test_output=FAILED" >> $GITHUB_OUTPUT
+
       - name: Archive test logs
         if: always()
         uses: actions/upload-artifact@v3
