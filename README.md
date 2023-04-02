@@ -37,5 +37,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
-将基于本版本，提供light nodes和pruned nodes功能。为linechain在智能终端上大规模应用奠定扩展基础。
