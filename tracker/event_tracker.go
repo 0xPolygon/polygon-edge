@@ -5,6 +5,7 @@ import (
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/blocktracker"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
 )
@@ -60,8 +61,12 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
+	blockMaxBacklog := e.numBlockConfirmations*2 + 1
+	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
+
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
+		tracker.WithBlockTracker(blockTracker),
 		tracker.WithStore(store),
 		tracker.WithFilter(&tracker.FilterConfig{
 			Async: true,
@@ -74,6 +79,24 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	go func() {
+		if err := blockTracker.Init(); err != nil {
+			e.logger.Error("failed to init blocktracker", "error", err)
+
+			return
+		}
+
+		if err := blockTracker.Start(); err != nil {
+			e.logger.Error("failed to start blocktracker", "error", err)
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+		blockTracker.Close()
+		store.Close()
+	}()
 
 	go func() {
 		if err := tt.Sync(ctx); err != nil {
