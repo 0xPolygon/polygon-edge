@@ -52,8 +52,9 @@ sequenceDiagram
 	Edge->>ExitHelper.sol: exit()
 	ExitHelper.sol->>CheckpointManager.sol: getEventMembershipByBlockNumber()
 	ExitHelper.sol->>RootERC20Predicate.sol:onL2StateReceive()
-	RootERC20Predicate.sol->>RootERC20Predicate.sol: withdraw() and emit event
+	RootERC20Predicate.sol->>RootERC20: transfer()
 	Edge->>Client: ok
+	RootERC20Predicate.sol-->>Edge: ERC20Withdraw Event
 	ExitHelper.sol-->>Edge: ExitProcessed Event
 ```
 
