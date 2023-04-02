@@ -35,7 +35,7 @@ jobs:
         run: ./setup-ci.sh
 
       - name: Run Go Test
-        run: go test -v -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+        run: make test
 
       - name: Run Go Test Succeeded
         if: success()
