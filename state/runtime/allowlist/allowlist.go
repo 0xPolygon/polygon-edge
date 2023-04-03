@@ -131,7 +131,6 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte,
 }
 
 func (a *AllowList) SetRole(addr types.Address, role Role) {
-	fmt.Println("SetRole", addr, role)
 	a.state.SetState(a.addr, types.BytesToHash(addr.Bytes()), types.Hash(role))
 }
 
