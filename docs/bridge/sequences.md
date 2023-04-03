@@ -4,8 +4,8 @@ Bridge tokens from rootchain to childchain via deposit.
 
 ```mermaid
 sequenceDiagram
-	User->>RootERC20.sol: approve()
 	User->>Edge: deposit
+	Edge->>RootERC20.sol: approve(RootERC20Predicate)
 	Edge->>RootERC20Predicate.sol: deposit()
 	Edge->>User: ok
 	RootERC20Predicate.sol->>StateSender.sol:syncState()
