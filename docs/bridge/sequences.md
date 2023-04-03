@@ -7,11 +7,13 @@ sequenceDiagram
 	User->>Edge: deposit
 	Edge->>RootERC20.sol: approve(RootERC20Predicate)
 	Edge->>RootERC20Predicate.sol: deposit()
+	RootERC20Predicate.sol->>RootERC20Predicate.sol: mapToken()
+	RootERC20Predicate.sol->>StateSender.sol: syncState(MAP_TOKEN_SIG)
 	Edge->>User: ok
-	RootERC20Predicate.sol->>StateSender.sol:syncState()
+	RootERC20Predicate.sol-->>Edge: TokenMapped Event
 	StateSender.sol-->>Edge: StateSynced Event
 	Edge->>StateReceiver.sol:commit()
-	StateReceiver.sol->>Edge: NewCommitment Event
+	StateReceiver.sol-->>Edge: NewCommitment Event
 	Edge->>StateReceiver.sol:execute()
 	StateReceiver.sol->>ChildERC20Predicate.sol:onStateReceive()
 	ChildERC20Predicate.sol->>ChildERC20.sol: mint()
