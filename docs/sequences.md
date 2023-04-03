@@ -4,7 +4,7 @@ Bridge tokens from L1->L2 via deposit.
 
 ```mermaid
 sequenceDiagram
-	Client->>IMXERC20.sol: approve()
+	Client->>RootERC20.sol: approve()
 	Client->>Edge: deposit
 	Edge->>RootERC20Predicate.sol: deposit()
 	Edge->>Client: ok
