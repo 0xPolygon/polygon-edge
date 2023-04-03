@@ -1,6 +1,6 @@
 ## Deposit
 
-Bridge tokens from L1->L2 via deposit.
+Bridge tokens from rootchain to childchain via deposit.
 
 ```mermaid
 sequenceDiagram
@@ -20,7 +20,7 @@ sequenceDiagram
 
 ## Withdraw
 
-Withdraw tokens from L2.
+Move tokens from childchain to rootchain via withdrawal.
 
 ```mermaid
 sequenceDiagram
@@ -38,7 +38,7 @@ sequenceDiagram
 ```
 ## Exit
 
-Finalize withdrawal.
+Finalize withdrawal of tokens from childchain to rootchain.
 
 ```mermaid
 sequenceDiagram
