@@ -34,7 +34,7 @@ func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc20",
 		Short:   "Deposits ERC 20 tokens from the root chain to the child chain",
-		PreRunE: runPreRun,
+		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
@@ -98,7 +98,7 @@ func GetCommand() *cobra.Command {
 	return depositCmd
 }
 
-func runPreRun(cmd *cobra.Command, _ []string) error {
+func preRunCommand(cmd *cobra.Command, _ []string) error {
 	if err := dp.Validate(); err != nil {
 		return err
 	}

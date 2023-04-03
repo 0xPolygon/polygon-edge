@@ -31,8 +31,8 @@ func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc20",
 		Short:   "Withdraws ERC 20 tokens from the child chain to the root chain",
-		PreRunE: preRun,
-		Run:     run,
+		PreRunE: preRunCommand,
+		Run:     runCommand,
 	}
 
 	withdrawCmd.Flags().StringVar(
@@ -83,7 +83,7 @@ func GetCommand() *cobra.Command {
 	return withdrawCmd
 }
 
-func preRun(cmd *cobra.Command, _ []string) error {
+func preRunCommand(cmd *cobra.Command, _ []string) error {
 	if err := wp.Validate(); err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func preRun(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func run(cmd *cobra.Command, _ []string) {
+func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
