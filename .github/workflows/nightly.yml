@@ -27,4 +27,73 @@ jobs:
     name: Polybft Property Tests
     uses: ./.github/workflows/property-polybft.yml
     needs: build
-  
+ 
+  notification:
+    name: Nightly Notifications
+    runs-on: ubuntu-latest
+    needs: [build, test, e2e, property]
+    if: success() || failure()
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.23.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_TEST_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Nightly Build"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Status* ${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.e2e.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Build ${{ needs.build.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Unit tests ${{ needs.test.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Property tests ${{ needs.property.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "E2E tests ${{ needs.e2e.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },  
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                  }
+                }
+              ]
+            }

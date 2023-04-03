@@ -40,7 +40,7 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
+	go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
 .PHONY: test-e2e
 test-e2e:
