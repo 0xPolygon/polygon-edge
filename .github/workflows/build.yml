@@ -7,14 +7,13 @@ on:  # yamllint disable-line rule:truthy
     outputs:
       workflow_output:
         description: "Build output"
-        value: ${{ jobs.go_build.outputs.build_output_success || jobs.go_build.outputs.build_output_failure }} 
+        value: ${{ jobs.go_build.outputs.build_output_failure }} 
 
 jobs:
   go_build:
     name: Polygon Edge
     runs-on: ubuntu-latest
     outputs:
-      build_output_success: ${{ steps.edge_build_success.outputs.build_output }}
       build_output_failure: ${{ steps.edge_build_failure.outputs.build_output }}
     steps:
       - name: Checkout code
@@ -35,15 +34,10 @@ jobs:
           GOARC: amd64
           GOOS: linux
 
-      - name: Build Polygon Edge Succeeded
-        if: success()
-        id: edge_build_success
-        run: echo "build_output=PASSED" >> $GITHUB_OUTPUT
-
       - name: Build Polygon Edge Failed
         if: failure()
         id: edge_build_failure
-        run: echo "build_output=FAILED" >> $GITHUB_OUTPUT
+        run: echo "build_output=false" >> $GITHUB_OUTPUT
 
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v3

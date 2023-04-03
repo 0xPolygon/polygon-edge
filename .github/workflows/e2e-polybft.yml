@@ -10,7 +10,7 @@ on:  # yamllint disable-line rule:truthy
     outputs:
       workflow_output:
         description: "E2E output"
-        value: ${{ jobs.build.outputs.e2e_output_success || jobs.build.outputs.e2e_output_failure }} 
+        value: ${{ jobs.build.outputs.e2e_output_failure }} 
 
 jobs:
   build:
@@ -21,7 +21,6 @@ jobs:
       E2E_TESTS_TYPE: 'integration'
       CI_VERBOSE: true
     outputs:
-      e2e_output_success: ${{ steps.run_e2e_success.outputs.test_output }}
       e2e_output_failure: ${{ steps.run_e2e_failure.outputs.test_output }}
     steps:
       - uses: actions/checkout@v3
@@ -33,15 +32,10 @@ jobs:
       - name: Run tests
         run: make test-e2e-polybft
 
-      - name: Run tests succeeded
-        if: success()
-        id: run_e2e_success
-        run: echo "test_output=PASSED" >> $GITHUB_OUTPUT
-
       - name: Run tests failed
         if: failure()
         id: run_e2e_failure
-        run: echo "test_output=FAILED" >> $GITHUB_OUTPUT
+        run: echo "test_output=false" >> $GITHUB_OUTPUT
 
       - name: Archive test logs
         if: always()

@@ -54,28 +54,35 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Build output: ${{ needs.build.outputs.workflow_output }}"
+                    "text": "*Status* ${{ needs.build.outputs.workflow_output == '' && needs.test.outputs.workflow_output == '' && needs.property.outputs.workflow_output == '' && needs.e2e.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Unit tests output: ${{ needs.test.outputs.workflow_output }}"
+                    "text": "Build ${{ needs.build.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Property tests output: ${{ needs.property.outputs.workflow_output }}"
+                    "text": "Unit tests ${{ needs.test.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "E2E tests output: ${{ needs.e2e.outputs.workflow_output }}"
+                    "text": "Property tests ${{ needs.property.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "E2E tests ${{ needs.e2e.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {

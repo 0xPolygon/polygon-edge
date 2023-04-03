@@ -11,14 +11,13 @@ on:  # yamllint disable-line rule:truthy
     outputs:
       workflow_output:
         description: "Unit tests output"
-        value: ${{ jobs.go_test.outputs.test_output_success || jobs.go_test.outputs.test_output_failure }}
+        value: ${{ jobs.go_test.outputs.test_output_failure }}
 
 jobs:
   go_test:
     name: Polygon Edge
     runs-on: ubuntu-latest
     outputs:
-      test_output_success: ${{ steps.run_tests_success.outputs.test_output }}
       test_output_failure: ${{ steps.run_tests_failure.outputs.test_output }}
     steps:
       - name: Setup Go
@@ -37,15 +36,10 @@ jobs:
       - name: Run Go Test
         run: make test
 
-      - name: Run Go Test Succeeded
-        if: success()
-        id: run_tests_success
-        run: echo "test_output=PASSED" >> $GITHUB_OUTPUT
-
       - name: Run Go Test Failed
         if: failure()
         id: run_tests_failure
-        run: echo "test_output=FAILED" >> $GITHUB_OUTPUT
+        run: echo "test_output=false" >> $GITHUB_OUTPUT
 
       # Triggering SonarQube analysis as results of it are required by Quality Gate check.
       - name: SonarQube Scan
