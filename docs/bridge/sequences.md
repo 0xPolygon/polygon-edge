@@ -20,15 +20,6 @@ sequenceDiagram
 	StateReceiver.sol->>ChildERC20Predicate.sol:onStateReceive()
 	ChildERC20Predicate.sol->>ChildERC20.sol: mint()
 	StateReceiver.sol-->>Edge:StateSyncResult Event
-	Edge->>User: ok
-	RootERC20Predicate.sol-->>Edge: TokenMapped Event
-	StateSender.sol-->>Edge: StateSynced Event
-	Edge->>StateReceiver.sol:commit()
-	StateReceiver.sol-->>Edge: NewCommitment Event
-	Edge->>StateReceiver.sol:execute()
-	StateReceiver.sol->>ChildERC20Predicate.sol:onStateReceive()
-	ChildERC20Predicate.sol->>ChildERC20.sol: mint()
-	StateReceiver.sol-->>Edge:StateSyncResult Event
 ```
 
 ## Withdraw
