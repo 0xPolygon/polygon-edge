@@ -4,10 +4,10 @@ Bridge tokens from rootchain to childchain via deposit.
 
 ```mermaid
 sequenceDiagram
-	Client->>RootERC20.sol: approve()
-	Client->>Edge: deposit
+	User->>RootERC20.sol: approve()
+	User->>Edge: deposit
 	Edge->>RootERC20Predicate.sol: deposit()
-	Edge->>Client: ok
+	Edge->>User: ok
 	RootERC20Predicate.sol->>StateSender.sol:syncState()
 	StateSender.sol-->>Edge: StateSynced Event
 	Edge->>StateReceiver.sol:commit()
@@ -24,13 +24,13 @@ Move tokens from childchain to rootchain via withdrawal.
 
 ```mermaid
 sequenceDiagram
-	Client->>Edge: withdraw
+	User->>Edge: withdraw
 	Edge->>ChildERC20Predicate.sol: withdrawTo()
 	ChildERC20Predicate.sol->>ChildERC20: burn()
 	ChildERC20Predicate.sol->>L2StateSender.sol: syncState(rootToken, WITHDRAW_SIG), recv=RootERC20Predicate
-	Edge->>Client: tx hash
-	Client->>Edge: get tx receipt
-	Edge->>Client: exit event id
+	Edge->>User: tx hash
+	User->>Edge: get tx receipt
+	Edge->>User: exit event id
 	ChildERC20Predicate.sol-->>Edge: L2ERC20Withdraw Event
 	L2StateSender.sol-->>Edge: StateSynced Event
 	Edge->>Edge: Seal block
@@ -42,7 +42,7 @@ Finalize withdrawal of tokens from childchain to rootchain.
 
 ```mermaid
 sequenceDiagram
-	Client->>Edge: exit, event id:X
+	User->>Edge: exit, event id:X
 	Edge->>Edge: bridge_generateExitProof()
 	Edge->>CheckpointManager.sol: getCheckpointBlock()
 	CheckpointManager.sol->>Edge: blockNum
@@ -53,7 +53,7 @@ sequenceDiagram
 	ExitHelper.sol->>CheckpointManager.sol: getEventMembershipByBlockNumber()
 	ExitHelper.sol->>RootERC20Predicate.sol:onL2StateReceive()
 	RootERC20Predicate.sol->>RootERC20: transfer()
-	Edge->>Client: ok
+	Edge->>User: ok
 	RootERC20Predicate.sol-->>Edge: ERC20Withdraw Event
 	ExitHelper.sol-->>Edge: ExitProcessed Event
 ```
