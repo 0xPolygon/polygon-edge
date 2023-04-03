@@ -10,7 +10,7 @@ sequenceDiagram
 	Edge->>Client: ok
 	RootERC20Predicate.sol->>StateSender.sol:syncState()
 	StateSender.sol-->>Edge: StateSynced Event
-	Edge->StateReceiver.sol:commit()
+	Edge->>StateReceiver.sol:commit()
 	StateReceiver.sol->>Edge: NewCommitment Event
 	Edge->>StateReceiver.sol:execute()
 	StateReceiver.sol->>ChildERC20Predicate.sol:onStateReceive()
