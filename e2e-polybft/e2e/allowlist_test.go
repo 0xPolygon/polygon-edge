@@ -129,6 +129,9 @@ func TestAllowList_Transactions(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
+	// bytecode for an empty smart contract
+	bytecode, _ := hex.DecodeString("6080604052348015600f57600080fd5b50603e80601d6000396000f3fe6080604052600080fdfea265627a7a7231582027748e4afe5ee282a786005d286f4427f13dac1b62e03f9aed311c2db7e8245364736f6c63430005110032")
+
 	expectRole := func(addr types.Address, role allowlist.Role) {
 		out := cluster.Call(t, contracts.AllowListTransactionsAddr, allowlist.ReadAllowListFunc, addr)
 
@@ -159,6 +162,16 @@ func TestAllowList_Transactions(t *testing.T) {
 		targetTxn := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1))
 		require.NoError(t, targetTxn.Wait())
 		require.True(t, targetTxn.Reverted())
+	}
+
+	{
+		// Step 2.5. 'targetAddr' **cannot** deploy a contract because it is not whitelisted.
+		// (The transaction does not fail but the contract is not deployed and all gas
+		// for the transaction is consumed)
+		deployTxn := cluster.Deploy(t, target, bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Reverted())
+		require.False(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
 	}
 
 	{
