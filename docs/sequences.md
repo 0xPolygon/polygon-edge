@@ -14,7 +14,7 @@ sequenceDiagram
 	StateReceiver.sol->>Edge: NewCommitment Event
 	Edge->>StateReceiver.sol:execute()
 	StateReceiver.sol->>ChildERC20Predicate.sol:onStateReceive()
-	ChildERC20Predicate.sol->>NativeERC20.sol: mint()
+	ChildERC20Predicate.sol->>ChildERC20.sol: mint()
 	StateReceiver.sol-->>Edge:StateSyncResult Event
 ```
 
