@@ -149,8 +149,9 @@ func TestAllowList_Transactions(t *testing.T) {
 
 	{
 		// Step 1. 'otherAddr' can send a normal transaction (non-contract creation).
-		err := cluster.Transfer(t, other, types.ZeroAddress, big.NewInt(1)).Wait()
-		require.NoError(t, err)
+		otherTxn := cluster.Transfer(t, other, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, otherTxn.Wait())
+		require.True(t, otherTxn.Succeed())
 	}
 
 	{
@@ -171,8 +172,9 @@ func TestAllowList_Transactions(t *testing.T) {
 
 	{
 		// Step 4. 'targetAddr' **can** send a normal transaction because it is whitelisted.
-		err := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1)).Wait()
-		require.NoError(t, err)
+		targetTxn := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, targetTxn.Wait())
+		require.True(t, targetTxn.Succeed())
 	}
 
 	{
