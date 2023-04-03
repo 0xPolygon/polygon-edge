@@ -9,6 +9,17 @@ sequenceDiagram
 	Edge->>RootERC20Predicate.sol: deposit()
 	RootERC20Predicate.sol->>RootERC20Predicate.sol: mapToken()
 	RootERC20Predicate.sol->>StateSender.sol: syncState(MAP_TOKEN_SIG)
+	RootERC20Predicate.sol-->>Edge: TokenMapped Event
+	StateSender.sol-->>Edge: StateSynced Event to map tokens on child predicate
+	RootERC20Predicate.sol->>StateSender.sol: syncState(DEPOSIT_SIG)
+	StateSender.sol-->>Edge: StateSynced Event to deposit on child chain
+	Edge->>User: ok
+	Edge->>StateReceiver.sol:commit()
+	StateReceiver.sol-->>Edge: NewCommitment Event
+	Edge->>StateReceiver.sol:execute()
+	StateReceiver.sol->>ChildERC20Predicate.sol:onStateReceive()
+	ChildERC20Predicate.sol->>ChildERC20.sol: mint()
+	StateReceiver.sol-->>Edge:StateSyncResult Event
 	Edge->>User: ok
 	RootERC20Predicate.sol-->>Edge: TokenMapped Event
 	StateSender.sol-->>Edge: StateSynced Event
