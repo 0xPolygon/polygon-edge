@@ -73,7 +73,7 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 		return fmt.Errorf("tx has from which is not allowed: %s", tx.Transaction.From)
 	}
 
-	address := tx.GetAddressFromSignature(p.invokerAddress, p.chainID, p.magicHashFn)
+	address := tx.RecoverSender(p.invokerAddress, p.chainID, p.magicHashFn)
 	if tx.Transaction.From != address {
 		return fmt.Errorf("invalid tx: expected sender %s but got %s", tx.Transaction.From, address)
 	}

@@ -62,7 +62,7 @@ type AATransaction struct {
 	Transaction Transaction `json:"transaction"`
 }
 
-func (t *AATransaction) GetAddressFromSignature(
+func (t *AATransaction) RecoverSender(
 	address types.Address, chainID int64, magicHashFn MagicHashFn) types.Address {
 	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
 	if err != nil {
@@ -88,7 +88,7 @@ func (t *AATransaction) GetAddressFromSignature(
 	return types.Address(recoveredAddress)
 }
 
-func (t *AATransaction) MakeSignature(
+func (t *AATransaction) Sign(
 	address types.Address, chainID int64, key ethgo.Key, magicHashFn MagicHashFn) error {
 	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
 	if err != nil {
@@ -115,7 +115,7 @@ func (t *AATransaction) MakeSignature(
 }
 
 func (t *AATransaction) ToAbi() ([]byte, error) {
-	// sginature "tuple(uint256 r,uint256 s,bool v)"
+	// signature "tuple(uint256 r,uint256 s,bool v)"
 	signature := map[string]interface{}{
 		"r": new(big.Int).SetBytes(t.Signature[:32]),
 		"s": new(big.Int).SetBytes(t.Signature[32:64]),

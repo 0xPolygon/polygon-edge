@@ -76,9 +76,9 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa, nil))
+		require.NoError(t, tx.Sign(aaInvokerAddress, chainID, userAccount.Ecdsa, nil))
 
-		require.Equal(t, tx.Transaction.From, tx.GetAddressFromSignature(aaInvokerAddress, chainID, nil))
+		require.Equal(t, tx.Transaction.From, tx.RecoverSender(aaInvokerAddress, chainID, nil))
 
 		req := makeRequest(t, "POST", "sendTransaction", tx)
 
@@ -221,7 +221,7 @@ func Test_AAServer(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, tx.MakeSignature(aaInvokerAddress, chainID, userAccount.Ecdsa, nil))
+		require.NoError(t, tx.Sign(aaInvokerAddress, chainID, userAccount.Ecdsa, nil))
 
 		req := makeRequest(t, "POST", "sendTransaction", &tx)
 

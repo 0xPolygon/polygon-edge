@@ -10,7 +10,9 @@ import (
 	"github.com/umbracle/ethgo/wallet"
 )
 
-func TestE2E_MakeSignature_And_GetAddressFromSignature(t *testing.T) {
+func Test_MakeSignature_And_GetAddressFromSignature(t *testing.T) {
+	t.Parallel()
+
 	bytes, err := hex.DecodeString("76de0be417b176b6621aec89fb1f73a926825d19e6fd89044adc32b40e200039")
 	require.NoError(t, err)
 
@@ -39,9 +41,9 @@ func TestE2E_MakeSignature_And_GetAddressFromSignature(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, aatx.MakeSignature(contractAddress, chainID, wallet, nil))
+	require.NoError(t, aatx.Sign(contractAddress, chainID, wallet, nil))
 
-	addressFromSignature := aatx.GetAddressFromSignature(contractAddress, chainID, nil)
+	addressFromSignature := aatx.RecoverSender(contractAddress, chainID, nil)
 
 	require.Equal(t, from.Bytes(), addressFromSignature.Bytes())
 }

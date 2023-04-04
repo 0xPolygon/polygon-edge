@@ -12,8 +12,8 @@ import (
 )
 
 type contractInfo struct {
-	Path string
-	Name string
+	path string
+	name string
 }
 
 func main() {
@@ -116,11 +116,11 @@ func main() {
 
 func populateContracts(f *jen.File, scpath string, contractInfos []contractInfo) {
 	for _, v := range contractInfos {
-		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, v.Name)
+		artifactBytes, err := artifact.ReadArtifactData(scpath, v.path, v.name)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		f.Var().Id(v.Name + "Artifact").String().Op("=").Lit(string(artifactBytes))
+		f.Var().Id(v.name + "Artifact").String().Op("=").Lit(string(artifactBytes))
 	}
 }

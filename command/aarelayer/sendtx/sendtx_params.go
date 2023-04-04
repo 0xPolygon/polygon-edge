@@ -118,7 +118,7 @@ func (rp *aarelayerSendTxParams) createAATransaction(key ethgo.Key) (*service.AA
 
 	invokerAddress := types.StringToAddress(rp.invokerAddr)
 
-	if err := aaTx.MakeSignature(invokerAddress, rp.chainID, key, crypto.Make3074Hash); err != nil {
+	if err := aaTx.Sign(invokerAddress, rp.chainID, key, crypto.Make3074Hash); err != nil {
 		return nil, err
 	}
 
