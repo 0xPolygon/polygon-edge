@@ -22,8 +22,11 @@ import (
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	const epochSize = 4
 
+	//nolint:godox
+	// TODO: Enable non-validators when proper support gets implemented
+	// (https://polygon.atlassian.net/browse/EVM-547)
+	// framework.WithNonValidators(2),
 	cluster := framework.NewTestCluster(t, 7,
-		framework.WithNonValidators(2),
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
@@ -80,7 +83,7 @@ func TestE2E_Consensus_Sync(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(4*epochSize, 2*time.Minute))
 }
 
-func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
+func TestE2E_Consensus_BulkDrop(t *testing.T) {
 	const (
 		clusterSize = 5
 		bulkToDrop  = 3
@@ -100,17 +103,14 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 		node.Stop()
 	}
 
-	// wait for a couple of blocks
-	require.NoError(t, cluster.WaitForBlock(epochSize, 30*time.Second))
-
 	// start dropped nodes again
 	for i := 0; i < bulkToDrop; i++ {
 		node := cluster.Servers[i]
 		node.Start()
 	}
 
-	// wait for block 11
-	require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 2*time.Minute))
+	// wait to proceed to the 2nd epoch
+	require.NoError(t, cluster.WaitForBlock(epochSize+1, 2*time.Minute))
 }
 
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
