@@ -13,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -29,6 +28,8 @@ const (
 
 	defaultPort = 8198
 )
+
+var defaultData = []byte{0xd0, 0x9d, 0xe0, 0x8a} // framework.MethodSig("increment")
 
 type aarelayerSendTxParams struct {
 	addr           string
@@ -86,7 +87,7 @@ func (rp *aarelayerSendTxParams) validateFlags() error {
 				return fmt.Errorf("invalid transaction: %d, wrong input: %s", i, parts[3])
 			}
 		} else {
-			input = framework.MethodSig("increment")
+			input = defaultData
 		}
 
 		to := types.StringToAddress(parts[0])

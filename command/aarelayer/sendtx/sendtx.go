@@ -2,7 +2,6 @@ package sendtx
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,7 +17,10 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-const numWaitReceiptRetries = 50
+const (
+	waitForReceiptTime    = time.Second * 10
+	numWaitReceiptRetries = 50
+)
 
 var params aarelayerSendTxParams
 
@@ -123,25 +125,14 @@ func waitForRecipt(cmd *cobra.Command, client *http.Client, uuid string) (*servi
 	}
 
 	responseObj := &service.AAReceipt{}
-	ctx, cancel := context.WithCancel(cmd.Context())
 	stopCh := common.GetTerminationSignalCh()
-	ticker := time.NewTicker(time.Second * 10)
 
+	ticker := time.NewTicker(waitForReceiptTime)
 	defer ticker.Stop()
-	defer cancel()
-
-	// just waits for os.Signal to cancel context
-	go func() {
-		select {
-		case <-stopCh:
-			cancel()
-		case <-ctx.Done():
-		}
-	}()
 
 	for i := 0; i < numWaitReceiptRetries; i++ {
 		select {
-		case <-ctx.Done():
+		case <-stopCh:
 			return nil, fmt.Errorf("program has been terminated while waiting for receipt: %s", uuid)
 		case <-ticker.C:
 			if err := executeRequest(client, req, &responseObj); err != nil {
@@ -172,9 +163,5 @@ func executeRequest(client *http.Client, request *http.Request, responseObject i
 		return err
 	}
 
-	if err := json.Unmarshal(bytes, responseObject); err != nil {
-		return err
-	}
-
-	return nil
+	return json.Unmarshal(bytes, responseObject)
 }
