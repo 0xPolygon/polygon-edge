@@ -15,10 +15,20 @@ var (
 	NativeERC20TokenContract = types.StringToAddress("0x1010")
 	// L2StateSenderContract is an address of bridge contract to the rootchain
 	L2StateSenderContract = types.StringToAddress("0x1002")
+
 	// ChildERC20Contract is an address of bridgable ERC20 token contract on the child chain
 	ChildERC20Contract = types.StringToAddress("0x1003")
 	// ChildERC20PredicateContract is an address of child ERC20 predicate contract on the child chain
 	ChildERC20PredicateContract = types.StringToAddress("0x1004")
+	// ChildERC721Contract is an address of bridgable ERC721 token contract on the child chain
+	ChildERC721Contract = types.StringToAddress("0x1005")
+	// ChildERC721PredicateContract is an address of child ERC721 predicate contract on the child chain
+	ChildERC721PredicateContract = types.StringToAddress("0x1006")
+	// ChildERC1155Contract is an address of bridgable ERC1155 token contract on the child chain
+	ChildERC1155Contract = types.StringToAddress("0x1007")
+	// ChildERC1155PredicateContract is an address of child ERC1155 predicate contract on the child chain
+	ChildERC1155PredicateContract = types.StringToAddress("0x1008")
+
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
 

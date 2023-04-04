@@ -203,14 +203,18 @@ func (v *Validator) String() string {
 // RootchainConfig contains information about rootchain contract addresses
 // as well as rootchain admin account address
 type RootchainConfig struct {
-	StateSenderAddress        types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress  types.Address `json:"checkpointManagerAddress"`
-	BLSAddress                types.Address `json:"blsAddress"`
-	BN256G2Address            types.Address `json:"bn256G2Address"`
-	ExitHelperAddress         types.Address `json:"exitHelperAddress"`
-	RootERC20PredicateAddress types.Address `json:"rootERC20PredicateAddress"`
-	RootNativeERC20Address    types.Address `json:"rootNativeERC20Address"`
-	ERC20TemplateAddress      types.Address `json:"erc20TemplateAddress"`
+	StateSenderAddress          types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddress    types.Address `json:"checkpointManagerAddress"`
+	BLSAddress                  types.Address `json:"blsAddress"`
+	BN256G2Address              types.Address `json:"bn256G2Address"`
+	ExitHelperAddress           types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddress   types.Address `json:"erc20PredicateAddress"`
+	RootNativeERC20Address      types.Address `json:"nativeERC20Address"`
+	ERC20TemplateAddress        types.Address `json:"erc20TemplateAddress"`
+	RootERC721PredicateAddress  types.Address `json:"erc721PredicateAddress"`
+	RootERC721Address           types.Address `json:"erc721Address"`
+	RootERC1155PredicateAddress types.Address `json:"erc1155PredicateAddress"`
+	RootERC1155Address          types.Address `json:"erc1155Address"`
 }
 
 // ToBridgeConfig creates BridgeConfig instance

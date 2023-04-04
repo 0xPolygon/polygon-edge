@@ -14,21 +14,27 @@ const (
 
 var (
 	// core-contracts smart contracts
-	CheckpointManager   *artifact.Artifact
-	ExitHelper          *artifact.Artifact
-	StateSender         *artifact.Artifact
-	RootERC20Predicate  *artifact.Artifact
-	BLS                 *artifact.Artifact
-	BLS256              *artifact.Artifact
-	System              *artifact.Artifact
-	Merkle              *artifact.Artifact
-	ChildValidatorSet   *artifact.Artifact
-	NativeERC20         *artifact.Artifact
-	NativeERC20Mintable *artifact.Artifact
-	StateReceiver       *artifact.Artifact
-	ChildERC20          *artifact.Artifact
-	ChildERC20Predicate *artifact.Artifact
-	L2StateSender       *artifact.Artifact
+	CheckpointManager     *artifact.Artifact
+	ExitHelper            *artifact.Artifact
+	StateSender           *artifact.Artifact
+	RootERC20Predicate    *artifact.Artifact
+	RootERC721Predicate   *artifact.Artifact
+	RootERC1155Predicate  *artifact.Artifact
+	BLS                   *artifact.Artifact
+	BLS256                *artifact.Artifact
+	System                *artifact.Artifact
+	Merkle                *artifact.Artifact
+	ChildValidatorSet     *artifact.Artifact
+	NativeERC20           *artifact.Artifact
+	NativeERC20Mintable   *artifact.Artifact
+	StateReceiver         *artifact.Artifact
+	ChildERC20            *artifact.Artifact
+	ChildERC20Predicate   *artifact.Artifact
+	ChildERC721           *artifact.Artifact
+	ChildERC721Predicate  *artifact.Artifact
+	ChildERC1155          *artifact.Artifact
+	ChildERC1155Predicate *artifact.Artifact
+	L2StateSender         *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -36,6 +42,8 @@ var (
 	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
+	RootERC721             *artifact.Artifact
+	RootERC1155            *artifact.Artifact
 )
 
 func init() {
@@ -81,6 +89,16 @@ func init() {
 		log.Fatal(err)
 	}
 
+	RootERC721Predicate, err = artifact.DecodeArtifact([]byte(RootERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootERC1155Predicate, err = artifact.DecodeArtifact([]byte(RootERC1155PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	StateReceiver, err = artifact.DecodeArtifact([]byte(StateReceiverArtifact))
 	if err != nil {
 		log.Fatal(err)
@@ -101,6 +119,26 @@ func init() {
 		log.Fatal(err)
 	}
 
+	ChildERC721, err = artifact.DecodeArtifact([]byte(ChildERC721Artifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildERC721Predicate, err = artifact.DecodeArtifact([]byte(ChildERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildERC1155, err = artifact.DecodeArtifact([]byte(ChildERC1155Artifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildERC1155Predicate, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
 	if err != nil {
 		log.Fatal(err)
@@ -117,6 +155,16 @@ func init() {
 	}
 
 	RootERC20, err = artifact.DecodeArtifact([]byte(MockERC20Artifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootERC721, err = artifact.DecodeArtifact([]byte(MockERC721Artifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootERC1155, err = artifact.DecodeArtifact([]byte(MockERC1155Artifact))
 	if err != nil {
 		log.Fatal(err)
 	}
