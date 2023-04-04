@@ -3,9 +3,7 @@ name: Nightly DevNet Workflow - Jesse
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
-      - main
-      - develop
-  pull_request:
+      - jesse/nightly-loadtest-workflow
   workflow_call: {}
   workflow_dispatch: {}
 
@@ -17,7 +15,7 @@ permissions:
 jobs:
   devnet:
     name: Build Devnet
-    uses: ./.github/workflows/devnet.yml
+    uses: ./.github/workflows/deploy.nightly.devnet.yml
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
@@ -35,5 +33,4 @@ jobs:
       VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
       ANSIBLE_PRIVATE_SSH: ${{ secrets.ANSIBLE_PRIVATE_SSH }}
     with:
-      runner: devnet
       environment: devnet
