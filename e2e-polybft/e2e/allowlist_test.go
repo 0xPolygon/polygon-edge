@@ -138,3 +138,94 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 		require.Equal(t, role.Uint64(), allowlist.AdminRole.Uint64())
 	}
 }
+
+func TestAllowList_Transactions(t *testing.T) {
+	// create two accounts, one for an admin sender and a second
+	// one for a non-enabled account that will switch on-off between
+	// both enabled and non-enabled roles.
+	admin, _ := wallet.GenerateKey()
+	target, _ := wallet.GenerateKey()
+	other, _ := wallet.GenerateKey()
+
+	adminAddr := types.Address(admin.Address())
+	targetAddr := types.Address(target.Address())
+	otherAddr := types.Address(other.Address())
+
+	cluster := framework.NewTestCluster(t, 3,
+		framework.WithPremine(adminAddr, targetAddr, otherAddr),
+		framework.WithTransactionsAllowListAdmin(adminAddr),
+		framework.WithTransactionsAllowListEnabled(otherAddr),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	// bytecode for an empty smart contract
+	bytecode, _ := hex.DecodeString("6080604052348015600f57600080fd5b50603e80601d6000396000f3fe6080604052600080fdfea265627a7a7231582027748e4afe5ee282a786005d286f4427f13dac1b62e03f9aed311c2db7e8245364736f6c63430005110032")
+
+	expectRole := func(addr types.Address, role allowlist.Role) {
+		out := cluster.Call(t, contracts.AllowListTransactionsAddr, allowlist.ReadAllowListFunc, addr)
+
+		num, ok := out["0"].(*big.Int)
+		require.True(t, ok)
+		require.Equal(t, role.Uint64(), num.Uint64())
+	}
+
+	{
+		// Step 0. Check the role of both accounts
+		expectRole(adminAddr, allowlist.AdminRole)
+		expectRole(targetAddr, allowlist.NoRole)
+		expectRole(otherAddr, allowlist.EnabledRole)
+	}
+
+	{
+		// Step 1. 'otherAddr' can send a normal transaction (non-contract creation).
+		otherTxn := cluster.Transfer(t, other, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, otherTxn.Wait())
+		require.True(t, otherTxn.Succeed())
+	}
+
+	{
+		// Step 2. 'targetAddr' **cannot** send a normal transaction because it is not whitelisted.
+		targetTxn := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, targetTxn.Wait())
+		require.True(t, targetTxn.Reverted())
+	}
+
+	{
+		// Step 2.5. 'targetAddr' **cannot** deploy a contract because it is not whitelisted.
+		// (The transaction does not fail but the contract is not deployed and all gas
+		// for the transaction is consumed)
+		deployTxn := cluster.Deploy(t, target, bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Reverted())
+		require.False(t, cluster.ExistsCode(t, deployTxn.Receipt().ContractAddress))
+	}
+
+	{
+		// Step 3. 'adminAddr' sends a transaction to enable 'targetAddr'.
+		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+
+		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, adminSetTxn.Wait())
+		expectRole(targetAddr, allowlist.EnabledRole)
+	}
+
+	{
+		// Step 4. 'targetAddr' **can** send a normal transaction because it is whitelisted.
+		targetTxn := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, targetTxn.Wait())
+		require.True(t, targetTxn.Succeed())
+	}
+
+	{
+		// Step 5. 'targetAddr' cannot enable other accounts since it is not an admin
+		// (The transaction fails)
+		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+
+		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, adminSetFailTxn.Wait())
+		require.True(t, adminSetFailTxn.Failed())
+		expectRole(types.ZeroAddress, allowlist.NoRole)
+	}
+}
