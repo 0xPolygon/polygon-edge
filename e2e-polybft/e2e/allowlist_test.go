@@ -136,10 +136,7 @@ func TestAllowList_Transactions(t *testing.T) {
 		out := cluster.Call(t, contracts.AllowListTransactionsAddr, allowlist.ReadAllowListFunc, addr)
 
 		num, ok := out["0"].(*big.Int)
-		if !ok {
-			t.Fatal("unexpected")
-		}
-
+		require.True(t, ok)
 		require.Equal(t, role.Uint64(), num.Uint64())
 	}
 
