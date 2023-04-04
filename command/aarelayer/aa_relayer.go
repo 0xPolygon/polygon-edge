@@ -85,11 +85,16 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	pool := service.NewAAPool()
 	pool.Init(pending)
 
+	var opts []service.AAVerificationOption
+	if params.eip3074Hash {
+		opts = append(opts, service.WithMagicHashFn(crypto.Make3074Hash))
+	}
+
 	verification := service.NewAAVerification(
 		config,
 		invokerAddress,
 		params.chainID,
-		service.WithMagicHashFn(crypto.Make3074Hash))
+		opts...)
 	restService := service.NewAARelayerRestServer(pool, state, verification, logger)
 
 	relayerService, err := service.NewAARelayerService(

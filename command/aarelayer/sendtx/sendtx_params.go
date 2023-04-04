@@ -25,6 +25,7 @@ const (
 	txFlag             = "tx"
 	waitForReceiptFlag = "wait-for-receipt"
 	invokerAddrFlag    = "invoker-addr"
+	eip3074HashFlag    = "hash-eip3074"
 
 	defaultPort = 8198
 )
@@ -40,6 +41,7 @@ type aarelayerSendTxParams struct {
 	txs            []string
 	waitForReceipt bool
 	invokerAddr    string
+	eip3074Hash    bool
 
 	payloads []service.Payload
 }
@@ -118,7 +120,12 @@ func (rp *aarelayerSendTxParams) createAATransaction(key ethgo.Key) (*service.AA
 
 	invokerAddress := types.StringToAddress(rp.invokerAddr)
 
-	if err := aaTx.Sign(invokerAddress, rp.chainID, key, crypto.Make3074Hash); err != nil {
+	var hashFn service.MagicHashFn
+	if params.eip3074Hash {
+		hashFn = crypto.Make3074Hash
+	}
+
+	if err := aaTx.Sign(invokerAddress, rp.chainID, key, hashFn); err != nil {
 		return nil, err
 	}
 
@@ -173,6 +180,13 @@ func setFlags(cmd *cobra.Command) {
 		invokerAddrFlag,
 		"",
 		"address of invoker smart contract",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.eip3074Hash,
+		eip3074HashFlag,
+		true,
+		"enable EIP-3074 hashing",
 	)
 
 	cmd.Flags().BoolVar(
