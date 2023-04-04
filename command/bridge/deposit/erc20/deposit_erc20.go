@@ -76,7 +76,7 @@ func GetCommand() *cobra.Command {
 	depositCmd.Flags().StringVar(
 		&dp.JSONRPCAddr,
 		common.JSONRPCFlag,
-		"http://127.0.0.1:8545",
+		txrelayer.DefaultRPCAddress,
 		"the JSON RPC root chain endpoint",
 	)
 
