@@ -1,0 +1,189 @@
+---
+
+name: Build Devnet
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: The runner to execute on
+        default: 'ubuntu-latest'
+        type: choice
+        options:
+          - ubuntu-latest
+          - devnet
+          - testnet
+      environment:
+        description: The environment to run against
+        required: false
+        type: environment
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+      runner:
+        required: true
+        type: string
+        description: The runner label to use
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      AWS_REGION:
+        required: true
+      TF_VAR_AWS_PROFILE:
+        required: true
+      TF_VAR_COMPANY_NAME:
+        required: true
+      TF_VAR_CREATE_SSH_KEY:
+        required: true
+      TF_VAR_DEPLOYMENT_NAME:
+        required: true
+      TF_VAR_DEVNET_KEY_VALUE:
+        required: true
+      TF_VAR_EXPLORER_RDS_MASTER_PASSWORD:
+        required: true
+      TF_VAR_JUMPBOX_SSH_ACCESS:
+        required: true
+      TF_VAR_OWNER:
+        required: true
+      SLACK_PERFORMANCE_WEBHOOK_URL:
+        required: true
+      DD_API_KEY:
+        required: true
+      LOADTEST_MNEMONIC:
+        required: true
+      VAULT_PASSWORD_FILE:
+        required: true
+      ANSIBLE_PRIVATE_SSH:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: maticnetwork/terraform-polygon-supernets
+          ref: polygon-edge-nightly-build
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.4.4
+      - name: Terraform Init
+        id: init
+        run: terraform init
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out=tfplan -no-color
+        continue-on-error: true
+        env:
+          TF_VAR_explorer_rds_master_password: ${{ secrets.TF_VAR_EXPLORER_RDS_MASTER_PASSWORD }}
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_company_name: ${{ secrets.TF_VAR_COMPANY_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+          TF_VAR_aws_profile: ${{ secrets.TF_VAR_AWS_PROFILE }}
+          TF_VAR_create_ssh_key: ${{ secrets.TF_VAR_CREATE_SSH_KEY }}
+          TF_VAR_devnet_key_value: ${{ secrets.TF_VAR_DEVNET_KEY_VALUE }}
+          TF_VAR_jumpbox_ssh_access: ${{ secrets.TF_VAR_JUMPBOX_SSH_ACCESS }}
+      # - name: Retrieve state file from s3
+      #   run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/nightly-build state.json
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+        continue-on-error: true
+        env:
+          TF_VAR_explorer_rds_master_password: ${{ secrets.TF_VAR_EXPLORER_RDS_MASTER_PASSWORD }}
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_company_name: ${{ secrets.TF_VAR_COMPANY_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+          TF_VAR_aws_profile: ${{ secrets.TF_VAR_AWS_PROFILE }}
+          TF_VAR_create_ssh_key: ${{ secrets.TF_VAR_CREATE_SSH_KEY }}
+          TF_VAR_devnet_key_value: ${{ secrets.TF_VAR_DEVNET_KEY_VALUE }}
+          TF_VAR_jumpbox_ssh_access: ${{ secrets.TF_VAR_JUMPBOX_SSH_ACCESS }}
+      - name: Install ansible / botocore / boto3
+        run: |
+          python3 -m pip install --user ansible
+          pip install boto3 botocore
+      - name: Run Ansible
+        working-directory: ansible
+        run: |
+          touch password.txt
+          echo "${{ secrets.VAULT_PASSWORD_FILE }}" > password.txt
+          mkdir ~/cert
+          touch ~/cert/2022-07-05-devnets-generic.key
+          echo "${{ secrets.ANSIBLE_PRIVATE_SSH }}" > ~/cert/2022-07-05-devnets-generic.key
+          chmod 600 ~/cert/2022-07-05-devnets-generic.key
+          ansible-inventory --graph
+          ansible-galaxy install -r requirements.yml
+          ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
+      - name: Set rpc url value
+        id: url
+        run: |
+          touch rpc.txt
+          terraform output -raw aws_lb_ext_validator_domain | grep -o -E '^ext[^:]*' > rpc.txt 
+      - uses: actions/upload-artifact@v3
+        with:
+          name: rpc-url
+          path: rpc.txt
+  loadtest:
+    needs: build
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test Nightly Build
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+    with:
+      runner: ${{ inputs.runner }}
+      environment: ${{ inputs.environment }}
+      scenario: multiple_EOA
+
+  # destroy_devnet:
+  #   needs: loadtest
+  #   if: always()
+  #   name: Destroy Nightly Build
+  #   runs-on: ubuntu-latest
+  #   environment: ${{ inputs.environment }}
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #       with:
+  #         repository: maticnetwork/terraform-polygon-supernets
+  #         ref: polygon-edge-nightly-build
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v2
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+  #         aws-region: ${{ secrets.AWS_REGION }}
+  #     - name: Install Terraform
+  #       uses: hashicorp/setup-terraform@v2
+  #       with:
+  #         terraform_version: 1.4.2
+  #     - name: Terraform Init
+  #       id: init
+  #       run: terraform init
+  #     - name: Retrieve state file from s3
+  #       run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/nightly-build state.json
+  #     - name: Terraform Destroy
+  #       id: destroy
+  #       run: terraform destroy -auto-approve -state=state.json
+  #       env:
+  #         TF_VAR_explorer_rds_master_password: ${{ secrets.TF_VAR_EXPLORER_RDS_MASTER_PASSWORD }}
+  #         TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+  #         TF_VAR_company_name: ${{ secrets.TF_VAR_COMPANY_NAME }}
+  #         TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+  #         TF_VAR_aws_profile: ${{ secrets.TF_VAR_AWS_PROFILE }}
+  #         TF_VAR_create_ssh_key: ${{ secrets.TF_VAR_CREATE_SSH_KEY }}
+  #         TF_VAR_devnet_key_value: ${{ secrets.TF_VAR_DEVNET_KEY_VALUE }}
+  #         TF_VAR_jumpbox_ssh_access: ${{ secrets.TF_VAR_JUMPBOX_SSH_ACCESS }}
