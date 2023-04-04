@@ -206,13 +206,13 @@ func NewServer(config *Config) (*Server, error) {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
 
-	// apply allow list genesis data
+	// apply allow list contracts deployer genesis data
 	if m.config.Chain.Params.ContractDeployerAllowList != nil {
 		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
 			m.config.Chain.Params.ContractDeployerAllowList)
 	}
 
-	// apply allow list genesis data
+	// apply transactions execution allow list genesis data
 	if m.config.Chain.Params.TransactionsAllowList != nil {
 		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
 			m.config.Chain.Params.TransactionsAllowList)
