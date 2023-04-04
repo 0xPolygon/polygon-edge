@@ -6,13 +6,19 @@ on:  # yamllint disable-line rule:truthy
       - main
       - develop  
   workflow_dispatch:
-  workflow_call:
+  workflow_call:    
+    outputs:
+      workflow_output:
+        description: "Fuzz output"
+        value: ${{ jobs.build.outputs.fuzz_output_failure }} 
 
 
 jobs:
   fuzz_test:
     name: Polygon Edge
     runs-on: ubuntu-latest
+    outputs:
+      fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}
     steps:
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -29,4 +35,9 @@ jobs:
 
       - name: Run Fuzz Test
         run: make fuzz-test
+
+      - name: Run fuzz tests failed
+        if: failure()
+        id: run_fuzz_failure
+        run: echo "test_output=false" >> $GITHUB_OUTPUT
       
