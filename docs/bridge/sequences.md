@@ -1,6 +1,6 @@
 ## Deposit
 
-Bridge tokens from rootchain to childchain via deposit.
+Bridge ERC 20 tokens from rootchain to childchain via deposit.
 
 ```mermaid
 sequenceDiagram
@@ -8,10 +8,10 @@ sequenceDiagram
 	Edge->>RootERC20.sol: approve(RootERC20Predicate)
 	Edge->>RootERC20Predicate.sol: deposit()
 	RootERC20Predicate.sol->>RootERC20Predicate.sol: mapToken()
-	RootERC20Predicate.sol->>StateSender.sol: syncState(MAP_TOKEN_SIG)
+	RootERC20Predicate.sol->>StateSender.sol: syncState(MAP_TOKEN_SIG), recv=ChildERC20Predicate
 	RootERC20Predicate.sol-->>Edge: TokenMapped Event
 	StateSender.sol-->>Edge: StateSynced Event to map tokens on child predicate
-	RootERC20Predicate.sol->>StateSender.sol: syncState(DEPOSIT_SIG)
+	RootERC20Predicate.sol->>StateSender.sol: syncState(DEPOSIT_SIG), recv=ChildERC20Predicate
 	StateSender.sol-->>Edge: StateSynced Event to deposit on child chain
 	Edge->>User: ok
 	Edge->>StateReceiver.sol:commit()
@@ -24,14 +24,14 @@ sequenceDiagram
 
 ## Withdraw
 
-Move tokens from childchain to rootchain via withdrawal.
+Bridge ERC 20 tokens from childchain to rootchain via withdrawal.
 
 ```mermaid
 sequenceDiagram
 	User->>Edge: withdraw
 	Edge->>ChildERC20Predicate.sol: withdrawTo()
 	ChildERC20Predicate.sol->>ChildERC20: burn()
-	ChildERC20Predicate.sol->>L2StateSender.sol: syncState(rootToken, WITHDRAW_SIG), recv=RootERC20Predicate
+	ChildERC20Predicate.sol->>L2StateSender.sol: syncState(WITHDRAW_SIG), recv=RootERC20Predicate
 	Edge->>User: tx hash
 	User->>Edge: get tx receipt
 	Edge->>User: exit event id
@@ -42,7 +42,7 @@ sequenceDiagram
 ```
 ## Exit
 
-Finalize withdrawal of tokens from childchain to rootchain.
+Finalize withdrawal of ERC 20 tokens from childchain to rootchain.
 
 ```mermaid
 sequenceDiagram
