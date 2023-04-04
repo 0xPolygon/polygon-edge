@@ -30,7 +30,7 @@ contract Sample {
 }
 */
 
-func TestAllowList_ContractDeployment(t *testing.T) {
+func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 	// create two accounts, one for an admin sender and a second
 	// one for a non-enabled account that will switch on-off between
 	// both enabled and non-enabled roles.
@@ -139,7 +139,7 @@ func TestAllowList_ContractDeployment(t *testing.T) {
 	}
 }
 
-func TestAllowList_Transactions(t *testing.T) {
+func TestE2E_AllowList_Transactions(t *testing.T) {
 	// create two accounts, one for an admin sender and a second
 	// one for a non-enabled account that will switch on-off between
 	// both enabled and non-enabled roles.
