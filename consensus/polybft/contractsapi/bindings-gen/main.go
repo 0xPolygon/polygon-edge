@@ -97,6 +97,7 @@ func main() {
 			"ExitHelper",
 			gensc.ExitHelper,
 			[]string{
+				"initialize",
 				"exit",
 			},
 			[]string{},
