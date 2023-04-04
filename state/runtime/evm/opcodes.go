@@ -248,6 +248,12 @@ const (
 	// CREATE2 creates a child contract with a salt
 	CREATE2 = 0xF5
 
+	// AUTH EIP-3074
+	AUTH = 0xF6
+
+	// AUTHCALL EIP-3074
+	AUTHCALL = 0xF7
+
 	// STATICCALL calls a method in another contract
 	STATICCALL = 0xFA
 
@@ -326,6 +332,8 @@ var opCodeToString = map[OpCode]string{
 	CALLCODE:       "CALLCODE",
 	DELEGATECALL:   "DELEGATECALL",
 	CREATE2:        "CREATE2",
+	AUTH:           "AUTH",
+	AUTHCALL:       "AUTHCALL",
 	STATICCALL:     "STATICCALL",
 	REVERT:         "REVERT",
 	SELFDESTRUCT:   "SELFDESTRUCT",

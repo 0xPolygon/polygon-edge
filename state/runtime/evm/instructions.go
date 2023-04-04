@@ -1129,10 +1129,16 @@ func opCall(op OpCode) instruction {
 			return
 		}
 
+		if op == AUTHCALL && !c.config.EIP3074 {
+			c.exit(errOpCodeNotFound)
+
+			return
+		}
+
 		var callType runtime.CallType
 
 		switch op {
-		case CALL:
+		case CALL, AUTHCALL:
 			callType = runtime.Call
 
 		case CALLCODE:
@@ -1191,8 +1197,13 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	addr, _ := c.popAddr()
 
 	var value *big.Int
-	if op == CALL || op == CALLCODE {
+	if op == CALL || op == CALLCODE || op == AUTHCALL {
 		value = c.pop()
+	}
+
+	var extValue *big.Int
+	if op == AUTHCALL {
+		extValue = c.pop()
 	}
 
 	// input range
@@ -1266,16 +1277,34 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 		return nil, 0, 0, nil
 	}
 
+	// If extValue is not nil that means op == AUTHCALL
+	// If valueExt is not zero, the instruction immediately returns 0. In this case the gas that would
+	// have been passed into the call is refunded, but not the gas consumed by the AUTHCALL opcode itself.
+	// In the future, this restriction may be relaxed to externally transfer value out of the authorized account.
+	if extValue != nil && extValue.BitLen() != 0 {
+		return nil, 0, 0, nil
+	}
+
 	if transfersValue {
 		gas += 2300
 	}
 
 	parent := c
 
+	fromAddr := parent.msg.Address
+
+	if op == AUTHCALL {
+		if c.authorized == nil {
+			return nil, 0, 0, fmt.Errorf("not authorized")
+		}
+
+		fromAddr = *c.authorized
+	}
+
 	contract := runtime.NewContractCall(
 		c.msg.Depth+1,
 		parent.msg.Origin,
-		parent.msg.Address,
+		fromAddr,
 		addr,
 		value,
 		gas,
@@ -1401,6 +1430,45 @@ func opHalt(op OpCode) instruction {
 			c.Halt()
 		}
 	}
+}
+
+func opAuth(c *state) {
+	if !c.config.EIP3074 {
+		c.exit(errOpCodeNotFound)
+
+		return
+	}
+
+	c.authorized = nil
+
+	commit := c.pop()
+	v := c.pop()
+	r := c.pop()
+	s := c.pop()
+
+	// create signature and validate
+	signature, err := crypto.EncodeSignature(r, s, v, c.config.Homestead)
+	if err != nil {
+		c.exit(fmt.Errorf("invalid signature values: %w", err))
+
+		return
+	}
+
+	magicBytes := crypto.Make3074Hash(c.host.GetTxContext().ChainID, c.msg.CodeAddress, commit.Bytes())
+
+	pubKey, err := crypto.RecoverPubkey(signature, magicBytes)
+	if err != nil {
+		c.exit(fmt.Errorf("invalid signature values: %w", err))
+
+		return
+	}
+
+	signAddr := crypto.PubKeyToAddress(pubKey)
+	c.authorized = &signAddr
+
+	c.push1().SetBytes(signAddr.Bytes())
+
+	return
 }
 
 var (
