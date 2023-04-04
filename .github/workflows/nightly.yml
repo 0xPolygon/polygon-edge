@@ -27,11 +27,16 @@ jobs:
     name: Polybft Property Tests
     uses: ./.github/workflows/property-polybft.yml
     needs: build
- 
+
+  fuzz:
+    name: Fuzz Tests
+    uses: ./.github/workflows/fuzz-test.yml
+    needs: build
+
   notification:
     name: Nightly Notifications
     runs-on: ubuntu-latest
-    needs: [build, test, e2e, property]
+    needs: [build, test, e2e, property, fuzz]
     if: success() || failure()
     steps:
       - name: Notify Slack
@@ -83,6 +88,13 @@ jobs:
                   "text": {
                     "type": "mrkdwn",
                     "text": "E2E tests ${{ needs.e2e.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Fuzz tests ${{ needs.fuzz.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {
