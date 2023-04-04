@@ -44,7 +44,7 @@ test:
 
 .PHONY: fuzz-test
 fuzz-test:
-	./fuzzAll.sh
+	./scripts/fuzzAll
 
 .PHONY: test-e2e
 test-e2e:
