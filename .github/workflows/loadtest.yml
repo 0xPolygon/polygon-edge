@@ -51,6 +51,8 @@ jobs:
   run_k6:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
+    outputs:
+      loadtest_output_failure: ${{ steps.run_k6_failure.outputs.test_output }}
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
@@ -97,6 +99,11 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
           LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
           LOADTEST_DURATION: ${{ inputs.duration }}
+
+      - name: Run tests failed
+        if: failure()
+        id: run_k6_failure
+        run: echo "test_output=false" >> $GITHUB_OUTPUT
       
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0

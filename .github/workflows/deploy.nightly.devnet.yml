@@ -14,6 +14,13 @@ on:  # yamllint disable-line rule:truthy
         description: The environment to run against
         type: string
         required: true
+    outputs:
+      workflow_output_loadtest1:
+        description: "Loadtest output"
+        value: ${{ jobs.loadtest1.outputs.loadtest_output_failure }} 
+      workflow_output_loadtest2:
+        description: "Loadtest output"
+        value: ${{ jobs.loadtest2.outputs.loadtest_output_failure }} 
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -71,10 +78,10 @@ jobs:
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
+        continue-on-error: true
       - name: Terraform Plan
         id: plan
         run: terraform plan -out=tfplan -no-color
-        continue-on-error: true
         env:
           TF_VAR_explorer_rds_master_password: ${{ secrets.TF_VAR_EXPLORER_RDS_MASTER_PASSWORD }}
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
@@ -99,7 +106,7 @@ jobs:
       - name: Install ansible / botocore / boto3
         run: |
           python3 -m pip install --user ansible
-          pip install boto3 botocore
+          python3 -m pip install boto3 botocore
       - name: Run Ansible
         working-directory: ansible
         run: |

@@ -142,6 +142,13 @@ jobs:
                   }
                 },
                 {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Load tests ${{ needs.loadtest.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
                   "type": "divider"
                 },  
                 {
