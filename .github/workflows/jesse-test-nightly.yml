@@ -1,5 +1,7 @@
 ---
-name: Nightly DevNet Workflow - Jesse
+### This manually triggers the edge nightly build loadtest when pushed to jesse/nightly-loadtest-workflow
+
+name: Nightly DevNet Workflow (Manual)
 on:  # yamllint disable-line rule:truthy
   push:
     branches:
