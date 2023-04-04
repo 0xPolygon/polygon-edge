@@ -25,7 +25,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(sender.Address())))
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
@@ -91,7 +91,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(premine.Address())))
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(2, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 

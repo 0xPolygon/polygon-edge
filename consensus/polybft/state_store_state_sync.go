@@ -26,8 +26,6 @@ var (
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
 	// errNoCommitmentForStateSync error message
 	errNoCommitmentForStateSync = errors.New("no commitment found for given state sync event")
-
-	stateTransferEventABI = contractsapi.StateSender.Abi.Events["StateSynced"]
 )
 
 /*

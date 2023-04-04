@@ -99,7 +99,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		proof, err := commitment.MerkleTree.GenerateProof(leaf)
 		require.NoError(t, err)
 
-		execute := &contractsapi.ExecuteFunction{
+		execute := &contractsapi.ExecuteStateReceiverFn{
 			Proof: proof,
 			Obj:   (*contractsapi.StateSync)(stateSync),
 		}
@@ -107,7 +107,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		inputData, err := execute.EncodeAbi()
 		require.NoError(t, err)
 
-		executionStateSync := &contractsapi.ExecuteFunction{}
+		executionStateSync := &contractsapi.ExecuteStateReceiverFn{}
 		require.NoError(t, executionStateSync.DecodeAbi(inputData))
 		require.Equal(t, stateSync.ID.Uint64(), executionStateSync.Obj.ID.Uint64())
 		require.Equal(t, stateSync.Sender, executionStateSync.Obj.Sender)
@@ -200,7 +200,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
 	cases := []contractsapi.StateTransactionInput{
-		&contractsapi.CommitEpochFunction{
+		&contractsapi.CommitEpochChildValidatorSetFn{
 			ID: big.NewInt(1),
 			Epoch: &contractsapi.Epoch{
 				StartBlock: big.NewInt(1),

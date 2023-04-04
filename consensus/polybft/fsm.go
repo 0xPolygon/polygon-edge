@@ -63,7 +63,7 @@ type fsm struct {
 	// commitEpochInput holds info about validators performance during single epoch
 	// (namely how many times each validator signed block during epoch).
 	// It is populated only for epoch-ending blocks.
-	commitEpochInput *contractsapi.CommitEpochFunction
+	commitEpochInput *contractsapi.CommitEpochChildValidatorSetFn
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -93,7 +93,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	// TODO: we will need to revisit once slashing is implemented
+	//nolint:godox
+	// TODO: we will need to revisit once slashing is implemented (to be fixed in EVM-519)
 	extra := &Extra{Parent: extraParent.Committed}
 	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
 	nextValidators := f.validators.Accounts()
@@ -213,7 +214,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
 	}
 
-	return createStateTransactionWithData(f.config.StateReceiverAddr, inputData), nil
+	return createStateTransactionWithData(contracts.StateReceiverContract, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
@@ -246,7 +247,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.config.ValidatorSetAddr, input), nil
+	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -436,11 +437,11 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return err
 			}
 
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainCheckpointManager)
+			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainStateReceiver)
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
-		case *contractsapi.CommitEpochFunction:
+		case *contractsapi.CommitEpochChildValidatorSetFn:
 			if commitEpochTxExists {
 				// if we already validated commit epoch tx,
 				// that means someone added more than one commit epoch tx to block,
@@ -553,9 +554,9 @@ func (f *fsm) ValidatorSet() ValidatorSet {
 // getCurrentValidators queries smart contract on the given block height and returns currently active validator set
 func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
-	systemState := f.backend.GetSystemState(f.config, provider)
-	newValidators, err := systemState.GetValidatorSet()
+	systemState := f.backend.GetSystemState(provider)
 
+	newValidators, err := systemState.GetValidatorSet()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
 	}

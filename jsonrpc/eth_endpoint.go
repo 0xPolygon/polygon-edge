@@ -358,7 +358,8 @@ func (e *Eth) GetStorageAt(
 		return nil, err
 	}
 
-	// TODO: GetStorage should return the values already parsed
+	//nolint:godox
+	// TODO: GetStorage should return the values already parsed (to be fixed in EVM-522)
 
 	// Parse the RLP value
 	p := &fastrlp.Parser{}

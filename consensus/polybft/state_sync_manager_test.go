@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -30,7 +31,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 
 	topic := &mockTopic{}
 
-	s, err := NewStateSyncManager(hclog.NewNullLogger(), state,
+	s, err := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
 			jsonrpcAddr:       "",
@@ -116,8 +117,8 @@ func (m *mockMsg) WithHash(hash []byte) *mockMsg {
 	return m
 }
 
-func (m *mockMsg) sign(val *testValidator) (*TransportMessage, error) {
-	signature, err := val.mustSign(m.hash).Marshal()
+func (m *mockMsg) sign(val *testValidator, domain []byte) (*TransportMessage, error) {
+	signature, err := val.mustSign(m.hash, domain).Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +138,7 @@ func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
 	s.validatorSet = vals.toValidatorSet()
 
 	badVal := newTestValidator(t, "a", 0)
-	msg, err := newMockMsg().sign(badVal)
+	msg, err := newMockMsg().sign(badVal, bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.Error(t, s.saveVote(msg))
@@ -152,7 +153,7 @@ func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 	s.validatorSet = vals.toValidatorSet()
 
 	val := newMockMsg()
-	msg, err := val.sign(vals.getValidator("0"))
+	msg, err := val.sign(vals.getValidator("0"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	msg.EpochNumber = 1
@@ -179,7 +180,7 @@ func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) 
 
 	// validator signs the msg in behalf of another validator
 	val := newMockMsg()
-	msg, err := val.sign(vals.getValidator("0"))
+	msg, err := val.sign(vals.getValidator("0"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	msg.From = vals.getValidator("1").Address().String()
@@ -187,7 +188,7 @@ func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) 
 
 	// non validator signs the msg in behalf of a validator
 	badVal := newTestValidator(t, "a", 0)
-	msg, err = newMockMsg().sign(badVal)
+	msg, err = newMockMsg().sign(badVal, bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	msg.From = vals.getValidator("1").Address().String()
@@ -201,10 +202,10 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 	s.validatorSet = vals.toValidatorSet()
 
 	msg := newMockMsg()
-	val1signed, err := msg.sign(vals.getValidator("1"))
+	val1signed, err := msg.sign(vals.getValidator("1"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	val2signed, err := msg.sign(vals.getValidator("2"))
+	val2signed, err := msg.sign(vals.getValidator("2"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	// vote with validator 1
@@ -257,10 +258,10 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validators 0 and 1 vote for the proposal, there is not enough
 	// voting power for the proposal
-	signedMsg1, err := msg.sign(vals.getValidator("0"))
+	signedMsg1, err := msg.sign(vals.getValidator("0"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	signedMsg2, err := msg.sign(vals.getValidator("1"))
+	signedMsg2, err := msg.sign(vals.getValidator("1"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.NoError(t, s.saveVote(signedMsg1))
@@ -272,10 +273,10 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validator 2 and 3 vote for the proposal, there is enough voting power now
 
-	signedMsg1, err = msg.sign(vals.getValidator("2"))
+	signedMsg1, err = msg.sign(vals.getValidator("2"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	signedMsg2, err = msg.sign(vals.getValidator("3"))
+	signedMsg2, err = msg.sign(vals.getValidator("3"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.NoError(t, s.saveVote(signedMsg1))
@@ -340,8 +341,12 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 0)
 
+	var stateSyncedEvent contractsapi.StateSyncedEvent
+
+	stateSyncEventID := stateSyncedEvent.Sig()
+
 	// log with the state sync topic but incorrect content
-	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateTransferEventABI.ID()}})
+	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateSyncEventID}})
 	stateSyncs, err = s.state.StateSyncStore.list()
 
 	require.NoError(t, err)
@@ -353,7 +358,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 	goodLog := &ethgo.Log{
 		Topics: []ethgo.Hash{
-			stateTransferEventABI.ID(),
+			stateSyncEventID,
 			ethgo.BytesToHash([]byte{0x0}), // state sync index 0
 			ethgo.ZeroHash,
 			ethgo.ZeroHash,
@@ -399,7 +404,8 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	// TODO: Deploy local artifacts
+	//nolint:godox
+	// TODO: Deploy local artifacts (to be fixed in EVM-542)
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {
 		return `

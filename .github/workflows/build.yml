@@ -3,11 +3,18 @@ name: Build
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
   workflow_call:
+   # Map the workflow outputs to job outputs
+    outputs:
+      workflow_output:
+        description: "Build output"
+        value: ${{ jobs.go_build.outputs.build_output_failure }} 
 
 jobs:
   go_build:
     name: Polygon Edge
     runs-on: ubuntu-latest
+    outputs:
+      build_output_failure: ${{ steps.edge_build_failure.outputs.build_output }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -27,6 +34,11 @@ jobs:
           GOARC: amd64
           GOOS: linux
 
+      - name: Build Polygon Edge Failed
+        if: failure()
+        id: edge_build_failure
+        run: echo "build_output=false" >> $GITHUB_OUTPUT
+
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v3
         with:
@@ -41,6 +53,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:

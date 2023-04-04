@@ -108,8 +108,8 @@ func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 	panic("Unsupported mock for GetHeaderByHash") //nolint:gocritic
 }
 
-func (m *blockchainMock) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
-	args := m.Called(config, provider)
+func (m *blockchainMock) GetSystemState(provider contract.Provider) SystemState {
+	args := m.Called(provider)
 
 	return args.Get(0).(SystemState) //nolint:forcetypeassert
 }
@@ -416,7 +416,7 @@ func (v *testValidator) Address() types.Address {
 }
 
 func (v *testValidator) Key() *wallet.Key {
-	return wallet.NewKey(v.account, bls.DomainCheckpointManager)
+	return wallet.NewKey(v.account)
 }
 
 func (v *testValidator) paramsValidator() *Validator {
@@ -438,8 +438,8 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 	}
 }
 
-func (v *testValidator) mustSign(hash []byte) *bls.Signature {
-	signature, err := v.account.Bls.Sign(hash, bls.DomainCheckpointManager)
+func (v *testValidator) mustSign(hash, domain []byte) *bls.Signature {
+	signature, err := v.account.Bls.Sign(hash, domain)
 	if err != nil {
 		panic(fmt.Sprintf("BUG: failed to sign: %v", err)) //nolint:gocritic
 	}

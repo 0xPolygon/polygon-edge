@@ -94,10 +94,10 @@ type topic interface {
 	Subscribe(handler func(obj interface{}, from peer.ID)) error
 }
 
-// NewStateSyncManager creates a new instance of state sync manager
-func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
+// newStateSyncManager creates a new instance of state sync manager
+func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
 	s := &stateSyncManager{
-		logger:  logger.Named("state-sync-manager"),
+		logger:  logger,
 		state:   state,
 		config:  config,
 		closeCh: make(chan struct{}),
@@ -217,7 +217,7 @@ func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types
 		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signer.String(), err)
 	}
 
-	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainCheckpointManager) {
+	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainStateReceiver) {
 		return fmt.Errorf("incorrect signature from %s", signer)
 	}
 
@@ -226,7 +226,10 @@ func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types
 
 // AddLog saves the received log from event tracker if it matches a state sync event ABI
 func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
-	if !stateTransferEventABI.Match(eventLog) {
+	event := &contractsapi.StateSyncedEvent{}
+
+	doesMatch, err := event.ParseLog(eventLog)
+	if !doesMatch {
 		return
 	}
 
@@ -237,9 +240,7 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event := &contractsapi.StateSyncedEvent{}
-
-	if err := event.ParseLog(eventLog); err != nil {
+	if err != nil {
 		s.logger.Error("could not decode state sync event", "err", err)
 
 		return
@@ -533,7 +534,7 @@ func (s *stateSyncManager) buildCommitment() error {
 
 	hashBytes := hash.Bytes()
 
-	signature, err := s.config.key.Sign(hashBytes)
+	signature, err := s.config.key.SignWithDomain(hashBytes, bls.DomainStateReceiver)
 	if err != nil {
 		return fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}

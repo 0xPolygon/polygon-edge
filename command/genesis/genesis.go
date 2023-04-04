@@ -206,22 +206,43 @@ func setFlags(cmd *cobra.Command) {
 			"",
 			"trie root from the corresponding triedb",
 		)
+
+		cmd.Flags().BoolVar(
+			&params.mintableNativeToken,
+			mintableTokenFlag,
+			false,
+			"flag indicate whether mintable or non-mintable native ERC20 token is deployed",
+		)
 	}
 
 	// Allow list
 	{
 		cmd.Flags().StringArrayVar(
 			&params.contractDeployerAllowListAdmin,
-			contractDeployedAllowListAdminFlag,
+			contractDeployerAllowListAdminFlag,
 			[]string{},
 			"list of addresses to use as admin accounts in the contract deployer allow list",
 		)
 
 		cmd.Flags().StringArrayVar(
 			&params.contractDeployerAllowListEnabled,
-			contractDeployedAllowListEnabledFlag,
+			contractDeployerAllowListEnabledFlag,
 			[]string{},
 			"list of addresses to enable by default in the contract deployer allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsAllowListAdmin,
+			transactionsAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the transactions allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsAllowListEnabled,
+			transactionsAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the transactions allow list",
 		)
 	}
 }

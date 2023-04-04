@@ -392,7 +392,8 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	if object.DirtyCode {
 		return object.Code
 	}
-	// TODO; Should we move this to state?
+	//nolint:godox
+	// TODO; Should we move this to state? (to be fixed in EVM-527)
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {
@@ -505,7 +506,8 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 	})
 }
 
-// TODO, check panics with this ones
+//nolint:godox
+// TODO, check panics with this ones (to be fixed in EVM-528)
 
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)

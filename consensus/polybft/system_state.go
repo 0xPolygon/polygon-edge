@@ -42,14 +42,14 @@ type SystemStateImpl struct {
 }
 
 // NewSystemState initializes new instance of systemState which abstracts smart contracts functions
-func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemStateImpl {
+func NewSystemState(valSetAddr types.Address, stateRcvAddr types.Address, provider contract.Provider) *SystemStateImpl {
 	s := &SystemStateImpl{}
 	s.validatorContract = contract.NewContract(
-		ethgo.Address(config.ValidatorSetAddr),
+		ethgo.Address(valSetAddr),
 		contractsapi.ChildValidatorSet.Abi, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
-		ethgo.Address(config.StateReceiverAddr),
+		ethgo.Address(stateRcvAddr),
 		contractsapi.StateReceiver.Abi,
 		contract.WithProvider(provider),
 	)
@@ -92,17 +92,28 @@ func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
 			return nil, fmt.Errorf("failed to decode total stake")
 		}
 
+		isActive, ok := output["active"].(bool)
+		if !ok {
+			return nil, fmt.Errorf("failed to decode active field")
+		}
+
 		return &ValidatorMetadata{
 			Address:     types.Address(addr),
 			BlsKey:      pubKey,
 			VotingPower: new(big.Int).Set(totalStake),
+			IsActive:    isActive,
 		}, nil
 	}
 
-	for _, index := range addresses {
-		val, err := queryValidator(index)
+	for _, addr := range addresses {
+		val, err := queryValidator(addr)
 		if err != nil {
 			return nil, err
+		}
+
+		// filter out non active validators
+		if !val.IsActive {
+			continue
 		}
 
 		res = append(res, val)

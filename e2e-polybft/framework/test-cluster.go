@@ -70,27 +70,30 @@ func resolveBinary() string {
 type TestClusterConfig struct {
 	t *testing.T
 
-	Name              string
-	Premine           []string // address[:amount]
-	PremineValidators []string // address[:amount]
-	StakeAmounts      []string // address[:amount]
-	HasBridge         bool
-	BootnodeCount     int
-	NonValidatorCount int
-	WithLogs          bool
-	WithStdout        bool
-	LogsDir           string
-	TmpDir            string
-	BlockGasLimit     uint64
-	ValidatorPrefix   string
-	Binary            string
-	ValidatorSetSize  uint64
-	EpochSize         int
-	EpochReward       int
-	SecretsCallback   func([]types.Address, *TestClusterConfig)
+	Name                string
+	Premine             []string // address[:amount]
+	PremineValidators   []string // address:[amount]
+	StakeAmounts        []string // address[:amount]
+	MintableNativeToken bool
+	HasBridge           bool
+	BootnodeCount       int
+	NonValidatorCount   int
+	WithLogs            bool
+	WithStdout          bool
+	LogsDir             string
+	TmpDir              string
+	BlockGasLimit       uint64
+	ValidatorPrefix     string
+	Binary              string
+	ValidatorSetSize    uint64
+	EpochSize           int
+	EpochReward         int
+	SecretsCallback     func([]types.Address, *TestClusterConfig)
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
+	TransactionsAllowListAdmin       []types.Address
+	TransactionsAllowListEnabled     []types.Address
 
 	NumBlockConfirmations uint64
 
@@ -176,6 +179,12 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 	}
 }
 
+func WithMintableNativeToken(mintableToken bool) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.MintableNativeToken = mintableToken
+	}
+}
+
 func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.SecretsCallback = fn
@@ -246,6 +255,18 @@ func WithContractDeployerAllowListAdmin(addr types.Address) ClusterOption {
 func WithContractDeployerAllowListEnabled(addr types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ContractDeployerAllowListEnabled = append(h.ContractDeployerAllowListEnabled, addr)
+	}
+}
+
+func WithTransactionsAllowListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TransactionsAllowListAdmin = append(h.TransactionsAllowListAdmin, addr)
+	}
+}
+
+func WithTransactionsAllowListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TransactionsAllowListEnabled = append(h.TransactionsAllowListEnabled, addr)
 	}
 }
 
@@ -367,6 +388,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
+		if cluster.Config.MintableNativeToken {
+			args = append(args, "--mintable-native-token")
+		}
+
 		if cluster.Config.HasBridge {
 			rootchainIP, err := helper.ReadRootchainIP()
 			require.NoError(t, err)
@@ -400,6 +425,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		if len(cluster.Config.ContractDeployerAllowListEnabled) != 0 {
 			args = append(args, "--contract-deployer-allow-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
+		}
+
+		if len(cluster.Config.TransactionsAllowListAdmin) != 0 {
+			args = append(args, "--transactions-allow-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsAllowListAdmin), ","))
+		}
+
+		if len(cluster.Config.TransactionsAllowListEnabled) != 0 {
+			args = append(args, "--transactions-allow-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsAllowListEnabled), ","))
 		}
 
 		// run cmd init-genesis with all the arguments
@@ -513,7 +548,7 @@ func (c *TestCluster) WaitUntil(timeout, pollFrequency time.Duration, handler fu
 func (c *TestCluster) WaitForReady(t *testing.T) {
 	t.Helper()
 
-	require.NoError(t, c.WaitForBlock(3, 1*time.Minute))
+	require.NoError(t, c.WaitForBlock(1, 30*time.Second))
 }
 
 func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {

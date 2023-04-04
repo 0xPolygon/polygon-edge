@@ -26,7 +26,6 @@ func (vs *validatorSnapshot) copy() *validatorSnapshot {
 	}
 }
 
-// TODO: Should we switch validators snapshot to Edge implementation? (validators/store/snapshot/snapshot.go)
 type validatorsSnapshotCache struct {
 	snapshots  map[uint64]*validatorSnapshot
 	state      *State

@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -21,10 +20,8 @@ import (
 )
 
 var (
-	stakeManager         = contracts.ValidatorSetContract
-	stakeFn              = contractsapi.ChildValidatorSet.Abi.Methods["stake"]
-	newValidatorEventABI = contractsapi.ChildValidatorSet.Abi.Events["NewValidator"]
-	stakeEventABI        = contractsapi.ChildValidatorSet.Abi.Events["Staked"]
+	stakeManager = contracts.ValidatorSetContract
+	stakeFn      = contractsapi.ChildValidatorSet.Abi.Methods["stake"]
 )
 
 var params registerParams
@@ -127,20 +124,23 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	result := &registerResult{}
 	foundLog := false
 
+	var newValidatorEvent contractsapi.NewValidatorEvent
 	for _, log := range receipt.Logs {
-		if newValidatorEventABI.Match(log) {
-			event, err := newValidatorEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
-
-			result.validatorAddress = event["validator"].(ethgo.Address).String() //nolint:forcetypeassert
-			result.stakeResult = "No stake parameters have been submitted"
-			result.amount = 0
-			foundLog = true
-
-			break
+		doesMatch, err := newValidatorEvent.ParseLog(log)
+		if !doesMatch {
+			continue
 		}
+
+		if err != nil {
+			return err
+		}
+
+		result.validatorAddress = newValidatorEvent.Validator.String()
+		result.stakeResult = "No stake parameters have been submitted"
+		result.amount = 0
+		foundLog = true
+
+		break
 	}
 
 	if !foundLog {
@@ -193,20 +193,23 @@ func populateStakeResults(receipt *ethgo.Receipt, result *registerResult) {
 	}
 
 	// check the logs to verify stake
+	var stakedEvent contractsapi.StakedEvent
 	for _, log := range receipt.Logs {
-		if stakeEventABI.Match(log) {
-			event, err := stakeEventABI.ParseLog(log)
-			if err != nil {
-				result.stakeResult = "Failed to parse stake log"
+		doesMatch, err := stakedEvent.ParseLog(log)
+		if !doesMatch {
+			continue
+		}
 
-				return
-			}
-
-			result.amount = event["amount"].(*big.Int).Uint64() //nolint:forcetypeassert
-			result.stakeResult = "Stake succeeded"
+		if err != nil {
+			result.stakeResult = "Failed to parse stake log"
 
 			return
 		}
+
+		result.amount = stakedEvent.Amount.Uint64()
+		result.stakeResult = "Stake succeeded"
+
+		return
 	}
 
 	result.stakeResult = "Could not find an appropriate log in receipt that stake happened"
@@ -219,7 +222,7 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 		return nil, fmt.Errorf("register validator failed: %w", err)
 	}
 
-	registerFn := &contractsapi.RegisterFunction{
+	registerFn := &contractsapi.RegisterChildValidatorSetFn{
 		Signature: sigMarshal,
 		Pubkey:    account.Bls.PublicKey().ToBigInt(),
 	}

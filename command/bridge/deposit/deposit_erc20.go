@@ -13,9 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -50,17 +48,10 @@ func GetCommand() *cobra.Command {
 	}
 
 	depositCmd.Flags().StringVar(
-		&dp.AccountDir,
-		polybftsecrets.AccountDirFlag,
+		&dp.SenderKey,
+		common.SenderKeyFlag,
 		"",
-		polybftsecrets.AccountDirFlagDesc,
-	)
-
-	depositCmd.Flags().StringVar(
-		&dp.AccountConfig,
-		polybftsecrets.AccountConfigFlag,
-		"",
-		polybftsecrets.AccountConfigFlagDesc,
+		"hex encoded private key of the account which sends rootchain deposit transactions",
 	)
 
 	depositCmd.Flags().StringSliceVar(
@@ -106,21 +97,18 @@ func GetCommand() *cobra.Command {
 			"(in that case tokens are minted to it, so it is able to make deposits)",
 	)
 
-	depositCmd.MarkFlagRequired(common.ReceiversFlag) //nolint:errcheck
-	depositCmd.MarkFlagRequired(common.AmountsFlag)   //nolint:errcheck
-	depositCmd.MarkFlagRequired(rootTokenFlag)        //nolint:errcheck
-	depositCmd.MarkFlagRequired(rootPredicateFlag)    //nolint:errcheck
+	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
+	_ = depositCmd.MarkFlagRequired(common.AmountsFlag)
+	_ = depositCmd.MarkFlagRequired(rootTokenFlag)
+	_ = depositCmd.MarkFlagRequired(rootPredicateFlag)
 
-	depositCmd.MarkFlagsMutuallyExclusive(
-		helper.TestModeFlag,
-		polybftsecrets.AccountDirFlag,
-		polybftsecrets.AccountConfigFlag)
+	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
 
 	return depositCmd
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
-	if err := dp.ValidateFlags(dp.testMode); err != nil {
+	if err := dp.ValidateFlags(); err != nil {
 		return err
 	}
 
@@ -131,26 +119,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var depositorKey ethgo.Key
-
-	if !dp.testMode {
-		depositorAccount, err := sidechain.GetAccount(dp.AccountDir, dp.AccountConfig)
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		depositorKey = depositorAccount.Ecdsa
-	} else {
-		rootchainKey, err := helper.GetRootchainTestPrivKey()
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize root chain private key: %w", err))
-
-			return
-		}
-
-		depositorKey = rootchainKey
+	depositorKey, err := helper.GetRootchainPrivateKey(dp.SenderKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize depositor private key: %w", err))
 	}
 
 	depositorAddr := depositorKey.Address()
@@ -271,7 +242,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	depositToFn := &contractsapi.DepositToFunction{
+	depositToFn := &contractsapi.DepositToRootERC20PredicateFn{
 		RootToken: types.StringToAddress(dp.rootTokenAddr),
 		Receiver:  receiver,
 		Amount:    amount,
@@ -293,7 +264,7 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
 func createMintTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	mintFn := &contractsapi.MintFunction{
+	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     receiver,
 		Amount: amount,
 	}
@@ -316,7 +287,7 @@ func createMintTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Tran
 // to ERC20 token for ERC20 predicate so that it is able to spend given tokens
 func createApproveERC20PredicateTxn(amount *big.Int,
 	rootERC20Predicate, rootERC20Token types.Address) (*ethgo.Transaction, error) {
-	approveFnParams := &contractsapi.ApproveFunction{
+	approveFnParams := &contractsapi.ApproveRootERC20Fn{
 		Spender: rootERC20Predicate,
 		Amount:  amount,
 	}

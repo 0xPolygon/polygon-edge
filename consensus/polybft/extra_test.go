@@ -189,7 +189,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		key, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
-		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash([]byte("This is test hash")))
+		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash([]byte("This is test hash")), bls.DomainCheckpointManager)
 		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
 
 		// Committed
@@ -212,11 +212,11 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		key, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
-		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)))
+		parentSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)), bls.DomainCheckpointManager)
 		extraMarshalled.Set(parentSignature.MarshalRLPWith(ar))
 
 		// Committed
-		committedSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)))
+		committedSignature := createSignature(t, []*wallet.Account{key}, types.BytesToHash(generateRandomBytes(t)), bls.DomainCheckpointManager)
 		extraMarshalled.Set(committedSignature.MarshalRLPWith(ar))
 
 		// Checkpoint data
@@ -279,7 +279,7 @@ func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 	polyBackendMock = new(polybftBackendMock)
 	polyBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities())
 
-	noQuorumSignature := createSignature(t, validators.getPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")))
+	noQuorumSignature := createSignature(t, validators.getPrivateIdentities("0", "1"), types.BytesToHash([]byte("FooBar")), bls.DomainCheckpointManager)
 	extra = &Extra{Committed: noQuorumSignature, Checkpoint: checkpoint}
 	checkpointHash, err := checkpoint.Hash(chainID, headerNum, header.Hash)
 	require.NoError(t, err)
@@ -290,7 +290,7 @@ func TestExtra_ValidateFinalizedData_UnhappyPath(t *testing.T) {
 		fmt.Sprintf("failed to verify signatures for block %d (proposal hash %s): quorum not reached", headerNum, checkpointHash))
 
 	// incorrect parent extra size
-	validSignature := createSignature(t, validators.getPrivateIdentities(), checkpointHash)
+	validSignature := createSignature(t, validators.getPrivateIdentities(), checkpointHash, bls.DomainCheckpointManager)
 	extra = &Extra{Committed: validSignature, Checkpoint: checkpoint}
 	err = extra.ValidateFinalizedData(
 		header, parent, nil, chainID, polyBackendMock, bls.DomainCheckpointManager, hclog.NewNullLogger())
@@ -323,7 +323,7 @@ func TestExtra_ValidateParentSignatures(t *testing.T) {
 	// validators not found
 	validators := newTestValidators(t, 5)
 	incorrectHash := types.BytesToHash([]byte("Hello World"))
-	invalidSig := createSignature(t, validators.getPrivateIdentities(), incorrectHash)
+	invalidSig := createSignature(t, validators.getPrivateIdentities(), incorrectHash, bls.DomainCheckpointManager)
 	extra = &Extra{Parent: invalidSig}
 	err = extra.ValidateParentSignatures(
 		headerNum, polyBackendMock, nil, nil, nil, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())
@@ -347,7 +347,7 @@ func TestExtra_ValidateParentSignatures(t *testing.T) {
 		fmt.Sprintf("failed to verify signatures for parent of block %d (proposal hash: %s): could not verify aggregated signature", headerNum, parentCheckpointHash))
 
 	// valid signature provided
-	validSig := createSignature(t, validators.getPrivateIdentities(), parentCheckpointHash)
+	validSig := createSignature(t, validators.getPrivateIdentities(), parentCheckpointHash, bls.DomainCheckpointManager)
 	extra = &Extra{Parent: validSig}
 	err = extra.ValidateParentSignatures(
 		headerNum, polyBackendMock, nil, parent, parentExtra, chainID, bls.DomainCheckpointManager, hclog.NewNullLogger())

@@ -38,8 +38,10 @@ const (
 	defaultBridge           = false
 	defaultEpochReward      = 1
 
-	contractDeployedAllowListAdminFlag   = "contract-deployer-allow-list-admin"
-	contractDeployedAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
+	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	transactionsAllowListAdminFlag       = "transactions-allow-list-admin"
+	transactionsAllowListEnabledFlag     = "transactions-allow-list-enabled"
 
 	bootnodePortStart = 30301
 )
@@ -91,11 +93,10 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:        manifest.GenesisValidators[0].Address,
-		Bridge:            bridge,
-		ValidatorSetAddr:  contracts.ValidatorSetContract,
-		StateReceiverAddr: contracts.StateReceiverContract,
-		InitialTrieRoot:   types.StringToHash(p.initialStateRoot),
+		Governance:         manifest.GenesisValidators[0].Address,
+		Bridge:             bridge,
+		InitialTrieRoot:    types.StringToHash(p.initialStateRoot),
+		MintableERC20Token: p.mintableNativeToken,
 	}
 
 	chainConfig := &chain.Chain{
@@ -214,14 +215,25 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	if len(p.transactionsAllowListAdmin) != 0 {
+		// only enable allow list if there is at least one address as **admin**, otherwise
+		// the allow list could never be updated
+		chainConfig.Params.TransactionsAllowList = &chain.AllowListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.transactionsAllowListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.transactionsAllowListEnabled),
+		}
+	}
+
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
 func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
-	genesisContracts := []struct {
+	type contractInfo struct {
 		artifact *artifact.Artifact
 		address  types.Address
-	}{
+	}
+
+	genesisContracts := []*contractInfo{
 		{
 			// ChildValidatorSet contract
 			artifact: contractsapi.ChildValidatorSet,
@@ -233,11 +245,6 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			address:  contracts.StateReceiverContract,
 		},
 		{
-			// NativeERC20 Token contract
-			artifact: contractsapi.NativeERC20,
-			address:  contracts.NativeERC20TokenContract,
-		},
-		{
 			// ChildERC20 token contract
 			artifact: contractsapi.ChildERC20,
 			address:  contracts.ChildERC20Contract,
@@ -246,6 +253,26 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			// ChildERC20Predicate contract
 			artifact: contractsapi.ChildERC20Predicate,
 			address:  contracts.ChildERC20PredicateContract,
+		},
+		{
+			// ChildERC721 token contract
+			artifact: contractsapi.ChildERC721,
+			address:  contracts.ChildERC721Contract,
+		},
+		{
+			// ChildERC721Predicate token contract
+			artifact: contractsapi.ChildERC721Predicate,
+			address:  contracts.ChildERC721PredicateContract,
+		},
+		{
+			// ChildERC1155 contract
+			artifact: contractsapi.ChildERC1155,
+			address:  contracts.ChildERC1155Contract,
+		},
+		{
+			// ChildERC1155Predicate token contract
+			artifact: contractsapi.ChildERC1155Predicate,
+			address:  contracts.ChildERC1155PredicateContract,
 		},
 		{
 			// BLS contract
@@ -262,6 +289,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			artifact: contractsapi.L2StateSender,
 			address:  contracts.L2StateSenderContract,
 		},
+	}
+
+	if !params.mintableNativeToken {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))

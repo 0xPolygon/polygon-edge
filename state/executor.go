@@ -20,6 +20,7 @@ import (
 
 const (
 	SpuriousDragonMaxCodeSize = 24576
+	TxPoolMaxInitCodeSize     = 2 * SpuriousDragonMaxCodeSize
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
@@ -210,6 +211,11 @@ func (e *Executor) BeginTxn(
 	// enable contract deployment allow list (if any)
 	if e.config.ContractDeployerAllowList != nil {
 		txn.deploymentAllowlist = allowlist.NewAllowList(txn, contracts.AllowListContractsAddr)
+	}
+
+	// enable transactions allow list (if any)
+	if e.config.TransactionsAllowList != nil {
+		txn.txnAllowList = allowlist.NewAllowList(txn, contracts.AllowListTransactionsAddr)
 	}
 
 	return txn, nil
@@ -590,6 +596,21 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	// check allow list (if any)
 	if t.deploymentAllowlist != nil && t.deploymentAllowlist.Addr() == contract.CodeAddress {
 		return t.deploymentAllowlist.Run(contract, host, &t.config)
+	}
+
+	if t.txnAllowList != nil {
+		if t.txnAllowList.Addr() == contract.CodeAddress {
+			return t.txnAllowList.Run(contract, host, &t.config)
+		}
+
+		if contract.Caller != contracts.SystemCaller {
+			txnAllowListRole := t.txnAllowList.GetRole(contract.Caller)
+			if !txnAllowListRole.Enabled() {
+				return &runtime.ExecutionResult{
+					Err: fmt.Errorf("caller not authorized"),
+				}
+			}
+		}
 	}
 
 	// check the precompiles

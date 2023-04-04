@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -334,7 +335,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			EpochSize:  10,
 			SprintSize: 5,
 		},
-		Key:        wallet.NewKey(validators.getPrivateIdentities()[0], bls.DomainCheckpointManager),
+		Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
 		blockchain: blockchainMock,
 	}
 	runtime := &consensusRuntime{
@@ -444,10 +445,9 @@ func Test_NewConsensusRuntime(t *testing.T) {
 			CheckpointAddr:  types.Address{0x10},
 			JSONRPCEndpoint: "testEndpoint",
 		},
-		ValidatorSetAddr: types.Address{0x11},
-		EpochSize:        10,
-		SprintSize:       10,
-		BlockTime:        2 * time.Second,
+		EpochSize:  10,
+		SprintSize: 10,
+		BlockTime:  2 * time.Second,
 	}
 
 	validators := newTestValidators(t, 3).getPublicIdentities()
@@ -482,7 +482,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
-	assert.Equal(t, "0x1100000000000000000000000000000000000000", runtime.config.PolyBFTConfig.ValidatorSetAddr.String())
+	assert.Equal(t, "0x0000000000000000000000000000000000000101", contracts.ValidatorSetContract.String())
 	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
 	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointAddr.String())
 	assert.True(t, runtime.IsBridgeEnabled())
@@ -549,9 +549,8 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 
 	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	polybftConfig := &PolyBFTConfig{
-		ValidatorSetAddr: contracts.ValidatorSetContract,
-		EpochSize:        epochSize,
-		SprintSize:       sprintSize,
+		EpochSize:  epochSize,
+		SprintSize: sprintSize,
 	}
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 19, epochSize, validators.getPublicIdentities())
@@ -687,7 +686,7 @@ func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 	}
 	sender := validatorAccounts.getValidator("A")
 	proposalHash := []byte{2, 4, 6, 8, 10}
-	proposalSignature, err := sender.Key().Sign(proposalHash)
+	proposalSignature, err := sender.Key().SignWithDomain(proposalHash, bls.DomainCheckpointManager)
 	require.NoError(t, err)
 
 	msg := &proto.Message{
@@ -1000,7 +999,7 @@ func TestConsensusRuntime_BuildCommitMessage(t *testing.T) {
 		},
 	}
 
-	committedSeal, err := key.Sign(proposalHash)
+	committedSeal, err := key.SignWithDomain(proposalHash, bls.DomainCheckpointManager)
 	require.NoError(t, err)
 
 	expected := proto.Message{
@@ -1064,18 +1063,6 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, signedMsg, runtime.BuildPrepareMessage(proposalHash, view))
-}
-
-func createTestMessageVote(t *testing.T, hash []byte, validator *testValidator) *MessageSignature {
-	t.Helper()
-
-	signature, err := validator.mustSign(hash).Marshal()
-	require.NoError(t, err)
-
-	return &MessageSignature{
-		From:      validator.Key().String(),
-		Signature: signature,
-	}
 }
 
 func createTestBlocks(t *testing.T, numberOfBlocks, defaultEpochSize uint64,
@@ -1175,8 +1162,9 @@ func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 
 	encodedEvents := make([][]byte, len(exitEvents))
 
+	var exitEventAPI contractsapi.L2StateSyncedEvent
 	for i, e := range exitEvents {
-		encodedEvent, err := ExitEventInputsABIType.Encode(e)
+		encodedEvent, err := exitEventAPI.Encode(e)
 		require.NoError(t, err)
 
 		encodedEvents[i] = encodedEvent
