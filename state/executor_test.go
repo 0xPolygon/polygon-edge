@@ -10,6 +10,7 @@ import (
 )
 
 func TestOverride(t *testing.T) {
+	t.Parallel()
 	state := newStateWithPreState(map[types.Address]*PreState{
 		{0x0}: {
 			Nonce:   1,

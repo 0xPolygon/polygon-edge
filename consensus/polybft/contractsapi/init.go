@@ -35,6 +35,7 @@ var (
 	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
+	TestSimple             *artifact.Artifact
 )
 
 func init() {
@@ -121,6 +122,11 @@ func init() {
 	}
 
 	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
