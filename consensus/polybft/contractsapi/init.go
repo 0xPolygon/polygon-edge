@@ -35,7 +35,7 @@ var (
 	ChildERC1155          *artifact.Artifact
 	ChildERC1155Predicate *artifact.Artifact
 	L2StateSender         *artifact.Artifact
-	EIP1559Burn         *artifact.Artifact
+	EIP1559Burn           *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
