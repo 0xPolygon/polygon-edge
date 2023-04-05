@@ -213,6 +213,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
 		BaseFee:    chain.GenesisBaseFee,
+		BaseFeeEM:  chain.GenesisBaseFeeEM,
 	}
 
 	if len(p.contractDeployerAllowListAdmin) != 0 {
