@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -863,7 +864,7 @@ func (c *consensusRuntime) BuildPrepareMessage(proposalHash []byte, view *proto.
 
 // BuildCommitMessage builds a COMMIT message based on the passed in proposal
 func (c *consensusRuntime) BuildCommitMessage(proposalHash []byte, view *proto.View) *proto.Message {
-	committedSeal, err := c.config.Key.Sign(proposalHash)
+	committedSeal, err := c.config.Key.SignWithDomain(proposalHash, bls.DomainCheckpointManager)
 	if err != nil {
 		c.logger.Error("Cannot create committed seal message.", "error", err)
 

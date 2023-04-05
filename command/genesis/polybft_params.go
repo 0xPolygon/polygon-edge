@@ -36,8 +36,10 @@ const (
 	defaultBlockTime        = 2 * time.Second
 	defaultEpochReward      = 1
 
-	contractDeployedAllowListAdminFlag   = "contract-deployer-allow-list-admin"
-	contractDeployedAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
+	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	transactionsAllowListAdminFlag       = "transactions-allow-list-admin"
+	transactionsAllowListEnabledFlag     = "transactions-allow-list-enabled"
 
 	bootnodePortStart = 30301
 )
@@ -222,6 +224,15 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	if len(p.transactionsAllowListAdmin) != 0 {
+		// only enable allow list if there is at least one address as **admin**, otherwise
+		// the allow list could never be updated
+		chainConfig.Params.TransactionsAllowList = &chain.AllowListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.transactionsAllowListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.transactionsAllowListEnabled),
+		}
+	}
+
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
@@ -251,6 +262,26 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			// ChildERC20Predicate contract
 			artifact: contractsapi.ChildERC20Predicate,
 			address:  contracts.ChildERC20PredicateContract,
+		},
+		{
+			// ChildERC721 token contract
+			artifact: contractsapi.ChildERC721,
+			address:  contracts.ChildERC721Contract,
+		},
+		{
+			// ChildERC721Predicate token contract
+			artifact: contractsapi.ChildERC721Predicate,
+			address:  contracts.ChildERC721PredicateContract,
+		},
+		{
+			// ChildERC1155 contract
+			artifact: contractsapi.ChildERC1155,
+			address:  contracts.ChildERC1155Contract,
+		},
+		{
+			// ChildERC1155Predicate token contract
+			artifact: contractsapi.ChildERC1155Predicate,
+			address:  contracts.ChildERC1155PredicateContract,
 		},
 		{
 			// BLS contract

@@ -626,7 +626,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrSmartContractRestricted
 		}
 
-		if p.forks.EIP158 && len(tx.Input) > state.SpuriousDragonMaxCodeSize {
+		if p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
 			return runtime.ErrMaxCodeSizeExceeded
 		}
 	}

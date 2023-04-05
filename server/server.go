@@ -20,7 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -207,10 +206,16 @@ func NewServer(config *Config) (*Server, error) {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
 
-	// apply allow list genesis data
+	// apply allow list contracts deployer genesis data
 	if m.config.Chain.Params.ContractDeployerAllowList != nil {
 		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
 			m.config.Chain.Params.ContractDeployerAllowList)
+	}
+
+	// apply transactions execution allow list genesis data
+	if m.config.Chain.Params.TransactionsAllowList != nil {
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+			m.config.Chain.Params.TransactionsAllowList)
 	}
 
 	var initialStateRoot = types.ZeroHash
@@ -563,7 +568,7 @@ func (s *Server) setupRelayer() error {
 		ethgo.Address(contracts.StateReceiverContract),
 		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
-		wallet.NewEcdsaSigner(wallet.NewKey(account, bls.DomainCheckpointManager)),
+		wallet.NewEcdsaSigner(wallet.NewKey(account)),
 	)
 
 	// start relayer

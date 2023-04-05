@@ -437,7 +437,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return err
 			}
 
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainCheckpointManager)
+			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainStateReceiver)
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
@@ -555,8 +555,8 @@ func (f *fsm) ValidatorSet() ValidatorSet {
 func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
 	provider := f.backend.GetStateProvider(pendingBlockState)
 	systemState := f.backend.GetSystemState(provider)
-	newValidators, err := systemState.GetValidatorSet()
 
+	newValidators, err := systemState.GetValidatorSet()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
 	}

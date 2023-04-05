@@ -5,14 +5,16 @@ on:  # yamllint disable-line rule:truthy
   workflow_call:
    # Map the workflow outputs to job outputs
     outputs:
-      build_output: ${{ jobs.go_build.outputs.build_output }}        
+      workflow_output:
+        description: "Build output"
+        value: ${{ jobs.go_build.outputs.build_output_failure }} 
 
 jobs:
   go_build:
     name: Polygon Edge
     runs-on: ubuntu-latest
     outputs:
-      build_output: ${{ steps.edge_build.outputs.build_output }}
+      build_output_failure: ${{ steps.edge_build_failure.outputs.build_output }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -25,13 +27,17 @@ jobs:
           go-version: 1.18.x
 
       - name: Build Polygon Edge
-      - id: edge_build       
-        run: echo "build_output=$(go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge)\n" >> $GITHUB_OUTPUT
+        run: go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge
         env:
           CC: gcc
           CXX: g++
           GOARC: amd64
           GOOS: linux
+
+      - name: Build Polygon Edge Failed
+        if: failure()
+        id: edge_build_failure
+        run: echo "build_output=false" >> $GITHUB_OUTPUT
 
       - name: 'Upload Artifact'
         uses: actions/upload-artifact@v3

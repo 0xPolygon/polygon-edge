@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
@@ -22,16 +21,27 @@ var (
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
 	errTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
+	rootchainAccountKey  *wallet.Key
 )
 
-// GetRootchainTestPrivKey initializes a private key instance from hardcoded test account hex encoded private key
-func GetRootchainTestPrivKey() (ethgo.Key, error) {
-	testAccPrivKeyRaw, err := hex.DecodeString(testAccountPrivKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode private key string '%s': %w", testAccountPrivKey, err)
+// GetRootchainPrivateKey initializes a private key from provided raw private key
+func GetRootchainPrivateKey(rawKey string) (ethgo.Key, error) {
+	privateKeyRaw := testAccountPrivKey
+	if rawKey != "" {
+		privateKeyRaw = rawKey
 	}
 
-	return wallet.NewWalletFromPrivKey(testAccPrivKeyRaw)
+	dec, err := hex.DecodeString(privateKeyRaw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode private key string '%s': %w", privateKeyRaw, err)
+	}
+
+	rootchainAccountKey, err = wallet.NewWalletFromPrivKey(dec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize key from provided private key '%s': %w", privateKeyRaw, err)
+	}
+
+	return rootchainAccountKey, nil
 }
 
 func GetRootchainID() (string, error) {
@@ -76,21 +86,4 @@ func ReadRootchainIP() (string, error) {
 	}
 
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
-}
-
-// ValidateSecretFlags validates provided secret flags.
-// In case isTestMode is set to true, test account is being used and no need to specify secrets,
-// otherwise they must be present.
-func ValidateSecretFlags(isTestMode bool, accountDir, accountConfigPath string) error {
-	if !isTestMode {
-		if err := sidechain.ValidateSecretFlags(accountDir, accountConfigPath); err != nil {
-			return err
-		}
-	} else {
-		if accountDir != "" || accountConfigPath != "" {
-			return errTestModeSecrets
-		}
-	}
-
-	return nil
 }

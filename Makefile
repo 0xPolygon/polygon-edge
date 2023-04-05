@@ -40,7 +40,11 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
+	go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+
+.PHONY: fuzz-test
+fuzz-test:
+	./scripts/fuzzAll
 
 .PHONY: test-e2e
 test-e2e:
@@ -57,6 +61,7 @@ test-e2e-polybft:
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true E2E_TESTS_TYPE=integration \
 	go test -v -timeout=45m ./e2e-polybft/e2e/...
 
+.PHONY: test-property-polybft
 test-property-polybft:
     # We can not build with race because of a bug in boltdb dependency
 	go build -o artifacts/polygon-edge .

@@ -1,0 +1,43 @@
+---
+name: Fuzz tests
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop  
+  workflow_dispatch:
+  workflow_call:    
+    outputs:
+      workflow_output:
+        description: "Fuzz output"
+        value: ${{ jobs.build.outputs.fuzz_output_failure }} 
+
+
+jobs:
+  fuzz_test:
+    name: Polygon Edge
+    runs-on: ubuntu-latest
+    outputs:
+      fuzz_output_failure: ${{ steps.run_fuzz_failure.outputs.test_output }}
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18.x
+
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: ./setup-ci.sh
+
+      - name: Run Fuzz Test
+        run: make fuzz-test
+
+      - name: Run fuzz tests failed
+        if: failure()
+        id: run_fuzz_failure
+        run: echo "test_output=false" >> $GITHUB_OUTPUT
+      

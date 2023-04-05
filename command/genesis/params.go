@@ -94,7 +94,10 @@ type genesisParams struct {
 	// allowlist
 	contractDeployerAllowListAdmin   []string
 	contractDeployerAllowListEnabled []string
-	mintableNativeToken              bool
+	transactionsAllowListAdmin       []string
+	transactionsAllowListEnabled     []string
+
+	mintableNativeToken bool
 }
 
 func (p *genesisParams) validateFlags() error {
