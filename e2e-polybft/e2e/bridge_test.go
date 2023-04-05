@@ -356,13 +356,14 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	const (
-		finalBlockNumber   = 20
 		votingPowerChanges = 3
+		epochSize          = 5
+		finalBlockNumber   = 4 * epochSize
 	)
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
-		framework.WithEpochSize(5),
+		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(1000))
 	defer cluster.Stop()
 
@@ -384,16 +385,16 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		votingPowerChangeValidators[i] = validator.Ecdsa.Address()
 	}
 
-	// L2 Tx relayer (for sending stake transaction and querying validator)
+	// L2 tx relayer (for sending stake transaction and querying validator)
 	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
-	// L1 Tx relayer (for querying checkpoints)
+	// L1 tx relayer (for querying checkpoints)
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	// waiting two epochs, so that some rewards get accumulated
-	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(2*epochSize, 1*time.Minute))
 
 	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
 		for i, validatorAddr := range votingPowerChangeValidators {
