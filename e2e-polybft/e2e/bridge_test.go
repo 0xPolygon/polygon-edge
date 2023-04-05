@@ -338,22 +338,6 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// getCheckpointBlockNumber gets current checkpoint block number from checkpoint manager smart contract
-func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) (uint64, error) {
-	checkpointBlockNumRaw, err := ABICall(l1Relayer, contractsapi.CheckpointManager,
-		checkpointManagerAddr, ethgo.ZeroAddress, "currentCheckpointBlockNumber")
-	if err != nil {
-		return 0, err
-	}
-
-	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
-	if err != nil {
-		return 0, err
-	}
-
-	return actualCheckpointBlock, nil
-}
-
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	const (
 		votingPowerChanges = 3
