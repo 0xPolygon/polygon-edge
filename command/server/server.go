@@ -185,13 +185,6 @@ func setFlags(cmd *cobra.Command) {
 		"maximum number of enqueued transactions per account",
 	)
 
-	cmd.Flags().Uint64Var(
-		&params.rawConfig.BlockTime,
-		blockTimeFlag,
-		defaultConfig.BlockTime,
-		"minimum block time in seconds (at least 1s)",
-	)
-
 	cmd.Flags().StringArrayVar(
 		&params.corsAllowedOrigins,
 		corsOriginFlag,
