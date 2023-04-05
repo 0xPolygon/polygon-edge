@@ -25,16 +25,16 @@ const (
 var params aaSendTxParams
 
 func GetCommand() *cobra.Command {
-	configCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:     "sendtx",
 		Short:   "sends account abstraction transaction to the relayer",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	setFlags(configCmd)
+	setFlags(cmd)
 
-	return configCmd
+	return cmd
 }
 
 func runPreRun(_ *cobra.Command, _ []string) error {
