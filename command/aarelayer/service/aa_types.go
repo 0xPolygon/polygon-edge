@@ -62,9 +62,17 @@ type AATransaction struct {
 	Transaction Transaction `json:"transaction"`
 }
 
+// RecoverSender recovers sender address from the AATransaction
+// The implementation involves several steps:
+// First, it creates an EIP712 hash for the AA transaction, which includes computing the domain separator hash.
+// This is a standard procedure for creating typed structured data hashes in the Ethereum ecosystem.
+// https://eips.ethereum.org/EIPS/eip-712
+// The second step involves using the magicHashFn parameter, if provided, to perform additional hashing
+// because of support for EIP3074. https://eips.ethereum.org/EIPS/eip-3074
+// Finally, the ethgowallet.Ecrecover function is executed to retrieve the actual address from the hash and signature.
 func (t *AATransaction) RecoverSender(
 	address types.Address, chainID int64, magicHashFn MagicHashFn) types.Address {
-	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
+	domainSeparator, err := getDomainSeparatorHash(address, chainID)
 	if err != nil {
 		return types.ZeroAddress
 	}
@@ -88,9 +96,11 @@ func (t *AATransaction) RecoverSender(
 	return types.Address(recoveredAddress)
 }
 
+// Sign makes signature for the Transaction and write it down inside AATransaction object
+// It uses analog steps from RecoverSender method
 func (t *AATransaction) Sign(
 	address types.Address, chainID int64, key ethgo.Key, magicHashFn MagicHashFn) error {
-	domainSeparator, err := GetDomainSeperatorHash(address, chainID)
+	domainSeparator, err := getDomainSeparatorHash(address, chainID)
 	if err != nil {
 		return err
 	}
@@ -114,6 +124,7 @@ func (t *AATransaction) Sign(
 	return nil
 }
 
+// ToAbi encodes AATransaction to the aa invoker smart contract call
 func (t *AATransaction) ToAbi() ([]byte, error) {
 	// signature "tuple(uint256 r,uint256 s,bool v)"
 	signature := map[string]interface{}{
@@ -160,12 +171,20 @@ type Transaction struct {
 	Payload []Payload     `json:"payload"`
 }
 
+// ComputeEip712Hash computes hash for transaction defined by EIP-712
+// explanation for algorithm is here https://eips.ethereum.org/EIPS/eip-712
 func (t *Transaction) ComputeEip712Hash(domainSeparator types.Hash) (types.Hash, error) {
-	txHashBytes, err := t.ComputeHash()
+	txHashBytes, err := t.computeHash()
 	if err != nil {
 		return types.ZeroHash, err
 	}
 
+	// This encoding is deterministic because the individual components are.
+	// The encoding is injective because the three cases always differ in first byte.
+	// RLP_encode(transaction) does not start with \x19.
+	// The encoding is compliant with EIP-191.
+	// The ‘version byte’ is fixed to 0x01, the ‘version specific data’ is the 32-byte
+	// domain separator domainSeparator and the ‘data to sign’ is the 32-byte hashStruct(message).
 	headerBytes := [2]byte{0x19, 0x1}
 	bytes := make([]byte, len(headerBytes)+len(domainSeparator)+len(txHashBytes))
 	copy(bytes, headerBytes[:])
@@ -175,7 +194,7 @@ func (t *Transaction) ComputeEip712Hash(domainSeparator types.Hash) (types.Hash,
 	return types.BytesToHash(crypto.Keccak256(bytes)), nil
 }
 
-func (t *Transaction) ComputeHash() (types.Hash, error) {
+func (t *Transaction) computeHash() (types.Hash, error) {
 	// "tuple(bytes32 typeHash, address from, uint256 nonce, bytes32 payloadsHash)")
 	payload := make([]byte, len(t.Payload)*types.HashLength)
 
@@ -267,9 +286,11 @@ type Log struct {
 	Data    []byte        `json:"data"`
 }
 
+// AAStateTransaction represents AATransaction that is kept in store and in the pool
 type AAStateTransaction struct {
 	ID           string         `json:"id"`
 	Tx           *AATransaction `json:"tx,omitempty"`
+	Hash         ethgo.Hash     `json:"hash,omitempty"`
 	Time         int64          `json:"time"`
 	TimeQueued   int64          `json:"time_queued"`
 	TimeFinished int64          `json:"time_completed"`
@@ -279,7 +300,7 @@ type AAStateTransaction struct {
 	Error        *string        `json:"error,omitempty"`
 }
 
-func GetDomainSeperatorHash(address types.Address, chainID int64) (types.Hash, error) {
+func getDomainSeparatorHash(address types.Address, chainID int64) (types.Hash, error) {
 	bytes, err := abi.Encode(
 		[]interface{}{
 			eip712DomainType,

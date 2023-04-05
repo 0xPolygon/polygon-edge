@@ -245,6 +245,7 @@ func EncodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 }
 
 // Make3074Hash serialize EIP-3074 messages in form keccak256(type ++ invoker ++ commit)
+// specification: https://eips.ethereum.org/EIPS/eip-3074
 func Make3074Hash(chainID int64, invokerAddr types.Address, commit []byte) []byte {
 	var msg [97]byte
 	msg[0] = 0x03

@@ -124,7 +124,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.invokerAddr,
 		invokerAddrFlag,
 		"",
-		"address of invoker smart contract",
+		"address of the invoker smart contract",
 	)
 
 	cmd.Flags().StringVar(

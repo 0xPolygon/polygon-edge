@@ -32,7 +32,7 @@ const (
 
 var defaultData = []byte{0xd0, 0x9d, 0xe0, 0x8a} // framework.MethodSig("increment")
 
-type aarelayerSendTxParams struct {
+type aaSendTxParams struct {
 	addr           string
 	accountDir     string
 	configPath     string
@@ -46,13 +46,17 @@ type aarelayerSendTxParams struct {
 	payloads []service.Payload
 }
 
-func (rp *aarelayerSendTxParams) validateFlags() error {
+func (rp *aaSendTxParams) validateFlags() error {
 	if !helper.ValidateIPPort(rp.addr) {
 		return fmt.Errorf("invalid address: %s", rp.addr)
 	}
 
 	if len(rp.txs) == 0 {
 		return errors.New("at least one transaction should be specified")
+	}
+
+	if rp.invokerAddr == "" {
+		return errors.New("address of invoker smart contract not specified")
 	}
 
 	for i, tx := range rp.txs {
@@ -102,14 +106,10 @@ func (rp *aarelayerSendTxParams) validateFlags() error {
 		})
 	}
 
-	if rp.invokerAddr == "" {
-		return errors.New("address of invoker smart contract not specified")
-	}
-
 	return sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.configPath)
 }
 
-func (rp *aarelayerSendTxParams) createAATransaction(key ethgo.Key) (*service.AATransaction, error) {
+func (rp *aaSendTxParams) createAATransaction(key ethgo.Key) (*service.AATransaction, error) {
 	aaTx := &service.AATransaction{
 		Transaction: service.Transaction{
 			From:    types.Address(key.Address()),
@@ -165,7 +165,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.nonce,
 		nonceFlag,
 		0,
-		"Nonce for the first transaction",
+		"nonce for the first transaction",
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -179,7 +179,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.invokerAddr,
 		invokerAddrFlag,
 		"",
-		"address of invoker smart contract",
+		"address of the invoker smart contract",
 	)
 
 	cmd.Flags().BoolVar(
@@ -193,7 +193,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.waitForReceipt,
 		waitForReceiptFlag,
 		true,
-		"should command wait for receipt or not (default is true)",
+		"wait for the receipt or not (default is true)",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountConfigFlag, polybftsecrets.AccountDirFlag)

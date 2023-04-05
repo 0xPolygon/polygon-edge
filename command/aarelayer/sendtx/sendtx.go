@@ -22,7 +22,7 @@ const (
 	numWaitReceiptRetries = 50
 )
 
-var params aarelayerSendTxParams
+var params aaSendTxParams
 
 func GetCommand() *cobra.Command {
 	configCmd := &cobra.Command{
@@ -79,7 +79,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("transaction %s failed", uuid)
 		}
 
-		cmd.Printf("Transaction has been included in block: %s\n", receipt.Mined.BlockHash.String())
+		cmd.Printf("Transaction has been included in block: %d, %s\n",
+			receipt.Mined.BlockNumber, receipt.Mined.BlockHash)
 	}
 
 	return nil

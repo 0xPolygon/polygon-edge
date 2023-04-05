@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"fmt"
-	"math/big"
 	"os"
 	"path"
 	"testing"
@@ -24,8 +23,8 @@ func TestE2E_AccountAbstraction(t *testing.T) {
 		customSecretPrefix = "other-"
 	)
 
-	someRandomAddress1 := types.StringToAddress("0xff00ff00ff00cc00bb11893")
-	someRandomAddress2 := types.StringToAddress("0xff00ff00ff00cc00bb11894")
+	receiver1 := types.StringToAddress("0xff00ff00ff00cc00bb11893")
+	receiver2 := types.StringToAddress("0xff00ff00ff00cc00bb11894")
 
 	deployerAccount, err := wallet.GenerateAccount()
 	require.NoError(t, err)
@@ -38,9 +37,9 @@ func TestE2E_AccountAbstraction(t *testing.T) {
 			addresses, err := clst.InitSecrets(customSecretPrefix, 2) // generate two additional accounts
 			require.NoError(t, err)
 
-			userBalance := fmt.Sprintf("%s:%d", addresses[0], amount*3)
-			relayerBalance := fmt.Sprintf("%s:%d", addresses[1], 0xFF00FF00000000)
-			deployerBalance := fmt.Sprintf("%s:%d", deployerAccount.Ecdsa.Address(), 0xFF00FF00000000)
+			userBalance := fmt.Sprintf("%s:%d", addresses[0], amount*5)
+			relayerBalance := fmt.Sprintf("%s:%d", addresses[1], ethgo.Ether(1))
+			deployerBalance := fmt.Sprintf("%s:%d", deployerAccount.Ecdsa.Address(), ethgo.Ether(1))
 			clst.Config.Premine = append(clst.Config.Premine, userBalance, relayerBalance, deployerBalance)
 		}))
 	defer func() {
@@ -75,34 +74,41 @@ func TestE2E_AccountAbstraction(t *testing.T) {
 		})
 	defer aaRelayer.Stop()
 
-	time.Sleep(time.Second * 10) // wait some time for aa relayer reset server to start
+	time.Sleep(time.Second * 10) // wait some time for the aa relayer rest server to start
 
-	// send to someRandomAddress1 some amount twice, and to someRandomAddress2 once same amount
-	addresses := []types.Address{someRandomAddress1, someRandomAddress2, someRandomAddress1}
+	// send two aa tx to receiver1 (3 payloads) and to receiver2 one aa tx
+	addresses := []types.Address{receiver1, receiver2, receiver1}
 
 	for i, address := range addresses {
+		txs := []string{
+			fmt.Sprintf("%s:%d:%d", address, amount, 21000),
+		}
+
+		if i == 0 {
+			// first time send two payloads
+			txs = append(txs, fmt.Sprintf("%s:%d:%d", address, amount*2, 21000))
+		}
+
 		require.NoError(t, aaRelayer.AASendTx(
 			path.Join(cluster.Config.TmpDir, fmt.Sprintf("%s1", customSecretPrefix)),
-			address,
-			big.NewInt(amount),
-			big.NewInt(21000),
 			uint64(len(addresses)-i-1), // let the aa tx pool to sort nonces out
+			txs,
 			true,
 			cluster.Config.GetStdout(fmt.Sprintf("aarelayersendtx%d", i)),
 		))
 
-		time.Sleep(10 * time.Second)
+		time.Sleep(5 * time.Second)
 	}
 
-	// check if balances of someRandomAddress1 and someRandomAddress2 are correct
+	// check if balances of receiver1 and receiver2 are correct
 	require.NoError(t, cluster.WaitUntil(time.Second*180, time.Second*10, func() bool {
-		val, err := cluster.Servers[0].JSONRPC().Eth().GetBalance(ethgo.Address(someRandomAddress2), ethgo.Latest)
+		val, err := cluster.Servers[0].JSONRPC().Eth().GetBalance(ethgo.Address(receiver2), ethgo.Latest)
 		if err != nil || val.Uint64() != amount {
 			return false
 		}
 
-		val, err = cluster.Servers[0].JSONRPC().Eth().GetBalance(ethgo.Address(someRandomAddress1), ethgo.Latest)
+		val, err = cluster.Servers[0].JSONRPC().Eth().GetBalance(ethgo.Address(receiver1), ethgo.Latest)
 
-		return err == nil && val.Uint64() == amount*2
+		return err == nil && val.Uint64() == amount*4
 	}))
 }

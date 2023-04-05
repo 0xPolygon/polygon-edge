@@ -88,6 +88,7 @@ type state struct {
 }
 
 func (c *state) reset() {
+	c.authorized = nil
 	c.sp = 0
 	c.ip = 0
 	c.gas = 0
