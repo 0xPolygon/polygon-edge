@@ -19,9 +19,6 @@ import (
 )
 
 const (
-	// elasticityMultiplier is the value to bound the maximum gas limit an EIP-1559 block may have.
-	elasticityMultiplier = 2
-
 	// defaultBaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks.
 	defaultBaseFeeChangeDenom = 8
 
@@ -1430,7 +1427,7 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 		return chain.GenesisBaseFee
 	}
 
-	parentGasTarget := parent.GasLimit / elasticityMultiplier
+	parentGasTarget := parent.GasLimit / b.config.Genesis.BaseFeeEM
 
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
 	if parent.GasUsed == parentGasTarget {
