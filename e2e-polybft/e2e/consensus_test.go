@@ -73,7 +73,7 @@ func TestE2E_Consensus_Sync(t *testing.T) {
 	node := cluster.Servers[0]
 	node.Stop()
 
-	// wait for at 2 epochs to elapse
+	// wait for 2 epochs to elapse
 	require.NoError(t, cluster.WaitForBlock(2*epochSize, 2*time.Minute))
 
 	// start the node again
