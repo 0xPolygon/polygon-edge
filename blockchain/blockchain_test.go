@@ -1367,6 +1367,9 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 							London: &fork,
 						},
 					},
+					Genesis: &chain.Genesis{
+						BaseFeeEM: 2,
+					},
 				},
 			}
 
