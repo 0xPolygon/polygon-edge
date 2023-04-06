@@ -25,7 +25,6 @@ type Config struct {
 	TxPool                   *TxPool    `json:"tx_pool" yaml:"tx_pool"`
 	LogLevel                 string     `json:"log_level" yaml:"log_level"`
 	RestoreFile              string     `json:"restore_file" yaml:"restore_file"`
-	BlockTime                uint64     `json:"block_time_s" yaml:"block_time_s"`
 	Headers                  *Headers   `json:"headers" yaml:"headers"`
 	LogFilePath              string     `json:"log_to" yaml:"log_to"`
 	JSONRPCBatchRequestLimit uint64     `json:"json_rpc_batch_request_limit" yaml:"json_rpc_batch_request_limit"`
@@ -111,7 +110,6 @@ func DefaultConfig() *Config {
 		},
 		LogLevel:    "INFO",
 		RestoreFile: "",
-		BlockTime:   DefaultBlockTime,
 		Headers: &Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},
