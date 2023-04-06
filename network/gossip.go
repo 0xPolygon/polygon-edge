@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 	"sync/atomic"
 
 	"github.com/hashicorp/go-hclog"
@@ -22,10 +23,13 @@ const (
 type Topic struct {
 	logger hclog.Logger
 
-	topic   *pubsub.Topic
-	typ     reflect.Type
-	closeCh chan struct{}
-	closed  *uint64
+	topic  *pubsub.Topic
+	typ    reflect.Type
+	closed *uint64
+
+	ctx       context.Context
+	cancelFn  context.CancelFunc
+	waitGroup sync.WaitGroup
 }
 
 func (t *Topic) createObj() proto.Message {
@@ -43,12 +47,14 @@ func (t *Topic) Close() {
 		return
 	}
 
+	t.cancelFn()       // close all subscribers
+	t.waitGroup.Wait() // wait for all the subscribers to finish
+
+	// if all subscribers are finished, close the topic
 	if t.topic != nil {
 		t.topic.Close()
 		t.topic = nil
 	}
-
-	close(t.closeCh)
 }
 
 func (t *Topic) Publish(obj proto.Message) error {
@@ -75,18 +81,14 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 }
 
 func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{}, from peer.ID)) {
-	ctx, cancelFn := context.WithCancel(context.Background())
-
-	go func() {
-		<-t.closeCh
-		cancelFn()
-	}()
+	t.waitGroup.Add(1)
+	defer t.waitGroup.Done()
 
 	for {
-		msg, err := sub.Next(ctx)
+		msg, err := sub.Next(t.ctx)
 		if err != nil {
 			// Above cancelFn() called.
-			if errors.Is(err, ctx.Err()) {
+			if errors.Is(err, t.ctx.Err()) {
 				break
 			}
 
@@ -114,12 +116,15 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 		return nil, err
 	}
 
+	ctx, cancelFn := context.WithCancel(context.Background())
+
 	tt := &Topic{
-		logger:  s.logger.Named(protoID),
-		topic:   topic,
-		typ:     reflect.TypeOf(obj).Elem(),
-		closeCh: make(chan struct{}),
-		closed:  new(uint64),
+		logger:   s.logger.Named(protoID),
+		topic:    topic,
+		typ:      reflect.TypeOf(obj).Elem(),
+		closed:   new(uint64),
+		ctx:      ctx,
+		cancelFn: cancelFn,
 	}
 
 	return tt, nil

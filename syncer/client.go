@@ -39,6 +39,9 @@ type syncPeerClient struct {
 	shouldEmitBlocks bool // flag for emitting blocks in the topic
 	closeCh          chan struct{}
 	closed           *uint64 // ACTIVE == 0, CLOSED == non-zero.
+
+	peerStatusUpdateChLock   sync.Mutex
+	peerStatusUpdateChClosed bool
 }
 
 func NewSyncPeerClient(
@@ -56,6 +59,9 @@ func NewSyncPeerClient(
 		shouldEmitBlocks:       true,
 		closeCh:                make(chan struct{}),
 		closed:                 new(uint64),
+
+		peerStatusUpdateChLock:   sync.Mutex{},
+		peerStatusUpdateChClosed: false,
 	}
 }
 
@@ -95,7 +101,10 @@ func (m *syncPeerClient) Close() {
 		close(m.closeCh)
 	}
 
+	m.peerStatusUpdateChLock.Lock()
+	m.peerStatusUpdateChClosed = true
 	close(m.peerStatusUpdateCh)
+	m.peerStatusUpdateChLock.Unlock()
 }
 
 // DisablePublishingPeerStatus disables publishing own status via gossip
@@ -210,16 +219,15 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 		return
 	}
 
-	if atomic.LoadUint64(m.closed) > 0 {
-		m.logger.Debug("received status from peer after client was closed, ignoring", "id", from)
+	m.peerStatusUpdateChLock.Lock()
+	defer m.peerStatusUpdateChLock.Unlock()
 
-		return
-	}
-
-	m.peerStatusUpdateCh <- &NoForkPeer{
-		ID:       from,
-		Number:   status.Number,
-		Distance: m.network.GetPeerDistance(from),
+	if !m.peerStatusUpdateChClosed {
+		m.peerStatusUpdateCh <- &NoForkPeer{
+			ID:       from,
+			Number:   status.Number,
+			Distance: m.network.GetPeerDistance(from),
+		}
 	}
 }
 
