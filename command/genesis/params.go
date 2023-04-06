@@ -299,6 +299,7 @@ func (p *genesisParams) initIBFTEngineMap(ibftType fork.IBFTType) {
 		string(server.IBFTConsensus): map[string]interface{}{
 			fork.KeyType:          ibftType,
 			fork.KeyValidatorType: p.ibftValidatorType,
+			fork.KeyBlockTime:     p.blockTime,
 			ibft.KeyEpochSize:     p.epochSize,
 		},
 	}

@@ -15,6 +15,7 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -447,7 +448,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		},
 		EpochSize:  10,
 		SprintSize: 10,
-		BlockTime:  2 * time.Second,
+		BlockTime:  common.Duration{Duration: 2 * time.Second},
 	}
 
 	validators := newTestValidators(t, 3).getPublicIdentities()

@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -278,7 +277,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		polyBFTConfig := PolyBFTConfig{
 			InitialValidatorSet: initValidators,
-			BlockTime:           2 * time.Second,
 			EpochSize:           24 * 60 * 60 / 2,
 			SprintSize:          5,
 			EpochReward:         reward,

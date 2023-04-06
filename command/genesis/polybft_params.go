@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -88,7 +89,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: manifest.GenesisValidators,
-		BlockTime:           p.blockTime,
+		BlockTime:           common.Duration{Duration: p.blockTime},
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
