@@ -506,9 +506,16 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
-	blockTime, err := extractBlockTime(engineConfig)
-	if err != nil {
-		return err
+	var (
+		blockTime = common.Duration{Duration: 0}
+		err       error
+	)
+
+	if engineName != string(DummyConsensus) && engineName != string(DevConsensus) {
+		blockTime, err = extractBlockTime(engineConfig)
+		if err != nil {
+			return err
+		}
 	}
 
 	config := &consensus.Config{
