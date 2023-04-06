@@ -20,16 +20,26 @@ type aaVerification struct {
 	config         *AAConfig
 	chainID        int64
 	invokerAddress types.Address
+	magicHashFn    MagicHashFn
 }
 
 func NewAAVerification(
-	config *AAConfig, invokerAddress types.Address, chainID int64, validationFn ValidationFunc) *aaVerification {
-	return &aaVerification{
-		validationFn:   validationFn,
+	config *AAConfig,
+	invokerAddress types.Address,
+	chainID int64,
+	opts ...AAVerificationOption,
+) *aaVerification {
+	v := &aaVerification{
 		config:         config,
 		chainID:        chainID,
 		invokerAddress: invokerAddress,
 	}
+
+	for _, opt := range opts {
+		opt(v)
+	}
+
+	return v
 }
 
 func (p *aaVerification) Validate(tx *AATransaction) error {
@@ -63,7 +73,7 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 		return fmt.Errorf("tx has from which is not allowed: %s", tx.Transaction.From)
 	}
 
-	address := tx.GetAddressFromSignature(p.invokerAddress, p.chainID)
+	address := tx.RecoverSender(p.invokerAddress, p.chainID, p.magicHashFn)
 	if tx.Transaction.From != address {
 		return fmt.Errorf("invalid tx: expected sender %s but got %s", tx.Transaction.From, address)
 	}
@@ -73,4 +83,18 @@ func (p *aaVerification) Validate(tx *AATransaction) error {
 	}
 
 	return nil
+}
+
+type AAVerificationOption func(*aaVerification)
+
+func WithValidationFn(validationFN ValidationFunc) AAVerificationOption {
+	return func(t *aaVerification) {
+		t.validationFn = validationFN
+	}
+}
+
+func WithMagicHashFn(magicHashFn MagicHashFn) AAVerificationOption {
+	return func(t *aaVerification) {
+		t.magicHashFn = magicHashFn
+	}
 }

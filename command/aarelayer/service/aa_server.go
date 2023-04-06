@@ -113,8 +113,7 @@ func (s *AARelayerRestServer) getTransactionReceipt(w http.ResponseWriter, r *ht
 
 func (s *AARelayerRestServer) ListenAndServe(addr string) error {
 	s.server = &http.Server{
-		Addr: addr,
-		// TODO: make this configurable?
+		Addr:         addr,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  120 * time.Second,

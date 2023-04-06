@@ -7,10 +7,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/command/aarelayer/sendtx"
 	"github.com/0xPolygon/polygon-edge/command/aarelayer/service"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -27,6 +29,7 @@ func GetCommand() *cobra.Command {
 		RunE:    runCommand,
 	}
 
+	cmd.AddCommand(sendtx.GetCommand())
 	setFlags(cmd)
 
 	return cmd
@@ -82,11 +85,16 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	pool := service.NewAAPool()
 	pool.Init(pending)
 
+	var opts []service.AAVerificationOption
+	if params.eip3074Hash {
+		opts = append(opts, service.WithMagicHashFn(crypto.Make3074Hash))
+	}
+
 	verification := service.NewAAVerification(
 		config,
 		invokerAddress,
 		params.chainID,
-		func(a *service.AATransaction) error { return nil })
+		opts...)
 	restService := service.NewAARelayerRestServer(pool, state, verification, logger)
 
 	relayerService, err := service.NewAARelayerService(

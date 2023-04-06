@@ -21,6 +21,7 @@ const (
 	invokerAddrFlag = "invoker-addr"
 	logPathFlag     = "log-path"
 	logLevelFlag    = "log-level"
+	eip3074HashFlag = "hash-eip3074"
 
 	defaultLogLevel = "info"
 	defaultPort     = 8198
@@ -35,6 +36,7 @@ type aarelayerParams struct {
 	invokerAddr string
 	logPath     string
 	logLevel    string
+	eip3074Hash bool
 }
 
 func (rp *aarelayerParams) validateFlags() error {
@@ -122,7 +124,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.invokerAddr,
 		invokerAddrFlag,
 		"",
-		"address of invoker smart contract",
+		"address of the invoker smart contract",
 	)
 
 	cmd.Flags().StringVar(
@@ -137,6 +139,13 @@ func setFlags(cmd *cobra.Command) {
 		logLevelFlag,
 		defaultLogLevel,
 		"logger log level",
+	)
+
+	cmd.Flags().BoolVar(
+		&params.eip3074Hash,
+		eip3074HashFlag,
+		true,
+		"enable EIP-3074 hashing",
 	)
 
 	helper.RegisterJSONRPCFlag(cmd)

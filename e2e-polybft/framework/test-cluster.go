@@ -87,7 +87,7 @@ type TestClusterConfig struct {
 	EpochSize            int
 	EpochReward          int
 	NativeTokenConfigRaw string
-	SecretsCallback      func([]types.Address, *TestClusterConfig)
+	SecretsCallback      func([]types.Address, *TestCluster)
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -192,7 +192,7 @@ func WithMintableNativeToken(mintableToken bool) ClusterOption {
 	}
 }
 
-func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
+func WithSecretsCallback(fn func([]types.Address, *TestCluster)) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.SecretsCallback = fn
 	}
@@ -359,7 +359,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 
 		if cluster.Config.SecretsCallback != nil {
-			cluster.Config.SecretsCallback(addresses, cluster.Config)
+			cluster.Config.SecretsCallback(addresses, cluster)
 		}
 
 		if config.NonValidatorCount > 0 {

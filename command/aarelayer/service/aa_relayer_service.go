@@ -126,6 +126,8 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 	atomic.AddUint64(&rs.currentNonce, 1) // increment global nonce for this relayer
 
 	stateTx.Status = StatusQueued
+	stateTx.Hash = hash
+
 	if err := rs.state.Update(stateTx); err != nil {
 		rs.logger.Error("error while updating tx state to queued", "id", stateTx.ID, "err", err)
 	}
@@ -155,10 +157,15 @@ func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTran
 }
 
 func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) (*ethgo.Transaction, error) {
+	input, err := stateTx.Tx.ToAbi()
+	if err != nil {
+		return nil, err
+	}
+
 	return &ethgo.Transaction{
 		From:  rs.key.Address(),
 		To:    (*ethgo.Address)(&rs.invokerAddr),
-		Input: nil, // TODO: encode stateTx to input
+		Input: input,
 		Nonce: atomic.LoadUint64(&rs.currentNonce),
 	}, nil
 }
@@ -188,18 +195,32 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 			break
 		}
 
-		if nonce != poppedTx.Tx.Transaction.Nonce {
+		if nonce == poppedTx.Tx.Transaction.Nonce {
+			stateTx = poppedTx
+			// update pool -> put statetx with next nonce to the timeHeap
+			rs.pool.Update(stateTx.Tx.Transaction.From)
+
+			break
+		} else if poppedTx.Tx.Transaction.Nonce > nonce {
+			// if tx nonce is greater current nonce than the tx will be returned back to the pool for later processing
 			rs.logger.Debug("transaction nonce mismatch",
 				"tx", poppedTx.ID, "from", address,
 				"nonce", poppedTx.Tx.Transaction.Nonce, "expected", nonce)
 
 			pushBackList = append(pushBackList, poppedTx)
 		} else {
-			stateTx = poppedTx
-			// update pool -> put statetx with next nonce to the timeHeap
-			rs.pool.Update(stateTx.Tx.Transaction.From)
+			// ...otherwise if it is lower update status to failed and never process it again
+			errorStr := "nonce too low"
+			poppedTx.Error = &errorStr
+			poppedTx.Status = StatusFailed
 
-			break
+			if err := rs.state.Update(stateTx); err != nil {
+				rs.logger.Debug("fail to update transaction status, nonce too low",
+					"tx", poppedTx.ID, "from", address, "nonce", poppedTx.Tx.Transaction.Nonce, "err", err)
+			} else {
+				rs.logger.Info("transaction status has been changed to failed because of low nonce",
+					"tx", poppedTx.ID, "from", address, "nonce", poppedTx.Tx.Transaction.Nonce)
+			}
 		}
 	}
 
@@ -237,6 +258,11 @@ func (rs *AARelayerService) populateStateTx(stateTx *AAStateTransaction, receipt
 
 	if receipt.Status == receiptSuccess {
 		stateTx.Status = StatusCompleted
+
+		rs.logger.Debug("transaction has been executed successfully",
+			"id", stateTx.ID,
+			"from", stateTx.Tx.Transaction.From,
+			"nonce", stateTx.Tx.Transaction.Nonce)
 	} else {
 		stateTx.Status = StatusFailed
 
