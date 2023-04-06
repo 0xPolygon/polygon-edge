@@ -64,9 +64,6 @@ type Headers struct {
 }
 
 const (
-	// DefaultBlockTime minimum block generation time in seconds
-	DefaultBlockTime uint64 = 2
-
 	// BlockTimeMultiplierForTimeout Multiplier to get IBFT timeout from block time
 	// timeout is calculated when IBFT timeout is not specified
 	BlockTimeMultiplierForTimeout uint64 = 5
