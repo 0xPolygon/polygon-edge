@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -251,4 +252,33 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 	}
 
 	return actualCheckpointBlock, nil
+}
+
+// waitForRootchainEpoch blocks for some predefined timeout to reach target epoch
+func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
+	rootchainTxRelayer txrelayer.TxRelayer, checkpointManager types.Address) error {
+	timer := time.NewTimer(timeout)
+
+	for {
+		select {
+		case <-timer.C:
+			return errors.New("root chain hasn't progressed to the desired epoch")
+		case <-time.Tick(time.Second):
+		}
+
+		rootchainEpochRaw, err := ABICall(rootchainTxRelayer, contractsapi.CheckpointManager,
+			ethgo.Address(checkpointManager), ethgo.ZeroAddress, "currentEpoch")
+		if err != nil {
+			return err
+		}
+
+		rootchainEpoch, err := types.ParseUint64orHex(&rootchainEpochRaw)
+		if err != nil {
+			return err
+		}
+
+		if rootchainEpoch >= targetEpoch {
+			return nil
+		}
+	}
 }
