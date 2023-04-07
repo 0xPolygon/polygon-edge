@@ -568,6 +568,10 @@ func extractBlockTime(engineConfig map[string]interface{}) (common.Duration, err
 		return common.Duration{}, errBlockTimeInvalid
 	}
 
+	if blockTime.Seconds() < 1 {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
 	return blockTime, nil
 }
 
