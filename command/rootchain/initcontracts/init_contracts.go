@@ -315,7 +315,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     stakeManagerName,
 			artifact: contractsapi.StakeManager,
 			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				fmt.Printf("RootNativeERC20Address: %v\n", cfg.RootNativeERC20Address)
 				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{cfg.RootNativeERC20Address})
 				if err != nil {
 					return nil, err
@@ -354,6 +353,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	for _, contract := range allContracts {
 		input := contract.artifact.Bytecode
+
 		if contract.constructorCallback != nil {
 			b, err := contract.constructorCallback(contract.artifact, rootchainConfig)
 			if err != nil {

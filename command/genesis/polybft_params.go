@@ -227,6 +227,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
+//nolint:godox
 func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *polybft.PolyBFTConfig,
 	rootConfig *polybft.RootchainConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
@@ -355,6 +356,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 
 	for _, contract := range genesisContracts {
 		code := contract.artifact.DeployedBytecode
+
 		if contract.constructorCallback != nil {
 			b, err := contract.constructorCallback(contract.artifact, polybftConfig, rootConfig)
 			if err != nil {
