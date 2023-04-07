@@ -224,13 +224,13 @@ func checkStateSyncResultLogs(
 	expectedCount int,
 ) {
 	t.Helper()
-	require.Len(t, logs, expectedCount)
+	require.Equal(t, len(logs), expectedCount)
 
 	var stateSyncResultEvent contractsapi.StateSyncResultEvent
 	for _, log := range logs {
 		doesMatch, err := stateSyncResultEvent.ParseLog(log)
-		require.True(t, doesMatch)
 		require.NoError(t, err)
+		require.True(t, doesMatch)
 
 		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
 

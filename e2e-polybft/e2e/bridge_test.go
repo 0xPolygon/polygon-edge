@@ -34,7 +34,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		amount                = 100
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
-		epochSize = 30
+		epochSize  = 30
+		sprintSize = 5
 	)
 
 	receivers := make([]string, transfersCount)
@@ -77,8 +78,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			),
 		)
 
-		// wait for a few more sprints
-		require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
+		// wait for a couple of sprints
+		require.NoError(t, cluster.WaitForBlock(8*sprintSize, 2*time.Minute))
 
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -177,7 +178,6 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	t.Run("multiple deposit batches per epoch", func(t *testing.T) {
 		const (
 			depositsSubset = 2
-			sprintSize     = 5
 		)
 
 		initialBlockNum, err := childEthEndpoint.BlockNumber()
