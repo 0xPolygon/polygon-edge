@@ -9,7 +9,6 @@ import (
 
 	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/stretchr/testify/assert"
 )
 
 func NumSubscribers(srv *Server, topic string) int {
@@ -110,18 +109,13 @@ func TestSimpleGossip(t *testing.T) {
 }
 
 func Test_RepeatedClose(t *testing.T) {
-	incr := 0
 	topic := &Topic{
-		cancelFn: func() {
-			incr++
-		},
-		closed: new(uint64),
+		closeCh: make(chan struct{}),
+		closed:  new(uint64),
 	}
 
 	// Call Close() twice to ensure that underlying logic (e.g. channel close) is
 	// only executed once.
 	topic.Close()
 	topic.Close()
-
-	assert.Equal(t, 1, incr)
 }

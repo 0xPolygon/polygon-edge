@@ -23,12 +23,10 @@ const (
 type Topic struct {
 	logger hclog.Logger
 
-	topic  *pubsub.Topic
-	typ    reflect.Type
-	closed *uint64
-
-	ctx       context.Context
-	cancelFn  context.CancelFunc
+	topic     *pubsub.Topic
+	typ       reflect.Type
+	closeCh   chan struct{}
+	closed    *uint64
 	waitGroup sync.WaitGroup
 }
 
@@ -47,7 +45,7 @@ func (t *Topic) Close() {
 		return
 	}
 
-	t.cancelFn()       // close all subscribers
+	close(t.closeCh)   // close all subscribers
 	t.waitGroup.Wait() // wait for all the subscribers to finish
 
 	// if all subscribers are finished, close the topic
@@ -84,11 +82,18 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{},
 	t.waitGroup.Add(1)
 	defer t.waitGroup.Done()
 
+	ctx, cancelFn := context.WithCancel(context.Background())
+
+	go func() {
+		<-t.closeCh
+		cancelFn()
+	}()
+
 	for {
-		msg, err := sub.Next(t.ctx)
+		msg, err := sub.Next(ctx)
 		if err != nil {
 			// Above cancelFn() called.
-			if errors.Is(err, t.ctx.Err()) {
+			if errors.Is(err, ctx.Err()) {
 				break
 			}
 
@@ -116,15 +121,12 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 		return nil, err
 	}
 
-	ctx, cancelFn := context.WithCancel(context.Background())
-
 	tt := &Topic{
-		logger:   s.logger.Named(protoID),
-		topic:    topic,
-		typ:      reflect.TypeOf(obj).Elem(),
-		closed:   new(uint64),
-		ctx:      ctx,
-		cancelFn: cancelFn,
+		logger:  s.logger.Named(protoID),
+		topic:   topic,
+		typ:     reflect.TypeOf(obj).Elem(),
+		closeCh: make(chan struct{}),
+		closed:  new(uint64),
 	}
 
 	return tt, nil
