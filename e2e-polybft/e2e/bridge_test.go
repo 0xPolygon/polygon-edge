@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"path"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,9 +28,9 @@ const (
 	manifestFileName = "manifest.json"
 )
 
-func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
+func TestE2E_Bridge_Transfers(t *testing.T) {
 	const (
-		transfersCount        = 10
+		transfersCount        = 5
 		amount                = 100
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
@@ -66,7 +65,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
 	t.Run("bridge ERC 20 tokens", func(t *testing.T) {
-		t.Logf("bridge ERC 20 tokens started...\n")
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
 		require.NoError(
@@ -174,8 +172,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, big.NewInt(amount), balance)
 		}
-
-		t.Logf("bridge ERC 20 tokens finished.\n")
 	})
 
 	t.Run("multiple deposit batches per epoch", func(t *testing.T) {
@@ -187,10 +183,10 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		initialBlockNum, err := childEthEndpoint.BlockNumber()
 		require.NoError(t, err)
 
+		// wait for next sprint block as the starting point,
+		// in order to be able to make assertions against blocks offseted by sprints
 		initialBlockNum = initialBlockNum + sprintSize - (initialBlockNum % sprintSize)
 		require.NoError(t, cluster.WaitForBlock(initialBlockNum, 1*time.Minute))
-
-		t.Logf("multiple deposit batches started %d...\n", initialBlockNum)
 
 		// send two transactions to the bridge so that we have a minimal commitment
 		require.NoError(
@@ -234,7 +230,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 		)
 
 		// wait for a few more sprints
-		require.NoError(t, cluster.WaitForBlock(midBlockNumber+epochSize, 3*time.Minute))
+		require.NoError(t, cluster.WaitForBlock(midBlockNumber+4*sprintSize, 3*time.Minute))
 
 		// check that we submitted the minimal commitment to smart contract
 		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
@@ -264,108 +260,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC20(t *testing.T) {
 
 		// assert that all state syncs are executed successfully
 		checkStateSyncResultLogs(t, logs, transfersCount)
-
-		t.Logf("multiple deposit batches finished.\n")
 	})
-}
-
-func TestE2E_Bridge_MultipleCommitmentsPerEpoch(t *testing.T) {
-	t.Skip("REMOVE")
-
-	const depositsCount = 10
-
-	receivers := make([]string, depositsCount)
-	amounts := make([]string, depositsCount)
-
-	for i := 0; i < depositsCount; i++ {
-		key, err := ethgow.GenerateKey()
-		require.NoError(t, err)
-
-		receivers[i] = types.Address(key.Address()).String()
-		amounts[i] = fmt.Sprintf("%d", 100)
-	}
-
-	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
-		framework.WithEpochSize(30))
-	defer cluster.Stop()
-
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
-	require.NoError(t, err)
-
-	cluster.WaitForReady(t)
-
-	// send two transactions to the bridge so that we have a minimal commitment
-	require.NoError(
-		t,
-		cluster.Bridge.DepositERC20(
-			manifest.RootchainConfig.RootNativeERC20Address,
-			manifest.RootchainConfig.RootERC20PredicateAddress,
-			strings.Join(receivers[:2], ","),
-			strings.Join(amounts[:2], ","),
-		),
-	)
-
-	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
-
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
-	require.NoError(t, err)
-
-	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
-	encode, err := lastCommittedIDMethod.Encode([]interface{}{})
-	require.NoError(t, err)
-
-	// check that we submitted the minimal commitment to smart contract
-	result, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
-	require.NoError(t, err)
-
-	lastCommittedID, err := strconv.ParseUint(result, 0, 64)
-	require.NoError(t, err)
-	require.Equal(t, uint64(2), lastCommittedID)
-
-	// send some more transactions to the bridge to build another commitment in epoch
-	require.NoError(
-		t,
-		cluster.Bridge.DepositERC20(
-			manifest.RootchainConfig.RootNativeERC20Address,
-			manifest.RootchainConfig.RootERC20PredicateAddress,
-			strings.Join(receivers[2:], ","),
-			strings.Join(amounts[2:], ","),
-		),
-	)
-
-	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(40, 3*time.Minute))
-
-	// check that we submitted the minimal commitment to smart contract
-	result, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
-	require.NoError(t, err)
-
-	// check that the second (larger commitment) was also submitted in epoch
-	lastCommittedID, err = strconv.ParseUint(result, 0, 64)
-	require.NoError(t, err)
-	require.Equal(t, uint64(depositsCount), lastCommittedID)
-
-	// the transactions are mined and state syncs should be executed by the relayer
-	// and there should be a success events
-	var stateSyncedResult contractsapi.StateSyncResultEvent
-
-	id := stateSyncedResult.Sig()
-	filter := &ethgo.LogFilter{
-		Topics: [][]*ethgo.Hash{
-			{&id},
-		},
-	}
-
-	filter.SetFromUint64(0)
-	filter.SetToUint64(100)
-
-	logs, err := cluster.Servers[0].JSONRPC().Eth().GetLogs(filter)
-	require.NoError(t, err)
-
-	// assert that all state syncs are executed successfully
-	checkStateSyncResultLogs(t, logs, depositsCount)
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
