@@ -334,7 +334,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 						cfg.BLSAddress,
 						cfg.StateSenderAddress,
 						cfg.RootNativeERC20Address,
-						contracts.ValidatorSetContract,
+						contracts.NewValidatorSetContract,
 						cfg.ExitHelperAddress,
 						string(bls.DomainValidatorSet),
 					})

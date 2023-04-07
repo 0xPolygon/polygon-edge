@@ -123,7 +123,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake)
+	allocs, err := p.deployContracts(totalStake, polyBftConfig, manifest.RootchainConfig)
 	if err != nil {
 		return err
 	}
@@ -227,10 +227,14 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
+func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *polybft.PolyBFTConfig,
+	rootConfig *polybft.RootchainConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
-		artifact *artifact.Artifact
-		address  types.Address
+		artifact            *artifact.Artifact
+		address             types.Address
+		constructorCallback func(artifact *artifact.Artifact,
+			polybftConfig *polybft.PolyBFTConfig,
+			rootConfig *polybft.RootchainConfig) ([]byte, error)
 	}
 
 	genesisContracts := []*contractInfo{
@@ -289,6 +293,54 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			artifact: contractsapi.L2StateSender,
 			address:  contracts.L2StateSenderContract,
 		},
+		{
+			artifact: contractsapi.ValidatorSet,
+			address:  contracts.NewValidatorSetContract,
+			constructorCallback: func(artifact *artifact.Artifact,
+				polybftConfig *polybft.PolyBFTConfig,
+				rootConfig *polybft.RootchainConfig) ([]byte, error) {
+				// TODO @goran-ethernal- this will be changed in the next PRs to use generated binding
+				// once we remove the old ChildValidatorSet on use the new ValidatorInit binding
+				validatorsMap := make([]map[string]interface{}, len(polybftConfig.InitialValidatorSet))
+				for i, validator := range polybftConfig.InitialValidatorSet {
+					validatorsMap[i] = map[string]interface{}{
+						"addr":  validator.Address,
+						"stake": validator.Stake,
+					}
+				}
+
+				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
+					contracts.L2StateSenderContract,
+					contracts.StateReceiverContract,
+					rootConfig.CustomSupernetManagerAddress,
+					new(big.Int).SetUint64(polybftConfig.EpochSize),
+					validatorsMap,
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				return append(artifact.Bytecode, encoded...), nil
+			},
+		},
+		{
+			artifact: contractsapi.RewardDistributor,
+			address:  contracts.RewardDistributorContract,
+			constructorCallback: func(artifact *artifact.Artifact,
+				polybftConfig *polybft.PolyBFTConfig,
+				rootConfig *polybft.RootchainConfig) ([]byte, error) {
+				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
+					contracts.NativeERC20TokenContract, // TODO @goran-ethernal - we will use a different token for rewards
+					contracts.NewValidatorSetContract,
+					new(big.Int).SetUint64(polybftConfig.EpochReward),
+				})
+				if err != nil {
+					return nil, err
+				}
+
+				return append(artifact.Bytecode, encoded...), nil
+			},
+		},
 	}
 
 	if !params.mintableNativeToken {
@@ -302,9 +354,19 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
+		code := contract.artifact.DeployedBytecode
+		if contract.constructorCallback != nil {
+			b, err := contract.constructorCallback(contract.artifact, polybftConfig, rootConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			code = b
+		}
+
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
-			Code:    contract.artifact.DeployedBytecode,
+			Code:    code,
 		}
 	}
 
