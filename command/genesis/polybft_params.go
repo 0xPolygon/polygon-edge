@@ -310,10 +310,17 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 					}
 				}
 
+				// TODO @goran-ethernal - we will remove once we change e2e tests
+				// since by RFC-201 we won't be able to start edge without bridge (root)
+				customSupernetManagerAddr := types.ZeroAddress
+				if rootConfig != nil {
+					customSupernetManagerAddr = rootConfig.CustomSupernetManagerAddress
+				}
+
 				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
 					contracts.L2StateSenderContract,
 					contracts.StateReceiverContract,
-					rootConfig.CustomSupernetManagerAddress,
+					customSupernetManagerAddr,
 					new(big.Int).SetUint64(polybftConfig.EpochSize),
 					validatorsMap,
 				})
