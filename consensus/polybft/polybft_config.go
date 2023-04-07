@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -34,7 +33,7 @@ type PolyBFTConfig struct {
 	SprintSize uint64 `json:"sprintSize"`
 
 	// BlockTime is target frequency of blocks production
-	BlockTime time.Duration `json:"blockTime"`
+	BlockTime common.Duration `json:"blockTime"`
 
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`

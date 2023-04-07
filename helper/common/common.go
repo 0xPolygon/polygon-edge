@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -25,6 +26,8 @@ var (
 	// Our staking repo is written in JS, as are many other clients
 	// If we use higher value JS will not be able to parse it
 	MaxSafeJSInt = uint64(math.Pow(2, 53) - 2)
+
+	errInvalidDuration = errors.New("invalid duration")
 )
 
 // Min returns the strictly lower number
@@ -235,6 +238,42 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 	d.Value = val
 
 	return nil
+}
+
+// Duration is a wrapper struct for time.Duration which implements json (un)marshaling
+type Duration struct {
+	time.Duration
+}
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.String())
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var (
+		v   interface{}
+		err error
+	)
+
+	if err = json.Unmarshal(b, &v); err != nil {
+		return err
+	}
+
+	switch value := v.(type) {
+	case float64:
+		d.Duration = time.Duration(value)
+
+		return nil
+	case string:
+		d.Duration, err = time.ParseDuration(value)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	return errInvalidDuration
 }
 
 // GetTerminationSignalCh returns a channel to emit signals by ctrl + c

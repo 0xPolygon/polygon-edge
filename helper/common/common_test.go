@@ -1,8 +1,10 @@
 package common
 
 import (
+	"encoding/json"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -59,4 +61,40 @@ func Test_BigIntDivCeil(t *testing.T) {
 	for _, c := range cases {
 		require.Equal(t, c.result, BigIntDivCeil(big.NewInt(c.a), big.NewInt(c.b)).Int64())
 	}
+}
+
+func Test_Duration_Marshal_UnmarshalJSON(t *testing.T) {
+	t.Parallel()
+
+	t.Run("use duration standalone", func(t *testing.T) {
+		t.Parallel()
+
+		original := &Duration{Duration: 5 * time.Minute}
+		originalRaw, err := original.MarshalJSON()
+		require.NoError(t, err)
+
+		other := &Duration{}
+		require.NoError(t, other.UnmarshalJSON(originalRaw))
+		require.Equal(t, original, other)
+	})
+
+	t.Run("use duration in wrapper struct", func(t *testing.T) {
+		t.Parallel()
+
+		type timer struct {
+			Elapsed Duration `json:"elapsed"`
+		}
+
+		dur, err := time.ParseDuration("2h35m21s")
+		require.NoError(t, err)
+
+		origTimer := &timer{Elapsed: Duration{dur}}
+
+		timerRaw, err := json.Marshal(origTimer)
+		require.NoError(t, err)
+
+		var otherTimer *timer
+		require.NoError(t, json.Unmarshal(timerRaw, &otherTimer))
+		require.Equal(t, origTimer, otherTimer)
+	})
 }

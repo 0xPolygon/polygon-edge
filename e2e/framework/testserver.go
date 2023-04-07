@@ -277,6 +277,13 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}
 
+	// provide block time flag
+	// (e2e framework expects BlockTime parameter to be provided in seconds)
+	if t.Config.BlockTime != 0 {
+		args = append(args, "--block-time",
+			(time.Duration(t.Config.BlockTime) * time.Second).String())
+	}
+
 	// add consensus flags
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
@@ -427,10 +434,6 @@ func (t *TestServer) Start(ctx context.Context) error {
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
-	}
-
-	if t.Config.BlockTime != 0 {
-		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
 	}
 
 	if t.Config.IBFTBaseTimeout != 0 {

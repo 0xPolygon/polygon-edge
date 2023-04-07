@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -44,6 +45,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
+)
+
+var (
+	errBlockTimeMissing = errors.New("block time configuration is missing")
+	errBlockTimeInvalid = errors.New("block time configuration is invalid")
 )
 
 // Server is the central manager of the blockchain client
@@ -500,6 +506,18 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
+	var (
+		blockTime = common.Duration{Duration: 0}
+		err       error
+	)
+
+	if engineName != string(DummyConsensus) && engineName != string(DevConsensus) {
+		blockTime, err = extractBlockTime(engineConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
@@ -517,7 +535,7 @@ func (s *Server) setupConsensus() error {
 			Grpc:                  s.grpcServer,
 			Logger:                s.logger,
 			SecretsManager:        s.secretsManager,
-			BlockTime:             s.config.BlockTime,
+			BlockTime:             uint64(blockTime.Seconds()),
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
 		},
 	)
@@ -529,6 +547,32 @@ func (s *Server) setupConsensus() error {
 	s.consensus = consensus
 
 	return nil
+}
+
+// extractBlockTime extracts blockTime parameter from consensus engine configuration.
+// If it is missing or invalid, an appropriate error is returned.
+func extractBlockTime(engineConfig map[string]interface{}) (common.Duration, error) {
+	blockTimeGeneric, ok := engineConfig["blockTime"]
+	if !ok {
+		return common.Duration{}, errBlockTimeMissing
+	}
+
+	blockTimeRaw, err := json.Marshal(blockTimeGeneric)
+	if err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	var blockTime common.Duration
+
+	if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	if blockTime.Seconds() < 1 {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	return blockTime, nil
 }
 
 // setupRelayer sets up the relayer
