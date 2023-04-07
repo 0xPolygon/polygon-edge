@@ -230,7 +230,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		)
 
 		// wait for a few more sprints
-		require.NoError(t, cluster.WaitForBlock(midBlockNumber+4*sprintSize, 3*time.Minute))
+		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
 		// check that we submitted the minimal commitment to smart contract
 		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
