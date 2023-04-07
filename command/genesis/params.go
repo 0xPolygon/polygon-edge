@@ -332,6 +332,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			ExtraData:  p.extraData,
 			GasUsed:    command.DefaultGenesisGasUsed,
 			BaseFee:    command.DefaultGenesisBaseFee,
+			BaseFeeEM:  command.DefaultGenesisBaseFeeEM,
 		},
 		Params: &chain.Params{
 			ChainID:      int64(p.chainID),

@@ -7,15 +7,20 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/hashicorp/go-multierror"
+
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-multierror"
 )
 
 const (
 	// GenesisBaseFee is the initial base fee for EIP-1559 blocks.
 	// Using 1 gwei by default
 	GenesisBaseFee = 1_000_000_000
+
+	// GenesisBaseFeeEM is the initial base fee elasticity multiplier for EIP-1559 blocks.
+	GenesisBaseFeeEM = 2
 
 	// GenesisGasLimit is the default gas limit of the Genesis block.
 	GenesisGasLimit uint64 = 4712388
@@ -45,6 +50,7 @@ type Genesis struct {
 	Coinbase   types.Address                     `json:"coinbase"`
 	Alloc      map[types.Address]*GenesisAccount `json:"alloc,omitempty"`
 	BaseFee    uint64                            `json:"baseFee"`
+	BaseFeeEM  uint64                            `json:"baseFeeEM"`
 
 	// Override
 	StateRoot types.Hash
@@ -120,6 +126,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		GasUsed    *string                     `json:"gasUsed,omitempty"`
 		ParentHash types.Hash                  `json:"parentHash"`
 		BaseFee    *string                     `json:"baseFee"`
+		BaseFeeEM  *string                     `json:"baseFeeEM"`
 	}
 
 	var enc Genesis
@@ -131,6 +138,7 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	enc.GasLimit = types.EncodeUint64(g.GasLimit)
 	enc.Difficulty = types.EncodeUint64(g.Difficulty)
 	enc.BaseFee = types.EncodeUint64(g.BaseFee)
+	enc.BaseFeeEM = types.EncodeUint64(g.BaseFeeEM)
 
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
@@ -166,6 +174,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		GasUsed    *string                    `json:"gasUsed"`
 		ParentHash *types.Hash                `json:"parentHash"`
 		BaseFee    *string                    `json:"baseFee"`
+		BaseFeeEM  *string                    `json:"baseFeeEM"`
 	}
 
 	var dec Genesis
@@ -179,14 +188,14 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		err = multierror.Append(err, fmt.Errorf("%s: %w", field, subErr))
 	}
 
-	nonce, subErr := types.ParseUint64orHex(dec.Nonce)
+	nonce, subErr := common.ParseUint64orHex(dec.Nonce)
 	if subErr != nil {
 		parseError("nonce", subErr)
 	}
 
 	binary.BigEndian.PutUint64(g.Nonce[:], nonce)
 
-	g.Timestamp, subErr = types.ParseUint64orHex(dec.Timestamp)
+	g.Timestamp, subErr = common.ParseUint64orHex(dec.Timestamp)
 	if subErr != nil {
 		parseError("timestamp", subErr)
 	}
@@ -202,19 +211,24 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("field 'gaslimit' is required")
 	}
 
-	g.GasLimit, subErr = types.ParseUint64orHex(dec.GasLimit)
+	g.GasLimit, subErr = common.ParseUint64orHex(dec.GasLimit)
 	if subErr != nil {
 		parseError("gaslimit", subErr)
 	}
 
-	g.Difficulty, subErr = types.ParseUint64orHex(dec.Difficulty)
+	g.Difficulty, subErr = common.ParseUint64orHex(dec.Difficulty)
 	if subErr != nil {
 		parseError("difficulty", subErr)
 	}
 
-	g.BaseFee, subErr = types.ParseUint64orHex(dec.BaseFee)
+	g.BaseFee, subErr = common.ParseUint64orHex(dec.BaseFee)
 	if subErr != nil {
 		parseError("baseFee", subErr)
+	}
+
+	g.BaseFeeEM, subErr = common.ParseUint64orHex(dec.BaseFeeEM)
+	if subErr != nil {
+		parseError("baseFeeEM", subErr)
 	}
 
 	if dec.Mixhash != nil {
@@ -232,12 +246,12 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	g.Number, subErr = types.ParseUint64orHex(dec.Number)
+	g.Number, subErr = common.ParseUint64orHex(dec.Number)
 	if subErr != nil {
 		parseError("number", subErr)
 	}
 
-	g.GasUsed, subErr = types.ParseUint64orHex(dec.GasUsed)
+	g.GasUsed, subErr = common.ParseUint64orHex(dec.GasUsed)
 	if subErr != nil {
 		parseError("gasused", subErr)
 	}
@@ -336,7 +350,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 		parseError("balance", subErr)
 	}
 
-	g.Nonce, subErr = types.ParseUint64orHex(dec.Nonce)
+	g.Nonce, subErr = common.ParseUint64orHex(dec.Nonce)
 
 	if subErr != nil {
 		parseError("nonce", subErr)
