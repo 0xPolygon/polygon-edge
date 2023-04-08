@@ -7,6 +7,11 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -18,16 +23,12 @@ import (
 	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 func TestIntegratoin_PerformExit(t *testing.T) {
 	t.Parallel()
 
-	const gasPrice = 1000000000000
+	const gasLimit = 1000000000000
 
 	// create validator set and checkpoint mngr
 	currentValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
@@ -36,17 +37,15 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	senderAddress := types.Address{1}
 	bn256Addr := types.Address{2}
-	rootERC20Token := types.Address{4}
 	stateSenderAddr := types.Address{5}
 	receiverAddr := types.Address{6}
 	amount1 := big.NewInt(3)
 	amount2 := big.NewInt(2)
 
 	alloc := map[types.Address]*chain.GenesisAccount{
-		senderAddress:         {Balance: big.NewInt(100000000000)},
+		senderAddress:         {Balance: ethgo.Ether(100)},
 		contracts.BLSContract: {Code: contractsapi.BLS.DeployedBytecode},
 		bn256Addr:             {Code: contractsapi.BLS256.DeployedBytecode},
-		rootERC20Token:        {Code: contractsapi.RootERC20.DeployedBytecode},
 		stateSenderAddr:       {Code: contractsapi.StateSender.DeployedBytecode},
 	}
 	transition := newTestTransition(t, alloc)
@@ -55,13 +54,14 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		input, err := abi.GetMethod(function).Encode(args)
 		require.NoError(t, err)
 
-		result := transition.Call2(senderAddress, addr, input, big.NewInt(0), 1000000000)
-		require.NoError(t, result.Err)
+		result := transition.Call2(senderAddress, addr, input, big.NewInt(0), gasLimit)
 		require.True(t, result.Succeeded())
-		require.False(t, result.Failed())
 
 		return result.ReturnValue
 	}
+
+	// deploy MockERC20 as root chain ERC 20 token
+	rootERC20Addr := deployAndInitContract(t, transition, contractsapi.RootERC20, senderAddress, nil)
 
 	// deploy CheckpointManager
 	checkpointManagerInit := func() ([]byte, error) {
@@ -72,7 +72,6 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 			ChainID_:        big.NewInt(0),
 		}).EncodeAbi()
 	}
-
 	checkpointManagerAddr := deployAndInitContract(t, transition, contractsapi.CheckpointManager, senderAddress, checkpointManagerInit)
 
 	// deploy ExitHelper
@@ -103,15 +102,35 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	epochNumber := uint64(1)
 	blockRound := uint64(1)
 
+	// mint
+	mintInput, err := (&contractsapi.MintRootERC20Fn{
+		To:     senderAddress,
+		Amount: alloc[senderAddress].Balance,
+	}).EncodeAbi()
+	require.NoError(t, err)
+
+	result := transition.Call2(senderAddress, rootERC20Addr, mintInput, nil, gasLimit)
+	require.NoError(t, result.Err)
+
+	// approve
+	approveInput, err := (&contractsapi.ApproveRootERC20Fn{
+		Spender: rootERC20PredicateAddr,
+		Amount:  ethgo.Ether(100),
+	}).EncodeAbi()
+	require.NoError(t, err)
+
+	result = transition.Call2(senderAddress, rootERC20Addr, approveInput, big.NewInt(0), gasLimit)
+	require.NoError(t, result.Err)
+
 	// deposit
-	depositFn, err := (&contractsapi.DepositToRootERC20PredicateFn{
-		RootToken: rootERC20Token,
+	depositInput, err := (&contractsapi.DepositToRootERC20PredicateFn{
+		RootToken: rootERC20Addr,
 		Receiver:  receiverAddr,
 		Amount:    new(big.Int).Add(amount1, amount2),
 	}).EncodeAbi()
 	require.NoError(t, err)
 
-	result := transition.Call2(senderAddress, rootERC20PredicateAddr, depositFn, big.NewInt(0), 1000000000)
+	result = transition.Call2(senderAddress, rootERC20PredicateAddr, depositInput, big.NewInt(0), gasLimit)
 	require.NoError(t, result.Err)
 
 	widthdrawSig := crypto.Keccak256([]byte("WITHDRAW"))
@@ -120,7 +139,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	exitData1, err := erc20DataType.Encode(map[string]interface{}{
 		"withdrawSignature": widthdrawSig,
-		"rootToken":         ethgo.Address(rootERC20Token),
+		"rootToken":         ethgo.Address(rootERC20Addr),
 		"withdrawer":        ethgo.Address(senderAddress),
 		"receiver":          ethgo.Address(receiverAddr),
 		"amount":            amount1,
@@ -129,7 +148,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	exitData2, err := erc20DataType.Encode(map[string]interface{}{
 		"withdrawSignature": widthdrawSig,
-		"rootToken":         ethgo.Address(rootERC20Token),
+		"rootToken":         ethgo.Address(rootERC20Addr),
 		"withdrawer":        ethgo.Address(senderAddress),
 		"receiver":          ethgo.Address(receiverAddr),
 		"amount":            amount2,
@@ -155,7 +174,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	eventRoot := exitTree.Hash()
 
-	checkpointData := CheckpointData{
+	checkpointData := &CheckpointData{
 		BlockRound:            blockRound,
 		EpochNumber:           epochNumber,
 		CurrentValidatorsHash: accSetHash,
@@ -183,7 +202,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	require.NoError(t, err)
 
 	extra := &Extra{
-		Checkpoint: &checkpointData,
+		Checkpoint: checkpointData,
 		Committed: &Signature{
 			AggregatedSignature: aggSignature,
 			Bitmap:              bmp,
@@ -200,7 +219,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	// check that the exit hasn't performed
 	res := getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
-	require.Equal(t, int(res[31]), 0)
+	require.Equal(t, 0, int(res[31]))
 
 	var exitEventAPI contractsapi.L2StateSyncedEvent
 	proofExitEvent, err := exitEventAPI.Encode(exits[0])
@@ -220,21 +239,15 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}).EncodeAbi()
 	require.NoError(t, err)
 
-	result = transition.Call2(senderAddress, exitHelperContractAddress, exitFnInput, big.NewInt(0), 1000000000)
+	result = transition.Call2(senderAddress, exitHelperContractAddress, exitFnInput, big.NewInt(0), gasLimit)
 	require.NoError(t, result.Err)
 
-	// check true
+	// check that first exit event is processed
 	res = getField(exitHelperContractAddress, contractsapi.ExitHelper.Abi, "processedExits", exits[0].ID)
-	require.Equal(t, types.ReceiptSuccess, int(res[31]))
+	require.Equal(t, 1, int(res[31]))
 
-	lastID := getField(rootERC20Token, contractsapi.RootERC20.Abi, "id")
-	require.Equal(t, uint8(1), lastID[31])
-
-	lastAddr := getField(rootERC20Token, contractsapi.RootERC20.Abi, "addr")
-	require.Equal(t, exits[0].Sender[:], lastAddr[12:])
-
-	lastCounter := getField(rootERC20Token, contractsapi.RootERC20.Abi, "counter")
-	require.Equal(t, uint8(1), lastCounter[31])
+	res = getField(rootERC20Addr, contractsapi.RootERC20.Abi, "balanceOf", receiverAddr)
+	require.Equal(t, amount1, new(big.Int).SetBytes(res))
 }
 
 func TestIntegration_CommitEpoch(t *testing.T) {
