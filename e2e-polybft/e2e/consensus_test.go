@@ -30,7 +30,28 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+	t.Run("consensus protocol", func(t *testing.T) {
+		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+	})
+
+	t.Run("sync protool drop single validator node", func(t *testing.T) {
+		// query the current block number, as it is a starting point for the test
+		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
+
+		// stop one node
+		node := cluster.Servers[0]
+		node.Stop()
+
+		// wait for 2 epochs to elapse, so that rest of the network progresses
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
+
+		// start the node again
+		node.Start()
+
+		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+	})
 }
 
 func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
@@ -57,30 +78,6 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 
 	// wait for block 55
 	require.NoError(t, cluster.WaitForBlock(55, 2*time.Minute))
-}
-
-func TestE2E_Consensus_Sync(t *testing.T) {
-	const epochSize = 4
-	// one node from the ensemble gets disconnected and connected again.
-	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, 6, framework.WithEpochSize(epochSize))
-	defer cluster.Stop()
-
-	// wait half of an epoch
-	require.NoError(t, cluster.WaitForBlock(epochSize/2, 1*time.Minute))
-
-	// stop one node
-	node := cluster.Servers[0]
-	node.Stop()
-
-	// wait for 2 epochs to elapse
-	require.NoError(t, cluster.WaitForBlock(2*epochSize, 2*time.Minute))
-
-	// start the node again
-	node.Start()
-
-	// wait 4 epochs to elapse
-	require.NoError(t, cluster.WaitForBlock(4*epochSize, 2*time.Minute))
 }
 
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
