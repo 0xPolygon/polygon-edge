@@ -213,7 +213,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	submitCheckpointEncoded, err := cm.abiEncodeCheckpointBlock(blockNumber, blockHash, extra, accSet)
 	require.NoError(t, err)
 
-	result = transition.Call2(senderAddress, checkpointManagerAddr, submitCheckpointEncoded, big.NewInt(0), 1000000000)
+	result = transition.Call2(senderAddress, checkpointManagerAddr, submitCheckpointEncoded, big.NewInt(0), gasLimit)
 	require.NoError(t, result.Err)
 	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(1))
 

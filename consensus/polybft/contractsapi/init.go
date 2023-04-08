@@ -39,7 +39,6 @@ var (
 	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
-	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
 	RootERC721             *artifact.Artifact
@@ -165,11 +164,6 @@ func init() {
 	}
 
 	RootERC1155, err = artifact.DecodeArtifact([]byte(MockERC1155Artifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
