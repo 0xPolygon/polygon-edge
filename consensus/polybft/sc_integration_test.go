@@ -35,15 +35,17 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	accSet := currentValidators.getPublicIdentities()
 	cm := checkpointManager{blockchain: &blockchainMock{}}
 
-	senderAddress := types.Address{1}   // account that sends exit/withdraw transactions
-	receiverAddr := types.Address{6}    // account that receive tokens
-	amount1 := big.NewInt(3)            // amount of the first widrawal
-	amount2 := big.NewInt(2)            // amount of the second widrawal
-	bn256Addr := types.Address{2}       // bls contract
-	stateSenderAddr := types.Address{5} // generic bridge contract on rootchain
+	deployerAddress := types.Address{76, 76, 1} // account that will deploy contracts
+	senderAddress := types.Address{1}           // account that sends exit/withdraw transactions
+	receiverAddr := types.Address{6}            // account that receive tokens
+	amount1 := big.NewInt(3)                    // amount of the first widrawal
+	amount2 := big.NewInt(2)                    // amount of the second widrawal
+	bn256Addr := types.Address{2}               // bls contract
+	stateSenderAddr := types.Address{5}         // generic bridge contract on rootchain
 
 	alloc := map[types.Address]*chain.GenesisAccount{
-		senderAddress:         {Balance: ethgo.Ether(100)}, // give 100 ethers to sender
+		senderAddress:         {Balance: new(big.Int).Add(amount1, amount2)}, // give some ethers to sender
+		deployerAddress:       {Balance: ethgo.Ether(100)},                   // give 100 ethers to deployer
 		contracts.BLSContract: {Code: contractsapi.BLS.DeployedBytecode},
 		bn256Addr:             {Code: contractsapi.BLS256.DeployedBytecode},
 		stateSenderAddr:       {Code: contractsapi.StateSender.DeployedBytecode},
@@ -54,14 +56,14 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		input, err := abi.GetMethod(function).Encode(args)
 		require.NoError(t, err)
 
-		result := transition.Call2(senderAddress, addr, input, big.NewInt(0), gasLimit)
+		result := transition.Call2(deployerAddress, addr, input, big.NewInt(0), gasLimit)
 		require.True(t, result.Succeeded())
 
 		return result.ReturnValue
 	}
 
 	// deploy MockERC20 as root chain ERC 20 token
-	rootERC20Addr := deployAndInitContract(t, transition, contractsapi.RootERC20, senderAddress, nil)
+	rootERC20Addr := deployAndInitContract(t, transition, contractsapi.RootERC20, deployerAddress, nil)
 
 	// deploy CheckpointManager
 	checkpointManagerInit := func() ([]byte, error) {
@@ -72,13 +74,13 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 			ChainID_:        big.NewInt(0),
 		}).EncodeAbi()
 	}
-	checkpointManagerAddr := deployAndInitContract(t, transition, contractsapi.CheckpointManager, senderAddress, checkpointManagerInit)
+	checkpointManagerAddr := deployAndInitContract(t, transition, contractsapi.CheckpointManager, deployerAddress, checkpointManagerInit)
 
 	// deploy ExitHelper
 	exitHelperInit := func() ([]byte, error) {
 		return (&contractsapi.InitializeExitHelperFn{NewCheckpointManager: checkpointManagerAddr}).EncodeAbi()
 	}
-	exitHelperContractAddress := deployAndInitContract(t, transition, contractsapi.ExitHelper, senderAddress, exitHelperInit)
+	exitHelperContractAddress := deployAndInitContract(t, transition, contractsapi.ExitHelper, deployerAddress, exitHelperInit)
 
 	// deploy RootERC20Predicate
 	rootERC20PredicateInit := func() ([]byte, error) {
@@ -90,7 +92,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 			NativeTokenRootAddress: contracts.NativeERC20TokenContract,
 		}).EncodeAbi()
 	}
-	rootERC20PredicateAddr := deployAndInitContract(t, transition, contractsapi.RootERC20Predicate, senderAddress, rootERC20PredicateInit)
+	rootERC20PredicateAddr := deployAndInitContract(t, transition, contractsapi.RootERC20Predicate, deployerAddress, rootERC20PredicateInit)
 
 	// validate initialization of CheckpointManager
 	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
@@ -110,13 +112,13 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}).EncodeAbi()
 	require.NoError(t, err)
 
-	result := transition.Call2(senderAddress, rootERC20Addr, mintInput, nil, gasLimit)
+	result := transition.Call2(deployerAddress, rootERC20Addr, mintInput, nil, gasLimit)
 	require.NoError(t, result.Err)
 
 	// approve
 	approveInput, err := (&contractsapi.ApproveRootERC20Fn{
 		Spender: rootERC20PredicateAddr,
-		Amount:  ethgo.Ether(100),
+		Amount:  alloc[senderAddress].Balance,
 	}).EncodeAbi()
 	require.NoError(t, err)
 
