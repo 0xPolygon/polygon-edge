@@ -98,6 +98,8 @@ type TestClusterConfig struct {
 	InitialTrieDB    string
 	InitialStateRoot types.Hash
 
+	IsPropertyTest bool
+
 	logsDirOnce sync.Once
 }
 
@@ -145,6 +147,12 @@ func (c *TestClusterConfig) GetStdout(name string, custom ...io.Writer) io.Write
 
 func (c *TestClusterConfig) initLogsDir() {
 	logsDir := path.Join("../..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
+	if c.IsPropertyTest {
+		// property tests run cluster multiple times, so each cluster run will be in the main folder
+		// e2e-logs-{someNumber}/NameOfPropertyTest/NameOfPropertyTest-{someNumber}
+		// to have a separation between logs of each cluster run
+		logsDir = path.Join(logsDir, fmt.Sprintf("%v-%d", c.t.Name(), time.Now().UTC().Unix()))
+	}
 
 	if err := common.CreateDirSafe(logsDir, 0750); err != nil {
 		c.t.Fatal(err)
@@ -265,6 +273,12 @@ func WithTransactionsAllowListAdmin(addr types.Address) ClusterOption {
 func WithTransactionsAllowListEnabled(addr types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.TransactionsAllowListEnabled = append(h.TransactionsAllowListEnabled, addr)
+	}
+}
+
+func WithPropertyTestLogging() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.IsPropertyTest = true
 	}
 }
 

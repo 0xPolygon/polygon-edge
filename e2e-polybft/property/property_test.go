@@ -35,6 +35,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 		}
 
 		cluster := framework.NewTestCluster(t, int(numNodes),
+			framework.WithPropertyTestLogging(),
 			framework.WithEpochSize(epochSize),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i, a := range adresses {
