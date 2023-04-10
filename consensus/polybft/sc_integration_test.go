@@ -35,15 +35,15 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	accSet := currentValidators.getPublicIdentities()
 	cm := checkpointManager{blockchain: &blockchainMock{}}
 
-	senderAddress := types.Address{1}
-	bn256Addr := types.Address{2}
-	stateSenderAddr := types.Address{5}
-	receiverAddr := types.Address{6}
-	amount1 := big.NewInt(3)
-	amount2 := big.NewInt(2)
+	senderAddress := types.Address{1}   // account that sends exit/withdraw transctions
+	receiverAddr := types.Address{6}    // account that receive tokens
+	amount1 := big.NewInt(3)            // amount of the first widrawal
+	amount2 := big.NewInt(2)            // amount of the second widrawal
+	bn256Addr := types.Address{2}       // bls contract
+	stateSenderAddr := types.Address{5} // generic bridge contract on rootchain
 
 	alloc := map[types.Address]*chain.GenesisAccount{
-		senderAddress:         {Balance: ethgo.Ether(100)},
+		senderAddress:         {Balance: ethgo.Ether(100)}, // give 100 ethers to sender
 		contracts.BLSContract: {Code: contractsapi.BLS.DeployedBytecode},
 		bn256Addr:             {Code: contractsapi.BLS256.DeployedBytecode},
 		stateSenderAddr:       {Code: contractsapi.StateSender.DeployedBytecode},
@@ -92,6 +92,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}
 	rootERC20PredicateAddr := deployAndInitContract(t, transition, contractsapi.RootERC20Predicate, senderAddress, rootERC20PredicateInit)
 
+	// validate initialization of CheckpointManager
 	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
 
 	accSetHash, err := accSet.Hash()
@@ -130,9 +131,11 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}).EncodeAbi()
 	require.NoError(t, err)
 
+	// send sync events to childchain so that receiver can obtain tokens
 	result = transition.Call2(senderAddress, rootERC20PredicateAddr, depositInput, big.NewInt(0), gasLimit)
 	require.NoError(t, result.Err)
 
+	// simulate withdrawal from childchain to rootchain
 	widthdrawSig := crypto.Keccak256([]byte("WITHDRAW"))
 	erc20DataType := abi.MustNewType(
 		"tuple(bytes32 withdrawSignature, address rootToken, address withdrawer, address receiver, uint256 amount)")
