@@ -283,6 +283,12 @@ func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
 
+func NewPropertyTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
+	opts = append(opts, WithPropertyTestLogging())
+
+	return NewTestCluster(t, validatorsCount, opts...)
+}
+
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
 	t.Helper()
 

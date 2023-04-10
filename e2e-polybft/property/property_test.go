@@ -34,8 +34,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			premine[i] = rapid.Uint64Range(1, maxPremine).Draw(tt, fmt.Sprintf("stake for node %d", i+1))
 		}
 
-		cluster := framework.NewTestCluster(t, int(numNodes),
-			framework.WithPropertyTestLogging(),
+		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i, a := range adresses {
