@@ -27,6 +27,8 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			numBlocks = rapid.Uint64Range(2, 5).Draw(tt, "number of blocks the cluster should mine")
 		)
 
+		t.Logf("Test run with %d nodes, epoch size: %d. Number of blocks to mine: %d", numNodes, epochSize, numBlocks)
+
 		premine := make([]uint64, numNodes)
 
 		// premined amount will determine validator's stake and therefore voting power
