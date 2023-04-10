@@ -234,8 +234,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 		artifact            *artifact.Artifact
 		address             types.Address
 		constructorCallback func(artifact *artifact.Artifact,
-			polybftConfig *polybft.PolyBFTConfig,
-			rootConfig *polybft.RootchainConfig) ([]byte, error)
+			polybftConfig *polybft.PolyBFTConfig) ([]byte, error)
 	}
 
 	genesisContracts := []*contractInfo{
@@ -298,8 +297,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 			artifact: contractsapi.ValidatorSet,
 			address:  contracts.NewValidatorSetContract,
 			constructorCallback: func(artifact *artifact.Artifact,
-				polybftConfig *polybft.PolyBFTConfig,
-				rootConfig *polybft.RootchainConfig) ([]byte, error) {
+				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
 				// TODO @goran-ethernal- this will be changed in the next PRs to use generated binding
 				// once we remove the old ChildValidatorSet on use the new ValidatorInit binding
 				validatorsMap := make([]map[string]interface{}, len(polybftConfig.InitialValidatorSet))
@@ -313,8 +311,8 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 				// TODO @goran-ethernal - we will remove once we change e2e tests
 				// since by RFC-201 we won't be able to start edge without bridge (root)
 				customSupernetManagerAddr := types.ZeroAddress
-				if rootConfig != nil {
-					customSupernetManagerAddr = rootConfig.CustomSupernetManagerAddress
+				if polybftConfig.Bridge != nil {
+					customSupernetManagerAddr = polybftConfig.Bridge.CustomSupernetManagerAddr
 				}
 
 				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
@@ -335,8 +333,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 			artifact: contractsapi.RewardDistributor,
 			address:  contracts.RewardDistributorContract,
 			constructorCallback: func(artifact *artifact.Artifact,
-				polybftConfig *polybft.PolyBFTConfig,
-				rootConfig *polybft.RootchainConfig) ([]byte, error) {
+				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
 				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
 					contracts.NativeERC20TokenContract, // TODO @goran-ethernal - we will use a different token for rewards
 					contracts.NewValidatorSetContract,
@@ -365,7 +362,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *poly
 		code := contract.artifact.DeployedBytecode
 
 		if contract.constructorCallback != nil {
-			b, err := contract.constructorCallback(contract.artifact, polybftConfig, rootConfig)
+			b, err := contract.constructorCallback(contract.artifact, polybftConfig)
 			if err != nil {
 				return nil, err
 			}
