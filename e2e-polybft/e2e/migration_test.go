@@ -21,7 +21,7 @@ import (
 	"github.com/umbracle/ethgo/wallet"
 )
 
-func TestMigration(t *testing.T) {
+func TestE2E_Migration(t *testing.T) {
 	userKey, _ := wallet.GenerateKey()
 	userAddr := userKey.Address()
 	userKey2, _ := wallet.GenerateKey()

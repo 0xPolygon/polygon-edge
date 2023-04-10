@@ -52,17 +52,17 @@ It has native support for running bridge, which enables running cross-chain tran
 5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates manifest configuration with rootchain contract addresses and rootchain default sender address.
 
     ```bash
-    polygon-edge rootchain init-contracts 
-    --data-dir <local_storage_secrets_path> | [--config <cloud_secrets_manager_config_path>] 
-    [--manifest ./manifest.json]
-    [--json-rpc http://127.0.0.1:8545]
+    polygon-edge rootchain init-contracts \
+    --deployer-key <hex_encoded_rootchain_account_private_key> \
+    [--manifest ./manifest.json] \
+    [--json-rpc http://127.0.0.1:8545] \
     [--test]
     ```
 
 6. Create chain configuration - this command creates chain configuration, which is needed to run a blockchain
 
     ```bash
-    polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10
+    polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10 \
     [--consensus polybft] [--bridge-json-rpc <rootchain_ip_address>] [--manifest ./manifest.json]
     ```
 
@@ -75,18 +75,23 @@ It has native support for running bridge, which enables running cross-chain tran
 8. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
 
     ```bash
-    polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 --seal --log-level DEBUG
+    polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 \
+    --seal --log-level DEBUG
 
-    polygon-edge server --data-dir ./test-chain-2 --chain genesis.json --grpc-address :5002 --libp2p :30302 --jsonrpc :10002 --seal --log-level DEBUG
+    polygon-edge server --data-dir ./test-chain-2 --chain genesis.json --grpc-address :5002 --libp2p :30302 --jsonrpc :10002 \
+    --seal --log-level DEBUG
 
-    polygon-edge server --data-dir ./test-chain-3 --chain genesis.json --grpc-address :5003 --libp2p :30303 --jsonrpc :10003 --seal --log-level DEBUG
+    polygon-edge server --data-dir ./test-chain-3 --chain genesis.json --grpc-address :5003 --libp2p :30303 --jsonrpc :10003 \
+    --seal --log-level DEBUG
     
-    polygon-edge server --data-dir ./test-chain-4 --chain genesis.json --grpc-address :5004 --libp2p :30304 --jsonrpc :10004 --seal --log-level DEBUG
+    polygon-edge server --data-dir ./test-chain-4 --chain genesis.json --grpc-address :5004 --libp2p :30304 --jsonrpc :10004 \
+    --seal --log-level DEBUG
     ```
 
     It is possible to run child chain nodes in "relayer" mode. It allows automatic execution of deposit events on behalf of users.
     In order to start node in relayer mode, it is necessary to supply `--relayer` flag:
 
     ```bash
-    polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 --seal --log-level DEBUG --relayer
+    polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 \
+    --seal --log-level DEBUG --relayer
     ```

@@ -2,7 +2,6 @@ package fund
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -105,7 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		fundAddr := ethgo.Address(validatorAcc)
 		txn := &ethgo.Transaction{
 			To:    &fundAddr,
-			Value: big.NewInt(1000000000000000000),
+			Value: ethgo.Ether(100),
 		}
 
 		receipt, err := txRelayer.SendTransactionLocal(txn)

@@ -140,6 +140,7 @@ func main() {
 			"RootERC20",
 			gensc.RootERC20,
 			[]string{
+				"balanceOf",
 				"approve",
 				"mint",
 			},

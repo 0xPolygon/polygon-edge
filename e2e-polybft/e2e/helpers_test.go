@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -223,16 +224,65 @@ func checkStateSyncResultLogs(
 	expectedCount int,
 ) {
 	t.Helper()
-	require.Len(t, logs, expectedCount)
+	require.Equal(t, len(logs), expectedCount)
 
 	var stateSyncResultEvent contractsapi.StateSyncResultEvent
 	for _, log := range logs {
 		doesMatch, err := stateSyncResultEvent.ParseLog(log)
-		require.True(t, doesMatch)
 		require.NoError(t, err)
+		require.True(t, doesMatch)
 
 		t.Logf("Block Number=%d, Decoded Log=%+v\n", log.BlockNumber, stateSyncResultEvent)
 
 		require.True(t, stateSyncResultEvent.Status)
+	}
+}
+
+// getCheckpointBlockNumber gets current checkpoint block number from checkpoint manager smart contract
+func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) (uint64, error) {
+	checkpointBlockNumRaw, err := ABICall(l1Relayer, contractsapi.CheckpointManager,
+		checkpointManagerAddr, ethgo.ZeroAddress, "currentCheckpointBlockNumber")
+	if err != nil {
+		return 0, err
+	}
+
+	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
+	if err != nil {
+		return 0, err
+	}
+
+	return actualCheckpointBlock, nil
+}
+
+// waitForRootchainEpoch blocks for some predefined timeout to reach target epoch
+func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
+	rootchainTxRelayer txrelayer.TxRelayer, checkpointManager types.Address) error {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			return errors.New("root chain hasn't progressed to the desired epoch")
+		case <-ticker.C:
+		}
+
+		rootchainEpochRaw, err := ABICall(rootchainTxRelayer, contractsapi.CheckpointManager,
+			ethgo.Address(checkpointManager), ethgo.ZeroAddress, "currentEpoch")
+		if err != nil {
+			return err
+		}
+
+		rootchainEpoch, err := types.ParseUint64orHex(&rootchainEpochRaw)
+		if err != nil {
+			return err
+		}
+
+		if rootchainEpoch >= targetEpoch {
+			return nil
+		}
 	}
 }

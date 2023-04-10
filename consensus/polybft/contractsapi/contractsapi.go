@@ -739,6 +739,22 @@ func (d *DepositToRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
 }
 
+type BalanceOfRootERC20Fn struct {
+	Account types.Address `abi:"account"`
+}
+
+func (b *BalanceOfRootERC20Fn) Sig() []byte {
+	return RootERC20.Abi.Methods["balanceOf"].ID()
+}
+
+func (b *BalanceOfRootERC20Fn) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["balanceOf"].Encode(b)
+}
+
+func (b *BalanceOfRootERC20Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["balanceOf"], buf, b)
+}
+
 type ApproveRootERC20Fn struct {
 	Spender types.Address `abi:"spender"`
 	Amount  *big.Int      `abi:"amount"`

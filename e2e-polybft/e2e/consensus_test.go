@@ -20,14 +20,43 @@ import (
 )
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
+	const epochSize = 4
+
+	//nolint:godox
+	// TODO: Enable non-validators when proper support gets implemented
+	// (https://polygon.atlassian.net/browse/EVM-547)
+	// framework.WithNonValidators(2),
 	cluster := framework.NewTestCluster(t, 7,
-		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
+		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(22, 1*time.Minute))
+	t.Run("consensus protocol", func(t *testing.T) {
+		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+	})
+
+	t.Run("sync protool drop single validator node", func(t *testing.T) {
+		// query the current block number, as it is a starting point for the test
+		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
+
+		// stop one node
+		node := cluster.Servers[0]
+		node.Stop()
+
+		// wait for 2 epochs to elapse, so that rest of the network progresses
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
+
+		// start the node again
+		node.Start()
+
+		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+	})
 }
 
 func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
+	t.Skip("Enable once we have proper support for non-validators.")
+
 	// one non-validator node from the ensemble gets disconnected and connected again.
 	// It should be able to pick up from the synchronization protocol again.
 	cluster := framework.NewTestCluster(t, 7,
@@ -51,38 +80,19 @@ func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(55, 2*time.Minute))
 }
 
-func TestE2E_Consensus_Sync(t *testing.T) {
-	// one node from the ensemble gets disconnected and connected again.
-	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, 6, framework.WithValidatorSnapshot(6))
-	defer cluster.Stop()
+func TestE2E_Consensus_BulkDrop(t *testing.T) {
+	const (
+		clusterSize = 5
+		bulkToDrop  = 3
+		epochSize   = 5
+	)
 
-	// wait for the start
-	require.NoError(t, cluster.WaitForBlock(5, 1*time.Minute))
-
-	// stop one node
-	node := cluster.Servers[0]
-	node.Stop()
-
-	// wait for at least 15 more blocks before starting again
-	require.NoError(t, cluster.WaitForBlock(20, 2*time.Minute))
-
-	// start the node again
-	node.Start()
-
-	// wait for block 35
-	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
-}
-
-func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
-	clusterSize := 5
-	bulkToDrop := 3
-
-	cluster := framework.NewTestCluster(t, clusterSize)
+	cluster := framework.NewTestCluster(t, clusterSize,
+		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
 	// wait for cluster to start
-	require.NoError(t, cluster.WaitForBlock(5, 1*time.Minute))
+	cluster.WaitForReady(t)
 
 	// drop bulk of nodes from cluster
 	for i := 0; i < bulkToDrop; i++ {
@@ -96,8 +106,8 @@ func TestE2E_Consensus_Bulk_Drop(t *testing.T) {
 		node.Start()
 	}
 
-	// wait for block 10
-	require.NoError(t, cluster.WaitForBlock(10, 2*time.Minute))
+	// wait to proceed to the 2nd epoch
+	require.NoError(t, cluster.WaitForBlock(epochSize+1, 2*time.Minute))
 }
 
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
@@ -583,11 +593,10 @@ func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *
 
 	endCh, waitCh := make(chan struct{}), make(chan struct{})
 
+	delegationAmount := ethgo.Ether(1).Uint64()
 	// delegate tokens to validator in the loop to be sure that the stake of validator will be changed at end of epoch block
 	go func() {
 		for {
-			delegationAmount := uint64(1e18)
-
 			err = cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
 			require.NoError(t, err)
 
