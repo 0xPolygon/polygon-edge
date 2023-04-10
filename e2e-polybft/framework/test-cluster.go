@@ -43,9 +43,6 @@ const (
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
 
-	// envE2ETestsType used just to display type of test if skipped
-	envE2ETestsType = "E2E_TESTS_TYPE"
-
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
 )
@@ -312,8 +309,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	if !isTrueEnv(envE2ETestsEnabled) {
-		testType := os.Getenv(envE2ETestsType)
-		if testType == "" {
+		var testType string
+		if config.IsPropertyTest {
+			testType = "property"
+		} else {
 			testType = "integration"
 		}
 
