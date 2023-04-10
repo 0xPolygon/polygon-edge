@@ -258,12 +258,16 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 	rootchainTxRelayer txrelayer.TxRelayer, checkpointManager types.Address) error {
 	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case <-timer.C:
 			return errors.New("root chain hasn't progressed to the desired epoch")
-		case <-time.Tick(time.Second):
+		case <-ticker.C:
 		}
 
 		rootchainEpochRaw, err := ABICall(rootchainTxRelayer, contractsapi.CheckpointManager,
