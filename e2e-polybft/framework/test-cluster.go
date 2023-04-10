@@ -284,6 +284,7 @@ func isTrueEnv(e string) bool {
 }
 
 func NewPropertyTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
+	t.Helper()
 	opts = append(opts, WithPropertyTestLogging())
 
 	return NewTestCluster(t, validatorsCount, opts...)
