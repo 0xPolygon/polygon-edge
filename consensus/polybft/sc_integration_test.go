@@ -35,7 +35,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	accSet := currentValidators.getPublicIdentities()
 	cm := checkpointManager{blockchain: &blockchainMock{}}
 
-	senderAddress := types.Address{1}   // account that sends exit/withdraw transctions
+	senderAddress := types.Address{1}   // account that sends exit/withdraw transactions
 	receiverAddr := types.Address{6}    // account that receive tokens
 	amount1 := big.NewInt(3)            // amount of the first widrawal
 	amount2 := big.NewInt(2)            // amount of the second widrawal
