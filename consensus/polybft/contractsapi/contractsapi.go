@@ -587,6 +587,22 @@ func (g *GetCheckpointBlockCheckpointManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["getCheckpointBlock"], buf, g)
 }
 
+type InitializeExitHelperFn struct {
+	NewCheckpointManager types.Address `abi:"newCheckpointManager"`
+}
+
+func (i *InitializeExitHelperFn) Sig() []byte {
+	return ExitHelper.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeExitHelperFn) EncodeAbi() ([]byte, error) {
+	return ExitHelper.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeExitHelperFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ExitHelper.Abi.Methods["initialize"], buf, i)
+}
+
 type ExitExitHelperFn struct {
 	BlockNumber  *big.Int     `abi:"blockNumber"`
 	LeafIndex    *big.Int     `abi:"leafIndex"`
