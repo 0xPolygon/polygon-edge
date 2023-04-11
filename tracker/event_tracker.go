@@ -88,12 +88,13 @@ func (e *EventTracker) Start(ctx context.Context) error {
 			return fmt.Errorf("failed to init blocktracker: %w", err)
 		}
 
-
-		go func() {
 		if err := blockTracker.Start(); err != nil {
-			e.logger.Error("failed to start blocktracker", "error", err)
+			return fmt.Errorf("failed to start blocktracker: %w", err)
 		}
-	}()
+
+		if err := tt.Sync(ctx); err != nil {
+			return fmt.Errorf("failed to sync: %w", err)
+		}
 
 		return nil
 	})
@@ -102,12 +103,6 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		<-ctx.Done()
 		blockTracker.Close()
 		store.Close()
-	}()
-
-	go func() {
-		if err := tt.Sync(ctx); err != nil {
-			e.logger.Error("failed to sync", "error", err)
-		}
 	}()
 
 	return g.Wait()
