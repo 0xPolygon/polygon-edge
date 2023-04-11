@@ -1,6 +1,7 @@
 package state
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -153,4 +154,3 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 		})
 	}
 }
-

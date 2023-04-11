@@ -35,7 +35,6 @@ var (
 	ChildERC1155          *artifact.Artifact
 	ChildERC1155Predicate *artifact.Artifact
 	L2StateSender         *artifact.Artifact
-	EIP1559Burn           *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -166,11 +165,6 @@ func init() {
 	}
 
 	RootERC1155, err = artifact.DecodeArtifact([]byte(MockERC1155Artifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	EIP1559Burn, err = artifact.DecodeArtifact([]byte(EIP1559BurnArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
