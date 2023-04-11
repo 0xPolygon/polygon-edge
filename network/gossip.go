@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 	"sync/atomic"
 
 	"github.com/hashicorp/go-hclog"
@@ -22,10 +23,11 @@ const (
 type Topic struct {
 	logger hclog.Logger
 
-	topic   *pubsub.Topic
-	typ     reflect.Type
-	closeCh chan struct{}
-	closed  *uint64
+	topic     *pubsub.Topic
+	typ       reflect.Type
+	closeCh   chan struct{}
+	closed    *uint64
+	waitGroup sync.WaitGroup
 }
 
 func (t *Topic) createObj() proto.Message {
@@ -43,12 +45,14 @@ func (t *Topic) Close() {
 		return
 	}
 
+	close(t.closeCh)   // close all subscribers
+	t.waitGroup.Wait() // wait for all the subscribers to finish
+
+	// if all subscribers are finished, close the topic
 	if t.topic != nil {
 		t.topic.Close()
 		t.topic = nil
 	}
-
-	close(t.closeCh)
 }
 
 func (t *Topic) Publish(obj proto.Message) error {
@@ -75,6 +79,9 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 }
 
 func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{}, from peer.ID)) {
+	t.waitGroup.Add(1)
+	defer t.waitGroup.Done()
+
 	ctx, cancelFn := context.WithCancel(context.Background())
 
 	go func() {

@@ -97,6 +97,7 @@ func main() {
 			"ExitHelper",
 			gensc.ExitHelper,
 			[]string{
+				"initialize",
 				"exit",
 			},
 			[]string{},
@@ -139,6 +140,7 @@ func main() {
 			"RootERC20",
 			gensc.RootERC20,
 			[]string{
+				"balanceOf",
 				"approve",
 				"mint",
 			},

@@ -587,6 +587,22 @@ func (g *GetCheckpointBlockCheckpointManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CheckpointManager.Abi.Methods["getCheckpointBlock"], buf, g)
 }
 
+type InitializeExitHelperFn struct {
+	NewCheckpointManager types.Address `abi:"newCheckpointManager"`
+}
+
+func (i *InitializeExitHelperFn) Sig() []byte {
+	return ExitHelper.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeExitHelperFn) EncodeAbi() ([]byte, error) {
+	return ExitHelper.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeExitHelperFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ExitHelper.Abi.Methods["initialize"], buf, i)
+}
+
 type ExitExitHelperFn struct {
 	BlockNumber  *big.Int     `abi:"blockNumber"`
 	LeafIndex    *big.Int     `abi:"leafIndex"`
@@ -721,6 +737,22 @@ func (d *DepositToRootERC20PredicateFn) EncodeAbi() ([]byte, error) {
 
 func (d *DepositToRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
+}
+
+type BalanceOfRootERC20Fn struct {
+	Account types.Address `abi:"account"`
+}
+
+func (b *BalanceOfRootERC20Fn) Sig() []byte {
+	return RootERC20.Abi.Methods["balanceOf"].ID()
+}
+
+func (b *BalanceOfRootERC20Fn) EncodeAbi() ([]byte, error) {
+	return RootERC20.Abi.Methods["balanceOf"].Encode(b)
+}
+
+func (b *BalanceOfRootERC20Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RootERC20.Abi.Methods["balanceOf"], buf, b)
 }
 
 type ApproveRootERC20Fn struct {

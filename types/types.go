@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math/big"
 	"strings"
 	"unicode"
 
@@ -163,3 +164,13 @@ type Proof struct {
 	Data     []Hash // the proof himself
 	Metadata map[string]interface{}
 }
+
+type OverrideAccount struct {
+	Nonce     *uint64
+	Code      []byte
+	Balance   *big.Int
+	State     map[Hash]Hash
+	StateDiff map[Hash]Hash
+}
+
+type StateOverride map[Address]OverrideAccount

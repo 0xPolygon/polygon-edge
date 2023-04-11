@@ -43,11 +43,6 @@ const (
 	// envStdoutEnabled signal whether the output of the nodes get piped to stdout
 	envStdoutEnabled = "E2E_STDOUT"
 
-	// envE2ETestsType used just to display type of test if skipped
-	envE2ETestsType = "E2E_TESTS_TYPE"
-)
-
-const (
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
 )
@@ -72,7 +67,7 @@ type TestClusterConfig struct {
 
 	Name                string
 	Premine             []string // address[:amount]
-	PremineValidators   []string // address:[amount]
+	PremineValidators   []string // address[:amount]
 	StakeAmounts        []string // address[:amount]
 	MintableNativeToken bool
 	HasBridge           bool
@@ -101,6 +96,8 @@ type TestClusterConfig struct {
 
 	InitialTrieDB    string
 	InitialStateRoot types.Hash
+
+	IsPropertyTest bool
 
 	logsDirOnce sync.Once
 }
@@ -149,6 +146,12 @@ func (c *TestClusterConfig) GetStdout(name string, custom ...io.Writer) io.Write
 
 func (c *TestClusterConfig) initLogsDir() {
 	logsDir := path.Join("../..", fmt.Sprintf("e2e-logs-%d", startTime), c.t.Name())
+	if c.IsPropertyTest {
+		// property tests run cluster multiple times, so each cluster run will be in the main folder
+		// e2e-logs-{someNumber}/NameOfPropertyTest/NameOfPropertyTest-{someNumber}
+		// to have a separation between logs of each cluster run
+		logsDir = path.Join(logsDir, fmt.Sprintf("%v-%d", c.t.Name(), time.Now().UTC().Unix()))
+	}
 
 	if err := common.CreateDirSafe(logsDir, 0750); err != nil {
 		c.t.Fatal(err)
@@ -282,8 +285,22 @@ func WithTransactionsAllowListEnabled(addr types.Address) ClusterOption {
 	}
 }
 
+func WithPropertyTestLogging() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.IsPropertyTest = true
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
+}
+
+func NewPropertyTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
+	t.Helper()
+
+	opts = append(opts, WithPropertyTestLogging())
+
+	return NewTestCluster(t, validatorsCount, opts...)
 }
 
 func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
@@ -312,8 +329,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	if !isTrueEnv(envE2ETestsEnabled) {
-		testType := os.Getenv(envE2ETestsType)
-		if testType == "" {
+		var testType string
+		if config.IsPropertyTest {
+			testType = "property"
+		} else {
 			testType = "integration"
 		}
 

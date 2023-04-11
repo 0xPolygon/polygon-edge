@@ -40,9 +40,9 @@ var (
 	// test smart contracts
 	//go:embed test-contracts/*
 	testContracts          embed.FS
-	TestL1StateReceiver    *artifact.Artifact
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
+	TestSimple             *artifact.Artifact
 	RootERC721             *artifact.Artifact
 	RootERC1155            *artifact.Artifact
 )
@@ -175,12 +175,12 @@ func init() {
 		log.Fatal(err)
 	}
 
-	TestL1StateReceiver, err = artifact.DecodeArtifact(readTestContractContent("TestL1StateReceiver.json"))
+	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
+	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
 	if err != nil {
 		log.Fatal(err)
 	}

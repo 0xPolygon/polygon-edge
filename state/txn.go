@@ -339,6 +339,10 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 		}
 	}
 
+	if object.withFakeStorage {
+		return types.Hash{}
+	}
+
 	return txn.snapshot.GetStorage(addr, object.Account.Root, key)
 }
 
@@ -482,6 +486,18 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 	}
 
 	return txn.snapshot.GetStorage(addr, obj.Account.Root, key)
+}
+
+// SetFullStorage is used to replace the full state of the address.
+// Only used for debugging on the override jsonrpc endpoint.
+func (txn *Txn) SetFullStorage(addr types.Address, state map[types.Hash]types.Hash) {
+	for k, v := range state {
+		txn.SetState(addr, k, v)
+	}
+
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.withFakeStorage = true
+	})
 }
 
 func (txn *Txn) TouchAccount(addr types.Address) {
