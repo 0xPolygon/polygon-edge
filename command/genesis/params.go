@@ -3,6 +3,8 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -11,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -30,6 +33,12 @@ const (
 	minValidatorCount = "min-validator-count"
 	maxValidatorCount = "max-validator-count"
 	mintableTokenFlag = "mintable-native-token"
+	nativeTokenFlag   = "native-token-config"
+
+	defaultTokenName     = "Polygon"
+	defaultTokenSymbol   = "MATIC"
+	defaultTokenDecimals = uint8(18)
+	tokenParamsNumber    = 3
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -45,6 +54,7 @@ var (
 	errValidatorsNotSpecified = errors.New("validator information not specified")
 	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
+	errInvalidTokenParams     = errors.New("native token params were not submitted in format <name:symbol:decimals>")
 )
 
 type genesisParams struct {
@@ -93,7 +103,9 @@ type genesisParams struct {
 	transactionsAllowListAdmin       []string
 	transactionsAllowListEnabled     []string
 
-	mintableNativeToken bool
+	mintableNativeToken  bool
+	nativeTokenConfigRaw string
+	nativeTokenConfig    *polybft.TokenConfig
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -107,6 +119,12 @@ func (p *genesisParams) validateFlags() error {
 		!p.areValidatorsSetManually() &&
 		!p.areValidatorsSetByPrefix() {
 		return errValidatorsNotSpecified
+	}
+
+	if p.isPolyBFTConsensus() {
+		if err := p.decodeTokenParams(); err != nil {
+			return errInvalidTokenParams
+		}
 	}
 
 	// Check if the genesis file already exists
@@ -381,6 +399,46 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	}
 
 	return stakingAccount, nil
+}
+
+func (p *genesisParams) decodeTokenParams() error {
+	if p.nativeTokenConfigRaw == "" {
+		p.nativeTokenConfig = &polybft.TokenConfig{
+			TokenName:     defaultTokenName,
+			TokenSymbol:   defaultTokenSymbol,
+			TokenDecimals: defaultTokenDecimals,
+		}
+	} else {
+		p.nativeTokenConfig = &polybft.TokenConfig{
+			TokenName:     defaultTokenName,
+			TokenSymbol:   defaultTokenSymbol,
+			TokenDecimals: defaultTokenDecimals,
+		}
+
+		params := strings.Split(p.nativeTokenConfigRaw, ":")
+		if len(params) != tokenParamsNumber { // 3 parameters
+			return errInvalidTokenParams
+		}
+
+		p.nativeTokenConfig.TokenName = strings.TrimSpace(params[0])
+		if p.nativeTokenConfig.TokenName == "" {
+			return errInvalidTokenParams
+		}
+
+		p.nativeTokenConfig.TokenSymbol = strings.TrimSpace(params[1])
+		if p.nativeTokenConfig.TokenSymbol == "" {
+			return errInvalidTokenParams
+		}
+
+		decimals, err := strconv.ParseUint(strings.TrimSpace(params[1]), 10, 8)
+		if err != nil {
+			return errInvalidTokenParams
+		}
+
+		p.nativeTokenConfig.TokenDecimals = uint8(decimals)
+	}
+
+	return nil
 }
 
 func (p *genesisParams) getResult() command.CommandResult {

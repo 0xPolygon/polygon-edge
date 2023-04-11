@@ -38,8 +38,10 @@ type PolyBFTConfig struct {
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
 
-	// MintableERC20Token denotes whether mintable ERC20 token is used
-	MintableERC20Token bool `json:"mintableERC20"`
+	// MintableNativeToken denotes whether mintable native token is used
+	MintableNativeToken bool `json:"mintableNative"`
+
+	NativTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 }
@@ -261,4 +263,11 @@ func (m *Manifest) Save(manifestPath string) error {
 	}
 
 	return nil
+}
+
+// TokenConfig is the configuration of nativ token used by edge network
+type TokenConfig struct {
+	TokenName     string `json:"tokenName"`
+	TokenSymbol   string `json:"tokenSymbol"`
+	TokenDecimals uint8  `json:"tokenDecimals"`
 }

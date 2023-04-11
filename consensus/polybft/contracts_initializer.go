@@ -17,12 +17,6 @@ const (
 	minDelegation = 1
 )
 
-var (
-	nativeTokenName     = "Polygon"
-	nativeTokenSymbol   = "MATIC"
-	nativeTokenDecimals = uint8(18)
-)
-
 // getInitChildValidatorSetInput builds input parameters for ChildValidatorSet SC initialization
 func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	apiValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
