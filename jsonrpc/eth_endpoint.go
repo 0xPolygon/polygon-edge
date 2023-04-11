@@ -62,7 +62,7 @@ type ethBlockchainStore interface {
 	GetAvgGasPrice() *big.Int
 
 	// ApplyTxn applies a transaction object to the blockchain
-	ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
+	ApplyTxn(header *types.Header, txn *types.Transaction, override types.StateOverride) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
@@ -388,8 +388,45 @@ func (e *Eth) GasPrice() (interface{}, error) {
 	return argUint64(common.Max(e.priceLimit, avgGasPrice)), nil
 }
 
+type overrideAccount struct {
+	Nonce     *argUint64                 `json:"nonce"`
+	Code      *argBytes                  `json:"code"`
+	Balance   *argUint64                 `json:"balance"`
+	State     *map[types.Hash]types.Hash `json:"state"`
+	StateDiff *map[types.Hash]types.Hash `json:"stateDiff"`
+}
+
+func (o *overrideAccount) ToType() types.OverrideAccount {
+	res := types.OverrideAccount{}
+
+	if o.Nonce != nil {
+		res.Nonce = (*uint64)(o.Nonce)
+	}
+
+	if o.Code != nil {
+		res.Code = *o.Code
+	}
+
+	if o.Balance != nil {
+		res.Balance = new(big.Int).SetUint64(*(*uint64)(o.Balance))
+	}
+
+	if o.State != nil {
+		res.State = *o.State
+	}
+
+	if o.StateDiff != nil {
+		res.StateDiff = *o.StateDiff
+	}
+
+	return res
+}
+
+// StateOverride is the collection of overridden accounts.
+type stateOverride map[types.Address]overrideAccount
+
 // Call executes a smart contract call using the transaction object data
-func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) {
+func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOverride) (interface{}, error) {
 	header, err := GetHeaderFromBlockNumberOrHash(filter, e.store)
 	if err != nil {
 		return nil, err
@@ -404,8 +441,16 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash) (interface{}, error) 
 		transaction.Gas = header.GasLimit
 	}
 
+	var override types.StateOverride
+	if apiOverride != nil {
+		override = types.StateOverride{}
+		for addr, o := range *apiOverride {
+			override[addr] = o.ToType()
+		}
+	}
+
 	// The return value of the execution is saved in the transition (returnValue field)
-	result, err := e.store.ApplyTxn(header, transaction)
+	result, err := e.store.ApplyTxn(header, transaction, override)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +585,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		txn := transaction.Copy()
 		txn.Gas = gas
 
-		result, applyErr := e.store.ApplyTxn(header, txn)
+		result, applyErr := e.store.ApplyTxn(header, txn, nil)
 
 		if applyErr != nil {
 			// Check the application error.

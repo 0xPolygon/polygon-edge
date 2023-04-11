@@ -259,6 +259,36 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 	}
 }
 
+func (t *Transition) WithStateOverride(override types.StateOverride) error {
+	for addr, o := range override {
+		if o.State != nil && o.StateDiff != nil {
+			return fmt.Errorf("cannot override both state and state diff")
+		}
+
+		if o.Nonce != nil {
+			t.state.SetNonce(addr, *o.Nonce)
+		}
+
+		if o.Balance != nil {
+			t.state.SetBalance(addr, o.Balance)
+		}
+
+		if o.Code != nil {
+			t.state.SetCode(addr, o.Code)
+		}
+
+		if o.State != nil {
+			t.state.SetFullStorage(addr, o.State)
+		}
+
+		for k, v := range o.StateDiff {
+			t.state.SetState(addr, k, v)
+		}
+	}
+
+	return nil
+}
+
 func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }

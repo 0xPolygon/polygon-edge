@@ -41,6 +41,7 @@ var (
 	testContracts          embed.FS
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
+	TestSimple             *artifact.Artifact
 	RootERC721             *artifact.Artifact
 	RootERC1155            *artifact.Artifact
 )
@@ -169,6 +170,11 @@ func init() {
 	}
 
 	TestWriteBlockMetadata, err = artifact.DecodeArtifact(readTestContractContent("TestWriteBlockMetadata.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
