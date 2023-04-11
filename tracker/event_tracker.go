@@ -2,12 +2,14 @@ package tracker
 
 import (
 	"context"
+	"fmt"
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/blocktracker"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
+	"golang.org/x/sync/errgroup"
 )
 
 type eventSubscription interface {
@@ -80,17 +82,21 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
-	go func() {
+	g := new(errgroup.Group)
+	g.Go(func() error {
 		if err := blockTracker.Init(); err != nil {
-			e.logger.Error("failed to init blocktracker", "error", err)
-
-			return
+			return fmt.Errorf("failed to init blocktracker: %w", err)
 		}
 
+
+		go func() {
 		if err := blockTracker.Start(); err != nil {
 			e.logger.Error("failed to start blocktracker", "error", err)
 		}
 	}()
+
+		return nil
+	})
 
 	go func() {
 		<-ctx.Done()
@@ -101,9 +107,8 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	go func() {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
-			panic(err)
 		}
 	}()
 
-	return nil
+	return g.Wait()
 }
