@@ -101,6 +101,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	go func() {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
+			panic(err)
 		}
 	}()
 
