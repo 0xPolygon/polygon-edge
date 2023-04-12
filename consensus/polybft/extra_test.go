@@ -835,6 +835,62 @@ func TestValidatorSetDelta_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 	})
 }
 
+func Test_GetIbftExtraClean(t *testing.T) {
+	t.Parallel()
+
+	key, err := wallet.GenerateAccount()
+	require.NoError(t, err)
+
+	extra := &Extra{
+		Validators: &ValidatorSetDelta{
+			Added: AccountSet{
+				&ValidatorMetadata{
+					Address:     types.BytesToAddress([]byte{11, 22}),
+					BlsKey:      key.Bls.PublicKey(),
+					VotingPower: new(big.Int).SetUint64(1000),
+					IsActive:    true,
+				},
+			},
+		},
+		Seal: []byte{},
+		Committed: &Signature{
+			AggregatedSignature: []byte{23, 24},
+			Bitmap:              []byte{11},
+		},
+		Parent: &Signature{
+			AggregatedSignature: []byte{0, 1},
+			Bitmap:              []byte{1},
+		},
+		Checkpoint: &CheckpointData{
+			BlockRound:            1,
+			EpochNumber:           1,
+			CurrentValidatorsHash: types.BytesToHash([]byte{2, 3}),
+			NextValidatorsHash:    types.BytesToHash([]byte{4, 5}),
+			EventRoot:             types.BytesToHash([]byte{6, 7}),
+		},
+	}
+
+	extraBytes := append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+
+	extraClean, err := GetIbftExtraClean(extraBytes)
+	require.NoError(t, err)
+
+	extraTwo := &Extra{}
+	require.NoError(t, extraTwo.UnmarshalRLP(extraClean[ExtraVanity:]))
+	require.True(t, extra.Validators.Equals(extra.Validators))
+	require.Equal(t, extra.Checkpoint.BlockRound, extraTwo.Checkpoint.BlockRound)
+	require.Equal(t, extra.Checkpoint.EpochNumber, extraTwo.Checkpoint.EpochNumber)
+	require.Equal(t, extra.Checkpoint.CurrentValidatorsHash, extraTwo.Checkpoint.CurrentValidatorsHash)
+	require.Equal(t, extra.Checkpoint.NextValidatorsHash, extraTwo.Checkpoint.NextValidatorsHash)
+	require.Equal(t, extra.Checkpoint.NextValidatorsHash, extraTwo.Checkpoint.NextValidatorsHash)
+	require.Equal(t, extra.Parent.AggregatedSignature, extraTwo.Parent.AggregatedSignature)
+	require.Equal(t, extra.Parent.Bitmap, extraTwo.Parent.Bitmap)
+
+	require.Empty(t, extraTwo.Seal)
+	require.Nil(t, extraTwo.Committed.AggregatedSignature)
+	require.Nil(t, extraTwo.Committed.Bitmap)
+}
+
 func Test_GetIbftExtraClean_Fail(t *testing.T) {
 	t.Parallel()
 
