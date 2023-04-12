@@ -122,7 +122,7 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	if p.isPolyBFTConsensus() {
-		if err := p.decodeTokenParams(); err != nil {
+		if err := p.extractTokenParams(); err != nil {
 			return errInvalidTokenParams
 		}
 	}
@@ -401,7 +401,7 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	return stakingAccount, nil
 }
 
-func (p *genesisParams) decodeTokenParams() error {
+func (p *genesisParams) extractTokenParams() error {
 	if p.nativeTokenConfigRaw == "" {
 		p.nativeTokenConfig = &polybft.TokenConfig{
 			TokenName:     defaultTokenName,
@@ -430,7 +430,7 @@ func (p *genesisParams) decodeTokenParams() error {
 			return errInvalidTokenParams
 		}
 
-		decimals, err := strconv.ParseUint(strings.TrimSpace(params[1]), 10, 8)
+		decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
 		if err != nil {
 			return errInvalidTokenParams
 		}
