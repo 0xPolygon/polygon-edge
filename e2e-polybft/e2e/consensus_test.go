@@ -622,7 +622,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
 
-	queryNativeERC20Metadata := func(funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) map[string]interface{} {
+	queryNativeERC20Metadata := func(funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
 		valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable, nativeTokenAddr, ethgo.ZeroAddress, funcName)
 		require.NoError(t, err)
 
@@ -634,7 +634,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		err = abiType.DecodeStruct(valueRaw, &decodedResult)
 		require.NoError(t, err)
 
-		return decodedResult
+		return decodedResult["0"]
 	}
 
 	validatorsAddrs := make([]types.Address, validatorCount)
@@ -677,16 +677,13 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	stringABIType := abi.MustNewType("tuple(string)")
 	uint8ABIType := abi.MustNewType("tuple(uint8)")
 
-	decodedResult := queryNativeERC20Metadata("name", stringABIType, relayer)
-	name := decodedResult["0"].(string) //nolint:forcetypeassert
+	name := queryNativeERC20Metadata("name", stringABIType, relayer)
 	require.Equal(t, tokenName, name)
 
-	decodedResult = queryNativeERC20Metadata("symbol", stringABIType, relayer)
-	symbol := decodedResult["0"].(string) //nolint:forcetypeassert
+	symbol := queryNativeERC20Metadata("symbol", stringABIType, relayer)
 	require.Equal(t, tokenSymbol, symbol)
 
-	decodedResult = queryNativeERC20Metadata("decimals", uint8ABIType, relayer)
-	decimalsCount := decodedResult["0"].(uint8) //nolint:forcetypeassert
+	decimalsCount := queryNativeERC20Metadata("decimals", uint8ABIType, relayer)
 	require.Equal(t, decimals, decimalsCount)
 
 	// send mint transactions
