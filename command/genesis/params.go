@@ -55,7 +55,8 @@ var (
 	errValidatorsNotSpecified = errors.New("validator information not specified")
 	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
-	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format <name:symbol:decimalsCount>")
+	errInvalidTokenParams     = errors.New("native token params were not submitted in proper" +
+		" format <name:symbol:decimals count>")
 )
 
 type genesisParams struct {
