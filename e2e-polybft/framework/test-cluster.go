@@ -44,7 +44,7 @@ const (
 	envStdoutEnabled = "E2E_STDOUT"
 
 	// prefix for validator directory
-	defaultValidatorPrefix = "test-validator-"
+	defaultValidatorPrefix = "test-chain-"
 
 	// prefix for non validators directory
 	nonValidatorPrefix = "test-non-validator-"
