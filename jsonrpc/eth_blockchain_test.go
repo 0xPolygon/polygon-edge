@@ -525,6 +525,10 @@ func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
 	return nil
 }
 
+func (m *mockBlockStore) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
+}
+
 func newTestBlock(number uint64, hash types.Hash) *types.Block {
 	return &types.Block{
 		Header: &types.Header{
