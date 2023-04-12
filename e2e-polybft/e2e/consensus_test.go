@@ -173,11 +173,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, owner.WhitelistValidator(secondValidatorAddr.String(), ownerSecrets))
 
 	// start the first and the second validator
-	dir1 := cluster.Config.Dir(cluster.Config.ValidatorPrefix + strconv.Itoa(validatorSize+1))
-	dir2 := cluster.Config.Dir(cluster.Config.ValidatorPrefix + strconv.Itoa(validatorSize+2))
-
-	cluster.InitTestServer(t, dir1, true, false)
-	cluster.InitTestServer(t, dir2, true, false)
+	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+1), true, false)
+	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+2), true, false)
 
 	ownerAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, ownerSecrets))
 	require.NoError(t, err)

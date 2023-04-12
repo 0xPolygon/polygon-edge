@@ -470,12 +470,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		dir := cluster.Config.Dir(cluster.Config.ValidatorPrefix + strconv.Itoa(i))
+		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, true, cluster.Config.HasBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
-		dir := cluster.Config.Dir(nonValidatorPrefix + strconv.Itoa(i))
+		dir := nonValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, false, false /* relayer */)
 	}
 
@@ -488,6 +488,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 
 	logLevel := os.Getenv(envLogLevel)
 
+	dataDir = c.Config.Dir(dataDir)
 	if c.Config.InitialTrieDB != "" {
 		err := CopyDir(c.Config.InitialTrieDB, filepath.Join(dataDir, "trie"))
 		if err != nil {
