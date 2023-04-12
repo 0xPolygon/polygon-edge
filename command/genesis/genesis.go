@@ -211,7 +211,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.nativeTokenConfigRaw,
 			nativeTokenConfigFlag,
 			"",
-			"configuration of native token in format <name:symbol:decimalsCount>",
+			"configuration of native token in format <name:symbol:decimals count>",
 		)
 	}
 
