@@ -406,15 +406,15 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 func (p *genesisParams) extractTokenParams() error {
 	if p.nativeTokenConfigRaw == "" {
 		p.nativeTokenConfig = &polybft.TokenConfig{
-			TokenName:     defaultTokenName,
-			TokenSymbol:   defaultTokenSymbol,
-			TokenDecimals: defaultTokenDecimals,
+			Name:     defaultTokenName,
+			Symbol:   defaultTokenSymbol,
+			Decimals: defaultTokenDecimals,
 		}
 	} else {
 		p.nativeTokenConfig = &polybft.TokenConfig{
-			TokenName:     defaultTokenName,
-			TokenSymbol:   defaultTokenSymbol,
-			TokenDecimals: defaultTokenDecimals,
+			Name:     defaultTokenName,
+			Symbol:   defaultTokenSymbol,
+			Decimals: defaultTokenDecimals,
 		}
 
 		params := strings.Split(p.nativeTokenConfigRaw, ":")
@@ -422,13 +422,13 @@ func (p *genesisParams) extractTokenParams() error {
 			return errInvalidTokenParams
 		}
 
-		p.nativeTokenConfig.TokenName = strings.TrimSpace(params[0])
-		if p.nativeTokenConfig.TokenName == "" {
+		p.nativeTokenConfig.Name = strings.TrimSpace(params[0])
+		if p.nativeTokenConfig.Name == "" {
 			return errInvalidTokenParams
 		}
 
-		p.nativeTokenConfig.TokenSymbol = strings.TrimSpace(params[1])
-		if p.nativeTokenConfig.TokenSymbol == "" {
+		p.nativeTokenConfig.Symbol = strings.TrimSpace(params[1])
+		if p.nativeTokenConfig.Symbol == "" {
 			return errInvalidTokenParams
 		}
 
@@ -437,7 +437,7 @@ func (p *genesisParams) extractTokenParams() error {
 			return errInvalidTokenParams
 		}
 
-		p.nativeTokenConfig.TokenDecimals = uint8(decimals)
+		p.nativeTokenConfig.Decimals = uint8(decimals)
 	}
 
 	return nil
