@@ -43,7 +43,7 @@ func (m *mockSnapshot) GetAccount(addr types.Address) (*Account, error) {
 }
 
 func (m *mockSnapshot) GetCode(hash types.Hash) ([]byte, bool) {
-	return nil, false
+	return []byte{0x1}, true
 }
 
 func newStateWithPreState(preState map[types.Address]*PreState) readSnapshot {
@@ -85,8 +85,10 @@ func TestTxn_TracesCompaction(t *testing.T) {
 	txn.SetState(addr, types.ZeroHash, oneHash) // updates
 	txn.SetState(addr, oneHash, types.ZeroHash)
 
+	txn.GetCode(addr)
+
 	txn.TouchAccount(addr)
-	require.Len(t, txn.journal, 16)
+	require.Len(t, txn.journal, 18)
 
 	trace := txn.getCompactJournal()
 	require.Len(t, trace, 1)
@@ -100,8 +102,9 @@ func TestTxn_TracesCompaction(t *testing.T) {
 			types.ZeroHash: oneHash,
 			oneHash:        types.ZeroHash,
 		},
-		Touched: boolTruePtr(),
-		Read:    boolTruePtr(),
+		CodeRead: []byte{0x1},
+		Touched:  boolTruePtr(),
+		Read:     boolTruePtr(),
 	})
 }
 
@@ -118,10 +121,11 @@ func TestJournalEntry_Merge(t *testing.T) {
 			Storage: map[types.Hash]types.Hash{
 				types.ZeroHash: types.ZeroHash,
 			},
-			Code:    []byte{0x1},
-			Suicide: boolTruePtr(),
-			Touched: boolTruePtr(),
-			Read:    boolTruePtr(),
+			Code:     []byte{0x1},
+			CodeRead: []byte{0x1},
+			Suicide:  boolTruePtr(),
+			Touched:  boolTruePtr(),
+			Read:     boolTruePtr(),
 			StorageRead: map[types.Hash]struct{}{
 				types.ZeroHash: {},
 			},

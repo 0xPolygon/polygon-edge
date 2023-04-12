@@ -136,6 +136,15 @@ func (txn *Txn) trackAccountChange(addr types.Address, changeType string, object
 	txn.addJournalEntry(entry)
 }
 
+func (txn *Txn) trackCodeRead(addr types.Address, code []byte) {
+	entry := &types.JournalEntry{
+		Addr:     addr,
+		CodeRead: code,
+	}
+
+	txn.addJournalEntry(entry)
+}
+
 // GetAccount returns an account
 func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 	object, exists := txn.getStateObject(addr)
@@ -478,6 +487,8 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	}
 
 	if object.DirtyCode {
+		txn.trackCodeRead(addr, object.Code)
+
 		return object.Code
 	}
 	// TODO; Should we move this to state?
@@ -485,11 +496,15 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 
 	if ok {
 		//nolint:forcetypeassert
-		return v.([]byte)
+		code := v.([]byte)
+		txn.trackCodeRead(addr, code)
+
+		return code
 	}
 
 	code, _ := txn.snapshot.GetCode(types.BytesToHash(object.Account.CodeHash))
 	txn.codeCache.Add(addr, code)
+	txn.trackCodeRead(addr, code)
 
 	return code
 }
