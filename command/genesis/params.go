@@ -3,6 +3,7 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -54,7 +55,7 @@ var (
 	errValidatorsNotSpecified = errors.New("validator information not specified")
 	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
-	errInvalidTokenParams     = errors.New("native token params were not submitted in format <name:symbol:decimals>")
+	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format <name:symbol:decimalsCount>")
 )
 
 type genesisParams struct {
@@ -431,7 +432,7 @@ func (p *genesisParams) extractTokenParams() error {
 		}
 
 		decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
-		if err != nil {
+		if err != nil || decimals <= 0 || decimals > math.MaxUint8 {
 			return errInvalidTokenParams
 		}
 
