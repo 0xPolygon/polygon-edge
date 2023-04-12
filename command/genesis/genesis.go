@@ -156,13 +156,6 @@ func setFlags(cmd *cobra.Command) {
 			"the manifest file path, which contains genesis metadata",
 		)
 
-		cmd.Flags().IntVar(
-			&params.validatorSetSize,
-			validatorSetSizeFlag,
-			defaultValidatorSetSize,
-			"the total number of validators",
-		)
-
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
 			sprintSizeFlag,

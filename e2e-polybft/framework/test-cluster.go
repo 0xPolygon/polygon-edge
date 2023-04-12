@@ -45,6 +45,9 @@ const (
 
 	// prefix for validator directory
 	defaultValidatorPrefix = "test-chain-"
+
+	// prefix for non validators directory
+	nonValidatorPrefix = "test-non-validator-"
 )
 
 var startTime int64
@@ -338,13 +341,27 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		once:        sync.Once{},
 	}
 
+	// in case no validators are specified in opts, all nodes will be validators
+	if cluster.Config.ValidatorSetSize == 0 {
+		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
+	}
+
 	{
-		// run init accounts
-		addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, validatorsCount)
+		// run init accounts for validators
+		addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
 		require.NoError(t, err)
 
 		if cluster.Config.SecretsCallback != nil {
 			cluster.Config.SecretsCallback(addresses, cluster.Config)
+		}
+
+		if config.NonValidatorCount > 0 {
+			// run init accounts for non-validators
+			_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
+			require.NoError(t, err)
+
+			// we don't call secrets callback on non-validators,
+			// since we have nothing to premine nor stake for non validators
 		}
 	}
 
@@ -372,11 +389,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
-	}
-
-	// in case no validators are specified in opts, all nodes will be validators
-	if cluster.Config.ValidatorSetSize == 0 {
-		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
 	if cluster.Config.HasBridge {
@@ -432,10 +444,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		if cluster.Config.ValidatorSetSize > 0 {
-			args = append(args, "--validator-set-size", fmt.Sprint(cluster.Config.ValidatorSetSize))
-		}
-
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
 			args = append(args, "--contract-deployer-allow-list-admin",
 				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
@@ -462,23 +470,25 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		cluster.InitTestServer(t, i, true, cluster.Config.HasBridge && i == 1 /* relayer */)
+		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
+		cluster.InitTestServer(t, dir, true, cluster.Config.HasBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
-		offsetIndex := i + int(cluster.Config.ValidatorSetSize)
-		cluster.InitTestServer(t, offsetIndex, false, false /* relayer */)
+		dir := nonValidatorPrefix + strconv.Itoa(i)
+		cluster.InitTestServer(t, dir, false, false /* relayer */)
 	}
 
 	return cluster
 }
 
-func (c *TestCluster) InitTestServer(t *testing.T, i int, isValidator bool, relayer bool) {
+func (c *TestCluster) InitTestServer(t *testing.T,
+	dataDir string, isValidator bool, relayer bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
 
-	dataDir := c.Config.Dir(c.Config.ValidatorPrefix + strconv.Itoa(i))
+	dataDir = c.Config.Dir(dataDir)
 	if c.Config.InitialTrieDB != "" {
 		err := CopyDir(c.Config.InitialTrieDB, filepath.Join(dataDir, "trie"))
 		if err != nil {
