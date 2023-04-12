@@ -204,6 +204,8 @@ func TestE2E_Migration(t *testing.T) {
 	_, err = cluster.InitSecrets("test-chain-8", 1)
 	require.NoError(t, err)
 
-	cluster.InitTestServer(t, 8, "test-chain-", false, false)
+	dir := cluster.Config.Dir("test-chain-8")
+
+	cluster.InitTestServer(t, dir, false, false)
 	require.NoError(t, cluster.WaitForBlock(33, time.Minute))
 }

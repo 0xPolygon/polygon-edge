@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"strconv"
 	"testing"
 	"time"
 
@@ -30,7 +31,7 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
 	})
 
-	t.Run("sync protocol drop single validator node", func(t *testing.T) {
+	t.Run("sync protocol, drop single validator node", func(t *testing.T) {
 		// query the current block number, as it is a starting point for the test
 		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
@@ -172,8 +173,11 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, owner.WhitelistValidator(secondValidatorAddr.String(), ownerSecrets))
 
 	// start the first and the second validator
-	cluster.InitTestServer(t, validatorSize+1, cluster.Config.ValidatorPrefix, true, false)
-	cluster.InitTestServer(t, validatorSize+2, cluster.Config.ValidatorPrefix, true, false)
+	dir1 := cluster.Config.Dir(cluster.Config.ValidatorPrefix + strconv.Itoa(validatorSize+1))
+	dir2 := cluster.Config.Dir(cluster.Config.ValidatorPrefix + strconv.Itoa(validatorSize+2))
+
+	cluster.InitTestServer(t, dir1, true, false)
+	cluster.InitTestServer(t, dir2, true, false)
 
 	ownerAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, ownerSecrets))
 	require.NoError(t, err)

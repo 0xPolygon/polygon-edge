@@ -44,7 +44,7 @@ const (
 	envStdoutEnabled = "E2E_STDOUT"
 
 	// prefix for validator directory
-	defaultValidatorPrefix = "test-chain-"
+	defaultValidatorPrefix = "test-validator-"
 
 	// prefix for non validators directory
 	nonValidatorPrefix = "test-non-validator-"
@@ -470,24 +470,24 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		cluster.InitTestServer(t, i, cluster.Config.ValidatorPrefix,
-			true, cluster.Config.HasBridge && i == 1 /* relayer */)
+		dir := cluster.Config.Dir(cluster.Config.ValidatorPrefix + strconv.Itoa(i))
+		cluster.InitTestServer(t, dir, true, cluster.Config.HasBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
-		cluster.InitTestServer(t, i, nonValidatorPrefix, false, false /* relayer */)
+		dir := cluster.Config.Dir(nonValidatorPrefix + strconv.Itoa(i))
+		cluster.InitTestServer(t, dir, false, false /* relayer */)
 	}
 
 	return cluster
 }
 
-func (c *TestCluster) InitTestServer(t *testing.T, i int,
-	validatorPrefix string, isValidator bool, relayer bool) {
+func (c *TestCluster) InitTestServer(t *testing.T,
+	dataDir string, isValidator bool, relayer bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
 
-	dataDir := c.Config.Dir(validatorPrefix + strconv.Itoa(i))
 	if c.Config.InitialTrieDB != "" {
 		err := CopyDir(c.Config.InitialTrieDB, filepath.Join(dataDir, "trie"))
 		if err != nil {
