@@ -128,18 +128,9 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 		return nil, nil
 	}
 
-	// we need to copy it because the store returns header from storage directly
-	// and not a copy, so changing it, actually changes it in storage as well
-	headerCopy := block.Header.Copy()
-
-	filteredExtra, err := e.store.FilterExtra(headerCopy.ExtraData)
-	if err != nil {
+	if err := e.filterExtra(block); err != nil {
 		return nil, err
 	}
-
-	headerCopy.ExtraData = filteredExtra
-	// no need to recompute hash (filtered out data is not in the hash in the first place)
-	block.Header = headerCopy
 
 	return toBlock(block, fullTx), nil
 }
@@ -151,20 +142,28 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 		return nil, nil
 	}
 
+	if err := e.filterExtra(block); err != nil {
+		return nil, err
+	}
+
+	return toBlock(block, fullTx), nil
+}
+
+func (e *Eth) filterExtra(block *types.Block) error {
 	// we need to copy it because the store returns header from storage directly
 	// and not a copy, so changing it, actually changes it in storage as well
 	headerCopy := block.Header.Copy()
 
 	filteredExtra, err := e.store.FilterExtra(headerCopy.ExtraData)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	headerCopy.ExtraData = filteredExtra
 	// no need to recompute hash (filtered out data is not in the hash in the first place)
 	block.Header = headerCopy
 
-	return toBlock(block, fullTx), nil
+	return nil
 }
 
 func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{}, error) {
