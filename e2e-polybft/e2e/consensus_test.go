@@ -620,6 +620,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
 		framework.WithMintableNativeToken(true),
+		framework.WithNativeTokenConfig("MyPolygon:MyMatic:18"),
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
 			for i, addr := range addrs {
