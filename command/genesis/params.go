@@ -23,23 +23,23 @@ import (
 )
 
 const (
-	dirFlag           = "dir"
-	nameFlag          = "name"
-	premineFlag       = "premine"
-	chainIDFlag       = "chain-id"
-	epochSizeFlag     = "epoch-size"
-	epochRewardFlag   = "epoch-reward"
-	blockGasLimitFlag = "block-gas-limit"
-	posFlag           = "pos"
-	minValidatorCount = "min-validator-count"
-	maxValidatorCount = "max-validator-count"
-	mintableTokenFlag = "mintable-native-token"
-	nativeTokenFlag   = "native-token-config"
+	dirFlag               = "dir"
+	nameFlag              = "name"
+	premineFlag           = "premine"
+	chainIDFlag           = "chain-id"
+	epochSizeFlag         = "epoch-size"
+	epochRewardFlag       = "epoch-reward"
+	blockGasLimitFlag     = "block-gas-limit"
+	posFlag               = "pos"
+	minValidatorCount     = "min-validator-count"
+	maxValidatorCount     = "max-validator-count"
+	mintableTokenFlag     = "mintable-native-token"
+	nativeTokenConfigFlag = "native-token-config"
 
-	defaultTokenName     = "Polygon"
-	defaultTokenSymbol   = "MATIC"
-	defaultTokenDecimals = uint8(18)
-	tokenParamsNumber    = 3
+	defaultNativeTokenName     = "Polygon"
+	defaultNativeTokenSymbol   = "MATIC"
+	defaultNativeTokenDecimals = uint8(18)
+	nativeTokenParamsNumber    = 3
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -124,7 +124,7 @@ func (p *genesisParams) validateFlags() error {
 	}
 
 	if p.isPolyBFTConsensus() {
-		if err := p.extractTokenParams(); err != nil {
+		if err := p.extractNativeTokenMetadata(); err != nil {
 			return err
 		}
 	}
@@ -403,42 +403,45 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	return stakingAccount, nil
 }
 
-func (p *genesisParams) extractTokenParams() error {
+// extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
+func (p *genesisParams) extractNativeTokenMetadata() error {
 	if p.nativeTokenConfigRaw == "" {
 		p.nativeTokenConfig = &polybft.TokenConfig{
-			Name:     defaultTokenName,
-			Symbol:   defaultTokenSymbol,
-			Decimals: defaultTokenDecimals,
-		}
-	} else {
-		p.nativeTokenConfig = &polybft.TokenConfig{
-			Name:     defaultTokenName,
-			Symbol:   defaultTokenSymbol,
-			Decimals: defaultTokenDecimals,
+			Name:     defaultNativeTokenName,
+			Symbol:   defaultNativeTokenSymbol,
+			Decimals: defaultNativeTokenDecimals,
 		}
 
-		params := strings.Split(p.nativeTokenConfigRaw, ":")
-		if len(params) != tokenParamsNumber { // 3 parameters
-			return errInvalidTokenParams
-		}
-
-		p.nativeTokenConfig.Name = strings.TrimSpace(params[0])
-		if p.nativeTokenConfig.Name == "" {
-			return errInvalidTokenParams
-		}
-
-		p.nativeTokenConfig.Symbol = strings.TrimSpace(params[1])
-		if p.nativeTokenConfig.Symbol == "" {
-			return errInvalidTokenParams
-		}
-
-		decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
-		if err != nil || decimals <= 0 || decimals > math.MaxUint8 {
-			return errInvalidTokenParams
-		}
-
-		p.nativeTokenConfig.Decimals = uint8(decimals)
+		return nil
 	}
+
+	params := strings.Split(p.nativeTokenConfigRaw, ":")
+	if len(params) != nativeTokenParamsNumber { // 3 parameters
+		return errInvalidTokenParams
+	}
+
+	p.nativeTokenConfig = &polybft.TokenConfig{
+		Name:     defaultNativeTokenName,
+		Symbol:   defaultNativeTokenSymbol,
+		Decimals: defaultNativeTokenDecimals,
+	}
+
+	p.nativeTokenConfig.Name = strings.TrimSpace(params[0])
+	if p.nativeTokenConfig.Name == "" {
+		return errInvalidTokenParams
+	}
+
+	p.nativeTokenConfig.Symbol = strings.TrimSpace(params[1])
+	if p.nativeTokenConfig.Symbol == "" {
+		return errInvalidTokenParams
+	}
+
+	decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
+	if err != nil || decimals > math.MaxUint8 {
+		return errInvalidTokenParams
+	}
+
+	p.nativeTokenConfig.Decimals = uint8(decimals)
 
 	return nil
 }
