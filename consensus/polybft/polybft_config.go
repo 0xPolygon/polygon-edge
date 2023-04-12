@@ -41,7 +41,8 @@ type PolyBFTConfig struct {
 	// MintableNativeToken denotes whether mintable native token is used
 	MintableNativeToken bool `json:"mintableNative"`
 
-	NativTokenConfig *TokenConfig `json:"nativeTokenConfig"`
+	// NativeTokenConfig defines name, symbol and decimal count of the native token
+	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 }
@@ -265,9 +266,9 @@ func (m *Manifest) Save(manifestPath string) error {
 	return nil
 }
 
-// TokenConfig is the configuration of nativ token used by edge network
+// TokenConfig is the configuration of native token used by edge network
 type TokenConfig struct {
-	TokenName     string `json:"tokenName"`
-	TokenSymbol   string `json:"tokenSymbol"`
-	TokenDecimals uint8  `json:"tokenDecimals"`
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Decimals uint8  `json:"decimals"`
 }

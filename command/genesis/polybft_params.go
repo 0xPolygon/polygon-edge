@@ -97,7 +97,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bridge:              bridge,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
 		MintableNativeToken: p.mintableNativeToken,
-		NativTokenConfig:    p.nativeTokenConfig,
+		NativeTokenConfig:   p.nativeTokenConfig,
 	}
 
 	chainConfig := &chain.Chain{

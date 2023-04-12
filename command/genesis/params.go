@@ -124,7 +124,7 @@ func (p *genesisParams) validateFlags() error {
 
 	if p.isPolyBFTConsensus() {
 		if err := p.extractTokenParams(); err != nil {
-			return errInvalidTokenParams
+			return err
 		}
 	}
 
