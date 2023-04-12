@@ -79,7 +79,6 @@ type genesisParams struct {
 
 	// PolyBFT
 	manifestPath            string
-	validatorSetSize        int
 	sprintSize              uint64
 	blockTime               time.Duration
 	bridgeJSONRPCAddr       string

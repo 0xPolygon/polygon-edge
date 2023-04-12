@@ -20,7 +20,7 @@ func TestE2E_NetworkDiscoveryProtocol(t *testing.T) {
 	)
 
 	// create cluster
-	cluster := framework.NewTestCluster(t, 10,
+	cluster := framework.NewTestCluster(t, validatorCount+nonValidatorCount,
 		framework.WithValidatorSnapshot(validatorCount),
 		framework.WithNonValidators(nonValidatorCount),
 		framework.WithBootnodeCount(1))
