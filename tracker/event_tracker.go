@@ -2,14 +2,12 @@ package tracker
 
 import (
 	"context"
-	"fmt"
 
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/blocktracker"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
-	"golang.org/x/sync/errgroup"
 )
 
 type eventSubscription interface {
@@ -58,14 +56,21 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
+	// Block Tracker
+	blockMaxBacklog := e.numBlockConfirmations*2 + 1
+	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
+	if err := blockTracker.Init(); err != nil {
+		return err
+	}
+	if err := blockTracker.Start(); err != nil {
+		return err
+	}
+
+	// Tracker
 	store, err := NewEventTrackerStore(e.dbPath, e.numBlockConfirmations, e.subscriber, e.logger)
 	if err != nil {
 		return err
 	}
-
-	blockMaxBacklog := e.numBlockConfirmations*2 + 1
-	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
-
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
 		tracker.WithBlockTracker(blockTracker),
@@ -81,23 +86,9 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	g := new(errgroup.Group)
-	g.Go(func() error {
-		if err := blockTracker.Init(); err != nil {
-			return fmt.Errorf("failed to init blocktracker: %w", err)
-		}
-
-		if err := blockTracker.Start(); err != nil {
-			return fmt.Errorf("failed to start blocktracker: %w", err)
-		}
-
-		if err := tt.Sync(ctx); err != nil {
-			return fmt.Errorf("failed to sync: %w", err)
-		}
-
-		return nil
-	})
+	if err := tt.Sync(ctx); err != nil {
+		e.logger.Error("failed to sync", "error", err)
+	}
 
 	go func() {
 		<-ctx.Done()
@@ -105,5 +96,5 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		store.Close()
 	}()
 
-	return g.Wait()
+	return nil
 }
