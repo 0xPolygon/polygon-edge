@@ -693,7 +693,7 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 		Committed:  &Signature{},
 	}
 
-	return ibftExtra.MarshalRLPTo(nil), nil
+	return append(make([]byte, ExtraVanity), ibftExtra.MarshalRLPTo(nil)...), nil
 }
 
 // GetIbftExtra returns the istanbul extra data field from the passed in header

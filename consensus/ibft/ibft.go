@@ -552,6 +552,11 @@ func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
 }
 
+// FilterExtra is the implementation of Consensus interface
+func (i *backendIBFT) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
+}
+
 // updateCurrentModules updates Signer, Hooks, and Validators
 // that are used at specified height
 // by fetching from ForkManager

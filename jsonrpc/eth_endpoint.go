@@ -68,11 +68,17 @@ type ethBlockchainStore interface {
 	GetSyncProgression() *progress.Progression
 }
 
+type ethFilter interface {
+	// FilterExtra filters data from block extra that is not included in block hash
+	FilterExtra(extra []byte) ([]byte, error)
+}
+
 // ethStore provides access to the methods needed by eth endpoint
 type ethStore interface {
 	ethTxPoolStore
 	ethStateStore
 	ethBlockchainStore
+	ethFilter
 }
 
 // Eth is the eth jsonrpc endpoint
@@ -122,6 +128,18 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 		return nil, nil
 	}
 
+	// we need to copy it because the store returns header from storage directly
+	// and not a copy, so changing it, actually changes it in storage as well
+	headerCopy := block.Header.Copy()
+
+	filteredExtra, err := e.store.FilterExtra(headerCopy.ExtraData)
+	if err != nil {
+		return nil, err
+	}
+
+	headerCopy.ExtraData = filteredExtra // no need to recompute hash (filtered out data is not in the hash in the first place)
+	block.Header = headerCopy
+
 	return toBlock(block, fullTx), nil
 }
 
@@ -131,6 +149,18 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 	if !ok {
 		return nil, nil
 	}
+
+	// we need to copy it because the store returns header from storage directly
+	// and not a copy, so changing it, actually changes it in storage as well
+	headerCopy := block.Header.Copy()
+
+	filteredExtra, err := e.store.FilterExtra(headerCopy.ExtraData)
+	if err != nil {
+		return nil, err
+	}
+
+	headerCopy.ExtraData = filteredExtra // no need to recompute hash (filtered out data is not in the hash in the first place)
+	block.Header = headerCopy
 
 	return toBlock(block, fullTx), nil
 }
