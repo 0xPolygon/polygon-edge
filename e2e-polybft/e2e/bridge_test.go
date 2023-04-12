@@ -92,7 +92,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		filter.SetFromUint64(0)
-		filter.SetToUint64(100)
+		filter.SetToUint64(8 * sprintSize)
 
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)
@@ -229,6 +229,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			),
 		)
 
+		finalBlockNum := midBlockNumber + 5*sprintSize
 		// wait for a few more sprints
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
@@ -253,7 +254,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		filter.SetFromUint64(initialBlockNum)
-		filter.SetToUint64(initialBlockNum + 2*epochSize)
+		filter.SetToUint64(finalBlockNum)
 
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)
