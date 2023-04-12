@@ -137,7 +137,8 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 		return nil, err
 	}
 
-	headerCopy.ExtraData = filteredExtra // no need to recompute hash (filtered out data is not in the hash in the first place)
+	headerCopy.ExtraData = filteredExtra
+	// no need to recompute hash (filtered out data is not in the hash in the first place)
 	block.Header = headerCopy
 
 	return toBlock(block, fullTx), nil
@@ -159,7 +160,8 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 		return nil, err
 	}
 
-	headerCopy.ExtraData = filteredExtra // no need to recompute hash (filtered out data is not in the hash in the first place)
+	headerCopy.ExtraData = filteredExtra
+	// no need to recompute hash (filtered out data is not in the hash in the first place)
 	block.Header = headerCopy
 
 	return toBlock(block, fullTx), nil
