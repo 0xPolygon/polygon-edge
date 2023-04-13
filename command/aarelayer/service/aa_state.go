@@ -19,6 +19,8 @@ type AATxState interface {
 	GetAllPending() ([]*AAStateTransaction, error)
 	// Get all queued transactions
 	GetAllQueued() ([]*AAStateTransaction, error)
+	// Get all sent transactions
+	GetAllSent() ([]*AAStateTransaction, error)
 	// Update modifies the metadata for the AA transaction
 	Update(stateTx *AAStateTransaction) error
 }
@@ -26,12 +28,14 @@ type AATxState interface {
 var (
 	pendingBucket  = []byte("pending")
 	queuedBucket   = []byte("queued")
+	sentBucket     = []byte("sent")
 	finishedBucket = []byte("finished")
 
-	allBuckets        = [][]byte{pendingBucket, queuedBucket, finishedBucket}
+	allBuckets        = [][]byte{pendingBucket, queuedBucket, sentBucket, finishedBucket}
 	statusToBucketMap = map[string][]byte{
 		StatusPending:   pendingBucket,
 		StatusQueued:    queuedBucket,
+		StatusSent:      sentBucket,
 		StatusCompleted: finishedBucket,
 		StatusFailed:    finishedBucket,
 	}
@@ -100,6 +104,10 @@ func (s *aaTxState) GetAllPending() ([]*AAStateTransaction, error) {
 
 func (s *aaTxState) GetAllQueued() ([]*AAStateTransaction, error) {
 	return s.getAllFromBucket(queuedBucket)
+}
+
+func (s *aaTxState) GetAllSent() ([]*AAStateTransaction, error) {
+	return s.getAllFromBucket(sentBucket)
 }
 
 func (s *aaTxState) Update(stateTx *AAStateTransaction) error {

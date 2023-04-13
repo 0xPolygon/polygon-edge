@@ -19,10 +19,11 @@ const (
 	domainSeparatorVersion = "1.0.0"
 
 	// Statuses
-	StatusPending   = "pending"   // The AA transaction is on the Pool
-	StatusQueued    = "queued"    // The AA transaction is waiting to be mined.
-	StatusCompleted = "completed" // The `AA transaction` was mined in a block.
-	StatusFailed    = "failed"    // AA transaction` failed during the process.
+	StatusPending   = "pending"   // tx is currently on the pending pool
+	StatusQueued    = "queued"    // tx is in a queue and waiting to be sent
+	StatusSent      = "sent"      // tx has been sent and is waiting for a receipt
+	StatusCompleted = "completed" // tx has been successfully mined into a block and is now complete
+	StatusFailed    = "failed"    // tx failed during the process and may or may not have been included in a block
 )
 
 // Types and keccak256 values of types from AccountAbstractionInvoker.sol
@@ -290,7 +291,6 @@ type Log struct {
 type AAStateTransaction struct {
 	ID           string         `json:"id"`
 	Tx           *AATransaction `json:"tx,omitempty"`
-	Hash         ethgo.Hash     `json:"hash,omitempty"`
 	Time         int64          `json:"time"`
 	TimeQueued   int64          `json:"time_queued"`
 	TimeFinished int64          `json:"time_completed"`
@@ -298,6 +298,9 @@ type AAStateTransaction struct {
 	Gas          uint64         `json:"gas"`
 	Mined        *Mined         `json:"mined,omitempty"`
 	Error        *string        `json:"error,omitempty"`
+	Hash         ethgo.Hash     `json:"hash,omitempty"`
+	Raw          []byte         `json:"raw,omitempty"`
+	Nonce        uint64         `json:"nonce,omitempty"`
 }
 
 func getDomainSeparatorHash(address types.Address, chainID int64) (types.Hash, error) {

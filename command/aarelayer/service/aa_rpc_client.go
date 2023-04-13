@@ -3,84 +3,51 @@ package service
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
-	"github.com/umbracle/ethgo/wallet"
 )
 
-const defaultGasLimit = 5242880 // 0x500000
-
-type AATxSender interface {
+// AARPCClient provides an interface to access some JSON-RPC methods for Ethereum-compatible nodes
+type AARPCClient interface {
 	// GetNonce retrieves current nonce for address
 	GetNonce(address ethgo.Address) (uint64, error)
 	// GetNonce retrieves current aa invoker nonce for address
 	GetAANonce(invokerAddress, address ethgo.Address) (uint64, error)
+	// GetGasPrice retrieves current gas price for the chain
+	GetGasPrice() (uint64, error)
 	// SendTransaction sends transaction but does not wait for receipt
-	SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error)
+	SendTransaction(txSerialized []byte) (ethgo.Hash, error)
 	// WaitForReceipt waits for receipt of specific transaction
 	WaitForReceipt(ctx context.Context, hash ethgo.Hash, delay time.Duration, numRetries int) (*ethgo.Receipt, error)
 }
 
-var _ AATxSender = (*AATxSenderImpl)(nil)
+var _ AARPCClient = (*aaRPCClientImpl)(nil)
 
-type AATxSenderImpl struct {
+type aaRPCClientImpl struct {
 	client *jsonrpc.Client
-
-	lock sync.Mutex
 }
 
-func NewAATxSender(ipAddress string) (AATxSender, error) {
+func NewAARPCClient(ipAddress string) (AARPCClient, error) {
 	client, err := jsonrpc.NewClient(ipAddress)
 	if err != nil {
 		return nil, err
 	}
 
-	return &AATxSenderImpl{
-		client: client,
-	}, nil
+	return &aaRPCClientImpl{client: client}, nil
 }
 
-// SendTransaction sends transaction but does not wait for receipt
-func (t *AATxSenderImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	if txn.GasPrice == 0 {
-		gasPrice, err := t.client.Eth().GasPrice()
-		if err != nil {
-			return ethgo.ZeroHash, err
-		}
-
-		txn.GasPrice = gasPrice
-	}
-
-	if txn.Gas == 0 {
-		txn.Gas = defaultGasLimit
-	}
-
-	chainID, err := t.client.Eth().ChainID()
-	if err != nil {
-		return ethgo.ZeroHash, err
-	}
-
-	signer := wallet.NewEIP155Signer(chainID.Uint64())
-	if txn, err = signer.SignTx(txn, key); err != nil {
-		return ethgo.ZeroHash, err
-	}
-
-	data, err := txn.MarshalRLPTo(nil)
-	if err != nil {
-		return ethgo.ZeroHash, err
-	}
-
-	return t.client.Eth().SendRawTransaction(data)
+func (t *aaRPCClientImpl) GetGasPrice() (uint64, error) {
+	return t.client.Eth().GasPrice()
 }
 
-func (t *AATxSenderImpl) WaitForReceipt(
+func (t *aaRPCClientImpl) SendTransaction(txSerialized []byte) (ethgo.Hash, error) {
+	return t.client.Eth().SendRawTransaction(txSerialized)
+}
+
+func (t *aaRPCClientImpl) WaitForReceipt(
 	ctx context.Context, hash ethgo.Hash, delay time.Duration, numRetries int) (*ethgo.Receipt, error) {
 	ticker := time.NewTicker(delay)
 	defer ticker.Stop()
@@ -107,11 +74,11 @@ func (t *AATxSenderImpl) WaitForReceipt(
 	return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 }
 
-func (t *AATxSenderImpl) GetNonce(address ethgo.Address) (uint64, error) {
+func (t *aaRPCClientImpl) GetNonce(address ethgo.Address) (uint64, error) {
 	return t.client.Eth().GetNonce(address, ethgo.Pending)
 }
 
-func (t *AATxSenderImpl) GetAANonce(invokerAddress, address ethgo.Address) (uint64, error) {
+func (t *aaRPCClientImpl) GetAANonce(invokerAddress, address ethgo.Address) (uint64, error) {
 	data, err := aaInvokerNoncesAbiType.Encode([]interface{}{address})
 	if err != nil {
 		return 0, nil

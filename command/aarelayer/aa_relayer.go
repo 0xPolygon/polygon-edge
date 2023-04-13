@@ -60,7 +60,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		jsonRPC = "http://" + jsonRPC
 	}
 
-	txSender, err := service.NewAATxSender(jsonRPC)
+	txSender, err := service.NewAARPCClient(jsonRPC)
 	if err != nil {
 		return err
 	}
@@ -103,6 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		state,
 		account.Ecdsa,
 		invokerAddress,
+		params.chainID,
 		logger,
 		service.WithPullTime(config.PullTime),
 		service.WithReceiptDelay(config.ReceiptRetryDelay),
