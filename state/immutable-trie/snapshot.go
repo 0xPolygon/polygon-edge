@@ -100,7 +100,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, *types.Trace, [
 		t.Proof()
 	}
 
-	return &Snapshot{trie: trie, state: s.state}, s.trace, root
+	return &Snapshot{trie: trie, state: s.state, trace: &types.Trace{}}, s.trace, root
 }
 
 type tracer struct {
