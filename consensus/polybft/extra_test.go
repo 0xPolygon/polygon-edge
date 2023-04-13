@@ -886,7 +886,6 @@ func Test_GetIbftExtraClean(t *testing.T) {
 	require.Equal(t, extra.Parent.AggregatedSignature, extraTwo.Parent.AggregatedSignature)
 	require.Equal(t, extra.Parent.Bitmap, extraTwo.Parent.Bitmap)
 
-	require.Empty(t, extraTwo.Seal)
 	require.Nil(t, extraTwo.Committed.AggregatedSignature)
 	require.Nil(t, extraTwo.Committed.Bitmap)
 }

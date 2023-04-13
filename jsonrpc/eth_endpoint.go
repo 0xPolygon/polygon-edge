@@ -69,7 +69,7 @@ type ethBlockchainStore interface {
 }
 
 type ethFilter interface {
-	// FilterExtra filters data from block extra that is not included in block hash
+	// FilterExtra filters extra data from header extra that is not included in block hash
 	FilterExtra(extra []byte) ([]byte, error)
 }
 
