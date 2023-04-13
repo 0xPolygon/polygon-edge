@@ -68,25 +68,26 @@ func resolveBinary() string {
 type TestClusterConfig struct {
 	t *testing.T
 
-	Name                string
-	Premine             []string // address[:amount]
-	PremineValidators   []string // address[:amount]
-	StakeAmounts        []string // address[:amount]
-	MintableNativeToken bool
-	HasBridge           bool
-	BootnodeCount       int
-	NonValidatorCount   int
-	WithLogs            bool
-	WithStdout          bool
-	LogsDir             string
-	TmpDir              string
-	BlockGasLimit       uint64
-	ValidatorPrefix     string
-	Binary              string
-	ValidatorSetSize    uint64
-	EpochSize           int
-	EpochReward         int
-	SecretsCallback     func([]types.Address, *TestClusterConfig)
+	Name                 string
+	Premine              []string // address[:amount]
+	PremineValidators    []string // address[:amount]
+	StakeAmounts         []string // address[:amount]
+	MintableNativeToken  bool
+	HasBridge            bool
+	BootnodeCount        int
+	NonValidatorCount    int
+	WithLogs             bool
+	WithStdout           bool
+	LogsDir              string
+	TmpDir               string
+	BlockGasLimit        uint64
+	ValidatorPrefix      string
+	Binary               string
+	ValidatorSetSize     uint64
+	EpochSize            int
+	EpochReward          int
+	NativeTokenConfigRaw string
+	SecretsCallback      func([]types.Address, *TestClusterConfig)
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -282,6 +283,12 @@ func WithPropertyTestLogging() ClusterOption {
 	}
 }
 
+func WithNativeTokenConfig(tokenConfigRaw string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.NativeTokenConfigRaw = tokenConfigRaw
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -411,6 +418,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+		}
+
+		// add optional genesis flags
+		if cluster.Config.NativeTokenConfigRaw != "" {
+			args = append(args, "--native-token-config", cluster.Config.NativeTokenConfigRaw)
 		}
 
 		if len(cluster.Config.Premine) != 0 {

@@ -204,7 +204,14 @@ func setFlags(cmd *cobra.Command) {
 			&params.mintableNativeToken,
 			mintableTokenFlag,
 			false,
-			"flag indicate whether mintable or non-mintable native ERC20 token is deployed",
+			"flag indicate whether mintable or non-mintable native token is deployed",
+		)
+
+		cmd.Flags().StringVar(
+			&params.nativeTokenConfigRaw,
+			nativeTokenConfigFlag,
+			"",
+			"configuration of native token in format <name:symbol:decimals count>",
 		)
 	}
 

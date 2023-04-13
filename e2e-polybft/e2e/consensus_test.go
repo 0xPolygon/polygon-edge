@@ -8,16 +8,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
@@ -611,7 +614,28 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		validatorCount = 5
 		epochSize      = 5
 		minterPath     = "test-chain-1"
+
+		tokenName   = "Edge Coin"
+		tokenSymbol = "EDGE"
+		decimals    = uint8(5)
 	)
+
+	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
+
+	queryNativeERC20Metadata := func(funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
+		valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable, nativeTokenAddr, ethgo.ZeroAddress, funcName)
+		require.NoError(t, err)
+
+		valueRaw, err := hex.DecodeHex(valueHex)
+		require.NoError(t, err)
+
+		var decodedResult map[string]interface{}
+
+		err = abiType.DecodeStruct(valueRaw, &decodedResult)
+		require.NoError(t, err)
+
+		return decodedResult["0"]
+	}
 
 	validatorsAddrs := make([]types.Address, validatorCount)
 	initialStake := ethgo.Gwei(1)
@@ -620,6 +644,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
 		framework.WithMintableNativeToken(true),
+		framework.WithNativeTokenConfig(fmt.Sprintf("%s:%s:%d", tokenName, tokenSymbol, decimals)),
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
 			for i, addr := range addrs {
@@ -644,14 +669,27 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	// send mint transactions
+	// initialize tx relayer
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(targetJSONRPC))
 	require.NoError(t, err)
 
+	// check are native token metadata correctly initialized
+	stringABIType := abi.MustNewType("tuple(string)")
+	uint8ABIType := abi.MustNewType("tuple(uint8)")
+
+	name := queryNativeERC20Metadata("name", stringABIType, relayer)
+	require.Equal(t, tokenName, name)
+
+	symbol := queryNativeERC20Metadata("symbol", stringABIType, relayer)
+	require.Equal(t, tokenSymbol, symbol)
+
+	decimalsCount := queryNativeERC20Metadata("decimals", uint8ABIType, relayer)
+	require.Equal(t, decimals, decimalsCount)
+
+	// send mint transactions
 	mintFn, exists := contractsapi.NativeERC20Mintable.Abi.Methods["mint"]
 	require.True(t, exists)
 
-	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
 	mintAmount := ethgo.Ether(10)
 
 	// make sure minter account can mint tokens
