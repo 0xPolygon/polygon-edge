@@ -101,7 +101,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		}
 	}
 
-	// Parent
+	// Parent Signatures
 	if elems[1].Elems() > 0 {
 		i.Parent = &Signature{}
 		if err := i.Parent.UnmarshalRLPWith(elems[1]); err != nil {
@@ -109,7 +109,7 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		}
 	}
 
-	// Committed
+	// Committed Signatures
 	if elems[2].Elems() > 0 {
 		i.Committed = &Signature{}
 		if err := i.Committed.UnmarshalRLPWith(elems[2]); err != nil {
