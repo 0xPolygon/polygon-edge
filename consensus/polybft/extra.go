@@ -28,7 +28,6 @@ var PolyBFTMixDigest = types.StringToHash("adce6e5230abe012342a44e4e9b6d05997d6f
 // Extra defines the structure of the extra field for Istanbul
 type Extra struct {
 	Validators *ValidatorSetDelta
-	Seal       []byte
 	Parent     *Signature
 	Committed  *Signature
 	Checkpoint *CheckpointData
@@ -52,21 +51,14 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(i.Validators.MarshalRLPWith(ar))
 	}
 
-	// Seal
-	if len(i.Seal) == 0 {
-		vv.Set(ar.NewNull())
-	} else {
-		vv.Set(ar.NewBytes(i.Seal))
-	}
-
-	// ParentSeal
+	// Parent Signatures
 	if i.Parent == nil {
 		vv.Set(ar.NewNullArray())
 	} else {
 		vv.Set(i.Parent.MarshalRLPWith(ar))
 	}
 
-	// CommittedSeal
+	// Committed Signatures
 	if i.Committed == nil {
 		vv.Set(ar.NewNullArray())
 	} else {
@@ -90,7 +82,7 @@ func (i *Extra) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
-	const expectedElements = 5
+	const expectedElements = 4
 
 	elems, err := v.GetElems()
 	if err != nil {
@@ -109,33 +101,26 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		}
 	}
 
-	// Seal
-	if elems[1].Len() > 0 {
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return err
-		}
-	}
-
-	// Parent
-	if elems[2].Elems() > 0 {
+	// Parent Signatures
+	if elems[1].Elems() > 0 {
 		i.Parent = &Signature{}
-		if err := i.Parent.UnmarshalRLPWith(elems[2]); err != nil {
+		if err := i.Parent.UnmarshalRLPWith(elems[1]); err != nil {
 			return err
 		}
 	}
 
-	// Committed
-	if elems[3].Elems() > 0 {
+	// Committed Signatures
+	if elems[2].Elems() > 0 {
 		i.Committed = &Signature{}
-		if err := i.Committed.UnmarshalRLPWith(elems[3]); err != nil {
+		if err := i.Committed.UnmarshalRLPWith(elems[2]); err != nil {
 			return err
 		}
 	}
 
 	// Checkpoint
-	if elems[4].Elems() > 0 {
+	if elems[3].Elems() > 0 {
 		i.Checkpoint = &CheckpointData{}
-		if err := i.Checkpoint.UnmarshalRLPWith(elems[4]); err != nil {
+		if err := i.Checkpoint.UnmarshalRLPWith(elems[3]); err != nil {
 			return err
 		}
 	}
@@ -689,7 +674,6 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 		Parent:     extra.Parent,
 		Validators: extra.Validators,
 		Checkpoint: extra.Checkpoint,
-		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
 

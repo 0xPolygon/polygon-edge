@@ -41,7 +41,6 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			Parent:     parentSignature,
 			Checkpoint: checkpointData,
 			Committed:  &Signature{},
-			Seal:       []byte{},
 		}
 
 		if extra.Checkpoint == nil {

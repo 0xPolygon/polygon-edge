@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -23,9 +24,17 @@ import (
 func TestExtra_Encoding(t *testing.T) {
 	t.Parallel()
 
-	parentStr := []byte("Here is the parent signature")
-	committedStr := []byte("Here is the committed signature")
-	bitmapStr := []byte("Here are the bitmap bytes")
+	digest := crypto.Keccak256([]byte("Dummy content to sign"))
+	keys := createRandomTestKeys(t, 2)
+	parentSig, err := keys[0].Sign(digest)
+	require.NoError(t, err)
+
+	committedSig, err := keys[1].Sign(digest)
+	require.NoError(t, err)
+
+	bmp := bitmap.Bitmap{}
+	bmp.Set(1)
+	bmp.Set(4)
 
 	addedValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C"}).getPublicIdentities()
 
@@ -49,7 +58,6 @@ func TestExtra_Encoding(t *testing.T) {
 		{
 			&Extra{
 				Validators: &ValidatorSetDelta{},
-				Seal:       []byte{3, 4},
 			},
 		},
 		{
@@ -66,7 +74,7 @@ func TestExtra_Encoding(t *testing.T) {
 				Validators: &ValidatorSetDelta{
 					Removed: removedValidators,
 				},
-				Parent:    &Signature{AggregatedSignature: parentStr, Bitmap: bitmapStr},
+				Parent:    &Signature{AggregatedSignature: parentSig, Bitmap: bmp},
 				Committed: &Signature{},
 			},
 		},
@@ -78,19 +86,19 @@ func TestExtra_Encoding(t *testing.T) {
 					Removed: removedValidators,
 				},
 				Parent:    &Signature{},
-				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
+				Committed: &Signature{AggregatedSignature: committedSig, Bitmap: bmp},
 			},
 		},
 		{
 			&Extra{
-				Parent:    &Signature{AggregatedSignature: parentStr, Bitmap: bitmapStr},
-				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
+				Parent:    &Signature{AggregatedSignature: parentSig, Bitmap: bmp},
+				Committed: &Signature{AggregatedSignature: committedSig, Bitmap: bmp},
 			},
 		},
 		{
 			&Extra{
-				Parent:    &Signature{AggregatedSignature: parentStr, Bitmap: bitmapStr},
-				Committed: &Signature{AggregatedSignature: committedStr, Bitmap: bitmapStr},
+				Parent:    &Signature{AggregatedSignature: parentSig, Bitmap: bmp},
+				Committed: &Signature{AggregatedSignature: committedSig, Bitmap: bmp},
 				Checkpoint: &CheckpointData{
 					BlockRound:            0,
 					EpochNumber:           3,
@@ -126,7 +134,7 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 
 		extra := &Extra{}
 		ar := &fastrlp.Arena{}
-		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "incorrect elements count to decode Extra, expected 5 but found 0")
+		require.ErrorContains(t, extra.UnmarshalRLPWith(ar.NewArray()), "incorrect elements count to decode Extra, expected 4 but found 0")
 	})
 
 	t.Run("Incorrect ValidatorSetDelta marshalled", func(t *testing.T) {
@@ -152,7 +160,6 @@ func TestExtra_UnmarshalRLPWith_NegativeCases(t *testing.T) {
 		extraMarshalled := ar.NewArray()
 		deltaMarshalled := new(ValidatorSetDelta).MarshalRLPWith(ar)
 		extraMarshalled.Set(deltaMarshalled)       // ValidatorSetDelta
-		extraMarshalled.Set(ar.NewNull())          // Seal
 		extraMarshalled.Set(ar.NewBytes([]byte{})) // Parent
 		extraMarshalled.Set(ar.NewBytes([]byte{})) // Committed
 		require.Error(t, extra.UnmarshalRLPWith(extraMarshalled))
