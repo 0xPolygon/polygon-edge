@@ -7,7 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
+	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/wallet"
@@ -55,8 +55,8 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 	bytecode, err := hex.DecodeString("608060405234801561001057600080fd5b506103e4806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806387b9d25c1461003b578063eb54dae114610059575b600080fd5b610043610089565b60405161005091906102b8565b60405180910390f35b610073600480360361006e9190810190610200565b6100a1565b60405161008091906102d3565b60405180910390f35b73020000000000000000000000000000000000000081565b600080606073020000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16846040516024016100e291906102b8565b6040516020818303038152906040527feb54dae1000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff838183161783525050505060405161016c91906102a1565b6000604051808303816000865af19150503d80600081146101a9576040519150601f19603f3d011682016040523d82523d6000602084013e6101ae565b606091505b50915091506000818060200190516101c99190810190610229565b9050809350505050919050565b6000813590506101e581610373565b92915050565b6000815190506101fa8161038a565b92915050565b60006020828403121561021257600080fd5b6000610220848285016101d6565b91505092915050565b60006020828403121561023b57600080fd5b6000610249848285016101eb565b91505092915050565b61025b81610304565b82525050565b600061026c826102ee565b61027681856102f9565b9350610286818560208601610340565b80840191505092915050565b61029b81610336565b82525050565b60006102ad8284610261565b915081905092915050565b60006020820190506102cd6000830184610252565b92915050565b60006020820190506102e86000830184610292565b92915050565b600081519050919050565b600081905092915050565b600061030f82610316565b9050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000819050919050565b60005b8381101561035e578082015181840152602081019050610343565b8381111561036d576000848401525b50505050565b61037c81610304565b811461038757600080fd5b50565b61039381610336565b811461039e57600080fd5b5056fea365627a7a723158201e056518a3df30ba0dbbaf963d113a2cd9836f8d678c3d3a99a53a4fabe59ad26c6578706572696d656e74616cf564736f6c63430005110040")
 	require.NoError(t, err)
 
-	expectRole := func(addr types.Address, role allowlist.Role) {
-		out := cluster.Call(t, contracts.AllowListContractsAddr, allowlist.ReadAllowListFunc, addr)
+	expectRole := func(addr types.Address, role addresslist.Role) {
+		out := cluster.Call(t, contracts.AllowListContractsAddr, addresslist.ReadAddressListFunc, addr)
 
 		num, ok := out["0"].(*big.Int)
 		if !ok {
@@ -68,9 +68,9 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 
 	{
 		// Step 0. Check the role of both accounts
-		expectRole(adminAddr, allowlist.AdminRole)
-		expectRole(targetAddr, allowlist.NoRole)
-		expectRole(otherAddr, allowlist.EnabledRole)
+		expectRole(adminAddr, addresslist.AdminRole)
+		expectRole(targetAddr, addresslist.NoRole)
+		expectRole(otherAddr, addresslist.EnabledRole)
 	}
 
 	{
@@ -103,11 +103,11 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 
 	{
 		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
-		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
 
 		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListContractsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
-		expectRole(targetAddr, allowlist.EnabledRole)
+		expectRole(targetAddr, addresslist.EnabledRole)
 	}
 
 	{
@@ -121,21 +121,21 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 	{
 		// Step 6. 'targetAddr' cannot enable other accounts since it is not an admin
 		// (The transaction fails)
-		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
 
 		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListContractsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
 		require.True(t, adminSetFailTxn.Failed())
-		expectRole(types.ZeroAddress, allowlist.NoRole)
+		expectRole(types.ZeroAddress, addresslist.NoRole)
 	}
 
 	{
 		// Step 7. Deploy a proxy contract that can call the allow list
-		resp := cluster.Call(t, proxyContract, allowlist.ReadAllowListFunc, adminAddr)
+		resp := cluster.Call(t, proxyContract, addresslist.ReadAddressListFunc, adminAddr)
 
 		role, ok := resp["0"].(*big.Int)
 		require.True(t, ok)
-		require.Equal(t, role.Uint64(), allowlist.AdminRole.Uint64())
+		require.Equal(t, role.Uint64(), addresslist.AdminRole.Uint64())
 	}
 }
 
@@ -163,8 +163,8 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 	// bytecode for an empty smart contract
 	bytecode, _ := hex.DecodeString("6080604052348015600f57600080fd5b50603e80601d6000396000f3fe6080604052600080fdfea265627a7a7231582027748e4afe5ee282a786005d286f4427f13dac1b62e03f9aed311c2db7e8245364736f6c63430005110032")
 
-	expectRole := func(addr types.Address, role allowlist.Role) {
-		out := cluster.Call(t, contracts.AllowListTransactionsAddr, allowlist.ReadAllowListFunc, addr)
+	expectRole := func(addr types.Address, role addresslist.Role) {
+		out := cluster.Call(t, contracts.AllowListTransactionsAddr, addresslist.ReadAddressListFunc, addr)
 
 		num, ok := out["0"].(*big.Int)
 		require.True(t, ok)
@@ -173,9 +173,9 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 
 	{
 		// Step 0. Check the role of both accounts
-		expectRole(adminAddr, allowlist.AdminRole)
-		expectRole(targetAddr, allowlist.NoRole)
-		expectRole(otherAddr, allowlist.EnabledRole)
+		expectRole(adminAddr, addresslist.AdminRole)
+		expectRole(targetAddr, addresslist.NoRole)
+		expectRole(otherAddr, addresslist.EnabledRole)
 	}
 
 	{
@@ -204,11 +204,11 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 
 	{
 		// Step 3. 'adminAddr' sends a transaction to enable 'targetAddr'.
-		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
 
 		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
-		expectRole(targetAddr, allowlist.EnabledRole)
+		expectRole(targetAddr, addresslist.EnabledRole)
 	}
 
 	{
@@ -221,11 +221,11 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 	{
 		// Step 5. 'targetAddr' cannot enable other accounts since it is not an admin
 		// (The transaction fails)
-		input, _ := allowlist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
 
 		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
 		require.True(t, adminSetFailTxn.Failed())
-		expectRole(types.ZeroAddress, allowlist.NoRole)
+		expectRole(types.ZeroAddress, addresslist.NoRole)
 	}
 }

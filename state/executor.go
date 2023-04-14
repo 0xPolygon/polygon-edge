@@ -10,7 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
+	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
@@ -210,12 +210,20 @@ func (e *Executor) BeginTxn(
 
 	// enable contract deployment allow list (if any)
 	if e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowlist = allowlist.NewAllowList(txn, contracts.AllowListContractsAddr)
+		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
+	}
+
+	if e.config.ContractDeployerBlockList != nil {
+		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
 	}
 
 	// enable transactions allow list (if any)
 	if e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = allowlist.NewAllowList(txn, contracts.AllowListTransactionsAddr)
+		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
+	}
+
+	if e.config.TransactionsBlockList != nil {
+		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
 	}
 
 	return txn, nil
@@ -245,8 +253,10 @@ type Transition struct {
 	precompiles *precompiled.Precompiled
 
 	// allow list runtimes
-	deploymentAllowlist *allowlist.AllowList
-	txnAllowList        *allowlist.AllowList
+	deploymentAllowList *addresslist.AddressList
+	deploymentBlockList *addresslist.AddressList
+	txnAllowList        *addresslist.AddressList
+	txnBlockList        *addresslist.AddressList
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -594,8 +604,12 @@ func (t *Transition) Call2(
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
 	// check allow list (if any)
-	if t.deploymentAllowlist != nil && t.deploymentAllowlist.Addr() == contract.CodeAddress {
-		return t.deploymentAllowlist.Run(contract, host, &t.config)
+	if t.deploymentAllowList != nil && t.deploymentAllowList.Addr() == contract.CodeAddress {
+		return t.deploymentAllowList.Run(contract, host, &t.config)
+	}
+
+	if t.deploymentBlockList != nil && t.deploymentBlockList.Addr() == contract.CodeAddress {
+		return t.deploymentBlockList.Run(contract, host, &t.config)
 	}
 
 	if t.txnAllowList != nil {
@@ -603,14 +617,17 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 			return t.txnAllowList.Run(contract, host, &t.config)
 		}
 
-		if contract.Caller != contracts.SystemCaller {
-			txnAllowListRole := t.txnAllowList.GetRole(contract.Caller)
-			if !txnAllowListRole.Enabled() {
-				return &runtime.ExecutionResult{
-					Err: fmt.Errorf("caller not authorized"),
-				}
-			}
+		t.checkAccessLists(contract, host, func(role addresslist.Role) bool {
+			return !role.Enabled()
+		})
+	} else if t.txnBlockList != nil {
+		if t.txnBlockList.Addr() == contract.CodeAddress {
+			return t.txnBlockList.Run(contract, host, &t.config)
 		}
+
+		t.checkAccessLists(contract, host, func(role addresslist.Role) bool {
+			return role == addresslist.EnabledRole
+		})
 	}
 
 	// check the precompiles
@@ -749,10 +766,19 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}()
 
 	// check if contract creation allow list is enabled
-	if t.deploymentAllowlist != nil {
-		role := t.deploymentAllowlist.GetRole(c.Caller)
+	if t.deploymentAllowList != nil {
+		role := t.deploymentAllowList.GetRole(c.Caller)
 
 		if !role.Enabled() {
+			return &runtime.ExecutionResult{
+				GasLeft: 0,
+				Err:     runtime.ErrNotAuth,
+			}
+		}
+	} else if t.deploymentBlockList != nil {
+		role := t.deploymentBlockList.GetRole(c.Caller)
+
+		if role == addresslist.EnabledRole {
 			return &runtime.ExecutionResult{
 				GasLeft: 0,
 				Err:     runtime.ErrNotAuth,
@@ -1040,4 +1066,19 @@ func (t *Transition) captureCallEnd(c *runtime.Contract, result *runtime.Executi
 		result.ReturnValue,
 		result.Err,
 	)
+}
+
+func (t *Transition) checkAccessLists(contract *runtime.Contract, host runtime.Host, condition func(addresslist.Role) bool) *runtime.ExecutionResult {
+	// check if the caller is on the allow list
+	if contract.Caller != contracts.SystemCaller {
+		txnAllowListRole := t.txnAllowList.GetRole(contract.Caller)
+		if condition(txnAllowListRole) {
+			return &runtime.ExecutionResult{
+				GasLeft: 0,
+				Err:     runtime.ErrNotAuth,
+			}
+		}
+	}
+
+	return nil
 }
