@@ -7,18 +7,18 @@ import (
 )
 
 const (
-	manifestPathFlag = "manifest"
-	deployerKeyFlag  = "deployer-key"
-	jsonRPCFlag      = "json-rpc"
-	erc20AddrFlag    = "erc20-token"
-	erc721AddrFlag   = "erc721-token"
-	erc1155AddrFlag  = "erc1155-token"
+	genesisPathFlag = "genesis"
+	deployerKeyFlag = "deployer-key"
+	jsonRPCFlag     = "json-rpc"
+	erc20AddrFlag   = "erc20-token"
+	erc721AddrFlag  = "erc721-token"
+	erc1155AddrFlag = "erc1155-token"
 
-	defaultManifestPath = "./manifest.json"
+	defaultGenesisPath = "./genesis.json"
 )
 
 type initContractsParams struct {
-	manifestPath         string
+	genesisPath          string
 	deployerKey          string
 	jsonRPCAddress       string
 	rootERC20TokenAddr   string
@@ -28,8 +28,8 @@ type initContractsParams struct {
 }
 
 func (ip *initContractsParams) validateFlags() error {
-	if _, err := os.Stat(ip.manifestPath); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("provided manifest path '%s' doesn't exist", ip.manifestPath)
+	if _, err := os.Stat(ip.genesisPath); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("provided genesis path '%s' doesn't exist", ip.genesisPath)
 	}
 
 	return nil

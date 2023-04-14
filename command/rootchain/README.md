@@ -4,10 +4,10 @@ Top level command for manipulating rootchain server.
 
 ## Start rootchain server
 
-This command starts `ethereum/client-go` container which is basically geth node.
+This command starts `ethereum/client-go` container which is Geth node started in dev mode.
 
 ```bash
-$ polygon-edge rootchain server
+polygon-edge rootchain server
 ```
 
 ## Fund initialized accounts
@@ -15,11 +15,13 @@ $ polygon-edge rootchain server
 This command funds the initialized accounts via `polygon-edge polybft-secrets` command.
 
 ```bash
-$ polygon-edge rootchain fund --data-dir data-dir- --num 2
+polygon-edge rootchain fund --data-dir data-dir- --num 2
 ```
-Or
+
+or
+
 ```bash
-$ polygon-edge rootchain fund --data-dir data-dir-1
+polygon-edge rootchain fund --data-dir data-dir-1
 ```
 
 ## Deploy and initialize contracts
@@ -27,9 +29,9 @@ $ polygon-edge rootchain fund --data-dir data-dir-1
 This command deploys and initializes rootchain contracts. Transactions are being sent to given `--json-rpc` endpoint and are signed by private key provided by `--adminKey` flag.
 
 ```bash
-$ polygon-edge rootchain init-contracts 
-    --manifest <manifest_file_path> 
-    --deployer-key <hex_encoded_rootchain_deployer_private_key>
+polygon-edge rootchain deploy \
+    --genesis <chain_config_file> \
+    --deployer-key <hex_encoded_rootchain_deployer_private_key> \
     --json-rpc <json_rpc_endpoint> 
 ```
 

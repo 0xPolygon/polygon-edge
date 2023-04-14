@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -90,10 +91,13 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	manifestPath            string
+	validatorsPath          string
+	validatorsPrefixPath    string
+	premineValidators       []string
+	stakes                  []string
+	validators              []string
 	sprintSize              uint64
 	blockTime               time.Duration
-	bridgeJSONRPCAddr       string
 	epochReward             uint64
 	eventTrackerStartBlocks []string
 
@@ -142,12 +146,12 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
-	// Validate min and max validators number
-	if err := command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators); err != nil {
-		return err
+	if _, err := os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
 	}
 
-	return nil
+	// Validate min and max validators number
+	return command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators)
 }
 
 func (p *genesisParams) isIBFTConsensus() bool {

@@ -16,7 +16,7 @@ func GetCommand() *cobra.Command {
 	genesisCmd := &cobra.Command{
 		Use:     "genesis",
 		Short:   "Generates the genesis configuration file with the passed in parameters",
-		PreRunE: runPreRun,
+		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
@@ -150,11 +150,48 @@ func setFlags(cmd *cobra.Command) {
 	// PolyBFT
 	{
 		cmd.Flags().StringVar(
-			&params.manifestPath,
-			manifestPathFlag,
-			defaultManifestPath,
-			"the manifest file path, which contains genesis metadata",
+			&params.validatorsPath,
+			validatorsPathFlag,
+			"./",
+			"root path containing polybft validators secrets",
 		)
+
+		cmd.Flags().StringVar(
+			&params.validatorsPrefixPath,
+			validatorsPrefixFlag,
+			defaultValidatorPrefixPath,
+			"folder prefix names for polybft validators secrets",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.validators,
+			validatorsFlag,
+			[]string{},
+			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.premineValidators,
+			premineValidatorsFlag,
+			[]string{},
+			fmt.Sprintf(
+				"the premined validators and balances (format: <address>[:<balance>]). Default premined balance: %d",
+				command.DefaultPremineBalance,
+			),
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.stakes,
+			stakeFlag,
+			[]string{},
+			fmt.Sprintf(
+				"validators staked amount (format: <address>[:<amount>]). Default stake amount: %d",
+				command.DefaultStake,
+			),
+		)
+
+		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
+		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPrefixFlag)
 
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
@@ -168,13 +205,6 @@ func setFlags(cmd *cobra.Command) {
 			blockTimeFlag,
 			defaultBlockTime,
 			"the predefined period which determines block creation frequency",
-		)
-
-		cmd.Flags().StringVar(
-			&params.bridgeJSONRPCAddr,
-			bridgeFlag,
-			"",
-			"the rootchain JSON RPC endpoint",
 		)
 
 		cmd.Flags().Uint64Var(
@@ -255,13 +285,13 @@ func setLegacyFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,
-		"the ID of the chain (not-applicable for Polybft consensus protocol as chain id is defined in manifest.json)",
+		"the ID of the chain",
 	)
 
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
 }
 
-func runPreRun(cmd *cobra.Command, _ []string) error {
+func preRunCommand(cmd *cobra.Command, _ []string) error {
 	if err := params.validateFlags(); err != nil {
 		return err
 	}

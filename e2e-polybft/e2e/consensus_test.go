@@ -509,10 +509,10 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
 	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
