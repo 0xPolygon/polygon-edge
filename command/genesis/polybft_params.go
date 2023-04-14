@@ -129,8 +129,20 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return err
 	}
 
-	// premine accounts
+	// premine initial validators
+	for _, v := range initialValidators {
+		allocs[v.Address] = &chain.GenesisAccount{
+			Balance: v.Balance,
+		}
+	}
+
+	// premine other accounts
 	for _, premine := range premineBalances {
+		// validators have already been premined, so no need to premine them again
+		if _, ok := allocs[premine.address]; ok {
+			continue
+		}
+
 		allocs[premine.address] = &chain.GenesisAccount{
 			Balance: premine.amount,
 		}
