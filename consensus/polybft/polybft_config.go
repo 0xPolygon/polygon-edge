@@ -47,6 +47,7 @@ type PolyBFTConfig struct {
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 }
 
+// LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
 func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, error) {
 	chainCfg, err := chain.ImportFromFile(chainConfigFile)
 	if err != nil {
@@ -215,6 +216,8 @@ func (v *Validator) String() string {
 
 // RootchainConfig contains rootchain metadata (such as JSON RPC endpoint and contract addresses)
 type RootchainConfig struct {
+	JSONRPCAddr string
+
 	StateSenderAddress          types.Address
 	CheckpointManagerAddress    types.Address
 	BLSAddress                  types.Address
@@ -227,13 +230,13 @@ type RootchainConfig struct {
 	RootERC721Address           types.Address
 	RootERC1155PredicateAddress types.Address
 	RootERC1155Address          types.Address
-
-	JSONRPCAddr string
 }
 
 // ToBridgeConfig creates BridgeConfig instance
 func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
+		JSONRPCEndpoint: r.JSONRPCAddr,
+
 		StateSenderAddr:          r.StateSenderAddress,
 		CheckpointManagerAddr:    r.CheckpointManagerAddress,
 		ExitHelperAddr:           r.ExitHelperAddress,
@@ -241,7 +244,6 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		RootNativeERC20Addr:      r.RootNativeERC20Address,
 		RootERC721PredicateAddr:  r.RootERC721PredicateAddress,
 		RootERC1155PredicateAddr: r.RootERC1155PredicateAddress,
-		JSONRPCEndpoint:          r.JSONRPCAddr,
 	}
 }
 
