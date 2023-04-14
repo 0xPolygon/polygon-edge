@@ -221,9 +221,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	if len(p.contractDeployerBlockListAdmin) != 0 {
-		// only enable allow list if there is at least one address as **admin**, otherwise
-		// the allow list could never be updated
-		chainConfig.Params.ContractDeployerAllowList = &chain.AddressListConfig{
+		// only enable block list if there is at least one address as **admin**, otherwise
+		// the block list could never be updated
+		chainConfig.Params.ContractDeployerBlockList = &chain.AddressListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.contractDeployerBlockListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.contractDeployerBlockListEnabled),
 		}
@@ -239,9 +239,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	if len(p.transactionsBlockListAdmin) != 0 {
-		// only enable allow list if there is at least one address as **admin**, otherwise
-		// the allow list could never be updated
-		chainConfig.Params.TransactionsAllowList = &chain.AddressListConfig{
+		// only enable block list if there is at least one address as **admin**, otherwise
+		// the block list could never be updated
+		chainConfig.Params.TransactionsBlockList = &chain.AddressListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.transactionsBlockListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.transactionsBlockListEnabled),
 		}

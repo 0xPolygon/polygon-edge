@@ -99,7 +99,7 @@ type genesisParams struct {
 
 	initialStateRoot string
 
-	// allowlist
+	// access lists
 	contractDeployerAllowListAdmin   []string
 	contractDeployerAllowListEnabled []string
 	contractDeployerBlockListAdmin   []string

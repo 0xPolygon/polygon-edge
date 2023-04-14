@@ -603,31 +603,45 @@ func (t *Transition) Call2(
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
-	// check allow list (if any)
+	// check contract deployment allow list (if any)
 	if t.deploymentAllowList != nil && t.deploymentAllowList.Addr() == contract.CodeAddress {
 		return t.deploymentAllowList.Run(contract, host, &t.config)
 	}
 
+	// check contract deployment block list (if any)
 	if t.deploymentBlockList != nil && t.deploymentBlockList.Addr() == contract.CodeAddress {
 		return t.deploymentBlockList.Run(contract, host, &t.config)
 	}
 
+	// check txns access lists, allow list takes precedence over block list
 	if t.txnAllowList != nil {
 		if t.txnAllowList.Addr() == contract.CodeAddress {
 			return t.txnAllowList.Run(contract, host, &t.config)
 		}
 
-		t.checkAccessLists(contract, host, func(role addresslist.Role) bool {
-			return !role.Enabled()
-		})
+		if contract.Caller != contracts.SystemCaller {
+			role := t.txnAllowList.GetRole(contract.Caller)
+			if !role.Enabled() {
+				return &runtime.ExecutionResult{
+					GasLeft: 0,
+					Err:     runtime.ErrNotAuth,
+				}
+			}
+		}
 	} else if t.txnBlockList != nil {
 		if t.txnBlockList.Addr() == contract.CodeAddress {
 			return t.txnBlockList.Run(contract, host, &t.config)
 		}
 
-		t.checkAccessLists(contract, host, func(role addresslist.Role) bool {
-			return role == addresslist.EnabledRole
-		})
+		if contract.Caller != contracts.SystemCaller {
+			role := t.txnBlockList.GetRole(contract.Caller)
+			if role == addresslist.EnabledRole {
+				return &runtime.ExecutionResult{
+					GasLeft: 0,
+					Err:     runtime.ErrNotAuth,
+				}
+			}
+		}
 	}
 
 	// check the precompiles
@@ -1066,19 +1080,4 @@ func (t *Transition) captureCallEnd(c *runtime.Contract, result *runtime.Executi
 		result.ReturnValue,
 		result.Err,
 	)
-}
-
-func (t *Transition) checkAccessLists(contract *runtime.Contract, host runtime.Host, condition func(addresslist.Role) bool) *runtime.ExecutionResult {
-	// check if the caller is on the allow list
-	if contract.Caller != contracts.SystemCaller {
-		txnAllowListRole := t.txnAllowList.GetRole(contract.Caller)
-		if condition(txnAllowListRole) {
-			return &runtime.ExecutionResult{
-				GasLeft: 0,
-				Err:     runtime.ErrNotAuth,
-			}
-		}
-	}
-
-	return nil
 }
