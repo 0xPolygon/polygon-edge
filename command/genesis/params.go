@@ -93,7 +93,6 @@ type genesisParams struct {
 	// PolyBFT
 	validatorsPath          string
 	validatorsPrefixPath    string
-	premineValidators       []string
 	stakes                  []string
 	validators              []string
 	sprintSize              uint64
@@ -372,13 +371,13 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineRaw := range p.premine {
-		premineInfo, err := ParsePremineInfo(premineRaw)
+		premineInfo, err := parsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
-			Balance: premineInfo.Amount,
+		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
+			Balance: premineInfo.amount,
 		}
 	}
 

@@ -25,11 +25,10 @@ import (
 )
 
 const (
-	premineValidatorsFlag = "premine-validators"
-	stakeFlag             = "stake"
-	validatorsFlag        = "validators"
-	validatorsPathFlag    = "validators-path"
-	validatorsPrefixFlag  = "validators-prefix"
+	stakeFlag            = "stake"
+	validatorsFlag       = "validators"
+	validatorsPathFlag   = "validators-path"
+	validatorsPrefixFlag = "validators-prefix"
 
 	defaultValidatorPrefixPath = "test-chain-"
 
@@ -63,7 +62,19 @@ var (
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
-	initialValidators, err := p.getValidatorAccounts()
+	// populate premine balance map
+	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
+
+	for _, premine := range p.premine {
+		premineInfo, err := parsePremineInfo(premine)
+		if err != nil {
+			return fmt.Errorf("invalid balance amount provided '%s' : %w", premine, err)
+		}
+
+		premineBalances[premineInfo.address] = premineInfo
+	}
+
+	initialValidators, err := p.getValidatorAccounts(premineBalances)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve genesis validators: %w", err)
 	}
@@ -121,13 +132,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	genesisValidators := make(map[types.Address]struct{}, len(initialValidators))
 	totalStake := big.NewInt(0)
 
 	for _, validator := range initialValidators {
-		// populate premine info for validator accounts
-		genesisValidators[validator.Address] = struct{}{}
-
 		// increment total stake
 		totalStake.Add(totalStake, validator.Stake)
 	}
@@ -138,55 +145,16 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return err
 	}
 
-	premineInfos := make([]*PremineInfo, len(p.premine))
-	premineValidatorsAddrs := []string{}
-	// premine non-validator
-	for i, premine := range p.premine {
-		premineInfo, err := ParsePremineInfo(premine)
-		if err != nil {
-			return err
-		}
-
-		// collect validators addresses which got premined, as it is an error
-		// genesis validators balances must be defined in manifest file and should not be changed in the genesis
-		if _, ok := genesisValidators[premineInfo.Address]; ok {
-			premineValidatorsAddrs = append(premineValidatorsAddrs, premineInfo.Address.String())
-		} else {
-			premineInfos[i] = premineInfo
-		}
-	}
-
-	// if there are any premined validators in the genesis command, consider it as an error
-	if len(premineValidatorsAddrs) > 0 {
-		return fmt.Errorf("it is not allowed to override genesis validators balance outside from the manifest definition. "+
-			"Validators which got premined: (%s)", strings.Join(premineValidatorsAddrs, ", "))
-	}
-
-	// populate genesis validators balances
-	for _, validator := range initialValidators {
-		allocs[validator.Address] = &chain.GenesisAccount{
-			Balance: validator.Balance,
-		}
-	}
-
-	// premine non-validator accounts
-	for _, premine := range premineInfos {
-		allocs[premine.Address] = &chain.GenesisAccount{
-			Balance: premine.Amount,
+	// premine accounts
+	for _, premine := range premineBalances {
+		allocs[premine.address] = &chain.GenesisAccount{
+			Balance: premine.amount,
 		}
 	}
 
 	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))
 
 	for i, validator := range initialValidators {
-		// update balance of genesis validator, because it could be changed via premine flag
-		balance, err := chain.GetGenesisAccountBalance(validator.Address, allocs)
-		if err != nil {
-			return err
-		}
-
-		validator.Balance = balance
-
 		// create validator metadata instance
 		metadata, err := validator.ToValidatorMetadata()
 		if err != nil {
@@ -337,27 +305,18 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 }
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
-func (p *genesisParams) getValidatorAccounts() ([]*polybft.Validator, error) {
+func (p *genesisParams) getValidatorAccounts(
+	premineBalances map[types.Address]*premineInfo) ([]*polybft.Validator, error) {
 	// populate validators premine info
-	premineMap := make(map[types.Address]*PremineInfo, len(p.premineValidators))
-	stakeMap := make(map[types.Address]*PremineInfo, len(p.stakes))
-
-	for _, premine := range p.premineValidators {
-		premineInfo, err := ParsePremineInfo(premine)
-		if err != nil {
-			return nil, fmt.Errorf("invalid balance amount provided '%s' : %w", premine, err)
-		}
-
-		premineMap[premineInfo.Address] = premineInfo
-	}
+	stakeMap := make(map[types.Address]*premineInfo, len(p.stakes))
 
 	for _, stake := range p.stakes {
-		stakeInfo, err := ParsePremineInfo(stake)
+		stakeInfo, err := parsePremineInfo(stake)
 		if err != nil {
 			return nil, fmt.Errorf("invalid stake amount provided '%s' : %w", stake, err)
 		}
 
-		stakeMap[stakeInfo.Address] = stakeInfo
+		stakeMap[stakeInfo.address] = stakeInfo
 	}
 
 	if len(p.validators) > 0 {
@@ -394,7 +353,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*polybft.Validator, error) {
 				Address:      addr,
 				BlsKey:       trimmedBLSKey,
 				BlsSignature: parts[3],
-				Balance:      getPremineAmount(addr, premineMap, command.DefaultPremineBalance),
+				Balance:      getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
 				Stake:        getPremineAmount(addr, stakeMap, command.DefaultStake),
 			}
 		}
@@ -413,7 +372,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*polybft.Validator, error) {
 	}
 
 	for _, v := range validators {
-		v.Balance = getPremineAmount(v.Address, premineMap, command.DefaultPremineBalance)
+		v.Balance = getPremineAmount(v.Address, premineBalances, command.DefaultPremineBalance)
 		v.Stake = getPremineAmount(v.Address, stakeMap, command.DefaultStake)
 	}
 
@@ -421,10 +380,10 @@ func (p *genesisParams) getValidatorAccounts() ([]*polybft.Validator, error) {
 }
 
 // getPremineAmount retrieves amount from the premine map or if not provided, returns default amount
-func getPremineAmount(addr types.Address, premineMap map[types.Address]*PremineInfo,
+func getPremineAmount(addr types.Address, premineMap map[types.Address]*premineInfo,
 	defaultAmount *big.Int) *big.Int {
 	if premine, exists := premineMap[addr]; exists {
-		return premine.Amount
+		return premine.amount
 	}
 
 	return defaultAmount

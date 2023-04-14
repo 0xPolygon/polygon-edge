@@ -306,15 +306,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	var err error
 
 	config := &TestClusterConfig{
-		t:                 t,
-		WithLogs:          isTrueEnv(envLogsEnabled),
-		WithStdout:        isTrueEnv(envStdoutEnabled),
-		Binary:            resolveBinary(),
-		EpochSize:         10,
-		EpochReward:       1,
-		BlockGasLimit:     1e7, // 10M
-		PremineValidators: []string{},
-		StakeAmounts:      []string{},
+		t:             t,
+		WithLogs:      isTrueEnv(envLogsEnabled),
+		WithStdout:    isTrueEnv(envStdoutEnabled),
+		Binary:        resolveBinary(),
+		EpochSize:     10,
+		EpochReward:   1,
+		BlockGasLimit: 1e7, // 10M
+		StakeAmounts:  []string{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -417,11 +416,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		// premine validators
-		for _, premineValidator := range cluster.Config.PremineValidators {
-			args = append(args, "--premine-validators", premineValidator)
-		}
-
+		// provide validators' stakes
 		for _, validatorStake := range cluster.Config.StakeAmounts {
 			args = append(args, "--stake", validatorStake)
 		}

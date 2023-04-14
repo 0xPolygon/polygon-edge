@@ -60,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %d",
+			"the premined accounts and balances (format: <address>[:<balance>]). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)
@@ -168,16 +168,6 @@ func setFlags(cmd *cobra.Command) {
 			validatorsFlag,
 			[]string{},
 			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
-		)
-
-		cmd.Flags().StringArrayVar(
-			&params.premineValidators,
-			premineValidatorsFlag,
-			[]string{},
-			fmt.Sprintf(
-				"the premined validators and balances (format: <address>[:<balance>]). Default premined balance: %d",
-				command.DefaultPremineBalance,
-			),
 		)
 
 		cmd.Flags().StringArrayVar(

@@ -123,7 +123,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		framework.WithEpochReward(epochReward),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
 		}),
 	)
@@ -333,7 +333,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
 				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
 		}),
@@ -444,7 +444,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		framework.WithEpochSize(5),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", a, premineAmount))
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premineAmount))
 				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", a, premineAmount))
 			}
 		}),
@@ -653,8 +653,8 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 				// (it is going to send mint transactions to all the other validators)
 				if i > 0 {
 					// premine other validators with as minimum stake as possible just to ensure liveness of consensus protocol
+					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initialBalance))
 					config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", addr, initialStake))
-					config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", addr, initialBalance))
 				}
 				validatorsAddrs[i] = addr
 			}
