@@ -25,7 +25,7 @@ jobs:
 
   e2eibft:
     name: IBFT E2E Tests
-    uses: ./.github/workflows/e2e.yml
+    uses: ./.github/workflows/e2e.yaml
     needs: build
 
   property:
