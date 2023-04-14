@@ -91,14 +91,13 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	validatorsPath          string
-	validatorsPrefixPath    string
-	stakes                  []string
-	validators              []string
-	sprintSize              uint64
-	blockTime               time.Duration
-	epochReward             uint64
-	eventTrackerStartBlocks []string
+	validatorsPath       string
+	validatorsPrefixPath string
+	stakes               []string
+	validators           []string
+	sprintSize           uint64
+	blockTime            time.Duration
+	epochReward          uint64
 
 	initialStateRoot string
 

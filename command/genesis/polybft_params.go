@@ -8,18 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -32,10 +31,9 @@ const (
 
 	defaultValidatorPrefixPath = "test-chain-"
 
-	sprintSizeFlag         = "sprint-size"
-	blockTimeFlag          = "block-time"
-	trackerStartBlocksFlag = "tracker-start-blocks"
-	trieRootFlag           = "trieroot"
+	sprintSizeFlag = "sprint-size"
+	blockTimeFlag  = "block-time"
+	trieRootFlag   = "trieroot"
 
 	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
@@ -83,19 +81,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return errNoGenesisValidators
 	}
 
-	var bridge *polybft.BridgeConfig
-
-	if len(p.eventTrackerStartBlocks) > 0 {
-		eventTrackerStartBlock, err := parseTrackerStartBlocks(p.eventTrackerStartBlocks)
-		if err != nil {
-			return err
-		}
-
-		bridge := &polybft.BridgeConfig{}
-		// populate bridge configuration
-		bridge.EventTrackerStartBlocks = eventTrackerStartBlock
-	}
-
 	if _, err := o.Write([]byte("[GENESIS VALIDATORS]\n")); err != nil {
 		return err
 	}
@@ -112,7 +97,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
-		Bridge:              bridge,
 		// use 1st account as governance address
 		Governance:          initialValidators[0].Address,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
