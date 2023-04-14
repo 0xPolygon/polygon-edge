@@ -337,29 +337,29 @@ func TestE2E_BlockList_Transactions(t *testing.T) {
 	}
 
 	{
-		// Step 3. 'adminAddr' sends a transaction to enable 'targetAddr'.
+		// Step 3. 'targetAddr' cannot enable other accounts since it is not an admin
+		// (The transaction fails)
+		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+
+		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.BlockListTransactionsAddr, input)
+		require.NoError(t, adminSetFailTxn.Wait())
+		require.True(t, adminSetFailTxn.Failed())
+		expectRole(t, cluster, contracts.BlockListTransactionsAddr, types.ZeroAddress, addresslist.NoRole)
+	}
+
+	{
+		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
 		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
 
-		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
+		adminSetTxn := cluster.MethodTxn(t, admin, contracts.BlockListTransactionsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
 		expectRole(t, cluster, contracts.BlockListTransactionsAddr, targetAddr, addresslist.EnabledRole)
 	}
 
 	{
-		// Step 4. 'targetAddr' **cannot** send a normal transaction because it is blacklisted.
+		// Step 5. 'targetAddr' **cannot** send a normal transaction because it is blacklisted.
 		targetTxn := cluster.Transfer(t, target, types.ZeroAddress, big.NewInt(1))
 		require.NoError(t, targetTxn.Wait())
 		require.True(t, targetTxn.Reverted())
-	}
-
-	{
-		// Step 5. 'targetAddr' cannot enable other accounts since it is not an admin
-		// (The transaction fails)
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
-
-		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListTransactionsAddr, input)
-		require.NoError(t, adminSetFailTxn.Wait())
-		require.True(t, adminSetFailTxn.Failed())
-		expectRole(t, cluster, contracts.BlockListTransactionsAddr, types.ZeroAddress, addresslist.NoRole)
 	}
 }
