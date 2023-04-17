@@ -155,7 +155,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s started...", contractsDeploymentTitle),
+		Message: fmt.Sprintf("%s started... Rootchain JSON RPC address %s.", contractsDeploymentTitle, params.jsonRPCAddress),
 	})
 
 	chainConfig, err := chain.ImportFromFile(params.genesisPath)
