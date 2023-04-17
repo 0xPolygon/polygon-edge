@@ -1218,7 +1218,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 	extra.Checkpoint = &CheckpointData{CurrentValidatorsHash: validatorsHash, NextValidatorsHash: validatorsHash}
 	parent := &types.Header{
 		Number:    parentBlockNumber,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		ExtraData: extra.MarshalRLPTo(nil),
 	}
 	parent.ComputeHash()
 
@@ -1278,11 +1278,8 @@ func createTestExtra(
 	parentSignaturesCount int,
 ) []byte {
 	extraData := createTestExtraObject(allAccounts, previousValidatorSet, validatorsCount, committedSignaturesCount, parentSignaturesCount)
-	marshaled := extraData.MarshalRLPTo(nil)
-	result := make([]byte, ExtraVanity+len(marshaled))
-	copy(result[ExtraVanity:], marshaled)
 
-	return result
+	return extraData.MarshalRLPTo(nil)
 }
 
 func createTestCommitment(t *testing.T, accounts []*wallet.Account) *CommitmentMessageSigned {

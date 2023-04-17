@@ -675,7 +675,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 			Config: &chain.Params{Engine: map[string]interface{}{
 				"polybft": polyBftConfig,
 			}},
-			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+			ExtraData: extra.MarshalRLPTo(nil),
 		}
 
 		genesisExtra, err := GetIbftExtra(genesis.ExtraData)

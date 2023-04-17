@@ -37,7 +37,7 @@ type Extra struct {
 func (i *Extra) MarshalRLPTo(dst []byte) []byte {
 	ar := &fastrlp.Arena{}
 
-	return i.MarshalRLPWith(ar).MarshalTo(dst)
+	return append(make([]byte, ExtraVanity), i.MarshalRLPWith(ar).MarshalTo(dst)...)
 }
 
 // MarshalRLPWith defines the marshal function implementation for Extra
@@ -77,7 +77,7 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 // UnmarshalRLP defines the unmarshal function wrapper for Extra
 func (i *Extra) UnmarshalRLP(input []byte) error {
-	return fastrlp.UnmarshalRLP(input, i)
+	return fastrlp.UnmarshalRLP(input[ExtraVanity:], i)
 }
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
@@ -681,15 +681,14 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 }
 
 // GetIbftExtra returns the istanbul extra data field from the passed in header
-func GetIbftExtra(extraB []byte) (*Extra, error) {
-	if len(extraB) < ExtraVanity {
-		return nil, fmt.Errorf("wrong extra size: %d", len(extraB))
+func GetIbftExtra(extraRaw []byte) (*Extra, error) {
+	if len(extraRaw) < ExtraVanity {
+		return nil, fmt.Errorf("wrong extra size: %d", len(extraRaw))
 	}
 
-	data := extraB[ExtraVanity:]
 	extra := &Extra{}
 
-	if err := extra.UnmarshalRLP(data); err != nil {
+	if err := extra.UnmarshalRLP(extraRaw); err != nil {
 		return nil, err
 	}
 

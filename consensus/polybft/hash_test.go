@@ -24,11 +24,11 @@ func Test_setupHeaderHashFunc(t *testing.T) {
 		Timestamp: 18,
 	}
 
-	header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	header.ExtraData = extra.MarshalRLPTo(nil)
 	notFullExtraHash := types.HeaderHash(header)
 
 	extra.Committed = createSignature(t, []*wallet.Account{generateTestAccount(t)}, types.ZeroHash, bls.DomainCheckpointManager)
-	header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	header.ExtraData = extra.MarshalRLPTo(nil)
 	fullExtraHash := types.HeaderHash(header)
 
 	assert.Equal(t, notFullExtraHash, fullExtraHash)

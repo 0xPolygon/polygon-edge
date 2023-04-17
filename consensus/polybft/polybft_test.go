@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -47,7 +46,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			extra.Checkpoint = &CheckpointData{}
 		}
 
-		header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+		header.ExtraData = extra.MarshalRLPTo(nil)
 		header.ComputeHash()
 
 		if len(committedAccounts) > 0 {
@@ -55,7 +54,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			require.NoError(t, err)
 
 			extra.Committed = createSignature(t, committedAccounts, checkpointHash, bls.DomainCheckpointManager)
-			header.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+			header.ExtraData = extra.MarshalRLPTo(nil)
 		}
 
 		return extra.Committed
