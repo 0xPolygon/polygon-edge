@@ -35,7 +35,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
 		epochSize  = 30
-		sprintSize = 5
+		sprintSize = uint64(5)
 	)
 
 	receivers := make([]string, transfersCount)
@@ -78,8 +78,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			),
 		)
 
+		finalBlockNum := 8 * sprintSize
 		// wait for a couple of sprints
-		require.NoError(t, cluster.WaitForBlock(8*sprintSize, 2*time.Minute))
+		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
 
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -92,7 +93,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		filter.SetFromUint64(0)
-		filter.SetToUint64(100)
+		filter.SetToUint64(finalBlockNum)
 
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)
@@ -229,6 +230,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			),
 		)
 
+		finalBlockNum := midBlockNumber + 5*sprintSize
 		// wait for a few more sprints
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
@@ -253,7 +255,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		filter.SetFromUint64(initialBlockNum)
-		filter.SetToUint64(initialBlockNum + 2*epochSize)
+		filter.SetToUint64(finalBlockNum)
 
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)

@@ -184,8 +184,7 @@ func (b *BlockBuilder) writeTxPoolTransaction(tx *types.Transaction) (bool, erro
 		return true, nil
 	}
 
-	err := b.WriteTx(tx)
-	if err != nil {
+	if err := b.WriteTx(tx); err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
 			return true, err
