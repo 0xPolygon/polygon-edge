@@ -7,8 +7,6 @@ It has a native support for running bridge, which enables running cross-chain tr
 
 ## Setup local testing environment
 
-### Precondition
-
 1. Build binary
 
     ```bash
@@ -48,12 +46,12 @@ It has a native support for running bridge, which enables running cross-chain tr
     polygon-edge rootchain server
     ```
 
-5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates manifest configuration with rootchain contract addresses and rootchain default sender address.
+5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates genesis configuration with rootchain contract addresses and rootchain default sender address.
 
     ```bash
     polygon-edge rootchain deploy \
     --deployer-key <hex_encoded_rootchain_account_private_key> \
-    [--manifest ./manifest.json] \
+    [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--test]
     ```
