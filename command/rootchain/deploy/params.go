@@ -1,4 +1,4 @@
-package initcontracts
+package deploy
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ const (
 	defaultGenesisPath = "./genesis.json"
 )
 
-type initContractsParams struct {
+type deployParams struct {
 	genesisPath          string
 	deployerKey          string
 	jsonRPCAddress       string
@@ -27,7 +27,7 @@ type initContractsParams struct {
 	isTestMode           bool
 }
 
-func (ip *initContractsParams) validateFlags() error {
+func (ip *deployParams) validateFlags() error {
 	if _, err := os.Stat(ip.genesisPath); errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("provided genesis path '%s' doesn't exist", ip.genesisPath)
 	}

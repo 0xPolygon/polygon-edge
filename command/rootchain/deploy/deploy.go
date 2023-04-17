@@ -1,4 +1,4 @@
-package initcontracts
+package deploy
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ const (
 )
 
 var (
-	params initContractsParams
+	params deployParams
 
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
@@ -206,6 +206,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	// populate bridge configuration
 	consensusConfig.Bridge = rootchainCfg.ToBridgeConfig()
 
+	// set event tracker start blocks for rootchain contract(s) of interest
 	blockNum, err := client.Eth().BlockNumber()
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to query rootchain latest block number: %w", err))
@@ -213,7 +214,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	// set event tracker start blocks for rootchain contract(s) of interest
 	consensusConfig.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
 		rootchainCfg.StateSenderAddress: blockNum,
 	}
