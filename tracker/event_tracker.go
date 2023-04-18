@@ -47,8 +47,8 @@ func NewEventTracker(
 
 // Start will initialize Block Tracker and Tracker instances and begin tracking events.
 // The Tracker will perform a concurrent sync operation which may take some time.
-// The sync error channel should be used to handle errors that occur from the concurrent sync operation.
-func (e *EventTracker) Start(ctx context.Context) (err error, syncErrCh chan error) {
+// The error channel should be used to handle errors that occur from the concurrent sync operation.
+func (e *EventTracker) Start(ctx context.Context) (error, chan error) {
 	e.logger.Info("Start tracking events",
 		"contract", e.contractAddr,
 		"JSON RPC address", e.rpcEndpoint,
@@ -99,6 +99,7 @@ func (e *EventTracker) Start(ctx context.Context) (err error, syncErrCh chan err
 	}()
 
 	// Run sync concurrently and return error channel
+	syncErrCh := make(chan error)
 	go func() {
 		syncErrCh <- tt.Sync(ctx)
 		close(syncErrCh)
