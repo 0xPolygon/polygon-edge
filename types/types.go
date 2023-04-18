@@ -240,6 +240,9 @@ type JournalEntry struct {
 	// Code tracks the initialization of the contract Code
 	Code []byte `json:"code,omitempty"`
 
+	// CodeRead tracks whether the contract Code was read
+	CodeRead []byte `json:"code_read,omitempty"`
+
 	// Suicide tracks whether the contract has been self destructed
 	Suicide *bool `json:"suicide,omitempty"`
 
@@ -271,6 +274,10 @@ func (j *JournalEntry) Merge(jj *JournalEntry) {
 
 	if jj.Code != nil && !bytes.Equal(jj.Code, j.Code) {
 		j.Code = jj.Code
+	}
+
+	if jj.CodeRead != nil && !bytes.Equal(jj.CodeRead, j.CodeRead) {
+		j.CodeRead = jj.CodeRead
 	}
 
 	if jj.Suicide != nil && jj.Suicide != j.Suicide {
