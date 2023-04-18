@@ -450,12 +450,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
-	}
 
-	if cluster.Config.HasBridge {
+		// deploy rootchain contracts
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
+		// fund validators on the rootchain
 		err = cluster.Bridge.fundRootchainValidators()
 		require.NoError(t, err)
 	}
