@@ -859,7 +859,6 @@ func Test_GetIbftExtraClean(t *testing.T) {
 				},
 			},
 		},
-		Seal: []byte{},
 		Committed: &Signature{
 			AggregatedSignature: []byte{23, 24},
 			Bitmap:              []byte{11},
