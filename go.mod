@@ -54,7 +54,7 @@ require (
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.22.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect
-	golang.org/x/tools v0.3.0
+	golang.org/x/tools v0.4.0
 	google.golang.org/genproto v0.0.0-20221010155953-15ba04fc1c0e
 	gopkg.in/yaml.v3 v3.0.1
 	lukechampine.com/blake3 v1.1.7 // indirect
@@ -72,20 +72,27 @@ require (
 	github.com/quasilyte/go-ruleguard v0.3.19
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	golang.org/x/sync v0.1.0
-	gopkg.in/DataDog/dd-trace-go.v1 v1.43.1
+	gopkg.in/DataDog/dd-trace-go.v1 v1.49.1
 	pgregory.net/rapid v0.5.5
 )
 
-require github.com/rogpeppe/go-internal v1.10.0 // indirect
+require (
+	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.43.1 // indirect
+	github.com/DataDog/go-libddwaf v1.0.0 // indirect
+	github.com/DataDog/go-tuf v0.3.0--fix-localmeta-fork // indirect
+	github.com/outcaste-io/ristretto v0.2.1 // indirect
+	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
+	github.com/secure-systems-lab/go-securesystemslib v0.5.0 // indirect
+)
 
 require (
 	cloud.google.com/go/compute v1.10.0 // indirect
 	cloud.google.com/go/iam v0.5.0 // indirect
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/DataDog/datadog-agent/pkg/obfuscate v0.0.0-20211129110424-6491aa3bf583 // indirect
-	github.com/DataDog/datadog-go v4.8.2+incompatible // indirect
-	github.com/DataDog/datadog-go/v5 v5.0.2 // indirect
+	github.com/DataDog/datadog-agent/pkg/obfuscate v0.43.0 // indirect
+	github.com/DataDog/datadog-go/v5 v5.1.1 // indirect
 	github.com/DataDog/gostackparse v0.5.0 // indirect
 	github.com/DataDog/sketches-go v1.2.1 // indirect
 	github.com/Microsoft/go-winio v0.5.1 // indirect
@@ -106,7 +113,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
-	github.com/dgraph-io/ristretto v0.1.0 // indirect
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
@@ -116,7 +122,6 @@ require (
 	github.com/go-toolsmith/astcopy v1.0.2 // indirect
 	github.com/go-toolsmith/astequal v1.0.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
@@ -146,7 +151,6 @@ require (
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.1.0 // indirect
 	github.com/koron/go-ssdp v0.0.3 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
@@ -160,7 +164,6 @@ require (
 	github.com/libp2p/go-reuseport v0.2.0 // indirect
 	github.com/libp2p/go-yamux/v3 v3.1.2 // indirect
 	github.com/lucas-clemente/quic-go v0.28.1 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/marten-seemann/qtls-go1-16 v0.1.5 // indirect
 	github.com/marten-seemann/qtls-go1-17 v0.1.2 // indirect
 	github.com/marten-seemann/qtls-go1-18 v0.1.2 // indirect
@@ -211,7 +214,7 @@ require (
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/tinylib/msgp v1.1.2 // indirect
+	github.com/tinylib/msgp v1.1.6 // indirect
 	github.com/trailofbits/go-fuzz-utils v0.0.0-20210901195358-9657fcfd256c
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
