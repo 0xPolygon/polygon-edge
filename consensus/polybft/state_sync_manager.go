@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path"
 	"sync"
 
@@ -125,7 +126,6 @@ func (s *stateSyncManager) Close() {
 
 // initTracker starts a new event tracker (to receive new state sync events)
 func (s *stateSyncManager) initTracker() error {
-	ctx, cancelFn := context.WithCancel(context.Background())
 
 	evtTracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
@@ -136,12 +136,28 @@ func (s *stateSyncManager) initTracker() error {
 		s.config.stateSenderStartBlock,
 		s.logger)
 
+	// Create child context for Event Tracker
+	ctx, cancelFn := context.WithCancel(context.Background())
 	go func() {
 		<-s.closeCh
 		cancelFn()
 	}()
 
-	return evtTracker.Start(ctx)
+	// Start Event Tracker and handle sync errors
+	err, syncErrCh := evtTracker.Start(ctx)
+	if err != nil {
+		return err
+	}
+	go func() {
+		// Sync errors are fatal for the sync manager
+		err := <-syncErrCh
+		if err != nil {
+			s.logger.Error("failed sync state manager", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	return nil
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)

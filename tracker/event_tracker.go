@@ -45,7 +45,10 @@ func NewEventTracker(
 	}
 }
 
-func (e *EventTracker) Start(ctx context.Context) error {
+// Start will initialize Block Tracker and Tracker instances and begin tracking events.
+// The Tracker will perform a concurrent sync operation which may take some time.
+// The sync error channel should be used to handle errors that occur from the concurrent sync operation.
+func (e *EventTracker) Start(ctx context.Context) (err error, syncErrCh chan error) {
 	e.logger.Info("Start tracking events",
 		"contract", e.contractAddr,
 		"JSON RPC address", e.rpcEndpoint,
@@ -54,23 +57,23 @@ func (e *EventTracker) Start(ctx context.Context) error {
 
 	provider, err := jsonrpc.NewClient(e.rpcEndpoint)
 	if err != nil {
-		return fmt.Errorf("failed to create RPC client: %w", err)
+		return fmt.Errorf("failed to create RPC client: %w", err), nil
 	}
 
 	// Block Tracker
 	blockMaxBacklog := e.numBlockConfirmations*2 + 1
 	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
 	if err := blockTracker.Init(); err != nil {
-		return fmt.Errorf("failed to init blocktracker: %w", err)
+		return fmt.Errorf("failed to init blocktracker: %w", err), nil
 	}
 	if err := blockTracker.Start(); err != nil {
-		return fmt.Errorf("failed to start blocktracker: %w", err)
+		return fmt.Errorf("failed to start blocktracker: %w", err), nil
 	}
 
 	// Tracker
 	store, err := NewEventTrackerStore(e.dbPath, e.numBlockConfirmations, e.subscriber, e.logger)
 	if err != nil {
-		return fmt.Errorf("failed to create tracker store: %w", err)
+		return fmt.Errorf("failed to create tracker store: %w", err), nil
 	}
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -85,17 +88,20 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		}),
 	)
 	if err != nil {
-		return err
-	}
-	if err := tt.Sync(ctx); err != nil {
-		return fmt.Errorf("failed to sync: %w", err)
+		return err, nil
 	}
 
+	// Clean up block tracker and store when required
 	go func() {
 		<-ctx.Done()
 		blockTracker.Close()
 		store.Close()
 	}()
 
-	return nil
+	// Run sync concurrently and return error channel
+	go func() {
+		syncErrCh <- tt.Sync(ctx)
+		close(syncErrCh)
+	}()
+	return nil, syncErrCh
 }

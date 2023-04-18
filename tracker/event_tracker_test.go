@@ -84,7 +84,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 		numBlockConfirmations: numBlockConfirmations,
 	}
 
-	err = tracker.Start(context.Background())
+	err, _ = tracker.Start(context.Background())
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)

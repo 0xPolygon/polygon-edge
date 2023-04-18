@@ -92,14 +92,27 @@ func (r *StateSyncRelayer) Start() error {
 		r.logger,
 	)
 
+	// Create child context for Event Tracker
 	ctx, cancelFn := context.WithCancel(context.Background())
-
 	go func() {
 		<-r.closeCh
 		cancelFn()
 	}()
 
-	return et.Start(ctx)
+	// Start Event Tracker and handle sync errors
+	err, syncErrCh := et.Start(ctx)
+	if err != nil {
+		return err
+	}
+	go func() {
+		// Sync errors are not fatal for the relayer
+		err := <-syncErrCh
+		if err != nil {
+			r.logger.Error("failed sync relayer", "error", err)
+		}
+	}()
+
+	return nil
 }
 
 // Stop function is used to tear down all the allocated resources
