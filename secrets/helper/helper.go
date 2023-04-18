@@ -93,7 +93,7 @@ func InitECDSAValidatorKey(secretsManager secrets.SecretsManager) (types.Address
 		}
 
 		y := validatorKey.PublicKey.Y.Bytes()
-		if y[31]%2 == 0 {
+		if len(y) > 31 && y[31]%2 == 0 {
 			break
 		}
 	}
