@@ -2,9 +2,11 @@ package fund
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -78,7 +80,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	paramsList := getParamsList()
-	resList := make(command.Results, len(paramsList))
+	resList := make(command.Results, 0)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
 	if err != nil {
@@ -87,37 +89,57 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	for i, params := range paramsList {
-		if err := params.initSecretsManager(); err != nil {
-			outputter.SetError(err)
+	var (
+		lock   sync.Mutex
+		g, ctx = errgroup.WithContext(cmd.Context())
+	)
 
-			return
-		}
+	for _, params := range paramsList {
+		params := params
 
-		validatorAcc, err := params.getValidatorAccount()
-		if err != nil {
-			outputter.SetError(err)
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				if err := params.initSecretsManager(); err != nil {
+					return err
+				}
 
-			return
-		}
+				validatorAcc, err := params.getValidatorAccount()
+				if err != nil {
+					return err
+				}
 
-		fundAddr := ethgo.Address(validatorAcc)
-		txn := &ethgo.Transaction{
-			To:    &fundAddr,
-			Value: ethgo.Ether(100),
-		}
+				fundAddr := ethgo.Address(validatorAcc)
+				txn := &ethgo.Transaction{
+					To:    &fundAddr,
+					Value: ethgo.Ether(100),
+				}
 
-		receipt, err := txRelayer.SendTransactionLocal(txn)
-		if err != nil {
-			outputter.SetError(err)
+				receipt, err := txRelayer.SendTransactionLocal(txn)
+				if err != nil {
+					return err
+				}
 
-			return
-		}
+				lock.Lock()
 
-		resList[i] = &result{
-			ValidatorAddr: validatorAcc,
-			TxHash:        types.Hash(receipt.TransactionHash),
-		}
+				resList = append(resList, &result{
+					ValidatorAddr: validatorAcc,
+					TxHash:        types.Hash(receipt.TransactionHash),
+				})
+
+				lock.Unlock()
+
+				return nil
+			}
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		outputter.SetError(fmt.Errorf("fund command failed. error: %w", err))
+
+		return
 	}
 
 	outputter.SetCommandResult(resList)
