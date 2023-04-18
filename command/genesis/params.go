@@ -144,8 +144,11 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
-	if _, err := os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
+	// Validate validatorsPath only if validators information were not provided via CLI flag
+	if len(p.validators) == 0 {
+		if _, err := os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
+		}
 	}
 
 	// Validate min and max validators number
