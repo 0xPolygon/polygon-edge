@@ -675,7 +675,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 			Config: &chain.Params{Engine: map[string]interface{}{
 				"polybft": polyBftConfig,
 			}},
-			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+			ExtraData: extra.MarshalRLPTo(nil),
 		}
 
 		genesisExtra, err := GetIbftExtra(genesis.ExtraData)
@@ -859,7 +859,6 @@ func Test_GetIbftExtraClean(t *testing.T) {
 				},
 			},
 		},
-		Seal: []byte{},
 		Committed: &Signature{
 			AggregatedSignature: []byte{23, 24},
 			Bitmap:              []byte{11},
@@ -877,13 +876,11 @@ func Test_GetIbftExtraClean(t *testing.T) {
 		},
 	}
 
-	extraBytes := append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
-
-	extraClean, err := GetIbftExtraClean(extraBytes)
+	extraClean, err := GetIbftExtraClean(extra.MarshalRLPTo(nil))
 	require.NoError(t, err)
 
 	extraTwo := &Extra{}
-	require.NoError(t, extraTwo.UnmarshalRLP(extraClean[ExtraVanity:]))
+	require.NoError(t, extraTwo.UnmarshalRLP(extraClean))
 	require.True(t, extra.Validators.Equals(extra.Validators))
 	require.Equal(t, extra.Checkpoint.BlockRound, extraTwo.Checkpoint.BlockRound)
 	require.Equal(t, extra.Checkpoint.EpochNumber, extraTwo.Checkpoint.EpochNumber)

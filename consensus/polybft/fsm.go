@@ -167,7 +167,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		"Next validators hash", nextValidatorsHash)
 
 	stateBlock, err := f.blockBuilder.Build(func(h *types.Header) {
-		h.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+		h.ExtraData = extra.MarshalRLPTo(nil)
 		h.MixHash = PolyBFTMixDigest
 	})
 
@@ -532,7 +532,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	}
 
 	// Write extra data to header
-	newBlock.Block.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	newBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil)
 
 	if err := f.backend.CommitBlock(newBlock); err != nil {
 		return nil, err
