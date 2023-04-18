@@ -2,7 +2,9 @@ package fund
 
 import (
 	"fmt"
+	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 
@@ -78,7 +80,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	defer outputter.WriteOutput()
 
 	paramsList := getParamsList()
-	resList := make(command.Results, len(paramsList))
+	resList := make(command.Results, 0)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
 	if err != nil {
@@ -87,16 +89,24 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	for i, params := range paramsList {
+	var (
+		wg    sync.WaitGroup
+		lock  sync.Mutex
+		errCh = make(chan error)
+	)
+
+	sendFundTx := func(params fundParams) {
+		defer wg.Done()
+
 		if err := params.initSecretsManager(); err != nil {
-			outputter.SetError(err)
+			errCh <- err
 
 			return
 		}
 
 		validatorAcc, err := params.getValidatorAccount()
 		if err != nil {
-			outputter.SetError(err)
+			errCh <- err
 
 			return
 		}
@@ -109,18 +119,42 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		receipt, err := txRelayer.SendTransactionLocal(txn)
 		if err != nil {
-			outputter.SetError(err)
+			errCh <- err
 
 			return
 		}
 
-		resList[i] = &result{
+		lock.Lock()
+
+		resList = append(resList, &result{
 			ValidatorAddr: validatorAcc,
 			TxHash:        types.Hash(receipt.TransactionHash),
-		}
+		})
+
+		lock.Unlock()
 	}
 
-	outputter.SetCommandResult(resList)
+	for _, params := range paramsList {
+		wg.Add(1)
+
+		go sendFundTx(params)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errCh)
+	}()
+
+	var resultingError error
+	for err := range errCh {
+		resultingError = multierror.Append(resultingError, err)
+	}
+
+	if resultingError != nil {
+		outputter.SetError(resultingError)
+	} else {
+		outputter.SetCommandResult(resList)
+	}
 }
 
 // getParamsList creates a list of initParams with num elements.
