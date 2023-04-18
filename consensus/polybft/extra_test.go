@@ -876,9 +876,7 @@ func Test_GetIbftExtraClean(t *testing.T) {
 		},
 	}
 
-	extraBytes := append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
-
-	extraClean, err := GetIbftExtraClean(extraBytes)
+	extraClean, err := GetIbftExtraClean(extra.MarshalRLPTo(nil))
 	require.NoError(t, err)
 
 	extraTwo := &Extra{}
