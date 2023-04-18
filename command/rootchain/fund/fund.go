@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -90,71 +90,59 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	var (
-		wg    sync.WaitGroup
-		lock  sync.Mutex
-		errCh = make(chan error)
+		lock   sync.Mutex
+		g, ctx = errgroup.WithContext(cmd.Context())
 	)
 
-	sendFundTx := func(params fundParams) {
-		defer wg.Done()
-
-		if err := params.initSecretsManager(); err != nil {
-			errCh <- err
-
-			return
-		}
-
-		validatorAcc, err := params.getValidatorAccount()
-		if err != nil {
-			errCh <- err
-
-			return
-		}
-
-		fundAddr := ethgo.Address(validatorAcc)
-		txn := &ethgo.Transaction{
-			To:    &fundAddr,
-			Value: ethgo.Ether(100),
-		}
-
-		receipt, err := txRelayer.SendTransactionLocal(txn)
-		if err != nil {
-			errCh <- err
-
-			return
-		}
-
-		lock.Lock()
-
-		resList = append(resList, &result{
-			ValidatorAddr: validatorAcc,
-			TxHash:        types.Hash(receipt.TransactionHash),
-		})
-
-		lock.Unlock()
-	}
-
 	for _, params := range paramsList {
-		wg.Add(1)
+		params := params
 
-		go sendFundTx(params)
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				if err := params.initSecretsManager(); err != nil {
+					return err
+				}
+
+				validatorAcc, err := params.getValidatorAccount()
+				if err != nil {
+					return err
+				}
+
+				fundAddr := ethgo.Address(validatorAcc)
+				txn := &ethgo.Transaction{
+					To:    &fundAddr,
+					Value: ethgo.Ether(100),
+				}
+
+				receipt, err := txRelayer.SendTransactionLocal(txn)
+				if err != nil {
+					return err
+				}
+
+				lock.Lock()
+
+				resList = append(resList, &result{
+					ValidatorAddr: validatorAcc,
+					TxHash:        types.Hash(receipt.TransactionHash),
+				})
+
+				lock.Unlock()
+
+				return nil
+			}
+		})
 	}
 
-	go func() {
-		wg.Wait()
-		close(errCh)
-	}()
+	if err = g.Wait(); err != nil {
+		outputter.SetError(fmt.Errorf("fund command failed. error: %w", err))
 
-	var resultingError error
-	for err := range errCh {
-		resultingError = multierror.Append(resultingError, err)
+		return
 	}
 
-	if resultingError != nil {
-		outputter.SetError(resultingError)
-	} else {
-		outputter.SetCommandResult(resList)
-	}
+	outputter.SetCommandResult(resList)
 }
 
 // getParamsList creates a list of initParams with num elements.
