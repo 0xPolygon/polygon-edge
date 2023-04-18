@@ -880,7 +880,7 @@ func Test_GetIbftExtraClean(t *testing.T) {
 	require.NoError(t, err)
 
 	extraTwo := &Extra{}
-	require.NoError(t, extraTwo.UnmarshalRLP(extraClean[ExtraVanity:]))
+	require.NoError(t, extraTwo.UnmarshalRLP(extraClean))
 	require.True(t, extra.Validators.Equals(extra.Validators))
 	require.Equal(t, extra.Checkpoint.BlockRound, extraTwo.Checkpoint.BlockRound)
 	require.Equal(t, extra.Checkpoint.EpochNumber, extraTwo.Checkpoint.EpochNumber)
