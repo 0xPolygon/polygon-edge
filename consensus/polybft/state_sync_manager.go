@@ -126,7 +126,6 @@ func (s *stateSyncManager) Close() {
 
 // initTracker starts a new event tracker (to receive new state sync events)
 func (s *stateSyncManager) initTracker() error {
-
 	evtTracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
 		s.config.jsonrpcAddr,
@@ -150,9 +149,8 @@ func (s *stateSyncManager) initTracker() error {
 	}
 	go func() {
 		// Sync errors are fatal for the sync manager
-		err := <-syncErrCh
-		if err != nil {
-			s.logger.Error("failed sync state manager", "error", err)
+		if err := <-syncErrCh; err != nil {
+			s.logger.Error("failed to sync state manager", "error", err)
 			os.Exit(1)
 		}
 	}()

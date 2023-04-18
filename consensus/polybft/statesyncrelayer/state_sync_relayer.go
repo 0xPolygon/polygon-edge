@@ -106,9 +106,8 @@ func (r *StateSyncRelayer) Start() error {
 	}
 	go func() {
 		// Sync errors are not fatal for the relayer
-		err := <-syncErrCh
-		if err != nil {
-			r.logger.Error("failed sync relayer", "error", err)
+		if err := <-syncErrCh; err != nil {
+			r.logger.Error("failed to sync relayer", "error", err)
 		}
 	}()
 
