@@ -1,0 +1,8 @@
+{
+    "allowContractCreation": true,
+    "allowList": ["0x71C7656EC7ab88b098defB751B7401B5f6d8976F"],
+    "denyList": null,
+    "pullTime": 2000,
+    "receiptRetryDelay": 10,
+    "receiptNumRetries": 100
+}

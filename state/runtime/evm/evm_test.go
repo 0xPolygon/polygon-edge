@@ -1,22 +1,24 @@
 package evm
 
 import (
+	"bytes"
 	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract {
+func newMockContract(value *big.Int, gas uint64, code []byte, to types.Address) *runtime.Contract {
 	return runtime.NewContract(
 		1,
 		types.ZeroAddress,
 		types.ZeroAddress,
-		types.ZeroAddress,
+		to,
 		value,
 		gas,
 		code,
@@ -75,7 +77,7 @@ func (m *mockHost) Selfdestruct(addr types.Address, beneficiary types.Address) {
 }
 
 func (m *mockHost) GetTxContext() runtime.TxContext {
-	panic("Not implemented in tests") //nolint:gocritic
+	return runtime.TxContext{}
 }
 
 func (m *mockHost) GetBlockHash(number int64) types.Hash {
@@ -118,6 +120,7 @@ func TestRun(t *testing.T) {
 		value    *big.Int
 		gas      uint64
 		code     []byte
+		to       types.Address
 		config   *chain.ForksInTime
 		expected *runtime.ExecutionResult
 	}{
@@ -176,6 +179,23 @@ func TestRun(t *testing.T) {
 				Err:     errRevert,
 			},
 		},
+		{
+			name:  "should succeed and return value of auth signer",
+			value: big.NewInt(0),
+			gas:   3100 + 4*3,
+			code:  getAuthTestCode(),
+			to:    types.StringToAddress("0xC66298c7a6aDE36b928d6e9598Af7804611AbDC0"),
+			config: &chain.ForksInTime{
+				Byzantium: true,
+				EIP3074:   true,
+			},
+			expected: &runtime.ExecutionResult{
+				ReturnValue: nil,
+				GasLeft:     0x0,
+				GasUsed:     0xc28, // 3100 + 4*3
+				Err:         nil,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -184,7 +204,7 @@ func TestRun(t *testing.T) {
 			t.Parallel()
 
 			evm := NewEVM()
-			contract := newMockContract(tt.value, tt.gas, tt.code)
+			contract := newMockContract(tt.value, tt.gas, tt.code, tt.to)
 			host := &mockHost{}
 			config := tt.config
 			if config == nil {
@@ -352,7 +372,7 @@ func TestRunWithTracer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			contract := newMockContract(tt.value, tt.gas, tt.code)
+			contract := newMockContract(tt.value, tt.gas, tt.code, types.ZeroAddress)
 			contract.Address = contractAddress
 			tracer := &mockTracer{}
 			host := &mockHost{
@@ -378,7 +398,28 @@ func TestRunWithTracer(t *testing.T) {
 
 			_, _ = state.Run()
 
-			assert.Equal(t, tt.expected, tracer.calls)
+			assert.Equal(t, tt.expected, tracer.calls, "failed for %s", tt.name)
 		})
 	}
+}
+
+func getAuthTestCode() []byte {
+	// r: 0x8b1b4920a872ff8fdd66a35ef370a9d9113af4234b91ab0087c51e8362287073
+	// s: 0x68da649ea8d0444671dc2e3ed9b40ab9b0eee08d745a5527bdb92f0dff746d9c
+	// v: false
+	// commit: 0x6ca2b29e76ec69ab132c23acdafc5650de9f0ee2aa6ada70031962b37e24b026
+	// user: 0x3D09c91F44C87C30901dDB742D99f168F5AEEf01
+	// invoker: 0xC66298c7a6aDE36b928d6e9598Af7804611AbDC0
+	authCode := new(bytes.Buffer)
+	authCode.WriteByte(PUSH32)
+	authCode.Write(hex.MustDecodeHex("0x68da649ea8d0444671dc2e3ed9b40ab9b0eee08d745a5527bdb92f0dff746d9c"))
+	authCode.WriteByte(PUSH32)
+	authCode.Write(hex.MustDecodeHex("0x8b1b4920a872ff8fdd66a35ef370a9d9113af4234b91ab0087c51e8362287073"))
+	authCode.WriteByte(PUSH1)
+	authCode.WriteByte(0x00)
+	authCode.WriteByte(PUSH32)
+	authCode.Write(hex.MustDecodeHex("0x6ca2b29e76ec69ab132c23acdafc5650de9f0ee2aa6ada70031962b37e24b026"))
+	authCode.WriteByte(AUTH)
+
+	return authCode.Bytes()
 }

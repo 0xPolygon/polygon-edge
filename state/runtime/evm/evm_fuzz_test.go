@@ -187,7 +187,7 @@ func FuzzTestEVM(f *testing.F) {
 			return
 		}
 
-		contract := newMockContract(big.NewInt(0), 10000000, code)
+		contract := newMockContract(big.NewInt(0), 10000000, code, types.ZeroAddress)
 		evm.Run(contract, host, config)
 	})
 }

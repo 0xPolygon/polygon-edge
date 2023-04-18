@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/0xPolygon/polygon-edge/command/aarelayer"
 	"github.com/0xPolygon/polygon-edge/command/backup"
 	"github.com/0xPolygon/polygon-edge/command/bridge"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
@@ -65,6 +66,7 @@ func (rc *RootCommand) registerSubCommands() {
 		polybftmanifest.GetCommand(),
 		bridge.GetCommand(),
 		regenesis.GetCommand(),
+		aarelayer.GetCommand(),
 	)
 }
 
