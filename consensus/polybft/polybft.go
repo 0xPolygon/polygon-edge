@@ -487,7 +487,14 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	return nil
 }
 
-// GetBridgeProvider returns an instance of BridgeDataProvider
+// GetBridgeProvider is an implementation of Consensus interface
+// Returns an instance of BridgeDataProvider
 func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 	return p.runtime
+}
+
+// GetBridgeProvider is an implementation of Consensus interface
+// Filters extra data to not contain Committed field
+func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
+	return GetIbftExtraClean(extra)
 }
