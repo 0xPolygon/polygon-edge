@@ -289,18 +289,6 @@ var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	var err error
-
-	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
-		// Decrypt the from address
-		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
-
-		txn.From, err = signer.Sender(txn)
-		if err != nil {
-			return NewTransitionApplicationError(err, false)
-		}
-	}
-
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
