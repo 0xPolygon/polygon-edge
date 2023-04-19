@@ -203,7 +203,7 @@ func (e *Executor) BeginTxn(
 		txn.txnAllowList = allowlist.NewAllowList(txn, contracts.AllowListTransactionsAddr)
 	}
 
-	return &Transition1{}, nil
+	return &Transition1{state: auxSnap2, tt: txn}, nil
 }
 
 type Transition1 struct {
