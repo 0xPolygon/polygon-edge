@@ -473,7 +473,12 @@ func (s *Server) IsConnected(peerID peer.ID) bool {
 
 // GetProtocols fetches the list of node-supported protocols
 func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
-	return s.host.Peerstore().GetProtocols(peerID)
+	protocols, err := s.host.Peerstore().GetProtocols(peerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return protocol.ConvertToStrings(protocols), nil
 }
 
 // removePeer removes a peer from the networking server's peer list,
