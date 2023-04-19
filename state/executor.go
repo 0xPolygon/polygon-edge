@@ -135,14 +135,6 @@ func (e *Executor) ProcessBlock(
 	}
 
 	for _, t := range block.Transactions {
-		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
-			if err := txn.WriteFailedReceipt(t); err != nil {
-				return nil, err
-			}
-
-			continue
-		}
-
 		if err := txn.Write(t); err != nil {
 			return nil, err
 		}
@@ -294,37 +286,6 @@ func (t *Transition) Receipts() []*types.Receipt {
 }
 
 var emptyFrom = types.Address{}
-
-func (t *Transition) WriteFailedReceipt(txn *types.Transaction) error {
-	signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
-
-	if txn.From == emptyFrom && txn.Type == types.LegacyTx {
-		// Decrypt the from address
-		from, err := signer.Sender(txn)
-		if err != nil {
-			return NewTransitionApplicationError(err, false)
-		}
-
-		txn.From = from
-	}
-
-	receipt := &types.Receipt{
-		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
-		TxHash:            txn.Hash,
-		Logs:              t.state.Logs(),
-	}
-
-	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
-	receipt.SetStatus(types.ReceiptFailed)
-	t.receipts = append(t.receipts, receipt)
-
-	if txn.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(txn.From, txn.Nonce).Ptr()
-	}
-
-	return nil
-}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
