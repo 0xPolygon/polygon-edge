@@ -1,7 +1,6 @@
 package deploy
 
 import (
-	"errors"
 	"fmt"
 	"os"
 )
@@ -28,8 +27,8 @@ type deployParams struct {
 }
 
 func (ip *deployParams) validateFlags() error {
-	if _, err := os.Stat(ip.genesisPath); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("provided genesis path '%s' doesn't exist", ip.genesisPath)
+	if _, err := os.Stat(ip.genesisPath); err != nil {
+		return fmt.Errorf("provided genesis path '%s' is invalid. Error: %w ", ip.genesisPath, err)
 	}
 
 	return nil
