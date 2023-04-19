@@ -79,7 +79,6 @@ func (e *Executor) WriteGenesis(
 	}
 
 	transition := &Transition{
-		logger:      e.logger,
 		ctx:         env,
 		state:       txn,
 		auxState:    e.state,
@@ -191,7 +190,6 @@ func (e *Executor) BeginTxn(
 	}
 
 	txn := &Transition{
-		logger:   e.logger,
 		ctx:      txCtx,
 		state:    newTxn,
 		snap:     auxSnap2,
@@ -222,8 +220,6 @@ func (e *Executor) BeginTxn(
 }
 
 type Transition struct {
-	logger hclog.Logger
-
 	// dummy
 	auxState State
 	snap     Snapshot
@@ -349,8 +345,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	result, e := t.Apply(msg)
 	if e != nil {
-		t.logger.Error("failed to apply tx", "err", e)
-
 		return e
 	}
 
