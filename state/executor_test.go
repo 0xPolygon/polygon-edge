@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,7 @@ func TestOverride(t *testing.T) {
 	balance := big.NewInt(2)
 	code := []byte{0x1}
 
-	tt := NewTransition(chain.ForksInTime{}, state, newTxn(state))
+	tt := NewTransition(chain.ForksInTime{}, state, runtime.TxContext{}, nil)
 
 	require.Empty(t, tt.state.GetCode(types.ZeroAddress))
 

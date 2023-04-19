@@ -8,8 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -166,8 +164,6 @@ func (e *Executor) BeginTxn(
 		return nil, err
 	}
 
-	newTxn := NewTxn(auxSnap2)
-
 	txCtx := runtime.TxContext{
 		Coinbase:   coinbaseReceiver,
 		Timestamp:  int64(header.Timestamp),
@@ -177,27 +173,16 @@ func (e *Executor) BeginTxn(
 		ChainID:    e.config.ChainID,
 	}
 
-	txn := &Transition{
-		ctx:         txCtx,
-		state:       newTxn,
-		snap:        auxSnap2,
-		getHash:     e.GetHash(header),
-		config:      forkConfig,
-		gasPool:     uint64(txCtx.GasLimit),
-		totalGas:    0,
-		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
-		PostHook:    e.PostHook,
-	}
+	txn := NewTransition(forkConfig, auxSnap2, txCtx, e.GetHash(header))
 
 	// enable contract deployment allow list (if any)
 	if e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowlist = allowlist.NewAllowList(txn, contracts.AllowListContractsAddr)
+		txn.WithDeploymentAllowList(contracts.AllowListContractsAddr)
 	}
 
 	// enable transactions allow list (if any)
 	if e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = allowlist.NewAllowList(txn, contracts.AllowListTransactionsAddr)
+		txn.WithTxnAllowList(contracts.AllowListTransactionsAddr)
 	}
 
 	return &Transition1{state: auxSnap2, tt: txn}, nil

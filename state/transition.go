@@ -51,24 +51,28 @@ type Transition struct {
 	txnAllowList        *allowlist.AllowList
 }
 
-func NewTransition2(config chain.ForksInTime, snap readSnapshot) *Transition {
+func NewTransition(config chain.ForksInTime, snap readSnapshot, ctx runtime.TxContext, getHashFn func(i uint64) types.Hash) *Transition {
 	return &Transition{
 		config:      config,
 		state:       newTxn(snap),
 		snap:        snap,
+		ctx:         ctx,
+		totalGas:    0,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		gasPool:     uint64(ctx.GasLimit),
+		getHash:     getHashFn,
 	}
 }
 
-func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
-	return &Transition{
-		config:      config,
-		state:       radix,
-		snap:        snap,
-		evm:         evm.NewEVM(),
-		precompiles: precompiled.NewPrecompiled(),
-	}
+func (t *Transition) WithDeploymentAllowList(addr types.Address) *Transition {
+	t.deploymentAllowlist = allowlist.NewAllowList(t, contracts.AllowListContractsAddr)
+	return t
+}
+
+func (t *Transition) WithTxnAllowList(addr types.Address) *Transition {
+	t.txnAllowList = allowlist.NewAllowList(t, contracts.AllowListTransactionsAddr)
+	return t
 }
 
 func (t *Transition) WithStateOverride(override types.StateOverride) error {
