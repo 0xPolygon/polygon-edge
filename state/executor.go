@@ -256,6 +256,13 @@ type Transition struct {
 
 	PostHook func(t *Transition)
 
+	// disableCleanEmptyAccounts does not clean the empty accounts at the end
+	// of the execution of the transaction. This is used in the official state
+	// tests since they require the state not to be removed, but, in normal execution
+	// the state needs to get removed. We use the negative condition in this flag so that
+	// it is enabled by default the cleaning.
+	disableCleanEmptyAccounts bool
+
 	// runtimes
 	evm         *evm.EVM
 	precompiles *precompiled.Precompiled
@@ -321,14 +328,25 @@ func (t *Transition) TotalGas() uint64 {
 
 var emptyFrom = types.Address{}
 
+func (t *Transition) DisableCleanEmptyAccounts() {
+	t.disableCleanEmptyAccounts = true
+}
+
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) (*types.Receipt, error) {
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
-	result, e := t.Apply(msg)
-	if e != nil {
-		return nil, e
+	s := t.state.Snapshot()
+
+	result, err := t.apply(msg)
+	if err != nil {
+		t.state.RevertToSnapshot(s)
+		return nil, err
+	}
+
+	if t.PostHook != nil {
+		t.PostHook(t)
 	}
 
 	t.totalGas += result.GasUsed
@@ -343,7 +361,9 @@ func (t *Transition) Write(txn *types.Transaction) (*types.Receipt, error) {
 	}
 
 	// The suicided accounts are set as deleted for the next iteration
-	t.state.CleanDeleteObjects(true)
+	if !t.disableCleanEmptyAccounts {
+		t.state.CleanDeleteObjects(true)
+	}
 
 	if result.Failed() {
 		receipt.SetStatus(types.ReceiptFailed)
@@ -384,22 +404,6 @@ func (t *Transition) addGasPool(amount uint64) {
 
 func (t *Transition) Txn() *Txn {
 	return t.state
-}
-
-// Apply applies a new transaction
-func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
-	s := t.state.Snapshot()
-
-	result, err := t.apply(msg)
-	if err != nil {
-		t.state.RevertToSnapshot(s)
-	}
-
-	if t.PostHook != nil {
-		t.PostHook(t)
-	}
-
-	return result, err
 }
 
 // ContextPtr returns reference of context

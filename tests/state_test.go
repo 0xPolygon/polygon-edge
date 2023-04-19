@@ -68,7 +68,9 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	}
 
 	executor := executor1.Transition()
-	executor.Apply(msg) //nolint:errcheck
+	executor.DisableCleanEmptyAccounts()
+
+	receipt, _ := executor.Write(msg) //nolint:errcheck
 
 	txn := executor.Txn()
 
@@ -90,7 +92,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 		)
 	}
 
-	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
+	if logs := rlpHashLogs(receipt.Logs); logs != p.Logs {
 		t.Fatalf(
 			"logs mismatch (%s, %s %d): expected %s but found %s",
 			name,
