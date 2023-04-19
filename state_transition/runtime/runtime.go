@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 

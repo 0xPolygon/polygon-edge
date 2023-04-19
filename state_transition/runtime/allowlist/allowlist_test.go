@@ -3,7 +3,7 @@ package allowlist
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/abi"

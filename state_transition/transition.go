@@ -1,4 +1,4 @@
-package state
+package statetransition
 
 import (
 	"errors"
@@ -9,20 +9,33 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
-	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
-	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime/allowlist"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime/evm"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime/precompiled"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
+
+const (
+	SpuriousDragonMaxCodeSize = 24576
+	TxPoolMaxInitCodeSize     = 2 * SpuriousDragonMaxCodeSize
+
+	TxGas                 uint64 = 21000 // Per transaction not creating a contract
+	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
+)
+
+// GetHashByNumber returns the hash function of a block number
+type GetHashByNumber = func(i uint64) types.Hash
+
+type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
 // Transition represents a state transition function that can execute
 // Ethereum transactions and interact with the low level merkle trie state.
 type Transition struct {
 	// snap is the reference to the current state on top of
 	// which the transition is being executed
-	snap readSnapshot
+	snap ReadSnapshot
 
 	config  chain.ForksInTime
 	state   *Txn
@@ -51,7 +64,7 @@ type Transition struct {
 	txnAllowList        *allowlist.AllowList
 }
 
-func NewTransition(config chain.ForksInTime, snap readSnapshot, ctx runtime.TxContext, getHashFn func(i uint64) types.Hash) *Transition {
+func NewTransition(config chain.ForksInTime, snap ReadSnapshot, ctx runtime.TxContext, getHashFn func(i uint64) types.Hash) *Transition {
 	return &Transition{
 		config:      config,
 		state:       newTxn(snap),
@@ -63,6 +76,11 @@ func NewTransition(config chain.ForksInTime, snap readSnapshot, ctx runtime.TxCo
 		gasPool:     uint64(ctx.GasLimit),
 		getHash:     getHashFn,
 	}
+}
+
+func (t *Transition) WithPostHook(postHookFn func(t *Transition)) *Transition {
+	t.PostHook = postHookFn
+	return t
 }
 
 func (t *Transition) WithDeploymentAllowList(addr types.Address) *Transition {

@@ -14,7 +14,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+	statetransition "github.com/0xPolygon/polygon-edge/state_transition"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -228,7 +229,7 @@ func buildState(
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
-	txn := state.NewTxn(snap)
+	txn := statetransition.NewTxn(snap)
 
 	for addr, alloc := range allocs {
 		txn.CreateAccount(addr)

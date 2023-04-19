@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	bn256 "github.com/umbracle/go-eth-bn256"
 )

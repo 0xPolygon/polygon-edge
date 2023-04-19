@@ -7,36 +7,23 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
+	statetransition "github.com/0xPolygon/polygon-edge/state_transition"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
-const (
-	SpuriousDragonMaxCodeSize = 24576
-	TxPoolMaxInitCodeSize     = 2 * SpuriousDragonMaxCodeSize
-
-	TxGas                 uint64 = 21000 // Per transaction not creating a contract
-	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
-)
-
 var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
-
-// GetHashByNumber returns the hash function of a block number
-type GetHashByNumber = func(i uint64) types.Hash
-
-type GetHashByNumberHelper = func(*types.Header) GetHashByNumber
 
 // Executor is the main entity
 type Executor struct {
 	logger  hclog.Logger
 	config  *chain.Params
 	state   State
-	GetHash GetHashByNumberHelper
+	GetHash statetransition.GetHashByNumberHelper
 
-	PostHook        func(txn *Transition)
-	GenesisPostHook func(*Transition) error
+	PostHook        func(txn *statetransition.Transition)
+	GenesisPostHook func(*statetransition.Transition) error
 }
 
 // NewExecutor creates a new executor
@@ -66,20 +53,14 @@ func (e *Executor) WriteGenesis(
 		return types.Hash{}, err
 	}
 
-	txn := NewTxn(snap)
 	config := e.config.Forks.At(0)
 
 	env := runtime.TxContext{
 		ChainID: e.config.ChainID,
 	}
 
-	transition := &Transition{
-		ctx:         env,
-		state:       txn,
-		gasPool:     uint64(env.GasLimit),
-		config:      config,
-		precompiles: precompiled.NewPrecompiled(),
-	}
+	transition := statetransition.NewTransition(config, snap, env, nil)
+	txn := transition.Txn()
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -105,7 +86,7 @@ func (e *Executor) WriteGenesis(
 		}
 	}
 
-	objs := txn.Commit(false)
+	objs := transition.Commit()
 	_, root := snap.Commit(objs)
 
 	return types.BytesToHash(root), nil
@@ -173,7 +154,11 @@ func (e *Executor) BeginTxn(
 		ChainID:    e.config.ChainID,
 	}
 
-	txn := NewTransition(forkConfig, auxSnap2, txCtx, e.GetHash(header))
+	txn := statetransition.NewTransition(forkConfig, auxSnap2, txCtx, e.GetHash(header))
+
+	if e.PostHook != nil {
+		txn.WithPostHook(e.PostHook)
+	}
 
 	// enable contract deployment allow list (if any)
 	if e.config.ContractDeployerAllowList != nil {
@@ -190,7 +175,7 @@ func (e *Executor) BeginTxn(
 
 type Transition1 struct {
 	state    Snapshot
-	tt       *Transition
+	tt       *statetransition.Transition
 	receipts []*types.Receipt
 }
 
@@ -218,6 +203,6 @@ func (t *Transition1) Commit() (Snapshot, types.Hash) {
 	return s2, types.BytesToHash(root)
 }
 
-func (t *Transition1) Transition() *Transition {
+func (t *Transition1) Transition() *statetransition.Transition {
 	return t.tt
 }

@@ -1,4 +1,4 @@
-package state
+package statetransition
 
 import (
 	"math/big"
@@ -8,13 +8,13 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state_transition/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
-type readSnapshot interface {
+type ReadSnapshot interface {
 	GetStorage(addr types.Address, root types.Hash, key types.Hash) types.Hash
 	GetAccount(addr types.Address) (*types.Account, error)
 	GetCode(hash types.Hash) ([]byte, bool)
@@ -30,13 +30,13 @@ var (
 
 // Txn is a reference of the state
 type Txn struct {
-	snapshot  readSnapshot
+	snapshot  ReadSnapshot
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
 }
 
-func NewTxn(snapshot Snapshot) *Txn {
+func NewTxn(snapshot ReadSnapshot) *Txn {
 	return newTxn(snapshot)
 }
 
@@ -44,7 +44,7 @@ func (txn *Txn) GetRadix() *iradix.Txn {
 	return txn.txn
 }
 
-func newTxn(snapshot readSnapshot) *Txn {
+func newTxn(snapshot ReadSnapshot) *Txn {
 	i := iradix.New()
 
 	codeCache, _ := lru.New(20)

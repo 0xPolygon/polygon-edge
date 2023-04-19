@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
+	statetransition "github.com/0xPolygon/polygon-edge/state_transition"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
@@ -73,7 +74,7 @@ func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {
 	return s.state.GetCode(hash)
 }
 
-func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
+func (s *Snapshot) Commit(objs []*statetransition.Object) (state.Snapshot, []byte) {
 	batch := s.state.storage.Batch()
 
 	tt := s.trie.Txn(s.state.storage)
