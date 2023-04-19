@@ -127,7 +127,7 @@ func (e *Executor) ProcessBlock(
 	parentRoot types.Hash,
 	block *types.Block,
 	blockCreator types.Address,
-) (*Transition, error) {
+) (*Transition1, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (e *Executor) BeginTxn(
 	parentRoot types.Hash,
 	header *types.Header,
 	coinbaseReceiver types.Address,
-) (*Transition, error) {
+) (*Transition1, error) {
 	forkConfig := e.config.Forks.At(header.Number)
 
 	auxSnap2, err := e.state.NewSnapshotAt(parentRoot)
@@ -181,16 +181,13 @@ func (e *Executor) BeginTxn(
 	}
 
 	txn := &Transition{
-		ctx:     txCtx,
-		state:   newTxn,
-		snap:    auxSnap2,
-		getHash: e.GetHash(header),
-		config:  forkConfig,
-		gasPool: uint64(txCtx.GasLimit),
-
-		receipts: []*types.Receipt{},
-		totalGas: 0,
-
+		ctx:         txCtx,
+		state:       newTxn,
+		snap:        auxSnap2,
+		getHash:     e.GetHash(header),
+		config:      forkConfig,
+		gasPool:     uint64(txCtx.GasLimit),
+		totalGas:    0,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
@@ -206,12 +203,47 @@ func (e *Executor) BeginTxn(
 		txn.txnAllowList = allowlist.NewAllowList(txn, contracts.AllowListTransactionsAddr)
 	}
 
-	return txn, nil
+	return &Transition1{}, nil
+}
+
+type Transition1 struct {
+	state    Snapshot
+	tt       *Transition
+	receipts []*types.Receipt
+}
+
+func (t *Transition1) Receipts() []*types.Receipt {
+	return t.receipts
+}
+
+func (t *Transition1) TotalGas() uint64 {
+	return t.tt.TotalGas()
+}
+
+func (t *Transition1) Write(txn *types.Transaction) error {
+	receipt, err := t.tt.Write(txn)
+	if err != nil {
+		return err
+	}
+	t.receipts = append(t.receipts, receipt)
+	return nil
+}
+
+// Commit commits the final result
+func (t *Transition1) Commit() (Snapshot, types.Hash) {
+	s2, root := t.state.Commit(t.tt.Commit())
+
+	return s2, types.BytesToHash(root)
+}
+
+func (t *Transition1) Transition() *Transition {
+	return t.tt
 }
 
 type Transition struct {
-	// dummy
-	snap Snapshot
+	// snap is the reference to the current state on top of
+	// which the transition is being executed
+	snap readSnapshot
 
 	config  chain.ForksInTime
 	state   *Txn
@@ -220,7 +252,6 @@ type Transition struct {
 	gasPool uint64
 
 	// result
-	receipts []*types.Receipt
 	totalGas uint64
 
 	PostHook func(t *Transition)
@@ -232,6 +263,16 @@ type Transition struct {
 	// allow list runtimes
 	deploymentAllowlist *allowlist.AllowList
 	txnAllowList        *allowlist.AllowList
+}
+
+func NewTransition2(config chain.ForksInTime, snap readSnapshot) *Transition {
+	return &Transition{
+		config:      config,
+		state:       newTxn(snap),
+		snap:        snap,
+		evm:         evm.NewEVM(),
+		precompiles: precompiled.NewPrecompiled(),
+	}
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -278,20 +319,16 @@ func (t *Transition) TotalGas() uint64 {
 	return t.totalGas
 }
 
-func (t *Transition) Receipts() []*types.Receipt {
-	return t.receipts
-}
-
 var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
-func (t *Transition) Write(txn *types.Transaction) error {
+func (t *Transition) Write(txn *types.Transaction) (*types.Receipt, error) {
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()
 
 	result, e := t.Apply(msg)
 	if e != nil {
-		return e
+		return nil, e
 	}
 
 	t.totalGas += result.GasUsed
@@ -322,17 +359,13 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = logs
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
-	t.receipts = append(t.receipts, receipt)
 
-	return nil
+	return receipt, nil
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash) {
-	objs := t.state.Commit(t.config.EIP155)
-	s2, root := t.snap.Commit(objs)
-
-	return s2, types.BytesToHash(root)
+func (t *Transition) Commit() []*Object {
+	return t.state.Commit(t.config.EIP155)
 }
 
 func (t *Transition) subGasPool(amount uint64) error {

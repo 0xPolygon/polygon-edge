@@ -217,7 +217,7 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 	)
 	assert.NoError(t, err)
 
-	return transition
+	return transition.Transition()
 }
 
 func Test_buildLogsFromReceipts(t *testing.T) {

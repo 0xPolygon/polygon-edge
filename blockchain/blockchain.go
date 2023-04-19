@@ -85,11 +85,11 @@ type Verifier interface {
 	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
-	PreCommitState(header *types.Header, txn *state.Transition) error
+	PreCommitState(header *types.Header, txn *state.Transition1) error
 }
 
 type Executor interface {
-	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition, error)
+	ProcessBlock(parentRoot types.Hash, block *types.Block, blockCreator types.Address) (*state.Transition1, error)
 }
 
 type TxSigner interface {

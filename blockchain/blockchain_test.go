@@ -1311,7 +1311,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 				hash types.Hash,
 				block *types.Block,
 				address types.Address,
-			) (*state.Transition, error) {
+			) (*state.Transition1, error) {
 				return nil, errUnableToExecute
 			})
 		}

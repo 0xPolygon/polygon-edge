@@ -224,7 +224,7 @@ func NewMockBlockchain(
 type verifyHeaderDelegate func(*types.Header) error
 type processHeadersDelegate func([]*types.Header) error
 type getBlockCreatorDelegate func(*types.Header) (types.Address, error)
-type preStateCommitDelegate func(*types.Header, *state.Transition) error
+type preStateCommitDelegate func(*types.Header, *state.Transition1) error
 
 type MockVerifier struct {
 	verifyHeaderFn    verifyHeaderDelegate
@@ -269,7 +269,7 @@ func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {
 	m.getBlockCreatorFn = fn
 }
 
-func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transition) error {
+func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transition1) error {
 	if m.preStateCommitFn != nil {
 		return m.preStateCommitFn(header, txn)
 	}
@@ -283,7 +283,7 @@ func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
 
 // Executor delegators
 
-type processBlockDelegate func(types.Hash, *types.Block, types.Address) (*state.Transition, error)
+type processBlockDelegate func(types.Hash, *types.Block, types.Address) (*state.Transition1, error)
 
 type mockExecutor struct {
 	processBlockFn processBlockDelegate
@@ -293,7 +293,7 @@ func (m *mockExecutor) ProcessBlock(
 	parentRoot types.Hash,
 	block *types.Block,
 	blockCreator types.Address,
-) (*state.Transition, error) {
+) (*state.Transition1, error) {
 	if m.processBlockFn != nil {
 		return m.processBlockFn(parentRoot, block, blockCreator)
 	}

@@ -101,7 +101,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	}
 
 	if callback != nil {
-		if err := callback(transition); err != nil {
+		if err := callback(transition.Transition()); err != nil {
 			return nil, err
 		}
 	}
@@ -132,7 +132,7 @@ func (p *blockchainWrapper) GetStateProviderForBlock(header *types.Header) (cont
 		return nil, err
 	}
 
-	return NewStateProvider(transition), nil
+	return NewStateProvider(transition.Transition()), nil
 }
 
 // GetStateProvider returns a reference to make queries to the provided state

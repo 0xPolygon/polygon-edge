@@ -323,6 +323,8 @@ func NewServer(config *Config) (*Server, error) {
 		if err := m.setupConsensus(); err != nil {
 			return nil, err
 		}
+
+		// this is due to ibft
 		m.blockchain.SetConsensus(m.consensus)
 	}
 
@@ -684,10 +686,12 @@ func (j *jsonRPCHub) ApplyTxn(
 		return nil, err
 	}
 
-	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
+	transition1, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 	if err != nil {
 		return
 	}
+
+	transition := transition1.Transition()
 
 	if override != nil {
 		if err = transition.WithStateOverride(override); err != nil {
@@ -719,11 +723,12 @@ func (j *jsonRPCHub) TraceBlock(
 		return nil, err
 	}
 
-	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	transition1, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
 	}
 
+	transition := transition1.Transition()
 	transition.SetTracer(tracer)
 
 	results := make([]interface{}, len(block.Transactions))
@@ -763,10 +768,11 @@ func (j *jsonRPCHub) TraceTxn(
 		return nil, err
 	}
 
-	transition, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
+	transition1, err := j.BeginTxn(parentHeader.StateRoot, block.Header, blockCreator)
 	if err != nil {
 		return nil, err
 	}
+	transition := transition1.Transition()
 
 	var targetTx *types.Transaction
 
@@ -806,11 +812,11 @@ func (j *jsonRPCHub) TraceCall(
 		return nil, err
 	}
 
-	transition, err := j.BeginTxn(parentHeader.StateRoot, parentHeader, blockCreator)
+	transition1, err := j.BeginTxn(parentHeader.StateRoot, parentHeader, blockCreator)
 	if err != nil {
 		return nil, err
 	}
-
+	transition := transition1.Transition()
 	transition.SetTracer(tracer)
 
 	if _, err := transition.Apply(tx); err != nil {

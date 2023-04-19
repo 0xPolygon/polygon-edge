@@ -62,7 +62,8 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 		return vmTestBlockHash
 	}
 
-	executor, _ := xxx.BeginTxn(pastRoot, c.Env.ToHeader(t), env.Coinbase)
+	executor1, _ := xxx.BeginTxn(pastRoot, c.Env.ToHeader(t), env.Coinbase)
+	executor := executor1.Transition()
 	executor.Apply(msg) //nolint:errcheck
 
 	txn := executor.Txn()

@@ -5,7 +5,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	hcf "github.com/hashicorp/go-hclog"
 )
@@ -59,7 +58,7 @@ type BlockBuilder struct {
 	block *types.Block
 
 	// state is in memory state transition
-	state *state.Transition
+	state *state.Transition1
 }
 
 // Init initializes block builder before adding transactions and actual block building
@@ -128,14 +127,6 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 
 // WriteTx applies given transaction to the state. If transaction apply fails, it reverts the saved snapshot.
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
-	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
-		if err := b.state.WriteFailedReceipt(tx); err != nil {
-			return err
-		}
-
-		return txpool.ErrBlockLimitExceeded
-	}
-
 	if err := b.state.Write(tx); err != nil {
 		return err
 	}
@@ -207,5 +198,5 @@ func (b *BlockBuilder) writeTxPoolTransaction(tx *types.Transaction) (bool, erro
 
 // GetState returns Transition reference
 func (b *BlockBuilder) GetState() *state.Transition {
-	return b.state
+	return b.state.Transition()
 }
