@@ -146,8 +146,8 @@ func (p *genesisParams) validateFlags() error {
 
 	// Validate validatorsPath only if validators information were not provided via CLI flag
 	if len(p.validators) == 0 {
-		if _, err := os.Stat(p.validatorsPath); errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("provided validators path '%s' doesn't exist", p.validatorsPath)
+		if _, err := os.Stat(p.validatorsPath); err != nil {
+			return fmt.Errorf("invalid validators path ('%s') provided. Error: %w", p.validatorsPath, err)
 		}
 	}
 
