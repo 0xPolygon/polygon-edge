@@ -81,7 +81,6 @@ func (e *Executor) WriteGenesis(
 	transition := &Transition{
 		ctx:         env,
 		state:       txn,
-		auxState:    e.state,
 		gasPool:     uint64(env.GasLimit),
 		config:      config,
 		precompiles: precompiled.NewPrecompiled(),
@@ -182,13 +181,12 @@ func (e *Executor) BeginTxn(
 	}
 
 	txn := &Transition{
-		ctx:      txCtx,
-		state:    newTxn,
-		snap:     auxSnap2,
-		getHash:  e.GetHash(header),
-		auxState: e.state,
-		config:   forkConfig,
-		gasPool:  uint64(txCtx.GasLimit),
+		ctx:     txCtx,
+		state:   newTxn,
+		snap:    auxSnap2,
+		getHash: e.GetHash(header),
+		config:  forkConfig,
+		gasPool: uint64(txCtx.GasLimit),
 
 		receipts: []*types.Receipt{},
 		totalGas: 0,
@@ -213,8 +211,7 @@ func (e *Executor) BeginTxn(
 
 type Transition struct {
 	// dummy
-	auxState State
-	snap     Snapshot
+	snap Snapshot
 
 	config  chain.ForksInTime
 	state   *Txn
