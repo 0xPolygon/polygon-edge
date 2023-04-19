@@ -773,9 +773,9 @@ func (c *consensusRuntime) GetVotingPowers(height uint64) (map[string]*big.Int, 
 
 	if c.fsm == nil {
 		return nil, errors.New("getting voting power failed - backend is not initialized")
-	} else if c.fsm.parent.Number+1 != height {
-		return nil, fmt.Errorf("getting voting power failed - backend is not initialized for height %d, parent height %d",
-			height, c.fsm.parent.Number)
+	} else if c.fsm.Height() != height {
+		return nil, fmt.Errorf("getting voting power failed - backend is not initialized for height %d, fsm height %d",
+			height, c.fsm.Height())
 	}
 
 	return c.fsm.validators.GetVotingPowers(), nil

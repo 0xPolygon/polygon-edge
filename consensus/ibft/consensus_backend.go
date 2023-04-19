@@ -140,9 +140,9 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
+// DISCLAIMER: IBFT will be deprecated so we set 1 as a voting power to all validators
 func (i *backendIBFT) GetVotingPowers(height uint64) (map[string]*big.Int, error) {
 	validators, err := i.forkManager.GetValidators(height)
-
 	if err != nil {
 		return nil, err
 	}
