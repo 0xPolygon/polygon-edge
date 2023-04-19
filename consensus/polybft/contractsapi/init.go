@@ -35,6 +35,10 @@ var (
 	ChildERC1155          *artifact.Artifact
 	ChildERC1155Predicate *artifact.Artifact
 	L2StateSender         *artifact.Artifact
+	CustomSupernetManager *artifact.Artifact
+	StakeManager          *artifact.Artifact
+	RewardDistributor     *artifact.Artifact
+	ValidatorSet          *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -175,6 +179,26 @@ func init() {
 	}
 
 	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	CustomSupernetManager, err = artifact.DecodeArtifact([]byte(CustomSupernetManagerArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	StakeManager, err = artifact.DecodeArtifact([]byte(StakeManagerArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RewardDistributor, err = artifact.DecodeArtifact([]byte(RewardDistributorArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ValidatorSet, err = artifact.DecodeArtifact([]byte(ValidatorSetArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

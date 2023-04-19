@@ -2,6 +2,7 @@ package contracts
 
 import "github.com/0xPolygon/polygon-edge/types"
 
+//nolint:godox
 var (
 	// ValidatorSetContract is an address of validator set contract deployed to child chain
 	ValidatorSetContract = types.StringToAddress("0x101")
@@ -9,6 +10,11 @@ var (
 	BLSContract = types.StringToAddress("0x102")
 	// MerkleContract is an address of Merkle contract on the child chain
 	MerkleContract = types.StringToAddress("0x103")
+	// TODO @goran-ethernal - this will be removed in next PRs
+	// we will just deploy new version of ChildValidatorSet contract on the existing 0x101 address
+	NewValidatorSetContract = types.StringToAddress("0x104")
+	// RewardDistributorContract is an address of RewardDistributorContract contract on the child chain
+	RewardDistributorContract = types.StringToAddress("0x105")
 	// StateReceiverContract is an address of bridge contract on the child chain
 	StateReceiverContract = types.StringToAddress("0x1001")
 	// NativeERC20TokenContract is an address of bridge contract (used for transferring ERC20 native tokens on child chain)

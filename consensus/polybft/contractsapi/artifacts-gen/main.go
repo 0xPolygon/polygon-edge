@@ -119,6 +119,22 @@ func main() {
 			"root/RootERC1155Predicate.sol",
 			"RootERC1155Predicate",
 		},
+		{
+			"root/staking/CustomSupernetManager.sol",
+			"CustomSupernetManager",
+		},
+		{
+			"root/staking/StakeManager.sol",
+			"StakeManager",
+		},
+		{
+			"child/validator/RewardDistributor.sol",
+			"RewardDistributor",
+		},
+		{
+			"child/validator/ValidatorSet.sol",
+			"ValidatorSet",
+		},
 	}
 
 	for _, v := range readContracts {

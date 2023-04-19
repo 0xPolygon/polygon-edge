@@ -74,13 +74,15 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain configuration, needed for bridging
 type BridgeConfig struct {
-	StateSenderAddr          types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddr    types.Address `json:"checkpointManagerAddress"`
-	ExitHelperAddr           types.Address `json:"exitHelperAddress"`
-	RootERC20PredicateAddr   types.Address `json:"erc20PredicateAddress"`
-	RootNativeERC20Addr      types.Address `json:"nativeERC20Address"`
-	RootERC721PredicateAddr  types.Address `json:"erc721PredicateAddress"`
-	RootERC1155PredicateAddr types.Address `json:"erc1155PredicateAddress"`
+	StateSenderAddr           types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddr     types.Address `json:"checkpointManagerAddress"`
+	ExitHelperAddr            types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddr    types.Address `json:"erc20PredicateAddress"`
+	RootNativeERC20Addr       types.Address `json:"nativeERC20Address"`
+	RootERC721PredicateAddr   types.Address `json:"erc721PredicateAddress"`
+	RootERC1155PredicateAddr  types.Address `json:"erc1155PredicateAddress"`
+	CustomSupernetManagerAddr types.Address `json:"customSupernetManagerAddr"`
+	StakeManagerAddr          types.Address `json:"stakeManagerAddr"`
 
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
 	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
@@ -218,18 +220,20 @@ func (v *Validator) String() string {
 type RootchainConfig struct {
 	JSONRPCAddr string
 
-	StateSenderAddress          types.Address
-	CheckpointManagerAddress    types.Address
-	BLSAddress                  types.Address
-	BN256G2Address              types.Address
-	ExitHelperAddress           types.Address
-	RootERC20PredicateAddress   types.Address
-	RootNativeERC20Address      types.Address
-	ERC20TemplateAddress        types.Address
-	RootERC721PredicateAddress  types.Address
-	RootERC721Address           types.Address
-	RootERC1155PredicateAddress types.Address
-	RootERC1155Address          types.Address
+	StateSenderAddress           types.Address
+	CheckpointManagerAddress     types.Address
+	BLSAddress                   types.Address
+	BN256G2Address               types.Address
+	ExitHelperAddress            types.Address
+	RootERC20PredicateAddress    types.Address
+	RootNativeERC20Address       types.Address
+	ERC20TemplateAddress         types.Address
+	RootERC721PredicateAddress   types.Address
+	RootERC721Address            types.Address
+	RootERC1155PredicateAddress  types.Address
+	RootERC1155Address           types.Address
+	CustomSupernetManagerAddress types.Address
+	StakeManagerAddress          types.Address
 }
 
 // ToBridgeConfig creates BridgeConfig instance
@@ -237,13 +241,15 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
 		JSONRPCEndpoint: r.JSONRPCAddr,
 
-		StateSenderAddr:          r.StateSenderAddress,
-		CheckpointManagerAddr:    r.CheckpointManagerAddress,
-		ExitHelperAddr:           r.ExitHelperAddress,
-		RootERC20PredicateAddr:   r.RootERC20PredicateAddress,
-		RootNativeERC20Addr:      r.RootNativeERC20Address,
-		RootERC721PredicateAddr:  r.RootERC721PredicateAddress,
-		RootERC1155PredicateAddr: r.RootERC1155PredicateAddress,
+		StateSenderAddr:           r.StateSenderAddress,
+		CheckpointManagerAddr:     r.CheckpointManagerAddress,
+		ExitHelperAddr:            r.ExitHelperAddress,
+		RootERC20PredicateAddr:    r.RootERC20PredicateAddress,
+		RootNativeERC20Addr:       r.RootNativeERC20Address,
+		RootERC721PredicateAddr:   r.RootERC721PredicateAddress,
+		RootERC1155PredicateAddr:  r.RootERC1155PredicateAddress,
+		CustomSupernetManagerAddr: r.CustomSupernetManagerAddress,
+		StakeManagerAddr:          r.StakeManagerAddress,
 	}
 }
 

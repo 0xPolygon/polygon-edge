@@ -23,18 +23,20 @@ import (
 const (
 	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
 
-	stateSenderName          = "StateSender"
-	checkpointManagerName    = "CheckpointManager"
-	blsName                  = "BLS"
-	bn256G2Name              = "BN256G2"
-	exitHelperName           = "ExitHelper"
-	rootERC20PredicateName   = "RootERC20Predicate"
-	rootERC20Name            = "RootERC20"
-	erc20TemplateName        = "ERC20Template"
-	rootERC721PredicateName  = "RootERC721Predicate"
-	rootERC721Name           = "RootERC721"
-	rootERC1155PredicateName = "RootERC1155Predicate"
-	rootERC1155Name          = "RootERC1155"
+	stateSenderName           = "StateSender"
+	checkpointManagerName     = "CheckpointManager"
+	blsName                   = "BLS"
+	bn256G2Name               = "BN256G2"
+	exitHelperName            = "ExitHelper"
+	rootERC20PredicateName    = "RootERC20Predicate"
+	rootERC20Name             = "RootERC20"
+	erc20TemplateName         = "ERC20Template"
+	rootERC721PredicateName   = "RootERC721Predicate"
+	rootERC721Name            = "RootERC721"
+	rootERC1155PredicateName  = "RootERC1155Predicate"
+	rootERC1155Name           = "RootERC1155"
+	customSupernetManagerName = "CustomSupernetManager"
+	stakeManagerName          = "StakeManager"
 )
 
 var (
@@ -78,6 +80,12 @@ var (
 		},
 		rootERC1155Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155Address = addr
+		},
+		customSupernetManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.CustomSupernetManagerAddress = addr
+		},
+		stakeManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.StakeManagerAddress = addr
 		},
 	}
 )
@@ -232,7 +240,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-// deployContracts deploys and initializes rootchain smart contracts
+// / deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	chainID int64, initialValidators []*polybft.Validator) (*polybft.RootchainConfig, error) {
 	// if the bridge contract is not created, we have to deploy all the contracts
