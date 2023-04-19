@@ -53,7 +53,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 	return types.BytesToHash(res)
 }
 
-func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
+func (s *Snapshot) GetAccount(addr types.Address) (*types.Account, error) {
 	key := crypto.Keccak256(addr.Bytes())
 
 	data, ok := s.trie.Get(key, s.state.storage)
@@ -61,7 +61,7 @@ func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 		return nil, nil
 	}
 
-	var account state.Account
+	var account types.Account
 	if err := account.UnmarshalRlp(data); err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, []byte) {
 		if obj.Deleted {
 			tt.Delete(hashit(obj.Address.Bytes()))
 		} else {
-			account := state.Account{
+			account := types.Account{
 				Balance:  obj.Balance,
 				Nonce:    obj.Nonce,
 				CodeHash: obj.CodeHash.Bytes(),

@@ -8,7 +8,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/fastrlp"
@@ -80,7 +79,7 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 		}
 
 		if !isStorage {
-			var account state.Account
+			var account types.Account
 			if err := account.UnmarshalRlp(n.buf); err != nil {
 				return fmt.Errorf("cant parse account %s: %w", hex.EncodeToString(encodeCompact(agg)), err)
 			} else {

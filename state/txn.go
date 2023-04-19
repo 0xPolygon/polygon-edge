@@ -16,7 +16,7 @@ var emptyStateHash = types.StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e
 
 type readSnapshot interface {
 	GetStorage(addr types.Address, root types.Hash, key types.Hash) types.Hash
-	GetAccount(addr types.Address) (*Account, error)
+	GetAccount(addr types.Address) (*types.Account, error)
 	GetCode(hash types.Hash) ([]byte, bool)
 }
 
@@ -78,7 +78,7 @@ func (txn *Txn) RevertToSnapshot(id int) {
 }
 
 // GetAccount returns an account
-func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
+func (txn *Txn) GetAccount(addr types.Address) (*types.Account, bool) {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
 		return nil, false
@@ -119,7 +119,7 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 	object, exists := txn.getStateObject(addr)
 	if !exists && create {
 		object = &StateObject{
-			Account: &Account{
+			Account: &types.Account{
 				Balance:  big.NewInt(0),
 				CodeHash: emptyCodeHash,
 				Root:     emptyStateHash,
@@ -526,7 +526,7 @@ func (txn *Txn) Empty(addr types.Address) bool {
 
 func newStateObject(txn *Txn) *StateObject {
 	return &StateObject{
-		Account: &Account{
+		Account: &types.Account{
 			Balance:  big.NewInt(0),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,
@@ -536,7 +536,7 @@ func newStateObject(txn *Txn) *StateObject {
 
 func (txn *Txn) CreateAccount(addr types.Address) {
 	obj := &StateObject{
-		Account: &Account{
+		Account: &types.Account{
 			Balance:  big.NewInt(0),
 			CodeHash: emptyCodeHash,
 			Root:     emptyStateHash,

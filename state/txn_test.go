@@ -27,13 +27,13 @@ func (m *mockSnapshot) GetStorage(addr types.Address, root types.Hash, key types
 	return res
 }
 
-func (m *mockSnapshot) GetAccount(addr types.Address) (*Account, error) {
+func (m *mockSnapshot) GetAccount(addr types.Address) (*types.Account, error) {
 	raw, ok := m.state[addr]
 	if !ok {
 		return nil, fmt.Errorf("account not found")
 	}
 
-	acct := &Account{
+	acct := &types.Account{
 		Balance: new(big.Int).SetUint64(raw.Balance),
 		Nonce:   raw.Nonce,
 	}
