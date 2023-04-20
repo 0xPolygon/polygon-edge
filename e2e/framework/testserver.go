@@ -625,8 +625,13 @@ func (t *Txn) Nonce(nonce uint64) *Txn {
 
 func (t *Txn) sendImpl() error {
 	// populate default values
-	t.raw.Gas = 1048576
-	t.raw.GasPrice = 1048576
+	if t.raw.Gas == 0 {
+		t.raw.Gas = 1048576
+	}
+
+	if t.raw.GasPrice == 0 {
+		t.raw.GasPrice = 1048576
+	}
 
 	if t.raw.Nonce == 0 {
 		nextNonce, err := t.client.GetNonce(t.key.Address(), ethgo.Latest)
