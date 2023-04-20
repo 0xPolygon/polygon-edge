@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -84,7 +83,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	pool := service.NewAAPool()
 	pool.Init(pending)
 
-	currentNonce, err := aaRPCClient.GetAANonce(ethgo.Address(invokerAddress), account.Ecdsa.Address())
+	currentNonce, err := state.GetNonce()
 	if err != nil {
 		return err
 	}

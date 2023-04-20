@@ -20,6 +20,8 @@ const (
 	defaultGasLimit = 5242880 // 0x500000
 )
 
+var nonceTooLowErrStr = "nonce too low"
+
 // AARelayerService pulls transaction from pool one at the time and sends it to relayer
 type AARelayerService struct {
 	pool         AAPool
@@ -81,6 +83,7 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 			}
 
 			if err := rs.addToQueue(stateTx); err != nil {
+				rs.pool.Push(stateTx) // if adding to queue fails, tx should return to the pending pool
 				rs.logger.Error(
 					"error while adding transaction to the queue",
 					"id", stateTx.ID,
@@ -191,8 +194,7 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 			pushBackList = append(pushBackList, poppedTx)
 		} else {
 			// ...otherwise if it is lower update status to failed and never process it again
-			errorStr := "nonce too low"
-			poppedTx.Error = &errorStr
+			poppedTx.Error = &nonceTooLowErrStr
 			poppedTx.Status = StatusFailed
 
 			if err := rs.state.Update(poppedTx); err != nil {
@@ -218,8 +220,6 @@ func (rs *AARelayerService) addToQueue(stateTx *AAStateTransaction) error {
 
 	txRaw, hash, err := rs.makeEthgoTransaction(stateTx)
 	if err != nil {
-		rs.pool.Push(stateTx) // if something went wrong in this step,  tx should return to the pending pool
-
 		return fmt.Errorf("failed to create transaction: %w", err)
 	}
 
@@ -229,12 +229,14 @@ func (rs *AARelayerService) addToQueue(stateTx *AAStateTransaction) error {
 	stateTx.Raw = txRaw
 
 	if err := rs.state.Update(stateTx); err != nil {
-		rs.pool.Push(stateTx) // if update status fails, tx should return to the pending pool
-
 		return fmt.Errorf("failed to update transaction state to queued: %w", err)
 	}
 
-	atomic.AddUint64(&rs.currentNonce, 1) // increment current aa relayer nonce
+	newNonce := atomic.AddUint64(&rs.currentNonce, 1) // increment current aa relayer nonce
+
+	if err := rs.state.UpdateNonce(newNonce); err != nil {
+		return fmt.Errorf("failed to update transaction state to queued: %w", err)
+	}
 
 	return nil
 }

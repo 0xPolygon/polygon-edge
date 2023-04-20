@@ -68,6 +68,7 @@ func Test_AARelayerService_Start(t *testing.T) {
 
 	state := new(dummyAATxState)
 	state.On("Update", mock.Anything).Return(nil)
+	state.On("UpdateNonce", mock.Anything).Return(nil)
 
 	aaTxSender := new(dummyAATxSender)
 	aaTxSender.On("GetAANonce", ethgo.Address(aaInvokerAddress), ethgo.Address(address)).
@@ -307,7 +308,7 @@ type dummyAATxState struct {
 }
 
 func (t *dummyAATxState) Add(transaction *AATransaction) (*AAStateTransaction, error) {
-	args := t.Called()
+	args := t.Called(transaction)
 
 	return args.Get(0).(*AAStateTransaction), args.Error(1) //nolint:forcetypeassert
 }
@@ -339,6 +340,16 @@ func (t *dummyAATxState) Update(stateTx *AAStateTransaction) error {
 	if stateTx.Status == StatusFailed {
 		return errors.New("Update failed")
 	}
+
+	return args.Error(0)
+}
+func (t *dummyAATxState) GetNonce() (uint64, error) {
+	args := t.Called()
+
+	return args.Get(0).(uint64), args.Error(1) //nolint:forcetypeassert
+}
+func (t *dummyAATxState) UpdateNonce(nonce uint64) error {
+	args := t.Called(nonce)
 
 	return args.Error(0)
 }
