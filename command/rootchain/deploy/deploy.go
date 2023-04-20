@@ -627,7 +627,8 @@ func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, cont
 	deployerKey ethgo.Key) (*ethgo.Receipt, error) {
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)
+		return nil, fmt.Errorf("failed to send transaction to %s contract (%s). error: %w",
+			contractName, txn.To.Address(), err)
 	}
 
 	if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
