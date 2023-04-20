@@ -42,13 +42,9 @@ func NewAARelayerService(
 	key ethgo.Key,
 	invokerAddr types.Address,
 	chainID int64,
+	currentNonce uint64,
 	logger hclog.Logger,
-	opts ...TxRelayerOption) (*AARelayerService, error) {
-	nonce, err := rpcClient.GetNonce(key.Address()) // get initial nonce for the aarelayer
-	if err != nil {
-		return nil, err
-	}
-
+	opts ...TxRelayerOption) *AARelayerService {
 	service := &AARelayerService{
 		rpcClient:    rpcClient,
 		pool:         pool,
@@ -56,7 +52,7 @@ func NewAARelayerService(
 		key:          key,
 		invokerAddr:  invokerAddr,
 		chainID:      chainID,
-		currentNonce: nonce,
+		currentNonce: currentNonce,
 		pullTime:     time.Millisecond * 5000,
 		receiptDelay: time.Millisecond * 500,
 		numRetries:   100,
@@ -67,7 +63,7 @@ func NewAARelayerService(
 		opt(service)
 	}
 
-	return service, nil
+	return service
 }
 
 func (rs *AARelayerService) Start(ctx context.Context) {
@@ -199,7 +195,7 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 			poppedTx.Error = &errorStr
 			poppedTx.Status = StatusFailed
 
-			if err := rs.state.Update(stateTx); err != nil {
+			if err := rs.state.Update(poppedTx); err != nil {
 				rs.logger.Debug("fail to update transaction status, nonce too low",
 					"tx", poppedTx.ID, "from", address, "nonce", poppedTx.Tx.Transaction.Nonce, "err", err)
 			} else {
