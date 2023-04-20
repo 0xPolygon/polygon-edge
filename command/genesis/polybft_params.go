@@ -124,7 +124,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake, polyBftConfig, manifest.RootchainConfig)
+	allocs, err := p.deployContracts(totalStake, polyBftConfig)
 	if err != nil {
 		return err
 	}
@@ -202,8 +202,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 }
 
 //nolint:godox
-func (p *genesisParams) deployContracts(totalStake *big.Int, polybftConfig *polybft.PolyBFTConfig,
-	rootConfig *polybft.RootchainConfig) (map[types.Address]*chain.GenesisAccount, error) {
+func (p *genesisParams) deployContracts(totalStake *big.Int,
+	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
 		artifact            *artifact.Artifact
 		address             types.Address

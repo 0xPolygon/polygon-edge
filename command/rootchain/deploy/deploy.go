@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -264,11 +265,54 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	type contractInfo struct {
-		name     string
-		artifact *artifact.Artifact
+		name                string
+		artifact            *artifact.Artifact
+		constructorCallback func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error)
 	}
 
-	deployContracts := []*contractInfo{
+	rootchainConfig := &polybft.RootchainConfig{
+		JSONRPCAddr: params.jsonRPCAddress,
+	}
+
+	tokenContracts := []*contractInfo{}
+
+	if params.rootERC20TokenAddr != "" {
+		// use existing root chain ERC20 token
+		if err := populateExistingTokenAddr(client.Eth(),
+			params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
+			return nil, err
+		}
+	} else {
+		// deploy MockERC20 as a default root chain ERC20 token
+		tokenContracts = append(tokenContracts,
+			&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
+	}
+
+	if params.rootERC721TokenAddr != "" {
+		// use existing root chain ERC721 token
+		if err := populateExistingTokenAddr(client.Eth(),
+			params.rootERC721TokenAddr, rootERC721Name, rootchainConfig); err != nil {
+			return nil, err
+		}
+	} else {
+		// deploy MockERC721 as a default root chain ERC721 token
+		tokenContracts = append(tokenContracts,
+			&contractInfo{name: rootERC721Name, artifact: contractsapi.RootERC721})
+	}
+
+	if params.rootERC1155TokenAddr != "" {
+		// use existing root chain ERC1155 token
+		if err := populateExistingTokenAddr(client.Eth(),
+			params.rootERC1155TokenAddr, rootERC1155Name, rootchainConfig); err != nil {
+			return nil, err
+		}
+	} else {
+		// deploy MockERC1155 as a default root chain ERC1155 token
+		tokenContracts = append(tokenContracts,
+			&contractInfo{name: rootERC1155Name, artifact: contractsapi.RootERC1155})
+	}
+
+	allContracts := []*contractInfo{
 		{
 			name:     stateSenderName,
 			artifact: contractsapi.StateSender,
@@ -305,51 +349,58 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     rootERC1155PredicateName,
 			artifact: contractsapi.RootERC1155Predicate,
 		},
-	}
-	rootchainConfig := &polybft.RootchainConfig{
-		JSONRPCAddr: params.jsonRPCAddress,
+		{
+			name:     stakeManagerName,
+			artifact: contractsapi.StakeManager,
+			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
+				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{cfg.RootNativeERC20Address})
+				if err != nil {
+					return nil, err
+				}
+
+				return append(artifact.Bytecode, encoded...), nil
+			},
+		},
+		{
+			name:     customSupernetManagerName,
+			artifact: contractsapi.CustomSupernetManager,
+			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
+				encoded, err := artifact.Abi.Constructor.Inputs.
+					Encode([]interface{}{
+						cfg.StakeManagerAddress,
+						cfg.BLSAddress,
+						cfg.StateSenderAddress,
+						cfg.RootNativeERC20Address,
+						contracts.NewValidatorSetContract,
+						cfg.ExitHelperAddress,
+						string(bls.DomainValidatorSet),
+					})
+				if err != nil {
+					return nil, err
+				}
+
+				return append(artifact.Bytecode, encoded...), nil
+			},
+		},
 	}
 
-	if params.rootERC20TokenAddr != "" {
-		// use existing root chain ERC20 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-			return nil, err
+	allContracts = append(tokenContracts, allContracts...)
+
+	for _, contract := range allContracts {
+		input := contract.artifact.Bytecode
+
+		if contract.constructorCallback != nil {
+			b, err := contract.constructorCallback(contract.artifact, rootchainConfig)
+			if err != nil {
+				return nil, err
+			}
+
+			input = b
 		}
-	} else {
-		// deploy MockERC20 as a default root chain ERC20 token
-		deployContracts = append(deployContracts,
-			&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
-	}
 
-	if params.rootERC721TokenAddr != "" {
-		// use existing root chain ERC721 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC721TokenAddr, rootERC721Name, rootchainConfig); err != nil {
-			return nil, err
-		}
-	} else {
-		// deploy MockERC721 as a default root chain ERC721 token
-		deployContracts = append(deployContracts,
-			&contractInfo{name: rootERC721Name, artifact: contractsapi.RootERC721})
-	}
-
-	if params.rootERC1155TokenAddr != "" {
-		// use existing root chain ERC1155 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC1155TokenAddr, rootERC1155Name, rootchainConfig); err != nil {
-			return nil, err
-		}
-	} else {
-		// deploy MockERC1155 as a default root chain ERC1155 token
-		deployContracts = append(deployContracts,
-			&contractInfo{name: rootERC1155Name, artifact: contractsapi.RootERC1155})
-	}
-
-	for _, contract := range deployContracts {
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
-			Input: contract.artifact.Bytecode,
+			Input: input,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, deployerKey)
