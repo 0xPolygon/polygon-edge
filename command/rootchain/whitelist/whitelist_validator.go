@@ -98,7 +98,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	txn := &ethgo.Transaction{
 		From:     ownerAccount.Ecdsa.Address(),
 		Input:    encoded,
-		To:       (*ethgo.Address)(&supernetAddr),
+		To:       &supernetAddr,
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 

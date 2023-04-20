@@ -37,12 +37,12 @@ type enlistResult struct {
 func (er enlistResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	var vals []string
+	vals := make([]string, len(er.newValidatorAddresses))
 
 	buffer.WriteString("\n[ENLIST VALIDATOR]\n")
 
-	for _, addr := range er.newValidatorAddresses {
-		vals = append(vals, fmt.Sprintf("Validator address|%s", addr))
+	for i, addr := range er.newValidatorAddresses {
+		vals[i] = fmt.Sprintf("Validator address|%s", addr)
 	}
 
 	buffer.WriteString(helper.FormatKV(vals))

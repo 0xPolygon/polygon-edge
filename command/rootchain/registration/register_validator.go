@@ -159,7 +159,7 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 	txn := &ethgo.Transaction{
 		Input: input,
-		To:    (*ethgo.Address)(&supernetAddr),
+		To:    &supernetAddr,
 	}
 
 	return sender.SendTransaction(txn, account.Ecdsa)
