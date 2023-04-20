@@ -14,9 +14,8 @@ function initIbftConsensus() {
 
 function initPolybftConsensus() {
     echo "Running with polybft consensus"
-    genesis_params="--consensus polybft --bridge-json-rpc http://127.0.0.1:8545"
+    genesis_params="--consensus polybft"
     ./polygon-edge polybft-secrets --insecure --data-dir test-chain- --num 4
-    ./polygon-edge manifest
 }
 
 function createGenesis() {
@@ -85,7 +84,6 @@ set -e
 # Reset test-dirs
 rm -rf test-chain-*
 rm -f genesis.json
-rm -f manifest.json
 
 # Build binary
 go build -o polygon-edge .

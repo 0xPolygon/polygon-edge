@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	manifestFileName = "manifest.json"
+	chainConfigFileName = "genesis.json"
 )
 
 func TestE2E_Bridge_Transfers(t *testing.T) {
@@ -59,7 +59,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
@@ -71,8 +71,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(
 			t,
 			cluster.Bridge.DepositERC20(
-				manifest.RootchainConfig.RootNativeERC20Address,
-				manifest.RootchainConfig.RootERC20PredicateAddress,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
 				strings.Join(receivers[:], ","),
 				strings.Join(amounts[:], ","),
 			),
@@ -141,9 +141,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		currentEpoch := currentExtra.Checkpoint.EpochNumber
 
 		require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
-			rootchainTxRelayer, manifest.RootchainConfig.CheckpointManagerAddress))
+			rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
-		exitHelper := manifest.RootchainConfig.ExitHelperAddress
+		exitHelper := polybftCfg.Bridge.ExitHelperAddr
 		rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 		childJSONRPC := validatorSrv.JSONRPCAddr()
 
@@ -167,7 +167,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			require.NoError(t, err)
 
 			balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress,
-				ethgo.Address(manifest.RootchainConfig.RootNativeERC20Address), balanceInput)
+				ethgo.Address(polybftCfg.Bridge.RootNativeERC20Addr), balanceInput)
 			require.NoError(t, err)
 
 			balance, err := types.ParseUint256orHex(&balanceRaw)
@@ -193,8 +193,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(
 			t,
 			cluster.Bridge.DepositERC20(
-				manifest.RootchainConfig.RootNativeERC20Address,
-				manifest.RootchainConfig.RootERC20PredicateAddress,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
 				strings.Join(receivers[:depositsSubset], ","),
 				strings.Join(amounts[:depositsSubset], ","),
 			),
@@ -223,8 +223,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(
 			t,
 			cluster.Bridge.DepositERC20(
-				manifest.RootchainConfig.RootNativeERC20Address,
-				manifest.RootchainConfig.RootERC20PredicateAddress,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
 				strings.Join(receivers[depositsSubset:], ","),
 				strings.Join(amounts[depositsSubset:], ","),
 			),
@@ -274,10 +274,10 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	testCheckpointBlockNumber := func(expectedCheckpointBlock uint64) (bool, error) {
 		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
@@ -328,11 +328,11 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		framework.WithEpochReward(1000))
 	defer cluster.Stop()
 
-	// load manifest file
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	// load polybftCfg file
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)

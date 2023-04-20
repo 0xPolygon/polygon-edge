@@ -1,15 +1,17 @@
-package initcontracts
+package deploy
 
 import (
 	"os"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/testutil"
+
+	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestDeployContracts_NoPanics(t *testing.T) {
@@ -17,8 +19,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 	t.Cleanup(func() {
-		err := os.RemoveAll(params.manifestPath)
-		if err != nil {
+		if err := os.RemoveAll(params.genesisPath); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -31,12 +32,12 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 
 	receipt, err := server.Fund(testKey.Address())
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), receipt.Status)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	outputter := command.InitializeOutputter(GetCommand())
 
 	require.NotPanics(t, func() {
-		err = deployContracts(outputter, client, &polybft.Manifest{})
+		_, err = deployContracts(outputter, client, 10, []*polybft.Validator{})
 	})
 	require.NoError(t, err)
 }

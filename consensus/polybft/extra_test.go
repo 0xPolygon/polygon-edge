@@ -673,7 +673,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 
 		genesis := &chain.Genesis{
 			Config: &chain.Params{Engine: map[string]interface{}{
-				"polybft": polyBftConfig,
+				ConsensusName: polyBftConfig,
 			}},
 			ExtraData: extra.MarshalRLPTo(nil),
 		}
@@ -692,7 +692,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 
 		genesis := &chain.Genesis{
 			Config: &chain.Params{Engine: map[string]interface{}{
-				"polybft": polyBftConfig,
+				ConsensusName: polyBftConfig,
 			}},
 			ExtraData: append(make([]byte, ExtraVanity), []byte{0x2, 0x3}...),
 		}

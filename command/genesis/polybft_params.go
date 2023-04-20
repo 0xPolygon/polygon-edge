@@ -4,33 +4,37 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"path"
 	"strings"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/multiformats/go-multiaddr"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
-	manifestPathFlag       = "manifest"
-	sprintSizeFlag         = "sprint-size"
-	blockTimeFlag          = "block-time"
-	bridgeFlag             = "bridge-json-rpc"
-	trackerStartBlocksFlag = "tracker-start-blocks"
-	trieRootFlag           = "trieroot"
+	stakeFlag            = "stake"
+	validatorsFlag       = "validators"
+	validatorsPathFlag   = "validators-path"
+	validatorsPrefixFlag = "validators-prefix"
 
-	defaultManifestPath     = "./manifest.json"
+	defaultValidatorPrefixPath = "test-chain-"
+
+	sprintSizeFlag = "sprint-size"
+	blockTimeFlag  = "block-time"
+	trieRootFlag   = "trieroot"
+
 	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
@@ -44,6 +48,10 @@ const (
 	transactionsAllowListEnabledFlag     = "transactions-allow-list-enabled"
 
 	bootnodePortStart = 30301
+
+	ecdsaAddressLength = 40
+	blsKeyLength       = 256
+	blsSignatureLength = 128
 )
 
 var (
@@ -52,49 +60,45 @@ var (
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
-	// load manifest file
-	manifest, err := polybft.LoadManifest(p.manifestPath)
-	if err != nil {
-		return fmt.Errorf("failed to load manifest file from provided path '%s': %w", p.manifestPath, err)
+	// populate premine balance map
+	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
+
+	for _, premine := range p.premine {
+		premineInfo, err := parsePremineInfo(premine)
+		if err != nil {
+			return fmt.Errorf("invalid balance amount provided '%s' : %w", premine, err)
+		}
+
+		premineBalances[premineInfo.address] = premineInfo
 	}
 
-	if len(manifest.GenesisValidators) == 0 {
+	initialValidators, err := p.getValidatorAccounts(premineBalances)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve genesis validators: %w", err)
+	}
+
+	if len(initialValidators) == 0 {
 		return errNoGenesisValidators
-	}
-
-	eventTrackerStartBlock, err := parseTrackerStartBlocks(params.eventTrackerStartBlocks)
-	if err != nil {
-		return err
-	}
-
-	var bridge *polybft.BridgeConfig
-
-	// populate bridge configuration
-	if p.bridgeJSONRPCAddr != "" && manifest.RootchainConfig != nil {
-		bridge = manifest.RootchainConfig.ToBridgeConfig()
-		bridge.JSONRPCEndpoint = p.bridgeJSONRPCAddr
-		bridge.EventTrackerStartBlocks = eventTrackerStartBlock
 	}
 
 	if _, err := o.Write([]byte("[GENESIS VALIDATORS]\n")); err != nil {
 		return err
 	}
 
-	for _, v := range manifest.GenesisValidators {
+	for _, v := range initialValidators {
 		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", v))); err != nil {
 			return err
 		}
 	}
 
 	polyBftConfig := &polybft.PolyBFTConfig{
-		InitialValidatorSet: manifest.GenesisValidators,
+		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          manifest.GenesisValidators[0].Address,
-		Bridge:              bridge,
+		Governance:          initialValidators[0].Address,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
 		MintableNativeToken: p.mintableNativeToken,
 		NativeTokenConfig:   p.nativeTokenConfig,
@@ -103,7 +107,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Params: &chain.Params{
-			ChainID: manifest.ChainID,
+			ChainID: int64(p.chainID),
 			Forks:   chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
@@ -112,13 +116,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	genesisValidators := make(map[types.Address]struct{}, len(manifest.GenesisValidators))
 	totalStake := big.NewInt(0)
 
-	for _, validator := range manifest.GenesisValidators {
-		// populate premine info for validator accounts
-		genesisValidators[validator.Address] = struct{}{}
-
+	for _, validator := range initialValidators {
 		// increment total stake
 		totalStake.Add(totalStake, validator.Stake)
 	}
@@ -129,55 +129,28 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return err
 	}
 
-	premineInfos := make([]*PremineInfo, len(p.premine))
-	premineValidatorsAddrs := []string{}
-	// premine non-validator
-	for i, premine := range p.premine {
-		premineInfo, err := ParsePremineInfo(premine)
-		if err != nil {
-			return err
-		}
-
-		// collect validators addresses which got premined, as it is an error
-		// genesis validators balances must be defined in manifest file and should not be changed in the genesis
-		if _, ok := genesisValidators[premineInfo.Address]; ok {
-			premineValidatorsAddrs = append(premineValidatorsAddrs, premineInfo.Address.String())
-		} else {
-			premineInfos[i] = premineInfo
+	// premine initial validators
+	for _, v := range initialValidators {
+		allocs[v.Address] = &chain.GenesisAccount{
+			Balance: v.Balance,
 		}
 	}
 
-	// if there are any premined validators in the genesis command, consider it as an error
-	if len(premineValidatorsAddrs) > 0 {
-		return fmt.Errorf("it is not allowed to override genesis validators balance outside from the manifest definition. "+
-			"Validators which got premined: (%s)", strings.Join(premineValidatorsAddrs, ", "))
-	}
+	// premine other accounts
+	for _, premine := range premineBalances {
+		// validators have already been premined, so no need to premine them again
+		if _, ok := allocs[premine.address]; ok {
+			continue
+		}
 
-	// populate genesis validators balances
-	for _, validator := range manifest.GenesisValidators {
-		allocs[validator.Address] = &chain.GenesisAccount{
-			Balance: validator.Balance,
+		allocs[premine.address] = &chain.GenesisAccount{
+			Balance: premine.amount,
 		}
 	}
 
-	// premine non-validator accounts
-	for _, premine := range premineInfos {
-		allocs[premine.Address] = &chain.GenesisAccount{
-			Balance: premine.Amount,
-		}
-	}
+	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))
 
-	validatorMetadata := make([]*polybft.ValidatorMetadata, len(manifest.GenesisValidators))
-
-	for i, validator := range manifest.GenesisValidators {
-		// update balance of genesis validator, because it could be changed via premine flag
-		balance, err := chain.GetGenesisAccountBalance(validator.Address, allocs)
-		if err != nil {
-			return err
-		}
-
-		validator.Balance = balance
-
+	for i, validator := range initialValidators {
 		// create validator metadata instance
 		metadata, err := validator.ToValidatorMetadata()
 		if err != nil {
@@ -325,6 +298,91 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
 
 	return extra.MarshalRLPTo(nil), nil
+}
+
+// getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
+func (p *genesisParams) getValidatorAccounts(
+	premineBalances map[types.Address]*premineInfo) ([]*polybft.Validator, error) {
+	// populate validators premine info
+	stakeMap := make(map[types.Address]*premineInfo, len(p.stakes))
+
+	for _, stake := range p.stakes {
+		stakeInfo, err := parsePremineInfo(stake)
+		if err != nil {
+			return nil, fmt.Errorf("invalid stake amount provided '%s' : %w", stake, err)
+		}
+
+		stakeMap[stakeInfo.address] = stakeInfo
+	}
+
+	if len(p.validators) > 0 {
+		validators := make([]*polybft.Validator, len(p.validators))
+		for i, validator := range p.validators {
+			parts := strings.Split(validator, ":")
+			if len(parts) != 4 {
+				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
+					"<P2P multi address:ECDSA address:public BLS key:BLS signature>, but got %d part(s)",
+					len(parts))
+			}
+
+			if _, err := multiaddr.NewMultiaddr(parts[0]); err != nil {
+				return nil, fmt.Errorf("invalid P2P multi address '%s' provided: %w ", parts[0], err)
+			}
+
+			trimmedAddress := strings.TrimPrefix(parts[1], "0x")
+			if len(trimmedAddress) != ecdsaAddressLength {
+				return nil, fmt.Errorf("invalid ECDSA address: %s", parts[1])
+			}
+
+			trimmedBLSKey := strings.TrimPrefix(parts[2], "0x")
+			if len(trimmedBLSKey) != blsKeyLength {
+				return nil, fmt.Errorf("invalid BLS key: %s", parts[2])
+			}
+
+			if len(parts[3]) != blsSignatureLength {
+				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
+			}
+
+			addr := types.StringToAddress(trimmedAddress)
+			validators[i] = &polybft.Validator{
+				MultiAddr:    parts[0],
+				Address:      addr,
+				BlsKey:       trimmedBLSKey,
+				BlsSignature: parts[3],
+				Balance:      getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
+				Stake:        getPremineAmount(addr, stakeMap, command.DefaultStake),
+			}
+		}
+
+		return validators, nil
+	}
+
+	validatorsPath := p.validatorsPath
+	if validatorsPath == "" {
+		validatorsPath = path.Dir(p.genesisPath)
+	}
+
+	validators, err := ReadValidatorsByPrefix(validatorsPath, p.validatorsPrefixPath)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, v := range validators {
+		v.Balance = getPremineAmount(v.Address, premineBalances, command.DefaultPremineBalance)
+		v.Stake = getPremineAmount(v.Address, stakeMap, command.DefaultStake)
+	}
+
+	return validators, nil
+}
+
+// getPremineAmount retrieves amount from the premine map or if not provided, returns default amount
+func getPremineAmount(addr types.Address, premineMap map[types.Address]*premineInfo,
+	defaultAmount *big.Int) *big.Int {
+	if premine, exists := premineMap[addr]; exists {
+		return premine.amount
+	}
+
+	return defaultAmount
 }
 
 func stringSliceToAddressSlice(addrs []string) []types.Address {
