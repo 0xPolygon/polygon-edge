@@ -108,13 +108,11 @@ func TestE2E_JsonRPC(t *testing.T) {
 		balance1, err = client.GetBalance(key1.Address(), ethgo.Latest)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(0), balance1)
-
 	})
 
 	t.Run("eth_getTransactionCount", func(t *testing.T) {
 		key1, _ := wallet.GenerateKey()
 
-		//nolint:godox
 		nonce, err := client.GetNonce(key1.Address(), ethgo.Latest)
 		require.Equal(t, uint64(0), nonce)
 		require.NoError(t, err)
@@ -158,7 +156,6 @@ func TestE2E_JsonRPC(t *testing.T) {
 		resp, err := client.GetStorageAt(txn.Receipt().ContractAddress, ethgo.Hash{}, ethgo.Latest)
 		require.NoError(t, err)
 		require.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", resp.String())
-
 	})
 
 	t.Run("eth_getCode", func(t *testing.T) {
@@ -282,5 +279,4 @@ func TestE2E_JsonRPC(t *testing.T) {
 		// Test. The dynamic 'from' field is populated
 		require.NotEqual(t, ethTxn.From, ethgo.ZeroAddress)
 	})
-
 }
