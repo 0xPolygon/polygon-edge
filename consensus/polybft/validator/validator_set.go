@@ -19,10 +19,10 @@ type ValidatorSet interface {
 	// Accounts returns the list of the ValidatorMetadata
 	Accounts() AccountSet
 
-	// checks if submitted signers have reached quorum
+	// HasQuorum checks if submitted signers have reached quorum
 	HasQuorum(signers map[types.Address]struct{}) bool
 
-	// retrieves map: string(address) -> vp
+	// GetVotingPowers retrieves map: string(address) -> vp
 	GetVotingPowers() map[string]*big.Int
 }
 
