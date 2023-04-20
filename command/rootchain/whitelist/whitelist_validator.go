@@ -7,9 +7,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -20,8 +20,8 @@ var params whitelistParams
 
 func GetCommand() *cobra.Command {
 	registerCmd := &cobra.Command{
-		Use:     "whitelist-validator",
-		Short:   "whitelist a new validator",
+		Use:     "whitelist-validators",
+		Short:   "whitelist new validators",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
@@ -46,11 +46,18 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
+	cmd.Flags().StringArrayVar(
+		&params.newValidatorAddresses,
+		newValidatorAddressesFlag,
+		[]string{},
+		"account addresses of a possible validators",
+	)
+
 	cmd.Flags().StringVar(
-		&params.newValidatorAddress,
-		newValidatorAddressFlag,
+		&params.supernetManagerAddress,
+		rootHelper.SupernetManagerAddressFlag,
 		"",
-		"account address of a possible validator",
+		"address of supernet manager contract",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
@@ -78,8 +85,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	whitelistFn := &contractsapi.AddToWhitelistChildValidatorSetFn{
-		WhitelistAddreses: []ethgo.Address{ethgo.Address(types.StringToAddress(params.newValidatorAddress))},
+	whitelistFn := &contractsapi.WhitelistValidatorsCustomSupernetManagerFn{
+		Validators_: stringSliceToAddressSlice(params.newValidatorAddresses),
 	}
 
 	encoded, err := whitelistFn.EncodeAbi()
@@ -87,10 +94,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
+	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 	txn := &ethgo.Transaction{
 		From:     ownerAccount.Ecdsa.Address(),
 		Input:    encoded,
-		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
+		To:       (*ethgo.Address)(&supernetAddr),
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 
@@ -106,7 +114,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	var (
 		whitelistEvent contractsapi.AddedToWhitelistEvent
 		result         = &enlistResult{}
-		foundLog       = false
 	)
 
 	for _, log := range receipt.Logs {
@@ -119,17 +126,25 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		result.newValidatorAddress = whitelistEvent.Validator.String()
-		foundLog = true
+		result.newValidatorAddresses = append(result.newValidatorAddresses, whitelistEvent.Validator.String())
 
 		break
 	}
 
-	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that enlistment happened")
+	if len(result.newValidatorAddresses) != len(params.newValidatorAddresses) {
+		return fmt.Errorf("enlistment of validators did not pass successfully")
 	}
 
 	outputter.WriteCommandResult(result)
 
 	return nil
+}
+
+func stringSliceToAddressSlice(addrs []string) []ethgo.Address {
+	res := make([]ethgo.Address, len(addrs))
+	for indx, addr := range addrs {
+		res[indx] = ethgo.Address(types.StringToAddress(addr))
+	}
+
+	return res
 }

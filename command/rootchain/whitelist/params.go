@@ -2,6 +2,7 @@ package whitelist
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -9,22 +10,28 @@ import (
 )
 
 var (
-	newValidatorAddressFlag = "address"
+	newValidatorAddressesFlag  = "new-validators-addr"
+	errNoNewValidatorsProvided = errors.New("no new validators addresses provided")
 )
 
 type whitelistParams struct {
-	accountDir          string
-	accountConfig       string
-	jsonRPC             string
-	newValidatorAddress string
+	accountDir             string
+	accountConfig          string
+	jsonRPC                string
+	newValidatorAddresses  []string
+	supernetManagerAddress string
 }
 
 func (ep *whitelistParams) validateFlags() error {
+	if len(ep.newValidatorAddresses) == 0 {
+		return errNoNewValidatorsProvided
+	}
+
 	return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.accountConfig)
 }
 
 type enlistResult struct {
-	newValidatorAddress string
+	newValidatorAddresses []string
 }
 
 func (er enlistResult) GetOutput() string {
@@ -34,7 +41,9 @@ func (er enlistResult) GetOutput() string {
 
 	buffer.WriteString("\n[ENLIST VALIDATOR]\n")
 
-	vals = append(vals, fmt.Sprintf("Validator Address|%s", er.newValidatorAddress))
+	for _, addr := range er.newValidatorAddresses {
+		vals = append(vals, fmt.Sprintf("Validator address|%s", addr))
+	}
 
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")

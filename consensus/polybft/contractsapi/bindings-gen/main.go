@@ -146,6 +146,17 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"CustomSupernetManager",
+			gensc.CustomSupernetManager,
+			[]string{
+				"whitelistValidators",
+				"register",
+			},
+			[]string{
+				"ValidatorRegistered",
+			},
+		},
 	}
 
 	generatedData := &generatedData{}
