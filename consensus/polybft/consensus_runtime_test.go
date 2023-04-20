@@ -323,7 +323,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	}
 	lastBlock := &types.Header{
 		Number:    1,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		ExtraData: extra.MarshalRLPTo(nil),
 	}
 
 	validators := newTestValidators(t, 3)
@@ -442,9 +442,9 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	polyBftConfig := &PolyBFTConfig{
 		Bridge: &BridgeConfig{
-			BridgeAddr:      types.Address{0x13},
-			CheckpointAddr:  types.Address{0x10},
-			JSONRPCEndpoint: "testEndpoint",
+			StateSenderAddr:       types.Address{0x13},
+			CheckpointManagerAddr: types.Address{0x10},
+			JSONRPCEndpoint:       "testEndpoint",
 		},
 		EpochSize:  10,
 		SprintSize: 10,
@@ -484,8 +484,8 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.Equal(t, "0x0000000000000000000000000000000000000101", contracts.ValidatorSetContract.String())
-	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.BridgeAddr.String())
-	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointAddr.String())
+	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.StateSenderAddr.String())
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddr.String())
 	assert.True(t, runtime.IsBridgeEnabled())
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
@@ -730,7 +730,7 @@ func TestConsensusRuntime_IsValidProposalHash(t *testing.T) {
 	block := &types.Block{
 		Header: &types.Header{
 			Number:    10,
-			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+			ExtraData: extra.MarshalRLPTo(nil),
 		},
 	}
 	block.Header.ComputeHash()
@@ -759,7 +759,7 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) 
 	block := &types.Block{
 		Header: &types.Header{
 			Number:    10,
-			ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+			ExtraData: extra.MarshalRLPTo(nil),
 		},
 	}
 
@@ -767,7 +767,7 @@ func TestConsensusRuntime_IsValidProposalHash_InvalidProposalHash(t *testing.T) 
 	require.NoError(t, err)
 
 	extra.Checkpoint.BlockRound = 2 // change it so it is not the same as in proposal hash
-	block.Header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	block.Header.ExtraData = extra.MarshalRLPTo(nil)
 	block.Header.ComputeHash()
 
 	runtime := &consensusRuntime{
@@ -846,7 +846,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	lastBuildBlock := &types.Header{
 		Number:    1,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		ExtraData: extra.MarshalRLPTo(nil),
 	}
 
 	blockchainMock := new(blockchainMock)
@@ -1079,7 +1079,7 @@ func createTestBlocks(t *testing.T, numberOfBlocks, defaultEpochSize uint64,
 
 	genesisBlock := &types.Header{
 		Number:    0,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		ExtraData: extra.MarshalRLPTo(nil),
 	}
 	parentHash := types.BytesToHash(big.NewInt(0).Bytes())
 
@@ -1150,12 +1150,7 @@ func createTestExtraForAccounts(t *testing.T, epoch uint64, validators AccountSe
 		Checkpoint: &CheckpointData{EpochNumber: epoch},
 	}
 
-	marshaled := extraData.MarshalRLPTo(nil)
-	result := make([]byte, ExtraVanity+len(marshaled))
-
-	copy(result[ExtraVanity:], marshaled)
-
-	return result
+	return extraData.MarshalRLPTo(nil)
 }
 
 func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -90,12 +91,13 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	manifestPath            string
-	sprintSize              uint64
-	blockTime               time.Duration
-	bridgeJSONRPCAddr       string
-	epochReward             uint64
-	eventTrackerStartBlocks []string
+	validatorsPath       string
+	validatorsPrefixPath string
+	stakes               []string
+	validators           []string
+	sprintSize           uint64
+	blockTime            time.Duration
+	epochReward          uint64
 
 	initialStateRoot string
 
@@ -146,12 +148,15 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
-	// Validate min and max validators number
-	if err := command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators); err != nil {
-		return err
+	// Validate validatorsPath only if validators information were not provided via CLI flag
+	if len(p.validators) == 0 {
+		if _, err := os.Stat(p.validatorsPath); err != nil {
+			return fmt.Errorf("invalid validators path ('%s') provided. Error: %w", p.validatorsPath, err)
+		}
 	}
 
-	return nil
+	// Validate min and max validators number
+	return command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators)
 }
 
 func (p *genesisParams) isIBFTConsensus() bool {
@@ -372,13 +377,13 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineRaw := range p.premine {
-		premineInfo, err := ParsePremineInfo(premineRaw)
+		premineInfo, err := parsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
-			Balance: premineInfo.Amount,
+		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
+			Balance: premineInfo.amount,
 		}
 	}
 

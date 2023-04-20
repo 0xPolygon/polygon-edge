@@ -354,7 +354,7 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	wgForGossip.Wait()
 
 	// close to terminate goroutine
-	close(client.peerStatusUpdateCh)
+	client.Close()
 
 	// wait until collecting routine is done
 	wgForConnectingStatus.Wait()

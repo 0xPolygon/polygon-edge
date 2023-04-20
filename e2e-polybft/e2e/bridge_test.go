@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	manifestFileName = "manifest.json"
+	chainConfigFileName = "genesis.json"
 )
 
 func TestE2E_Bridge_Transfers(t *testing.T) {
@@ -35,7 +35,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
 		epochSize  = 30
-		sprintSize = 5
+		sprintSize = uint64(5)
 	)
 
 	receivers := make([]string, transfersCount)
@@ -59,7 +59,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
@@ -71,15 +71,16 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(
 			t,
 			cluster.Bridge.DepositERC20(
-				manifest.RootchainConfig.RootNativeERC20Address,
-				manifest.RootchainConfig.RootERC20PredicateAddress,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
 				strings.Join(receivers[:], ","),
 				strings.Join(amounts[:], ","),
 			),
 		)
 
+		finalBlockNum := 8 * sprintSize
 		// wait for a couple of sprints
-		require.NoError(t, cluster.WaitForBlock(8*sprintSize, 2*time.Minute))
+		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
 
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -92,7 +93,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		filter.SetFromUint64(0)
-		filter.SetToUint64(100)
+		filter.SetToUint64(finalBlockNum)
 
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)
@@ -140,9 +141,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		currentEpoch := currentExtra.Checkpoint.EpochNumber
 
 		require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
-			rootchainTxRelayer, manifest.RootchainConfig.CheckpointManagerAddress))
+			rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
-		exitHelper := manifest.RootchainConfig.ExitHelperAddress
+		exitHelper := polybftCfg.Bridge.ExitHelperAddr
 		rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 		childJSONRPC := validatorSrv.JSONRPCAddr()
 
@@ -166,7 +167,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			require.NoError(t, err)
 
 			balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress,
-				ethgo.Address(manifest.RootchainConfig.RootNativeERC20Address), balanceInput)
+				ethgo.Address(polybftCfg.Bridge.RootNativeERC20Addr), balanceInput)
 			require.NoError(t, err)
 
 			balance, err := types.ParseUint256orHex(&balanceRaw)
@@ -192,8 +193,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(
 			t,
 			cluster.Bridge.DepositERC20(
-				manifest.RootchainConfig.RootNativeERC20Address,
-				manifest.RootchainConfig.RootERC20PredicateAddress,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
 				strings.Join(receivers[:depositsSubset], ","),
 				strings.Join(amounts[:depositsSubset], ","),
 			),
@@ -222,13 +223,14 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(
 			t,
 			cluster.Bridge.DepositERC20(
-				manifest.RootchainConfig.RootNativeERC20Address,
-				manifest.RootchainConfig.RootERC20PredicateAddress,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
 				strings.Join(receivers[depositsSubset:], ","),
 				strings.Join(amounts[depositsSubset:], ","),
 			),
 		)
 
+		finalBlockNum := midBlockNumber + 5*sprintSize
 		// wait for a few more sprints
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
@@ -253,7 +255,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		filter.SetFromUint64(initialBlockNum)
-		filter.SetToUint64(initialBlockNum + 2*epochSize)
+		filter.SetToUint64(finalBlockNum)
 
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)
@@ -272,10 +274,10 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	testCheckpointBlockNumber := func(expectedCheckpointBlock uint64) (bool, error) {
 		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
@@ -326,11 +328,11 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		framework.WithEpochReward(1000))
 	defer cluster.Stop()
 
-	// load manifest file
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	// load polybftCfg file
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)

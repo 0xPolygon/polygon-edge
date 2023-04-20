@@ -1,4 +1,4 @@
-package initcontracts
+package deploy
 
 import (
 	"bytes"
