@@ -157,6 +157,16 @@ func main() {
 				"ValidatorRegistered",
 			},
 		},
+		{
+			"StakeManager",
+			gensc.StakeManager,
+			[]string{
+				"registerChildChain",
+			},
+			[]string{
+				"ChildManagerRegistered",
+			},
+		},
 	}
 
 	generatedData := &generatedData{}
