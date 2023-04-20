@@ -2836,9 +2836,9 @@ func TestSetSealing(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Set initial value
-			pool.sealing = 0
+			pool.sealing.Store(false)
 			if test.initialValue {
-				pool.sealing = 1
+				pool.sealing.Store(true)
 			}
 
 			// call the target
@@ -2848,7 +2848,7 @@ func TestSetSealing(t *testing.T) {
 			assert.Equal(
 				t,
 				test.expectedValue,
-				pool.getSealing(),
+				pool.sealing.Load(),
 			)
 		})
 	}

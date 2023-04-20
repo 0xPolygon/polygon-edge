@@ -301,15 +301,15 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 		Key: createTestKey(t),
 	}
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		activeValidatorFlag: 1,
-		config:              config,
+		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		config:             config,
 		epoch: &epochMetadata{
 			Number:     1,
 			Validators: validators.getPublicIdentities(),
 		},
 		lastBuiltBlock: &types.Header{},
 	}
+	runtime.setIsActiveValidator(true)
 
 	err := runtime.FSM()
 	assert.ErrorIs(t, err, errNotAValidator)
@@ -340,10 +340,9 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		blockchain: blockchainMock,
 	}
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:              hclog.NewNullLogger(),
-		activeValidatorFlag: 1,
-		config:              config,
+		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		logger:             hclog.NewNullLogger(),
+		config:             config,
 		epoch: &epochMetadata{
 			Number:            1,
 			Validators:        validators.getPublicIdentities(),
@@ -354,6 +353,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		stateSyncManager:  &dummyStateSyncManager{},
 		checkpointManager: &dummyCheckpointManager{},
 	}
+	runtime.setIsActiveValidator(true)
 
 	err := runtime.FSM()
 	require.NoError(t, err)
@@ -512,9 +512,8 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 		blockchain: blockchainMock,
 	}
 	runtime := &consensusRuntime{
-		proposerCalculator:  NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		activeValidatorFlag: 1,
-		config:              config,
+		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		config:             config,
 		epoch: &epochMetadata{
 			Number:            1,
 			Validators:        validatorSet,
@@ -524,6 +523,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 			Number: originalBlockNumber,
 		},
 	}
+	runtime.setIsActiveValidator(true)
 
 	epoch, err := runtime.restartEpoch(newCurrentHeader)
 

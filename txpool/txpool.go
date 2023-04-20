@@ -173,7 +173,7 @@ type TxPool struct {
 
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
-	sealing uint32
+	sealing atomic.Bool
 
 	// baseFee is the base fee of the current head.
 	// This is needed to sort transactions by price
@@ -338,21 +338,7 @@ func (p *TxPool) SetSigner(s signer) {
 
 // SetSealing sets the sealing flag
 func (p *TxPool) SetSealing(sealing bool) {
-	newValue := uint32(0)
-	if sealing {
-		newValue = 1
-	}
-
-	atomic.CompareAndSwapUint32(
-		&p.sealing,
-		p.sealing,
-		newValue,
-	)
-}
-
-// sealing returns the current set sealing flag
-func (p *TxPool) getSealing() bool {
-	return atomic.LoadUint32(&p.sealing) == 1
+	p.sealing.CompareAndSwap(p.sealing.Load(), sealing)
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
@@ -576,7 +562,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	// reset accounts with the new state
 	p.resetAccounts(stateNonces)
 
-	if !p.getSealing() {
+	if !p.sealing.Load() {
 		// only non-validator cleanup inactive accounts
 		p.updateAccountSkipsCounts(stateNonces)
 	}
@@ -843,7 +829,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 // addGossipTx handles receiving transactions
 // gossiped by the network.
 func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
-	if !p.getSealing() {
+	if !p.sealing.Load() {
 		return
 	}
 

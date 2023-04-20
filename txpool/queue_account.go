@@ -12,7 +12,7 @@ import (
 // All methods assume the (correct) lock is held.
 type accountQueue struct {
 	sync.RWMutex
-	wLock uint32
+	wLock atomic.Bool
 	queue minNonceQueue
 }
 
@@ -27,18 +27,17 @@ func newAccountQueue() *accountQueue {
 }
 
 func (q *accountQueue) lock(write bool) {
-	switch write {
-	case true:
+	if write {
 		q.Lock()
-		atomic.StoreUint32(&q.wLock, 1)
-	case false:
+	} else {
 		q.RLock()
-		atomic.StoreUint32(&q.wLock, 0)
 	}
+
+	q.wLock.Store(write)
 }
 
 func (q *accountQueue) unlock() {
-	if atomic.SwapUint32(&q.wLock, 0) == 1 {
+	if q.wLock.Swap(false) {
 		q.Unlock()
 	} else {
 		q.RUnlock()
