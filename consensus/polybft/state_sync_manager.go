@@ -151,11 +151,9 @@ func (s *stateSyncManager) initTracker() error {
 		// Sync errors are fatal for the sync manager
 		if err := <-syncErrCh; err != nil {
 			s.logger.Error("failed to sync state manager", "error", err)
-			// NOTE: runtime.Goexit() is preferred but we do not have
-			// a ctx that can be used to cancel any sibling goroutines that may
-			// have been started from the stack that calls this func. As such,
-			// we cannot ensure that runtime.Goexit() will cause the program to exit,
-			// even if we are in the main goroutine here.
+			// NOTE: it would be better to either cancel a root context or
+			// propagate an error to main which results in root context cancellation
+			// and exit via main.
 			os.Exit(1)
 		}
 	}()
