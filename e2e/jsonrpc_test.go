@@ -22,14 +22,15 @@ func TestJsonRPC(t *testing.T) {
 	fund, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	bytecode, _ := hex.DecodeString(sampleByteCode)
+	bytecode, err := hex.DecodeString(sampleByteCode)
+	require.NoError(t, err)
 
 	ibftManager := framework.NewIBFTServersManager(
 		t,
 		1,
 		IBFTDirPrefix,
 		func(i int, config *framework.TestServerConfig) {
-			config.Premine(types.Address(fund.Address()), framework.EthToWei(10))
+			config.Premine(types.Address(fund.Address()), ethgo.Ether(10))
 			config.SetBlockTime(1)
 		},
 	)
@@ -42,7 +43,8 @@ func TestJsonRPC(t *testing.T) {
 	client := srv.JSONRPC().Eth()
 
 	t.Run("eth_getBalance", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 
 		// Test. return zero if the account does not exists
 		balance1, err := client.GetBalance(key1.Address(), ethgo.Latest)
@@ -50,7 +52,7 @@ func TestJsonRPC(t *testing.T) {
 		require.Equal(t, balance1, big.NewInt(0))
 
 		// Test. return the balance of an account
-		newBalance := framework.EthToWei(1)
+		newBalance := ethgo.Ether(1)
 		txn, err := srv.Txn(fund).Transfer(key1.Address(), newBalance).Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
@@ -90,7 +92,8 @@ func TestJsonRPC(t *testing.T) {
 	})
 
 	t.Run("eth_getTransactionCount", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 
 		nonce, err := client.GetNonce(key1.Address(), ethgo.Latest)
 		require.Equal(t, uint64(0), nonce)
@@ -123,10 +126,11 @@ func TestJsonRPC(t *testing.T) {
 	})
 
 	t.Run("eth_getStorage", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 
 		txn := srv.Txn(fund)
-		txn, err := txn.Transfer(key1.Address(), one).Send()
+		txn, err = txn.Transfer(key1.Address(), one).Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
 
@@ -143,8 +147,10 @@ func TestJsonRPC(t *testing.T) {
 	t.Run("eth_getCode", func(t *testing.T) {
 		// we use a predefined private key so that the deployed contract address is deterministic.
 		// Note that in order to work, this private key should only be used for this test.
-		priv, _ := hex.DecodeString("2c15bd0dc992a47ca660983ae4b611f4ffb6178e14e04e2b34d153f3a74ce741")
-		key1, _ := wallet.NewWalletFromPrivKey(priv)
+		priv, err := hex.DecodeString("2c15bd0dc992a47ca660983ae4b611f4ffb6178e14e04e2b34d153f3a74ce741")
+		require.NoError(t, err)
+		key1, err := wallet.NewWalletFromPrivKey(priv)
+		require.NoError(t, err)
 
 		// fund the account so that it can deploy a contract
 		txn, err := srv.Txn(fund).Transfer(key1.Address(), big.NewInt(10000000000000000)).Send()
@@ -191,9 +197,10 @@ func TestJsonRPC(t *testing.T) {
 	})
 
 	t.Run("eth_getBlockByHash", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 		txn := srv.Txn(fund)
-		txn, err := txn.Transfer(key1.Address(), one).Send()
+		txn, err = txn.Transfer(key1.Address(), one).Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
 		txReceipt := txn.Receipt()
@@ -205,9 +212,10 @@ func TestJsonRPC(t *testing.T) {
 	})
 
 	t.Run("eth_getBlockByNumber", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 		txn := srv.Txn(fund)
-		txn, err := txn.Transfer(key1.Address(), one).Send()
+		txn, err = txn.Transfer(key1.Address(), one).Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
 		txReceipt := txn.Receipt()
@@ -219,10 +227,11 @@ func TestJsonRPC(t *testing.T) {
 	})
 
 	t.Run("eth_getTransactionReceipt", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 
 		txn := srv.Txn(fund)
-		txn, err := txn.Transfer(key1.Address(), one).Send()
+		txn, err = txn.Transfer(key1.Address(), one).Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
 
@@ -253,11 +262,12 @@ func TestJsonRPC(t *testing.T) {
 	})
 
 	t.Run("eth_getTransactionByHash", func(t *testing.T) {
-		key1, _ := wallet.GenerateKey()
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
 
 		// Test. We should be able to query the transaction by its hash
 		txn := srv.Txn(fund)
-		txn, err := txn.Transfer(key1.Address(), one).Send()
+		txn, err = txn.Transfer(key1.Address(), one).Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
 
