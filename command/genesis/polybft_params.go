@@ -44,8 +44,12 @@ const (
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
+	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
+	contractDeployerBlockListEnabledFlag = "contract-deployer-block-list-enabled"
 	transactionsAllowListAdminFlag       = "transactions-allow-list-admin"
 	transactionsAllowListEnabledFlag     = "transactions-allow-list-enabled"
+	transactionsBlockListAdminFlag       = "transactions-block-list-admin"
+	transactionsBlockListEnabledFlag     = "transactions-block-list-enabled"
 
 	bootnodePortStart = 30301
 
@@ -183,18 +187,36 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	if len(p.contractDeployerAllowListAdmin) != 0 {
 		// only enable allow list if there is at least one address as **admin**, otherwise
 		// the allow list could never be updated
-		chainConfig.Params.ContractDeployerAllowList = &chain.AllowListConfig{
+		chainConfig.Params.ContractDeployerAllowList = &chain.AddressListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.contractDeployerAllowListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.contractDeployerAllowListEnabled),
+		}
+	}
+
+	if len(p.contractDeployerBlockListAdmin) != 0 {
+		// only enable block list if there is at least one address as **admin**, otherwise
+		// the block list could never be updated
+		chainConfig.Params.ContractDeployerBlockList = &chain.AddressListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.contractDeployerBlockListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.contractDeployerBlockListEnabled),
 		}
 	}
 
 	if len(p.transactionsAllowListAdmin) != 0 {
 		// only enable allow list if there is at least one address as **admin**, otherwise
 		// the allow list could never be updated
-		chainConfig.Params.TransactionsAllowList = &chain.AllowListConfig{
+		chainConfig.Params.TransactionsAllowList = &chain.AddressListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.transactionsAllowListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.transactionsAllowListEnabled),
+		}
+	}
+
+	if len(p.transactionsBlockListAdmin) != 0 {
+		// only enable block list if there is at least one address as **admin**, otherwise
+		// the block list could never be updated
+		chainConfig.Params.TransactionsBlockList = &chain.AddressListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.transactionsBlockListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.transactionsBlockListEnabled),
 		}
 	}
 

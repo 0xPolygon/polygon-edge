@@ -101,11 +101,15 @@ type genesisParams struct {
 
 	initialStateRoot string
 
-	// allowlist
+	// access lists
 	contractDeployerAllowListAdmin   []string
 	contractDeployerAllowListEnabled []string
+	contractDeployerBlockListAdmin   []string
+	contractDeployerBlockListEnabled []string
 	transactionsAllowListAdmin       []string
 	transactionsAllowListEnabled     []string
+	transactionsBlockListAdmin       []string
+	transactionsBlockListEnabled     []string
 
 	mintableNativeToken  bool
 	nativeTokenConfigRaw string

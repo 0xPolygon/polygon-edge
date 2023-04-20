@@ -90,8 +90,12 @@ type TestClusterConfig struct {
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
+	ContractDeployerBlockListAdmin   []types.Address
+	ContractDeployerBlockListEnabled []types.Address
 	TransactionsAllowListAdmin       []types.Address
 	TransactionsAllowListEnabled     []types.Address
+	TransactionsBlockListAdmin       []types.Address
+	TransactionsBlockListEnabled     []types.Address
 
 	NumBlockConfirmations uint64
 
@@ -264,6 +268,18 @@ func WithContractDeployerAllowListEnabled(addr types.Address) ClusterOption {
 	}
 }
 
+func WithContractDeployerBlockListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ContractDeployerBlockListAdmin = append(h.ContractDeployerBlockListAdmin, addr)
+	}
+}
+
+func WithContractDeployerBlockListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ContractDeployerBlockListEnabled = append(h.ContractDeployerBlockListEnabled, addr)
+	}
+}
+
 func WithTransactionsAllowListAdmin(addr types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.TransactionsAllowListAdmin = append(h.TransactionsAllowListAdmin, addr)
@@ -273,6 +289,18 @@ func WithTransactionsAllowListAdmin(addr types.Address) ClusterOption {
 func WithTransactionsAllowListEnabled(addr types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.TransactionsAllowListEnabled = append(h.TransactionsAllowListEnabled, addr)
+	}
+}
+
+func WithTransactionsBlockListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TransactionsBlockListAdmin = append(h.TransactionsBlockListAdmin, addr)
+	}
+}
+
+func WithTransactionsBlockListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TransactionsBlockListEnabled = append(h.TransactionsBlockListEnabled, addr)
 	}
 }
 
@@ -431,6 +459,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListEnabled), ","))
 		}
 
+		if len(cluster.Config.ContractDeployerBlockListAdmin) != 0 {
+			args = append(args, "--contract-deployer-block-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerBlockListAdmin), ","))
+		}
+
+		if len(cluster.Config.ContractDeployerBlockListEnabled) != 0 {
+			args = append(args, "--contract-deployer-block-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerBlockListEnabled), ","))
+		}
+
 		if len(cluster.Config.TransactionsAllowListAdmin) != 0 {
 			args = append(args, "--transactions-allow-list-admin",
 				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsAllowListAdmin), ","))
@@ -439,6 +477,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		if len(cluster.Config.TransactionsAllowListEnabled) != 0 {
 			args = append(args, "--transactions-allow-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsAllowListEnabled), ","))
+		}
+
+		if len(cluster.Config.TransactionsBlockListAdmin) != 0 {
+			args = append(args, "--transactions-block-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsBlockListAdmin), ","))
+		}
+
+		if len(cluster.Config.TransactionsBlockListEnabled) != 0 {
+			args = append(args, "--transactions-block-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsBlockListEnabled), ","))
 		}
 
 		// run genesis command with all the arguments

@@ -1,4 +1,4 @@
-package allowlist
+package addresslist
 
 import (
 	"bytes"
@@ -10,34 +10,34 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-// list of function methods for the allow list functionality
+// list of function methods for the address list functionality
 var (
 	SetAdminFunc            = abi.MustNewMethod("function setAdmin(address)")
 	SetEnabledSignatureFunc = abi.MustNewMethod("function setEnabled(address)")
 	SetNoneFunc             = abi.MustNewMethod("function setNone(address)")
-	ReadAllowListFunc       = abi.MustNewMethod("function readAllowList(address) returns (uint256)")
+	ReadAddressListFunc     = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
 )
 
 // list of gas costs for the operations
 var (
-	writeAllowListCost = uint64(20000)
-	readAllowListCost  = uint64(5000)
+	writeAddressListCost = uint64(20000)
+	readAddressListCost  = uint64(5000)
 )
 
-type AllowList struct {
+type AddressList struct {
 	state stateRef
 	addr  types.Address
 }
 
-func NewAllowList(state stateRef, addr types.Address) *AllowList {
-	return &AllowList{state: state, addr: addr}
+func NewAddressList(state stateRef, addr types.Address) *AddressList {
+	return &AddressList{state: state, addr: addr}
 }
 
-func (a *AllowList) Addr() types.Address {
+func (a *AddressList) Addr() types.Address {
 	return a.addr
 }
 
-func (a *AllowList) Run(c *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) *runtime.ExecutionResult {
+func (a *AddressList) Run(c *runtime.Contract, host runtime.Host, _ *chain.ForksInTime) *runtime.ExecutionResult {
 	ret, gasUsed, err := a.runInputCall(c.Caller, c.Input, c.Gas, c.Static)
 
 	res := &runtime.ExecutionResult{
@@ -57,7 +57,7 @@ var (
 	errWriteProtection     = fmt.Errorf("write protection")
 )
 
-func (a *AllowList) runInputCall(caller types.Address, input []byte,
+func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	gas uint64, isStatic bool) ([]byte, uint64, error) {
 	// decode the function signature from the input
 	if len(input) < types.SignatureSize {
@@ -87,8 +87,8 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte,
 
 	inputAddr := types.BytesToAddress(inputBytes)
 
-	if bytes.Equal(sig, ReadAllowListFunc.ID()) {
-		if err := consumeGas(readAllowListCost); err != nil {
+	if bytes.Equal(sig, ReadAddressListFunc.ID()) {
+		if err := consumeGas(readAddressListCost); err != nil {
 			return nil, 0, err
 		}
 
@@ -110,7 +110,7 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte,
 		return nil, 0, errFunctionNotFound
 	}
 
-	if err := consumeGas(writeAllowListCost); err != nil {
+	if err := consumeGas(writeAddressListCost); err != nil {
 		return nil, gasUsed, err
 	}
 
@@ -130,11 +130,11 @@ func (a *AllowList) runInputCall(caller types.Address, input []byte,
 	return nil, gasUsed, nil
 }
 
-func (a *AllowList) SetRole(addr types.Address, role Role) {
+func (a *AddressList) SetRole(addr types.Address, role Role) {
 	a.state.SetState(a.addr, types.BytesToHash(addr.Bytes()), types.Hash(role))
 }
 
-func (a *AllowList) GetRole(addr types.Address) Role {
+func (a *AddressList) GetRole(addr types.Address) Role {
 	res := a.state.GetStorage(a.addr, types.BytesToHash(addr.Bytes()))
 
 	return Role(res)
