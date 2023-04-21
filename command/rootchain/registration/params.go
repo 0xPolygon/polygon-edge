@@ -16,6 +16,12 @@ type registerParams struct {
 }
 
 func (rp *registerParams) validateFlags() error {
+	// validate jsonrpc address
+	_, err := helper.ParseJSONRPCAddress(rp.jsonRPC)
+	if err != nil {
+		return fmt.Errorf("failed to parse json rpc address. Error: %w", err)
+	}
+
 	return sidechainHelper.ValidateSecretFlags(rp.accountDir, rp.accountConfig)
 }
 

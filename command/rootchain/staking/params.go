@@ -21,8 +21,14 @@ type stakeParams struct {
 	chainID          uint64
 }
 
-func (v *stakeParams) validateFlags() error {
-	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.accountConfig)
+func (sp *stakeParams) validateFlags() error {
+	// validate jsonrpc address
+	_, err := helper.ParseJSONRPCAddress(sp.jsonRPC)
+	if err != nil {
+		return fmt.Errorf("failed to parse json rpc address. Error: %w", err)
+	}
+
+	return sidechainHelper.ValidateSecretFlags(sp.accountDir, sp.accountConfig)
 }
 
 type stakeResult struct {
