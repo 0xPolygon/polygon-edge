@@ -33,6 +33,7 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
+	pbftNonce = types.EncodeNonce(0)
 )
 
 type fsm struct {
@@ -594,6 +595,13 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	// verify parent number
 	if header.Number != parent.Number+1 {
 		return fmt.Errorf("invalid number")
+	}
+	if header.Nonce != pbftNonce {
+		return fmt.Errorf("invalid nonce")
+	}
+	//verify that the gasUsed is <= gasLimit
+	if header.GasUsed > header.GasLimit {
+		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasUsed, header.GasLimit)
 	}
 	// verify time has passed
 	if header.Timestamp <= parent.Timestamp {

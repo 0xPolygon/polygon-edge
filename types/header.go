@@ -58,6 +58,11 @@ func (n Nonce) String() string {
 func (n Nonce) MarshalText() ([]byte, error) {
 	return []byte(n.String()), nil
 }
+func EncodeNonce(i uint64) Nonce {
+	var n Nonce
+	binary.BigEndian.PutUint64(n[:], i)
+	return n
+}
 
 func (h *Header) Copy() *Header {
 	newHeader := &Header{
