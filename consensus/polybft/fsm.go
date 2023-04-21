@@ -588,6 +588,9 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
+	if len(header.ExtraData) < 32 {
+		return fmt.Errorf("extra-data shorter than 32 bytes (%d)", len(header.ExtraData))
+	}
 	// verify parent hash
 	if parent.Hash != header.ParentHash {
 		return fmt.Errorf("incorrect header parent hash (parent=%s, header parent=%s)", parent.Hash, header.ParentHash)

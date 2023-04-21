@@ -27,8 +27,9 @@ import (
 func TestFSM_ValidateHeader(t *testing.T) {
 	t.Parallel()
 
+	extra := createTestExtra(AccountSet{}, AccountSet{}, 0, 0, 0)
 	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
-	header := &types.Header{Number: 0}
+	header := &types.Header{Number: 0, ExtraData: extra}
 
 	// parent hash
 	require.ErrorContains(t, validateHeaderFields(parent, header), "incorrect header parent hash")
