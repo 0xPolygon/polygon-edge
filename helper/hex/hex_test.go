@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestDecodeUint64 verifies that uint64 values
@@ -37,4 +38,32 @@ func TestDecodeUint64(t *testing.T) {
 
 		assert.Equal(t, uint64Array[index], decodedValue)
 	}
+}
+
+func TestDecodeHexToBig(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Error on decoding", func(t *testing.T) {
+		t.Parallel()
+
+		value, err := DecodeHexToBig("012345q")
+		require.ErrorContains(t, err, "failed to convert string")
+		require.Nil(t, value)
+	})
+
+	t.Run("Happy path", func(t *testing.T) {
+		t.Parallel()
+
+		big, err := DecodeHexToBig("0x0123456")
+		require.NoError(t, err)
+		require.Equal(t, uint64(1193046), big.Uint64())
+
+		big, err = DecodeHexToBig("0123456") // this should work as well
+		require.NoError(t, err)
+		require.Equal(t, uint64(1193046), big.Uint64())
+
+		big, err = DecodeHexToBig("0x0000000000000000000000000000000000000200")
+		require.NoError(t, err)
+		require.Equal(t, uint64(512), big.Uint64())
+	})
 }

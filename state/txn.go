@@ -75,7 +75,7 @@ func (txn *Txn) Snapshot() int {
 // RevertToSnapshot reverts to a given snapshot
 func (txn *Txn) RevertToSnapshot(id int) {
 	if id > len(txn.snapshots) {
-		panic("")
+		panic("") //nolint:gocritic
 	}
 
 	tree := txn.snapshots[id]
@@ -130,7 +130,7 @@ func (txn *Txn) trackAccountChange(addr types.Address, changeType string, object
 		entry.Balance = object.Account.Balance
 	} else {
 		// this is covered on unit tests
-		panic(fmt.Sprintf("BUG: Not expected change '%s'", changeType))
+		panic(fmt.Sprintf("BUG: Not expected change '%s'", changeType)) //nolint:gocritic
 	}
 
 	txn.addJournalEntry(entry)
@@ -491,7 +491,8 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 
 		return object.Code
 	}
-	// TODO; Should we move this to state?
+	//nolint:godox
+	// TODO; Should we move this to state? (to be fixed in EVM-527)
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {
@@ -610,7 +611,8 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 	})
 }
 
-// TODO, check panics with this ones
+//nolint:godox
+// TODO, check panics with this ones (to be fixed in EVM-528)
 
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
@@ -672,13 +674,13 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	for _, k := range remove {
 		v, ok := txn.txn.Get(k)
 		if !ok {
-			panic("it should not happen")
+			panic("it should not happen") //nolint:gocritic
 		}
 
 		obj, ok := v.(*StateObject)
 
 		if !ok {
-			panic("it should not happen")
+			panic("it should not happen") //nolint:gocritic
 		}
 
 		obj2 := obj.Copy()

@@ -16,6 +16,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/umbracle/ethgo"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -236,7 +237,7 @@ type GenerateTxReqParams struct {
 }
 
 func generateTx(params GenerateTxReqParams) (*types.Transaction, error) {
-	signer := crypto.NewEIP155Signer(100)
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
 
 	signedTx, signErr := signer.SignTx(&types.Transaction{
 		Nonce:    params.Nonce,

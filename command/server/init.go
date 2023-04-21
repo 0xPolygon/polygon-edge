@@ -61,6 +61,8 @@ func (p *serverParams) initRawParams() error {
 	p.initPeerLimits()
 	p.initLogFileLocation()
 
+	p.relayer = p.rawConfig.Relayer
+
 	return p.initAddresses()
 }
 
@@ -204,7 +206,10 @@ func (p *serverParams) initUsingMaxPeers() {
 			float64(p.rawConfig.Network.MaxPeers) * network.DefaultDialRatio,
 		),
 	)
-	p.rawConfig.Network.MaxInboundPeers = p.rawConfig.Network.MaxPeers - p.rawConfig.Network.MaxOutboundPeers
+	// MaxPeers is expected to be greater than MaxOutboundPeers as long as DefaultDialRatio is less than 0
+	if p.rawConfig.Network.MaxPeers > p.rawConfig.Network.MaxOutboundPeers {
+		p.rawConfig.Network.MaxInboundPeers = p.rawConfig.Network.MaxPeers - p.rawConfig.Network.MaxOutboundPeers
+	}
 }
 
 func (p *serverParams) initAddresses() error {

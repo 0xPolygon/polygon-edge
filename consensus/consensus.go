@@ -34,6 +34,9 @@ type Consensus interface {
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 
+	// GetBridgeProvider returns an instance of BridgeDataProvider
+	GetBridgeProvider() BridgeDataProvider
+
 	// Initialize initializes the consensus (e.g. setup data)
 	Initialize() error
 
@@ -55,7 +58,7 @@ type Config struct {
 	// Config defines specific configuration parameters for the consensus
 	Config map[string]interface{}
 
-	// Path is the directory path for the consensus protocol tos tore information
+	// Path is the directory path for the consensus protocol to store information
 	Path string
 }
 
@@ -70,7 +73,18 @@ type Params struct {
 	Logger         hclog.Logger
 	SecretsManager secrets.SecretsManager
 	BlockTime      uint64
+
+	NumBlockConfirmations uint64
 }
 
 // Factory is the factory function to create a discovery consensus
 type Factory func(*Params) (Consensus, error)
+
+// BridgeDataProvider is an interface providing bridge related functions
+type BridgeDataProvider interface {
+	// GenerateExit proof generates proof of exit for given exit event
+	GenerateExitProof(exitID uint64) (types.Proof, error)
+
+	// GetStateSyncProof retrieves the StateSync proof
+	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
+}

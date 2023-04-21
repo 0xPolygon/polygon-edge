@@ -18,7 +18,8 @@ var (
 )
 
 func TestJsonRPC(t *testing.T) {
-	// TODO: Reuse the same tests for websockets and IPC.
+	//nolint:godox
+	// TODO: Reuse the same tests for websockets and IPC. (to be fixed in EVM-521)
 	fund, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
@@ -50,28 +51,36 @@ func TestJsonRPC(t *testing.T) {
 
 		// Test. return the balance of an account
 		newBalance := big.NewInt(22000)
-		srv.Txn(fund).Transfer(key1.Address(), newBalance).Send().NoFail(t)
+		txn, err := srv.Txn(fund).Transfer(key1.Address(), newBalance).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		balance1, err = client.GetBalance(key1.Address(), ethgo.Latest)
 		require.NoError(t, err)
 		require.Equal(t, balance1, newBalance)
 
+		//nolint:godox
 		// Test. return 0 if the balance of an existing account is empty
-		// TODO
+		// TODO (to be fixed in EVM-521)
 	})
 
 	t.Run("eth_getTransactionCount", func(t *testing.T) {
 		key1, _ := wallet.GenerateKey()
 
-		// TODO. return zero if the account does not exists in the state (Does not work)
+		//nolint:godox
+		// TODO. return zero if the account does not exists in the state (Does not work) (to be fixed in EVM-521)
 		_, err := client.GetNonce(key1.Address(), ethgo.Latest)
 		require.NoError(t, err)
 
-		srv.Txn(fund).Transfer(key1.Address(), big.NewInt(10000000000000000)).Send().NoFail(t)
+		txn, err := srv.Txn(fund).Transfer(key1.Address(), big.NewInt(10000000000000000)).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		// Test. increase the nonce with new transactions
-		txn := srv.Txn(key1)
-		txn.Transfer(ethgo.ZeroAddress, one).Send().NoFail(t)
+		txn = srv.Txn(key1)
+		txn, err = txn.Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		nonce1, err := client.GetNonce(key1.Address(), ethgo.Latest)
 		require.NoError(t, err)
@@ -82,10 +91,12 @@ func TestJsonRPC(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, nonce1, uint64(0))
 
-		// Test. TODO. you can query the nonce at any block hash in time
+		// Test. TODO. you can query the nonce at any block hash in time (to be fixed in EVM-521) //nolint:godox
 		block, err := client.GetBlockByNumber(ethgo.BlockNumber(txn.Receipt().BlockNumber)-1, false)
 		require.NoError(t, err)
-		client.GetNonce(key1.Address(), block.Hash)
+
+		_, err = client.GetNonce(key1.Address(), ethgo.BlockNumber(block.Number))
+		require.NoError(t, err)
 	})
 
 	t.Run("eth_getStorage", func(t *testing.T) {
@@ -99,7 +110,9 @@ func TestJsonRPC(t *testing.T) {
 		key1, _ := wallet.NewWalletFromPrivKey(priv)
 
 		// fund the account so that it can deploy a contract
-		srv.Txn(fund).Transfer(key1.Address(), big.NewInt(10000000000000000)).Send().NoFail(t)
+		txn, err := srv.Txn(fund).Transfer(key1.Address(), big.NewInt(10000000000000000)).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		codeAddr := ethgo.HexToAddress("0xDBfca0c43cA12759256a7Dd587Dc4c6EEC1D89A5")
 
@@ -108,8 +121,10 @@ func TestJsonRPC(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, code, "0x")
 
-		txn := srv.Txn(key1)
-		txn.Deploy(bytecode).Send().NoFail(t)
+		txn = srv.Txn(key1)
+		txn, err = txn.Deploy(bytecode).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		receipt := txn.Receipt()
 
@@ -120,7 +135,7 @@ func TestJsonRPC(t *testing.T) {
 		cases := []ethgo.BlockNumberOrHash{
 			ethgo.Latest,
 			ethgo.BlockNumber(receipt.BlockNumber),
-			// receipt.BlockHash, TODO: It does not work
+			// receipt.BlockHash, TODO: It does not work (to be fixed in EVM-521) //nolint:godox
 		}
 		for _, c := range cases {
 			code, err = client.GetCode(codeAddr, c)
@@ -147,7 +162,9 @@ func TestJsonRPC(t *testing.T) {
 		key1, _ := wallet.GenerateKey()
 
 		txn := srv.Txn(fund)
-		txn.Transfer(key1.Address(), one).Send().NoFail(t)
+		txn, err := txn.Transfer(key1.Address(), one).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		// Test. We cannot retrieve a receipt of an empty hash
 		emptyReceipt, err := client.GetTransactionReceipt(ethgo.ZeroHash)
@@ -168,7 +185,9 @@ func TestJsonRPC(t *testing.T) {
 
 		// Test. The receipt of a deployed contract has the 'ContractAddress' field.
 		txn = srv.Txn(fund)
-		txn.Deploy(bytecode).Send().NoFail(t)
+		txn, err = txn.Deploy(bytecode).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		require.NotEqual(t, txn.Receipt().ContractAddress, ethgo.ZeroAddress)
 	})
@@ -178,7 +197,9 @@ func TestJsonRPC(t *testing.T) {
 
 		// Test. We should be able to query the transaction by its hash
 		txn := srv.Txn(fund)
-		txn.Transfer(key1.Address(), one).Send().NoFail(t)
+		txn, err := txn.Transfer(key1.Address(), one).Send()
+		require.NoError(t, err)
+		txn.NoFail(t)
 
 		ethTxn, err := client.GetTransactionByHash(txn.Receipt().TransactionHash)
 		require.NoError(t, err)

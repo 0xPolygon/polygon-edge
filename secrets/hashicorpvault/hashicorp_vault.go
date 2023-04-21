@@ -139,8 +139,14 @@ func (v *VaultSecretsManager) GetSecret(name string) ([]byte, error) {
 		return nil, secrets.ErrSecretNotFound
 	}
 
+	// Convert data into a map
+	secretsMap, ok := data.(map[string]interface{})
+	if !ok {
+		return nil, secrets.ErrSecretNotFound
+	}
+
 	// Grab the value
-	value, ok := data.(map[string]interface{})[name]
+	value, ok := secretsMap[name]
 	if !ok {
 		return nil, secrets.ErrSecretNotFound
 	}

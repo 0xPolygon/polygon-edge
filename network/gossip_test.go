@@ -31,7 +31,7 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 
 func TestSimpleGossip(t *testing.T) {
 	numServers := 10
-	sentMessage := fmt.Sprintf("%d", time.Now().Unix())
+	sentMessage := fmt.Sprintf("%d", time.Now().UTC().Unix())
 	servers, createErr := createServers(numServers, nil)
 
 	if createErr != nil {
@@ -106,4 +106,16 @@ func TestSimpleGossip(t *testing.T) {
 			}
 		}
 	}
+}
+
+func Test_RepeatedClose(t *testing.T) {
+	topic := &Topic{
+		closeCh: make(chan struct{}),
+		closed:  new(uint64),
+	}
+
+	// Call Close() twice to ensure that underlying logic (e.g. channel close) is
+	// only executed once.
+	topic.Close()
+	topic.Close()
 }

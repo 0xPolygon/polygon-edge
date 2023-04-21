@@ -25,8 +25,6 @@ func GetCommand() *cobra.Command {
 	setFlags(genesisCmd)
 	setLegacyFlags(genesisCmd)
 
-	helper.SetRequiredFlags(genesisCmd, params.getRequiredFlags())
-
 	genesisCmd.AddCommand(
 		// genesis predeploy
 		predeploy.GetCommand(),
@@ -62,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
+			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)
@@ -148,6 +146,91 @@ func setFlags(cmd *cobra.Command) {
 			"the maximum number of validators in the validator set for PoS",
 		)
 	}
+
+	// PolyBFT
+	{
+		cmd.Flags().StringVar(
+			&params.manifestPath,
+			manifestPathFlag,
+			defaultManifestPath,
+			"the manifest file path, which contains genesis metadata",
+		)
+
+		cmd.Flags().IntVar(
+			&params.validatorSetSize,
+			validatorSetSizeFlag,
+			defaultValidatorSetSize,
+			"the total number of validators",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.sprintSize,
+			sprintSizeFlag,
+			defaultSprintSize,
+			"the number of block included into a sprint",
+		)
+
+		cmd.Flags().DurationVar(
+			&params.blockTime,
+			blockTimeFlag,
+			defaultBlockTime,
+			"the predefined period which determines block creation frequency",
+		)
+
+		cmd.Flags().StringVar(
+			&params.bridgeJSONRPCAddr,
+			bridgeFlag,
+			"",
+			"the rootchain JSON RPC endpoint",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.epochReward,
+			epochRewardFlag,
+			defaultEpochReward,
+			"reward size for block sealing",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.eventTrackerStartBlocks,
+			trackerStartBlocksFlag,
+			[]string{},
+			"event tracker starting block configuration, which is specified per contract address "+
+				"(format: <contract address>:<start block>)",
+		)
+
+		//Regenesis flag that allows to start from non-empty database
+		cmd.Flags().StringVar(
+			&params.initialStateRoot,
+			trieRootFlag,
+			"",
+			"trie root from the corresponding triedb",
+		)
+
+		cmd.Flags().BoolVar(
+			&params.mintableNativeToken,
+			mintableTokenFlag,
+			false,
+			"flag indicate whether mintable or non-mintable native ERC20 token is deployed",
+		)
+	}
+
+	// Allow list
+	{
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListAdmin,
+			contractDeployedAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the contract deployer allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListEnabled,
+			contractDeployedAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the contract deployer allow list",
+		)
+	}
 }
 
 // setLegacyFlags sets the legacy flags to preserve backwards compatibility
@@ -158,16 +241,18 @@ func setLegacyFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlagLEGACY,
 		command.DefaultChainID,
-		"the ID of the chain",
+		"the ID of the chain (not-applicable for Polybft consensus protocol as chain id is defined in manifest.json)",
 	)
 
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func runPreRun(cmd *cobra.Command, _ []string) error {
 	if err := params.validateFlags(); err != nil {
 		return err
 	}
+
+	helper.SetRequiredFlags(cmd, params.getRequiredFlags())
 
 	return params.initRawParams()
 }
@@ -176,7 +261,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	if err := params.generateGenesis(); err != nil {
+	var err error
+
+	if params.isPolyBFTConsensus() {
+		err = params.generatePolyBftChainConfig(outputter)
+	} else {
+		err = params.generateGenesis()
+	}
+
+	if err != nil {
 		outputter.SetError(err)
 
 		return

@@ -23,12 +23,18 @@ func GetCommand() *cobra.Command {
 
 			addr := helper.GetGRPCAddress(cmd)
 
-			sidecar, err := newSidecar(addr)
+			sidecar, err := newSidecar(addr, outputter)
 			if err != nil {
-				panic(err)
+				outputter.SetError(err)
+
+				return
 			}
 
-			helper.HandleSignals(sidecar.Close, outputter)
+			if err = helper.HandleSignals(sidecar.Close, outputter); err != nil {
+				outputter.SetError(err)
+
+				return
+			}
 		},
 	}
 
@@ -42,7 +48,7 @@ type sidecar struct {
 	closeCh chan struct{}
 }
 
-func newSidecar(grpcAddress string) (*sidecar, error) {
+func newSidecar(grpcAddress string, outputter command.OutputFormatter) (*sidecar, error) {
 	client, err := helper.GetSystemClientConnection(grpcAddress)
 	if err != nil {
 		return nil, err
@@ -53,18 +59,20 @@ func newSidecar(grpcAddress string) (*sidecar, error) {
 		closeCh: make(chan struct{}),
 	}
 
-	go s.run()
+	go s.run(outputter)
 
 	return s, nil
 }
 
-func (s *sidecar) run() {
+func (s *sidecar) run(outputter command.OutputFormatter) {
 	lastBlock := int64(0)
 
 	for {
 		status, err := s.clt.GetStatus(context.Background(), &emptypb.Empty{})
 		if err != nil {
-			panic(err)
+			outputter.SetError(err)
+
+			return
 		}
 
 		if lastBlock == status.Current.Number {
@@ -73,12 +81,16 @@ func (s *sidecar) run() {
 
 		traceResp, err := s.clt.GetTrace(context.Background(), &proto.GetTraceRequest{Number: uint64(status.Current.Number)})
 		if err != nil {
-			panic(err)
+			outputter.SetError(err)
+
+			return
 		}
 
 		var trace *types.Trace
 		if err := json.Unmarshal(traceResp.Trace, &trace); err != nil {
-			panic(err)
+			outputter.SetError(err)
+
+			return
 		}
 
 		fmt.Println("-----")

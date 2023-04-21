@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/state"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
+
+	commonHelpers "github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 // Node represents a node reference
@@ -30,7 +31,7 @@ func (v *ValueNode) Hash() ([]byte, bool) {
 
 // SetHash implements the node interface
 func (v *ValueNode) SetHash(b []byte) []byte {
-	panic("We cannot set hash on value node")
+	panic("We cannot set hash on value node") //nolint:gocritic
 }
 
 type common struct {
@@ -44,7 +45,7 @@ func (c *common) Hash() ([]byte, bool) {
 
 // SetHash implements the node interface
 func (c *common) SetHash(b []byte) []byte {
-	c.hash = extendByteSlice(c.hash, len(b))
+	c.hash = commonHelpers.ExtendByteSlice(c.hash, len(b))
 	copy(c.hash, b)
 
 	return c.hash
@@ -90,19 +91,17 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	state   *State
-	root    Node
-	epoch   uint32
-	storage Storage
-	tracer  Tracer
+	root   Node
+	epoch  uint32
+	tracer Tracer
 }
 
 func NewTrie() *Trie {
 	return &Trie{}
 }
 
-func (t *Trie) Get(k []byte) ([]byte, bool) {
-	txn := t.Txn()
+func (t *Trie) Get(k []byte, storage Storage) ([]byte, bool) {
+	txn := t.Txn(storage)
 	txn.tracer = t.tracer
 
 	res := txn.Lookup(k)
@@ -119,85 +118,10 @@ func hashit(k []byte) []byte {
 
 var accountArenaPool fastrlp.ArenaPool
 
-var stateArenaPool fastrlp.ArenaPool // TODO, Remove once we do update in fastrlp
-
-func (t *Trie) Commit(objs []*state.Object) (*Trie, []byte) {
-	// Create an insertion batch for all the entries
-	batch := t.storage.Batch()
-
-	tt := t.Txn()
-	tt.batch = batch
-
-	arena := accountArenaPool.Get()
-	defer accountArenaPool.Put(arena)
-
-	ar1 := stateArenaPool.Get()
-	defer stateArenaPool.Put(ar1)
-
-	for _, obj := range objs {
-		if obj.Deleted {
-			tt.Delete(hashit(obj.Address.Bytes()))
-		} else {
-			account := state.Account{
-				Balance:  obj.Balance,
-				Nonce:    obj.Nonce,
-				CodeHash: obj.CodeHash.Bytes(),
-				Root:     obj.Root, // old root
-			}
-
-			if len(obj.Storage) != 0 {
-				trie, err := t.state.newTrieAt(obj.Root)
-				if err != nil {
-					panic(err)
-				}
-
-				localTxn := trie.Txn()
-				localTxn.batch = batch
-
-				for _, entry := range obj.Storage {
-					k := hashit(entry.Key)
-					if entry.Deleted {
-						localTxn.Delete(k)
-					} else {
-						vv := ar1.NewBytes(bytes.TrimLeft(entry.Val, "\x00"))
-						localTxn.Insert(k, vv.MarshalTo(nil))
-					}
-				}
-
-				accountStateRoot, _ := localTxn.Hash()
-				accountStateTrie := localTxn.Commit()
-
-				// Add this to the cache
-				t.state.AddState(types.BytesToHash(accountStateRoot), accountStateTrie)
-
-				account.Root = types.BytesToHash(accountStateRoot)
-			}
-
-			if obj.DirtyCode {
-				t.state.SetCode(obj.CodeHash, obj.Code)
-			}
-
-			vv := account.MarshalWith(arena)
-			data := vv.MarshalTo(nil)
-
-			tt.Insert(hashit(obj.Address.Bytes()), data)
-			arena.Reset()
-		}
-	}
-
-	root, _ := tt.Hash()
-
-	nTrie := tt.Commit()
-	nTrie.state = t.state
-	nTrie.storage = t.storage
-
-	// Write all the entries to db
-	batch.Write()
-
-	t.state.AddState(types.BytesToHash(root), nTrie)
-
-	return nTrie, root
-}
+// TODO, Remove once we do update in fastrlp (to be fixed in EVM-528)
+//
+//nolint:godox
+var stateArenaPool fastrlp.ArenaPool
 
 // Hash returns the root hash of the trie. It does not write to the
 // database and can be used even if the trie doesn't have one.
@@ -206,39 +130,19 @@ func (t *Trie) Hash() types.Hash {
 		return types.EmptyRootHash
 	}
 
-	hash, cached, _ := t.hashRoot()
-	t.root = cached
+	hash := t.hashRoot()
 
 	return types.BytesToHash(hash)
 }
 
-func (t *Trie) TryUpdate(key, value []byte) error {
-	k := bytesToHexNibbles(key)
-
-	if len(value) != 0 {
-		tt := t.Txn()
-		n := tt.insert(t.root, k, value)
-		t.root = n
-	} else {
-		tt := t.Txn()
-		n, ok := tt.delete(t.root, k)
-		if !ok {
-			return fmt.Errorf("missing node")
-		}
-		t.root = n
-	}
-
-	return nil
-}
-
-func (t *Trie) hashRoot() ([]byte, Node, error) {
+func (t *Trie) hashRoot() []byte {
 	hash, _ := t.root.Hash()
 
-	return hash, t.root, nil
+	return hash
 }
 
-func (t *Trie) Txn() *Txn {
-	return &Txn{root: t.root, epoch: t.epoch + 1, storage: t.storage}
+func (t *Trie) Txn(storage Storage) *Txn {
+	return &Txn{root: t.root, epoch: t.epoch + 1, storage: storage}
 }
 
 type Putter interface {
@@ -258,7 +162,7 @@ type Txn struct {
 }
 
 func (t *Txn) Commit() *Trie {
-	return &Trie{epoch: t.epoch, root: t.root, storage: t.storage}
+	return &Trie{epoch: t.epoch, root: t.root}
 }
 
 func (t *Txn) Lookup(key []byte) []byte {
@@ -280,7 +184,7 @@ func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
 		if n.hash {
 			nc, ok, err := GetNode(n.buf, t.storage)
 			if err != nil {
-				panic(err)
+				panic(err) //nolint:gocritic
 			}
 
 			if !ok {
@@ -326,7 +230,7 @@ func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
 		return nil, res
 
 	default:
-		panic(fmt.Sprintf("unknown node type %v", n))
+		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic
 	}
 }
 
@@ -372,7 +276,7 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 		if n.hash {
 			nc, ok, err := GetNode(n.buf, t.storage)
 			if err != nil {
-				panic(err)
+				panic(err) //nolint:gocritic
 			}
 
 			if !ok {
@@ -432,17 +336,13 @@ func (t *Txn) insert(node Node, search, value []byte) Node {
 			k := search[0]
 			child := n.getEdge(k)
 			newChild := t.insert(child, search[1:], value)
-			if child == nil {
-				b.setEdge(k, newChild)
-			} else {
-				b.setEdge(k, newChild)
-			}
+			b.setEdge(k, newChild)
 
 			return b
 		}
 
 	default:
-		panic(fmt.Sprintf("unknown node type %v", n))
+		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic
 	}
 }
 
@@ -491,7 +391,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		if n.hash {
 			nc, ok, err := GetNode(n.buf, t.storage)
 			if err != nil {
-				panic(err)
+				panic(err) //nolint:gocritic
 			}
 
 			if !ok {
@@ -564,7 +464,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			// This needs better testing
 			aux, ok, err := GetNode(vv.buf, t.storage)
 			if err != nil {
-				panic(err)
+				panic(err) //nolint:gocritic
 			}
 
 			if !ok {
@@ -590,7 +490,7 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 		return ncc, true
 	}
 
-	panic("it should not happen")
+	panic("it should not happen") //nolint:gocritic
 }
 
 func prefixLen(k1, k2 []byte) int {
@@ -616,13 +516,4 @@ func concat(a, b []byte) []byte {
 	copy(c[len(a):], b)
 
 	return c
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-
-	return b[:needLen]
 }

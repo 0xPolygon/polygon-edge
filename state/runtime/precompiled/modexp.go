@@ -6,6 +6,8 @@ import (
 	"math"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type modExp struct {
@@ -137,7 +139,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return gasCost.Uint64()
 }
 
-func (m *modExp) run(input []byte) ([]byte, error) {
+func (m *modExp) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	// get the lengths
 	var baseLen, exponentLen, modulusLen uint64
 

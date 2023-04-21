@@ -7,6 +7,9 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/require"
+	"github.com/syndtr/goleveldb/leveldb"
+	ldbstorage "github.com/syndtr/goleveldb/leveldb/storage"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -17,7 +20,16 @@ func TestTrie_Proof(t *testing.T) {
 	val := acct.MarshalWith(&fastrlp.Arena{}).MarshalTo(nil)
 
 	tt := NewTrie()
-	txn := tt.Txn()
+
+	ldbStorage := ldbstorage.NewMemStorage()
+	ldb, err := leveldb.Open(ldbStorage, nil)
+	require.NoError(t, err)
+
+	defer ldb.Close()
+
+	kv := NewKV(ldb)
+
+	txn := tt.Txn(kv)
 	txn.Insert([]byte{0x1, 0x2}, val)
 	txn.Insert([]byte{0x1, 0x1}, val)
 
@@ -27,7 +39,8 @@ func TestTrie_Proof(t *testing.T) {
 	}
 	txn.tracer = tracer
 
-	txn.Hash()
+	_, err = txn.Hash()
+	require.NoError(t, err)
 	txn.Lookup([]byte{0x1, 0x2})
 
 	tracer.Proof()

@@ -3,6 +3,9 @@ name: Ephemeral DevNet Workflow
 
 on:  # yamllint disable-line rule:truthy
   workflow_dispatch:
+  push:
+    branches:
+      - develop
 
 permissions:
   id-token: write
@@ -20,15 +23,14 @@ jobs:
   build:
     name: Build
     uses: ./.github/workflows/build.yml
-    secrets:
-      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
 
   test:
     name: Test
     uses: ./.github/workflows/test.yml
     needs: build
     secrets:
-      GH_TOKEN_CLONE_PRIVATE: ${{ secrets.GH_TOKEN_CLONE_PRIVATE }}
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   container_image_build:
     name: Build/Push Container Image
@@ -52,7 +54,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
@@ -86,13 +88,13 @@ jobs:
           name: polygon-edge
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v1-node16
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Notify Slack
-        uses: slackapi/slack-github-action@v1.22.0
+        uses: slackapi/slack-github-action@v1.23.0
         if: false
         continue-on-error: true
         env:
@@ -172,7 +174,7 @@ jobs:
           echo "Ephemeral Devnet Deployment Complete"
 
       - name: Notify Slack - Failures
-        uses: slackapi/slack-github-action@v1.22.0
+        uses: slackapi/slack-github-action@v1.23.0
         if: ${{ job.status != 'success' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_DEPLOYMENT_WEBHOOK_URL }}
@@ -208,45 +210,30 @@ jobs:
               ]
             }
 
-  pandoras_box_eoa:
-    uses: ./.github/workflows/pandoras_box.yml
-    name: Pandora's Box EOA
+  loadtest:
     needs: deploy_eph_devnet
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
-      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+      LOADTEST_RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
-      runner: devnet-ephemeral
+      runner: devnet
       environment: devnet-ephemeral
-      transaction_batch: '200'
-      transaction_count: '10000'
-      mode: EOA
-  pandoras_box_erc20:
-    uses: ./.github/workflows/pandoras_box.yml
-    name: Pandora's Box ERC20
-    needs: deploy_eph_devnet
+      scenario: multiple_EOA
+  
+  loadtestERC20:
+    needs: loadtest
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
-      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
+      LOADTEST_RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
-      runner: devnet-ephemeral
+      runner: devnet
       environment: devnet-ephemeral
-      transaction_batch: '200'
-      transaction_count: '10000'
-      mode: ERC20
-  pandoras_box_erc721:
-    uses: ./.github/workflows/pandoras_box.yml
-    name: Pandora's Box ERC721
-    needs: deploy_eph_devnet
-    secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      PANDORAS_TARGET: ${{ secrets.PANDORAS_TARGET }}
-      PANDORAS_MNEMONIC: ${{ secrets.PANDORAS_MNEMONIC }}
-    with:
-      runner: devnet-ephemeral
-      environment: devnet-ephemeral
-      transaction_batch: '200'
-      transaction_count: '10000'
-      mode: ERC721
+      scenario: multiple_ERC20

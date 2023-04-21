@@ -38,6 +38,9 @@ const (
 	// we should have enough capacity of the queue
 	// because when queue is full, validation is throttled and new messages are dropped.
 	validateBufferSize = 1024
+
+	// networkMetrics is a prefix used for network-related metrics
+	networkMetrics = "network"
 )
 
 const (
@@ -239,7 +242,12 @@ func setupLibp2pKey(secretsManager secrets.SecretsManager) (crypto.PrivKey, erro
 
 // Start starts the networking services
 func (s *Server) Start() error {
-	s.logger.Info("LibP2P server running", "addr", common.AddrInfoToString(s.AddrInfo()))
+	addr, err := common.AddrInfoToString(s.AddrInfo())
+	if err != nil {
+		return err
+	}
+
+	s.logger.Info("LibP2P server running", "addr", addr)
 
 	if setupErr := s.setupIdentity(); setupErr != nil {
 		return fmt.Errorf("unable to setup identity, %w", setupErr)
@@ -389,9 +397,10 @@ func (s *Server) runDial() {
 	}
 
 	for {
+		//nolint:godox
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently
+		// maxDials requests concurrently (to be fixed in EVM-541)
 		for s.connectionCounts.HasFreeOutboundConn() {
 			tt := s.dialQueue.PopTask()
 			if tt == nil {
@@ -514,7 +523,7 @@ func (s *Server) removePeerInfo(peerID peer.ID) *PeerConnInfo {
 		}
 	}
 
-	metrics.SetGauge([]string{"peers"}, float32(len(s.peers)))
+	metrics.SetGauge([]string{networkMetrics, "peers"}, float32(len(s.peers)))
 
 	return connectionInfo
 }
@@ -609,7 +618,7 @@ func (s *Server) NewProtoConnection(protocol string, peerID peer.ID) (*rawGrpc.C
 		return nil, err
 	}
 
-	return p.Client(stream), nil
+	return p.Client(stream)
 }
 
 func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
@@ -617,7 +626,7 @@ func (s *Server) NewStream(proto string, id peer.ID) (network.Stream, error) {
 }
 
 type Protocol interface {
-	Client(network.Stream) *rawGrpc.ClientConn
+	Client(network.Stream) (*rawGrpc.ClientConn, error)
 	Handler() func(network.Stream)
 }
 
@@ -769,10 +778,12 @@ func (s *Server) SubscribeCh(ctx context.Context) (<-chan *peerEvent.PeerEvent, 
 func (s *Server) updateConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		metrics.SetGauge([]string{"inbound_connections_count"}, float32(s.connectionCounts.GetInboundConnCount()))
+		metrics.SetGauge([]string{networkMetrics, "inbound_connections_count"},
+			float32(s.connectionCounts.GetInboundConnCount()))
 
 	case network.DirOutbound:
-		metrics.SetGauge([]string{"outbound_connections_count"}, float32(s.connectionCounts.GetOutboundConnCount()))
+		metrics.SetGauge([]string{networkMetrics, "outbound_connections_count"},
+			float32(s.connectionCounts.GetOutboundConnCount()))
 	}
 }
 
@@ -780,11 +791,11 @@ func (s *Server) updateConnCountMetrics(direction network.Direction) {
 func (s *Server) updatePendingConnCountMetrics(direction network.Direction) {
 	switch direction {
 	case network.DirInbound:
-		metrics.SetGauge([]string{"pending_inbound_connections_count"},
+		metrics.SetGauge([]string{networkMetrics, "pending_inbound_connections_count"},
 			float32(s.connectionCounts.GetPendingInboundConnCount()))
 
 	case network.DirOutbound:
-		metrics.SetGauge([]string{"pending_outbound_connections_count"},
+		metrics.SetGauge([]string{networkMetrics, "pending_outbound_connections_count"},
 			float32(s.connectionCounts.GetPendingOutboundConnCount()))
 	}
 }

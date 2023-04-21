@@ -813,17 +813,19 @@ func opReturnDataCopy(c *state) {
 	dataOffset := c.pop()
 	length := c.pop()
 
-	if !c.allocateMemory(memOffset, length) {
-		return
-	}
-
 	if !dataOffset.IsUint64() {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return
 	}
 
-	if ulength := length.Uint64(); !c.consumeGas(((ulength + 31) / 32) * copyGas) {
+	// if length is 0, return immediately since no need for the data copying nor memory allocation
+	if length.Sign() == 0 || !c.allocateMemory(memOffset, length) {
+		return
+	}
+
+	ulength := length.Uint64()
+	if !c.consumeGas(((ulength + 31) / 32) * copyGas) {
 		return
 	}
 
@@ -842,7 +844,7 @@ func opReturnDataCopy(c *state) {
 	}
 
 	data := c.returnData[dataOffset.Uint64():dataEndIndex]
-	copy(c.memory[memOffset.Uint64():], data)
+	copy(c.memory[memOffset.Uint64():memOffset.Uint64()+ulength], data)
 }
 
 func opCodeCopy(c *state) {
@@ -1143,7 +1145,7 @@ func opCall(op OpCode) instruction {
 			callType = runtime.StaticCall
 
 		default:
-			panic("not expected")
+			panic("not expected") //nolint:gocritic
 		}
 
 		contract, offset, size, err := c.buildCallContract(op)
@@ -1173,7 +1175,7 @@ func opCall(op OpCode) instruction {
 		}
 
 		if result.Succeeded() || result.Reverted() {
-			if len(result.ReturnValue) != 0 {
+			if len(result.ReturnValue) != 0 && size > 0 {
 				copy(c.memory[offset:offset+size], result.ReturnValue)
 			}
 		}
@@ -1331,7 +1333,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 		return nil, nil
 	}
 
-	// Consume memory resize gas (TODO, change with get2)
+	// Consume memory resize gas (TODO, change with get2) (to be fixed in EVM-528) //nolint:godox
 	if !c.consumeGas(gasCost) {
 		return nil, nil
 	}

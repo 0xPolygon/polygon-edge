@@ -54,6 +54,8 @@ func TestSign_CommittedSeals(t *testing.T) {
 	var (
 		h   = &types.Header{}
 		err error
+
+		roundNumber uint64 = 1
 	)
 
 	correctValSet := pool.ValidatorSet()
@@ -95,11 +97,18 @@ func TestSign_CommittedSeals(t *testing.T) {
 			seals[acc.Address()] = seal
 		}
 
-		sealed, err := signerA.WriteCommittedSeals(h, seals)
-
+		sealed, err := signerA.WriteCommittedSeals(h, roundNumber, seals)
 		assert.NoError(t, err)
 
-		return signerA.VerifyCommittedSeals(sealed, correctValSet, OptimalQuorumSize(correctValSet))
+		committedSeal, err := signerA.GetIBFTExtra(sealed)
+		assert.NoError(t, err)
+
+		return signerA.VerifyCommittedSeals(
+			sealed.Hash,
+			committedSeal.CommittedSeals,
+			correctValSet,
+			OptimalQuorumSize(correctValSet),
+		)
 	}
 
 	// Correct

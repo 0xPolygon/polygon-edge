@@ -1,11 +1,43 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
+
+type TxType byte
+
+const (
+	LegacyTx TxType = 0x0
+	StateTx  TxType = 0x7f
+
+	StateTransactionGasLimit = 1000000 // some arbitrary default gas limit for state transactions
+)
+
+func txTypeFromByte(b byte) (TxType, error) {
+	tt := TxType(b)
+
+	switch tt {
+	case LegacyTx, StateTx:
+		return tt, nil
+	default:
+		return tt, fmt.Errorf("unknown transaction type: %d", b)
+	}
+}
+
+func (t TxType) String() (s string) {
+	switch t {
+	case LegacyTx:
+		return "LegacyTx"
+	case StateTx:
+		return "StateTx"
+	}
+
+	return
+}
 
 type Transaction struct {
 	Nonce    uint64
@@ -19,6 +51,8 @@ type Transaction struct {
 	S        *big.Int
 	Hash     Hash
 	From     Address
+
+	Type TxType
 
 	// Cache
 	size atomic.Value

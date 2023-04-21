@@ -1,6 +1,8 @@
 package snapshot
 
 import (
+	"math"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/spf13/cobra"
@@ -19,10 +21,10 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().IntVar(
+	cmd.Flags().Uint64Var(
 		&params.blockNumber,
 		numberFlag,
-		-1,
+		math.MaxUint64,
 		"the block height (number) for the snapshot",
 	)
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type ecrecover struct {
@@ -19,7 +21,7 @@ func (e *ecrecover) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return 3000
 }
 
-func (e *ecrecover) run(input []byte) ([]byte, error) {
+func (e *ecrecover) run(input []byte, caller types.Address, _ runtime.Host) ([]byte, error) {
 	input, _ = e.p.get(input, 128)
 
 	// recover the value v. Expect all zeros except the last byte
@@ -33,7 +35,7 @@ func (e *ecrecover) run(input []byte) ([]byte, error) {
 	r := big.NewInt(0).SetBytes(input[64:96])
 	s := big.NewInt(0).SetBytes(input[96:128])
 
-	if !crypto.ValidateSignatureValues(v, r, s) {
+	if !crypto.ValidateSignatureValues(new(big.Int).SetBytes([]byte{v}), r, s, false) {
 		return nil, nil
 	}
 
@@ -55,8 +57,8 @@ func (i *identity) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return baseGasCalc(input, 15, 3)
 }
 
-func (i *identity) run(in []byte) ([]byte, error) {
-	return in, nil
+func (i *identity) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
+	return input, nil
 }
 
 type sha256h struct {
@@ -66,7 +68,7 @@ func (s *sha256h) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return baseGasCalc(input, 60, 12)
 }
 
-func (s *sha256h) run(input []byte) ([]byte, error) {
+func (s *sha256h) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	h := sha256.Sum256(input)
 
 	return h[:], nil
@@ -80,7 +82,7 @@ func (r *ripemd160h) gas(input []byte, config *chain.ForksInTime) uint64 {
 	return baseGasCalc(input, 600, 120)
 }
 
-func (r *ripemd160h) run(input []byte) ([]byte, error) {
+func (r *ripemd160h) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, error) {
 	ripemd := ripemd160.New()
 	ripemd.Write(input)
 	res := ripemd.Sum(nil)

@@ -2,6 +2,7 @@ package types
 
 import (
 	goHex "encoding/hex"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
@@ -28,6 +29,12 @@ type Receipt struct {
 	GasUsed         uint64
 	ContractAddress *Address
 	TxHash          Hash
+
+	TransactionType TxType
+}
+
+func (r *Receipt) IsLegacyTx() bool {
+	return r.TransactionType == LegacyTx
 }
 
 func (r *Receipt) SetStatus(s ReceiptStatus) {
@@ -49,7 +56,7 @@ const BloomByteLength = 256
 type Bloom [BloomByteLength]byte
 
 func (b *Bloom) UnmarshalText(input []byte) error {
-	input = hex.DropHexPrefix(input)
+	input = []byte(strings.TrimPrefix(strings.ToLower(string(input)), "0x"))
 	if _, err := goHex.Decode(b[:], input); err != nil {
 		return err
 	}
@@ -87,7 +94,7 @@ func CreateBloom(receipts []*Receipt) (b Bloom) {
 
 func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 	hasher.Reset()
-	hasher.Write(h[:])
+	hasher.Write(h[:]) //nolint:errcheck
 	buf := hasher.Read()
 
 	for i := 0; i < 6; i += 2 {
@@ -128,7 +135,7 @@ func (b *Bloom) IsLogInBloom(log *Log) bool {
 // isByteArrPresent checks if the byte array is possibly present in the Bloom filter
 func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 	hasher.Reset()
-	hasher.Write(data[:])
+	hasher.Write(data[:]) //nolint:errcheck
 	buf := hasher.Read()
 
 	for i := 0; i < 6; i += 2 {
@@ -141,7 +148,7 @@ func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 
 		referenceByte := b[byteLocation]
 
-		isSet := int(referenceByte & (1 << (bitLocation - 1)))
+		isSet := uint(referenceByte & (1 << (bitLocation - 1)))
 
 		if isSet == 0 {
 			return false

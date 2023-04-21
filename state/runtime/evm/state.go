@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -113,7 +114,7 @@ func (c *state) validJumpdest(dest *big.Int) bool {
 		return false
 	}
 
-	return c.bitmap.isSet(uint(udest))
+	return c.bitmap.isSet(udest)
 }
 
 func (c *state) Halt() {
@@ -122,7 +123,7 @@ func (c *state) Halt() {
 
 func (c *state) exit(err error) {
 	if err == nil {
-		panic("cannot stop with none")
+		return
 	}
 
 	c.stop = true
@@ -224,7 +225,7 @@ func (c *state) Run() ([]byte, error) {
 
 	for !c.stop {
 		op, ok = c.CurrentOpCode()
-		gasCopy := c.gas
+		gasCopy, ipCopy := c.gas, uint64(c.ip)
 
 		c.captureState(int(op))
 
@@ -237,7 +238,7 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
-			c.captureExecutionError(op.String(), c.ip, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy, 0)
 
 			break
 		}
@@ -245,7 +246,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(errStackUnderflow)
-			c.captureExecutionError(op.String(), c.ip, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
 
 			break
 		}
@@ -253,15 +254,15 @@ func (c *state) Run() ([]byte, error) {
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
-			c.captureExecutionError(op.String(), c.ip, gasCopy)
+			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
 
 			break
 		}
 
-		c.captureSuccessfulExecution(op.String(), gasCopy)
-
 		// execute the instruction
 		inst.inst(c)
+
+		c.captureSuccessfulExecution(op.String(), ipCopy, gasCopy, gasCopy-c.gas)
 
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
@@ -297,7 +298,7 @@ func (c *state) Len() int {
 // consumes gas if memory needs to be expanded
 func (c *state) allocateMemory(offset, size *big.Int) bool {
 	if !offset.IsUint64() || !size.IsUint64() {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return false
 	}
@@ -310,7 +311,7 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 	s := size.Uint64()
 
 	if o > 0xffffffffe0 || s > 0xffffffffe0 {
-		c.exit(errGasUintOverflow)
+		c.exit(errReturnDataOutOfBounds)
 
 		return false
 	}
@@ -328,19 +329,10 @@ func (c *state) allocateMemory(offset, size *big.Int) bool {
 		}
 
 		// resize the memory
-		c.memory = extendByteSlice(c.memory, int(w*32))
+		c.memory = common.ExtendByteSlice(c.memory, int(w*32))
 	}
 
 	return true
-}
-
-func extendByteSlice(b []byte, needLen int) []byte {
-	b = b[:cap(b)]
-	if n := needLen - cap(b); n > 0 {
-		b = append(b, make([]byte, n)...)
-	}
-
-	return b[:needLen]
 }
 
 func (c *state) get2(dst []byte, offset, length *big.Int) ([]byte, bool) {
@@ -402,7 +394,9 @@ func (c *state) captureState(opCode int) {
 
 func (c *state) captureSuccessfulExecution(
 	opCode string,
+	ip uint64,
 	gas uint64,
+	consumedGas uint64,
 ) {
 	tracer := c.host.GetTracer()
 
@@ -412,10 +406,10 @@ func (c *state) captureSuccessfulExecution(
 
 	tracer.ExecuteState(
 		c.msg.Address,
-		uint64(c.ip),
+		ip,
 		opCode,
 		gas,
-		c.currentConsumedGas,
+		consumedGas,
 		c.returnData,
 		c.msg.Depth,
 		c.err,
@@ -427,6 +421,7 @@ func (c *state) captureExecutionError(
 	opCode string,
 	ip int,
 	gas uint64,
+	consumedGas uint64,
 ) {
 	tracer := c.host.GetTracer()
 
@@ -439,7 +434,7 @@ func (c *state) captureExecutionError(
 		uint64(ip),
 		opCode,
 		gas,
-		c.currentConsumedGas,
+		consumedGas,
 		c.returnData,
 		c.msg.Depth,
 		c.err,

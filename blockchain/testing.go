@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -124,8 +125,6 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		}
 	}
 
-	// TODO, find a way to add the snapshot, this will fail until that is fixed.
-	// snap, _ := state.NewSnapshot(types.Hash{})
 	return b
 }
 
@@ -343,7 +342,12 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 		executor = &mockExecutor{}
 	}
 
-	b, err := NewBlockchain(hclog.NewNullLogger(), "", config, &MockVerifier{}, executor, &mockSigner{})
+	db, err := memory.NewMemoryStorage(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := NewBlockchain(hclog.NewNullLogger(), db, config, &MockVerifier{}, executor, &mockSigner{})
 	if err != nil {
 		return nil, err
 	}

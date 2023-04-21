@@ -9,10 +9,21 @@ import (
 // Params are all the set of params for the chain
 type Params struct {
 	Forks          *Forks                 `json:"forks"`
-	ChainID        int                    `json:"chainID"`
+	ChainID        int64                  `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
+
+	// AllowList configuration
+	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowListConfig,omitempty"`
+}
+
+type AllowListConfig struct {
+	// AdminAddresses is the list of the initial admin addresses
+	AdminAddresses []types.Address `json:"adminAddresses,omitempty"`
+
+	// EnabledAddresses is the list of the initial enabled addresses
+	EnabledAddresses []types.Address `json:"enabledAddresses,omitempty"`
 }
 
 func (p *Params) GetEngine() string {
@@ -36,6 +47,7 @@ type Forks struct {
 	Constantinople *Fork `json:"constantinople,omitempty"`
 	Petersburg     *Fork `json:"petersburg,omitempty"`
 	Istanbul       *Fork `json:"istanbul,omitempty"`
+	London         *Fork `json:"london,omitempty"`
 	EIP150         *Fork `json:"EIP150,omitempty"`
 	EIP158         *Fork `json:"EIP158,omitempty"`
 	EIP155         *Fork `json:"EIP155,omitempty"`
@@ -65,6 +77,10 @@ func (f *Forks) IsPetersburg(block uint64) bool {
 	return f.active(f.Petersburg, block)
 }
 
+func (f *Forks) IsLondon(block uint64) bool {
+	return f.active(f.London, block)
+}
+
 func (f *Forks) IsEIP150(block uint64) bool {
 	return f.active(f.EIP150, block)
 }
@@ -84,6 +100,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		Constantinople: f.active(f.Constantinople, block),
 		Petersburg:     f.active(f.Petersburg, block),
 		Istanbul:       f.active(f.Istanbul, block),
+		London:         f.active(f.London, block),
 		EIP150:         f.active(f.EIP150, block),
 		EIP158:         f.active(f.EIP158, block),
 		EIP155:         f.active(f.EIP155, block),
@@ -112,6 +129,7 @@ type ForksInTime struct {
 	Constantinople,
 	Petersburg,
 	Istanbul,
+	London,
 	EIP150,
 	EIP158,
 	EIP155 bool
@@ -126,4 +144,5 @@ var AllForksEnabled = &Forks{
 	Constantinople: NewFork(0),
 	Petersburg:     NewFork(0),
 	Istanbul:       NewFork(0),
+	London:         NewFork(0),
 }

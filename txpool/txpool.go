@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/armon/go-metrics"
@@ -33,6 +34,9 @@ const (
 	maxAccountSkips = uint64(10)
 
 	pruningCooldown = 5000 * time.Millisecond
+
+	// txPoolMetrics is a prefix used for txpool-related metrics
+	txPoolMetrics = "txpool"
 )
 
 // errors
@@ -52,6 +56,7 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
+	ErrInvalidTxType           = errors.New("invalid tx type")
 )
 
 // indicates origin of a transaction
@@ -60,7 +65,6 @@ type txOrigin int
 const (
 	local  txOrigin = iota // json-RPC/gRPC endpoints
 	gossip                 // gossip protocol
-	reorg                  // legacy code
 )
 
 func (o txOrigin) String() (s string) {
@@ -69,8 +73,6 @@ func (o txOrigin) String() (s string) {
 		s = "local"
 	case gossip:
 		s = "gossip"
-	case reorg:
-		s = "reorg"
 	}
 
 	return
@@ -274,7 +276,7 @@ func NewTxPool(
 
 func (p *TxPool) updatePending(i int64) {
 	newPending := atomic.AddInt64(&p.pending, i)
-	metrics.SetGauge([]string{"pending_transactions"}, float32(newPending))
+	metrics.SetGauge([]string{txPoolMetrics, "pending_transactions"}, float32(newPending))
 }
 
 // Start runs the pool's main loop in the background.
@@ -506,33 +508,16 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 // ResetWithHeaders processes the transactions from the new
 // headers to sync the pool with the new state.
 func (p *TxPool) ResetWithHeaders(headers ...*types.Header) {
-	e := &blockchain.Event{
-		NewChain: headers,
-	}
-
 	// process the txs in the event
 	// to make sure the pool is up-to-date
-	p.processEvent(e)
+	p.processEvent(&blockchain.Event{
+		NewChain: headers,
+	})
 }
 
 // processEvent collects the latest nonces for each account containted
 // in the received event. Resets all known accounts with the new nonce.
 func (p *TxPool) processEvent(event *blockchain.Event) {
-	oldTxs := make(map[types.Hash]*types.Transaction)
-
-	// Legacy reorg logic //
-	for _, header := range event.OldChain {
-		// transactions to be returned to the pool
-		block, ok := p.store.GetBlockByHash(header.Hash, true)
-		if !ok {
-			continue
-		}
-
-		for _, tx := range block.Transactions {
-			oldTxs[tx.Hash] = tx
-		}
-	}
-
 	// Grab the latest state root now that the block has been inserted
 	stateRoot := p.store.Header().StateRoot
 	stateNonces := make(map[types.Address]uint64)
@@ -575,17 +560,6 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 
 			// update the result map
 			stateNonces[addr] = latestNonce
-
-			// Legacy reorg logic //
-			// Update the addTxns in case of reorgs
-			delete(oldTxs, tx.Hash)
-		}
-	}
-
-	// Legacy reorg logic //
-	for _, tx := range oldTxs {
-		if err := p.addTx(reorg, tx); err != nil {
-			p.logger.Error("add tx", "err", err)
 		}
 	}
 
@@ -601,6 +575,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // validateTx ensures the transaction conforms to specific
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
+	// Check the transaction type. State transactions are not expected to be added to the pool
+	if tx.Type == types.StateTx {
+		return ErrInvalidTxType
+	}
+
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
 		return ErrOversizedData
@@ -632,8 +611,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && !p.deploymentWhitelist.allowed(tx.From) {
-		return ErrSmartContractRestricted
+	if tx.IsContractCreation() {
+		if !p.deploymentWhitelist.allowed(tx.From) {
+			return ErrSmartContractRestricted
+		}
+
+		if p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
+			return runtime.ErrMaxCodeSizeExceeded
+		}
 	}
 
 	// Reject underpriced transactions
@@ -740,7 +725,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// check for overflow
-	if p.gauge.read()+slotsRequired(tx) > p.gauge.max {
+	if slotsRequired(tx) > p.gauge.max-p.gauge.read() {
 		return ErrTxPoolOverflow
 	}
 

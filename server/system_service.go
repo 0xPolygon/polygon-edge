@@ -47,13 +47,18 @@ func (s *systemService) GetTrace(ctx context.Context, req *proto.GetTraceRequest
 func (s *systemService) GetStatus(ctx context.Context, req *empty.Empty) (*proto.ServerStatus, error) {
 	header := s.server.blockchain.Header()
 
+	addr, err := common.AddrInfoToString(s.server.network.AddrInfo())
+	if err != nil {
+		return nil, err
+	}
+
 	status := &proto.ServerStatus{
-		Network: int64(s.server.chain.Params.ChainID),
+		Network: s.server.chain.Params.ChainID,
 		Current: &proto.ServerStatus_Block{
 			Number: int64(header.Number),
 			Hash:   header.Hash.String(),
 		},
-		P2PAddr: common.AddrInfoToString(s.server.network.AddrInfo()),
+		P2PAddr: addr,
 	}
 
 	return status, nil

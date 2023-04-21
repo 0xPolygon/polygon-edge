@@ -261,7 +261,7 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	blockHash, err := v.GetBytes(blockHash[:0], 32)
 
 	if err != nil {
-		panic(err)
+		return types.Hash{}, false
 	}
 
 	return types.BytesToHash(blockHash), true

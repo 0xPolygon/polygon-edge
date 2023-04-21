@@ -91,6 +91,11 @@ type Body struct {
 	Uncles       []*Header
 }
 
+type FullBlock struct {
+	Block    *Block
+	Receipts []*Receipt
+}
+
 type Block struct {
 	Header       *Header
 	Transactions []*Transaction

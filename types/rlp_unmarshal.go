@@ -13,6 +13,8 @@ type RLPUnmarshaler interface {
 
 type unmarshalRLPFunc func(p *fastrlp.Parser, v *fastrlp.Value) error
 
+type unmarshalRLPFromFunc func(TxType, *fastrlp.Parser, *fastrlp.Value) error
+
 func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	pr := fastrlp.DefaultParserPool.Get()
 
@@ -23,7 +25,7 @@ func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 		return err
 	}
 
-	if err := obj(pr, v); err != nil {
+	if err = obj(pr, v); err != nil {
 		fastrlp.DefaultParserPool.Put(pr)
 
 		return err
@@ -34,11 +36,58 @@ func UnmarshalRlp(obj unmarshalRLPFunc, input []byte) error {
 	return nil
 }
 
-func (b *Block) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(b.UnmarshalRLPFrom, input)
+func unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value, cb unmarshalRLPFromFunc) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < len(elems); i++ {
+		// Non-legacy tx raw contains a tx type prefix in the beginning according to EIP-2718.
+		// Here we check if the first element is a tx type and unmarshal it first.
+		txType := LegacyTx
+		if elems[i].Type() == fastrlp.TypeBytes {
+			if err = txType.unmarshalRLPFrom(p, elems[i]); err != nil {
+				return err
+			}
+
+			// Then we increment element number in order to go to the actual tx data raw below.
+			i++
+		}
+
+		if err = cb(txType, p, elems[i]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (t *TxType) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
+	bytes, err := v.Bytes()
+	if err != nil {
+		return err
+	}
+
+	if l := len(bytes); l != 1 {
+		return fmt.Errorf("expected 1 byte transaction type, but size is %d", l)
+	}
+
+	tt, err := txTypeFromByte(bytes[0])
+	if err != nil {
+		return err
+	}
+
+	*t = tt
+
+	return nil
+}
+
+func (b *Block) UnmarshalRLP(input []byte) error {
+	return UnmarshalRlp(b.unmarshalRLPFrom, input)
+}
+
+func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -50,23 +99,27 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// header
 	b.Header = &Header{}
-	if err := b.Header.UnmarshalRLPFrom(p, elems[0]); err != nil {
+	if err = b.Header.unmarshalRLPFrom(p, elems[0]); err != nil {
 		return err
 	}
 
 	// transactions
-	txns, err := elems[1].GetElems()
-	if err != nil {
-		return err
-	}
+	if err = unmarshalRLPFrom(p, elems[1], func(txType TxType, p *fastrlp.Parser, v *fastrlp.Value) error {
+		bTxn := &Transaction{
+			Type: txType,
+		}
 
-	for _, txn := range txns {
-		bTxn := &Transaction{}
-		if err := bTxn.UnmarshalRLPFrom(p, txn); err != nil {
+		if err = bTxn.unmarshalRLPFrom(p, v); err != nil {
 			return err
 		}
 
+		bTxn = bTxn.ComputeHash()
+
 		b.Transactions = append(b.Transactions, bTxn)
+
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	// uncles
@@ -77,7 +130,7 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	for _, uncle := range uncles {
 		bUncle := &Header{}
-		if err := bUncle.UnmarshalRLPFrom(p, uncle); err != nil {
+		if err = bUncle.unmarshalRLPFrom(p, uncle); err != nil {
 			return err
 		}
 
@@ -88,10 +141,10 @@ func (b *Block) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (h *Header) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(h.UnmarshalRLPFrom, input)
+	return UnmarshalRlp(h.unmarshalRLPFrom, input)
 }
 
-func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (h *Header) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -172,33 +225,43 @@ func (h *Header) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (r *Receipts) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
+	return UnmarshalRlp(r.unmarshalRLPFrom, input)
 }
 
-func (r *Receipts) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
-	elems, err := v.GetElems()
-	if err != nil {
-		return err
-	}
+func (r *Receipts) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+	return unmarshalRLPFrom(p, v, func(txType TxType, p *fastrlp.Parser, v *fastrlp.Value) error {
+		obj := &Receipt{
+			TransactionType: txType,
+		}
 
-	for _, elem := range elems {
-		rr := &Receipt{}
-		if err := rr.UnmarshalRLPFrom(p, elem); err != nil {
+		if err := obj.unmarshalRLPFrom(p, v); err != nil {
 			return err
 		}
 
-		(*r) = append(*r, rr)
-	}
+		*r = append(*r, obj)
 
-	return nil
+		return nil
+	})
 }
 
 func (r *Receipt) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(r.UnmarshalRLPFrom, input)
+	r.TransactionType = LegacyTx
+	offset := 0
+
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
+		var err error
+		if r.TransactionType, err = txTypeFromByte(input[0]); err != nil {
+			return err
+		}
+
+		offset = 1
+	}
+
+	return UnmarshalRlp(r.unmarshalRLPFrom, input[offset:])
 }
 
-// UnmarshalRLP unmarshals a Receipt in RLP format
-func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+// unmarshalRLPFrom unmarshals a Receipt in RLP format
+func (r *Receipt) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -229,6 +292,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	if r.CumulativeGasUsed, err = elems[1].GetUint64(); err != nil {
 		return err
 	}
+
 	// logsBloom
 	if _, err = elems[2].GetBytes(r.LogsBloom[:0], 256); err != nil {
 		return err
@@ -242,7 +306,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	for _, elem := range logsElems {
 		log := &Log{}
-		if err := log.UnmarshalRLPFrom(p, elem); err != nil {
+		if err = log.unmarshalRLPFrom(p, elem); err != nil {
 			return err
 		}
 
@@ -252,7 +316,7 @@ func (r *Receipt) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	return nil
 }
 
-func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -263,9 +327,10 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	}
 
 	// address
-	if err := elems[0].GetAddr(l.Address[:]); err != nil {
+	if err = elems[0].GetAddr(l.Address[:]); err != nil {
 		return err
 	}
+
 	// topics
 	topicElems, err := elems[1].GetElems()
 	if err != nil {
@@ -275,7 +340,7 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	l.Topics = make([]Hash, len(topicElems))
 
 	for indx, topic := range topicElems {
-		if err := topic.GetHash(l.Topics[indx][:]); err != nil {
+		if err = topic.GetHash(l.Topics[indx][:]); err != nil {
 			return err
 		}
 	}
@@ -289,11 +354,23 @@ func (l *Log) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 func (t *Transaction) UnmarshalRLP(input []byte) error {
-	return UnmarshalRlp(t.UnmarshalRLPFrom, input)
+	t.Type = LegacyTx
+	offset := 0
+
+	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
+		var err error
+		if t.Type, err = txTypeFromByte(input[0]); err != nil {
+			return err
+		}
+
+		offset = 1
+	}
+
+	return UnmarshalRlp(t.unmarshalRLPFrom, input[offset:])
 }
 
-// UnmarshalRLPFrom unmarshals a Transaction in RLP format
-func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
+// unmarshalRLPFrom unmarshals a Transaction in RLP format
+func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
 		return err
@@ -309,15 +386,18 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if t.Nonce, err = elems[0].GetUint64(); err != nil {
 		return err
 	}
+
 	// gasPrice
 	t.GasPrice = new(big.Int)
-	if err := elems[1].GetBigInt(t.GasPrice); err != nil {
+	if err = elems[1].GetBigInt(t.GasPrice); err != nil {
 		return err
 	}
+
 	// gas
 	if t.Gas, err = elems[2].GetUint64(); err != nil {
 		return err
 	}
+
 	// to
 	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
 		// address
@@ -327,11 +407,13 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// reset To
 		t.To = nil
 	}
+
 	// value
 	t.Value = new(big.Int)
-	if err := elems[4].GetBigInt(t.Value); err != nil {
+	if err = elems[4].GetBigInt(t.Value); err != nil {
 		return err
 	}
+
 	// input
 	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
 		return err
@@ -348,10 +430,26 @@ func (t *Transaction) UnmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if err = elems[7].GetBigInt(t.R); err != nil {
 		return err
 	}
+
 	// S
 	t.S = new(big.Int)
 	if err = elems[8].GetBigInt(t.S); err != nil {
 		return err
+	}
+
+	if t.Type == StateTx {
+		// set From with default value
+		t.From = ZeroAddress
+
+		// We need to set From field for state transaction,
+		// because we are using unique, predefined address, for sending such transactions
+		// From
+		if len(elems) >= 10 {
+			if vv, err := v.Get(9).Bytes(); err == nil && len(vv) == AddressLength {
+				// address
+				t.From = BytesToAddress(vv)
+			}
+		}
 	}
 
 	return nil

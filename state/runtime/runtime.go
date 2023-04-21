@@ -51,7 +51,7 @@ func (s StorageStatus) String() string {
 	case StorageDeleted:
 		return "StorageDeleted"
 	default:
-		panic("BUG: storage status not found")
+		panic("BUG: storage status not found") //nolint:gocritic
 	}
 }
 
@@ -60,6 +60,7 @@ type Host interface {
 	AccountExists(addr types.Address) bool
 	GetStorage(addr types.Address, key types.Hash) types.Hash
 	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
+	SetState(addr types.Address, key types.Hash, value types.Hash)
 	GetBalance(addr types.Address) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
@@ -71,6 +72,7 @@ type Host interface {
 	Callx(*Contract, Host) *ExecutionResult
 	Empty(addr types.Address) bool
 	GetNonce(addr types.Address) uint64
+	Transfer(from types.Address, to types.Address, amount *big.Int) error
 	GetTracer() VMTracer
 	GetRefund() uint64
 }
@@ -101,10 +103,11 @@ type VMTracer interface {
 // ExecutionResult includes all output after executing given evm
 // message no matter the execution itself is successful or not.
 type ExecutionResult struct {
-	ReturnValue []byte // Returned data from the runtime (function result or data supplied with revert opcode)
-	GasLeft     uint64 // Total gas left as result of execution
-	GasUsed     uint64 // Total gas used as result of execution
-	Err         error  // Any error encountered during the execution, listed below
+	ReturnValue []byte        // Returned data from the runtime (function result or data supplied with revert opcode)
+	GasLeft     uint64        // Total gas left as result of execution
+	GasUsed     uint64        // Total gas used as result of execution
+	Err         error         // Any error encountered during the execution, listed below
+	Address     types.Address // Contract address
 }
 
 func (r *ExecutionResult) Succeeded() bool { return r.Err == nil }
@@ -134,6 +137,9 @@ var (
 	ErrDepth                    = errors.New("max call depth exceeded")
 	ErrExecutionReverted        = errors.New("execution was reverted")
 	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
+	ErrUnauthorizedCaller       = errors.New("unauthorized caller")
+	ErrInvalidInputData         = errors.New("invalid input data")
+	ErrNotAuth                  = errors.New("not in allow list")
 )
 
 type CallType int

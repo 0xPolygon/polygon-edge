@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+
+function initIbftConsensus() {
+    echo "Running with ibft consensus"
+    ./polygon-edge secrets init --insecure --data-dir test-chain- --num 4
+
+    node1_id=$(./polygon-edge secrets output --data-dir test-chain-1 | grep Node | head -n 1 | awk -F ' ' '{print $4}')
+    node2_id=$(./polygon-edge secrets output --data-dir test-chain-2 | grep Node | head -n 1 | awk -F ' ' '{print $4}')
+
+    genesis_params="--consensus ibft --ibft-validators-prefix-path test-chain- \
+    --bootnode /ip4/127.0.0.1/tcp/30301/p2p/$node1_id \
+    --bootnode /ip4/127.0.0.1/tcp/30302/p2p/$node2_id"
+}
+
+function initPolybftConsensus() {
+    echo "Running with polybft consensus"
+    genesis_params="--consensus polybft --validator-set-size=4 --bridge-json-rpc http://127.0.0.1:8545"
+    ./polygon-edge polybft-secrets --insecure --data-dir test-chain- --num 4
+    ./polygon-edge manifest
+}
+
+function createGenesis() {
+    ./polygon-edge genesis $genesis_params \
+      --block-gas-limit 10000000 \
+      --premine 0x85da99c8a7c2c95964c8efd687e95e632fc533d6:1000000000000000000000 \
+      --epoch-size 10
+}
+
+function startServerFromBinary() {
+  if [ "$1" == "write-logs" ]; then
+    echo "Writing validators logs to the files..."
+    ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
+      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
+    ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
+      --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-2.log &
+    ./polygon-edge server --data-dir ./test-chain-3 --chain genesis.json \
+      --grpc-address :30000 --libp2p :30303 --jsonrpc :30002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-3.log &
+    ./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json \
+      --grpc-address :40000 --libp2p :30304 --jsonrpc :40002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-4.log &
+      wait
+  else
+    ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
+      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG &
+    ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
+      --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG &
+    ./polygon-edge server --data-dir ./test-chain-3 --chain genesis.json \
+      --grpc-address :30000 --libp2p :30303 --jsonrpc :30002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG &
+    ./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json \
+      --grpc-address :40000 --libp2p :30304 --jsonrpc :40002 \
+      --num-block-confirmations 2 --seal --log-level DEBUG &
+      wait
+  fi
+}
+
+function startServerFromDockerCompose() {
+    case "$1" in
+      "ibft")
+        docker-compose -f ./docker/local/docker-compose.yml up -d --build
+        ;;
+      "polybft")
+        cd core-contracts && npm install && npm run compile && cd -
+        go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
+        EDGE_CONSENSUS=polybft docker-compose -f ./docker/local/docker-compose.yml up -d --build
+        ;;
+    esac
+}
+
+function destroyDockerEnvironment() {
+    docker-compose -f ./docker/local/docker-compose.yml down -v
+}
+
+function stopDockerEnvironment() {
+    docker-compose -f ./docker/local/docker-compose.yml stop
+}
+
+set -e
+
+# Reset test-dirs
+rm -rf test-chain-*
+rm -f genesis.json
+rm -f manifest.json
+
+# Build binary
+go build -o polygon-edge .
+
+# If --docker flag is set run docker environment otherwise run from binary
+case "$2" in
+  "--docker")
+    # cluster {consensus} --docker destroy
+    if [ "$3" == "destroy" ]; then
+      destroyDockerEnvironment
+      echo "Docker $1 environment destroyed!"
+      exit 0
+    # cluster {consensus} --docker stop
+    elif [ "$3" == "stop" ]; then
+      stopDockerEnvironment
+      echo "Docker $1 environment stoped!"
+      exit 0;
+    fi
+
+    # cluster {consensus} --docker
+    echo "Running $1 docker environment..."
+    startServerFromDockerCompose $1
+    echo "Docker $1 environment deployed."
+    exit 0
+    ;;
+  # cluster {consensus}
+  *)
+    echo "Running $1 environment from local binary..."
+    # Initialize ibft or polybft consensus
+    if [ "$1" == "ibft" ]; then
+      # Initialize ibft consensus
+      initIbftConsensus
+      # Create genesis file and start the server from binary
+      createGenesis
+      startServerFromBinary $2
+      exit 0;
+    elif [ "$1" == "polybft" ]; then
+      # Initialize polybft consensus
+      initPolybftConsensus
+      # Create genesis file and start the server from binary
+      createGenesis
+      startServerFromBinary $2
+      exit 0;
+    else
+      echo "Unsupported consensus mode. Supported modes are: ibft and polybft "
+      exit 1;
+    fi
+  ;;
+esac

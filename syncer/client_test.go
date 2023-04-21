@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -44,6 +45,7 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
+		closed:                 new(uint64),
 	}
 
 	// need to register protocol
@@ -522,4 +524,103 @@ func Test_syncPeerClient_GetBlocks(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, blocks)
+}
+
+func Test_EmitMultipleBlocks(t *testing.T) {
+	t.Parallel()
+
+	var (
+		// network layer
+		clientSrv = newTestNetwork(t)
+		peerSrv   = newTestNetwork(t)
+
+		clientLatest = uint64(10)
+
+		subscription = blockchain.NewMockSubscription()
+
+		client = newTestSyncPeerClient(clientSrv, &mockBlockchain{
+			subscription:  subscription,
+			headerHandler: newSimpleHeaderHandler(clientLatest),
+		})
+	)
+
+	t.Cleanup(func() {
+		clientSrv.Close()
+		peerSrv.Close()
+		client.Close()
+	})
+
+	err := network.JoinAndWaitMultiple(
+		network.DefaultJoinTimeout,
+		clientSrv,
+		peerSrv,
+	)
+
+	require.NoError(t, err)
+
+	// start gossip
+	require.NoError(t, client.startGossip())
+
+	// start to subscribe blockchain events
+	go client.startNewBlockProcess()
+
+	// push latest block number to blockchain subscription
+	pushSubscription := func(sub *blockchain.MockSubscription, latest uint64) {
+		sub.Push(&blockchain.Event{
+			NewChain: []*types.Header{
+				{
+					Number: latest,
+				},
+			},
+		})
+	}
+
+	waitForGossip := func(wg *sync.WaitGroup) bool {
+		c := make(chan struct{})
+		go func() {
+			defer close(c)
+			wg.Wait()
+		}()
+		select {
+		case <-c:
+			return true
+		case <-time.After(5 * time.Second):
+			return false
+		}
+	}
+
+	// create topic & subscribe in peer
+	topic, err := peerSrv.NewTopic(statusTopicName, &proto.SyncPeerStatus{})
+	assert.NoError(t, err)
+
+	testGossip := func(t *testing.T, blocksNum int) {
+		t.Helper()
+
+		var wgForGossip sync.WaitGroup
+
+		wgForGossip.Add(blocksNum)
+
+		require.NoError(t, topic.Subscribe(func(_ interface{}, _ peer.ID) {
+			wgForGossip.Done()
+		}))
+
+		// need to wait for a few seconds to propagate subscribing
+		time.Sleep(2 * time.Second)
+		client.EnablePublishingPeerStatus()
+
+		go func() {
+			for i := 0; i < blocksNum; i++ {
+				pushSubscription(subscription, clientLatest+uint64(i))
+			}
+		}()
+
+		gossiped := waitForGossip(&wgForGossip)
+
+		require.Equal(t, true, gossiped)
+	}
+
+	t.Run("should receive all blocks", func(t *testing.T) {
+		t.Parallel()
+		testGossip(t, 4)
+	})
 }

@@ -1,0 +1,147 @@
+---
+  name: Load Test
+  on:  # yamllint disable-line rule:truthy
+    workflow_dispatch:
+      inputs:
+        runner:
+          description: The runner to execute on
+          default: 'ubuntu-latest'
+          type: choice
+          options:
+            - ubuntu-latest
+            - devnet
+            - testnet
+        environment:
+          description: The environment to run against
+          required: false
+          type: environment
+        scenario:
+          default: 'simple'
+          description: The scenario to run
+          type: string
+        duration:
+          default: '2m'
+          description: Duration of the test
+          required: false
+          type: string
+    workflow_call:
+      inputs:
+        environment:
+          description: The environment to run against
+          type: string
+          required: true
+        runner:
+          required: true
+          type: string
+          description: The runner label to use
+        scenario:
+          required: true
+          description: The mode for the stress test
+          type: string
+        duration:
+          default: '2m'
+          description: Duration of the test
+          required: false
+          type: string
+      secrets:
+        SLACK_PERFORMANCE_WEBHOOK_URL:
+          required: true
+        DD_API_KEY:
+          required: true
+        LOADTEST_RPC_URL:
+          required: true
+        LOADTEST_MNEMONIC:
+          required: true
+
+  
+  jobs:
+    run_k6:
+      environment: ${{ inputs.environment }}
+      runs-on: ubuntu-latest
+      steps:
+        - name: Install Go
+          uses: actions/setup-go@v3
+          with:
+            go-version: 1.18.x
+  
+        - name: Checkout code
+          uses: actions/checkout@v3
+        
+        - uses: datadog/agent-github-action@v1.3
+          with:
+            api_key: ${{ secrets.DD_API_KEY }}
+        
+        - name: Install xk6
+          run: |
+            go install go.k6.io/xk6/cmd/xk6@latest
+            xk6 build --with github.com/distribworks/xk6-ethereum@5c6e782669953f1e5d1f44509e610fb2e3d22238
+        
+        - name: Install JQ
+          run: |
+            mkdir -p $HOME/.local/bin
+            curl -sLo $HOME/.local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 && chmod +x $HOME/.local/bin/jq
+            echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+        - id: k6
+          name: Run scenario
+          run: |
+            ./k6 run --out statsd loadtest/scenarios/${{ inputs.scenario }}.js
+            echo "tps_avg=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.avg')" >> $GITHUB_OUTPUT
+            echo "tps_max=$(cat summary.json | jq -r '.metrics.ethereum_tps.values.max')" >> $GITHUB_OUTPUT
+            echo "iterations=$(cat summary.json | jq -r '.metrics.iterations.values.count')" >> $GITHUB_OUTPUT
+            echo "block=$(cat summary.json | jq -r '.metrics.ethereum_block.values.count')" >> $GITHUB_OUTPUT
+            echo "ttm=$(cat summary.json | jq -r '.metrics.ethereum_time_to_mine.values.avg')" >> $GITHUB_OUTPUT
+            echo "gas_avg=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.avg')" >> $GITHUB_OUTPUT
+            echo "gas_max=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.max')" >> $GITHUB_OUTPUT
+          env:
+            K6_STATSD_ENABLE_TAGS: true
+            RPC_URL: ${{ secrets.LOADTEST_RPC_URL }}
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+            LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+            LOADTEST_DURATION: ${{ inputs.duration }}
+        
+        - name: Notify Slack
+          uses: slackapi/slack-github-action@v1.23.0
+          env:
+            SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+            SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          with:
+            payload: |
+              {
+                "blocks": [
+                  {
+                    "type": "header",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "K6 Loadtest Results"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "*Scenario*: `${{ inputs.scenario }}`\n *Average TPS*: `${{ steps.k6.outputs.tps_avg }}`\n*Max TPS*: `${{ steps.k6.outputs.tps_max }}`\n*Transactions*: `${{ steps.k6.outputs.iterations }}`\n*Block Number*: `${{ steps.k6.outputs.block }}`\n*Time to Mine*: `${{ steps.k6.outputs.ttm }}`\n*Average Gas Used*: `${{ steps.k6.outputs.gas_avg }}`\n*Max Gas Used*: `${{ steps.k6.outputs.gas_max }}`"
+                    }
+                  },
+                  {
+                    "type": "divider"
+                  },
+                  {
+                    "type": "context",
+                    "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "Environment: `${{ inputs.environment }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "JSON-RPC Endpoint: ${{ secrets.LOADTEST_RPC_URL }}"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "Workflow: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|Results>"
+                        }
+                      ]
+                    }
+                  ]
+                }

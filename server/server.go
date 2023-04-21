@@ -11,10 +11,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
@@ -26,12 +34,15 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
@@ -70,11 +81,9 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
-}
 
-var dirPaths = []string{
-	"blockchain",
-	"trie",
+	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
+	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -129,14 +138,19 @@ func NewServer(config *Config) (*Server, error) {
 		logger:             logger.Named("server"),
 		config:             config,
 		chain:              config.Chain,
-		grpcServer:         grpc.NewServer(),
+		grpcServer:         grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
+	var dirPaths = []string{
+		"blockchain",
+		"trie",
+	}
+
 	// Generate all the paths in the dataDir
-	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
@@ -186,15 +200,74 @@ func NewServer(config *Config) (*Server, error) {
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
+	// custom write genesis hook per consensus engine
+	engineName := m.config.Chain.Params.GetEngine()
+	if factory, exists := genesisCreationFactory[ConsensusType(engineName)]; exists {
+		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
+	}
+
+	// apply allow list genesis data
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+			m.config.Chain.Params.ContractDeployerAllowList)
+	}
+
+	var initialStateRoot = types.ZeroHash
+
+	if ConsensusType(engineName) == PolyBFTConsensus {
+		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
+		if err != nil {
+			return nil, err
+		}
+
+		if polyBFTConfig.InitialTrieRoot != types.ZeroHash {
+			checkedInitialTrieRoot, err := itrie.HashChecker(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
+			if err != nil {
+				return nil, fmt.Errorf("error on state root verification %w", err)
+			}
+
+			if checkedInitialTrieRoot != polyBFTConfig.InitialTrieRoot {
+				return nil, errors.New("invalid initial state root")
+			}
+
+			logger.Info("Initial state root checked and correct")
+
+			initialStateRoot = polyBFTConfig.InitialTrieRoot
+		}
+	}
+
+	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
+	if err != nil {
+		return nil, err
+	}
+
 	// compute the genesis root state
-	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(uint64(m.config.Chain.Params.ChainID))
+	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
+
+	// create storage instance for blockchain
+	var db storage.Storage
+	{
+		if m.config.DataDir == "" {
+			db, err = memory.NewMemoryStorage(nil)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			db, err = leveldb.NewLevelDBStorage(
+				filepath.Join(m.config.DataDir, "blockchain"),
+				m.logger,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, m.config.DataDir, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, nil, m.executor, signer)
 	if err != nil {
 		return nil, err
 	}
@@ -277,9 +350,30 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	// start relayer
+	if config.Relayer {
+		if err := m.setupRelayer(); err != nil {
+			return nil, err
+		}
+	}
+
 	m.txpool.Start()
 
 	return m, nil
+}
+
+func unaryInterceptor(
+	ctx context.Context,
+	req interface{},
+	_ *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (interface{}, error) {
+	// Validate request
+	if err := validate.ValidateRequest(req); err != nil {
+		return nil, err
+	}
+
+	return handler(ctx, req)
 }
 
 func (s *Server) restoreChain() error {
@@ -408,16 +502,17 @@ func (s *Server) setupConsensus() error {
 
 	consensus, err := engine(
 		&consensus.Params{
-			Context:        context.Background(),
-			Config:         config,
-			TxPool:         s.txpool,
-			Network:        s.network,
-			Blockchain:     s.blockchain,
-			Executor:       s.executor,
-			Grpc:           s.grpcServer,
-			Logger:         s.logger,
-			SecretsManager: s.secretsManager,
-			BlockTime:      s.config.BlockTime,
+			Context:               context.Background(),
+			Config:                config,
+			TxPool:                s.txpool,
+			Network:               s.network,
+			Blockchain:            s.blockchain,
+			Executor:              s.executor,
+			Grpc:                  s.grpcServer,
+			Logger:                s.logger,
+			SecretsManager:        s.secretsManager,
+			BlockTime:             s.config.BlockTime,
+			NumBlockConfirmations: s.config.NumBlockConfirmations,
 		},
 	)
 
@@ -426,6 +521,40 @@ func (s *Server) setupConsensus() error {
 	}
 
 	s.consensus = consensus
+
+	return nil
+}
+
+// setupRelayer sets up the relayer
+func (s *Server) setupRelayer() error {
+	account, err := wallet.NewAccountFromSecret(s.secretsManager)
+	if err != nil {
+		return fmt.Errorf("failed to create account from secret: %w", err)
+	}
+
+	polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(s.config.Chain)
+	if err != nil {
+		return fmt.Errorf("failed to extract polybft config: %w", err)
+	}
+
+	trackerStartBlockConfig := map[types.Address]uint64{}
+	if polyBFTConfig.Bridge != nil {
+		trackerStartBlockConfig = polyBFTConfig.Bridge.EventTrackerStartBlocks
+	}
+
+	relayer := statesyncrelayer.NewRelayer(
+		s.config.DataDir,
+		s.config.JSONRPC.JSONRPCAddr.String(),
+		ethgo.Address(contracts.StateReceiverContract),
+		trackerStartBlockConfig[contracts.StateReceiverContract],
+		s.logger.Named("relayer"),
+		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+	)
+
+	// start relayer
+	if err := relayer.Start(); err != nil {
+		return fmt.Errorf("failed to start relayer: %w", err)
+	}
 
 	return nil
 }
@@ -439,6 +568,7 @@ type jsonRPCHub struct {
 	*state.Executor
 	*network.Server
 	consensus.Consensus
+	consensus.BridgeDataProvider
 }
 
 func (j *jsonRPCHub) GetPeers() int {
@@ -659,6 +789,7 @@ func (s *Server) setupJSONRPC() error {
 		Executor:           s.executor,
 		Consensus:          s.consensus,
 		Server:             s.network,
+		BridgeDataProvider: s.consensus.GetBridgeProvider(),
 	}
 
 	conf := &jsonrpc.Config{
@@ -740,10 +871,15 @@ func (s *Server) Close() {
 		}
 	}
 
-	// close the txpool's main loop
+	// Stop state sync relayer
+	if s.stateSyncRelayer != nil {
+		s.stateSyncRelayer.Stop()
+	}
+
+	// Close the txpool's main loop
 	s.txpool.Close()
 
-	// close DataDog profiler
+	// Close DataDog profiler
 	s.closeDataDogProfiler()
 }
 

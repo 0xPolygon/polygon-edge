@@ -19,6 +19,8 @@ const (
 	AddressLength = 20
 )
 
+const SignatureSize = 4
+
 type Hash [HashLength]byte
 
 type Address [AddressLength]byte
@@ -88,11 +90,11 @@ func (a Address) Bytes() []byte {
 }
 
 func StringToHash(str string) Hash {
-	return BytesToHash(stringToBytes(str))
+	return BytesToHash(StringToBytes(str))
 }
 
 func StringToAddress(str string) Address {
-	return BytesToAddress(stringToBytes(str))
+	return BytesToAddress(StringToBytes(str))
 }
 
 func AddressToString(address Address) string {
@@ -110,7 +112,7 @@ func BytesToAddress(b []byte) Address {
 	return a
 }
 
-func stringToBytes(str string) []byte {
+func StringToBytes(str string) []byte {
 	str = strings.TrimPrefix(str, "0x")
 	if len(str)%2 == 1 {
 		str = "0" + str
@@ -123,14 +125,14 @@ func stringToBytes(str string) []byte {
 
 // UnmarshalText parses a hash in hex syntax.
 func (h *Hash) UnmarshalText(input []byte) error {
-	*h = BytesToHash(stringToBytes(string(input)))
+	*h = BytesToHash(StringToBytes(string(input)))
 
 	return nil
 }
 
 // UnmarshalText parses an address in hex syntax.
 func (a *Address) UnmarshalText(input []byte) error {
-	buf := stringToBytes(string(input))
+	buf := StringToBytes(string(input))
 	if len(buf) != AddressLength {
 		return fmt.Errorf("incorrect length")
 	}
@@ -151,6 +153,8 @@ func (a Address) MarshalText() ([]byte, error) {
 // TODO: Replace jsonrpc/types/argByte with this?
 // Still unsure if the codification will be done on protobuf side more
 // than marshaling in json and if this will become necessary.
+//
+//nolint:godox
 type ArgBytes []byte
 
 func (b ArgBytes) MarshalText() ([]byte, error) {
@@ -301,4 +305,9 @@ func (j *JournalEntry) Merge(jj *JournalEntry) {
 			j.StorageRead[k] = struct{}{}
 		}
 	}
+}
+
+type Proof struct {
+	Data     []Hash // the proof himself
+	Metadata map[string]interface{}
 }
