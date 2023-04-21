@@ -31,7 +31,7 @@ const (
 	epochSizeFlag         = "epoch-size"
 	epochRewardFlag       = "epoch-reward"
 	blockGasLimitFlag     = "block-gas-limit"
-	burnContractFlag  = "burn-contract"
+	burnContractFlag      = "burn-contract"
 	posFlag               = "pos"
 	minValidatorCount     = "min-validator-count"
 	maxValidatorCount     = "max-validator-count"
