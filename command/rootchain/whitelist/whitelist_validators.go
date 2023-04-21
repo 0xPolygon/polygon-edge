@@ -10,6 +10,7 @@ import (
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -33,6 +34,20 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
+		&params.accountDir,
+		polybftsecrets.AccountDirFlag,
+		"",
+		polybftsecrets.AccountDirFlagDesc,
+	)
+
+	cmd.Flags().StringVar(
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
+		"",
+		polybftsecrets.AccountConfigFlagDesc,
+	)
+
+	cmd.Flags().StringVar(
 		&params.privateKey,
 		polybftsecrets.PrivateKeyFlag,
 		"",
@@ -54,6 +69,9 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountConfigFlag)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.PrivateKeyFlag, polybftsecrets.AccountDirFlag)
+
 	helper.RegisterJSONRPCFlag(cmd)
 }
 
@@ -67,9 +85,26 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ownerKey, err := rootHelper.GetRootchainPrivateKey(params.privateKey)
-	if err != nil {
-		return fmt.Errorf("failed to initialize private key: %w", err)
+	var ecdsaKey ethgo.Key
+	if params.privateKey != "" {
+		key, err := rootHelper.GetRootchainPrivateKey(params.privateKey)
+		if err != nil {
+			return fmt.Errorf("failed to initialize private key: %w", err)
+		}
+
+		ecdsaKey = key
+	} else {
+		secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.accountConfig, true)
+		if err != nil {
+			return err
+		}
+
+		key, err := wallet.GetEcdsaFromSecret(secretsManager)
+		if err != nil {
+			return err
+		}
+
+		ecdsaKey = key
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
@@ -89,13 +124,13 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 	txn := &ethgo.Transaction{
-		From:     ownerKey.Address(),
+		From:     ecdsaKey.Address(),
 		Input:    encoded,
 		To:       &supernetAddr,
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 
-	receipt, err := txRelayer.SendTransaction(txn, ownerKey)
+	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)
 	if err != nil {
 		return fmt.Errorf("enlist validator failed %w", err)
 	}

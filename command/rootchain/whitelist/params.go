@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 const (
@@ -17,6 +18,8 @@ var (
 )
 
 type whitelistParams struct {
+	accountDir             string
+	accountConfig          string
 	privateKey             string
 	jsonRPC                string
 	newValidatorAddresses  []string
@@ -26,6 +29,10 @@ type whitelistParams struct {
 func (ep *whitelistParams) validateFlags() error {
 	if len(ep.newValidatorAddresses) == 0 {
 		return errNoNewValidatorsProvided
+	}
+
+	if ep.privateKey == "" {
+		return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.accountConfig)
 	}
 
 	return nil
