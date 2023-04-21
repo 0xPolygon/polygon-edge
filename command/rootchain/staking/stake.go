@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -24,7 +25,7 @@ var (
 func GetCommand() *cobra.Command {
 	stakeCmd := &cobra.Command{
 		Use:     "stake",
-		Short:   "Stakes the amount sent for validator or delegates its stake to another account",
+		Short:   "Stakes the amount sent for validator on rootchain",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
@@ -50,28 +51,20 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.Flags().BoolVar(
-		&params.self,
-		sidechainHelper.SelfFlag,
-		false,
-		"indicates if its a self stake action",
-	)
-
 	cmd.Flags().Uint64Var(
 		&params.amount,
 		sidechainHelper.AmountFlag,
 		0,
-		"amount to stake or delegate to another account",
+		"amount to stake",
 	)
 
-	cmd.Flags().StringVar(
-		&params.delegateAddress,
-		delegateAddressFlag,
-		"",
-		"account address to which stake should be delegated",
+	cmd.Flags().Uint64Var(
+		&params.chainID,
+		polybftsecrets.ChainIDFlag,
+		0,
+		polybftsecrets.ChainIDFlagDesc,
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(sidechainHelper.SelfFlag, delegateAddressFlag)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
@@ -96,27 +89,25 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	var encoded []byte
-	if params.self {
-		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["stake"].Encode([]interface{}{})
-		if err != nil {
-			return err
-		}
-	} else {
-		delegateToAddress := types.StringToAddress(params.delegateAddress)
-		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["delegate"].Encode(
-			[]interface{}{ethgo.Address(delegateToAddress), false})
-		if err != nil {
-			return err
-		}
+	gasPrice, err := rootHelper.GetGasPriceOnRoot(params.jsonRPC)
+	if err != nil {
+		return err
 	}
+
+	stakeFn := contractsapi.StakeForStakeManagerFn{
+		ID:     new(big.Int).SetUint64(params.chainID),
+		Amount: new(big.Int).SetUint64(params.amount),
+		Data:   []byte{}, // we don't need to send anything in data
+	}
+
+	encoded, err := stakeFn.EncodeAbi()
 
 	txn := &ethgo.Transaction{
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
 		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
 		Value:    new(big.Int).SetUint64(params.amount),
-		GasPrice: sidechainHelper.DefaultGasPrice,
+		GasPrice: gasPrice,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
@@ -133,42 +124,30 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	var (
-		stakedEvent    contractsapi.StakedEvent
-		delegatedEvent contractsapi.DelegatedEvent
-		foundLog       bool
+		stakeAddedEvent contractsapi.StakeAddedEvent
+		foundLog        bool
 	)
 
 	// check the logs to check for the result
 	for _, log := range receipt.Logs {
-		doesMatch, err := stakedEvent.ParseLog(log)
+		doesMatch, err := stakeAddedEvent.ParseLog(log)
 		if err != nil {
 			return err
 		}
 
-		if doesMatch { // its a stake function call
-			result.isSelfStake = true
-			result.amount = stakedEvent.Amount.Uint64()
-			foundLog = true
-
-			break
+		if !doesMatch {
+			continue
 		}
 
-		doesMatch, err = delegatedEvent.ParseLog(log)
-		if err != nil {
-			return err
-		}
+		result.amount = stakeAddedEvent.Amount.Uint64()
+		result.validatorAddress = stakeAddedEvent.Validator.String()
+		foundLog = true
 
-		if doesMatch {
-			result.amount = delegatedEvent.Amount.Uint64()
-			result.delegatedTo = delegatedEvent.Validator.String()
-			foundLog = true
-
-			break
-		}
+		break
 	}
 
 	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that stake or delegate happened")
+		return fmt.Errorf("could not find an appropriate log in receipt that stake happened")
 	}
 
 	outputter.WriteCommandResult(result)

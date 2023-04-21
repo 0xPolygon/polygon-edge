@@ -860,6 +860,24 @@ func (r *RegisterChildChainStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["registerChildChain"], buf, r)
 }
 
+type StakeForStakeManagerFn struct {
+	ID     *big.Int `abi:"id"`
+	Amount *big.Int `abi:"amount"`
+	Data   []byte   `abi:"data"`
+}
+
+func (s *StakeForStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["stakeFor"].ID()
+}
+
+func (s *StakeForStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["stakeFor"].Encode(s)
+}
+
+func (s *StakeForStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["stakeFor"], buf, s)
+}
+
 type ChildManagerRegisteredEvent struct {
 	ID      *big.Int      `abi:"id"`
 	Manager types.Address `abi:"manager"`
@@ -879,4 +897,26 @@ func (c *ChildManagerRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(StakeManager.Abi.Events["ChildManagerRegistered"], log, c)
+}
+
+type StakeAddedEvent struct {
+	ID        *big.Int      `abi:"id"`
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*StakeAddedEvent) Sig() ethgo.Hash {
+	return StakeManager.Abi.Events["StakeAdded"].ID()
+}
+
+func (*StakeAddedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StakeManager.Abi.Events["StakeAdded"].Inputs.Encode(inputs)
+}
+
+func (s *StakeAddedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StakeManager.Abi.Events["StakeAdded"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StakeManager.Abi.Events["StakeAdded"], log, s)
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -114,6 +113,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
+	gasPrice, err := rootHelper.GetGasPriceOnRoot(params.jsonRPC)
+	if err != nil {
+		return err
+	}
+
 	whitelistFn := &contractsapi.WhitelistValidatorsCustomSupernetManagerFn{
 		Validators_: stringSliceToAddressSlice(params.newValidatorAddresses),
 	}
@@ -128,7 +132,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		From:     ecdsaKey.Address(),
 		Input:    encoded,
 		To:       &supernetAddr,
-		GasPrice: sidechainHelper.DefaultGasPrice,
+		GasPrice: gasPrice,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)

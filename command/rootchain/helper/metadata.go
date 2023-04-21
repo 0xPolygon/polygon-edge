@@ -9,6 +9,7 @@ import (
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -87,4 +88,29 @@ func ReadRootchainIP() (string, error) {
 	}
 
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
+}
+
+// JSONRPC returns a new jsonrpc client on the given endpoint
+func JSONRPC(endpoint string) (*jsonrpc.Client, error) {
+	clt, err := jsonrpc.NewClient(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("could not open client. Error: %w", err)
+	}
+
+	return clt, nil
+}
+
+// GetGasPriceOnRoot returns gas price
+func GetGasPriceOnRoot(jsonrpcEndpoint string) (uint64, error) {
+	client, err := JSONRPC(jsonrpcEndpoint)
+	if err != nil {
+		return 0, err
+	}
+
+	gasPrice, err := client.Eth().GasPrice()
+	if err != nil {
+		return 0, fmt.Errorf("could not get gas price on root. Error: %w", err)
+	}
+
+	return gasPrice, nil
 }
