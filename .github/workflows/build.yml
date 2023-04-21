@@ -18,9 +18,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with:
-          submodules: recursive
-
+        
       - name: Setup Go environment
         uses: actions/setup-go@v3
         with:
