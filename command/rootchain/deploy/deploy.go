@@ -515,12 +515,12 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 
 	for _, log := range receipt.Logs {
 		doesMatch, err := childChainRegisteredEvent.ParseLog(log)
-		if !doesMatch {
-			continue
-		}
-
 		if err != nil {
 			return 0, err
+		}
+
+		if !doesMatch {
+			continue
 		}
 
 		chainID = childChainRegisteredEvent.ID.Int64()
