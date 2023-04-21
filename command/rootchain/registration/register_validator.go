@@ -24,7 +24,7 @@ var params registerParams
 func GetCommand() *cobra.Command {
 	registerCmd := &cobra.Command{
 		Use:     "register-validator",
-		Short:   "Registers an enlisted validator to supernet manager on rootchain",
+		Short:   "registers a whitelisted validator to supernet manager on rootchain",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}

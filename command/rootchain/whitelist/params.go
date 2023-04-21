@@ -9,8 +9,11 @@ import (
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
+const (
+	newValidatorAddressesFlag = "addresses"
+)
+
 var (
-	newValidatorAddressesFlag  = "new-validators-addr"
 	errNoNewValidatorsProvided = errors.New("no new validators addresses provided")
 )
 
@@ -30,18 +33,18 @@ func (ep *whitelistParams) validateFlags() error {
 	return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.accountConfig)
 }
 
-type enlistResult struct {
+type whitelistResult struct {
 	newValidatorAddresses []string
 }
 
-func (er enlistResult) GetOutput() string {
+func (wr whitelistResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	vals := make([]string, len(er.newValidatorAddresses))
+	vals := make([]string, len(wr.newValidatorAddresses))
 
-	buffer.WriteString("\n[ENLIST VALIDATOR]\n")
+	buffer.WriteString("\n[WHITELIST VALIDATOR]\n")
 
-	for i, addr := range er.newValidatorAddresses {
+	for i, addr := range wr.newValidatorAddresses {
 		vals[i] = fmt.Sprintf("Validator address|%s", addr)
 	}
 

@@ -113,7 +113,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	var (
 		whitelistEvent contractsapi.AddedToWhitelistEvent
-		result         = &enlistResult{}
+		result         = &whitelistResult{}
 	)
 
 	for _, log := range receipt.Logs {
