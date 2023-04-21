@@ -86,6 +86,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	defer outputter.WriteOutput()
 
 	var ecdsaKey ethgo.Key
+
 	if params.privateKey != "" {
 		key, err := rootHelper.GetRootchainPrivateKey(params.privateKey)
 		if err != nil {
