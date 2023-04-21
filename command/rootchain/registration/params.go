@@ -26,11 +26,10 @@ type registerResult struct {
 func (rr registerResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	buffer.WriteString("\n[REGISTRATION]\n")
+	buffer.WriteString("\n[VALIDATOR REGISTRATION]\n")
 
 	vals := make([]string, 0, 1)
 	vals = append(vals, fmt.Sprintf("Validator Address|%s", rr.validatorAddress))
-
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")
 
