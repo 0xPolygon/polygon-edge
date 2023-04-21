@@ -588,7 +588,7 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
-	if len(header.ExtraData) < 32 {
+	if len(header.ExtraData) < ExtraVanity {
 		return fmt.Errorf("extra-data shorter than 32 bytes (%d)", len(header.ExtraData))
 	}
 	// verify parent hash
