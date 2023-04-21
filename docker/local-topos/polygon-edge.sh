@@ -86,7 +86,7 @@ case "$1" in
         CONST_ADDRESS_DEPLOYER_ADDRESS=0x0000000000000000000000000000000000001110
         "$POLYGON_EDGE_BIN" genesis predeploy \
           --chain "$GENESIS_PATH" \
-          --artifacts-path "$CONTRACTS_PATH"/ConstAddressDeployer.json \
+          --artifacts-path "$CONTRACTS_PATH"/topos-core/ConstAddressDeployer.sol/ConstAddressDeployer.json \
           --predeploy-address "$CONST_ADDRESS_DEPLOYER_ADDRESS" \
           2>&1 >/dev/null && echo "ConstAddressDeployer has been successfully predeployed!" \
           || echo "Predeployment of ConstAddressDeployer failed with error code $?"
