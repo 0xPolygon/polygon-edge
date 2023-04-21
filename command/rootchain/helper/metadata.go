@@ -107,10 +107,5 @@ func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error
 		return nil, err
 	}
 
-	key, err := polybftWallet.GetEcdsaFromSecret(secretsManager)
-	if err != nil {
-		return nil, err
-	}
-
-	return key, nil
+	return polybftWallet.GetEcdsaFromSecret(secretsManager)
 }

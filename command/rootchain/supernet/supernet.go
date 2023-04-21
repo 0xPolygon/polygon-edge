@@ -19,7 +19,7 @@ var params supernetParams
 func GetCommand() *cobra.Command {
 	registerCmd := &cobra.Command{
 		Use:     "supernet",
-		Short:   "Supernet command",
+		Short:   "Supernet initialization & finalization command",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}

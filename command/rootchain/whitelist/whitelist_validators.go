@@ -83,7 +83,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ecdsaKey, err := rootHelper.GetECDSAKey(params.privateKey, params.accountDir, params.accountDir)
+	ecdsaKey, err := rootHelper.GetECDSAKey(params.privateKey, params.accountDir, params.accountConfig)
 	if err != nil {
 		return err
 	}
