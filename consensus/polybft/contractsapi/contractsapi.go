@@ -788,3 +788,58 @@ func (m *MintRootERC20Fn) EncodeAbi() ([]byte, error) {
 func (m *MintRootERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }
+
+type WhitelistValidatorsCustomSupernetManagerFn struct {
+	Validators_ []ethgo.Address `abi:"validators_"`
+}
+
+func (w *WhitelistValidatorsCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["whitelistValidators"].ID()
+}
+
+func (w *WhitelistValidatorsCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["whitelistValidators"].Encode(w)
+}
+
+func (w *WhitelistValidatorsCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["whitelistValidators"], buf, w)
+}
+
+type RegisterCustomSupernetManagerFn struct {
+	Validator_ types.Address `abi:"validator_"`
+	Signature  [2]*big.Int   `abi:"signature"`
+	Pubkey     [4]*big.Int   `abi:"pubkey"`
+}
+
+func (r *RegisterCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["register"].ID()
+}
+
+func (r *RegisterCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["register"].Encode(r)
+}
+
+func (r *RegisterCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["register"], buf, r)
+}
+
+type ValidatorRegisteredEvent struct {
+	Validator types.Address `abi:"validator"`
+	BlsKey    [4]*big.Int   `abi:"blsKey"`
+}
+
+func (*ValidatorRegisteredEvent) Sig() ethgo.Hash {
+	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].ID()
+}
+
+func (*ValidatorRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
+	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].Inputs.Encode(inputs)
+}
+
+func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !CustomSupernetManager.Abi.Events["ValidatorRegistered"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(CustomSupernetManager.Abi.Events["ValidatorRegistered"], log, v)
+}

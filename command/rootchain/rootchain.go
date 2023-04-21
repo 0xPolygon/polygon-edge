@@ -5,7 +5,9 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/rootchain/deploy"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/fund"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/registration"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/whitelist"
 )
 
 // GetCommand creates "rootchain" helper command
@@ -22,6 +24,10 @@ func GetCommand() *cobra.Command {
 		deploy.GetCommand(),
 		// rootchain fund
 		fund.GetCommand(),
+		// rootchain (supernet manager) whitelist validator
+		whitelist.GetCommand(),
+		// rootchain (supernet manager) register validator
+		registration.GetCommand(),
 	)
 
 	return rootchainCmd
