@@ -843,3 +843,40 @@ func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 
 	return true, decodeEvent(CustomSupernetManager.Abi.Events["ValidatorRegistered"], log, v)
 }
+
+type RegisterChildChainStakeManagerFn struct {
+	Manager types.Address `abi:"manager"`
+}
+
+func (r *RegisterChildChainStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["registerChildChain"].ID()
+}
+
+func (r *RegisterChildChainStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["registerChildChain"].Encode(r)
+}
+
+func (r *RegisterChildChainStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["registerChildChain"], buf, r)
+}
+
+type ChildManagerRegisteredEvent struct {
+	ID      *big.Int      `abi:"id"`
+	Manager types.Address `abi:"manager"`
+}
+
+func (*ChildManagerRegisteredEvent) Sig() ethgo.Hash {
+	return StakeManager.Abi.Events["ChildManagerRegistered"].ID()
+}
+
+func (*ChildManagerRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StakeManager.Abi.Events["ChildManagerRegistered"].Inputs.Encode(inputs)
+}
+
+func (c *ChildManagerRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StakeManager.Abi.Events["ChildManagerRegistered"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StakeManager.Abi.Events["ChildManagerRegistered"], log, c)
+}

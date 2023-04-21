@@ -107,8 +107,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Params: &chain.Params{
-			ChainID: int64(p.chainID),
-			Forks:   chain.AllForksEnabled,
+			Forks: chain.AllForksEnabled,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},

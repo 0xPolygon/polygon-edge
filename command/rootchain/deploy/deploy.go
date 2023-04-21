@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -204,8 +205,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	rootchainCfg, err := deployContracts(outputter, client,
-		chainConfig.Params.ChainID, consensusConfig.InitialValidatorSet)
+	rootchainCfg, chainID, err := deployContracts(outputter, client, consensusConfig.InitialValidatorSet)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
@@ -228,7 +228,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// write updated chain configuration
+	chainConfig.Params.ChainID = chainID
 	chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
+
 	if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save chain configuration bridge data: %w", err))
 
@@ -243,16 +245,16 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // / deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
-	chainID int64, initialValidators []*polybft.Validator) (*polybft.RootchainConfig, error) {
+	initialValidators []*polybft.Validator) (*polybft.RootchainConfig, int64, error) {
 	// if the bridge contract is not created, we have to deploy all the contracts
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize tx relayer: %w", err)
+		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
 	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize deployer key: %w", err)
+		return nil, 0, fmt.Errorf("failed to initialize deployer key: %w", err)
 	}
 
 	if params.isTestMode {
@@ -260,7 +262,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	}
 
@@ -280,7 +282,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		// use existing root chain ERC20 token
 		if err := populateExistingTokenAddr(client.Eth(),
 			params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	} else {
 		// deploy MockERC20 as a default root chain ERC20 token
@@ -292,7 +294,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		// use existing root chain ERC721 token
 		if err := populateExistingTokenAddr(client.Eth(),
 			params.rootERC721TokenAddr, rootERC721Name, rootchainConfig); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	} else {
 		// deploy MockERC721 as a default root chain ERC721 token
@@ -304,7 +306,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		// use existing root chain ERC1155 token
 		if err := populateExistingTokenAddr(client.Eth(),
 			params.rootERC1155TokenAddr, rootERC1155Name, rootchainConfig); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 	} else {
 		// deploy MockERC1155 as a default root chain ERC1155 token
@@ -392,7 +394,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		if contract.constructorCallback != nil {
 			b, err := contract.constructorCallback(contract.artifact, rootchainConfig)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 
 			input = b
@@ -405,18 +407,18 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 		receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-			return nil, fmt.Errorf("deployment of %s contract failed", contract.name)
+			return nil, 0, fmt.Errorf("deployment of %s contract failed", contract.name)
 		}
 
 		contractAddr := types.Address(receipt.ContractAddress)
 
 		populatorFn, ok := metadataPopulatorMap[contract.name]
 		if !ok {
-			return nil, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", contract.name)
+			return nil, 0, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", contract.name)
 		}
 
 		populatorFn(rootchainConfig, contractAddr)
@@ -424,10 +426,15 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contractAddr, receipt.TransactionHash))
 	}
 
+	chainID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	// init CheckpointManager
 	if err := initializeCheckpointManager(outputter, txRelayer, chainID,
 		initialValidators, rootchainConfig, deployerKey); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	outputter.WriteCommandResult(&messageResult{
@@ -436,7 +443,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	// init ExitHelper
 	if err := initializeExitHelper(txRelayer, rootchainConfig, deployerKey); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	outputter.WriteCommandResult(&messageResult{
@@ -445,14 +452,14 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	// init RootERC20Predicate
 	if err := initializeRootERC20Predicate(txRelayer, rootchainConfig, deployerKey); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	outputter.WriteCommandResult(&messageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
 	})
 
-	return rootchainConfig, nil
+	return rootchainConfig, chainID, nil
 }
 
 // populateExistingTokenAddr checks whether given token is deployed on the provided address.
@@ -476,6 +483,57 @@ func populateExistingTokenAddr(eth *jsonrpc.Eth, tokenAddr, tokenName string,
 	populatorFn(rootchainCfg, addr)
 
 	return nil
+}
+
+// registerChainOnStakeManager registers child chain and its supernet manager on rootchain
+func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
+	rootchainCfg *polybft.RootchainConfig, deployerKey ethgo.Key) (int64, error) {
+	registerChainFn := &contractsapi.RegisterChildChainStakeManagerFn{
+		Manager: rootchainCfg.CustomSupernetManagerAddress,
+	}
+
+	encoded, err := registerChainFn.EncodeAbi()
+	if err != nil {
+		return 0, fmt.Errorf("failed to encode parameters for registering child chain on supernets. error: %w", err)
+	}
+
+	txn := &ethgo.Transaction{
+		To:    (*ethgo.Address)(&rootchainCfg.StakeManagerAddress),
+		Input: encoded,
+	}
+
+	receipt, err := sendTransaction(txRelayer, txn, checkpointManagerName, deployerKey)
+	if err != nil {
+		return 0, err
+	}
+
+	var (
+		childChainRegisteredEvent contractsapi.ChildManagerRegisteredEvent
+		found                     bool
+		chainID                   int64
+	)
+
+	for _, log := range receipt.Logs {
+		doesMatch, err := childChainRegisteredEvent.ParseLog(log)
+		if err != nil {
+			return 0, err
+		}
+
+		if !doesMatch {
+			continue
+		}
+
+		chainID = childChainRegisteredEvent.ID.Int64()
+		found = true
+
+		break
+	}
+
+	if !found {
+		return 0, errors.New("could not find a log that child chain was registered on stake manager")
+	}
+
+	return chainID, nil
 }
 
 // initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
@@ -509,7 +567,9 @@ func initializeCheckpointManager(
 		Input: initCheckpointInput,
 	}
 
-	return sendTransaction(txRelayer, txn, checkpointManagerName, deployerKey)
+	_, err = sendTransaction(txRelayer, txn, checkpointManagerName, deployerKey)
+
+	return err
 }
 
 // initializeExitHelper invokes initialize function on "ExitHelper" smart contract
@@ -527,7 +587,9 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 		Input: input,
 	}
 
-	return sendTransaction(txRelayer, txn, exitHelperName, deployerKey)
+	_, err = sendTransaction(txRelayer, txn, exitHelperName, deployerKey)
+
+	return err
 }
 
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
@@ -552,22 +614,25 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 		Input: input,
 	}
 
-	return sendTransaction(txRelayer, txn, rootERC20PredicateName, deployerKey)
+	_, err = sendTransaction(txRelayer, txn, rootERC20PredicateName, deployerKey)
+
+	return err
 }
 
 // sendTransaction sends provided transaction
 func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string,
-	deployerKey ethgo.Key) error {
+	deployerKey ethgo.Key) (*ethgo.Receipt, error) {
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {
-		return fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)
+		return nil, fmt.Errorf("failed to send transaction to %s contract (%s). error: %w",
+			contractName, txn.To.Address(), err)
 	}
 
 	if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-		return fmt.Errorf("transaction execution failed on %s contract", contractName)
+		return nil, fmt.Errorf("transaction execution failed on %s contract", contractName)
 	}
 
-	return nil
+	return receipt, nil
 }
 
 // validatorSetToABISlice converts given validators to generic map
