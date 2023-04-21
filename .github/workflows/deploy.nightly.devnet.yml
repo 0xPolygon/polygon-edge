@@ -90,18 +90,22 @@ jobs:
           chmod 600 ~/devnet_private.key 
           eval "$(ssh-agent)"
           ssh-add ~/devnet_private.key
-          terraform output -raw geth_private_ip > rootchain_rpc.txt 
+          terraform output -raw geth_private_ip > rootchain_rpc.txt
       - name: Install ansible / botocore / boto3
         run: |
           python3 -m pip install --user ansible
           python3 -m pip install boto3 botocore
+      - name: Configure ansible for nightly build
+        working-directory: ansible
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD_FILE }}" > password.txt
+          cp local-extra-vars.yml.template local-extra-vars.yml
+          sed 's/devnet01/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
+          sed 's/devnet01/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' local-extra-vars.yml > local-extra-vars.yml.tmp && mv local-extra-vars.yml.tmp local-extra-vars.yml
+          echo "\nrootchain_json_rpc: http://$(cat ../rootchain_rpc.txt):8545" >> local-extra-vars.yml
       - name: Run Ansible
         working-directory: ansible
         run: |
-          touch password.txt
-          echo "${{ secrets.VAULT_PASSWORD_FILE }}" > password.txt
-          cp local-extra-vars.yml.template local-extra-vars.yml
-          echo "\nrootchain_json_rpc: http://$(cat ../rootchain_rpc.txt):8545" >> local-extra-vars.yml
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
           ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
