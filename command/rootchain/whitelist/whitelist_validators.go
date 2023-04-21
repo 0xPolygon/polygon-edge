@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -84,27 +83,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var ecdsaKey ethgo.Key
-
-	if params.privateKey != "" {
-		key, err := rootHelper.GetRootchainPrivateKey(params.privateKey)
-		if err != nil {
-			return fmt.Errorf("failed to initialize private key: %w", err)
-		}
-
-		ecdsaKey = key
-	} else {
-		secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.accountConfig, true)
-		if err != nil {
-			return err
-		}
-
-		key, err := wallet.GetEcdsaFromSecret(secretsManager)
-		if err != nil {
-			return err
-		}
-
-		ecdsaKey = key
+	ecdsaKey, err := rootHelper.GetECDSAKey(params.privateKey, params.accountDir, params.accountDir)
+	if err != nil {
+		return err
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
