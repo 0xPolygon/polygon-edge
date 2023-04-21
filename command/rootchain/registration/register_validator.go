@@ -115,12 +115,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	var validatorRegisteredEvent contractsapi.ValidatorRegisteredEvent
 	for _, log := range receipt.Logs {
 		doesMatch, err := validatorRegisteredEvent.ParseLog(log)
-		if !doesMatch {
-			continue
-		}
-
 		if err != nil {
 			return err
+		}
+
+		if !doesMatch {
+			continue
 		}
 
 		result.validatorAddress = validatorRegisteredEvent.Validator.String()
