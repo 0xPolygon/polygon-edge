@@ -8,10 +8,6 @@ import (
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
-const (
-	chainIDFlag = "chain-id"
-)
-
 type registerParams struct {
 	accountDir             string
 	accountConfig          string
