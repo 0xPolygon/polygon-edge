@@ -5,6 +5,7 @@ on:  # yamllint disable-line rule:truthy
     branches:
       - main
       - develop
+  workflow_dispatch:
   workflow_call:
     outputs:
       workflow_output:
