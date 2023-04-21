@@ -27,7 +27,10 @@ func (sp *supernetParams) validateFlags() error {
 		return sidechainHelper.ValidateSecretFlags(sp.accountDir, sp.accountConfig)
 	}
 
-	return nil
+	// validate jsonrpc address
+	_, err := helper.ParseJSONRPCAddress(sp.jsonRPC)
+
+	return err
 }
 
 type supernetResult struct {
