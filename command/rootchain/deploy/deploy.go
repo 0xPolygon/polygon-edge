@@ -320,6 +320,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			artifact: contractsapi.StateSender,
 		},
 		{
+			name:     checkpointManagerName,
+			artifact: contractsapi.CheckpointManager,
+		},
+		{
 			name:     blsName,
 			artifact: contractsapi.BLS,
 		},
@@ -379,13 +383,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 				return append(artifact.Bytecode, encoded...), nil
 			},
-		},
-		{
-			// since checkpoint manager needs chain Id,
-			// and since chain id is gotten when registering chain on stake manager
-			// we must deploy it the last
-			name:     checkpointManagerName,
-			artifact: contractsapi.CheckpointManager,
 		},
 	}
 
