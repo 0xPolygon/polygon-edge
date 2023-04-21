@@ -155,13 +155,14 @@ func run(cmd *cobra.Command, _ []string) {
 
 		receipt, err := txRelayer.SendTransaction(txn, senderAccount)
 		if err != nil {
-			outputter.SetError(fmt.Errorf("receiver: %s, amount: %s, error: %w", receiver, amount, err))
+			outputter.SetError(fmt.Errorf("failed to send withdraw transaction (receiver: %s, amount: %s). error: %w)",
+				receiver, amount, err))
 
 			return
 		}
 
 		if receipt.Status == uint64(types.ReceiptFailed) {
-			outputter.SetError(fmt.Errorf("receiver: %s, amount: %s", receiver, amount))
+			outputter.SetError(fmt.Errorf("failed to execute withdrawal (receiver: %s, amount: %s)", receiver, amount))
 
 			return
 		}

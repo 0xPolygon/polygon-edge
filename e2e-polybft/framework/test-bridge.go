@@ -170,11 +170,11 @@ func (t *TestBridge) cmdRun(args ...string) error {
 }
 
 // deployRootchainContracts deploys and initializes rootchain contracts
-func (t *TestBridge) deployRootchainContracts(manifestPath string) error {
+func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 	args := []string{
 		"rootchain",
-		"init-contracts",
-		"--manifest", manifestPath,
+		"deploy",
+		"--genesis", genesisPath,
 		"--test",
 	}
 
@@ -195,7 +195,7 @@ func (t *TestBridge) fundRootchainValidators() error {
 	}
 
 	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to deploy fund validators: %w", err)
+		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
 
 	return nil

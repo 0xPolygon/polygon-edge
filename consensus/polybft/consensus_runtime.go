@@ -157,7 +157,7 @@ func (c *consensusRuntime) close() {
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
-		stateSenderAddr := c.config.PolyBFTConfig.Bridge.BridgeAddr
+		stateSenderAddr := c.config.PolyBFTConfig.Bridge.StateSenderAddr
 		stateSyncManager, err := newStateSyncManager(
 			logger.Named("state-sync-manager"),
 			c.config.State,
@@ -198,7 +198,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 		c.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(c.config.Key),
 			defaultCheckpointsOffset,
-			c.config.PolyBFTConfig.Bridge.CheckpointAddr,
+			c.config.PolyBFTConfig.Bridge.CheckpointManagerAddr,
 			txRelayer,
 			c.config.blockchain,
 			c.config.polybftBackend,

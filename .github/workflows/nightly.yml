@@ -19,8 +19,13 @@ jobs:
       SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   e2e:
-    name: Polybft E2E Tests
+    name: PolyBFT E2E Tests
     uses: ./.github/workflows/e2e-polybft.yml
+    needs: build
+
+  e2eibft:
+    name: IBFT E2E Tests
+    uses: ./.github/workflows/e2e.yaml
     needs: build
 
   property:
@@ -36,13 +41,13 @@ jobs:
   notification:
     name: Nightly Notifications
     runs-on: ubuntu-latest
-    needs: [build, test, e2e, property, fuzz]
+    needs: [build, test, e2e, e2eibft, property, fuzz]
     if: success() || failure()
     steps:
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_TEST_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_EDGE_GITHUB_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
         with:
           payload: |
@@ -88,6 +93,13 @@ jobs:
                   "text": {
                     "type": "mrkdwn",
                     "text": "E2E tests ${{ needs.e2e.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "E2E IBFT tests ${{ needs.e2eibft.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {

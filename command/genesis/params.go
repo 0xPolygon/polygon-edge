@@ -3,6 +3,10 @@ package genesis
 import (
 	"errors"
 	"fmt"
+	"math"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -11,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -19,18 +24,24 @@ import (
 )
 
 const (
-	dirFlag           = "dir"
-	nameFlag          = "name"
-	premineFlag       = "premine"
-	chainIDFlag       = "chain-id"
-	epochSizeFlag     = "epoch-size"
-	epochRewardFlag   = "epoch-reward"
-	blockGasLimitFlag = "block-gas-limit"
+	dirFlag               = "dir"
+	nameFlag              = "name"
+	premineFlag           = "premine"
+	chainIDFlag           = "chain-id"
+	epochSizeFlag         = "epoch-size"
+	epochRewardFlag       = "epoch-reward"
+	blockGasLimitFlag     = "block-gas-limit"
 	burnContractFlag  = "burn-contract"
-	posFlag           = "pos"
-	minValidatorCount = "min-validator-count"
-	maxValidatorCount = "max-validator-count"
-	mintableTokenFlag = "mintable-native-token"
+	posFlag               = "pos"
+	minValidatorCount     = "min-validator-count"
+	maxValidatorCount     = "max-validator-count"
+	mintableTokenFlag     = "mintable-native-token"
+	nativeTokenConfigFlag = "native-token-config"
+
+	defaultNativeTokenName     = "Polygon"
+	defaultNativeTokenSymbol   = "MATIC"
+	defaultNativeTokenDecimals = uint8(18)
+	nativeTokenParamsNumber    = 3
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -46,6 +57,8 @@ var (
 	errValidatorsNotSpecified = errors.New("validator information not specified")
 	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
+	errInvalidTokenParams     = errors.New("native token params were not submitted in proper" +
+		" format <name:symbol:decimals count>")
 )
 
 type genesisParams struct {
@@ -81,23 +94,29 @@ type genesisParams struct {
 	genesisConfig *chain.Chain
 
 	// PolyBFT
-	manifestPath            string
-	validatorSetSize        int
-	sprintSize              uint64
-	blockTime               time.Duration
-	bridgeJSONRPCAddr       string
-	epochReward             uint64
-	eventTrackerStartBlocks []string
+	validatorsPath       string
+	validatorsPrefixPath string
+	stakes               []string
+	validators           []string
+	sprintSize           uint64
+	blockTime            time.Duration
+	epochReward          uint64
 
 	initialStateRoot string
 
-	// allowlist
+	// access lists
 	contractDeployerAllowListAdmin   []string
 	contractDeployerAllowListEnabled []string
+	contractDeployerBlockListAdmin   []string
+	contractDeployerBlockListEnabled []string
 	transactionsAllowListAdmin       []string
 	transactionsAllowListEnabled     []string
+	transactionsBlockListAdmin       []string
+	transactionsBlockListEnabled     []string
 
-	mintableNativeToken bool
+	mintableNativeToken  bool
+	nativeTokenConfigRaw string
+	nativeTokenConfig    *polybft.TokenConfig
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -113,6 +132,12 @@ func (p *genesisParams) validateFlags() error {
 		return errValidatorsNotSpecified
 	}
 
+	if p.isPolyBFTConsensus() {
+		if err := p.extractNativeTokenMetadata(); err != nil {
+			return err
+		}
+	}
+
 	// Check if the genesis file already exists
 	if generateError := verifyGenesisExistence(p.genesisPath); generateError != nil {
 		return errors.New(generateError.GetMessage())
@@ -126,12 +151,15 @@ func (p *genesisParams) validateFlags() error {
 		return errInvalidEpochSize
 	}
 
-	// Validate min and max validators number
-	if err := command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators); err != nil {
-		return err
+	// Validate validatorsPath only if validators information were not provided via CLI flag
+	if len(p.validators) == 0 {
+		if _, err := os.Stat(p.validatorsPath); err != nil {
+			return fmt.Errorf("invalid validators path ('%s') provided. Error: %w", p.validatorsPath, err)
+		}
 	}
 
-	return nil
+	// Validate min and max validators number
+	return command.ValidateMinMaxValidatorsNumber(p.minNumValidators, p.maxNumValidators)
 }
 
 func (p *genesisParams) isIBFTConsensus() bool {
@@ -364,13 +392,13 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	for _, premineRaw := range p.premine {
-		premineInfo, err := ParsePremineInfo(premineRaw)
+		premineInfo, err := parsePremineInfo(premineRaw)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Genesis.Alloc[premineInfo.Address] = &chain.GenesisAccount{
-			Balance: premineInfo.Amount,
+		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
+			Balance: premineInfo.amount,
 		}
 	}
 
@@ -397,6 +425,49 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	}
 
 	return stakingAccount, nil
+}
+
+// extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
+func (p *genesisParams) extractNativeTokenMetadata() error {
+	if p.nativeTokenConfigRaw == "" {
+		p.nativeTokenConfig = &polybft.TokenConfig{
+			Name:     defaultNativeTokenName,
+			Symbol:   defaultNativeTokenSymbol,
+			Decimals: defaultNativeTokenDecimals,
+		}
+
+		return nil
+	}
+
+	params := strings.Split(p.nativeTokenConfigRaw, ":")
+	if len(params) != nativeTokenParamsNumber { // 3 parameters
+		return errInvalidTokenParams
+	}
+
+	p.nativeTokenConfig = &polybft.TokenConfig{
+		Name:     defaultNativeTokenName,
+		Symbol:   defaultNativeTokenSymbol,
+		Decimals: defaultNativeTokenDecimals,
+	}
+
+	p.nativeTokenConfig.Name = strings.TrimSpace(params[0])
+	if p.nativeTokenConfig.Name == "" {
+		return errInvalidTokenParams
+	}
+
+	p.nativeTokenConfig.Symbol = strings.TrimSpace(params[1])
+	if p.nativeTokenConfig.Symbol == "" {
+		return errInvalidTokenParams
+	}
+
+	decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
+	if err != nil || decimals > math.MaxUint8 {
+		return errInvalidTokenParams
+	}
+
+	p.nativeTokenConfig.Decimals = uint8(decimals)
+
+	return nil
 }
 
 func (p *genesisParams) getResult() command.CommandResult {

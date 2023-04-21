@@ -249,3 +249,7 @@ func (d *Dev) Close() error {
 func (d *Dev) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
 }
+
+func (d *Dev) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
+}

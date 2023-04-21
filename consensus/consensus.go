@@ -37,6 +37,9 @@ type Consensus interface {
 	// GetBridgeProvider returns an instance of BridgeDataProvider
 	GetBridgeProvider() BridgeDataProvider
 
+	// FilterExtra filters extra data in header that is not a part of block hash
+	FilterExtra(extra []byte) ([]byte, error)
+
 	// Initialize initializes the consensus (e.g. setup data)
 	Initialize() error
 

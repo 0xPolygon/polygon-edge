@@ -1,4 +1,4 @@
-package allowlist
+package addresslist
 
 import (
 	"testing"
@@ -21,16 +21,16 @@ func (m *mockState) GetStorage(addr types.Address, key types.Hash) types.Hash {
 	return m.state[key]
 }
 
-func newMockAllowList() *AllowList {
+func newMockAddressList() *AddressList {
 	state := &mockState{
 		state: map[types.Hash]types.Hash{},
 	}
 
-	return NewAllowList(state, types.Address{})
+	return NewAddressList(state, types.Address{})
 }
 
-func TestAllowList_WrongInput(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_WrongInput(t *testing.T) {
+	a := newMockAddressList()
 
 	input := []byte{}
 
@@ -51,20 +51,20 @@ func TestAllowList_WrongInput(t *testing.T) {
 	require.Equal(t, errFunctionNotFound, err)
 }
 
-func TestAllowList_ReadOp_NotEnoughGas(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_ReadOp_NotEnoughGas(t *testing.T) {
+	a := newMockAddressList()
 
-	input, _ := ReadAllowListFunc.Encode([]interface{}{types.Address{}})
+	input, _ := ReadAddressListFunc.Encode([]interface{}{types.Address{}})
 
 	_, _, err := a.runInputCall(types.Address{}, input, 0, false)
 	require.Equal(t, runtime.ErrOutOfGas, err)
 
-	_, _, err = a.runInputCall(types.Address{}, input, readAllowListCost-1, false)
+	_, _, err = a.runInputCall(types.Address{}, input, readAddressListCost-1, false)
 	require.Equal(t, runtime.ErrOutOfGas, err)
 }
 
-func TestAllowList_ReadOp_Full(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_ReadOp_Full(t *testing.T) {
+	a := newMockAddressList()
 	a.SetRole(types.Address{}, AdminRole)
 
 	cases := []struct {
@@ -84,48 +84,48 @@ func TestAllowList_ReadOp_Full(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		input, _ := ReadAllowListFunc.Encode([]interface{}{c.addr})
-		role, gasUsed, err := a.runInputCall(types.Address{}, input, readAllowListCost, false)
+		input, _ := ReadAddressListFunc.Encode([]interface{}{c.addr})
+		role, gasUsed, err := a.runInputCall(types.Address{}, input, readAddressListCost, false)
 		require.NoError(t, err)
-		require.Equal(t, gasUsed, readAllowListCost)
+		require.Equal(t, gasUsed, readAddressListCost)
 		require.Equal(t, c.role.Bytes(), role)
 	}
 }
 
-func TestAllowList_WriteOp_NotEnoughGas(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_WriteOp_NotEnoughGas(t *testing.T) {
+	a := newMockAddressList()
 
 	input, _ := SetAdminFunc.Encode([]interface{}{types.Address{}})
 
 	_, _, err := a.runInputCall(types.Address{}, input, 0, false)
 	require.Equal(t, runtime.ErrOutOfGas, err)
 
-	_, _, err = a.runInputCall(types.Address{}, input, writeAllowListCost-1, false)
+	_, _, err = a.runInputCall(types.Address{}, input, writeAddressListCost-1, false)
 	require.Equal(t, runtime.ErrOutOfGas, err)
 }
 
-func TestAllowList_WriteOp_CannotWriteInStaticCall(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_WriteOp_CannotWriteInStaticCall(t *testing.T) {
+	a := newMockAddressList()
 
 	input, _ := SetAdminFunc.Encode([]interface{}{types.Address{}})
 
-	_, gasCost, err := a.runInputCall(types.Address{}, input, writeAllowListCost, true)
-	require.Equal(t, writeAllowListCost, gasCost)
+	_, gasCost, err := a.runInputCall(types.Address{}, input, writeAddressListCost, true)
+	require.Equal(t, writeAddressListCost, gasCost)
 	require.Equal(t, err, errWriteProtection)
 }
 
-func TestAllowList_WriteOp_OnlyAdminCanUpdate(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_WriteOp_OnlyAdminCanUpdate(t *testing.T) {
+	a := newMockAddressList()
 
 	input, _ := SetAdminFunc.Encode([]interface{}{types.Address{}})
 
-	_, gasCost, err := a.runInputCall(types.Address{}, input, writeAllowListCost, false)
-	require.Equal(t, writeAllowListCost, gasCost)
+	_, gasCost, err := a.runInputCall(types.Address{}, input, writeAddressListCost, false)
+	require.Equal(t, writeAddressListCost, gasCost)
 	require.Equal(t, err, runtime.ErrNotAuth)
 }
 
-func TestAllowList_WriteOp_Full(t *testing.T) {
-	a := newMockAllowList()
+func TestAddressList_WriteOp_Full(t *testing.T) {
+	a := newMockAddressList()
 	a.SetRole(types.Address{}, AdminRole)
 
 	targetAddr := types.Address{0x1}
@@ -145,8 +145,8 @@ func TestAllowList_WriteOp_Full(t *testing.T) {
 	for _, c := range cases {
 		input, _ := c.method.Encode([]interface{}{targetAddr})
 
-		ret, gasCost, err := a.runInputCall(types.Address{}, input, writeAllowListCost, false)
-		require.Equal(t, writeAllowListCost, gasCost)
+		ret, gasCost, err := a.runInputCall(types.Address{}, input, writeAddressListCost, false)
+		require.Equal(t, writeAddressListCost, gasCost)
 		require.NoError(t, err)
 		require.Empty(t, ret)
 		require.Equal(t, c.role, a.GetRole(targetAddr))

@@ -4,8 +4,13 @@ import (
 	"fmt"
 	"math/big"
 	"path"
+	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -13,28 +18,23 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	const epochSize = 4
 
-	//nolint:godox
-	// TODO: Enable non-validators when proper support gets implemented
-	// (https://polygon.atlassian.net/browse/EVM-547)
-	// framework.WithNonValidators(2),
-	cluster := framework.NewTestCluster(t, 7,
-		framework.WithEpochSize(epochSize))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithEpochSize(epochSize), framework.WithNonValidators(2))
 	defer cluster.Stop()
 
 	t.Run("consensus protocol", func(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
 	})
 
-	t.Run("sync protool drop single validator node", func(t *testing.T) {
+	t.Run("sync protocol, drop single validator node", func(t *testing.T) {
 		// query the current block number, as it is a starting point for the test
 		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
 		require.NoError(t, err)
@@ -52,32 +52,25 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
 		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
 	})
-}
 
-func TestE2E_Consensus_Sync_WithNonValidators(t *testing.T) {
-	t.Skip("Enable once we have proper support for non-validators.")
+	t.Run("sync protocol, drop single non-validator node", func(t *testing.T) {
+		// query the current block number, as it is a starting point for the test
+		currentBlockNum, err := cluster.Servers[0].JSONRPC().Eth().BlockNumber()
+		require.NoError(t, err)
 
-	// one non-validator node from the ensemble gets disconnected and connected again.
-	// It should be able to pick up from the synchronization protocol again.
-	cluster := framework.NewTestCluster(t, 7,
-		framework.WithNonValidators(2), framework.WithValidatorSnapshot(5))
-	defer cluster.Stop()
+		// stop one non-validator node
+		node := cluster.Servers[6]
+		node.Stop()
 
-	// wait for the start
-	require.NoError(t, cluster.WaitForBlock(20, 1*time.Minute))
+		// wait for 2 epochs to elapse, so that rest of the network progresses
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
 
-	// stop one non-validator node
-	node := cluster.Servers[6]
-	node.Stop()
+		// start the node again
+		node.Start()
 
-	// wait for at least 15 more blocks before starting again
-	require.NoError(t, cluster.WaitForBlock(35, 2*time.Minute))
-
-	// start the node again
-	node.Start()
-
-	// wait for block 55
-	require.NoError(t, cluster.WaitForBlock(55, 2*time.Minute))
+		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
+		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+	})
 }
 
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
@@ -130,7 +123,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 		framework.WithEpochReward(epochReward),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
 		}),
 	)
@@ -183,8 +176,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, owner.WhitelistValidator(secondValidatorAddr.String(), ownerSecrets))
 
 	// start the first and the second validator
-	cluster.InitTestServer(t, validatorSize+1, true, false)
-	cluster.InitTestServer(t, validatorSize+2, true, false)
+	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+1), true, false)
+	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+2), true, false)
 
 	ownerAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, ownerSecrets))
 	require.NoError(t, err)
@@ -342,7 +335,7 @@ func TestE2E_Consensus_Delegation_Undelegation(t *testing.T) {
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%s", a, premineBalance))
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
 				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%s", a, premineBalance))
 			}
 		}),
@@ -453,7 +446,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		framework.WithEpochSize(5),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
-				config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", a, premineAmount))
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premineAmount))
 				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", a, premineAmount))
 			}
 		}),
@@ -518,10 +511,10 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	manifest, err := polybft.LoadManifest(path.Join(cluster.Config.TmpDir, manifestFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	checkpointManagerAddr := ethgo.Address(manifest.RootchainConfig.CheckpointManagerAddress)
+	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	// query rootchain validator set and make sure that validator which unstaked all the funds isn't present in validator set anymore
 	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
@@ -623,7 +616,28 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		validatorCount = 5
 		epochSize      = 5
 		minterPath     = "test-chain-1"
+
+		tokenName   = "Edge Coin"
+		tokenSymbol = "EDGE"
+		decimals    = uint8(5)
 	)
+
+	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
+
+	queryNativeERC20Metadata := func(funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
+		valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable, nativeTokenAddr, ethgo.ZeroAddress, funcName)
+		require.NoError(t, err)
+
+		valueRaw, err := hex.DecodeHex(valueHex)
+		require.NoError(t, err)
+
+		var decodedResult map[string]interface{}
+
+		err = abiType.DecodeStruct(valueRaw, &decodedResult)
+		require.NoError(t, err)
+
+		return decodedResult["0"]
+	}
 
 	validatorsAddrs := make([]types.Address, validatorCount)
 	initialStake := ethgo.Gwei(1)
@@ -632,6 +646,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
 		framework.WithMintableNativeToken(true),
+		framework.WithNativeTokenConfig(fmt.Sprintf("%s:%s:%d", tokenName, tokenSymbol, decimals)),
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
 			for i, addr := range addrs {
@@ -640,8 +655,8 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 				// (it is going to send mint transactions to all the other validators)
 				if i > 0 {
 					// premine other validators with as minimum stake as possible just to ensure liveness of consensus protocol
+					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initialBalance))
 					config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", addr, initialStake))
-					config.PremineValidators = append(config.PremineValidators, fmt.Sprintf("%s:%d", addr, initialBalance))
 				}
 				validatorsAddrs[i] = addr
 			}
@@ -656,14 +671,27 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	// send mint transactions
+	// initialize tx relayer
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(targetJSONRPC))
 	require.NoError(t, err)
 
+	// check are native token metadata correctly initialized
+	stringABIType := abi.MustNewType("tuple(string)")
+	uint8ABIType := abi.MustNewType("tuple(uint8)")
+
+	name := queryNativeERC20Metadata("name", stringABIType, relayer)
+	require.Equal(t, tokenName, name)
+
+	symbol := queryNativeERC20Metadata("symbol", stringABIType, relayer)
+	require.Equal(t, tokenSymbol, symbol)
+
+	decimalsCount := queryNativeERC20Metadata("decimals", uint8ABIType, relayer)
+	require.Equal(t, decimals, decimalsCount)
+
+	// send mint transactions
 	mintFn, exists := contractsapi.NativeERC20Mintable.Abi.Methods["mint"]
 	require.True(t, exists)
 
-	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
 	mintAmount := ethgo.Ether(10)
 
 	// make sure minter account can mint tokens

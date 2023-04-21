@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"os"
-	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -14,6 +12,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
+
+const ConsensusName = "polybft"
 
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
@@ -38,35 +38,50 @@ type PolyBFTConfig struct {
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
 
-	// MintableERC20Token denotes whether mintable ERC20 token is used
-	MintableERC20Token bool `json:"mintableERC20"`
+	// MintableNativeToken denotes whether mintable native token is used
+	MintableNativeToken bool `json:"mintableNative"`
+
+	// NativeTokenConfig defines name, symbol and decimal count of the native token
+	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 }
 
+// LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
+func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, error) {
+	chainCfg, err := chain.ImportFromFile(chainConfigFile)
+	if err != nil {
+		return PolyBFTConfig{}, err
+	}
+
+	return GetPolyBFTConfig(chainCfg)
+}
+
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
 func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
-	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine["polybft"])
+	consensusConfigJSON, err := json.Marshal(chainConfig.Params.Engine[ConsensusName])
 	if err != nil {
 		return PolyBFTConfig{}, err
 	}
 
 	var polyBFTConfig PolyBFTConfig
-	err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig)
-
-	if err != nil {
+	if err = json.Unmarshal(consensusConfigJSON, &polyBFTConfig); err != nil {
 		return PolyBFTConfig{}, err
 	}
 
 	return polyBFTConfig, nil
 }
 
-// BridgeConfig is the rootchain bridge configuration
+// BridgeConfig is the rootchain configuration, needed for bridging
 type BridgeConfig struct {
-	BridgeAddr              types.Address            `json:"stateSenderAddr"`
-	CheckpointAddr          types.Address            `json:"checkpointAddr"`
-	RootERC20PredicateAddr  types.Address            `json:"rootERC20PredicateAddr"`
-	RootNativeERC20Addr     types.Address            `json:"rootNativeERC20Addr"`
+	StateSenderAddr          types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddr    types.Address `json:"checkpointManagerAddress"`
+	ExitHelperAddr           types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddr   types.Address `json:"erc20PredicateAddress"`
+	RootNativeERC20Addr      types.Address `json:"nativeERC20Address"`
+	RootERC721PredicateAddr  types.Address `json:"erc721PredicateAddress"`
+	RootERC1155PredicateAddr types.Address `json:"erc1155PredicateAddress"`
+
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
 	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
 }
@@ -199,66 +214,42 @@ func (v *Validator) String() string {
 		v.Address, v.Balance, v.MultiAddr, v.BlsKey)
 }
 
-// RootchainConfig contains information about rootchain contract addresses
-// as well as rootchain admin account address
+// RootchainConfig contains rootchain metadata (such as JSON RPC endpoint and contract addresses)
 type RootchainConfig struct {
-	StateSenderAddress          types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddress    types.Address `json:"checkpointManagerAddress"`
-	BLSAddress                  types.Address `json:"blsAddress"`
-	BN256G2Address              types.Address `json:"bn256G2Address"`
-	ExitHelperAddress           types.Address `json:"exitHelperAddress"`
-	RootERC20PredicateAddress   types.Address `json:"erc20PredicateAddress"`
-	RootNativeERC20Address      types.Address `json:"nativeERC20Address"`
-	ERC20TemplateAddress        types.Address `json:"erc20TemplateAddress"`
-	RootERC721PredicateAddress  types.Address `json:"erc721PredicateAddress"`
-	RootERC721Address           types.Address `json:"erc721Address"`
-	RootERC1155PredicateAddress types.Address `json:"erc1155PredicateAddress"`
-	RootERC1155Address          types.Address `json:"erc1155Address"`
+	JSONRPCAddr string
+
+	StateSenderAddress          types.Address
+	CheckpointManagerAddress    types.Address
+	BLSAddress                  types.Address
+	BN256G2Address              types.Address
+	ExitHelperAddress           types.Address
+	RootERC20PredicateAddress   types.Address
+	RootNativeERC20Address      types.Address
+	ERC20TemplateAddress        types.Address
+	RootERC721PredicateAddress  types.Address
+	RootERC721Address           types.Address
+	RootERC1155PredicateAddress types.Address
+	RootERC1155Address          types.Address
 }
 
 // ToBridgeConfig creates BridgeConfig instance
 func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
-		BridgeAddr:             r.StateSenderAddress,
-		CheckpointAddr:         r.CheckpointManagerAddress,
-		RootERC20PredicateAddr: r.RootERC20PredicateAddress,
-		RootNativeERC20Addr:    r.RootNativeERC20Address,
+		JSONRPCEndpoint: r.JSONRPCAddr,
+
+		StateSenderAddr:          r.StateSenderAddress,
+		CheckpointManagerAddr:    r.CheckpointManagerAddress,
+		ExitHelperAddr:           r.ExitHelperAddress,
+		RootERC20PredicateAddr:   r.RootERC20PredicateAddress,
+		RootNativeERC20Addr:      r.RootNativeERC20Address,
+		RootERC721PredicateAddr:  r.RootERC721PredicateAddress,
+		RootERC1155PredicateAddr: r.RootERC1155PredicateAddress,
 	}
 }
 
-// Manifest holds metadata, such as genesis validators and rootchain configuration
-type Manifest struct {
-	GenesisValidators []*Validator     `json:"validators"`
-	RootchainConfig   *RootchainConfig `json:"rootchain"`
-	ChainID           int64            `json:"chainID"`
-}
-
-// LoadManifest deserializes Manifest instance
-func LoadManifest(metadataFile string) (*Manifest, error) {
-	data, err := os.ReadFile(metadataFile)
-	if err != nil {
-		return nil, err
-	}
-
-	var manifest Manifest
-
-	if err := json.Unmarshal(data, &manifest); err != nil {
-		return nil, err
-	}
-
-	return &manifest, nil
-}
-
-// Save marshals RootchainManifest instance to json and persists it to given location
-func (m *Manifest) Save(manifestPath string) error {
-	data, err := json.MarshalIndent(m, "", "    ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal rootchain manifest to JSON: %w", err)
-	}
-
-	if err := common.SaveFileSafe(filepath.Clean(manifestPath), data, 0660); err != nil {
-		return fmt.Errorf("failed to save rootchain manifest file: %w", err)
-	}
-
-	return nil
+// TokenConfig is the configuration of native token used by edge network
+type TokenConfig struct {
+	Name     string `json:"name"`
+	Symbol   string `json:"symbol"`
+	Decimals uint8  `json:"decimals"`
 }

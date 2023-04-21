@@ -1,4 +1,4 @@
-package allowlist
+package addresslist
 
 import (
 	"math/big"
@@ -20,7 +20,7 @@ func TestGenesis(t *testing.T) {
 		Alloc: map[types.Address]*chain.GenesisAccount{},
 	}
 
-	config := &chain.AllowListConfig{
+	config := &chain.AddressListConfig{
 		AdminAddresses: []types.Address{
 			one,
 		},

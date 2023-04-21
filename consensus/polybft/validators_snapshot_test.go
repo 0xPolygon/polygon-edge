@@ -282,7 +282,7 @@ func createValidatorDeltaHeader(t *testing.T, blockNumber, epoch uint64, oldVali
 
 	return &types.Header{
 		Number:    blockNumber,
-		ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+		ExtraData: extra.MarshalRLPTo(nil),
 	}
 }
 

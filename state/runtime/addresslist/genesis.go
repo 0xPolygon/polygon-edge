@@ -1,4 +1,4 @@
-package allowlist
+package addresslist
 
 import (
 	"math/big"
@@ -7,9 +7,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func ApplyGenesisAllocs(chain *chain.Genesis, allowListAddr types.Address, config *chain.AllowListConfig) {
-	allocList := &AllowList{
-		addr:  allowListAddr,
+func ApplyGenesisAllocs(chain *chain.Genesis, addressListAddr types.Address, config *chain.AddressListConfig) {
+	allocList := &AddressList{
+		addr:  addressListAddr,
 		state: &genesisState{chain},
 	}
 

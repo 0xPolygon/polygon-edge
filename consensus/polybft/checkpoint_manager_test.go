@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -80,7 +79,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 			extra.Checkpoint = checkpoint
 			extra.Committed = &Signature{Bitmap: bitmap, AggregatedSignature: signature}
 			header = &types.Header{
-				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+				ExtraData: extra.MarshalRLPTo(nil),
 			}
 			epochNumber++
 		} else {
@@ -152,7 +151,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 		AggregatedSignature: aggSignature,
 		Bitmap:              bmp,
 	}
-	header.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+	header.ExtraData = extra.MarshalRLPTo(nil)
 	header.ComputeHash()
 
 	backendMock := new(polybftBackendMock)

@@ -23,15 +23,17 @@ type Params struct {
 	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
-	// AllowList configuration
-	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowList,omitempty"`
-	TransactionsAllowList     *AllowListConfig `json:"transactionsAllowList,omitempty"`
+	// Access control configuration
+	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
+	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
+	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
+	TransactionsBlockList     *AddressListConfig `json:"transactionsBlockList,omitempty"`
 
 	// Governance contract where the token will be sent to and burn in london fork
 	BurnContract map[string]string `json:"burnContract"`
 }
 
-type AllowListConfig struct {
+type AddressListConfig struct {
 	// AdminAddresses is the list of the initial admin addresses
 	AdminAddresses []types.Address `json:"adminAddresses,omitempty"`
 

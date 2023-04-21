@@ -143,15 +143,15 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
 		}
 
-		if polyBFTConfig.MintableERC20Token {
+		if polyBFTConfig.MintableNativeToken {
 			// initialize NativeERC20Mintable SC
 			params := &contractsapi.InitializeNativeERC20MintableFn{
 				Predicate_: contracts.ChildERC20PredicateContract,
 				Owner_:     polyBFTConfig.Governance,
 				RootToken_: rootNativeERC20Token,
-				Name_:      nativeTokenName,
-				Symbol_:    nativeTokenSymbol,
-				Decimals_:  nativeTokenDecimals,
+				Name_:      polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
 			}
 
 			input, err := params.EncodeAbi()
@@ -165,9 +165,9 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		} else {
 			// initialize NativeERC20 SC
 			params := &contractsapi.InitializeNativeERC20Fn{
-				Name_:      nativeTokenName,
-				Symbol_:    nativeTokenSymbol,
-				Decimals_:  nativeTokenDecimals,
+				Name_:      polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
 				RootToken_: rootNativeERC20Token,
 				Predicate_: contracts.ChildERC20PredicateContract,
 			}
@@ -487,7 +487,14 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	return nil
 }
 
-// GetBridgeProvider returns an instance of BridgeDataProvider
+// GetBridgeProvider is an implementation of Consensus interface
+// Returns an instance of BridgeDataProvider
 func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 	return p.runtime
+}
+
+// GetBridgeProvider is an implementation of Consensus interface
+// Filters extra data to not contain Committed field
+func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
+	return GetIbftExtraClean(extra)
 }
