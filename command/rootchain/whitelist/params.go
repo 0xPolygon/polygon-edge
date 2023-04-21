@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
 const (
@@ -18,8 +17,7 @@ var (
 )
 
 type whitelistParams struct {
-	accountDir             string
-	accountConfig          string
+	privateKey             string
 	jsonRPC                string
 	newValidatorAddresses  []string
 	supernetManagerAddress string
@@ -30,7 +28,7 @@ func (ep *whitelistParams) validateFlags() error {
 		return errNoNewValidatorsProvided
 	}
 
-	return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.accountConfig)
+	return nil
 }
 
 type whitelistResult struct {

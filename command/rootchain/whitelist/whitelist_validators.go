@@ -33,17 +33,10 @@ func GetCommand() *cobra.Command {
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&params.accountDir,
-		polybftsecrets.AccountDirFlag,
+		&params.privateKey,
+		polybftsecrets.PrivateKeyFlag,
 		"",
-		polybftsecrets.AccountDirFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.accountConfig,
-		polybftsecrets.AccountConfigFlag,
-		"",
-		polybftsecrets.AccountConfigFlagDesc,
+		polybftsecrets.PrivateKeyFlagDesc,
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -74,9 +67,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	ownerAccount, err := sidechainHelper.GetAccount(params.accountDir, params.accountConfig)
+	ownerKey, err := rootHelper.GetRootchainPrivateKey(params.privateKey)
 	if err != nil {
-		return fmt.Errorf("enlist validator failed: %w", err)
+		return fmt.Errorf("failed to initialize private key: %w", err)
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
@@ -96,13 +89,13 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 	txn := &ethgo.Transaction{
-		From:     ownerAccount.Ecdsa.Address(),
+		From:     ownerKey.Address(),
 		Input:    encoded,
 		To:       &supernetAddr,
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 
-	receipt, err := txRelayer.SendTransaction(txn, ownerAccount.Ecdsa)
+	receipt, err := txRelayer.SendTransaction(txn, ownerKey)
 	if err != nil {
 		return fmt.Errorf("enlist validator failed %w", err)
 	}
