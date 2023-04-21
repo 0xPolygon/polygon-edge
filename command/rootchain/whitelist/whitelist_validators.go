@@ -62,9 +62,9 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.supernetManagerAddress,
-		rootHelper.SupernetManagerAddressFlag,
+		rootHelper.SupernetManagerFlag,
 		"",
-		"address of supernet manager contract",
+		rootHelper.SupernetManagerFlagDesc,
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)

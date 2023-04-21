@@ -11,7 +11,6 @@ import (
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -49,6 +48,13 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlag,
 		"",
 		polybftsecrets.AccountConfigFlagDesc,
+	)
+
+	cmd.Flags().StringVar(
+		&params.stakeManagerAddr,
+		stakeManagerFlag,
+		"",
+		"address of stake manager contract on rootchain",
 	)
 
 	cmd.Flags().Uint64Var(
@@ -101,11 +107,15 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	encoded, err := stakeFn.EncodeAbi()
+	if err != nil {
+		return err
+	}
 
+	stakeManagerAddr := ethgo.Address(types.StringToAddress(params.stakeManagerAddr))
 	txn := &ethgo.Transaction{
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
-		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
+		To:       &stakeManagerAddr,
 		Value:    new(big.Int).SetUint64(params.amount),
 		GasPrice: gasPrice,
 	}

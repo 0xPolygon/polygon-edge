@@ -8,12 +8,17 @@ import (
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
+const (
+	stakeManagerFlag = "stake-manager"
+)
+
 type stakeParams struct {
-	accountDir    string
-	accountConfig string
-	jsonRPC       string
-	amount        uint64
-	chainID       uint64
+	accountDir       string
+	accountConfig    string
+	stakeManagerAddr string
+	jsonRPC          string
+	amount           uint64
+	chainID          uint64
 }
 
 func (v *stakeParams) validateFlags() error {

@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	testAccountPrivKey         = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
-	TestModeFlag               = "test"
-	SupernetManagerAddressFlag = "supernet-manager-address"
+	testAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
+	TestModeFlag            = "test"
+	SupernetManagerFlag     = "supernet-manager"
+	SupernetManagerFlagDesc = "address of supernet manager contract"
 )
 
 var (

@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"github.com/0xPolygon/polygon-edge/command/sidechain/staking"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/unstaking"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/validators"
 
@@ -16,7 +15,6 @@ func GetCommand() *cobra.Command {
 	}
 
 	polybftCmd.AddCommand(
-		staking.GetCommand(),
 		unstaking.GetCommand(),
 		withdraw.GetCommand(),
 		validators.GetCommand(),
