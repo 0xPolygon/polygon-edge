@@ -242,8 +242,8 @@ func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 	depositBatchFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
 		RootToken: types.StringToAddress(dp.TokenAddr),
 		Receivers: receivers,
-		Amounts:   amounts,
 		TokenIDs:  tokenIDs,
+		Amounts:   amounts,
 	}
 
 	input, err := depositBatchFn.EncodeAbi()

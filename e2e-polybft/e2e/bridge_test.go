@@ -400,19 +400,18 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 
 	t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
 
-	rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
-	require.NoError(t, err)
-
-	// send withdraw transaction
-	err = cluster.Bridge.Withdraw(
-		common.ERC1155,
-		hex.EncodeToString(rawKey),
-		strings.Join(receivers[:], ","),
-		strings.Join(amounts[:], ","),
-		strings.Join(tokenIDs[:], ","),
-		cluster.Servers[0].JSONRPCAddr(),
-		contracts.ChildERC1155Contract)
-	require.NoError(t, err)
+	for i, receiverKey := range receiverKeys {
+		// send withdraw transactions
+		err = cluster.Bridge.Withdraw(
+			common.ERC1155,
+			receiverKey,
+			receivers[i],
+			amounts[i],
+			tokenIDs[i],
+			validatorSrv.JSONRPCAddr(),
+			childTokenAddr)
+		require.NoError(t, err)
+	}
 
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
@@ -421,31 +420,10 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	require.NoError(t, err)
 
 	currentEpoch := currentExtra.Checkpoint.EpochNumber
-
 	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
 
-	fail := 0
-
-	// make sure we have progressed to the next epoch on the root chain
-	// before sending exit transaction to the root chain
-	// (it means that checkpoint was submitted)
-	for range time.Tick(time.Second) {
-		currentEpochString, err := ABICall(rootchainTxRelayer, contractsapi.CheckpointManager,
-			ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr), ethgo.ZeroAddress, "currentEpoch")
-		require.NoError(t, err)
-
-		rootchainEpoch, err := types.ParseUint64orHex(&currentEpochString)
-		require.NoError(t, err)
-
-		if rootchainEpoch >= currentEpoch {
-			break
-		}
-
-		if fail > 300 {
-			t.Fatal("root chain hasn't progressed to the next epoch")
-		}
-		fail++
-	}
+	require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
+		rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 	exitHelper := polybftCfg.Bridge.ExitHelperAddr
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
