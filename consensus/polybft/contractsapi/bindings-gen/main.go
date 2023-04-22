@@ -143,7 +143,6 @@ func main() {
 				"balanceOf",
 				"approve",
 				"mint",
-				"balanceOf",
 			},
 			[]string{},
 		},
