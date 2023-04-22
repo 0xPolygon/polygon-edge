@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -92,54 +93,124 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 	}
 }
 
-// DepositERC20 function invokes bridge deposit ERC20 tokens (from the root to the child chain)
-// with given receivers and amounts
-func (t *TestBridge) DepositERC20(rootTokenAddr, rootPredicateAddr types.Address, receivers, amounts string) error {
+// Deposit function invokes bridge deposit of ERC tokens (from the root to the child chain)
+// with given receivers, amounts and/or token ids
+func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
+	receivers, amounts, tokenIDs string) error {
+	args := []string{}
+
 	if receivers == "" {
 		return errors.New("provide at least one receiver address value")
 	}
 
-	if amounts == "" {
-		return errors.New("provide at least one amount value")
+	switch token {
+	case bridgeCommon.ERC20:
+		if amounts == "" {
+			return errors.New("provide at least one amount value")
+		}
+
+		if tokenIDs != "" {
+			return errors.New("not expected to provide token ids for ERC-20 deposits")
+		}
+
+		args = append(args,
+			"bridge",
+			"deposit-erc20",
+			"--test",
+			"--root-token", rootTokenAddr.String(),
+			"--root-predicate", rootPredicateAddr.String(),
+			"--receivers", receivers,
+			"--amounts", amounts)
+
+	case bridgeCommon.ERC721:
+		//nolint:godox
+		// TODO: Implement ERC721 deposits
+
+	case bridgeCommon.ERC1155:
+		if amounts == "" {
+			return errors.New("provide at least one amount value")
+		}
+
+		if tokenIDs == "" {
+			return errors.New("provide at least one token id value")
+		}
+
+		args = append(args,
+			"bridge",
+			"deposit-erc1155",
+			"--test",
+			"--root-token", rootTokenAddr.String(),
+			"--root-predicate", rootPredicateAddr.String(),
+			"--receivers", receivers,
+			"--amounts", amounts,
+			"--token-ids", tokenIDs)
 	}
 
-	return t.cmdRun(
-		"bridge",
-		"deposit-erc20",
-		"--test",
-		"--root-token", rootTokenAddr.String(),
-		"--root-predicate", rootPredicateAddr.String(),
-		"--receivers", receivers,
-		"--amounts", amounts)
+	return t.cmdRun(args...)
 }
 
-// WithdrawERC20 function is used to invoke bridge withdraw ERC20 tokens (from the child to the root chain)
-// with given receivers and amounts
-func (t *TestBridge) WithdrawERC20(senderKey, receivers, amounts, jsonRPCEndpoint string) error {
+// Withdraw function is used to invoke bridge withdrawals for any kind of ERC tokens (from the child to the root chain)
+// with given receivers, amounts and/or token ids
+func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
+	senderKey, receivers,
+	amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error {
 	if senderKey == "" {
-		return errors.New("provide hex encoded sender private key")
+		return errors.New("provide hex-encoded sender private key")
 	}
 
 	if receivers == "" {
 		return errors.New("provide at least one receiver address value")
-	}
-
-	if amounts == "" {
-		return errors.New("provide at least one amount value")
 	}
 
 	if jsonRPCEndpoint == "" {
 		return errors.New("provide a JSON RPC endpoint URL")
 	}
 
-	return t.cmdRun(
-		"bridge",
-		"withdraw-erc20",
-		"--sender-key", senderKey,
-		"--receivers", receivers,
-		"--amounts", amounts,
-		"--json-rpc", jsonRPCEndpoint,
-	)
+	args := []string{}
+
+	switch token {
+	case bridgeCommon.ERC20:
+		if amounts == "" {
+			return errors.New("provide at least one amount value")
+		}
+
+		if tokenIDs != "" {
+			return errors.New("not expected to provide token ids for ERC-20 withdrawals")
+		}
+
+		args = append(args,
+			"bridge",
+			"withdraw-erc20",
+			"--sender-key", senderKey,
+			"--receivers", receivers,
+			"--amounts", amounts,
+			"--json-rpc", jsonRPCEndpoint)
+
+	case bridgeCommon.ERC721:
+		//nolint:godox
+		// TODO: Implement ERC721 withdrawal
+
+	case bridgeCommon.ERC1155:
+		if amounts == "" {
+			return errors.New("provide at least one amount value")
+		}
+
+		if tokenIDs == "" {
+			return errors.New("provide at least one token id value")
+		}
+
+		args = append(args,
+			"bridge",
+			"withdraw-erc1155",
+			"--sender-key", senderKey,
+			"--receivers", receivers,
+			"--amounts", amounts,
+			"--token-ids", tokenIDs,
+			"--json-rpc", jsonRPCEndpoint,
+			"--child-token", childToken.String())
+	}
+
+	return t.cmdRun(args...)
 }
 
 // SendExitTransaction sends exit transaction to the root chain

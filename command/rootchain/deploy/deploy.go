@@ -35,6 +35,7 @@ const (
 	rootERC721Name           = "RootERC721"
 	rootERC1155PredicateName = "RootERC1155Predicate"
 	rootERC1155Name          = "RootERC1155"
+	erc1155TemplateName      = "ERC1155Template"
 )
 
 var (
@@ -78,6 +79,9 @@ var (
 		},
 		rootERC1155Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155Address = addr
+		},
+		erc1155TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.ERC1155TemplateAddress = addr
 		},
 	}
 )
@@ -297,6 +301,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     rootERC1155PredicateName,
 			artifact: contractsapi.RootERC1155Predicate,
 		},
+		{
+			name:     erc1155TemplateName,
+			artifact: contractsapi.ChildERC1155,
+		},
 	}
 	rootchainConfig := &polybft.RootchainConfig{
 		JSONRPCAddr: params.jsonRPCAddress,
@@ -371,27 +379,20 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		return nil, err
 	}
 
-	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, checkpointManagerName),
-	})
-
 	// init ExitHelper
-	if err := initializeExitHelper(txRelayer, rootchainConfig, deployerKey); err != nil {
+	if err := initializeExitHelper(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
 		return nil, err
 	}
-
-	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, exitHelperName),
-	})
 
 	// init RootERC20Predicate
-	if err := initializeRootERC20Predicate(txRelayer, rootchainConfig, deployerKey); err != nil {
+	if err := initializeRootERC20Predicate(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
 		return nil, err
 	}
 
-	outputter.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
-	})
+	// init RootERC1155Predicate
+	if err := initializeRootERC1155Predicate(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
+		return rootchainConfig, err
+	}
 
 	return rootchainConfig, nil
 }
@@ -421,13 +422,13 @@ func populateExistingTokenAddr(eth *jsonrpc.Eth, tokenAddr, tokenName string,
 
 // initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
 func initializeCheckpointManager(
-	o command.OutputFormatter,
+	cmdOutput command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer,
 	chainID int64,
 	validators []*polybft.Validator,
 	rootchainCfg *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
-	validatorSet, err := validatorSetToABISlice(o, validators)
+	validatorSet, err := validatorSetToABISlice(cmdOutput, validators)
 	if err != nil {
 		return fmt.Errorf("failed to convert validators to map: %w", err)
 	}
@@ -439,22 +440,27 @@ func initializeCheckpointManager(
 		NewValidatorSet: validatorSet,
 	}
 
-	initCheckpointInput, err := initialize.EncodeAbi()
+	input, err := initialize.EncodeAbi()
 	if err != nil {
 		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
 	}
 
-	addr := ethgo.Address(rootchainCfg.CheckpointManagerAddress)
-	txn := &ethgo.Transaction{
-		To:    &addr,
-		Input: initCheckpointInput,
+	if err := sendTransaction(txRelayer, ethgo.Address(rootchainCfg.CheckpointManagerAddress),
+		input, checkpointManagerName, deployerKey); err != nil {
+		return err
 	}
 
-	return sendTransaction(txRelayer, txn, checkpointManagerName, deployerKey)
+	cmdOutput.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, checkpointManagerName),
+	})
+
+	return nil
 }
 
 // initializeExitHelper invokes initialize function on "ExitHelper" smart contract
-func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
+func initializeExitHelper(cmdOutput command.OutputFormatter,
+	txRelayer txrelayer.TxRelayer,
+	rootchainConfig *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
 	input, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
 		Encode([]interface{}{rootchainConfig.CheckpointManagerAddress})
@@ -462,18 +468,21 @@ func initializeExitHelper(txRelayer txrelayer.TxRelayer, rootchainConfig *polybf
 		return fmt.Errorf("failed to encode parameters for ExitHelper.initialize. error: %w", err)
 	}
 
-	addr := ethgo.Address(rootchainConfig.ExitHelperAddress)
-	txn := &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
+	if err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.ExitHelperAddress),
+		input, exitHelperName, deployerKey); err != nil {
+		return err
 	}
 
-	return sendTransaction(txRelayer, txn, exitHelperName, deployerKey)
+	cmdOutput.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, exitHelperName),
+	})
+
+	return nil
 }
 
 // initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
-func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
+func initializeRootERC20Predicate(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
+	rootchainConfig *polybft.RootchainConfig, deployerKey ethgo.Key) error {
 	rootERC20PredicateParams := &contractsapi.InitializeRootERC20PredicateFn{
 		NewStateSender:         rootchainConfig.StateSenderAddress,
 		NewExitHelper:          rootchainConfig.ExitHelperAddress,
@@ -487,18 +496,54 @@ func initializeRootERC20Predicate(txRelayer txrelayer.TxRelayer, rootchainConfig
 		return fmt.Errorf("failed to encode parameters for RootERC20Predicate.initialize. error: %w", err)
 	}
 
-	addr := ethgo.Address(rootchainConfig.RootERC20PredicateAddress)
+	if err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC20PredicateAddress),
+		input, rootERC20PredicateName, deployerKey); err != nil {
+		return err
+	}
+
+	cmdOutput.WriteCommandResult(
+		&messageResult{
+			Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
+		})
+
+	return nil
+}
+
+// initializeRootERC1155Predicate invokes initialize function on RootERC1155Predicate smart contract
+func initializeRootERC1155Predicate(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
+	rootchainConfig *polybft.RootchainConfig, deployerKey ethgo.Key) error {
+	rootERC1155PredicateParams := &contractsapi.InitializeRootERC1155PredicateFn{
+		NewStateSender:           rootchainConfig.StateSenderAddress,
+		NewExitHelper:            rootchainConfig.ExitHelperAddress,
+		NewChildERC1155Predicate: contracts.ChildERC1155PredicateContract,
+		NewChildTokenTemplate:    rootchainConfig.ERC1155TemplateAddress,
+	}
+
+	input, err := rootERC1155PredicateParams.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("failed to encode parameters for RootERC1155Predicate.initialize. error: %w", err)
+	}
+
+	if err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC1155PredicateAddress),
+		input, rootERC1155PredicateName, deployerKey); err != nil {
+		return err
+	}
+
+	cmdOutput.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC1155PredicateName),
+	})
+
+	return nil
+}
+
+// sendTransaction sends provided transaction
+func sendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []byte, contractName string,
+	deployerKey ethgo.Key) error {
 	txn := &ethgo.Transaction{
 		To:    &addr,
 		Input: input,
 	}
 
-	return sendTransaction(txRelayer, txn, rootERC20PredicateName, deployerKey)
-}
-
-// sendTransaction sends provided transaction
-func sendTransaction(txRelayer txrelayer.TxRelayer, txn *ethgo.Transaction, contractName string,
-	deployerKey ethgo.Key) error {
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {
 		return fmt.Errorf("failed to send transaction to %s contract (%s). error: %w", contractName, txn.To.Address(), err)
