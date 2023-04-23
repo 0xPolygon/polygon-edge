@@ -33,7 +33,7 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	pbftNonce = types.EncodeNonce(0)
+	pbftNonce = types.Nonce{}
 )
 
 type fsm struct {
@@ -589,7 +589,7 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	if len(header.ExtraData) < ExtraVanity {
-		return fmt.Errorf("extra-data shorter than 32 bytes (%d)", len(header.ExtraData))
+		return fmt.Errorf("extra-data shorter than %d bytes (%d)", ExtraVanity, len(header.ExtraData))
 	}
 	// verify parent hash
 	if parent.Hash != header.ParentHash {
