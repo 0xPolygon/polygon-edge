@@ -433,7 +433,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 		ownerInput, err := ownerOfFn.EncodeAbi()
 		require.NoError(t, err)
 
-		addressRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(manifest.RootchainConfig.RootERC721Address), ownerInput)
+		addressRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(polybftCfg.Bridge.RootERC721Addr), ownerInput)
 		require.NoError(t, err)
 
 		require.Equal(t, receiver, types.StringToAddress(addressRaw))

@@ -399,7 +399,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	// init RootERC721Predicate
 	if err := initializeRootERC721Predicate(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
-		return err
+		return nil, err
 	}
 
 	// init RootERC1155Predicate
