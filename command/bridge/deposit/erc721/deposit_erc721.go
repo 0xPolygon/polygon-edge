@@ -1,13 +1,10 @@
-package erc1155
+package deposit
 
 import (
 	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -16,23 +13,23 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
 )
 
-type depositERC1155Params struct {
-	*common.ERC1155BridgeParams
+type depositERC721Params struct {
+	*common.ERC721BridgeParams
 	testMode bool
 }
 
 var (
-	// depositParams is abstraction for provided bridge parameter values
-	dp *depositERC1155Params = &depositERC1155Params{ERC1155BridgeParams: common.NewERC1155BridgeParams()}
+	dp *depositERC721Params = &depositERC721Params{ERC721BridgeParams: common.NewERC721BridgeParams()}
 )
 
-// GetCommand returns the bridge deposit command
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
-		Use:     "deposit-erc1155",
-		Short:   "Deposits ERC 1155 tokens from the root chain to the child chain",
+		Use:     "deposit-erc721",
+		Short:   "Deposits ERC721 tokens from the root chain to the child chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
@@ -52,13 +49,6 @@ func GetCommand() *cobra.Command {
 	)
 
 	depositCmd.Flags().StringSliceVar(
-		&dp.Amounts,
-		common.AmountsFlag,
-		nil,
-		"amounts that are sent to the receivers accounts",
-	)
-
-	depositCmd.Flags().StringSliceVar(
 		&dp.TokenIDs,
 		common.TokenIDsFlag,
 		nil,
@@ -69,14 +59,14 @@ func GetCommand() *cobra.Command {
 		&dp.TokenAddr,
 		common.RootTokenFlag,
 		"",
-		"root ERC 1155 token address",
+		"root ERC 721 token address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.PredicateAddr,
 		common.RootPredicateFlag,
 		"",
-		"root ERC 1155 token predicate address",
+		"root ERC 721 token predicate address",
 	)
 
 	depositCmd.Flags().StringVar(
@@ -95,7 +85,6 @@ func GetCommand() *cobra.Command {
 	)
 
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
-	_ = depositCmd.MarkFlagRequired(common.AmountsFlag)
 	_ = depositCmd.MarkFlagRequired(common.TokenIDsFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootPredicateFlag)
@@ -127,21 +116,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	amounts := make([]*big.Int, len(dp.Amounts))
-	tokenIDs := make([]*big.Int, len(dp.TokenIDs))
+	receivers := make([]ethgo.Address, len(dp.Receivers))
+	tokenIDs := make([]*big.Int, len(dp.Receivers))
 
-	for i := range dp.Receivers {
-		amountRaw := dp.Amounts[i]
-		tokenIDRaw := dp.TokenIDs[i]
-
-		amount, err := types.ParseUint256orHex(&amountRaw)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amountRaw, err))
-
-			return
-		}
-
-		amounts[i] = amount
+	for i, tokenIDRaw := range dp.TokenIDs {
+		tokenIDRaw := tokenIDRaw
 
 		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
@@ -150,62 +129,57 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
+		receivers[i] = ethgo.Address(types.StringToAddress(dp.Receivers[i]))
 		tokenIDs[i] = tokenID
 	}
 
 	if dp.testMode {
-		// mint tokens to depositor, so he is able to send them
-		mintTxn, err := createMintTxn(types.Address(depositorAddr), types.Address(depositorAddr), amounts, tokenIDs)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
+		for i := 0; i < len(tokenIDs); i++ {
+			mintTxn, err := createMintTxn(types.Address(depositorAddr), types.Address(depositorAddr))
+			if err != nil {
+				outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
 
-			return
-		}
+				return
+			}
 
-		receipt, err := txRelayer.SendTransaction(mintTxn, depositorKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
+			receipt, err := txRelayer.SendTransaction(mintTxn, depositorKey)
+			if err != nil {
+				outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
 
-			return
-		}
+				return
+			}
 
-		if receipt.Status == uint64(types.ReceiptFailed) {
-			outputter.SetError(fmt.Errorf("failed to mint tokens to depositor %s", depositorAddr))
+			if receipt.Status == uint64(types.ReceiptFailed) {
+				outputter.SetError(fmt.Errorf("failed to mint tokens to depositor %s", depositorAddr))
 
-			return
+				return
+			}
 		}
 	}
 
-	// approve root erc1155 predicate
-	approveTxn, err := createApproveERC1155PredicateTxn(
-		types.StringToAddress(dp.PredicateAddr),
+	approveTxn, err := createApproveERC721PredicateTxn(types.StringToAddress(dp.PredicateAddr),
 		types.StringToAddress(dp.TokenAddr))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to create root erc 1155 approve transaction: %w", err))
+		outputter.SetError(fmt.Errorf("failed to approve predicate: %w", err))
 
 		return
 	}
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send root erc 1155 approve transaction"))
+		outputter.SetError(fmt.Errorf("failed to send root erc 721 approve transaction"))
 
 		return
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		outputter.SetError(fmt.Errorf("failed to approve root erc 1155 predicate"))
+		outputter.SetError(fmt.Errorf("failed to approve root erc 721 predicate"))
 
 		return
 	}
 
-	receivers := make([]ethgo.Address, len(dp.Receivers))
-	for i, receiverRaw := range dp.Receivers {
-		receivers[i] = ethgo.Address(types.StringToAddress(receiverRaw))
-	}
-
 	// deposit tokens
-	depositTxn, err := createDepositTxn(depositorAddr, receivers, amounts, tokenIDs)
+	depositTxn, err := createDepositTxn(depositorAddr, receivers, tokenIDs)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create tx input: %w", err))
 
@@ -214,39 +188,37 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	receipt, err = txRelayer.SendTransaction(depositTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("sending deposit transactions failed (receivers: %s, amount: %s): %w",
-			strings.Join(dp.Receivers, ", "), strings.Join(dp.Amounts, ", "), err))
+		outputter.SetError(fmt.Errorf("sending deposit transactions failed (receivers: %s, tokenIDs: %s): %w",
+			strings.Join(dp.Receivers, ", "), strings.Join(dp.TokenIDs, ", "), err))
 
 		return
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		outputter.SetError(fmt.Errorf("sending deposit transactions failed (receivers: %s, amounts: %s)",
-			strings.Join(dp.Receivers, ", "), strings.Join(dp.Amounts, ", ")))
+		outputter.SetError(fmt.Errorf("sending deposit transactions failed (receivers: %s, tokenIDs: %s)",
+			strings.Join(dp.Receivers, ", "), strings.Join(dp.TokenIDs, ", ")))
 
 		return
 	}
 
 	outputter.SetCommandResult(
-		&depositERC1155Result{
+		&depositERC721Result{
 			Sender:    depositorAddr.String(),
 			Receivers: dp.Receivers,
-			Amounts:   dp.Amounts,
 			TokenIDs:  dp.TokenIDs,
 		})
 }
 
-// createDepositTxn encodes parameters for deposit function on rootchain predicate contract
-func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
-	amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
-	depositBatchFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
+// createDepositTxn encodes parameters for deposit fnction on rootchain predicate contract
+func createDepositTxn(sender ethgo.Address,
+	receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
+	depositToRoot := &contractsapi.DepositBatchRootERC721PredicateFn{
 		RootToken: types.StringToAddress(dp.TokenAddr),
 		Receivers: receivers,
 		TokenIDs:  tokenIDs,
-		Amounts:   amounts,
 	}
 
-	input, err := depositBatchFn.EncodeAbi()
+	input, err := depositToRoot.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
@@ -261,11 +233,9 @@ func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
-func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
-	mintFn := &contractsapi.MintBatchRootERC1155Fn{
-		To:      receiver,
-		Amounts: amounts,
-		IDs:     tokenIDs,
+func createMintTxn(sender, receiver types.Address) (*ethgo.Transaction, error) {
+	mintFn := &contractsapi.MintRootERC721Fn{
+		To: receiver,
 	}
 
 	input, err := mintFn.EncodeAbi()
@@ -282,21 +252,19 @@ func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int)
 	}, nil
 }
 
-// createApproveERC1155PredicateTxn sends approve transaction
-// to ERC1155 token for ERC1155 predicate so that it is able to spend given tokens
-func createApproveERC1155PredicateTxn(rootERC1155Predicate,
-	rootERC1155Token types.Address) (*ethgo.Transaction, error) {
-	approveFnParams := &contractsapi.SetApprovalForAllRootERC1155Fn{
-		Operator: rootERC1155Predicate,
+// createApproveERC721PredicateTxn sends approve transaction
+func createApproveERC721PredicateTxn(rootERC721Predicate, rootERC721Token types.Address) (*ethgo.Transaction, error) {
+	approveFnParams := &contractsapi.SetApprovalForAllRootERC721Fn{
+		Operator: rootERC721Predicate,
 		Approved: true,
 	}
 
 	input, err := approveFnParams.EncodeAbi()
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode parameters for RootERC1155.setApprovalForAll. error: %w", err)
+		return nil, fmt.Errorf("failed to encode parameters for RootERC721.approve. error: %w", err)
 	}
 
-	addr := ethgo.Address(rootERC1155Token)
+	addr := ethgo.Address(rootERC721Token)
 
 	return &ethgo.Transaction{
 		To:    &addr,
@@ -304,23 +272,21 @@ func createApproveERC1155PredicateTxn(rootERC1155Predicate,
 	}, nil
 }
 
-type depositERC1155Result struct {
+type depositERC721Result struct {
 	Sender    string   `json:"sender"`
 	Receivers []string `json:"receivers"`
-	Amounts   []string `json:"amounts"`
-	TokenIDs  []string `json:"tokenIds"`
+	TokenIDs  []string `json:"tokenIDs"`
 }
 
-func (r *depositERC1155Result) GetOutput() string {
+func (r *depositERC721Result) GetOutput() string {
 	var buffer bytes.Buffer
 
-	vals := make([]string, 0, 4)
+	vals := make([]string, 0, 3)
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
+	vals = append(vals, fmt.Sprintf("TokenIDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	buffer.WriteString("\n[DEPOSIT ERC1155]\n")
+	buffer.WriteString("\n[DEPOSIT ERC 721]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 

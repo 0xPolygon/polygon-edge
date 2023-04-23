@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
@@ -93,7 +94,7 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 		{
 			"empty endpoint",
 			"",
-			"http://127.0.0.1:8545",
+			txrelayer.DefaultRPCAddress,
 		},
 	}
 
@@ -115,7 +116,7 @@ func TestStateSyncRelayer_Stop(t *testing.T) {
 	key, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	r := NewRelayer("test-chain-1", "http://127.0.0.1:8545", ethgo.Address(contracts.StateReceiverContract), 0, hclog.NewNullLogger(), key)
+	r := NewRelayer("test-chain-1", txrelayer.DefaultRPCAddress, ethgo.Address(contracts.StateReceiverContract), 0, hclog.NewNullLogger(), key)
 
 	require.NotPanics(t, func() { r.Stop() })
 }

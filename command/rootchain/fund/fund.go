@@ -59,8 +59,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&jsonRPCAddress,
 		jsonRPCFlag,
-		"http://127.0.0.1:8545",
-		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+		txrelayer.DefaultRPCAddress,
+		"the rootchain JSON RPC endpoint",
 	)
 
 	// Don't accept data-dir and config flags because they are related to different secrets managers.

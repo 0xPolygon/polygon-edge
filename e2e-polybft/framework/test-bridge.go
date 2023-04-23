@@ -123,8 +123,18 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--amounts", amounts)
 
 	case bridgeCommon.ERC721:
-		//nolint:godox
-		// TODO: Implement ERC721 deposits
+		if tokenIDs == "" {
+			return errors.New("provide at least one token id value")
+		}
+
+		args = append(args,
+			"bridge",
+			"deposit-erc721",
+			"--test",
+			"--root-token", rootTokenAddr.String(),
+			"--root-predicate", rootPredicateAddr.String(),
+			"--receivers", receivers,
+			"--token-ids", tokenIDs)
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {
@@ -187,8 +197,18 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"--json-rpc", jsonRPCEndpoint)
 
 	case bridgeCommon.ERC721:
-		//nolint:godox
-		// TODO: Implement ERC721 withdrawal
+		if tokenIDs == "" {
+			return errors.New("provide at least one token id value")
+		}
+
+		args = append(args,
+			"bridge",
+			"withdraw-erc721",
+			"--sender-key", senderKey,
+			"--receivers", receivers,
+			"--token-ids", tokenIDs,
+			"--json-rpc", jsonRPCEndpoint,
+			"--child-token", childToken.String())
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {

@@ -44,7 +44,7 @@ type TxRelayerImpl struct {
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
-		ipAddress:      "http://127.0.0.1:8545",
+		ipAddress:      DefaultRPCAddress,
 		receiptTimeout: 50 * time.Millisecond,
 	}
 	for _, opt := range opts {
