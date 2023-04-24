@@ -134,7 +134,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	// TODO - @goran-ethernal update this once e2e tests get fixed //nolint:godox
+	//nolint:godox
+	// TODO - @goran-ethernal update this check once e2e tests get fixed
 	// systemState := polybft.NewSystemState(
 	// 	contracts.ValidatorSetContract,
 	// 	contracts.StateReceiverContract,
@@ -231,9 +232,11 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	validators := polybft.AccountSet{}
 	// assert that new validator is among validator set
+
+	//nolint:godox
 	require.NoError(t, cluster.WaitUntil(20*time.Second, 1*time.Second, func() bool {
 		// query validators
-		// TODO - @goran-ethernal update this check once e2e tests get fixed //nolint:godox
+		// TODO - @goran-ethernal update this check once e2e tests get fixed
 		//validators, err = systemState.GetValidatorSet()
 		require.NoError(t, err)
 
@@ -457,7 +460,8 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	// TODO - @goran-ethernal update this once e2e tests get fixed //nolint:godox
+	//nolint:godox
+	// TODO - @goran-ethernal update this once e2e tests get fixed
 	// systemState := polybft.NewSystemState(
 	// 	contracts.ValidatorSetContract,
 	// 	contracts.StateReceiverContract,
@@ -483,7 +487,8 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait end of epoch
 	require.NoError(t, cluster.WaitForBlock(10, 20*time.Second))
 
-	// TODO - @goran-ethernal update this check once e2e tests get fixed //nolint:godox
+	//nolint:godox
+	// TODO - @goran-ethernal update this check once e2e tests get fixed
 	// validatorSet, err := systemState.GetValidatorSet()
 	// require.NoError(t, err)
 
