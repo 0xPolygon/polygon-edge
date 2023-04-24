@@ -65,7 +65,7 @@ type Transaction struct {
 	Type TxType
 
 	// Cache
-	size atomic.Value
+	size atomic.Pointer[uint64]
 }
 
 // IsContractCreation checks if tx is contract creation
@@ -182,16 +182,11 @@ func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 
 func (t *Transaction) Size() uint64 {
 	if size := t.size.Load(); size != nil {
-		sizeVal, ok := size.(uint64)
-		if !ok {
-			return 0
-		}
-
-		return sizeVal
+		return *size
 	}
 
 	size := uint64(len(t.MarshalRLP()))
-	t.size.Store(size)
+	t.size.Store(&size)
 
 	return size
 }
