@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	polybftWallet "github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
@@ -88,4 +90,22 @@ func ReadRootchainIP() (string, error) {
 	}
 
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
+}
+
+func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error) {
+	if privateKey != "" {
+		key, err := GetRootchainPrivateKey(privateKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize private key: %w", err)
+		}
+
+		return key, nil
+	}
+
+	secretsManager, err := polybftsecrets.GetSecretsManager(accountDir, accountConfig, true)
+	if err != nil {
+		return nil, err
+	}
+
+	return polybftWallet.GetEcdsaFromSecret(secretsManager)
 }

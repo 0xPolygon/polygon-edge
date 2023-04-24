@@ -3,6 +3,7 @@ package polybft
 import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/registration"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/staking"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/supernet"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/whitelist"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/unstaking"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/validators"
@@ -27,6 +28,9 @@ func GetCommand() *cobra.Command {
 		registration.GetCommand(),
 		// rootchain (stake manager) stake command
 		staking.GetCommand(),
+		// rootchain (supernet manager) command for finalizing genesis
+		// validator set and enabling staking
+		supernet.GetCommand(),
 	)
 
 	return polybftCmd

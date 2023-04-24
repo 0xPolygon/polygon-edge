@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -84,33 +83,15 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var ecdsaKey ethgo.Key
-
-	if params.privateKey != "" {
-		key, err := rootHelper.GetRootchainPrivateKey(params.privateKey)
-		if err != nil {
-			return fmt.Errorf("failed to initialize private key: %w", err)
-		}
-
-		ecdsaKey = key
-	} else {
-		secretsManager, err := polybftsecrets.GetSecretsManager(params.accountDir, params.accountConfig, true)
-		if err != nil {
-			return err
-		}
-
-		key, err := wallet.GetEcdsaFromSecret(secretsManager)
-		if err != nil {
-			return err
-		}
-
-		ecdsaKey = key
+	ecdsaKey, err := rootHelper.GetECDSAKey(params.privateKey, params.accountDir, params.accountConfig)
+	if err != nil {
+		return err
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
 		txrelayer.WithReceiptTimeout(150*time.Millisecond))
 	if err != nil {
-		return fmt.Errorf("enlist validator failed: %w", err)
+		return fmt.Errorf("whitelist validator failed. Could not create tx relayer: %w", err)
 	}
 
 	gasPrice, err := txRelayer.GetGasPrice()
@@ -124,7 +105,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	encoded, err := whitelistFn.EncodeAbi()
 	if err != nil {
-		return fmt.Errorf("enlist validator failed: %w", err)
+		return fmt.Errorf("whitelist validator failed. Could not abi encode whitelist function: %w", err)
 	}
 
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
@@ -137,11 +118,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)
 	if err != nil {
-		return fmt.Errorf("enlist validator failed %w", err)
+		return fmt.Errorf("whitelist validator failed %w", err)
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("enlist validator transaction failed on block %d", receipt.BlockNumber)
+		return fmt.Errorf("whitelist validator transaction failed on block %d", receipt.BlockNumber)
 	}
 
 	var (
@@ -165,7 +146,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if len(result.newValidatorAddresses) != len(params.newValidatorAddresses) {
-		return fmt.Errorf("enlistment of validators did not pass successfully")
+		return fmt.Errorf("whitelist of validators did not pass successfully")
 	}
 
 	outputter.WriteCommandResult(result)
