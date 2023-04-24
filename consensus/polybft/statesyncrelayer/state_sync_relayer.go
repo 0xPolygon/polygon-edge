@@ -38,7 +38,7 @@ func sanitizeRPCEndpoint(rpcEndpoint string) string {
 		if err == nil {
 			rpcEndpoint = fmt.Sprintf("http://%s:%s", "127.0.0.1", port)
 		} else {
-			rpcEndpoint = "http://127.0.0.1:8545"
+			rpcEndpoint = txrelayer.DefaultRPCAddress
 		}
 	}
 

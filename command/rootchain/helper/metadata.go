@@ -21,7 +21,8 @@ var (
 	ErrRootchainNotFound = errors.New("rootchain not found")
 	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
 	errTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
-	rootchainAccountKey  *wallet.Key
+
+	rootchainAccountKey *wallet.Key
 )
 
 // GetRootchainPrivateKey initializes a private key from provided raw private key

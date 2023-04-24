@@ -114,27 +114,27 @@ func TestEncodingAndParsingEvent(t *testing.T) {
 
 	// log matches event
 	doesMatch, err := exitEvent.ParseLog(log)
-	require.True(t, doesMatch)
 	require.NoError(t, err)
+	require.True(t, doesMatch)
 	require.Equal(t, uint64(11), exitEvent.ID.Uint64())
 
 	// change exit event id
 	log.Topics[1] = ethgo.BytesToHash(common.EncodeUint64ToBytes(22))
 	doesMatch, err = exitEvent.ParseLog(log)
-	require.True(t, doesMatch)
 	require.NoError(t, err)
+	require.True(t, doesMatch)
 	require.Equal(t, uint64(22), exitEvent.ID.Uint64())
 
 	// log does not match event
 	log.Topics[0] = stateSyncEventAPI.Sig()
 	doesMatch, err = exitEvent.ParseLog(log)
-	require.False(t, doesMatch)
 	require.NoError(t, err)
+	require.False(t, doesMatch)
 
 	// error on parsing log
 	log.Topics[0] = exitEventAPI.Sig()
 	log.Topics = log.Topics[:3]
 	doesMatch, err = exitEvent.ParseLog(log)
-	require.True(t, doesMatch)
 	require.Error(t, err)
+	require.True(t, doesMatch)
 }

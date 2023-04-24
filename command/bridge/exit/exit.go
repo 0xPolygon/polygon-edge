@@ -79,7 +79,7 @@ func GetCommand() *cobra.Command {
 	exitCmd.Flags().StringVar(
 		&ep.rootJSONRPCAddr,
 		rootJSONRPCFlag,
-		"http://127.0.0.1:8545",
+		txrelayer.DefaultRPCAddress,
 		"the JSON RPC root chain endpoint",
 	)
 
