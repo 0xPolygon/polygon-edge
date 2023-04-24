@@ -631,8 +631,12 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	}
 
-	// Reject underpriced transactions
 	if tx.Type == types.DynamicFeeTx {
+		// Reject dynamic fee tx if london hardfork is not enabled
+		if !p.forks.London {
+			return ErrInvalidTxType
+		}
+
 		// Check EIP-1559-related fields and make sure they are correct
 		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
 			return ErrUnderpriced
@@ -650,6 +654,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrTipAboveFeeCap
 		}
 
+		// Reject underpriced transactions
 		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
 			return ErrUnderpriced
 		}
