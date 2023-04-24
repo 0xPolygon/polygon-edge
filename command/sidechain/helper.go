@@ -60,10 +60,10 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 	return GetAccount(accountDir, "")
 }
 
-//nolint:godox
-
 // GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address
 // TODO - @goran-ethernal depricate this function once we change e2e tests
+//
+//nolint:godox
 func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
 	getValidatorMethod := contractsapi.ChildValidatorSet.Abi.GetMethod("getValidator")
 
