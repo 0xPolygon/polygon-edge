@@ -14,13 +14,13 @@ const (
 	DefaultConsensus        = server.PolyBFTConsensus
 	DefaultGenesisGasUsed   = 458752  // 0x70000
 	DefaultGenesisGasLimit  = 5242880 // 0x500000
-	DefaultGenesisBaseFee   = chain.GenesisBaseFee
 	DefaultGenesisBaseFeeEM = chain.GenesisBaseFeeEM
 )
 
 var (
 	DefaultStake          = ethgo.Ether(1e6)
 	DefaultPremineBalance = ethgo.Ether(1e6)
+	DefaultGenesisBaseFee = chain.GenesisBaseFee
 )
 
 const (

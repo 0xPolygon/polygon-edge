@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/umbracle/ethgo"
+
 	"github.com/hashicorp/go-multierror"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -15,10 +17,6 @@ import (
 )
 
 const (
-	// GenesisBaseFee is the initial base fee for EIP-1559 blocks.
-	// Using 1 gwei by default
-	GenesisBaseFee = 1_000_000_000
-
 	// GenesisBaseFeeEM is the initial base fee elasticity multiplier for EIP-1559 blocks.
 	GenesisBaseFeeEM = 2
 
@@ -27,6 +25,11 @@ const (
 
 	// GenesisDifficulty is the default difficulty of the Genesis block.
 	GenesisDifficulty uint64 = 131072
+)
+
+var (
+	// GenesisBaseFee is the initial base fee for EIP-1559 blocks.
+	GenesisBaseFee = ethgo.Gwei(1).Uint64()
 )
 
 // Chain is the blockchain chain configuration
