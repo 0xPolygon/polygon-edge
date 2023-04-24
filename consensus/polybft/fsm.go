@@ -33,7 +33,7 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	pbftNonce = types.Nonce{}
+	zeroNonce = types.Nonce{}
 )
 
 type fsm struct {
@@ -600,7 +600,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 		return fmt.Errorf("invalid number")
 	}
 	//verifity header is zero
-	if header.Nonce != pbftNonce {
+	if header.Nonce != zeroNonce {
 		return fmt.Errorf("invalid nonce")
 	}
 	//verify that the gasUsed is <= gasLimit
