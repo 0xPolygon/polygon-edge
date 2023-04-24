@@ -14,6 +14,11 @@ import (
 
 // ValidatorInfo is data transfer object which holds validator information,
 // provided by smart contract
+// TODO - @goran-ethernal deprecate this struct once we change e2e tests
+// we will instead use the contractsapi generated stub once we remove old
+// ChildValidatorSet contract and its stubs
+//
+//nolint:godox
 type ValidatorInfo struct {
 	Address             ethgo.Address
 	Stake               *big.Int
@@ -21,6 +26,7 @@ type ValidatorInfo struct {
 	Commission          *big.Int
 	WithdrawableRewards *big.Int
 	Active              bool
+	Whitelisted         bool
 }
 
 // SystemState is an interface to interact with the consensus system contracts in the chain

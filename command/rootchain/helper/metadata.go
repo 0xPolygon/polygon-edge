@@ -2,12 +2,17 @@ package helper
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftWallet "github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
@@ -108,4 +113,44 @@ func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error
 	}
 
 	return polybftWallet.GetEcdsaFromSecret(secretsManager)
+}
+
+// GetValidatorInfo queries SupernetManager smart contract on root
+// and retrieves validator info for given address
+func GetValidatorInfo(validatorAddr, supernetManagerAddr ethgo.Address,
+	txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+	getValidatorMethod := contractsapi.CustomSupernetManager.Abi.GetMethod("validators")
+
+	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
+		supernetManagerAddr, encode)
+	if err != nil {
+		return nil, err
+	}
+
+	byteResponse, err := hex.DecodeHex(response)
+	if err != nil {
+		return nil, fmt.Errorf("unable to decode hex response, %w", err)
+	}
+
+	decoded, err := getValidatorMethod.Outputs.Decode(byteResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	decodedOutputsMap, ok := decoded.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not convert decoded outputs to map")
+	}
+
+	return &polybft.ValidatorInfo{
+		Address:     validatorAddr.Address(),
+		Stake:       decodedOutputsMap["stake"].(*big.Int),     //nolint:forcetypeassert
+		Active:      decodedOutputsMap["isActive"].(bool),      //nolint:forcetypeassert
+		Whitelisted: decodedOutputsMap["isWhitelisted"].(bool), //nolint:forcetypeassert
+	}, nil
 }
