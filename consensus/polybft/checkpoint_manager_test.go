@@ -506,6 +506,10 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
+func (d *dummyTxRelayer) GetGasPrice() (uint64, error) {
+	return 0, nil
+}
+
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 	t.Helper()
 

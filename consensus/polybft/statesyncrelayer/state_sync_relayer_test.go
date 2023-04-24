@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
@@ -12,6 +13,8 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 )
+
+var _ txrelayer.TxRelayer = (*txRelayerMock)(nil)
 
 type txRelayerMock struct {
 	mock.Mock
@@ -33,6 +36,10 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	args := t.Called(txn)
 
 	return nil, args.Error(1)
+}
+
+func (d *txRelayerMock) GetGasPrice() (uint64, error) {
+	return 0, nil
 }
 
 func Test_executeStateSync(t *testing.T) {
