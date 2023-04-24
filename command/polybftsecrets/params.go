@@ -20,7 +20,6 @@ const (
 	networkFlag            = "network"
 	numFlag                = "num"
 	outputFlag             = "output"
-	chainIDFlag            = "chain-id"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -122,9 +121,9 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().Int64Var(
 		&ip.chainID,
-		chainIDFlag,
+		ChainIDFlag,
 		command.DefaultChainID,
-		"the ID of the chain",
+		ChainIDFlagDesc,
 	)
 }
 

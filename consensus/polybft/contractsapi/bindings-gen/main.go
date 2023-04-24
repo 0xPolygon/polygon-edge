@@ -162,9 +162,11 @@ func main() {
 			gensc.StakeManager,
 			[]string{
 				"registerChildChain",
+				"stakeFor",
 			},
 			[]string{
 				"ChildManagerRegistered",
+				"StakeAdded",
 			},
 		},
 	}

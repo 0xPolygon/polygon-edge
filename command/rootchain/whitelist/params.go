@@ -35,7 +35,10 @@ func (ep *whitelistParams) validateFlags() error {
 		return sidechainHelper.ValidateSecretFlags(ep.accountDir, ep.accountConfig)
 	}
 
-	return nil
+	// validate jsonrpc address
+	_, err := helper.ParseJSONRPCAddress(ep.jsonRPC)
+
+	return err
 }
 
 type whitelistResult struct {
