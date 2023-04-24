@@ -5,6 +5,11 @@ on:  # yamllint disable-line rule:truthy
     # * is a special character in YAML so you have to quote this string
     - cron: '0 0 * * *'
 
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
 jobs:
   build:
     name: Build
@@ -42,6 +47,27 @@ jobs:
     name: Nightly Notifications
     runs-on: ubuntu-latest
     needs: [build, test, e2e, e2eibft, property, fuzz]
+
+  loadtest:
+    name: Build Devnet
+    uses: ./.github/workflows/deploy.nightly.devnet.yml
+    secrets:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      TF_VAR_COMPANY_NAME: ${{ secrets.TF_VAR_COMPANY_NAME }}
+      TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+      TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+      VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
+    with:
+      environment: devnet
+ 
+  notification:
+    name: Nightly Notifications
+    runs-on: ubuntu-latest
+    needs: [build, test, e2e, e2eibft, property, fuzz, loadtest]
     if: success() || failure()
     steps:
       - name: Notify Slack
@@ -107,6 +133,13 @@ jobs:
                   "text": {
                     "type": "mrkdwn",
                     "text": "Fuzz tests ${{ needs.fuzz.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Load tests ${{ needs.loadtest.outputs.workflow_output == '' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {
