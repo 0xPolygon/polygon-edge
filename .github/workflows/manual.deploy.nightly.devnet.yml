@@ -3,11 +3,12 @@
 
 name: Nightly DevNet Workflow (Manual)
 on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - jesse/nightly-loadtest-workflow
+  pull_request:
+    branches: [main]
   workflow_call: {}
   workflow_dispatch: {}
+
+concurrency: 'manual-nightly-devnet'
 
 permissions:
   id-token: write
@@ -21,7 +22,6 @@ jobs:
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      TF_VAR_AWS_PROFILE: ${{ secrets.TF_VAR_AWS_PROFILE }}
       TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
       TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
