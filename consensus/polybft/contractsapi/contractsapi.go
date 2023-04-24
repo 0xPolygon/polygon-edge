@@ -920,7 +920,6 @@ func (w *WithdrawBatchChildERC1155PredicateFn) DecodeAbi(buf []byte) error {
 
 type InitializeChildERC1155Fn struct {
 	RootToken_ types.Address `abi:"rootToken_"`
-	Name_      string        `abi:"name_"`
 	Uri_       string        `abi:"uri_"`
 }
 
