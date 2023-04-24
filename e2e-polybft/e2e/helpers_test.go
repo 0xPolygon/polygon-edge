@@ -225,10 +225,10 @@ func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
 func checkStateSyncResultLogs(
 	t *testing.T,
 	logs []*ethgo.Log,
-	expectedCount int,
+	expectedLogsCount int,
 ) {
 	t.Helper()
-	require.Equal(t, len(logs), expectedCount)
+	require.Equal(t, expectedLogsCount, len(logs))
 
 	var stateSyncResultEvent contractsapi.StateSyncResultEvent
 	for _, log := range logs {
