@@ -130,7 +130,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
 		b.params.Logger.Info("Transaction gas limit exceedes block gas limit", "hash", tx.Hash,
-			"tx gas limit", tx.Gas, "bloc gas limt", b.params.GasLimit)
+			"tx gas limit", tx.Gas, "block gas limt", b.params.GasLimit)
 
 		return txpool.ErrBlockLimitExceeded
 	}
