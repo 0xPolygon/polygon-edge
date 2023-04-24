@@ -38,7 +38,7 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	return nil, args.Error(1)
 }
 
-func (d *txRelayerMock) GetGasPrice() (uint64, error) {
+func (t *txRelayerMock) GetGasPrice() (uint64, error) {
 	return 0, nil
 }
 
