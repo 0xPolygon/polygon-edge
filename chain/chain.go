@@ -7,9 +7,8 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/umbracle/ethgo"
-
 	"github.com/hashicorp/go-multierror"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
