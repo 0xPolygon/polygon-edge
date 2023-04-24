@@ -138,11 +138,11 @@ func (e *Executor) ProcessBlock(
 	}
 
 	for _, t := range block.Transactions {
-		if t.ExceedsBlockGasLimit(block.Header.GasLimit) {
+		if t.Gas > block.Header.GasLimit {
 			continue
 		}
 
-		if err := txn.Write(t); err != nil {
+		if err = txn.Write(t); err != nil {
 			return nil, err
 		}
 	}
