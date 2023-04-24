@@ -81,7 +81,6 @@ type TestClusterConfig struct {
 	TmpDir               string
 	BlockGasLimit        uint64
 	BurnContracts        map[uint64]types.Address
-	ContractsDir         string
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64

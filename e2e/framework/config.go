@@ -120,11 +120,6 @@ func (t *TestServerConfig) SetBlockGasTarget(target uint64) {
 	t.BlockGasTarget = target
 }
 
-// SetBaseFee sets the given base fee for the test server
-func (t *TestServerConfig) SetBaseFee(baseFee uint64) {
-	t.BaseFee = baseFee
-}
-
 // SetBurnContract sets the given burn contract for the test server
 func (t *TestServerConfig) SetBurnContract(block uint64, address types.Address) {
 	if t.BurnContracts == nil {
