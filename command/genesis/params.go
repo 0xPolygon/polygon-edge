@@ -367,7 +367,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			ChainID:      int64(p.chainID),
 			Forks:        chain.AllForksEnabled,
 			Engine:       p.consensusEngineConfig,
-			BurnContract: map[string]string{},
+			BurnContract: map[uint64]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -378,7 +378,7 @@ func (p *genesisParams) initGenesisConfig() error {
 			return err
 		}
 
-		chainConfig.Params.BurnContract[block.String()] = address.String()
+		chainConfig.Params.BurnContract[block] = address.String()
 	}
 
 	// Predeploy staking smart contract if needed

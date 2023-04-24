@@ -115,7 +115,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BurnContract: map[string]string{},
+			BurnContract: map[uint64]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -158,7 +158,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			return err
 		}
 
-		chainConfig.Params.BurnContract[block.String()] = addr.String()
+		chainConfig.Params.BurnContract[block] = addr.String()
 	}
 
 	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))

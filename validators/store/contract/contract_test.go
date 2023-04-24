@@ -83,8 +83,8 @@ func newTestTransition(
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
-		BurnContract: map[string]string{
-			"0": types.ZeroAddress.String(),
+		BurnContract: map[uint64]string{
+			0: types.ZeroAddress.String(),
 		},
 	}, st, hclog.NewNullLogger())
 

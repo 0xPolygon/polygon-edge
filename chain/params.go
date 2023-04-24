@@ -2,10 +2,8 @@ package chain
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"sort"
-	"strconv"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -30,7 +28,7 @@ type Params struct {
 	TransactionsBlockList     *AddressListConfig `json:"transactionsBlockList,omitempty"`
 
 	// Governance contract where the token will be sent to and burn in london fork
-	BurnContract map[string]string `json:"burnContract"`
+	BurnContract map[uint64]string `json:"burnContract"`
 }
 
 type AddressListConfig struct {
@@ -45,12 +43,7 @@ type AddressListConfig struct {
 func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
 	blocks := make([]uint64, 0, len(p.BurnContract))
 
-	for k := range p.BurnContract {
-		startBlock, err := strconv.ParseUint(k, 10, 64)
-		if err != nil {
-			return types.ZeroAddress, fmt.Errorf("failed to parse %s block: %w", k, err)
-		}
-
+	for startBlock := range p.BurnContract {
 		blocks = append(blocks, startBlock)
 	}
 
@@ -64,11 +57,11 @@ func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
 
 	for i := 0; i < len(blocks)-1; i++ {
 		if block >= blocks[i] && block < blocks[i+1] {
-			return types.StringToAddress(p.BurnContract[fmt.Sprintf("%d", blocks[i])]), nil
+			return types.StringToAddress(p.BurnContract[blocks[i]]), nil
 		}
 	}
 
-	return types.StringToAddress(p.BurnContract[fmt.Sprintf("%d", blocks[len(blocks)-1])]), nil
+	return types.StringToAddress(p.BurnContract[blocks[len(blocks)-1]]), nil
 }
 
 func (p *Params) GetEngine() string {

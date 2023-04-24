@@ -121,21 +121,21 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 }
 
 // parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
-func parseBurnContractInfo(burnContractInfoRaw string) (*big.Int, types.Address, error) {
+func parseBurnContractInfo(burnContractInfoRaw string) (uint64, types.Address, error) {
 	// <block>:<address>
 	burnContractParts := strings.Split(burnContractInfoRaw, ":")
 	if len(burnContractParts) != 2 {
-		return nil, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>")
+		return 0, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>")
 	}
 
 	blockRaw := burnContractParts[0]
 
 	block, err := types.ParseUint256orHex(&blockRaw)
 	if err != nil {
-		return nil, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
+		return 0, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
 	}
 
-	return block, types.StringToAddress(burnContractParts[1]), nil
+	return block.Uint64(), types.StringToAddress(burnContractParts[1]), nil
 }
 
 // GetValidatorKeyFiles returns file names which has validator secrets
