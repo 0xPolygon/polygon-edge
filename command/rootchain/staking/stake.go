@@ -8,7 +8,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -95,7 +94,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	gasPrice, err := rootHelper.GetGasPriceOnRoot(params.jsonRPC)
+	gasPrice, err := txRelayer.GetGasPrice()
 	if err != nil {
 		return err
 	}
