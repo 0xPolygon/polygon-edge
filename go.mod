@@ -66,7 +66,7 @@ require (
 )
 
 require (
-	github.com/dave/jennifer v1.6.0
+	github.com/dave/jennifer v1.6.1
 	github.com/quasilyte/go-ruleguard v0.3.19
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	golang.org/x/sync v0.1.0
