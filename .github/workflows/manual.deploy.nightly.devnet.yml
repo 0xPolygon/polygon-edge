@@ -4,7 +4,7 @@
 name: Nightly DevNet Workflow (Manual)
 on:  # yamllint disable-line rule:truthy
   pull_request:
-    branches: [main]
+    branches: [develop]
   workflow_call: {}
   workflow_dispatch: {}
 
