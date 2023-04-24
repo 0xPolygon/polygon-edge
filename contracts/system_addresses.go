@@ -46,4 +46,8 @@ var (
 	AllowListTransactionsAddr = types.StringToAddress("0x0200000000000000000000000000000000000002")
 	// BlockListTransactionsAddr is the address of the transactions block list
 	BlockListTransactionsAddr = types.StringToAddress("0x0300000000000000000000000000000000000002")
+	// AllowListBridgeAddr is the address of the bridge allow list
+	AllowListBridgeAddr = types.StringToAddress("0x0200000000000000000000000000000000000004")
+	// BlockListBridgeAddr is the address of the bridge block list
+	BlockListBridgeAddr = types.StringToAddress("0x0300000000000000000000000000000000000004")
 )

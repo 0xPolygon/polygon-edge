@@ -284,6 +284,34 @@ func setFlags(cmd *cobra.Command) {
 			[]string{},
 			"list of addresses to enable by default in the transactions block list",
 		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeAllowListAdmin,
+			bridgeAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the bridge allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeAllowListEnabled,
+			bridgeAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the bridge allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeBlockListAdmin,
+			bridgeBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the bridge block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeBlockListEnabled,
+			bridgeBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the bridge block list",
+		)
 	}
 }
 

@@ -96,6 +96,10 @@ type TestClusterConfig struct {
 	TransactionsAllowListEnabled     []types.Address
 	TransactionsBlockListAdmin       []types.Address
 	TransactionsBlockListEnabled     []types.Address
+	BridgeAllowListAdmin             []types.Address
+	BridgeAllowListEnabled           []types.Address
+	BridgeBlockListAdmin             []types.Address
+	BridgeBlockListEnabled           []types.Address
 
 	NumBlockConfirmations uint64
 
@@ -304,6 +308,30 @@ func WithTransactionsBlockListEnabled(addr types.Address) ClusterOption {
 	}
 }
 
+func WithBridgeAllowListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BridgeAllowListAdmin = append(h.BridgeAllowListAdmin, addr)
+	}
+}
+
+func WithBridgeAllowListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BridgeAllowListEnabled = append(h.BridgeAllowListEnabled, addr)
+	}
+}
+
+func WithBridgeBlockListAdmin(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BridgeBlockListAdmin = append(h.BridgeBlockListAdmin, addr)
+	}
+}
+
+func WithBridgeBlockListEnabled(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BridgeBlockListEnabled = append(h.BridgeBlockListEnabled, addr)
+	}
+}
+
 func WithPropertyTestLogging() ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.IsPropertyTest = true
@@ -487,6 +515,26 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		if len(cluster.Config.TransactionsBlockListEnabled) != 0 {
 			args = append(args, "--transactions-block-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.TransactionsBlockListEnabled), ","))
+		}
+
+		if len(cluster.Config.BridgeAllowListAdmin) != 0 {
+			args = append(args, "--bridge-allow-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListAdmin), ","))
+		}
+
+		if len(cluster.Config.BridgeAllowListEnabled) != 0 {
+			args = append(args, "--bridge-allow-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeAllowListEnabled), ","))
+		}
+
+		if len(cluster.Config.BridgeBlockListAdmin) != 0 {
+			args = append(args, "--bridge-block-list-admin",
+				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListAdmin), ","))
+		}
+
+		if len(cluster.Config.BridgeBlockListEnabled) != 0 {
+			args = append(args, "--bridge-block-list-enabled",
+				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
 		}
 
 		// run genesis command with all the arguments

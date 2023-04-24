@@ -19,6 +19,8 @@ type Params struct {
 	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
 	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
 	TransactionsBlockList     *AddressListConfig `json:"transactionsBlockList,omitempty"`
+	BridgeAllowList           *AddressListConfig `json:"bridgeAllowList,omitempty"`
+	BridgeBlockList           *AddressListConfig `json:"bridgeBlockList,omitempty"`
 }
 
 type AddressListConfig struct {

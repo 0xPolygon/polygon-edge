@@ -110,6 +110,10 @@ type genesisParams struct {
 	transactionsAllowListEnabled     []string
 	transactionsBlockListAdmin       []string
 	transactionsBlockListEnabled     []string
+	bridgeAllowListAdmin             []string
+	bridgeAllowListEnabled           []string
+	bridgeBlockListAdmin             []string
+	bridgeBlockListEnabled           []string
 
 	mintableNativeToken  bool
 	nativeTokenConfigRaw string
