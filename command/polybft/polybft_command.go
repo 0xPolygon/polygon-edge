@@ -4,9 +4,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/registration"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/staking"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/supernet"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/validators"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/whitelist"
 	"github.com/0xPolygon/polygon-edge/command/sidechain/unstaking"
-	"github.com/0xPolygon/polygon-edge/command/sidechain/validators"
 
 	"github.com/0xPolygon/polygon-edge/command/sidechain/withdraw"
 	"github.com/spf13/cobra"
@@ -21,6 +21,7 @@ func GetCommand() *cobra.Command {
 	polybftCmd.AddCommand(
 		unstaking.GetCommand(),
 		withdraw.GetCommand(),
+		// rootchain (supernet manager) command that queries validator info
 		validators.GetCommand(),
 		// rootchain (supernet manager) whitelist validator
 		whitelist.GetCommand(),

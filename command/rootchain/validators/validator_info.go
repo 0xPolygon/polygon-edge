@@ -6,9 +6,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
 )
 
 var (
@@ -44,6 +47,13 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
+	cmd.Flags().StringVar(
+		&params.supernetManagerAddress,
+		rootHelper.SupernetManagerFlag,
+		"",
+		rootHelper.SupernetManagerFlagDesc,
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
@@ -68,19 +78,18 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	validatorAddr := validatorAccount.Ecdsa.Address()
+	supernetManagerAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 
-	validatorInfo, err := sidechainHelper.GetValidatorInfo(validatorAddr, txRelayer)
+	validatorInfo, err := rootHelper.GetValidatorInfo(validatorAddr, supernetManagerAddr, txRelayer)
 	if err != nil {
 		return fmt.Errorf("failed to get validator info for %s: %w", validatorAddr, err)
 	}
 
 	outputter.WriteCommandResult(&validatorsInfoResult{
-		address:             validatorInfo.Address.String(),
-		stake:               validatorInfo.Stake.Uint64(),
-		totalStake:          validatorInfo.TotalStake.Uint64(),
-		commission:          validatorInfo.Commission.Uint64(),
-		withdrawableRewards: validatorInfo.WithdrawableRewards.Uint64(),
-		active:              validatorInfo.Active,
+		address:     validatorInfo.Address.String(),
+		stake:       validatorInfo.Stake.Uint64(),
+		active:      validatorInfo.Active,
+		whitelisted: validatorInfo.Whitelisted,
 	})
 
 	return nil
