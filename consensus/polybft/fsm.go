@@ -599,11 +599,11 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	if header.Number != parent.Number+1 {
 		return fmt.Errorf("invalid number")
 	}
-	//verifity header is zero
+	// verify header nonce is zero
 	if header.Nonce != zeroNonce {
 		return fmt.Errorf("invalid nonce")
 	}
-	//verify that the gasUsed is <= gasLimit
+	// verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasUsed, header.GasLimit)
 	}
