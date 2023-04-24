@@ -142,7 +142,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		ParentHash: parentHeader.Hash,
 		Timestamp:  parentHeader.Timestamp + 1,
 		MixHash:    PolyBFTMixDigest,
-		Difficulty: 1,
+		Difficulty: 0,
 	}
 	updateHeaderExtra(currentHeader, currentDelta, nil,
 		&CheckpointData{

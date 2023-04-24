@@ -33,7 +33,8 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	pbftNonce = types.Nonce{}
+	pbftDifficulty = uint64(0)
+	pbftNonce      = types.Nonce{}
 )
 
 type fsm struct {
@@ -599,6 +600,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	if header.Number != parent.Number+1 {
 		return fmt.Errorf("invalid number")
 	}
+	//verifity header is zero
 	if header.Nonce != pbftNonce {
 		return fmt.Errorf("invalid nonce")
 	}
@@ -615,8 +617,8 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 		return fmt.Errorf("mix digest is not correct")
 	}
 	// difficulty must be > 0
-	if header.Difficulty <= 0 {
-		return fmt.Errorf("difficulty should be greater than zero")
+	if header.Difficulty != 0 {
+		return fmt.Errorf("difficulty should be zero")
 	}
 	// calculated header hash must be correct
 	if header.Hash != types.HeaderHash(header) {

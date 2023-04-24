@@ -76,7 +76,7 @@ func (b *BlockBuilder) Reset() error {
 		ParentHash:   b.params.Parent.Hash,
 		Number:       b.params.Parent.Number + 1,
 		Miner:        b.params.Coinbase[:],
-		Difficulty:   1,
+		Difficulty:   0,
 		StateRoot:    types.EmptyRootHash, // this avoids needing state for now
 		TxRoot:       types.EmptyRootHash,
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now

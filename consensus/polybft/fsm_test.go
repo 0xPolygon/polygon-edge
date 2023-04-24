@@ -48,10 +48,10 @@ func TestFSM_ValidateHeader(t *testing.T) {
 	header.MixHash = PolyBFTMixDigest
 
 	// difficulty
-	header.Difficulty = 0
-	require.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be greater than zero")
-
 	header.Difficulty = 1
+	require.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be zero")
+
+	header.Difficulty = 0
 	header.Hash = types.BytesToHash([]byte{11, 22, 33})
 	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid header hash")
 
@@ -1242,7 +1242,7 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 			ParentHash: parent.Hash,
 			Timestamp:  parent.Timestamp + 1,
 			MixHash:    PolyBFTMixDigest,
-			Difficulty: 1,
+			Difficulty: 0,
 			ExtraData:  parent.ExtraData,
 		},
 	})
