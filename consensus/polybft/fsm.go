@@ -33,8 +33,7 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	pbftDifficulty = uint64(0)
-	pbftNonce      = types.Nonce{}
+	pbftNonce = types.Nonce{}
 )
 
 type fsm struct {
@@ -616,7 +615,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	if header.MixHash != PolyBFTMixDigest {
 		return fmt.Errorf("mix digest is not correct")
 	}
-	// difficulty must be > 0
+	// difficulty must be zero
 	if header.Difficulty != 0 {
 		return fmt.Errorf("difficulty should be zero")
 	}
