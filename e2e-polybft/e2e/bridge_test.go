@@ -98,6 +98,14 @@ func testBridgeNativeERC20Tokens(t *testing.T, cluster *framework.TestCluster, p
 	transfersCount := len(receivers)
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+	initialBalances := make([]*big.Int, transfersCount)
+
+	for i, receiver := range receivers {
+		initBalance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
+		require.NoError(t, err)
+
+		initialBalances[i] = initBalance
+	}
 
 	// DEPOSIT ERC20 TOKENS
 	// send a few transactions to the bridge
@@ -143,7 +151,7 @@ func testBridgeNativeERC20Tokens(t *testing.T, cluster *framework.TestCluster, p
 
 		amount, ok := new(big.Int).SetString(amounts[i], 10)
 		require.True(t, ok)
-		require.Equal(t, amount, balance)
+		require.Equal(t, new(big.Int).Add(initialBalances[i], amount), balance)
 	}
 
 	t.Log("Deposits were successfully processed")
@@ -391,6 +399,20 @@ func testMultipleDepositBatchesPerEpoch(t *testing.T, cluster *framework.TestClu
 	// in order to be able to make assertions against blocks offseted by sprints
 	initialBlockNum := waitForNextSprintBlock(t, childEthEndpoint, sprintSize, cluster)
 
+	// query last committed id, because of other tests which could have changed it
+	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
+	lastCommittedIDInput, err := lastCommittedIDMethod.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
+	require.NoError(t, err)
+
+	commitmentIDRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
+	require.NoError(t, err)
+
+	initialCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
+	require.NoError(t, err)
+
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
 		t,
@@ -408,20 +430,13 @@ func testMultipleDepositBatchesPerEpoch(t *testing.T, cluster *framework.TestClu
 	midBlockNumber := initialBlockNum + 2*sprintSize
 	require.NoError(t, cluster.WaitForBlock(midBlockNumber, 2*time.Minute))
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
-	require.NoError(t, err)
-
-	lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
-	encode, err := lastCommittedIDMethod.Encode([]interface{}{})
-	require.NoError(t, err)
-
 	// check that we submitted the minimal commitment to smart contract
-	commitmentIDRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
+	commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
 	require.NoError(t, err)
 
 	lastCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
 	require.NoError(t, err)
-	require.Equal(t, uint64(transfersCount+depositsSubset), lastCommittedID)
+	require.Equal(t, initialCommittedID+depositsSubset, lastCommittedID)
 
 	// send some more transactions to the bridge to build another commitment in epoch
 	require.NoError(
@@ -441,13 +456,13 @@ func testMultipleDepositBatchesPerEpoch(t *testing.T, cluster *framework.TestClu
 	require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
 	// check that we submitted the minimal commitment to smart contract
-	commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
+	commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
 	require.NoError(t, err)
 
 	// check that the second (larger commitment) was also submitted in epoch
-	lastCommittedID, err = types.ParseUint64orHex(&commitmentIDRaw)
+	initialCommittedID, err = types.ParseUint64orHex(&commitmentIDRaw)
 	require.NoError(t, err)
-	require.Equal(t, uint64(2*transfersCount), lastCommittedID)
+	require.Equal(t, uint64(2*transfersCount), initialCommittedID)
 
 	// the transactions are mined and state syncs should be executed by the relayer
 	// and there should be a success events
