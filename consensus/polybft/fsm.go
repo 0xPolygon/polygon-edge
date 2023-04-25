@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -33,6 +34,7 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
+	allowedFutureBlockTimeSeconds = int64(60)
 )
 
 type fsm struct {
@@ -587,6 +589,10 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
+	// verify time is from the future
+	if header.Timestamp > uint64(time.Now().UTC().Unix()+allowedFutureBlockTimeSeconds) {
+		return fmt.Errorf("block from the future")
+	}
 	// verify parent hash
 	if parent.Hash != header.ParentHash {
 		return fmt.Errorf("incorrect header parent hash (parent=%s, header parent=%s)", parent.Hash, header.ParentHash)

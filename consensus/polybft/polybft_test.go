@@ -126,7 +126,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	parentHeader := &types.Header{
 		Number:    polyBftConfig.EpochSize,
-		Timestamp: uint64(time.Now().UTC().UnixMilli()),
+		Timestamp: uint64(time.Now().UTC().Unix()),
 	}
 	parentCommitment := updateHeaderExtra(parentHeader, parentDelta, nil, &CheckpointData{EpochNumber: 1}, accountSetParent)
 
