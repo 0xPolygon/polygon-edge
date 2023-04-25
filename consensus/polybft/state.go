@@ -54,6 +54,7 @@ type State struct {
 	CheckpointStore       *CheckpointStore
 	EpochStore            *EpochStore
 	ProposerSnapshotStore *ProposerSnapshotStore
+	StakeStore            *StakeStore
 }
 
 // newState creates new instance of State
@@ -70,6 +71,7 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 		CheckpointStore:       &CheckpointStore{db: db},
 		EpochStore:            &EpochStore{db: db},
 		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
+		StakeStore:            &StakeStore{db: db},
 	}
 
 	if err = s.initStorages(); err != nil {
@@ -82,7 +84,7 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 // initStorages initializes data storages
 func (s *State) initStorages() error {
 	// init the buckets
-	err := s.db.Update(func(tx *bolt.Tx) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
 		if err := s.StateSyncStore.initialize(tx); err != nil {
 			return err
 		}
@@ -96,10 +98,8 @@ func (s *State) initStorages() error {
 			return err
 		}
 
-		return nil
+		return s.StakeStore.initialize(tx)
 	})
-
-	return err
 }
 
 // bucketStats returns stats for the given bucket in db

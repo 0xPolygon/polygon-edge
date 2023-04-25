@@ -216,16 +216,7 @@ func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, err
 		return nil, err
 	}
 
-	if f.logger.IsDebug() {
-		var buf bytes.Buffer
-		for _, v := range nextValidators {
-			if _, err := buf.WriteString(fmt.Sprintf("%s\n", v.String())); err != nil {
-				return nil, err
-			}
-		}
-
-		f.logger.Debug("getValidatorsTransition", "Next validators", buf.String())
-	}
+	f.logger.Debug("getValidatorsTransition", "Next validators", nextValidators.String())
 
 	return nextValidators, nil
 }
