@@ -35,6 +35,9 @@ type BlockBuilderParams struct {
 
 	// txPoolInterface implementation
 	TxPool txPoolInterface
+
+	// BaseFee is the base fee
+	BaseFee uint64
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
@@ -82,6 +85,7 @@ func (b *BlockBuilder) Reset() error {
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
 		GasLimit:     b.params.GasLimit,
+		BaseFee:      b.params.BaseFee,
 		Timestamp:    uint64(headerTime.Unix()),
 	}
 
@@ -128,7 +132,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 
 // WriteTx applies given transaction to the state. If transaction apply fails, it reverts the saved snapshot.
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
-	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
+	if tx.Gas > b.params.GasLimit {
 		b.params.Logger.Info("Transaction gas limit exceedes block gas limit", "hash", tx.Hash,
 			"tx gas limit", tx.Gas, "block gas limt", b.params.GasLimit)
 
@@ -148,7 +152,7 @@ func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 func (b *BlockBuilder) Fill() {
 	blockTimer := time.NewTimer(b.params.BlockTime)
 
-	b.params.TxPool.Prepare()
+	b.params.TxPool.Prepare(b.params.BaseFee)
 write:
 	for {
 		select {

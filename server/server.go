@@ -268,8 +268,15 @@ func NewServer(config *Config) (*Server, error) {
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(m.config.Chain.Params.ChainID),
+		chain.AllForksEnabled.At(0).Homestead,
+		crypto.NewEIP155Signer(
+			uint64(m.config.Chain.Params.ChainID),
+			chain.AllForksEnabled.At(0).Homestead,
+		),
+	)
 
 	// create storage instance for blockchain
 	var db storage.Storage
@@ -291,7 +298,14 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(
+		logger,
+		db,
+		config.Chain,
+		nil,
+		m.executor,
+		signer,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -19,8 +19,14 @@ import (
 )
 
 const (
-	BlockGasTargetDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations
-	defaultCacheSize      int    = 100  // The default size for Blockchain LRU cache structures
+	// defaultBaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks.
+	defaultBaseFeeChangeDenom = 8
+
+	// blockGasTargetDivisor is the bound divisor of the gas limit, used in update calculations
+	blockGasTargetDivisor uint64 = 1024
+
+	// defaultCacheSize is the default size for Blockchain LRU cache structures
+	defaultCacheSize int = 100
 )
 
 var (
@@ -378,7 +384,7 @@ func (b *Blockchain) calculateGasLimit(parentGasLimit uint64) uint64 {
 		return blockGasTarget
 	}
 
-	delta := parentGasLimit * 1 / BlockGasTargetDivisor
+	delta := parentGasLimit * 1 / blockGasTargetDivisor
 	if parentGasLimit < blockGasTarget {
 		// The gas limit is lower than the gas target, so it should
 		// increase towards the target
@@ -1033,7 +1039,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 	gasPrices := make([]*big.Int, len(block.Transactions))
 	for i, transaction := range block.Transactions {
-		gasPrices[i] = transaction.GasPrice
+		gasPrices[i] = transaction.GetGasPrice(block.Header.BaseFee)
 	}
 
 	b.updateGasPriceAvg(gasPrices)
@@ -1135,7 +1141,7 @@ func (b *Blockchain) verifyGasLimit(header *types.Header, parentHeader *types.He
 		diff *= -1
 	}
 
-	limit := parentHeader.GasLimit / BlockGasTargetDivisor
+	limit := parentHeader.GasLimit / blockGasTargetDivisor
 	if uint64(diff) > limit {
 		return fmt.Errorf(
 			"invalid gas limit, limit = %d, want %d +- %d",
@@ -1413,4 +1419,38 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 // Close closes the DB connection
 func (b *Blockchain) Close() error {
 	return b.db.Close()
+}
+
+// CalculateBaseFee calculates the basefee of the header.
+func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
+	if !b.config.Params.Forks.IsLondon(parent.Number) {
+		return chain.GenesisBaseFee
+	}
+
+	parentGasTarget := parent.GasLimit / b.config.Genesis.BaseFeeEM
+
+	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
+	if parent.GasUsed == parentGasTarget {
+		return parent.BaseFee
+	}
+
+	// If the parent block used more gas than its target, the baseFee should increase.
+	if parent.GasUsed > parentGasTarget {
+		gasUsedDelta := parent.GasUsed - parentGasTarget
+		baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
+
+		return parent.BaseFee + common.Max(baseFeeDelta, 1)
+	}
+
+	// Otherwise, if the parent block used less gas than its target, the baseFee should decrease.
+	gasUsedDelta := parentGasTarget - parent.GasUsed
+	baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
+
+	return common.Max(parent.BaseFee-baseFeeDelta, 0)
+}
+
+func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
+	y := baseFee * gasUsedDelta / parentGasTarget
+
+	return y / defaultBaseFeeChangeDenom
 }

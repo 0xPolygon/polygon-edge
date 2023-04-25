@@ -196,9 +196,11 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	// send some tokens from the owner to the second validator so that the second validator can register and stake
 	receipt, err = txRelayer.SendTransaction(&ethgo.Transaction{
-		From:  ownerAcc.Ecdsa.Address(),
-		To:    &secondValidatorAddr,
-		Value: initialBalance,
+		From:                 ownerAcc.Ecdsa.Address(),
+		To:                   &secondValidatorAddr,
+		Value:                initialBalance,
+		MaxFeePerGas:         big.NewInt(1000000000),
+		MaxPriorityFeePerGas: big.NewInt(100000000),
 	}, ownerAcc.Ecdsa)
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)

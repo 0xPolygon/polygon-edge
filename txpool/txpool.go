@@ -57,6 +57,9 @@ var (
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
 	ErrInvalidTxType           = errors.New("invalid tx type")
+	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
+	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
+	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
 )
 
 // indicates origin of a transaction
@@ -171,6 +174,10 @@ type TxPool struct {
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
 	sealing uint32
+
+	// baseFee is the base fee of the current head.
+	// This is needed to sort transactions by price
+	baseFee uint64
 
 	// Event manager for txpool events
 	eventManager *eventManager
@@ -376,11 +383,14 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 
 // Prepare generates all the transactions
 // ready for execution. (primaries)
-func (p *TxPool) Prepare() {
+func (p *TxPool) Prepare(baseFee uint64) {
 	// clear from previous round
 	if p.executables.length() != 0 {
 		p.executables.clear()
 	}
+
+	// set base fee
+	p.updateBaseFee(baseFee)
 
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
@@ -621,9 +631,38 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	}
 
-	// Reject underpriced transactions
-	if tx.IsUnderpriced(p.priceLimit) {
-		return ErrUnderpriced
+	if tx.Type == types.DynamicFeeTx {
+		// Reject dynamic fee tx if london hardfork is not enabled
+		if !p.forks.London {
+			return ErrInvalidTxType
+		}
+
+		// Check EIP-1559-related fields and make sure they are correct
+		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
+			return ErrUnderpriced
+		}
+
+		if tx.GasFeeCap.BitLen() > 256 {
+			return ErrFeeCapVeryHigh
+		}
+
+		if tx.GasTipCap.BitLen() > 256 {
+			return ErrTipVeryHigh
+		}
+
+		if tx.GasFeeCap.Cmp(tx.GasTipCap) < 0 {
+			return ErrTipAboveFeeCap
+		}
+
+		// Reject underpriced transactions
+		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
+			return ErrUnderpriced
+		}
+	} else {
+		// Legacy approach to check if the given tx is not underpriced
+		if tx.GetGasPrice(p.GetBaseFee()).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+			return ErrUnderpriced
+		}
 	}
 
 	// Grab the state root for the latest block
@@ -956,6 +995,12 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
+}
+
+// updateBaseFee updates base fee in the tx pool and priced queue
+func (p *TxPool) updateBaseFee(baseFee uint64) {
+	atomic.StoreUint64(&p.baseFee, baseFee)
+	atomic.StoreUint64(&p.executables.queue.baseFee, baseFee)
 }
 
 // toHash returns the hash(es) of given transaction(s)

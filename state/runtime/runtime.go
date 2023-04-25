@@ -11,15 +11,17 @@ import (
 
 // TxContext is the context of the transaction
 type TxContext struct {
-	GasPrice   types.Hash
-	Origin     types.Address
-	Coinbase   types.Address
-	Number     int64
-	Timestamp  int64
-	GasLimit   int64
-	ChainID    int64
-	Difficulty types.Hash
-	Tracer     tracer.Tracer
+	GasPrice     types.Hash
+	Origin       types.Address
+	Coinbase     types.Address
+	Number       int64
+	Timestamp    int64
+	GasLimit     int64
+	ChainID      int64
+	Difficulty   types.Hash
+	Tracer       tracer.Tracer
+	BaseFee      *big.Int
+	BurnContract types.Address
 }
 
 // StorageStatus is the status of the storage access

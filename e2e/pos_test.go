@@ -9,6 +9,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
@@ -19,9 +24,6 @@ import (
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 // foundInValidatorSet is a helper function for searching through the passed in set for a specific
@@ -358,27 +360,35 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 
 	// Required default values
 	numTransactions := 5
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	currentNonce := 0
 
 	// TxPool client
 	clt := srv.TxnPoolOperator()
 
-	generateTx := func() *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &stakingContractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    big.NewInt(0),
-			V:        big.NewInt(1), // it is necessary to encode in rlp,
-			Input:    framework.MethodSig("unstake"),
-		}, senderKey)
-
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
+	generateTx := func(i int) *types.Transaction {
+		unsignedTx := &types.Transaction{
+			Nonce: uint64(currentNonce),
+			From:  types.ZeroAddress,
+			To:    &stakingContractAddr,
+			Gas:   framework.DefaultGasLimit,
+			Value: big.NewInt(0),
+			V:     big.NewInt(1), // it is necessary to encode in rlp,
+			Input: framework.MethodSig("unstake"),
 		}
+
+		// Just make very second transaction with dynamic gas fee
+		if i%2 == 0 {
+			unsignedTx.Type = types.DynamicFeeTx
+			unsignedTx.GasFeeCap = bigGasPrice
+			unsignedTx.GasTipCap = bigGasPrice
+		} else {
+			unsignedTx.Type = types.LegacyTx
+			unsignedTx.GasPrice = bigGasPrice
+		}
+
+		signedTx, err := signer.SignTx(unsignedTx, senderKey)
+		require.NoError(t, err, "Unable to sign transaction")
 
 		currentNonce++
 
@@ -390,7 +400,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	for i := 0; i < numTransactions; i++ {
 		var msg *txpoolOp.AddTxnReq
 
-		unstakeTxn := generateTx()
+		unstakeTxn := generateTx(i)
 
 		msg = &txpoolOp.AddTxnReq{
 			Raw: &any.Any{
@@ -500,27 +510,35 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 
 	// Required default values
 	numTransactions := 6
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	currentNonce := 0
 
 	// TxPool client
 	txpoolClient := srv.TxnPoolOperator()
 
-	generateTx := func(value *big.Int, methodName string) *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &stakingContractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    value,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
-			Input:    framework.MethodSig(methodName),
-		}, senderKey)
-
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
+	generateTx := func(i int, value *big.Int, methodName string) *types.Transaction {
+		unsignedTx := &types.Transaction{
+			Nonce: uint64(currentNonce),
+			From:  types.ZeroAddress,
+			To:    &stakingContractAddr,
+			Gas:   framework.DefaultGasLimit,
+			Value: value,
+			V:     big.NewInt(1), // it is necessary to encode in rlp
+			Input: framework.MethodSig(methodName),
 		}
+
+		// Just make very second transaction with dynamic gas fee
+		if i%2 == 0 {
+			unsignedTx.Type = types.DynamicFeeTx
+			unsignedTx.GasFeeCap = bigGasPrice
+			unsignedTx.GasTipCap = bigGasPrice
+		} else {
+			unsignedTx.Type = types.LegacyTx
+			unsignedTx.GasPrice = bigGasPrice
+		}
+
+		signedTx, err := signer.SignTx(unsignedTx, senderKey)
+		require.NoError(t, err, "Unable to sign transaction")
 
 		currentNonce++
 
@@ -535,7 +553,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 		var msg *txpoolOp.AddTxnReq
 
 		if i%2 == 0 {
-			unstakeTxn := generateTx(zeroEth, "unstake")
+			unstakeTxn := generateTx(i, zeroEth, "unstake")
 			msg = &txpoolOp.AddTxnReq{
 				Raw: &any.Any{
 					Value: unstakeTxn.MarshalRLP(),
@@ -543,7 +561,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 				From: types.ZeroAddress.String(),
 			}
 		} else {
-			stakeTxn := generateTx(oneEth, "stake")
+			stakeTxn := generateTx(i, oneEth, "stake")
 			msg = &txpoolOp.AddTxnReq{
 				Raw: &any.Any{
 					Value: stakeTxn.MarshalRLP(),
@@ -631,27 +649,34 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	// Required default values
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer := crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 	currentNonce := 0
 
 	// TxPool client
 	txpoolClient := srv.TxnPoolOperator()
 
-	generateTx := func(value *big.Int, methodName string) *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
-			Nonce:    uint64(currentNonce),
-			From:     types.ZeroAddress,
-			To:       &stakingContractAddr,
-			GasPrice: bigGasPrice,
-			Gas:      framework.DefaultGasLimit,
-			Value:    value,
-			V:        big.NewInt(1), // it is necessary to encode in rlp
-			Input:    framework.MethodSig(methodName),
-		}, senderKey)
-
-		if signErr != nil {
-			t.Fatalf("Unable to sign transaction, %v", signErr)
+	generateTx := func(dynamicTx bool, value *big.Int, methodName string) *types.Transaction {
+		unsignedTx := &types.Transaction{
+			Nonce: uint64(currentNonce),
+			From:  types.ZeroAddress,
+			To:    &stakingContractAddr,
+			Gas:   framework.DefaultGasLimit,
+			Value: value,
+			V:     big.NewInt(1), // it is necessary to encode in rlp
+			Input: framework.MethodSig(methodName),
 		}
+
+		if dynamicTx {
+			unsignedTx.Type = types.DynamicFeeTx
+			unsignedTx.GasFeeCap = bigGasPrice
+			unsignedTx.GasTipCap = bigGasPrice
+		} else {
+			unsignedTx.Type = types.LegacyTx
+			unsignedTx.GasPrice = bigGasPrice
+		}
+
+		signedTx, err := signer.SignTx(unsignedTx, senderKey)
+		require.NoError(t, err, "Unable to signatransaction")
 
 		currentNonce++
 
@@ -663,8 +688,8 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 
 	// addTxn is a helper method for generating and adding a transaction
 	// through the operator command
-	addTxn := func(value *big.Int, methodName string) {
-		txn := generateTx(value, methodName)
+	addTxn := func(dynamicTx bool, value *big.Int, methodName string) {
+		txn := generateTx(dynamicTx, value, methodName)
 		txnMsg := &txpoolOp.AddTxnReq{
 			Raw: &any.Any{
 				Value: txn.MarshalRLP(),
@@ -681,10 +706,10 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	}
 
 	// Stake transaction
-	addTxn(oneEth, "stake")
+	addTxn(false, oneEth, "stake")
 
 	// Unstake transaction
-	addTxn(zeroEth, "unstake")
+	addTxn(true, zeroEth, "unstake")
 
 	// Wait for the transactions to go through
 	totalGasUsed := srv.GetGasTotal(txHashes)
