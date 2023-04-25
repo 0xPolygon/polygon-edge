@@ -82,7 +82,6 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		stakes     = []uint64{10, 10, 10, 10, 10}
 		epoch      = uint64(1)
 		stakeAdded = uint64(1)
-		// stakeRemoved = uint64(5)
 	)
 
 	validators := newTestValidatorsWithAliases(t, aliases, stakes)

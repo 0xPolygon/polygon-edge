@@ -15,9 +15,13 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-// getValidatorABI is an ABI method on SupernetManager contract
-// that returns the validator data
-var getValidatorABI, _ = contractsapi.CustomSupernetManager.Abi.Methods["getValidator"]
+var (
+	// getValidatorABI is an ABI method on SupernetManager contract
+	// that returns the validator data
+	getValidatorABI, _ = contractsapi.CustomSupernetManager.Abi.Methods["getValidator"]
+
+	bigZero = big.NewInt(0)
+)
 
 // stakeManager saves transfer events that happened in each block
 // and calculates updated validator set based on changed stake
@@ -86,15 +90,19 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 		return nil, fmt.Errorf("failed to get transfer events for epoch: %d. Error: %w", epoch, err)
 	}
 
+	if len(transferEvents) == 0 {
+		return &ValidatorSetDelta{}, nil
+	}
+
 	stakeCounter := newStakeCounter(currentValidatorSet)
 
 	for _, event := range transferEvents {
 		if event.IsStake() {
 			// then this amount was minted To validator address
-			stakeCounter.addStake(event.To, event.Value.Uint64())
+			stakeCounter.addStake(event.To, event.Value)
 		} else if event.IsUnstake() {
 			// then this amount was burned From validator address
-			stakeCounter.removeStake(event.From, event.Value.Uint64())
+			stakeCounter.removeStake(event.From, event.Value)
 		} else {
 			// this should not happen, but lets log it if it does
 			s.logger.Debug("Found a transfer event that represents neither stake nor unstake")
@@ -110,40 +118,44 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 	addedValidators := AccountSet{}
 
 	// first deal with existing validators
+	nonChangedValidators := 0
 	for i, a := range currentValidatorSet.Copy() {
-		sortedIndex := stakeCounter.sortedIndex(a.Address)
-		if sortedIndex == -1 {
-			// something went wrong and this should not happen
-			return nil, fmt.Errorf("validator: %v not in stake map", a.Address.String())
-		}
+		stakeInfo := stakeCounter.getStake(a.Address)
 
-		if sortedIndex > s.maxValidatorSetSize-1 {
+		if stakeInfo.pos > s.maxValidatorSetSize-1 {
 			// validator is not in the maximum validator set we support based on its stake
 			// so we will remove it
 			removedBitmap.Set(uint64(i))
 		} else {
-			stake := stakeCounter.getStake(a.Address)
-			if stake == 0 {
-				// validator unstaked all, remove it from validator set
+			if stakeInfo.stake.Cmp(bigZero) == 0 {
+				// validator un-staked all, remove it from validator set
 				removedBitmap.Set(uint64(i))
-			} else if stake != a.VotingPower.Uint64() {
+			} else if stakeInfo.stake.Cmp(a.VotingPower) != 0 {
 				// validator updated its stake so put it in the updated validators list
-				a.VotingPower = new(big.Int).SetUint64(stake)
+				a.VotingPower = new(big.Int).Set(stakeInfo.stake)
 				updatedValidators = append(updatedValidators, a)
+			} else {
+				// he did not change stake, but he's left in validator set
+				nonChangedValidators++
 			}
 		}
 	}
 
 	// add new validators
-	for _, a := range stakeCounter.iterateThroughNewValidators() {
-		if (len(addedValidators) + len(updatedValidators)) == s.maxValidatorSetSize {
+	for _, si := range stakeCounter.iterateThroughNewValidators() {
+		if si.pos > s.maxValidatorSetSize-1 {
+			// new validator doesn't have enough stake to be in validator set
+			continue
+		}
+
+		if (len(addedValidators) + len(updatedValidators) + nonChangedValidators) == s.maxValidatorSetSize {
 			// we reached the maximum validator set size
 			break
 		}
 
-		validatorData, err := s.getNewValidatorInfo(a.address, a.stake)
+		validatorData, err := s.getNewValidatorInfo(si.address, si.stake)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w", a.address.String(), err)
+			return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w", si.address, err)
 		}
 
 		addedValidators = append(addedValidators, validatorData)
@@ -203,7 +215,7 @@ func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64,
 }
 
 // getValidatorInfo returns data for new validator (bls key, is active) from the supernet contract
-func (s *stakeManager) getNewValidatorInfo(address types.Address, stake uint64) (*ValidatorMetadata, error) {
+func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int) (*ValidatorMetadata, error) {
 	encoded, err := getValidatorABI.Encode([]interface{}{address})
 	if err != nil {
 		return nil, err
@@ -253,22 +265,23 @@ func (s *stakeManager) getNewValidatorInfo(address types.Address, stake uint64) 
 
 	return &ValidatorMetadata{
 		Address:     address,
-		VotingPower: new(big.Int).SetUint64(stake),
+		VotingPower: stake,
 		BlsKey:      pubKey,
 		IsActive:    true,
 	}, nil
 }
 
 // stakeInfo holds info about validator stake
+// it holds sorted map of all stakes of all validators
 type stakeInfo struct {
+	pos     int
+	stake   *big.Int
 	address types.Address
-	stake   uint64
 }
 
 // stakeCOunter sorts and returns stake info for all validators
 type stakeCounter struct {
-	sortedByStake       []*stakeInfo
-	stakeMap            map[types.Address]uint64
+	stakeMap            map[types.Address]*stakeInfo
 	currentValidatorSet AccountSet
 }
 
@@ -276,53 +289,56 @@ type stakeCounter struct {
 func newStakeCounter(currentValidatorSet AccountSet) *stakeCounter {
 	stakeCounter := &stakeCounter{
 		currentValidatorSet: currentValidatorSet,
-		stakeMap:            make(map[types.Address]uint64, 0),
+		stakeMap:            make(map[types.Address]*stakeInfo, 0),
 	}
 
 	for _, v := range currentValidatorSet {
-		stakeCounter.stakeMap[v.Address] += v.VotingPower.Uint64()
+		stakeCounter.stakeMap[v.Address] = &stakeInfo{
+			stake:   new(big.Int).Set(v.VotingPower),
+			address: v.Address,
+		}
 	}
 
 	return stakeCounter
 }
 
 // addStake adds given amount for a validator to stake map
-func (sc *stakeCounter) addStake(address types.Address, stake uint64) {
-	sc.stakeMap[address] += stake
+func (sc *stakeCounter) addStake(address types.Address, amount *big.Int) {
+	sInfo, exists := sc.stakeMap[address]
+	if !exists {
+		sInfo = &stakeInfo{address: address, stake: big.NewInt(0)}
+		sc.stakeMap[address] = sInfo
+	}
+
+	sc.stakeMap[address].stake = sInfo.stake.Add(sInfo.stake, amount)
 }
 
 // removeStake removes given amount for a validator from stake map
-func (sc *stakeCounter) removeStake(address types.Address, stake uint64) {
-	sc.stakeMap[address] -= stake
+func (sc *stakeCounter) removeStake(address types.Address, amount *big.Int) {
+	bigStake := sc.stakeMap[address].stake
+	sc.stakeMap[address].stake = bigStake.Sub(bigStake, amount)
 }
 
 // sortByStake sorts all validators by their stake amount
 func (sc *stakeCounter) sortByStake() {
-	sc.sortedByStake = make([]*stakeInfo, 0)
-	for a, s := range sc.stakeMap {
-		sc.sortedByStake = append(sc.sortedByStake, &stakeInfo{address: a, stake: s})
+	keys := make([]types.Address, 0, len(sc.stakeMap))
+	for k := range sc.stakeMap {
+		keys = append(keys, k)
 	}
 
-	// sort from highest to lowest stake
-	sort.Slice(sc.sortedByStake, func(i, j int) bool {
-		return sc.sortedByStake[i].stake > sc.sortedByStake[j].stake
+	sort.Slice(keys, func(i, j int) bool {
+		v1, v2 := sc.stakeMap[keys[i]], sc.stakeMap[keys[j]]
+		return v1.stake.Cmp(v2.stake) > 1
 	})
-}
 
-// getStake returns total stake amount for given validator
-func (sc *stakeCounter) getStake(address types.Address) uint64 {
-	return sc.stakeMap[address]
-}
-
-// sortedIndex return the index of the given validator in the sorted list of stakes
-func (sc *stakeCounter) sortedIndex(address types.Address) int {
-	for i, s := range sc.sortedByStake {
-		if s.address == address {
-			return i
-		}
+	for i, k := range keys {
+		sc.stakeMap[k].pos = i
 	}
+}
 
-	return -1
+// getStake returns stake info for given validator
+func (sc *stakeCounter) getStake(address types.Address) *stakeInfo {
+	return sc.stakeMap[address]
 }
 
 // iterateThroughNewValidators returns a slice of stake info of validators that are not
@@ -331,8 +347,8 @@ func (sc *stakeCounter) iterateThroughNewValidators() []*stakeInfo {
 	newValidators := make([]*stakeInfo, 0)
 
 	currentValidatorSetMap := sc.currentValidatorSet.GetAddressesAsSet()
-	for _, s := range sc.sortedByStake {
-		if _, exists := currentValidatorSetMap[s.address]; exists {
+	for a, s := range sc.stakeMap {
+		if _, exists := currentValidatorSetMap[a]; exists {
 			continue
 		}
 
