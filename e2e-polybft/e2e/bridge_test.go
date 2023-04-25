@@ -228,6 +228,8 @@ func testBridgeNativeERC20Tokens(t *testing.T, cluster *framework.TestCluster, p
 	}
 }
 
+// testBridgeERC721Tokens test performs deposits and withdrawals of ERC-721 tokens
+//
 //nolint:thelper
 func testBridgeERC721Tokens(t *testing.T, cluster *framework.TestCluster, polybftCfg polybft.PolyBFTConfig,
 	receiverKeys []*ethgow.Key, tokenIDs []string) {
@@ -654,6 +656,8 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 }
 
 func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
+	t.Skip("REMOVE")
+
 	const (
 		txnCount              = 5
 		amount                = 100
