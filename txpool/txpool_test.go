@@ -34,6 +34,7 @@ var (
 	forks = &chain.Forks{
 		Homestead: chain.NewFork(0),
 		Istanbul:  chain.NewFork(0),
+		London:    chain.NewFork(0),
 	}
 )
 
@@ -1833,6 +1834,22 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
 			ErrTipAboveFeeCap,
+		)
+	})
+
+	t.Run("dynamic fee tx placed without eip-1559 fork enabled", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.London = false
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(10000)
+		tx.GasTipCap = big.NewInt(100000)
+
+		assert.ErrorIs(t,
+			pool.addTx(local, signTx(tx)),
+			ErrInvalidTxType,
 		)
 	})
 }
