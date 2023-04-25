@@ -1836,7 +1836,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		)
 	})
 
-	t.Run("dynamic fee tx placed without EIP-1559 fork enabled", func(t *testing.T) {
+	t.Run("dynamic fee tx placed without eip-1559 fork enabled", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.London = false
