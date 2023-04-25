@@ -86,7 +86,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 
 	return NewTxPool(
 		hclog.NewNullLogger(),
-		forks.At(0),
+		chain.AllForksEnabled.At(0),
 		storeToUse,
 		nil,
 		nil,
@@ -1833,6 +1833,22 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
 			ErrTipAboveFeeCap,
+		)
+	})
+
+	t.Run("dynamic fee tx placed without EIP-1559 fork enabled", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.London = false
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(10000)
+		tx.GasTipCap = big.NewInt(100000)
+
+		assert.ErrorIs(t,
+			pool.addTx(local, signTx(tx)),
+			ErrInvalidTxType,
 		)
 	})
 }
