@@ -216,7 +216,7 @@ func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, err
 		return nil, err
 	}
 
-	f.logger.Debug("getValidatorsTransition", "Next validators", nextValidators.String())
+	f.logger.Debug("getValidatorsTransition", "Next validators", nextValidators)
 
 	return nextValidators, nil
 }
