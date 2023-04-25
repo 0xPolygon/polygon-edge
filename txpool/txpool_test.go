@@ -34,6 +34,7 @@ var (
 	forks = &chain.Forks{
 		Homestead: chain.NewFork(0),
 		Istanbul:  chain.NewFork(0),
+		London:    chain.NewFork(0),
 	}
 )
 
@@ -86,7 +87,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 
 	return NewTxPool(
 		hclog.NewNullLogger(),
-		chain.AllForksEnabled.At(0),
+		forks.At(0),
 		storeToUse,
 		nil,
 		nil,
