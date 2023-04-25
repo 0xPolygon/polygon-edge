@@ -234,6 +234,15 @@ func (e *Executor) BeginTxn(
 		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
 	}
 
+	// enable transactions allow list (if any)
+	if e.config.BridgeAllowList != nil {
+		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
+	}
+
+	if e.config.BridgeBlockList != nil {
+		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
+	}
+
 	return txn, nil
 }
 
@@ -265,6 +274,8 @@ type Transition struct {
 	deploymentBlockList *addresslist.AddressList
 	txnAllowList        *addresslist.AddressList
 	txnBlockList        *addresslist.AddressList
+	bridgeAllowList     *addresslist.AddressList
+	bridgeBlockList     *addresslist.AddressList
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -701,6 +712,16 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
+	}
+
+	// check bridge allow list (if any)
+	if t.bridgeAllowList != nil && t.bridgeAllowList.Addr() == contract.CodeAddress {
+		return t.bridgeAllowList.Run(contract, host, &t.config)
+	}
+
+	// check contract deployment block list (if any)
+	if t.bridgeBlockList != nil && t.bridgeBlockList.Addr() == contract.CodeAddress {
+		return t.bridgeBlockList.Run(contract, host, &t.config)
 	}
 
 	// check the precompiles

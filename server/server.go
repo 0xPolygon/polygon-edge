@@ -236,6 +236,18 @@ func NewServer(config *Config) (*Server, error) {
 			m.config.Chain.Params.TransactionsBlockList)
 	}
 
+	// apply bridge allow list genesis data
+	if m.config.Chain.Params.BridgeAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
+			m.config.Chain.Params.BridgeAllowList)
+	}
+
+	// apply bridge block list genesis data
+	if m.config.Chain.Params.BridgeBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
+			m.config.Chain.Params.BridgeBlockList)
+	}
+
 	var initialStateRoot = types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {

@@ -363,3 +363,37 @@ func TestE2E_BlockList_Transactions(t *testing.T) {
 		require.True(t, targetTxn.Reverted())
 	}
 }
+
+func TestE2E_AddressLists_Bridge(t *testing.T) {
+	// create two accounts, one for an admin sender and a second
+	// one for a non-enabled account that will switch on-off between
+	// both enabled and non-enabled roles.
+	admin, _ := wallet.GenerateKey()
+	target, _ := wallet.GenerateKey()
+	other, _ := wallet.GenerateKey()
+
+	adminAddr := types.Address(admin.Address())
+	targetAddr := types.Address(target.Address())
+	otherAddr := types.Address(other.Address())
+
+	cluster := framework.NewTestCluster(t, 3,
+		framework.WithPremine(adminAddr, targetAddr, otherAddr),
+		framework.WithBridgeAllowListAdmin(adminAddr),
+		framework.WithBridgeAllowListEnabled(otherAddr),
+		framework.WithBridgeBlockListAdmin(adminAddr),
+		framework.WithBridgeBlockListEnabled(otherAddr),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	{
+		// Step 0. Check the role of both accounts
+		expectRole(t, cluster, contracts.AllowListBridgeAddr, adminAddr, addresslist.AdminRole)
+		expectRole(t, cluster, contracts.AllowListBridgeAddr, targetAddr, addresslist.NoRole)
+		expectRole(t, cluster, contracts.AllowListBridgeAddr, otherAddr, addresslist.EnabledRole)
+		expectRole(t, cluster, contracts.BlockListBridgeAddr, adminAddr, addresslist.AdminRole)
+		expectRole(t, cluster, contracts.BlockListBridgeAddr, targetAddr, addresslist.NoRole)
+		expectRole(t, cluster, contracts.BlockListBridgeAddr, otherAddr, addresslist.EnabledRole)
+	}
+}

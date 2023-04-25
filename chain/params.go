@@ -26,6 +26,8 @@ type Params struct {
 	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
 	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
 	TransactionsBlockList     *AddressListConfig `json:"transactionsBlockList,omitempty"`
+	BridgeAllowList           *AddressListConfig `json:"bridgeAllowList,omitempty"`
+	BridgeBlockList           *AddressListConfig `json:"bridgeBlockList,omitempty"`
 
 	// Governance contract where the token will be sent to and burn in london fork
 	BurnContract map[uint64]string `json:"burnContract"`

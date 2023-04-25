@@ -49,6 +49,10 @@ const (
 	transactionsAllowListEnabledFlag     = "transactions-allow-list-enabled"
 	transactionsBlockListAdminFlag       = "transactions-block-list-admin"
 	transactionsBlockListEnabledFlag     = "transactions-block-list-enabled"
+	bridgeAllowListAdminFlag             = "bridge-allow-list-admin"
+	bridgeAllowListEnabledFlag           = "bridge-allow-list-enabled"
+	bridgeBlockListAdminFlag             = "bridge-block-list-admin"
+	bridgeBlockListEnabledFlag           = "bridge-block-list-enabled"
 
 	bootnodePortStart = 30301
 
@@ -228,6 +232,24 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		chainConfig.Params.TransactionsBlockList = &chain.AddressListConfig{
 			AdminAddresses:   stringSliceToAddressSlice(p.transactionsBlockListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.transactionsBlockListEnabled),
+		}
+	}
+
+	if len(p.bridgeAllowListAdmin) != 0 {
+		// only enable allow list if there is at least one address as **admin**, otherwise
+		// the allow list could never be updated
+		chainConfig.Params.BridgeAllowList = &chain.AddressListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.bridgeAllowListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.bridgeAllowListEnabled),
+		}
+	}
+
+	if len(p.bridgeBlockListAdmin) != 0 {
+		// only enable block list if there is at least one address as **admin**, otherwise
+		// the block list could never be updated
+		chainConfig.Params.BridgeBlockList = &chain.AddressListConfig{
+			AdminAddresses:   stringSliceToAddressSlice(p.bridgeBlockListAdmin),
+			EnabledAddresses: stringSliceToAddressSlice(p.bridgeBlockListEnabled),
 		}
 	}
 
