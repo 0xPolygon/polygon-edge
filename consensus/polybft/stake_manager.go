@@ -77,7 +77,8 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	return s.state.StakeStore.insertTransferEvents(epoch, events)
 }
 
-// UpdateValidatorSet returns an updated validator set based on stake change (transfer) events from ValidatorSet contract
+// UpdateValidatorSet returns an updated validator set
+// based on stake change (transfer) events from ValidatorSet contract
 func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	s.logger.Info("Calculating validators set update...", "epoch", epoch)
 
@@ -170,7 +171,8 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 }
 
 // getTransferEventsFromReceipts parses logs from receipts to find transfer events
-func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64, receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
+func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64,
+	receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
 	events := make([]*contractsapi.TransferEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
@@ -184,6 +186,7 @@ func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64, receipts []*t
 			}
 
 			var transferEvent contractsapi.TransferEvent
+
 			doesMatch, err := transferEvent.ParseLog(convertLog(log))
 			if err != nil {
 				return nil, err
@@ -327,6 +330,7 @@ func (sc *stakeCounter) sortedIndex(address types.Address) int {
 // in the current validator set
 func (sc *stakeCounter) iterateThroughNewValidators() []*stakeInfo {
 	newValidators := make([]*stakeInfo, 0)
+
 	for _, s := range sc.sortedByStake {
 		if sc.currentValidatorSet.ContainsAddress(s.address) {
 			continue

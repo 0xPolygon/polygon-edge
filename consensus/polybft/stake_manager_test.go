@@ -107,7 +107,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			})
 		}
 
-		state.StakeStore.insertTransferEvents(epoch, events)
+		require.NoError(t, state.StakeStore.insertTransferEvents(epoch, events))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			},
 		}
 
-		state.StakeStore.insertTransferEvents(epoch+1, events)
+		require.NoError(t, state.StakeStore.insertTransferEvents(epoch+1, events))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+1, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -153,7 +153,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			},
 		}
 
-		state.StakeStore.insertTransferEvents(epoch+2, events)
+		require.NoError(t, state.StakeStore.insertTransferEvents(epoch+2, events))
 
 		txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
 			return validator.ValidatorMetadata()
