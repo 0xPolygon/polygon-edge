@@ -22,10 +22,9 @@ var getValidatorABI, _ = contractsapi.CustomSupernetManager.Abi.Methods["getVali
 // stakeManager saves transfer events that happened in each block
 // and calculates updated validator set based on changed stake
 type stakeManager struct {
-	logger           hclog.Logger
-	state            *State
-	rootChainRelayer txrelayer.TxRelayer
-	// key is the identity of the node submitting a checkpoint
+	logger                  hclog.Logger
+	state                   *State
+	rootChainRelayer        txrelayer.TxRelayer
 	key                     ethgo.Key
 	validatorSetContract    types.Address
 	supernetManagerContract types.Address
