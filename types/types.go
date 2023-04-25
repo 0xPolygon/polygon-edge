@@ -10,15 +10,26 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
-var ZeroAddress = Address{}
-var ZeroHash = Hash{}
-
 const (
 	HashLength    = 32
 	AddressLength = 20
+
+	SignatureSize = 4
 )
 
-const SignatureSize = 4
+var (
+	// ZeroAddress is the default zero address
+	ZeroAddress = Address{}
+
+	// ZeroHash is the default zero hash
+	ZeroHash = Hash{}
+
+	// EmptyRootHash is the root when there are no transactions
+	EmptyRootHash = StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+
+	// EmptyUncleHash is the root when there are no uncles
+	EmptyUncleHash = StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+)
 
 type Hash [HashLength]byte
 
@@ -148,14 +159,6 @@ func (h Hash) MarshalText() ([]byte, error) {
 func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
-
-var (
-	// EmptyRootHash is the root when there are no transactions
-	EmptyRootHash = StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-
-	// EmptyUncleHash is the root when there are no uncles
-	EmptyUncleHash = StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
-)
 
 type Proof struct {
 	Data     []Hash // the proof himself

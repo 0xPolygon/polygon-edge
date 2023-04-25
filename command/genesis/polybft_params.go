@@ -39,7 +39,6 @@ const (
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
-	defaultBridge           = false
 	defaultEpochReward      = 1
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
@@ -120,6 +119,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
+			BurnContract: map[uint64]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -156,6 +156,15 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	for _, burnContract := range p.burnContracts {
+		block, addr, err := parseBurnContractInfo(burnContract)
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Params.BurnContract[block] = addr.String()
+	}
+
 	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))
 
 	for i, validator := range initialValidators {
@@ -186,6 +195,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		ExtraData:  genesisExtraData,
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
+		BaseFee:    chain.GenesisBaseFee,
+		BaseFeeEM:  chain.GenesisBaseFeeEM,
 	}
 
 	if len(p.contractDeployerAllowListAdmin) != 0 {

@@ -488,8 +488,8 @@ type txPoolMock struct {
 	mock.Mock
 }
 
-func (tp *txPoolMock) Prepare() {
-	tp.Called()
+func (tp *txPoolMock) Prepare(baseFee uint64) {
+	tp.Called(baseFee)
 }
 
 func (tp *txPoolMock) Length() uint64 {

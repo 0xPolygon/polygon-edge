@@ -6,6 +6,7 @@ on:  # yamllint disable-line rule:truthy
       - main
       - develop
   pull_request:
+  workflow_dispatch:
   workflow_call:
     outputs:
       workflow_output:
@@ -22,7 +23,9 @@ jobs:
     outputs:
       e2e_output_failure: ${{ steps.run_e2e_failure.outputs.test_output }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Install Go
         uses: actions/setup-go@v3
         with:

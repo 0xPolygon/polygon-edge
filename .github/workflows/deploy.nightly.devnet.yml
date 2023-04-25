@@ -1,0 +1,247 @@
+---
+
+name: Build Devnet
+on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: The environment to run against
+        required: false
+        type: environment
+  workflow_call:
+    inputs:
+      environment:
+        description: The environment to run against
+        type: string
+        required: true
+    outputs:
+      workflow_output_loadtest1:
+        description: "Loadtest output"
+        value: ${{ jobs.loadtest1.outputs.loadtest_output_failure }} 
+      workflow_output_loadtest2:
+        description: "Loadtest output"
+        value: ${{ jobs.loadtest2.outputs.loadtest_output_failure }} 
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      AWS_REGION:
+        required: true
+      TF_VAR_DEPLOYMENT_NAME:
+        required: true
+      TF_VAR_OWNER:
+        required: true
+      SLACK_PERFORMANCE_WEBHOOK_URL:
+        required: true
+      DD_API_KEY:
+        required: true
+      LOADTEST_MNEMONIC:
+        required: true
+      VAULT_PASSWORD_FILE:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: maticnetwork/terraform-polygon-supernets
+          ref: main
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: 1.4.5
+      - name: Configure terraform for nightly build
+        run: |
+          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        continue-on-error: true
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out=tfplan -no-color
+        env:
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      - name: Configure private keys
+        run: |
+          terraform output pk_ansible > ~/devnet_private.key
+          chmod 600 ~/devnet_private.key 
+          eval "$(ssh-agent)"
+          ssh-add ~/devnet_private.key
+          terraform output -raw geth_private_ip | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" | head -1 | tr -d '\n' > rootchain_rpc.txt
+      - name: Install ansible / botocore / boto3
+        run: |
+          python3 -m pip install --user ansible
+          python3 -m pip install boto3 botocore
+      - name: Configure ansible for nightly build
+        working-directory: ansible
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD_FILE }}" > password.txt
+          cp local-extra-vars.yml.template local-extra-vars.yml
+          sed 's/devnet01/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
+          sed 's/devnet01/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' local-extra-vars.yml > local-extra-vars.yml.tmp && mv local-extra-vars.yml.tmp local-extra-vars.yml
+          ROOTCHAIN_RPC=$(cat ../rootchain_rpc.txt)
+          echo "rootchain_json_rpc: http://$ROOTCHAIN_RPC:8545" >> local-extra-vars.yml
+      - name: Create script file
+        working-directory: ansible
+        run: |
+          cat > roles/edge/templates/bootstrap.sh <<'EOF'
+          #!/bin/bash
+
+          main() {
+              if [[ -d "/var/lib/bootstrap" ]]; then
+                  echo "It appears this network has already been boot strapped"
+                  exit
+              fi
+              mkdir /var/lib/bootstrap
+              pushd /var/lib/bootstrap
+
+          {% for item in hostvars %}
+          {% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %}
+              polygon-edge polybft-secrets init --data-dir {{ hostvars[item].tags["Name"] }} \
+              --chain-id {{ chain_id }} \
+              --json \
+              --insecure > {{ hostvars[item].tags["Name"] }}.json
+          {% endif %}
+          {% endfor %}
+
+              apt update
+              curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+              apt-get install -y nodejs
+
+              pushd /opt/polygon-edge/
+              make compile-core-contracts
+              cp -r /opt/polygon-edge/core-contracts /var/lib/bootstrap/core-contracts/
+              popd
+
+              polygon-edge manifest {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_signature') {% endif %}{% endfor %} \
+                          --path ./manifest.json \
+                          --premine-validators 1000000000000000000000000000 \
+                          --chain-id {{ chain_id }}
+
+              polygon-edge genesis \
+                          {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_signature') {% endif %}{% endfor %} \
+                          --consensus polybft \
+                          {% for item in hostvars %}{% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %} --bootnode /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id') {% endif %}{% endfor %} \
+                          {% for address in premine_address %} --premine {{ address }}:1000000000000000000000000000 {% endfor %}
+                          --premine 0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa:1000000000000000000000000000 \
+                          --premine 0x0000000000000000000000000000000000000000 \
+                          --block-gas-limit {{ block_gas_limit }} \
+                          --block-time {{ block_time }}s \
+                          --chain-id {{ chain_id }} \
+                          --epoch-size 10
+
+              polycli wallet create --words 12 --language english | jq '.Addresses[0]' > rootchain-wallet.json
+              COINBASE_ADDRESS=$(curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_coinbase","params":[],"id":1}' {{ rootchain_json_rpc }} | jq -r '.result')
+              curl -X POST --data '{"jsonrpc":"2.0","method":"eth_sendTransaction","params":[{"from":"'"$COINBASE_ADDRESS"'","to":"'"$(cat rootchain-wallet.json | jq -r '.ETHAddress')"'","value":"0x3635C9ADC5DEA00000"}],"id":1}' -H "Content-Type: application/json" {{ rootchain_json_rpc }}
+              sleep 5
+              polygon-edge rootchain deploy \
+                --deployer-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
+                --json-rpc {{ rootchain_json_rpc }}      
+
+          {% for item in hostvars %}
+          {% if (hostvars[item].tags.Role == "validator") %}
+              polygon-edge rootchain fund --data-dir {{ hostvars[item].tags["Name"] }} --json-rpc {{ rootchain_json_rpc }}
+          {% endif %}
+          {% endfor %}
+
+              tar czf {{ base_dn }}.tar.gz validator* fullnode* genesis.json
+              popd
+          }
+
+          main
+
+          EOF
+      - name: Run Ansible
+        working-directory: ansible
+        run: |
+          ansible-inventory --graph
+          ansible-galaxy install -r requirements.yml
+          ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
+      - name: Set rpc url value
+        id: url
+        run: |
+          terraform output -raw aws_lb_ext_domain
+          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc.txt 
+      - uses: actions/upload-artifact@v3
+        with:
+          name: rpc-url
+          path: rpc.txt
+
+  loadtest1:
+    needs: build
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test Nightly Build - multiple_EOA
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+    with:
+      environment: ${{ inputs.environment }}
+      scenario: multiple_EOA
+
+  loadtest2:
+    needs: loadtest1
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test Nightly Build - multiple_ERC20
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+    with:
+      environment: ${{ inputs.environment }}
+      scenario: multiple_ERC20
+
+  destroy_devnet:
+    needs: [loadtest1, loadtest2]
+    if: always()
+    name: Destroy Nightly Build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: maticnetwork/terraform-polygon-supernets
+          ref: main
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: 1.4.5
+      - name: Configure terraform for nightly build
+        run: |
+          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+      - name: Terraform Destroy
+        id: destroy
+        run: terraform destroy -auto-approve -state=state.json
+        env:
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}

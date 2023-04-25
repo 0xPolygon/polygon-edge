@@ -53,3 +53,13 @@ func Keccak256Rlp(dst []byte, src *fastrlp.Value) []byte {
 
 	return dst
 }
+
+// PrefixedKeccak256Rlp hashes a fastrlp.Value using keccak-256 with the given prefix
+func PrefixedKeccak256Rlp(prefix, dst []byte, src *fastrlp.Value) []byte {
+	h := DefaultKeccakPool.Get()
+	_, _ = h.Write(prefix)
+	dst = h.WriteRlp(dst, src)
+	DefaultKeccakPool.Put(h)
+
+	return dst
+}

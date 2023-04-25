@@ -20,7 +20,6 @@ const (
 // common errors for all polybft commands
 var (
 	ErrInvalidNum                     = fmt.Errorf("num flag value should be between 1 and %d", maxInitNum)
-	ErrInvalidConfig                  = errors.New("invalid secrets configuration")
 	ErrInvalidParams                  = errors.New("no config file or data directory passed in")
 	ErrUnsupportedType                = errors.New("unsupported secrets manager")
 	ErrSecureLocalStoreNotImplemented = errors.New(
@@ -35,9 +34,7 @@ func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (se
 	if configPath != "" {
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			invalidConfigErr := ErrInvalidConfig.Error()
-
-			return nil, fmt.Errorf("%s: %w", invalidConfigErr, readErr)
+			return nil, fmt.Errorf("invalid secrets configuration: %w", readErr)
 		}
 
 		if !secrets.SupportedServiceManager(secretsConfig.Type) {

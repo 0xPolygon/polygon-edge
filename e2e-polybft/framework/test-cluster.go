@@ -80,6 +80,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
+	BurnContracts        map[uint64]types.Address
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -251,6 +252,16 @@ func WithEpochReward(epochReward int) ClusterOption {
 func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BlockGasLimit = blockGasLimit
+	}
+}
+
+func WithBurnContract(block uint64, address types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		if h.BurnContracts == nil {
+			h.BurnContracts = map[uint64]types.Address{}
+		}
+
+		h.BurnContracts[block] = address
 	}
 }
 
@@ -455,6 +466,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		if cluster.Config.MintableNativeToken {
 			args = append(args, "--mintable-native-token")
+		}
+
+		if len(cluster.Config.BurnContracts) != 0 {
+			for block, addr := range cluster.Config.BurnContracts {
+				args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
+			}
+		} else {
+			// London hardfork is enabled by default so there must be a default burn contract
+			args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(

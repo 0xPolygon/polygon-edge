@@ -35,7 +35,7 @@ var (
 
 // txPoolInterface is an abstraction of transaction pool
 type txPoolInterface interface {
-	Prepare()
+	Prepare(uint64)
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(*types.Transaction)
@@ -101,7 +101,7 @@ type consensusRuntime struct {
 	lastBuiltBlock *types.Header
 
 	// activeValidatorFlag indicates whether the given node is amongst currently active validator set
-	activeValidatorFlag uint32
+	activeValidatorFlag atomic.Bool
 
 	// checkpointManager represents abstraction for checkpoint submission
 	checkpointManager CheckpointManager
@@ -557,16 +557,12 @@ func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 
 // setIsActiveValidator updates the activeValidatorFlag field
 func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
-	if isActiveValidator {
-		atomic.StoreUint32(&c.activeValidatorFlag, 1)
-	} else {
-		atomic.StoreUint32(&c.activeValidatorFlag, 0)
-	}
+	c.activeValidatorFlag.Store(isActiveValidator)
 }
 
 // isActiveValidator indicates if node is in validator set or not
 func (c *consensusRuntime) isActiveValidator() bool {
-	return atomic.LoadUint32(&c.activeValidatorFlag) == 1
+	return c.activeValidatorFlag.Load()
 }
 
 // isFixedSizeOfEpochMet checks if epoch reached its end that was configured by its default size

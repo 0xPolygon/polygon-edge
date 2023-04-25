@@ -5,6 +5,7 @@ on:  # yamllint disable-line rule:truthy
     branches:
       - main
       - develop
+  workflow_dispatch:
   workflow_call:
     outputs:
       workflow_output:
@@ -21,7 +22,9 @@ jobs:
     outputs:
       property_output_failure: ${{ steps.run_property_failure.outputs.test_output }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
       - name: Install Go
         uses: actions/setup-go@v3
         with:

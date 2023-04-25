@@ -8,7 +8,7 @@ import (
 )
 
 type node struct {
-	shuttingDown uint64
+	shuttingDown atomic.Bool
 	cmd          *exec.Cmd
 	doneCh       chan struct{}
 	exitResult   *exitResult
@@ -52,7 +52,7 @@ func (n *node) run() {
 }
 
 func (n *node) IsShuttingDown() bool {
-	return atomic.LoadUint64(&n.shuttingDown) == 1
+	return n.shuttingDown.Load()
 }
 
 func (n *node) Stop() error {
@@ -65,7 +65,7 @@ func (n *node) Stop() error {
 		return err
 	}
 
-	atomic.StoreUint64(&n.shuttingDown, 1)
+	n.shuttingDown.Store(true)
 	<-n.Wait()
 
 	return nil
