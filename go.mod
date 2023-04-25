@@ -6,7 +6,7 @@ require (
 	github.com/btcsuite/btcd v0.22.1
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/envoyproxy/protoc-gen-validate v0.9.1
+	github.com/envoyproxy/protoc-gen-validate v1.0.0
 	github.com/golang/protobuf v1.5.3
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/websocket v1.5.0
@@ -31,7 +31,7 @@ require (
 	github.com/umbracle/fastrlp v0.1.0
 	github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b
 	golang.org/x/crypto v0.8.0
-	google.golang.org/grpc v1.54.0
+	google.golang.org/grpc v1.53.0-dev
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
