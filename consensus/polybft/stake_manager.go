@@ -119,6 +119,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 
 	// first deal with existing validators
 	nonChangedValidators := 0
+
 	for i, a := range currentValidatorSet.Copy() {
 		stakeInfo := stakeCounter.getStake(a.Address)
 
@@ -328,6 +329,7 @@ func (sc *stakeCounter) sortByStake() {
 
 	sort.Slice(keys, func(i, j int) bool {
 		v1, v2 := sc.stakeMap[keys[i]], sc.stakeMap[keys[j]]
+
 		return v1.stake.Cmp(v2.stake) > 1
 	})
 
