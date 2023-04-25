@@ -102,6 +102,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
 		MintableNativeToken: p.mintableNativeToken,
 		NativeTokenConfig:   p.nativeTokenConfig,
+		MaxValidatorSetSize: p.maxNumValidators,
 	}
 
 	chainConfig := &chain.Chain{

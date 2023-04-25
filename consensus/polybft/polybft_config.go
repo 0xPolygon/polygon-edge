@@ -45,6 +45,9 @@ type PolyBFTConfig struct {
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
+
+	// MaxValidatorSetSize indicates the maximum size of validator set
+	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig

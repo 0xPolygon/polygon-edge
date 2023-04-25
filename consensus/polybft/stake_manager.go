@@ -23,6 +23,25 @@ var (
 	bigZero = big.NewInt(0)
 )
 
+// StakeManager interface provides functions for handling stake change of validators
+// and updating validator set based on changed stake
+type StakeManager interface {
+	PostBlock(req *PostBlockRequest) error
+	UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error)
+}
+
+// dummyStakeManager is a dummy implementation of StakeManager interface
+// used only for unit testing
+type dummyStakeManager struct{}
+
+func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
+	currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+	return &ValidatorSetDelta{}, nil
+}
+
+var _ StakeManager = (*stakeManager)(nil)
+
 // stakeManager saves transfer events that happened in each block
 // and calculates updated validator set based on changed stake
 type stakeManager struct {
