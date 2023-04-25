@@ -91,11 +91,18 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 	}
 
 	if len(transferEvents) == 0 {
+		s.logger.Info("Calculating validators set finished. No transfer events for given epoch.",
+			"epoch", epoch)
+
 		return &ValidatorSetDelta{}, nil
 	}
 
+	// stake counter holds sorted stakes by current and (possible) new validators
+	// he will add to map current stake (voting power) of the current validators
+	// on object instantiation
 	stakeCounter := newStakeCounter(currentValidatorSet)
 
+	// update the stake counter with stake changes from transfer events
 	for _, event := range transferEvents {
 		if event.IsStake() {
 			// then this amount was minted To validator address
@@ -142,7 +149,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 		}
 	}
 
-	// add new validators
+	// add new validators until we reach the max validator set size
 	for _, si := range stakeCounter.iterateThroughNewValidators() {
 		if si.pos > s.maxValidatorSetSize-1 {
 			// new validator doesn't have enough stake to be in validator set
