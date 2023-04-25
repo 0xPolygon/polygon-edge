@@ -34,7 +34,7 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	allowedFutureBlockTimeSeconds = int64(60)
+	allowedFutureBlockTimeSeconds = int64(15)
 )
 
 type fsm struct {
