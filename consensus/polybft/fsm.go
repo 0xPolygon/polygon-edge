@@ -33,6 +33,8 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
 	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
+	errValidatorSetDeltaMismatch        = errors.New("validator set delta mismatch")
+	errValidatorsUpdateInNonEpochEnding = errors.New("trying to update validator set in a non epoch ending block")
 )
 
 type fsm struct {
@@ -82,6 +84,9 @@ type fsm struct {
 
 	// exitEventRootHash is the calculated root hash for given checkpoint block
 	exitEventRootHash types.Hash
+
+	// newValidatorsDelta carries the updates of validator set on epoch ending block
+	newValidatorsDelta *ValidatorSetDelta
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -123,26 +128,13 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	// fill the block with transactions
 	f.blockBuilder.Fill()
 
-	// update extra validators if needed, but only after all transactions has been written
-	// each transaction can update state and therefore change validators stake for example
 	if f.isEndOfEpoch {
-		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
+		nextValidators, err = nextValidators.ApplyDelta(f.newValidatorsDelta)
 		if err != nil {
 			return nil, err
 		}
 
-		validatorsDelta, err := createValidatorSetDelta(f.validators.Accounts(), nextValidators)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create validator set delta: %w", err)
-		}
-
-		extra.Validators = validatorsDelta
-		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
-
-		nextValidators, err = f.getValidatorsTransition(validatorsDelta)
-		if err != nil {
-			return nil, err
-		}
+		extra.Validators = f.newValidatorsDelta
 	}
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
@@ -218,7 +210,6 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 }
 
 // getValidatorsTransition applies delta to the current validators,
-// as ChildValidatorSet SC returns validators in different order than the one kept on the Edge
 func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, error) {
 	nextValidators, err := f.validators.Accounts().ApplyDelta(delta)
 	if err != nil {
@@ -320,13 +311,12 @@ func (f *fsm) Validate(proposal []byte) error {
 
 	validateExtraData := func(transition *state.Transition) error {
 		if f.isEndOfEpoch {
-			if nextValidators, err = f.getCurrentValidators(transition); err != nil {
-				return err
+			if !extra.Validators.Equals(f.newValidatorsDelta) {
+				return errValidatorSetDeltaMismatch
 			}
-		}
-
-		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
-			return err
+		} else if !extra.Validators.IsEmpty() {
+			// delta should be empty in non epoch ending blocks
+			return errValidatorsUpdateInNonEpochEnding
 		}
 
 		nextValidators, err = f.getValidatorsTransition(extra.Validators)
@@ -549,19 +539,6 @@ func (f *fsm) Height() uint64 {
 // ValidatorSet returns the validator set for the current round
 func (f *fsm) ValidatorSet() ValidatorSet {
 	return f.validators
-}
-
-// getCurrentValidators queries smart contract on the given block height and returns currently active validator set
-func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
-	provider := f.backend.GetStateProvider(pendingBlockState)
-	systemState := f.backend.GetSystemState(provider)
-
-	newValidators, err := systemState.GetValidatorSet()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
-	}
-
-	return newValidators, nil
 }
 
 // verifyCommitEpochTx creates commit epoch transaction and compares its hash with the one extracted from the block.

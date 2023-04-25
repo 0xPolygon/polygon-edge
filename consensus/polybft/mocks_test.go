@@ -50,6 +50,12 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block, callback func(*state.Transition) error) (*types.FullBlock, error) {
 	args := m.Called(parent, block, callback)
 
+	if callback != nil {
+		if err := callback(nil); err != nil {
+			return nil, err
+		}
+	}
+
 	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
 }
 

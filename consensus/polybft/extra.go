@@ -171,21 +171,6 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
-// ValidateDelta validates validator set delta provided in the Extra
-// with the one being calculated by the validator itself
-func (i *Extra) ValidateDelta(oldValidators AccountSet, newValidators AccountSet) error {
-	delta, err := createValidatorSetDelta(oldValidators, newValidators)
-	if err != nil {
-		return err
-	}
-
-	if !i.Validators.Equals(delta) {
-		return fmt.Errorf("validator set delta is invalid")
-	}
-
-	return nil
-}
-
 // ValidateParentSignatures validates signatures for parent block
 func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
 	parent *types.Header, parentExtra *Extra, chainID uint64, domain []byte, logger hclog.Logger) error {
