@@ -172,6 +172,42 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		require.Equal(t, validator.Address(), updateDelta.Added[0].Address)
 		require.Equal(t, uint64(10), updateDelta.Added[0].VotingPower.Uint64())
 	})
+
+	t.Run("UpdateValidatorSet - max validator set size reached", func(t *testing.T) {
+		validator := newTestValidatorsWithAliases(t, []string{"F"}, []uint64{100}).getValidator("F")
+
+		events := []*contractsapi.TransferEvent{
+			{
+				From:  types.ZeroAddress,
+				To:    validator.Address(),
+				Value: new(big.Int).SetUint64(validator.votingPower),
+			},
+		}
+
+		require.NoError(t, state.StakeStore.insertTransferEvents(epoch+3, events))
+
+		txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
+			return validator.ValidatorMetadata()
+		})
+
+		stakeManager.rootChainRelayer = txRelayerMock
+		// this will make one existing validator to be removed from validator set
+		// because we now have 6 validators, and the new validator has more stake
+		stakeManager.maxValidatorSetSize = 5
+
+		// just mock the call however, the dummy relayer should do its magic
+		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, error(nil))
+
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3, validators.getPublicIdentities())
+		require.NoError(t, err)
+		require.Len(t, updateDelta.Added, 1)
+		require.Len(t, updateDelta.Updated, 0)
+		require.Len(t, updateDelta.Removed, 1)
+		require.Equal(t, validator.Address(), updateDelta.Added[0].Address)
+		require.Equal(t, uint64(100), updateDelta.Added[0].VotingPower.Uint64())
+	})
+
 }
 
 func createTestLogForTransferEvent(t *testing.T, validatorSet, from, to types.Address, stake uint64) *types.Log {

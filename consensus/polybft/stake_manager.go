@@ -124,6 +124,14 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 	updatedValidators := AccountSet{}
 	addedValidators := AccountSet{}
 
+	for addr, v := range stakeCounter.currentValidatorSet {
+		// remove existing validators from validator set if they
+		// did not make it to the set
+		if _, exists := stakeCounter.stakeMap[addr]; !exists {
+			removedBitmap.Set(v.index)
+		}
+	}
+
 	for addr, si := range stakeCounter.stakeMap {
 		// check if its a current validator
 		if currentValidator, exists := stakeCounter.currentValidatorSet[addr]; exists {
