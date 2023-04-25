@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"testing"
@@ -260,6 +261,84 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailedToApplyStateTx(t *testing.T) {
 	mBlockBuilder.AssertExpectations(t)
 }
 
+func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) {
+	t.Parallel()
+
+	const (
+		validatorsCount          = 6
+		remainingValidatorsCount = 3
+		signaturesCount          = 4
+		parentBlockNumber        = 49
+	)
+
+	validators := newTestValidators(t, validatorsCount).getPublicIdentities()
+	extra := createTestExtraObject(validators, AccountSet{}, validatorsCount-1, signaturesCount, signaturesCount)
+	extra.Validators = nil
+
+	extraData := extra.MarshalRLPTo(nil)
+	parent := &types.Header{Number: parentBlockNumber, ExtraData: extraData}
+	parent.ComputeHash()
+	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, extraData)
+
+	blockBuilderMock := newBlockBuilderMock(stateBlock)
+	blockBuilderMock.On("WriteTx", mock.Anything).Return(error(nil)).Once()
+
+	addedValidators := newTestValidators(t, 2).getPublicIdentities()
+	removedValidators := [3]uint64{3, 4, 5}
+	removedBitmap := &bitmap.Bitmap{}
+
+	for _, i := range removedValidators {
+		removedBitmap.Set(i)
+	}
+
+	newDelta := &ValidatorSetDelta{
+		Added:   addedValidators,
+		Updated: AccountSet{},
+		Removed: *removedBitmap,
+	}
+
+	blockChainMock := new(blockchainMock)
+
+	validatorSet := NewValidatorSet(validators, hclog.NewNullLogger())
+
+	fsm := &fsm{
+		parent:             parent,
+		blockBuilder:       blockBuilderMock,
+		config:             &PolyBFTConfig{},
+		backend:            blockChainMock,
+		isEndOfEpoch:       true,
+		validators:         validatorSet,
+		commitEpochInput:   createTestCommitEpochInput(t, 0, validators, 10),
+		exitEventRootHash:  types.ZeroHash,
+		logger:             hclog.NewNullLogger(),
+		newValidatorsDelta: newDelta,
+	}
+
+	proposal, err := fsm.BuildProposal(0)
+	assert.NoError(t, err)
+	assert.NotNil(t, proposal)
+
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
+	assert.NoError(t, err)
+	assert.Len(t, blockExtra.Validators.Added, 2)
+	assert.False(t, blockExtra.Validators.IsEmpty())
+
+	for _, addedValidator := range addedValidators {
+		assert.True(t, blockExtra.Validators.Added.ContainsAddress(addedValidator.Address))
+	}
+
+	for _, removedValidator := range removedValidators {
+		assert.True(
+			t,
+			blockExtra.Validators.Removed.IsSet(removedValidator),
+			fmt.Sprintf("Expected validator at index %d to be marked as removed, but it wasn't", removedValidator),
+		)
+	}
+
+	blockBuilderMock.AssertExpectations(t)
+	blockChainMock.AssertExpectations(t)
+}
+
 func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T) {
 	t.Parallel()
 
@@ -280,8 +359,6 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	blockBuilderMock.On("Fill").Once()
 	blockBuilderMock.On("Reset").Return(error(nil)).Once()
 
-	systemStateMock := new(systemStateMock)
-
 	fsm := &fsm{parent: parent, blockBuilder: blockBuilderMock,
 		config: &PolyBFTConfig{}, backend: &blockchainMock{},
 		isEndOfEpoch: false, validators: testValidators.toValidatorSet(),
@@ -296,7 +373,6 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 	assert.True(t, blockExtra.Validators.IsEmpty())
 
 	blockBuilderMock.AssertExpectations(t)
-	systemStateMock.AssertNotCalled(t, "GetValidatorSet")
 }
 
 func TestFSM_BuildProposal_EpochEndingBlock_FailToGetNextValidatorsHash(t *testing.T) {
