@@ -306,11 +306,11 @@ func newStakeCounter(currentValidatorSet AccountSet) *stakeCounter {
 func (sc *stakeCounter) addStake(address types.Address, amount *big.Int) {
 	sInfo, exists := sc.stakeMap[address]
 	if !exists {
-		sInfo = &stakeInfo{address: address, stake: big.NewInt(0)}
+		sInfo = &stakeInfo{address: address, stake: amount}
 		sc.stakeMap[address] = sInfo
+	} else {
+		sc.stakeMap[address].stake = sInfo.stake.Add(sInfo.stake, amount)
 	}
-
-	sc.stakeMap[address].stake = sInfo.stake.Add(sInfo.stake, amount)
 }
 
 // removeStake removes given amount for a validator from stake map
