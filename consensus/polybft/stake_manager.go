@@ -164,7 +164,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 			return nil, err
 		}
 
-		s.logger.Debug("New validator set", "validatorSet", newValidatorSet.String())
+		s.logger.Debug("New validator set", "validatorSet", newValidatorSet)
 	}
 
 	return delta, nil
