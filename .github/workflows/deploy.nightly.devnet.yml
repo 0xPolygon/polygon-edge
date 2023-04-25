@@ -179,12 +179,11 @@ jobs:
       - name: Set rpc url value
         id: url
         run: |
-          terraform output -raw aws_lb_ext_domain
-          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc.txt 
+          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
       - uses: actions/upload-artifact@v3
         with:
-          name: rpc-url
-          path: rpc.txt
+          name: rpc_url
+          path: rpc_url.txt
 
   loadtest1:
     needs: build
@@ -192,6 +191,7 @@ jobs:
     name: Load Test Nightly Build - multiple_EOA
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
@@ -204,6 +204,7 @@ jobs:
     name: Load Test Nightly Build - multiple_ERC20
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:

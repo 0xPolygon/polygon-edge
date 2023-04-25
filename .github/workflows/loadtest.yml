@@ -44,6 +44,8 @@ on:  # yamllint disable-line rule:truthy
         required: true
       DD_API_KEY:
         required: true
+      LOADTEST_RPC_URL:
+        required: true
       LOADTEST_MNEMONIC:
         required: true
 
@@ -78,10 +80,21 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Download artifact to get rpc url
+        env: 
+          url: ${{ secrets.LOADTEST_RPC_URL }}
+        if: ${{ env.url == '' }}
         uses: actions/download-artifact@v3
         with:
-          name: rpc-url
-      - run: echo "RPC_URL=http://$(cat rpc.txt)" >> $GITHUB_ENV
+          name: rpc_url
+
+      - name: Set rpc_url
+        id: set_rpc_url
+        run: |
+          if [[ -z "${{ secrets.LOADTEST_RPC_URL }}" ]]; then
+            echo "rpc_url=http://$(cat rpc.txt)" >> $GITHUB_OUTPUT
+          else
+            echo "rpc_url=${{ secrets.LOADTEST_RPC_URL }}" >> $GITHUB_OUTPUT
+          fi
 
       - id: k6
         name: Run scenario
@@ -96,6 +109,7 @@ jobs:
           echo "gas_max=$(cat summary.json | jq -r '.metrics.ethereum_gas_used.values.max')" >> $GITHUB_OUTPUT
         env:
           K6_STATSD_ENABLE_TAGS: true
+          RPC_URL: ${{ steps.set_rpc_url.outputs.rpc_url }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
           LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
           LOADTEST_DURATION: ${{ inputs.duration }}
@@ -140,7 +154,7 @@ jobs:
                       },
                       {
                         "type": "mrkdwn",
-                        "text": "JSON-RPC Endpoint: ${{ env.RPC_URL }}"
+                        "text": "JSON-RPC Endpoint: ${{ steps.set_rpc_url.outputs.rpc_url }}"
                       },
                       {
                         "type": "mrkdwn",
