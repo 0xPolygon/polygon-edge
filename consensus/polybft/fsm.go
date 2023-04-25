@@ -210,7 +210,6 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 }
 
 // getValidatorsTransition applies delta to the current validators,
-// as ChildValidatorSet SC returns validators in different order than the one kept on the Edge
 func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, error) {
 	nextValidators, err := f.validators.Accounts().ApplyDelta(delta)
 	if err != nil {
