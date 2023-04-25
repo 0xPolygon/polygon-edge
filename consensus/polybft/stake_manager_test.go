@@ -207,7 +207,6 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		require.Equal(t, validator.Address(), updateDelta.Added[0].Address)
 		require.Equal(t, uint64(100), updateDelta.Added[0].VotingPower.Uint64())
 	})
-
 }
 
 func createTestLogForTransferEvent(t *testing.T, validatorSet, from, to types.Address, stake uint64) *types.Log {
