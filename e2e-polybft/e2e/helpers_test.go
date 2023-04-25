@@ -24,6 +24,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
@@ -289,6 +290,19 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 			return nil
 		}
 	}
+}
+
+// waitForNextSprintBlock queries the latest block and waits for the next sprint block
+func waitForNextSprintBlock(t *testing.T, ethEndpoint *jsonrpc.Eth, sprintSize uint64, cluster *framework.TestCluster) uint64 {
+	t.Helper()
+
+	initialBlock, err := ethEndpoint.BlockNumber()
+	require.NoError(t, err)
+
+	sprintBlock := initialBlock + sprintSize - (initialBlock % sprintSize)
+	require.NoError(t, cluster.WaitForBlock(sprintBlock, 1*time.Minute))
+
+	return sprintBlock
 }
 
 func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Address, addr types.Address, role addresslist.Role) {
