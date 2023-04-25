@@ -69,8 +69,8 @@ type Blockchain struct {
 	// any new fields from being added
 	receiptsCache *lru.Cache // LRU cache for the block receipts
 
-	currentHeader     atomic.Value // The current header
-	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
+	currentHeader     atomic.Pointer[types.Header] // The current header
+	currentDifficulty atomic.Pointer[big.Int]      // The current difficulty of the chain (total difficulty)
 
 	stream *eventStream // Event subscriptions
 
@@ -312,22 +312,12 @@ func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
 
 // Header returns the current header (atomic)
 func (b *Blockchain) Header() *types.Header {
-	header, ok := b.currentHeader.Load().(*types.Header)
-	if !ok {
-		return nil
-	}
-
-	return header
+	return b.currentHeader.Load()
 }
 
 // CurrentTD returns the current total difficulty (atomic)
 func (b *Blockchain) CurrentTD() *big.Int {
-	td, ok := b.currentDifficulty.Load().(*big.Int)
-	if !ok {
-		return nil
-	}
-
-	return td
+	return b.currentDifficulty.Load()
 }
 
 // Config returns the blockchain configuration

@@ -106,7 +106,7 @@ type Block struct {
 	Uncles       []*Header
 
 	// Cache
-	size atomic.Value // *uint64
+	size atomic.Pointer[uint64]
 }
 
 func (b *Block) Hash() Hash {
@@ -138,12 +138,7 @@ func (b *Block) Size() uint64 {
 		return size
 	}
 
-	sizeVal, ok := sizePtr.(*uint64)
-	if !ok {
-		return 0
-	}
-
-	return *sizeVal
+	return *sizePtr
 }
 
 func (b *Block) String() string {
