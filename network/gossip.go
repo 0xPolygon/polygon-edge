@@ -71,7 +71,7 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 	}
 
 	// Mark topic active.
-	t.closed.Swap(false)
+	t.closed.Store(false)
 
 	go t.readLoop(sub, handler)
 
@@ -127,6 +127,7 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 		typ:     reflect.TypeOf(obj).Elem(),
 		closeCh: make(chan struct{}),
 	}
+	tt.closed.Store(false)
 
 	return tt, nil
 }
