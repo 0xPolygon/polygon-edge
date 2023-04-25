@@ -330,8 +330,9 @@ func (sc *stakeCounter) sortedIndex(address types.Address) int {
 func (sc *stakeCounter) iterateThroughNewValidators() []*stakeInfo {
 	newValidators := make([]*stakeInfo, 0)
 
+	currentValidatorSetMap := sc.currentValidatorSet.GetAddressesAsSet()
 	for _, s := range sc.sortedByStake {
-		if sc.currentValidatorSet.ContainsAddress(s.address) {
+		if _, exists := currentValidatorSetMap[s.address]; exists {
 			continue
 		}
 
