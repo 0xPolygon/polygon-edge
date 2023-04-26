@@ -17,34 +17,6 @@ const (
 	minDelegation = 1
 )
 
-// getInitChildValidatorSetInput builds input parameters for ChildValidatorSet SC initialization
-func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
-	apiValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
-
-	for i, validator := range polyBFTConfig.InitialValidatorSet {
-		validatorData, err := validator.ToValidatorInitAPIBinding()
-		if err != nil {
-			return nil, err
-		}
-
-		apiValidators[i] = validatorData
-	}
-
-	params := &contractsapi.InitializeChildValidatorSetFn{
-		Init: &contractsapi.InitStruct{
-			EpochReward:   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
-			MinStake:      big.NewInt(minStake),
-			MinDelegation: big.NewInt(minDelegation),
-			EpochSize:     new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		},
-		NewBls:     contracts.BLSContract,
-		Governance: polyBFTConfig.Governance,
-		Validators: apiValidators,
-	}
-
-	return params.EncodeAbi()
-}
-
 // getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
 func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	//nolint:godox

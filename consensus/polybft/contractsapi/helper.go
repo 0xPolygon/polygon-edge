@@ -38,7 +38,10 @@ func (u *Uptime) AddValidatorUptime(address types.Address, count int64) {
 	})
 }
 
-var _ StateTransactionInput = &CommitEpochChildValidatorSetFn{}
+var (
+	_ StateTransactionInput = &CommitEpochValidatorSetFn{}
+	_ StateTransactionInput = &DistributeRewardForRewardDistributorFn{}
+)
 
 // IsStake indicates if transfer event (from ERC20 implementation) mints tokens to a non zero address
 func (t *TransferEvent) IsStake() bool {

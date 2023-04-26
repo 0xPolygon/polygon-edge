@@ -581,12 +581,14 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	commitEpochInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock, consensusRuntime.epoch)
+	commitEpochInput, distributeRewardsInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock,
+		consensusRuntime.epoch)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, commitEpochInput)
 	assert.Equal(t, uint64(epoch), commitEpochInput.ID.Uint64())
 	assert.Equal(t, uint64(epochStartBlock), commitEpochInput.Epoch.StartBlock.Uint64())
 	assert.Equal(t, uint64(epochEndBlock), commitEpochInput.Epoch.EndBlock.Uint64())
+	assert.Equal(t, uint64(epoch), distributeRewardsInput.EpochID.Uint64())
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)

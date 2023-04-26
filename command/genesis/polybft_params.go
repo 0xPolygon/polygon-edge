@@ -272,13 +272,11 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.NewValidatorSetContract,
 			constructorCallback: func(artifact *artifact.Artifact,
 				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				// TODO @goran-ethernal- this will be changed in the next PRs to use generated binding
-				// once we remove the old ChildValidatorSet on use the new ValidatorInit binding
-				validatorsMap := make([]map[string]interface{}, len(polybftConfig.InitialValidatorSet))
+				initialValidators := make([]*contractsapi.ValidatorInit, len(polybftConfig.InitialValidatorSet))
 				for i, validator := range polybftConfig.InitialValidatorSet {
-					validatorsMap[i] = map[string]interface{}{
-						"addr":  validator.Address,
-						"stake": validator.Stake,
+					initialValidators[i] = &contractsapi.ValidatorInit{
+						Addr:  validator.Address,
+						Stake: validator.Stake,
 					}
 				}
 
@@ -289,13 +287,15 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 					customSupernetManagerAddr = polybftConfig.Bridge.CustomSupernetManagerAddr
 				}
 
-				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
-					contracts.L2StateSenderContract,
-					contracts.StateReceiverContract,
-					customSupernetManagerAddr,
-					new(big.Int).SetUint64(polybftConfig.EpochSize),
-					validatorsMap,
-				})
+				constructor := &contractsapi.ValidatorSetFn{
+					StateSender:      contracts.L2StateSenderContract,
+					StateReceiver:    contracts.StateReceiverContract,
+					RootChainManager: customSupernetManagerAddr,
+					EpochSize_:       new(big.Int).SetUint64(polybftConfig.EpochSize),
+					InitalValidators: nil,
+				}
+
+				encoded, err := constructor.EncodeAbi()
 				if err != nil {
 					return nil, err
 				}
@@ -308,11 +308,13 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.RewardDistributorContract,
 			constructorCallback: func(artifact *artifact.Artifact,
 				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{
-					contracts.NativeERC20TokenContract, // TODO @goran-ethernal - we will use a different token for rewards
-					contracts.NewValidatorSetContract,
-					new(big.Int).SetUint64(polybftConfig.EpochReward),
-				})
+				constructor := &contractsapi.RewardDistributorFn{
+					RewardToken:  contracts.NativeERC20TokenContract, // TODO @goran-ethernal - we will use a different token for rewards
+					ValidatorSet: contracts.NewValidatorSetContract,
+					BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+				}
+
+				encoded, err := constructor.EncodeAbi()
 				if err != nil {
 					return nil, err
 				}

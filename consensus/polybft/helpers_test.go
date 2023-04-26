@@ -58,16 +58,32 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash, 
 }
 
 func createTestCommitEpochInput(t *testing.T, epochID uint64,
-	validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochChildValidatorSetFn {
+	epochSize uint64) *contractsapi.CommitEpochValidatorSetFn {
 	t.Helper()
-
-	if validatorSet == nil {
-		validatorSet = newTestValidators(t, 5).getPublicIdentities()
-	}
 
 	var startBlock uint64 = 0
 	if epochID > 1 {
 		startBlock = (epochID - 1) * epochSize
+	}
+
+	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
+		ID: new(big.Int).SetUint64(epochID),
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(startBlock + 1),
+			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
+			EpochRoot:  types.Hash{},
+		},
+	}
+
+	return commitEpoch
+}
+
+func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
+	validatorSet AccountSet, epochSize uint64) *contractsapi.DistributeRewardForRewardDistributorFn {
+	t.Helper()
+
+	if validatorSet == nil {
+		validatorSet = newTestValidators(t, 5).getPublicIdentities()
 	}
 
 	uptime := &contractsapi.Uptime{
@@ -76,21 +92,14 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64,
 		TotalBlocks: new(big.Int).SetUint64(epochSize),
 	}
 
-	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
-		ID: uptime.EpochID,
-		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(startBlock + 1),
-			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
-			EpochRoot:  types.Hash{},
-		},
-		Uptime: uptime,
-	}
-
 	for i := range validatorSet {
 		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
 	}
 
-	return commitEpoch
+	return &contractsapi.DistributeRewardForRewardDistributorFn{
+		EpochID: new(big.Int).SetUint64(epochID),
+		Uptime:  uptime,
+	}
 }
 
 func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contractsapi.StateSyncedEvent {

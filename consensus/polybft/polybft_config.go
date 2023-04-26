@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -169,31 +168,6 @@ func (v *Validator) UnmarshalBLSSignature() (*bls.Signature, error) {
 	}
 
 	return bls.UnmarshalSignature(decoded)
-}
-
-// ToValidatorInitAPIBinding converts Validator to instance of contractsapi.ValidatorInit
-func (v Validator) ToValidatorInitAPIBinding() (*contractsapi.ValidatorInit, error) {
-	blsSignature, err := v.UnmarshalBLSSignature()
-	if err != nil {
-		return nil, err
-	}
-
-	signBigInts, err := blsSignature.ToBigInt()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := v.UnmarshalBLSPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	return &contractsapi.ValidatorInit{
-		Addr:      v.Address,
-		Pubkey:    pubKey.ToBigInt(),
-		Signature: signBigInts,
-		Stake:     new(big.Int).Set(v.Stake),
-	}, nil
 }
 
 // ToValidatorMetadata creates ValidatorMetadata instance

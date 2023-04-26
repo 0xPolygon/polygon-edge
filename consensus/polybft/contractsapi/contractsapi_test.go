@@ -33,21 +33,11 @@ func TestEncoding_Method(t *testing.T) {
 			Bitmap:    []byte{},
 		},
 		// empty commit epoch
-		&CommitEpochChildValidatorSetFn{
+		&CommitEpochValidatorSetFn{
 			ID: big.NewInt(1),
 			Epoch: &Epoch{
 				StartBlock: big.NewInt(1),
 				EndBlock:   big.NewInt(1),
-			},
-			Uptime: &Uptime{
-				EpochID: big.NewInt(1),
-				UptimeData: []*UptimeData{
-					{
-						Validator:    types.Address{0x1},
-						SignedBlocks: big.NewInt(1),
-					},
-				},
-				TotalBlocks: big.NewInt(1),
 			},
 		},
 	}

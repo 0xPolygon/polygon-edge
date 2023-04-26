@@ -200,17 +200,12 @@ func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
 	cases := []contractsapi.StateTransactionInput{
-		&contractsapi.CommitEpochChildValidatorSetFn{
+		&contractsapi.CommitEpochValidatorSetFn{
 			ID: big.NewInt(1),
 			Epoch: &contractsapi.Epoch{
 				StartBlock: big.NewInt(1),
 				EndBlock:   big.NewInt(10),
 				EpochRoot:  types.Hash{},
-			},
-			Uptime: &contractsapi.Uptime{
-				EpochID:     big.NewInt(1),
-				TotalBlocks: big.NewInt(10),
-				UptimeData:  []*contractsapi.UptimeData{},
 			},
 		},
 	}
