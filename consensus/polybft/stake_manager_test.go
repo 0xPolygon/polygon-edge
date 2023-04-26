@@ -231,33 +231,27 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 		newAliases := []string{"H", "J", "K"}
 		newValidators := newTestValidatorsWithAliases(t, newAliases, []uint64{10, 10, 10})
 
-		test := func() ([]stakeInfo, []stakeInfo) {
+		test := func() ([]stakeInfo, int) {
 			stakeCounter := newStakeCounter(validators.getPublicIdentities())
 
 			for _, v := range newValidators.getPublicIdentities() {
 				stakeCounter.addStake(v.Address, v.VotingPower)
 			}
 
-			return stakeCounter.getSortedMaxSlice(maxValidatorSetSize)
+			return stakeCounter.sortByStake(maxValidatorSetSize), len(stakeCounter.stakeMap)
 		}
 
-		initialSlice, initialToRemove := test()
+		initialSlice, initialCnt := test()
 
 		// stake counter and stake map should always be deterministic
 		for i := 0; i < timesToExecute; i++ {
-			currentSlice, currentToRemove := test()
+			currentSlice, currentCnt := test()
 
 			require.Len(t, currentSlice, len(initialSlice))
-			require.Len(t, currentToRemove, len(initialToRemove))
+			require.Equal(t, initialCnt, currentCnt)
 
 			for i, si := range currentSlice {
 				initialSi := initialSlice[i]
-				require.Equal(t, si.address, initialSi.address)
-				require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
-			}
-
-			for i, si := range currentToRemove {
-				initialSi := initialToRemove[i]
 				require.Equal(t, si.address, initialSi.address)
 				require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
 			}

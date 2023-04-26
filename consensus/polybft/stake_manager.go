@@ -140,10 +140,9 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 	updatedValidators := AccountSet{}
 	addedValidators := AccountSet{}
 
-	// get sorted slice of validators (stake, address) pairs
-	stakeInfos, stakeInfosToRemove := stakeCounter.getSortedMaxSlice(s.maxValidatorSetSize)
-	// remove from stake map addresses that are after maxValidatorSetSize
-	stakeCounter.removeFromStakeMap(stakeInfosToRemove)
+	// sort validators by stake since we update the validator set based on highest stakes
+	// this also returns sorted slice of validators (stake, address) pairs
+	stakeInfos := stakeCounter.sortByStake(s.maxValidatorSetSize)
 
 	for addr, v := range stakeCounter.currentValidatorSet {
 		// remove existing validators from validator set if they
@@ -348,9 +347,9 @@ func (sc *stakeCounter) removeStake(address types.Address, amount *big.Int) {
 	stakeInfo.Sub(stakeInfo, amount)
 }
 
-// getSortedMaxSlice returns all validator pairs (address, stake) in sorted order
-// and pairs that are after maxValidatorSetSize
-func (sc *stakeCounter) getSortedMaxSlice(maxValidatorSetSize int) ([]stakeInfo, []stakeInfo) {
+// sortByStake returns all validator pairs (address, stake) in sorted order
+// also remove addresses from sc.stakeMap that are after maxValidatorSetSize
+func (sc *stakeCounter) sortByStake(maxValidatorSetSize int) []stakeInfo {
 	stakeInfos := make([]stakeInfo, 0, len(sc.stakeMap))
 	for k, v := range sc.stakeMap {
 		stakeInfos = append(stakeInfos, stakeInfo{
@@ -373,15 +372,12 @@ func (sc *stakeCounter) getSortedMaxSlice(maxValidatorSetSize int) ([]stakeInfo,
 	})
 
 	if len(stakeInfos) <= maxValidatorSetSize {
-		return stakeInfos, nil
+		return stakeInfos
 	}
 
-	return stakeInfos[:maxValidatorSetSize], stakeInfos[maxValidatorSetSize:]
-}
-
-// removeFromStakeMap removes from stake map all addresses from stakeInfos
-func (sc *stakeCounter) removeFromStakeMap(stakeInfos []stakeInfo) {
-	for _, si := range stakeInfos {
+	for _, si := range stakeInfos[maxValidatorSetSize:] {
 		delete(sc.stakeMap, si.address)
 	}
+
+	return stakeInfos[:maxValidatorSetSize]
 }
