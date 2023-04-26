@@ -31,6 +31,8 @@ var (
 	ChildERC1155Contract = types.StringToAddress("0x1007")
 	// ChildERC1155PredicateContract is an address of child ERC1155 predicate contract on the child chain
 	ChildERC1155PredicateContract = types.StringToAddress("0x1008")
+	// MockRewardTokenContract is an address of MockRewardToken contract on the child chain
+	MockRewardTokenContract = types.StringToAddress("0x1009")
 
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")

@@ -38,6 +38,7 @@ var (
 	StakeManager          *artifact.Artifact
 	RewardDistributor     *artifact.Artifact
 	ValidatorSet          *artifact.Artifact
+	MockRewardToken       *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -193,6 +194,11 @@ func init() {
 	}
 
 	ValidatorSet, err = artifact.DecodeArtifact([]byte(ValidatorSetArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	MockRewardToken, err = artifact.DecodeArtifact([]byte(MockRewardTokenArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

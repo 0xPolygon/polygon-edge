@@ -263,6 +263,11 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.L2StateSenderContract,
 		},
 		{
+			// MockRewardToken contract
+			artifact: contractsapi.MockRewardToken,
+			address:  contracts.MockRewardTokenContract,
+		},
+		{
 			artifact: contractsapi.ValidatorSet,
 			address:  contracts.ValidatorSetContract,
 			constructorCallback: func(artifact *artifact.Artifact,
@@ -304,7 +309,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			constructorCallback: func(artifact *artifact.Artifact,
 				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
 				constructor := &contractsapi.RewardDistributorFn{
-					RewardToken:  contracts.NativeERC20TokenContract, // TODO @goran-ethernal - we will use a different token for rewards
+					RewardToken:  contracts.MockRewardTokenContract,
 					ValidatorSet: contracts.ValidatorSetContract,
 					BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
 				}
