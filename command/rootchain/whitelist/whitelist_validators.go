@@ -52,7 +52,7 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.PrivateKeyFlagDesc,
 	)
 
-	cmd.Flags().StringArrayVar(
+	cmd.Flags().StringSliceVar(
 		&params.newValidatorAddresses,
 		newValidatorAddressesFlag,
 		[]string{},
@@ -127,7 +127,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	var (
 		whitelistEvent contractsapi.AddedToWhitelistEvent
-		result         = &whitelistResult{}
+		result         = &whitelistResult{providedAddresses: params.newValidatorAddresses}
 	)
 
 	for _, log := range receipt.Logs {
@@ -141,8 +141,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 
 		result.newValidatorAddresses = append(result.newValidatorAddresses, whitelistEvent.Validator.String())
-
-		break
 	}
 
 	if len(result.newValidatorAddresses) != len(params.newValidatorAddresses) {

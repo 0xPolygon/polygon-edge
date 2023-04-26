@@ -4,7 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +29,30 @@ import (
 const (
 	chainConfigFileName = "genesis.json"
 )
+
+func init() {
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	parent := filepath.Dir(wd)
+	wd = filepath.Join(parent, "../artifacts/polygon-edge")
+	os.Setenv("EDGE_BINARY", wd)
+	os.Setenv("E2E_TESTS", "true")
+	os.Setenv("E2E_LOGS", "true")
+	os.Setenv("E2E_LOG_LEVEL", "debug")
+}
+
+func TestE2E_Bre(t *testing.T) {
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithBridge(),
+		framework.WithNumBlockConfirmations(2),
+		framework.WithEpochSize(5))
+	defer cluster.Stop()
+
+	cluster.WaitForBlock(5, time.Minute)
+}
 
 func TestE2E_Bridge_Transfers(t *testing.T) {
 	const (

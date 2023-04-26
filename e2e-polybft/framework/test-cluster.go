@@ -351,23 +351,21 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
-	{
-		// run init accounts for validators
-		addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	// run init accounts for validators
+	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	require.NoError(t, err)
+
+	if cluster.Config.SecretsCallback != nil {
+		cluster.Config.SecretsCallback(addresses, cluster.Config)
+	}
+
+	if config.NonValidatorCount > 0 {
+		// run init accounts for non-validators
+		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
 		require.NoError(t, err)
 
-		if cluster.Config.SecretsCallback != nil {
-			cluster.Config.SecretsCallback(addresses, cluster.Config)
-		}
-
-		if config.NonValidatorCount > 0 {
-			// run init accounts for non-validators
-			_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
-			require.NoError(t, err)
-
-			// we don't call secrets callback on non-validators,
-			// since we have nothing to premine nor stake for non validators
-		}
+		// we don't call secrets callback on non-validators,
+		// since we have nothing to premine nor stake for non validators
 	}
 
 	genesisPath := path.Join(config.TmpDir, "genesis.json")
@@ -457,6 +455,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// fund validators on the rootchain
 		err = cluster.Bridge.fundRootchainValidators()
+		require.NoError(t, err)
+
+		// whitelist genesis validators on the rootchain
+		err = cluster.Bridge.whitelistValidators(addresses, genesisPath)
+		require.NoError(t, err)
+
+		// register genesis validators on the rootchain
+		err = cluster.Bridge.registerGenesisValidators(genesisPath)
 		require.NoError(t, err)
 	}
 

@@ -376,7 +376,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 					Matic:             cfg.RootNativeERC20Address,
 					ChildValidatorSet: contracts.ValidatorSetContract,
 					ExitHelper:        cfg.ExitHelperAddress,
-					Domain:            string(bls.DomainValidatorSet),
+					Domain:            bls.DomainValidatorSetString,
 				}
 
 				encoded, err := constructor.EncodeAbi()

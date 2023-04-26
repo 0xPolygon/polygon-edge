@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	testAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
+	TestAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
 	TestModeFlag            = "test"
 	SupernetManagerFlag     = "supernet-manager"
 	SupernetManagerFlagDesc = "address of supernet manager contract"
@@ -37,7 +37,7 @@ var (
 
 // GetRootchainPrivateKey initializes a private key from provided raw private key
 func GetRootchainPrivateKey(rawKey string) (ethgo.Key, error) {
-	privateKeyRaw := testAccountPrivKey
+	privateKeyRaw := TestAccountPrivKey
 	if rawKey != "" {
 		privateKeyRaw = rawKey
 	}

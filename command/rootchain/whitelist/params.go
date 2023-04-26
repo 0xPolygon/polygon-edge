@@ -42,18 +42,27 @@ func (ep *whitelistParams) validateFlags() error {
 }
 
 type whitelistResult struct {
+	providedAddresses     []string
 	newValidatorAddresses []string
 }
 
 func (wr whitelistResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	vals := make([]string, len(wr.newValidatorAddresses))
+	var vals []string
+	for _, addr := range wr.providedAddresses {
+		vals = append(vals, fmt.Sprintf("Validator address|%s", addr))
+	}
 
-	buffer.WriteString("\n[WHITELIST VALIDATOR]\n")
+	buffer.WriteString("\n[WHITELIST PROVIDED VALIDATORS]\n")
+	buffer.WriteString(helper.FormatKV(vals))
+	buffer.WriteString("\n")
 
-	for i, addr := range wr.newValidatorAddresses {
-		vals[i] = fmt.Sprintf("Validator address|%s", addr)
+	buffer.WriteString("\n[WHITELIST VALIDATORS]\n")
+
+	vals = []string{}
+	for _, addr := range wr.newValidatorAddresses {
+		vals = append(vals, fmt.Sprintf("Validator address|%s", addr))
 	}
 
 	buffer.WriteString(helper.FormatKV(vals))

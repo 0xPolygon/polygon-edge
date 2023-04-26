@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"path"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -190,7 +196,7 @@ func (t *TestBridge) fundRootchainValidators() error {
 	args := []string{
 		"rootchain",
 		"fund",
-		"--data-dir", path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
+		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
 		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
 	}
 
@@ -199,4 +205,73 @@ func (t *TestBridge) fundRootchainValidators() error {
 	}
 
 	return nil
+}
+
+func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address, genesisPath string) error {
+	polybftConfig, err := readPolybftConfig(genesisPath)
+	if err != nil {
+		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
+	}
+
+	addressesAsString := make([]string, len(validatorAddresses))
+	for i := 0; i < len(validatorAddresses); i++ {
+		addressesAsString[i] = validatorAddresses[i].String()
+	}
+
+	args := []string{
+		"polybft",
+		"whitelist-validators",
+		"--addresses", strings.Join(addressesAsString, ","),
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+		"--private-key", rootHelper.TestAccountPrivKey,
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
+	}
+
+	return nil
+}
+
+func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
+	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
+	if err != nil {
+		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
+	}
+
+	polybftConfig, err := readPolybftConfig(genesisPath)
+	if err != nil {
+		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
+	}
+
+	for _, secret := range validatorSecrets {
+		args := []string{
+			"polybft",
+			"register-validator",
+			"--jsonrpc", t.JSONRPCAddr(),
+			"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+			"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
+		}
+
+		if err := t.cmdRun(args...); err != nil {
+			return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, error) {
+	chainConfig, err := chain.ImportFromFile(genesisPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read chain configuration: %w", err)
+	}
+
+	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve consensus configuration: %w", err)
+	}
+
+	return &consensusConfig, nil
 }
