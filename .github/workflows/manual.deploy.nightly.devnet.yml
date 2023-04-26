@@ -3,9 +3,9 @@
 
 name: Nightly DevNet Workflow (Manual)
 on:  # yamllint disable-line rule:truthy
-  push:
-    branches:
-      - jesse/fix-unit-test
+  # push:
+  #   branches:
+  #     - jesse/fix-unit-test
   workflow_call: {}
   workflow_dispatch: {}
 
