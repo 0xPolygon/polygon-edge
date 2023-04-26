@@ -349,7 +349,7 @@ func (sc *stakeCounter) addStake(address types.Address, amount *big.Int) {
 // removeStake removes given amount for a validator from stake map
 func (sc *stakeCounter) removeStake(address types.Address, amount *big.Int) {
 	bigStake := sc.stakeMap[address].stake
-	sc.stakeMap[address].stake = bigStake.Sub(bigStake, amount)
+	bigStake.Sub(bigStake, amount)
 }
 
 // sortByStake sorts all validators by their stake amount
@@ -376,7 +376,7 @@ func (sc *stakeCounter) sortByStake(maxValidatorSetSize int) {
 		}
 	})
 
-	for i, k := range keys {
+	for i, k := range keys[:maxValidatorSetSize] {
 		sc.stakeMap[k].pos = i
 	}
 
