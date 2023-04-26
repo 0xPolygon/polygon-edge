@@ -228,6 +228,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
 		stateSyncManager:  &dummyStateSyncManager{},
 		checkpointManager: &dummyCheckpointManager{},
+		stakeManager:      &dummyStakeManager{},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
@@ -421,6 +422,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		lastBuiltBlock:     lastBuiltBlock,
 		stateSyncManager:   &dummyStateSyncManager{},
 		checkpointManager:  &dummyCheckpointManager{},
+		stakeManager:       &dummyStakeManager{},
 	}
 
 	err := runtime.FSM()

@@ -169,6 +169,14 @@ func main() {
 				"StakeAdded",
 			},
 		},
+		{
+			"ValidatorSet",
+			gensc.ValidatorSet,
+			[]string{},
+			[]string{
+				"Transfer",
+			},
+		},
 	}
 
 	generatedData := &generatedData{}

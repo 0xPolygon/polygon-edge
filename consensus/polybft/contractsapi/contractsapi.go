@@ -920,3 +920,25 @@ func (s *StakeAddedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 
 	return true, decodeEvent(StakeManager.Abi.Events["StakeAdded"], log, s)
 }
+
+type TransferEvent struct {
+	From  types.Address `abi:"from"`
+	To    types.Address `abi:"to"`
+	Value *big.Int      `abi:"value"`
+}
+
+func (*TransferEvent) Sig() ethgo.Hash {
+	return ValidatorSet.Abi.Events["Transfer"].ID()
+}
+
+func (*TransferEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ValidatorSet.Abi.Events["Transfer"].Inputs.Encode(inputs)
+}
+
+func (t *TransferEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ValidatorSet.Abi.Events["Transfer"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ValidatorSet.Abi.Events["Transfer"], log, t)
+}

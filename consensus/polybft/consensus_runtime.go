@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -112,6 +113,9 @@ type consensusRuntime struct {
 	// manager for state sync bridge transactions
 	stateSyncManager StateSyncManager
 
+	// manager for handling validator stake change and updating validator set
+	stakeManager StakeManager
+
 	// logger instance
 	logger hcf.Logger
 }
@@ -136,6 +140,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if err := runtime.initCheckpointManager(log); err != nil {
+		return nil, err
+	}
+
+	if err := runtime.initStakeManager(log); err != nil {
 		return nil, err
 	}
 
@@ -211,6 +219,26 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	return nil
 }
 
+// initStakeManager initializes stake manager
+func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+	if err != nil {
+		return err
+	}
+
+	c.stakeManager = newStakeManager(
+		logger.Named("stake-manager"),
+		c.state,
+		txRelayer,
+		wallet.NewEcdsaSigner(c.config.Key),
+		contracts.NewValidatorSetContract,
+		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
+	)
+
+	return nil
+}
+
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
@@ -278,6 +306,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 		c.logger.Error("Could not update proposer calculator", "err", err)
+	}
+
+	// handle transfer events that happened in block
+	if err := c.stakeManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in stake manager", "err", err)
 	}
 
 	if isEndOfEpoch {
@@ -361,6 +394,11 @@ func (c *consensusRuntime) FSM() error {
 		ff.commitEpochInput, err = c.calculateCommitEpochInput(parent, epoch)
 		if err != nil {
 			return fmt.Errorf("cannot calculate commit epoch info: %w", err)
+		}
+
+		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number, epoch.Validators.Copy())
+		if err != nil {
+			return fmt.Errorf("cannot update validator set on epoch ending: %w", err)
 		}
 	}
 
