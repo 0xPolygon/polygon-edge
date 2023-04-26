@@ -287,7 +287,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 					customSupernetManagerAddr = polybftConfig.Bridge.CustomSupernetManagerAddr
 				}
 
-				constructor := &contractsapi.ValidatorSetFn{
+				constructor := &contractsapi.ValidatorSetConstructorFn{
 					StateSender:      contracts.L2StateSenderContract,
 					StateReceiver:    contracts.StateReceiverContract,
 					RootChainManager: customSupernetManagerAddr,
@@ -308,7 +308,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.RewardDistributorContract,
 			constructorCallback: func(artifact *artifact.Artifact,
 				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				constructor := &contractsapi.RewardDistributorFn{
+				constructor := &contractsapi.RewardDistributorConstructorFn{
 					RewardToken:  contracts.MockRewardTokenContract,
 					ValidatorSet: contracts.ValidatorSetContract,
 					BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),

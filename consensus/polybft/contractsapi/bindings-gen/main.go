@@ -197,7 +197,7 @@ func main() {
 
 	for _, c := range cases {
 		if c.generateConstructor {
-			if err := generateFunction(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
+			if err := generateConstructor(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -417,6 +417,52 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
 		"Name":         event.Name,
 		"TName":        strings.Title(name),
 		"ContractName": contractName,
+	}
+
+	renderedString, err := renderTmpl(tmplStr, inputs)
+	if err != nil {
+		return err
+	}
+
+	generatedData.resultString = append(generatedData.resultString, renderedString)
+
+	return nil
+}
+
+// generateConstruct generates stubs for a smart contract constructor
+func generateConstructor(generatedData *generatedData,
+	contractName string, constructor *abi.Method) error {
+	methodName := fmt.Sprintf(functionNameFormat, strings.Title(contractName+"Constructor"))
+	res := []string{}
+
+	_, err := generateType(generatedData, methodName, constructor.Inputs, &res)
+	if err != nil {
+		return err
+	}
+
+	// write encode/decode functions
+	tmplStr := `
+{{range .Structs}}
+	{{.}}
+{{ end }}
+
+func ({{.Sig}} *{{.TName}}) Sig() []byte {
+	return {{.ContractName}}.Abi.Constructor.ID()
+}
+
+func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+	return {{.ContractName}}.Abi.Constructor.Inputs.Encode({{.Sig}})
+}
+
+func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+	return decodeMethod({{.ContractName}}.Abi.Constructor, buf, {{.Sig}})
+}`
+
+	inputs := map[string]interface{}{
+		"Structs":      res,
+		"Sig":          strings.ToLower(string(methodName[0])),
+		"ContractName": contractName,
+		"TName":        strings.Title(methodName),
 	}
 
 	renderedString, err := renderTmpl(tmplStr, inputs)

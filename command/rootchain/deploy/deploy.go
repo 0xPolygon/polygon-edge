@@ -355,7 +355,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     stakeManagerName,
 			artifact: contractsapi.StakeManager,
 			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				constructor := &contractsapi.StakeManagerFn{MATIC_: cfg.RootNativeERC20Address}
+				constructor := &contractsapi.StakeManagerConstructorFn{MATIC_: cfg.RootNativeERC20Address}
 
 				encoded, err := constructor.EncodeAbi()
 				if err != nil {
@@ -369,7 +369,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     customSupernetManagerName,
 			artifact: contractsapi.CustomSupernetManager,
 			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				constructor := &contractsapi.CustomSupernetManagerFn{
+				constructor := &contractsapi.CustomSupernetManagerConstructorFn{
 					StakeManager:      cfg.StakeManagerAddress,
 					Bls:               cfg.BLSAddress,
 					StateSender:       cfg.StateSenderAddress,
