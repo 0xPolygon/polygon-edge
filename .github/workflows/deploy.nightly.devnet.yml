@@ -144,6 +144,7 @@ jobs:
                           {% for address in premine_address %} --premine {{ address }}:1000000000000000000000000000 {% endfor %}
                           --premine 0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa:1000000000000000000000000000 \
                           --premine 0x0000000000000000000000000000000000000000 \
+                          --burn-contract 0:0x0000000000000000000000000000000000000000 \
                           --block-gas-limit {{ block_gas_limit }} \
                           --block-time {{ block_time }}s \
                           --chain-id {{ chain_id }} \
