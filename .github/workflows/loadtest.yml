@@ -91,7 +91,7 @@ jobs:
         id: set_rpc_url
         run: |
           if [[ -z "${{ secrets.LOADTEST_RPC_URL }}" ]]; then
-            echo "rpc_url=http://$(cat rpc.txt)" >> $GITHUB_OUTPUT
+            echo "rpc_url=http://$(cat rpc_url.txt)" >> $GITHUB_OUTPUT
           else
             echo "rpc_url=${{ secrets.LOADTEST_RPC_URL }}" >> $GITHUB_OUTPUT
           fi
