@@ -24,10 +24,6 @@ func main() {
 		Name string
 	}{
 		{
-			"child/ChildValidatorSet.sol",
-			"ChildValidatorSet",
-		},
-		{
 			"child/L2StateSender.sol",
 			"L2StateSender",
 		},

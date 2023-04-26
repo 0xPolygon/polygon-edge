@@ -186,8 +186,8 @@ func TestStateTransaction_Signature(t *testing.T) {
 		sig string
 	}{
 		{
-			contractsapi.ChildValidatorSet.Abi.GetMethod("commitEpoch"),
-			"410899c9",
+			contractsapi.ValidatorSet.Abi.GetMethod("commitEpoch"),
+			"0f50287c",
 		},
 	}
 	for _, c := range cases {

@@ -545,6 +545,22 @@ func (r *RegisterCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(CustomSupernetManager.Abi.Methods["register"], buf, r)
 }
 
+type GetValidatorCustomSupernetManagerFn struct {
+	Validator_ types.Address `abi:"validator_"`
+}
+
+func (g *GetValidatorCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["getValidator"].ID()
+}
+
+func (g *GetValidatorCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["getValidator"].Encode(g)
+}
+
+func (g *GetValidatorCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["getValidator"], buf, g)
+}
+
 type ValidatorRegisteredEvent struct {
 	Validator types.Address `abi:"validator"`
 	BlsKey    [4]*big.Int   `abi:"blsKey"`

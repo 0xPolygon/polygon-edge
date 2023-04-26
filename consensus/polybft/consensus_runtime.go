@@ -231,7 +231,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		c.state,
 		txRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
-		contracts.NewValidatorSetContract,
+		contracts.ValidatorSetContract,
 		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
 	)

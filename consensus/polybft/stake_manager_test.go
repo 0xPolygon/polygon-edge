@@ -278,13 +278,7 @@ func createTestLogForTransferEvent(t *testing.T, validatorSet, from, to types.Ad
 	}
 }
 
-var (
-	_ txrelayer.TxRelayer = (*dummyStakeTxRelayer)(nil)
-	//nolint:godox
-	// TODO - @goran-ethernal change this once we remove old ChildValidatorSet
-	// and its stubs, to use the new validator stub from the new contract
-	validatorTypeABI = abi.MustNewType("tuple(uint256[4] blsKey, uint256 stake, bool isWhitelisted, bool isActive)")
-)
+var _ txrelayer.TxRelayer = (*dummyStakeTxRelayer)(nil)
 
 type dummyStakeTxRelayer struct {
 	mock.Mock

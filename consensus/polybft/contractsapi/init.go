@@ -24,7 +24,6 @@ var (
 	BLS256                *artifact.Artifact
 	System                *artifact.Artifact
 	Merkle                *artifact.Artifact
-	ChildValidatorSet     *artifact.Artifact
 	NativeERC20           *artifact.Artifact
 	NativeERC20Mintable   *artifact.Artifact
 	StateReceiver         *artifact.Artifact
@@ -139,11 +138,6 @@ func init() {
 	}
 
 	ChildERC1155Predicate, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

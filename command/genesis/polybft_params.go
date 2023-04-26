@@ -213,11 +213,6 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 
 	genesisContracts := []*contractInfo{
 		{
-			// ChildValidatorSet contract
-			artifact: contractsapi.ChildValidatorSet,
-			address:  contracts.ValidatorSetContract,
-		},
-		{
 			// State receiver contract
 			artifact: contractsapi.StateReceiver,
 			address:  contracts.StateReceiverContract,
@@ -269,7 +264,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 		},
 		{
 			artifact: contractsapi.ValidatorSet,
-			address:  contracts.NewValidatorSetContract,
+			address:  contracts.ValidatorSetContract,
 			constructorCallback: func(artifact *artifact.Artifact,
 				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
 				initialValidators := make([]*contractsapi.ValidatorInit, len(polybftConfig.InitialValidatorSet))
@@ -310,7 +305,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
 				constructor := &contractsapi.RewardDistributorFn{
 					RewardToken:  contracts.NativeERC20TokenContract, // TODO @goran-ethernal - we will use a different token for rewards
-					ValidatorSet: contracts.NewValidatorSetContract,
+					ValidatorSet: contracts.ValidatorSetContract,
 					BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
 				}
 

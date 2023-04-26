@@ -245,7 +245,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.NewValidatorSetContract, input), nil
+	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
 }
 
 // createDistributeRewardsTx create a StateTransaction, which invokes RewardDistributor smart contract

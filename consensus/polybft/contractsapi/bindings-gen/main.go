@@ -145,6 +145,7 @@ func main() {
 			[]string{
 				"whitelistValidators",
 				"register",
+				"getValidator",
 			},
 			[]string{
 				"ValidatorRegistered",

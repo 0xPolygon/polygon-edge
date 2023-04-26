@@ -88,25 +88,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	txn := &ethgo.Transaction{
-		From:     validatorAccount.Ecdsa.Address(),
-		Input:    encoded,
-		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
-		GasPrice: sidechainHelper.DefaultGasPrice,
-	}
-
-	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
+	receipt, err := sendTransactionToValidatorSetContract(encoded, validatorAccount.Ecdsa, txRelayer, "unstake")
 	if err != nil {
 		return err
-	}
-
-	isSuccess, err := sendTransactionToValidatorSetContract(encoded, validatorAccount.Ecdsa, txRelayer)
-	if err != nil {
-		return err
-	}
-
-	if !isSuccess {
-		return fmt.Errorf("unstake transaction failed on block %d", receipt.BlockNumber)
 	}
 
 	var (
@@ -140,13 +124,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	isSuccess, err = sendTransactionToValidatorSetContract(encoded, validatorAccount.Ecdsa, txRelayer)
+	receipt, err = sendTransactionToValidatorSetContract(encoded, validatorAccount.Ecdsa, txRelayer, "withdraw")
 	if err != nil {
 		return err
-	}
-
-	if !isSuccess {
-		return fmt.Errorf("withdraw transaction on ValidatorSet contract failed on block %d", receipt.BlockNumber)
 	}
 
 	result := &unstakeResult{
@@ -178,7 +158,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 }
 
 func sendTransactionToValidatorSetContract(encoded []byte, senderKey ethgo.Key,
-	txRelayer txrelayer.TxRelayer) (bool, error) {
+	txRelayer txrelayer.TxRelayer, txName string) (*ethgo.Receipt, error) {
 	txn := &ethgo.Transaction{
 		From:     senderKey.Address(),
 		Input:    encoded,
@@ -188,8 +168,12 @@ func sendTransactionToValidatorSetContract(encoded []byte, senderKey ethgo.Key,
 
 	receipt, err := txRelayer.SendTransaction(txn, senderKey)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return receipt.Status == uint64(types.ReceiptSuccess), nil
+	if receipt.Status != uint64(types.ReceiptSuccess) {
+		return nil, fmt.Errorf("%s transaction failed on block: %d", txName, receipt.BlockNumber)
+	}
+
+	return receipt, nil
 }
