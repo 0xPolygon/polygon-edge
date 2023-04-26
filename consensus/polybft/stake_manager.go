@@ -365,12 +365,21 @@ func (sc *stakeCounter) sortByStake(maxValidatorSetSize int) {
 	sort.Slice(keys, func(i, j int) bool {
 		v1, v2 := sc.stakeMap[keys[i]], sc.stakeMap[keys[j]]
 
-		return v1.stake.Cmp(v2.stake) > 1
+		cmp := v1.stake.Cmp(v2.stake)
+		if cmp > 1 {
+			return true
+		} else if cmp == 0 {
+			return keys[i].String() < keys[j].String()
+		}
+
+		return false
 	})
 
 	for i, k := range keys {
 		sc.stakeMap[k].pos = i
 	}
+
+	fmt.Println(keys)
 
 	// remove validators that don't make it in max validator set size
 	for _, k := range keys[maxValidatorSetSize:] {

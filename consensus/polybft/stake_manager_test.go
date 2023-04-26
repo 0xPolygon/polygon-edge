@@ -209,6 +209,44 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	})
 }
 
+func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
+	t.Parallel()
+
+	aliases := []string{"A", "B", "C", "D", "E", "F", "G"}
+	validators := newTestValidatorsWithAliases(t, aliases, []uint64{100, 100, 100, 50, 50, 30, 10})
+
+	newAliases := []string{"H", "J", "K"}
+	newValidators := newTestValidatorsWithAliases(t, newAliases, []uint64{10, 10, 10})
+
+	test := func() map[types.Address]*stakeInfo {
+		stakeCounter := newStakeCounter(validators.getPublicIdentities())
+
+		for _, v := range newValidators.getPublicIdentities() {
+			stakeCounter.addStake(v.Address, v.VotingPower)
+		}
+
+		stakeCounter.sortByStake(1000)
+
+		return stakeCounter.stakeMap
+	}
+
+	initialStakeMap := test()
+
+	// stake counter and stake map should always be deterministic
+	for i := 0; i < 1000; i++ {
+		stakeMap := test()
+
+		require.Len(t, stakeMap, len(initialStakeMap))
+
+		for a, si := range stakeMap {
+			initialSi, exists := initialStakeMap[a]
+			require.True(t, exists)
+			require.Equal(t, si.pos, initialSi.pos)
+			require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
+		}
+	}
+}
+
 func createTestLogForTransferEvent(t *testing.T, validatorSet, from, to types.Address, stake uint64) *types.Log {
 	t.Helper()
 
