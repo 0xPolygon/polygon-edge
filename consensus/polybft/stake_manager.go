@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -365,21 +366,19 @@ func (sc *stakeCounter) sortByStake(maxValidatorSetSize int) {
 	sort.Slice(keys, func(i, j int) bool {
 		v1, v2 := sc.stakeMap[keys[i]], sc.stakeMap[keys[j]]
 
-		cmp := v1.stake.Cmp(v2.stake)
-		if cmp > 1 {
+		switch v1.stake.Cmp(v2.stake) {
+		case 1:
 			return true
-		} else if cmp == 0 {
-			return keys[i].String() < keys[j].String()
+		case 0:
+			return bytes.Compare(keys[i][:], keys[j][:]) < 0
+		default:
+			return false
 		}
-
-		return false
 	})
 
 	for i, k := range keys {
 		sc.stakeMap[k].pos = i
 	}
-
-	fmt.Println(keys)
 
 	// remove validators that don't make it in max validator set size
 	for _, k := range keys[maxValidatorSetSize:] {
