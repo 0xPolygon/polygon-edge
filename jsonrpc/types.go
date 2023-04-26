@@ -31,6 +31,7 @@ type transaction struct {
 	BlockHash   *types.Hash    `json:"blockHash"`
 	BlockNumber *argUint64     `json:"blockNumber"`
 	TxIndex     *argUint64     `json:"transactionIndex"`
+	Type        types.TxType   `json:"type"`
 }
 
 func (t transaction) getHash() types.Hash { return t.Hash }
@@ -66,6 +67,7 @@ func toTransaction(
 		S:        argBig(*t.S),
 		Hash:     t.Hash,
 		From:     t.From,
+		Type:     t.Type,
 	}
 
 	if t.GasTipCap != nil {
@@ -331,6 +333,7 @@ type txnArgs struct {
 	Data      *argBytes
 	Input     *argBytes
 	Nonce     *argUint64
+	Type      *argUint64
 }
 
 type progression struct {
