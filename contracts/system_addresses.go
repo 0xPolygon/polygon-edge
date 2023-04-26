@@ -2,7 +2,6 @@ package contracts
 
 import "github.com/0xPolygon/polygon-edge/types"
 
-//nolint:godox
 var (
 	// ValidatorSetContract is an address of validator set contract deployed to child chain
 	ValidatorSetContract = types.StringToAddress("0x101")

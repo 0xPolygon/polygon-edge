@@ -28,13 +28,17 @@ type blockBuilder interface {
 }
 
 var (
-	errCommitEpochTxDoesNotExist         = errors.New("commit epoch transaction is not found in the epoch ending block")
-	errCommitEpochTxNotExpected          = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
-	errCommitEpochTxSingleExpected       = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
-	errDistributeRewardsTxDoesNotExist   = errors.New("distribute rewards transaction is not found in the epoch ending block")
-	errDistributeRewardsTxNotExpected    = errors.New("didn't expect distribute rewards transaction in a non epoch ending block")
-	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is allowed in an epoch ending block")
-	errProposalDontMatch                 = errors.New("failed to insert proposal, because the validated proposal " +
+	errCommitEpochTxDoesNotExist   = errors.New("commit epoch transaction is not found in the epoch ending block")
+	errCommitEpochTxNotExpected    = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
+	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed " +
+		"in an epoch ending block")
+	errDistributeRewardsTxDoesNotExist = errors.New("distribute rewards transaction is " +
+		"not found in the epoch ending block")
+	errDistributeRewardsTxNotExpected = errors.New("didn't expect distribute rewards transaction " +
+		"in a non epoch ending block")
+	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is " +
+		"allowed in an epoch ending block")
+	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
 	errValidatorSetDeltaMismatch        = errors.New("validator set delta mismatch")
 	errValidatorsUpdateInNonEpochEnding = errors.New("trying to update validator set in a non epoch ending block")
