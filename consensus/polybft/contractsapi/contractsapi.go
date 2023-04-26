@@ -803,6 +803,22 @@ func (c *CommitEpochValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ValidatorSet.Abi.Methods["commitEpoch"], buf, c)
 }
 
+type UnstakeValidatorSetFn struct {
+	Amount *big.Int `abi:"amount"`
+}
+
+func (u *UnstakeValidatorSetFn) Sig() []byte {
+	return ValidatorSet.Abi.Methods["unstake"].ID()
+}
+
+func (u *UnstakeValidatorSetFn) EncodeAbi() ([]byte, error) {
+	return ValidatorSet.Abi.Methods["unstake"].Encode(u)
+}
+
+func (u *UnstakeValidatorSetFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ValidatorSet.Abi.Methods["unstake"], buf, u)
+}
+
 type TransferEvent struct {
 	From  types.Address `abi:"from"`
 	To    types.Address `abi:"to"`
@@ -823,6 +839,49 @@ func (t *TransferEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(ValidatorSet.Abi.Events["Transfer"], log, t)
+}
+
+type WithdrawalRegisteredEvent struct {
+	Account types.Address `abi:"account"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (*WithdrawalRegisteredEvent) Sig() ethgo.Hash {
+	return ValidatorSet.Abi.Events["WithdrawalRegistered"].ID()
+}
+
+func (*WithdrawalRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ValidatorSet.Abi.Events["WithdrawalRegistered"].Inputs.Encode(inputs)
+}
+
+func (w *WithdrawalRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ValidatorSet.Abi.Events["WithdrawalRegistered"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ValidatorSet.Abi.Events["WithdrawalRegistered"], log, w)
+}
+
+type WithdrawalEvent struct {
+	Account types.Address `abi:"account"`
+	To      types.Address `abi:"to"`
+	Amount  *big.Int      `abi:"amount"`
+}
+
+func (*WithdrawalEvent) Sig() ethgo.Hash {
+	return ValidatorSet.Abi.Events["Withdrawal"].ID()
+}
+
+func (*WithdrawalEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ValidatorSet.Abi.Events["Withdrawal"].Inputs.Encode(inputs)
+}
+
+func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ValidatorSet.Abi.Events["Withdrawal"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
 }
 
 type RewardDistributorFn struct {

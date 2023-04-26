@@ -173,9 +173,12 @@ func main() {
 			true,
 			[]string{
 				"commitEpoch",
+				"unstake",
 			},
 			[]string{
 				"Transfer",
+				"WithdrawalRegistered",
+				"Withdrawal",
 			},
 		},
 		{
