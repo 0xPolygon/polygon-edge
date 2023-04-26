@@ -215,39 +215,49 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 	stakes := [][]uint64{
 		{103, 102, 101, 51, 50, 30, 10},
 		{100, 100, 100, 50, 50, 30, 10},
+		{103, 102, 101, 51, 50, 30, 10},
+		{100, 100, 100, 50, 50, 30, 10},
 	}
 
-	for _, stake := range stakes {
+	maxValidatorSetSizes := []int{1000, 1000, 5, 6}
+
+	for ind, stake := range stakes {
+		maxValidatorSetSize := maxValidatorSetSizes[ind]
+
 		aliases := []string{"A", "B", "C", "D", "E", "F", "G"}
 		validators := newTestValidatorsWithAliases(t, aliases, stake)
 
 		newAliases := []string{"H", "J", "K"}
 		newValidators := newTestValidatorsWithAliases(t, newAliases, []uint64{10, 10, 10})
 
-		test := func() map[types.Address]*stakeInfo {
+		test := func() ([]stakeInfo, []stakeInfo) {
 			stakeCounter := newStakeCounter(validators.getPublicIdentities())
 
 			for _, v := range newValidators.getPublicIdentities() {
 				stakeCounter.addStake(v.Address, v.VotingPower)
 			}
 
-			stakeCounter.sortByStake(1000)
-
-			return stakeCounter.stakeMap
+			return stakeCounter.getSortedMaxSlice(maxValidatorSetSize)
 		}
 
-		initialStakeMap := test()
+		initialSlice, initialToRemove := test()
 
 		// stake counter and stake map should always be deterministic
 		for i := 0; i < 1000; i++ {
-			stakeMap := test()
+			currentSlice, currentToRemove := test()
 
-			require.Len(t, stakeMap, len(initialStakeMap))
+			require.Len(t, currentSlice, len(initialSlice))
+			require.Len(t, currentToRemove, len(initialToRemove))
 
-			for a, si := range stakeMap {
-				initialSi, exists := initialStakeMap[a]
-				require.True(t, exists)
-				require.Equal(t, si.pos, initialSi.pos)
+			for i, si := range currentSlice {
+				initialSi := initialSlice[i]
+				require.Equal(t, si.address, initialSi.address)
+				require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
+			}
+
+			for i, si := range currentToRemove {
+				initialSi := initialToRemove[i]
+				require.Equal(t, si.address, initialSi.address)
 				require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
 			}
 		}
