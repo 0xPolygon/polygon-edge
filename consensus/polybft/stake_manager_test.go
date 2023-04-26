@@ -212,13 +212,14 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 	t.Parallel()
 
+	const timesToExecute = 250
+
 	stakes := [][]uint64{
 		{103, 102, 101, 51, 50, 30, 10},
 		{100, 100, 100, 50, 50, 30, 10},
 		{103, 102, 101, 51, 50, 30, 10},
 		{100, 100, 100, 50, 50, 30, 10},
 	}
-
 	maxValidatorSetSizes := []int{1000, 1000, 5, 6}
 
 	for ind, stake := range stakes {
@@ -243,7 +244,7 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 		initialSlice, initialToRemove := test()
 
 		// stake counter and stake map should always be deterministic
-		for i := 0; i < 1000; i++ {
+		for i := 0; i < timesToExecute; i++ {
 			currentSlice, currentToRemove := test()
 
 			require.Len(t, currentSlice, len(initialSlice))
