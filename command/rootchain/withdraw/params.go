@@ -13,10 +13,12 @@ var (
 )
 
 type withdrawParams struct {
-	accountDir    string
-	accountConfig string
-	jsonRPC       string
-	addressTo     string
+	accountDir       string
+	accountConfig    string
+	jsonRPC          string
+	stakeManagerAddr string
+	addressTo        string
+	amount           uint64
 }
 
 func (v *withdrawParams) validateFlags() error {

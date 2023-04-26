@@ -158,10 +158,13 @@ func main() {
 			[]string{
 				"registerChildChain",
 				"stakeFor",
+				"releaseStakeOf",
+				"withdrawStake",
 			},
 			[]string{
 				"ChildManagerRegistered",
 				"StakeAdded",
+				"StakeWithdrawn",
 			},
 		},
 		{

@@ -8,10 +8,6 @@ import (
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 )
 
-const (
-	stakeManagerFlag = "stake-manager"
-)
-
 type stakeParams struct {
 	accountDir       string
 	accountConfig    string

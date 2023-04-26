@@ -2,14 +2,15 @@ package withdraw
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -53,6 +54,20 @@ func setFlags(cmd *cobra.Command) {
 		"address where to withdraw withdrawable amount",
 	)
 
+	cmd.Flags().StringVar(
+		&params.stakeManagerAddr,
+		rootHelper.StakeManagerFlag,
+		"",
+		rootHelper.StakeManagerFlagDesc,
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.amount,
+		sidechainHelper.AmountFlag,
+		0,
+		"amount to withdraw",
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 	helper.RegisterJSONRPCFlag(cmd)
 }
@@ -78,17 +93,27 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["withdraw"].Encode(
-		[]interface{}{ethgo.HexToAddress(params.addressTo)})
+	withdrawFn := &contractsapi.WithdrawStakeStakeManagerFn{
+		To:     types.StringToAddress(params.addressTo),
+		Amount: new(big.Int).SetUint64(params.amount),
+	}
+
+	encoded, err := withdrawFn.EncodeAbi()
 	if err != nil {
 		return err
 	}
 
+	gasPrice, err := txRelayer.GetGasPrice()
+	if err != nil {
+		return err
+	}
+
+	stakeManagerAddr := ethgo.Address(types.StringToAddress(params.stakeManagerAddr))
 	txn := &ethgo.Transaction{
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
-		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
-		GasPrice: sidechainHelper.DefaultGasPrice,
+		To:       &stakeManagerAddr,
+		GasPrice: gasPrice,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
@@ -105,7 +130,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	var (
-		withdrawalEvent contractsapi.WithdrawalEvent
+		withdrawalEvent contractsapi.StakeWithdrawnEvent
 		foundLog        bool
 	)
 
@@ -120,7 +145,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 
 		result.amount = withdrawalEvent.Amount.Uint64()
-		result.withdrawnTo = withdrawalEvent.To.String()
+		result.withdrawnTo = withdrawalEvent.Recipient.String()
 		foundLog = true
 
 		break

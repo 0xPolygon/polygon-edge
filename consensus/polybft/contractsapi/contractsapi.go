@@ -636,6 +636,40 @@ func (s *StakeForStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["stakeFor"], buf, s)
 }
 
+type ReleaseStakeOfStakeManagerFn struct {
+	Validator types.Address `abi:"validator"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (r *ReleaseStakeOfStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["releaseStakeOf"].ID()
+}
+
+func (r *ReleaseStakeOfStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["releaseStakeOf"].Encode(r)
+}
+
+func (r *ReleaseStakeOfStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["releaseStakeOf"], buf, r)
+}
+
+type WithdrawStakeStakeManagerFn struct {
+	To     types.Address `abi:"to"`
+	Amount *big.Int      `abi:"amount"`
+}
+
+func (w *WithdrawStakeStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["withdrawStake"].ID()
+}
+
+func (w *WithdrawStakeStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["withdrawStake"].Encode(w)
+}
+
+func (w *WithdrawStakeStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["withdrawStake"], buf, w)
+}
+
 type ChildManagerRegisteredEvent struct {
 	ID      *big.Int      `abi:"id"`
 	Manager types.Address `abi:"manager"`
@@ -677,6 +711,28 @@ func (s *StakeAddedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(StakeManager.Abi.Events["StakeAdded"], log, s)
+}
+
+type StakeWithdrawnEvent struct {
+	Validator types.Address `abi:"validator"`
+	Recipient types.Address `abi:"recipient"`
+	Amount    *big.Int      `abi:"amount"`
+}
+
+func (*StakeWithdrawnEvent) Sig() ethgo.Hash {
+	return StakeManager.Abi.Events["StakeWithdrawn"].ID()
+}
+
+func (*StakeWithdrawnEvent) Encode(inputs interface{}) ([]byte, error) {
+	return StakeManager.Abi.Events["StakeWithdrawn"].Inputs.Encode(inputs)
+}
+
+func (s *StakeWithdrawnEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !StakeManager.Abi.Events["StakeWithdrawn"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(StakeManager.Abi.Events["StakeWithdrawn"], log, s)
 }
 
 type ValidatorInit struct {

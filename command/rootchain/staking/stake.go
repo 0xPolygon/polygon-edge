@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -51,9 +52,9 @@ func setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(
 		&params.stakeManagerAddr,
-		stakeManagerFlag,
+		rootHelper.StakeManagerFlag,
 		"",
-		"address of stake manager contract on rootchain",
+		rootHelper.StakeManagerFlagDesc,
 	)
 
 	cmd.Flags().Uint64Var(

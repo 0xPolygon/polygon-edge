@@ -24,6 +24,8 @@ const (
 	TestModeFlag            = "test"
 	SupernetManagerFlag     = "supernet-manager"
 	SupernetManagerFlagDesc = "address of supernet manager contract"
+	StakeManagerFlag        = "stake-manager"
+	StakeManagerFlagDesc    = "address of stake manager contract"
 )
 
 var (
