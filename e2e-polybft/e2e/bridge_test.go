@@ -69,16 +69,18 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
+	latestExitEventID := uint64(0)
+
 	t.Run("bridge native ERC-20 tokens", func(t *testing.T) {
-		testBridgeNativeERC20Tokens(t, cluster, polybftCfg, receivers, amounts)
+		latestExitEventID = testBridgeNativeERC20Tokens(t, cluster, polybftCfg, receivers, amounts)
 	})
 
 	t.Run("bridge ERC-721 tokens", func(t *testing.T) {
-		testBridgeERC721Tokens(t, cluster, polybftCfg, receiverKeys, tokenIDs)
+		latestExitEventID = testBridgeERC721Tokens(t, cluster, polybftCfg, receiverKeys, tokenIDs, latestExitEventID)
 	})
 
 	t.Run("bridge ERC-1155 tokens", func(t *testing.T) {
-		testBridgeERC1155Tokens(t, cluster, polybftCfg, receiverKeys, receivers, tokenIDs, amounts)
+		latestExitEventID = testBridgeERC1155Tokens(t, cluster, polybftCfg, receiverKeys, receivers, tokenIDs, amounts, latestExitEventID)
 	})
 
 	t.Run("multiple deposit batches per epoch", func(t *testing.T) {
@@ -90,7 +92,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 //
 //nolint:thelper
 func testBridgeNativeERC20Tokens(t *testing.T, cluster *framework.TestCluster, polybftCfg polybft.PolyBFTConfig,
-	receivers, amounts []string) {
+	receivers, amounts []string) uint64 {
 	const (
 		sprintSize = uint64(5)
 	)
@@ -195,10 +197,9 @@ func testBridgeNativeERC20Tokens(t *testing.T, cluster *framework.TestCluster, p
 	exitHelper := polybftCfg.Bridge.ExitHelperAddr
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 	childJSONRPC := validatorSrv.JSONRPCAddr()
+	exitEventID := uint64(1)
 
-	for i := 0; i < transfersCount; i++ {
-		exitEventID := uint64(i + 1)
-
+	for ; exitEventID <= uint64(transfersCount); exitEventID++ {
 		// send exit transaction to exit helper
 		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
@@ -226,13 +227,15 @@ func testBridgeNativeERC20Tokens(t *testing.T, cluster *framework.TestCluster, p
 		require.True(t, ok)
 		require.Equal(t, amount, balance)
 	}
+
+	return exitEventID
 }
 
 // testBridgeERC721Tokens test performs deposits and withdrawals of ERC-721 tokens
 //
 //nolint:thelper
 func testBridgeERC721Tokens(t *testing.T, cluster *framework.TestCluster, polybftCfg polybft.PolyBFTConfig,
-	receiverKeys []*ethgow.Key, tokenIDs []string) {
+	receiverKeys []*ethgow.Key, tokenIDs []string, lastProcessedExitEventID uint64) uint64 {
 	const (
 		sprintSize = 5
 	)
@@ -242,8 +245,8 @@ func testBridgeERC721Tokens(t *testing.T, cluster *framework.TestCluster, polybf
 	receiverAddrs := make([]types.Address, len(receiverKeys))
 	receivers := make([]string, len(receiverKeys))
 
-	for i, receiverAddrRaw := range receiverKeys {
-		addr := types.Address(receiverAddrRaw.Address())
+	for i, receiverKey := range receiverKeys {
+		addr := types.Address(receiverKey.Address())
 		receiverAddrs[i] = addr
 		receivers[i] = addr.String()
 	}
@@ -355,16 +358,17 @@ func testBridgeERC721Tokens(t *testing.T, cluster *framework.TestCluster, polybf
 	exitHelper := polybftCfg.Bridge.ExitHelperAddr
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 	childJSONRPC := validatorSrv.JSONRPCAddr()
+	exitEventID := lastProcessedExitEventID + 1
 
-	for i := uint64(1); i <= transfersCount; i++ {
+	for ; exitEventID < transfersCount+lastProcessedExitEventID; exitEventID++ {
 		// send exit transaction to exit helper
-		err = cluster.Bridge.SendExitTransaction(exitHelper, i, rootJSONRPC, childJSONRPC)
+		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
 		// make sure exit event is processed successfully
-		isProcessed, err := isExitEventProcessed(i, ethgo.Address(exitHelper), rootchainTxRelayer)
+		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
 		require.NoError(t, err)
-		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", i))
+		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 	}
 
 	// assert that owners of given token ids are the accounts on the root chain ERC 721 token
@@ -381,14 +385,15 @@ func testBridgeERC721Tokens(t *testing.T, cluster *framework.TestCluster, polybf
 
 		require.Equal(t, receiver, types.StringToAddress(addressRaw))
 	}
+
+	return exitEventID
 }
 
 // testBridgeERC1155Tokens test performs deposits and withdrawals of ERC-1155 tokens
 //
 //nolint:thelper
 func testBridgeERC1155Tokens(t *testing.T, cluster *framework.TestCluster, polybftCfg polybft.PolyBFTConfig,
-	receiverKeys []*ethgow.Key, receivers, tokenIDs, amounts []string) {
-
+	receiverKeys []*ethgow.Key, receivers, tokenIDs, amounts []string, lastProcessedExitEventID uint64) uint64 {
 	const (
 		sprintSize = uint64(5)
 	)
@@ -515,8 +520,9 @@ func testBridgeERC1155Tokens(t *testing.T, cluster *framework.TestCluster, polyb
 	exitHelper := polybftCfg.Bridge.ExitHelperAddr
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 	childJSONRPC := validatorSrv.JSONRPCAddr()
+	exitEventID := lastProcessedExitEventID + 1
 
-	for exitEventID := uint64(1); exitEventID <= transfersCount; exitEventID++ {
+	for ; exitEventID < transfersCount+lastProcessedExitEventID; exitEventID++ {
 		// send exit transaction to exit helper
 		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
@@ -531,7 +537,7 @@ func testBridgeERC1155Tokens(t *testing.T, cluster *framework.TestCluster, polyb
 	for i, receiver := range receivers {
 		balanceOfFn := &contractsapi.BalanceOfRootERC1155Fn{
 			Account: types.StringToAddress(receiver),
-			ID:      big.NewInt(int64(i + 1)),
+			ID:      big.NewInt(int64(i)),
 		}
 
 		balanceInput, err := balanceOfFn.EncodeAbi()
@@ -543,10 +549,13 @@ func testBridgeERC1155Tokens(t *testing.T, cluster *framework.TestCluster, polyb
 
 		balance, err := types.ParseUint256orHex(&balanceRaw)
 		require.NoError(t, err)
+
 		amount, ok := new(big.Int).SetString(amounts[i], 10)
 		require.True(t, ok)
 		require.Equal(t, amount, balance)
 	}
+
+	return exitEventID
 }
 
 // testMultipleDepositBatchesPerEpoch test performs several deposits in a single epoch and makes sure they are all settled
@@ -580,6 +589,8 @@ func testMultipleDepositBatchesPerEpoch(t *testing.T, cluster *framework.TestClu
 
 	initialCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
 	require.NoError(t, err)
+
+	t.Logf("Initial committed ID: %d\n", initialCommittedID)
 
 	// send two transactions to the bridge so that we have a minimal commitment
 	require.NoError(
