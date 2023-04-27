@@ -30,6 +30,10 @@ on:  # yamllint disable-line rule:truthy
         description: The environment to run against
         type: string
         required: true
+      runner:
+        required: true
+        type: string
+        description: The runner label to use
       scenario:
         required: true
         description: The mode for the stress test
