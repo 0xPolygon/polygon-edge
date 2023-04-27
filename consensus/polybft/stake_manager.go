@@ -76,16 +76,7 @@ func newStakeManager(
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
 func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
-	epoch := req.Epoch
-
-	if req.IsEpochEndingBlock {
-		// transfer events that happened in epoch ending blocks,
-		// should be added to the bucket of the next epoch
-		epoch++
-	}
-
-	// commit exit events only when we finalize a block
-	events, err := s.getTransferEventsFromReceipts(epoch, req.FullBlock.Receipts)
+	events, err := s.getTransferEventsFromReceipts(req.FullBlock.Receipts)
 	if err != nil {
 		return err
 	}
@@ -95,33 +86,14 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 			"eventsNum", len(events), "block", req.FullBlock.Block.Number())
 	}
 
-	return s.state.StakeStore.insertTransferEvents(epoch, events)
-}
-
-// UpdateValidatorSet returns an updated validator set
-// based on stake change (transfer) events from ValidatorSet contract
-func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	s.logger.Info("Calculating validators set update...", "epoch", epoch)
-
-	transferEvents, err := s.state.StakeStore.getTransferEvents(epoch)
+	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transfer events for epoch: %d. Error: %w", epoch, err)
+		return err
 	}
 
-	if len(transferEvents) == 0 {
-		s.logger.Info("Calculating validators set finished. No transfer events for given epoch.",
-			"epoch", epoch)
+	stakeCounter := newStakeCounter(fullValidatorSet, fullValidatorSet, len(fullValidatorSet))
 
-		return &ValidatorSetDelta{}, nil
-	}
-
-	// stake counter holds sorted stakes by current and (possible) new validators
-	// he will add to map current stake (voting power) of the current validators
-	// on object instantiation
-	stakeCounter := newStakeCounter(currentValidatorSet.Copy())
-
-	// update the stake counter with stake changes from transfer events
-	for _, event := range transferEvents {
+	for _, event := range events {
 		if event.IsStake() {
 			// then this amount was minted To validator address
 			stakeCounter.addStake(event.To, event.Value)
@@ -134,15 +106,61 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 		}
 	}
 
-	removedBitmap := bitmap.Bitmap{}
-	updatedValidators := AccountSet{}
-	addedValidators := AccountSet{}
+	newFullValidatorSet := AccountSet{}
+
+	for addr, stake := range stakeCounter.stakeMap {
+		oldValidator, exists := stakeCounter.oldCurrentValidatorSet[addr]
+		if exists {
+			// only add it to full validator set if he did not unstake all
+			if stake.Cmp(bigZero) > 0 {
+				oldValidator.VotingPower = stake
+				newFullValidatorSet = append(newFullValidatorSet, oldValidator.ValidatorMetadata)
+			}
+		} else {
+			newValidatorMetaData, err := s.getNewValidatorInfo(addr, stake)
+			if err != nil {
+				s.logger.Warn("Could not get info for new validator", "epoch", req.Epoch, "address", addr)
+
+				// we don't need BLS key in full validator set, only when building delta
+				// so we will try to get it there
+				newValidatorMetaData = &ValidatorMetadata{
+					Address:     addr,
+					VotingPower: stake,
+					IsActive:    true,
+				}
+			}
+
+			newFullValidatorSet = append(newFullValidatorSet, newValidatorMetaData)
+		}
+	}
+
+	return s.state.StakeStore.insertFullValidatorSet(newFullValidatorSet)
+}
+
+// UpdateValidatorSet returns an updated validator set
+// based on stake change (transfer) events from ValidatorSet contract
+func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+	s.logger.Info("Calculating validators set update...", "epoch", epoch)
+
+	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full validators set. Epoch: %d. Error: %w", epoch, err)
+	}
+
+	// stake counter holds sorted stakes by current and (possible) new validators
+	// he will add to map current stake (voting power) of the current validators
+	// on object instantiation
+	stakeCounter := newStakeCounter(currentValidatorSet, fullValidatorSet.Copy(), s.maxValidatorSetSize)
 
 	// sort validators by stake since we update the validator set based on highest stakes
 	// this also returns sorted slice of validators (stake, address) pairs
 	stakeInfos := stakeCounter.sortByStake(s.maxValidatorSetSize)
 
-	for addr, v := range stakeCounter.currentValidatorSet {
+	removedBitmap := bitmap.Bitmap{}
+	updatedValidators := AccountSet{}
+	addedValidators := AccountSet{}
+
+	for addr, v := range stakeCounter.oldCurrentValidatorSet {
 		// remove existing validators from validator set if they
 		// did not make it to the set
 		if _, exists := stakeCounter.stakeMap[addr]; !exists {
@@ -152,7 +170,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 
 	for _, stakeInfo := range stakeInfos {
 		// check if its a current validator
-		if currentValidator, exists := stakeCounter.currentValidatorSet[stakeInfo.address]; exists {
+		if currentValidator, exists := stakeCounter.oldCurrentValidatorSet[stakeInfo.address]; exists {
 			if stakeInfo.stake.Cmp(bigZero) == 0 {
 				// validator un-staked all, remove it from validator set
 				removedBitmap.Set(currentValidator.index)
@@ -173,10 +191,15 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 			}
 		} else {
 			// its a new validator, add it to delta in added validators
-			validatorData, err := s.getNewValidatorInfo(stakeInfo.address, stakeInfo.stake)
-			if err != nil {
-				return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
-					stakeInfo.address, err)
+			validatorData := stakeCounter.oldFullValidatorSet[stakeInfo.address].ValidatorMetadata
+			if validatorData.BlsKey == nil {
+				// we need to get it from smart contract
+
+				validatorData, err = s.getNewValidatorInfo(stakeInfo.address, stakeInfo.stake)
+				if err != nil {
+					return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
+						stakeInfo.address, err)
+				}
 			}
 
 			addedValidators = append(addedValidators, validatorData)
@@ -207,8 +230,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 }
 
 // getTransferEventsFromReceipts parses logs from receipts to find transfer events
-func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64,
-	receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
+func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
 	events := make([]*contractsapi.TransferEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
@@ -307,20 +329,31 @@ type expandedValidatorMetadata struct {
 
 // stakeCounter sorts and returns stake info for all validators
 type stakeCounter struct {
-	stakeMap            map[types.Address]*big.Int
-	currentValidatorSet map[types.Address]*expandedValidatorMetadata
+	stakeMap               map[types.Address]*big.Int
+	oldCurrentValidatorSet map[types.Address]*expandedValidatorMetadata
+	oldFullValidatorSet    map[types.Address]*expandedValidatorMetadata
 }
 
 // newStakeCounter returns a new instance of stake counter
-func newStakeCounter(currentValidatorSet AccountSet) *stakeCounter {
+func newStakeCounter(oldCurrentValidatorSet, oldFullValidatorSet AccountSet,
+	maxValidatorSetSize int) *stakeCounter {
+
 	stakeCounter := &stakeCounter{
-		stakeMap:            make(map[types.Address]*big.Int),
-		currentValidatorSet: make(map[types.Address]*expandedValidatorMetadata, len(currentValidatorSet)),
+		stakeMap:               make(map[types.Address]*big.Int),
+		oldCurrentValidatorSet: make(map[types.Address]*expandedValidatorMetadata, len(oldCurrentValidatorSet)),
+		oldFullValidatorSet:    make(map[types.Address]*expandedValidatorMetadata, len(oldFullValidatorSet)),
 	}
 
-	for i, v := range currentValidatorSet {
+	for i, v := range oldCurrentValidatorSet {
+		stakeCounter.oldCurrentValidatorSet[v.Address] = &expandedValidatorMetadata{
+			ValidatorMetadata: v,
+			index:             uint64(i),
+		}
+	}
+
+	for i, v := range oldFullValidatorSet {
 		stakeCounter.stakeMap[v.Address] = new(big.Int).Set(v.VotingPower)
-		stakeCounter.currentValidatorSet[v.Address] = &expandedValidatorMetadata{
+		stakeCounter.oldFullValidatorSet[v.Address] = &expandedValidatorMetadata{
 			ValidatorMetadata: v,
 			index:             uint64(i),
 		}
