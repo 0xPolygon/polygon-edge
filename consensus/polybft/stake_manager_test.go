@@ -26,6 +26,16 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 		maxValidatorSetSize: 10,
 	}
 
+	t.Run("Not first epoch", func(t *testing.T) {
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID:   2,
+			ValidatorSet: NewValidatorSet(validators, stakeManager.logger),
+		}))
+
+		_, err := state.StakeStore.getFullValidatorSet()
+		require.ErrorIs(t, errNoFullValidatorSet, err)
+	})
+
 	t.Run("First epoch", func(t *testing.T) {
 		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
 			NewEpochID:   1,
@@ -35,16 +45,6 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
 		require.Len(t, fullValidatorSet, len(validators))
-	})
-
-	t.Run("Not first epoch", func(t *testing.T) {
-		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID:   2,
-			ValidatorSet: NewValidatorSet(validators, stakeManager.logger),
-		}))
-
-		_, err := state.StakeStore.getFullValidatorSet()
-		require.ErrorIs(t, errNoFullValidatorSet, err)
 	})
 }
 
