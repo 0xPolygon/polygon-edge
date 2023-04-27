@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
@@ -16,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
+	"golang.org/x/sync/errgroup"
 )
 
 type TestBridge struct {
@@ -252,21 +254,33 @@ func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
 		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
 	}
 
-	for _, secret := range validatorSecrets {
-		args := []string{
-			"polybft",
-			"register-validator",
-			"--jsonrpc", t.JSONRPCAddr(),
-			"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
-			"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-		}
+	g, ctx := errgroup.WithContext(context.Background())
 
-		if err := t.cmdRun(args...); err != nil {
-			return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
-		}
+	for _, secret := range validatorSecrets {
+		secret := secret
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				args := []string{
+					"polybft",
+					"register-validator",
+					"--jsonrpc", t.JSONRPCAddr(),
+					"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
+				}
+
+				if err := t.cmdRun(args...); err != nil {
+					return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
+				}
+
+				return nil
+			}
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error {
@@ -280,24 +294,37 @@ func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error
 		return fmt.Errorf("could not do initial staking of genesis validators on stake manager: %w", err)
 	}
 
-	for i, secret := range validatorSecrets {
-		args := []string{
-			"polybft",
-			"stake",
-			"--jsonrpc", t.JSONRPCAddr(),
-			"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
-			"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-			"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Stake.Uint64(), 10),
-			"--chain-id", strconv.FormatUint(chainID, 10),
-			"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-		}
+	g, ctx := errgroup.WithContext(context.Background())
 
-		if err := t.cmdRun(args...); err != nil {
-			return fmt.Errorf("failed to do initial staking for genesis validator on stake manager: %w", err)
-		}
+	for i, secret := range validatorSecrets {
+		secret := secret
+		i := i
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				args := []string{
+					"polybft",
+					"stake",
+					"--jsonrpc", t.JSONRPCAddr(),
+					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
+					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
+					"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Stake.Uint64(), 10),
+					"--chain-id", strconv.FormatUint(chainID, 10),
+					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+				}
+
+				if err := t.cmdRun(args...); err != nil {
+					return fmt.Errorf("failed to do initial staking for genesis validator on stake manager: %w", err)
+				}
+
+				return nil
+			}
+		})
 	}
 
-	return nil
+	return g.Wait()
 }
 
 func (t *TestBridge) finalizeGenesis(genesisPath string) error {
