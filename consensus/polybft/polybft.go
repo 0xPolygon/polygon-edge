@@ -118,18 +118,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// initialize ChildValidatorSet SC
-		input, err := getInitChildValidatorSetInput(polyBFTConfig)
-		if err != nil {
-			return err
-		}
-
-		if err = initContract(contracts.ValidatorSetContract, input, "ChildValidatorSet", transition); err != nil {
-			return err
-		}
-
 		// initialize ChildERC20Predicate SC
-		input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
+		input, err := getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
 		if err != nil {
 			return err
 		}

@@ -24,10 +24,6 @@ func main() {
 		Name string
 	}{
 		{
-			"child/ChildValidatorSet.sol",
-			"ChildValidatorSet",
-		},
-		{
 			"child/L2StateSender.sol",
 			"L2StateSender",
 		},
@@ -134,6 +130,10 @@ func main() {
 		{
 			"child/validator/ValidatorSet.sol",
 			"ValidatorSet",
+		},
+		{
+			"mocks/MockRewardToken.sol",
+			"MockRewardToken",
 		},
 	}
 

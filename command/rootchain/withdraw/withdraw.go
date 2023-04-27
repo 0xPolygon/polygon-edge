@@ -1,4 +1,4 @@
-package staking
+package withdraw
 
 import (
 	"fmt"
@@ -17,22 +17,19 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var (
-	params stakeParams
-)
+var params withdrawParams
 
 func GetCommand() *cobra.Command {
-	stakeCmd := &cobra.Command{
-		Use:     "stake",
-		Short:   "Stakes the amount sent for validator on rootchain",
+	withdrawCmd := &cobra.Command{
+		Use:     "withdraw",
+		Short:   "Withdraws sender's withdrawable amount to specified address",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	helper.RegisterJSONRPCFlag(stakeCmd)
-	setFlags(stakeCmd)
+	setFlags(withdrawCmd)
 
-	return stakeCmd
+	return withdrawCmd
 }
 
 func setFlags(cmd *cobra.Command) {
@@ -51,6 +48,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
+		&params.addressTo,
+		addressToFlag,
+		"",
+		"address where to withdraw withdrawable amount",
+	)
+
+	cmd.Flags().StringVar(
 		&params.stakeManagerAddr,
 		rootHelper.StakeManagerFlag,
 		"",
@@ -61,17 +65,11 @@ func setFlags(cmd *cobra.Command) {
 		&params.amount,
 		sidechainHelper.AmountFlag,
 		0,
-		"amount to stake",
-	)
-
-	cmd.Flags().Uint64Var(
-		&params.chainID,
-		polybftsecrets.ChainIDFlag,
-		0,
-		polybftsecrets.ChainIDFlagDesc,
+		"amount to withdraw",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
+	helper.RegisterJSONRPCFlag(cmd)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -95,18 +93,17 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	gasPrice, err := txRelayer.GetGasPrice()
+	withdrawFn := &contractsapi.WithdrawStakeStakeManagerFn{
+		To:     types.StringToAddress(params.addressTo),
+		Amount: new(big.Int).SetUint64(params.amount),
+	}
+
+	encoded, err := withdrawFn.EncodeAbi()
 	if err != nil {
 		return err
 	}
 
-	stakeFn := contractsapi.StakeForStakeManagerFn{
-		ID:     new(big.Int).SetUint64(params.chainID),
-		Amount: new(big.Int).SetUint64(params.amount),
-		Data:   []byte{}, // we don't need to send anything in data
-	}
-
-	encoded, err := stakeFn.EncodeAbi()
+	gasPrice, err := txRelayer.GetGasPrice()
 	if err != nil {
 		return err
 	}
@@ -116,7 +113,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
 		To:       &stakeManagerAddr,
-		Value:    new(big.Int).SetUint64(params.amount),
 		GasPrice: gasPrice,
 	}
 
@@ -126,38 +122,37 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("staking transaction failed on block %d", receipt.BlockNumber)
+		return fmt.Errorf("withdraw transaction failed on block %d", receipt.BlockNumber)
 	}
 
-	result := &stakeResult{
+	result := &withdrawResult{
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
 	var (
-		stakeAddedEvent contractsapi.StakeAddedEvent
+		withdrawalEvent contractsapi.StakeWithdrawnEvent
 		foundLog        bool
 	)
 
-	// check the logs to check for the result
 	for _, log := range receipt.Logs {
-		doesMatch, err := stakeAddedEvent.ParseLog(log)
-		if err != nil {
-			return err
-		}
-
+		doesMatch, err := withdrawalEvent.ParseLog(log)
 		if !doesMatch {
 			continue
 		}
 
-		result.amount = stakeAddedEvent.Amount.Uint64()
-		result.validatorAddress = stakeAddedEvent.Validator.String()
+		if err != nil {
+			return err
+		}
+
+		result.amount = withdrawalEvent.Amount.Uint64()
+		result.withdrawnTo = withdrawalEvent.Recipient.String()
 		foundLog = true
 
 		break
 	}
 
 	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that stake happened")
+		return fmt.Errorf("could not find an appropriate log in receipt that withdrawal happened")
 	}
 
 	outputter.WriteCommandResult(result)

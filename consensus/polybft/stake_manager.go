@@ -14,14 +14,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var (
-	// getValidatorABI is an ABI method on SupernetManager contract
-	// that returns the validator data
-	getValidatorABI, _ = contractsapi.CustomSupernetManager.Abi.Methods["getValidator"]
-
-	bigZero = big.NewInt(0)
+	bigZero          = big.NewInt(0)
+	validatorTypeABI = abi.MustNewType("tuple(uint256[4] blsKey, uint256 stake, bool isWhitelisted, bool isActive)")
 )
 
 // StakeManager interface provides functions for handling stake change of validators
@@ -243,7 +241,11 @@ func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64,
 
 // getValidatorInfo returns data for new validator (bls key, is active) from the supernet contract
 func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int) (*ValidatorMetadata, error) {
-	encoded, err := getValidatorABI.Encode([]interface{}{address})
+	getValidatorFn := &contractsapi.GetValidatorCustomSupernetManagerFn{
+		Validator_: address,
+	}
+
+	encoded, err := getValidatorFn.EncodeAbi()
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +263,7 @@ func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int
 		return nil, fmt.Errorf("unable to decode hex response, %w", err)
 	}
 
-	decoded, err := getValidatorABI.Outputs.Decode(byteResponse)
+	decoded, err := validatorTypeABI.Decode(byteResponse)
 	if err != nil {
 		return nil, err
 	}
@@ -275,12 +277,7 @@ func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int
 		return nil, fmt.Errorf("could not convert decoded outputs to map")
 	}
 
-	outputMap, ok := output["0"].(map[string]interface{})
-	if !ok {
-		return nil, fmt.Errorf("could not convert decoded outputs to map")
-	}
-
-	blsKey, ok := outputMap["blsKey"].([4]*big.Int)
+	blsKey, ok := output["blsKey"].([4]*big.Int)
 	if !ok {
 		return nil, fmt.Errorf("failed to decode blskey")
 	}

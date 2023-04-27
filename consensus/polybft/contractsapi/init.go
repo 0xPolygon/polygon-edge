@@ -24,7 +24,6 @@ var (
 	BLS256                *artifact.Artifact
 	System                *artifact.Artifact
 	Merkle                *artifact.Artifact
-	ChildValidatorSet     *artifact.Artifact
 	NativeERC20           *artifact.Artifact
 	NativeERC20Mintable   *artifact.Artifact
 	StateReceiver         *artifact.Artifact
@@ -39,6 +38,7 @@ var (
 	StakeManager          *artifact.Artifact
 	RewardDistributor     *artifact.Artifact
 	ValidatorSet          *artifact.Artifact
+	MockRewardToken       *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -143,11 +143,6 @@ func init() {
 		log.Fatal(err)
 	}
 
-	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	NativeERC20, err = artifact.DecodeArtifact([]byte(NativeERC20Artifact))
 	if err != nil {
 		log.Fatal(err)
@@ -199,6 +194,11 @@ func init() {
 	}
 
 	ValidatorSet, err = artifact.DecodeArtifact([]byte(ValidatorSetArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	MockRewardToken, err = artifact.DecodeArtifact([]byte(MockRewardTokenArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

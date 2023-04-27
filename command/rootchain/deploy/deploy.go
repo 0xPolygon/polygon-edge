@@ -355,7 +355,9 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     stakeManagerName,
 			artifact: contractsapi.StakeManager,
 			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				encoded, err := artifact.Abi.Constructor.Inputs.Encode([]interface{}{cfg.RootNativeERC20Address})
+				constructor := &contractsapi.StakeManagerConstructorFn{MATIC_: cfg.RootNativeERC20Address}
+
+				encoded, err := constructor.EncodeAbi()
 				if err != nil {
 					return nil, err
 				}
@@ -367,16 +369,17 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 			name:     customSupernetManagerName,
 			artifact: contractsapi.CustomSupernetManager,
 			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				encoded, err := artifact.Abi.Constructor.Inputs.
-					Encode([]interface{}{
-						cfg.StakeManagerAddress,
-						cfg.BLSAddress,
-						cfg.StateSenderAddress,
-						cfg.RootNativeERC20Address,
-						contracts.NewValidatorSetContract,
-						cfg.ExitHelperAddress,
-						string(bls.DomainValidatorSet),
-					})
+				constructor := &contractsapi.CustomSupernetManagerConstructorFn{
+					StakeManager:      cfg.StakeManagerAddress,
+					Bls:               cfg.BLSAddress,
+					StateSender:       cfg.StateSenderAddress,
+					Matic:             cfg.RootNativeERC20Address,
+					ChildValidatorSet: contracts.ValidatorSetContract,
+					ExitHelper:        cfg.ExitHelperAddress,
+					Domain:            string(bls.DomainValidatorSet),
+				}
+
+				encoded, err := constructor.EncodeAbi()
 				if err != nil {
 					return nil, err
 				}

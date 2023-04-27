@@ -186,8 +186,8 @@ func TestStateTransaction_Signature(t *testing.T) {
 		sig string
 	}{
 		{
-			contractsapi.ChildValidatorSet.Abi.GetMethod("commitEpoch"),
-			"410899c9",
+			contractsapi.ValidatorSet.Abi.GetMethod("commitEpoch"),
+			"0f50287c",
 		},
 	}
 	for _, c := range cases {
@@ -200,17 +200,12 @@ func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
 	cases := []contractsapi.StateTransactionInput{
-		&contractsapi.CommitEpochChildValidatorSetFn{
+		&contractsapi.CommitEpochValidatorSetFn{
 			ID: big.NewInt(1),
 			Epoch: &contractsapi.Epoch{
 				StartBlock: big.NewInt(1),
 				EndBlock:   big.NewInt(10),
 				EpochRoot:  types.Hash{},
-			},
-			Uptime: &contractsapi.Uptime{
-				EpochID:     big.NewInt(1),
-				TotalBlocks: big.NewInt(10),
-				UptimeData:  []*contractsapi.UptimeData{},
 			},
 		},
 	}

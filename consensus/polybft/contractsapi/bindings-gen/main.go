@@ -29,14 +29,16 @@ type generatedData struct {
 
 func main() {
 	cases := []struct {
-		contractName string
-		artifact     *artifact.Artifact
-		functions    []string
-		events       []string
+		contractName        string
+		artifact            *artifact.Artifact
+		generateConstructor bool
+		functions           []string
+		events              []string
 	}{
 		{
 			"StateReceiver",
 			gensc.StateReceiver,
+			false,
 			[]string{
 				"commit",
 				"execute",
@@ -47,27 +49,9 @@ func main() {
 			},
 		},
 		{
-			"ChildValidatorSet",
-			gensc.ChildValidatorSet,
-			[]string{
-				"commitEpoch",
-				"initialize",
-				"addToWhitelist",
-				"register",
-			},
-			[]string{
-				"NewValidator",
-				"Staked",
-				"Delegated",
-				"Unstaked",
-				"Undelegated",
-				"AddedToWhitelist",
-				"Withdrawal",
-			},
-		},
-		{
 			"StateSender",
 			gensc.StateSender,
+			false,
 			[]string{
 				"syncState",
 			},
@@ -78,6 +62,7 @@ func main() {
 		{
 			"L2StateSender",
 			gensc.L2StateSender,
+			false,
 			[]string{},
 			[]string{
 				"L2StateSynced",
@@ -86,6 +71,7 @@ func main() {
 		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
+			false,
 			[]string{
 				"submit",
 				"initialize",
@@ -96,6 +82,7 @@ func main() {
 		{
 			"ExitHelper",
 			gensc.ExitHelper,
+			false,
 			[]string{
 				"initialize",
 				"exit",
@@ -105,6 +92,7 @@ func main() {
 		{
 			"ChildERC20Predicate",
 			gensc.ChildERC20Predicate,
+			false,
 			[]string{
 				"initialize",
 				"withdrawTo",
@@ -114,6 +102,7 @@ func main() {
 		{
 			"NativeERC20",
 			gensc.NativeERC20,
+			false,
 			[]string{
 				"initialize",
 			},
@@ -122,6 +111,7 @@ func main() {
 		{
 			"NativeERC20Mintable",
 			gensc.NativeERC20Mintable,
+			false,
 			[]string{
 				"initialize",
 			},
@@ -130,6 +120,7 @@ func main() {
 		{
 			"RootERC20Predicate",
 			gensc.RootERC20Predicate,
+			false,
 			[]string{
 				"initialize",
 				"depositTo",
@@ -139,6 +130,7 @@ func main() {
 		{
 			"RootERC20",
 			gensc.RootERC20,
+			false,
 			[]string{
 				"balanceOf",
 				"approve",
@@ -149,39 +141,67 @@ func main() {
 		{
 			"CustomSupernetManager",
 			gensc.CustomSupernetManager,
+			true,
 			[]string{
 				"whitelistValidators",
 				"register",
+				"getValidator",
 			},
 			[]string{
 				"ValidatorRegistered",
+				"AddedToWhitelist",
 			},
 		},
 		{
 			"StakeManager",
 			gensc.StakeManager,
+			true,
 			[]string{
 				"registerChildChain",
 				"stakeFor",
+				"releaseStakeOf",
+				"withdrawStake",
 			},
 			[]string{
 				"ChildManagerRegistered",
 				"StakeAdded",
+				"StakeWithdrawn",
 			},
 		},
 		{
 			"ValidatorSet",
 			gensc.ValidatorSet,
-			[]string{},
+			true,
+			[]string{
+				"commitEpoch",
+				"unstake",
+			},
 			[]string{
 				"Transfer",
+				"WithdrawalRegistered",
+				"Withdrawal",
 			},
+		},
+		{
+			"RewardDistributor",
+			gensc.RewardDistributor,
+			true,
+			[]string{
+				"distributeRewardFor",
+			},
+			[]string{},
 		},
 	}
 
 	generatedData := &generatedData{}
 
 	for _, c := range cases {
+		if c.generateConstructor {
+			if err := generateConstructor(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
+				log.Fatal(err)
+			}
+		}
+
 		for _, method := range c.functions {
 			if err := generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method]); err != nil {
 				log.Fatal(err)
@@ -397,6 +417,52 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
 		"Name":         event.Name,
 		"TName":        strings.Title(name),
 		"ContractName": contractName,
+	}
+
+	renderedString, err := renderTmpl(tmplStr, inputs)
+	if err != nil {
+		return err
+	}
+
+	generatedData.resultString = append(generatedData.resultString, renderedString)
+
+	return nil
+}
+
+// generateConstruct generates stubs for a smart contract constructor
+func generateConstructor(generatedData *generatedData,
+	contractName string, constructor *abi.Method) error {
+	methodName := fmt.Sprintf(functionNameFormat, strings.Title(contractName+"Constructor"))
+	res := []string{}
+
+	_, err := generateType(generatedData, methodName, constructor.Inputs, &res)
+	if err != nil {
+		return err
+	}
+
+	// write encode/decode functions
+	tmplStr := `
+{{range .Structs}}
+	{{.}}
+{{ end }}
+
+func ({{.Sig}} *{{.TName}}) Sig() []byte {
+	return {{.ContractName}}.Abi.Constructor.ID()
+}
+
+func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+	return {{.ContractName}}.Abi.Constructor.Inputs.Encode({{.Sig}})
+}
+
+func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+	return decodeMethod({{.ContractName}}.Abi.Constructor, buf, {{.Sig}})
+}`
+
+	inputs := map[string]interface{}{
+		"Structs":      res,
+		"Sig":          strings.ToLower(string(methodName[0])),
+		"ContractName": contractName,
+		"TName":        strings.Title(methodName),
 	}
 
 	renderedString, err := renderTmpl(tmplStr, inputs)

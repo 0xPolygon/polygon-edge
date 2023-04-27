@@ -231,7 +231,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		c.state,
 		txRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
-		contracts.NewValidatorSetContract,
+		contracts.ValidatorSetContract,
 		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
 	)
@@ -391,7 +391,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfEpoch {
-		ff.commitEpochInput, err = c.calculateCommitEpochInput(parent, epoch)
+		ff.commitEpochInput, ff.distributeRewardsInput, err = c.calculateCommitEpochInput(parent, epoch)
 		if err != nil {
 			return fmt.Errorf("cannot calculate commit epoch info: %w", err)
 		}
@@ -492,7 +492,9 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 // in the current epoch, and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
-	epoch *epochMetadata) (*contractsapi.CommitEpochChildValidatorSetFn, error) {
+	epoch *epochMetadata,
+) (*contractsapi.CommitEpochValidatorSetFn,
+	*contractsapi.DistributeRewardForRewardDistributorFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -515,18 +517,18 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 
 	blockExtra, err := GetIbftExtra(currentBlock.ExtraData)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// calculate uptime for current epoch
 	for blockHeader.Number > epoch.FirstBlockInEpoch {
 		if err := getSealersForBlock(blockExtra, epoch.Validators); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -536,16 +538,16 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		for i := 0; i < commitEpochLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			if err := getSealersForBlock(blockExtra, validators); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 	}
@@ -570,17 +572,21 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
 	}
 
-	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
+	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
 			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
-		Uptime: uptime,
 	}
 
-	return commitEpoch, nil
+	distributeRewards := &contractsapi.DistributeRewardForRewardDistributorFn{
+		EpochID: new(big.Int).SetUint64(epochID),
+		Uptime:  uptime,
+	}
+
+	return commitEpoch, distributeRewards, nil
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
