@@ -454,7 +454,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 
 		// fund validators on the rootchain
-		err = cluster.Bridge.fundRootchainValidators()
+		err = cluster.Bridge.fundRootchainValidators(genesisPath)
 		require.NoError(t, err)
 
 		// whitelist genesis validators on the rootchain
@@ -463,6 +463,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// register genesis validators on the rootchain
 		err = cluster.Bridge.registerGenesisValidators(genesisPath)
+		require.NoError(t, err)
+
+		// do initial staking for genesis validators on the rootchain
+		err = cluster.Bridge.initialStakingOfGenesisValidators(genesisPath)
 		require.NoError(t, err)
 	}
 

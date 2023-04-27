@@ -192,12 +192,19 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 }
 
 // fundRootchainValidators sends predefined amount of tokens to rootchain validators
-func (t *TestBridge) fundRootchainValidators() error {
+func (t *TestBridge) fundRootchainValidators(genesisPath string) error {
+	polybftConfig, _, err := readPolybftConfig(genesisPath)
+	if err != nil {
+		return fmt.Errorf("could not fund validators on rootchain: %w", err)
+	}
+
 	args := []string{
 		"rootchain",
 		"fund",
 		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
 		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
+		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+		"--mint",
 	}
 
 	if err := t.cmdRun(args...); err != nil {
@@ -208,7 +215,7 @@ func (t *TestBridge) fundRootchainValidators() error {
 }
 
 func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address, genesisPath string) error {
-	polybftConfig, err := readPolybftConfig(genesisPath)
+	polybftConfig, _, err := readPolybftConfig(genesisPath)
 	if err != nil {
 		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
 	}
@@ -240,7 +247,7 @@ func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
 		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
 	}
 
-	polybftConfig, err := readPolybftConfig(genesisPath)
+	polybftConfig, _, err := readPolybftConfig(genesisPath)
 	if err != nil {
 		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
 	}
@@ -262,16 +269,47 @@ func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
 	return nil
 }
 
-func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, error) {
+func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error {
+	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
+	if err != nil {
+		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
+	}
+
+	polybftConfig, chainID, err := readPolybftConfig(genesisPath)
+	if err != nil {
+		return fmt.Errorf("could not do initial staking of genesis validators on stake manager: %w", err)
+	}
+
+	for i, secret := range validatorSecrets {
+		args := []string{
+			"polybft",
+			"stake",
+			"--jsonrpc", t.JSONRPCAddr(),
+			"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
+			"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
+			"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Stake.Uint64(), 10),
+			"--chain-id", strconv.FormatUint(chainID, 10),
+			"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+		}
+
+		if err := t.cmdRun(args...); err != nil {
+			return fmt.Errorf("failed to do initial staking for genesis validator on stake manager: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, uint64, error) {
 	chainConfig, err := chain.ImportFromFile(genesisPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read chain configuration: %w", err)
+		return nil, 0, fmt.Errorf("failed to read chain configuration: %w", err)
 	}
 
 	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve consensus configuration: %w", err)
+		return nil, 0, fmt.Errorf("failed to retrieve consensus configuration: %w", err)
 	}
 
-	return &consensusConfig, nil
+	return &consensusConfig, uint64(chainConfig.Params.ChainID), nil
 }

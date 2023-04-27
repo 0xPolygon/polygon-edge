@@ -9,10 +9,9 @@ import (
 )
 
 const (
-	dataDirFlag = "data-dir"
-	configFlag  = "config"
-	numFlag     = "num"
-	jsonRPCFlag = "json-rpc"
+	numFlag           = "num"
+	jsonRPCFlag       = "json-rpc"
+	mintRootTokenFlag = "mint"
 )
 
 var (
@@ -22,8 +21,11 @@ var (
 )
 
 type fundParams struct {
-	dataDir    string
-	configPath string
+	dataDir             string
+	configPath          string
+	nativeRootTokenAddr string
+	deployerPrivateKey  string
+	mintRootToken       bool
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
