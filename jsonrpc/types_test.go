@@ -219,6 +219,7 @@ func mockTxn() *transaction {
 		BlockHash:   &types.ZeroHash,
 		BlockNumber: argUintPtr(1),
 		TxIndex:     argUintPtr(2),
+		Type:        argUint64(types.LegacyTx),
 	}
 
 	return tt
