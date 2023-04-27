@@ -49,7 +49,6 @@ jobs:
     secrets:
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-      TF_VAR_COMPANY_NAME: ${{ secrets.TF_VAR_COMPANY_NAME }}
       TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
       TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
