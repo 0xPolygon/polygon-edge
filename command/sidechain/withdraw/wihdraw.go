@@ -1,8 +1,7 @@
-package unstaking
+package withdraw
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -17,12 +16,12 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var params unstakeParams
+var params withdrawParams
 
 func GetCommand() *cobra.Command {
 	unstakeCmd := &cobra.Command{
-		Use:     "unstake",
-		Short:   "Unstakes the amount sent for validator or undelegates amount from validator",
+		Use:     "withdraw-child",
+		Short:   "Withdraws pending withdrawals on child chain for given validator",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
@@ -46,13 +45,6 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlag,
 		"",
 		polybftsecrets.AccountConfigFlagDesc,
-	)
-
-	cmd.Flags().Uint64Var(
-		&params.amount,
-		sidechainHelper.AmountFlag,
-		0,
-		"amount to unstake from validator",
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
@@ -79,11 +71,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	unstakeFn := &contractsapi.UnstakeValidatorSetFn{
-		Amount: new(big.Int).SetUint64(params.amount),
-	}
-
-	encoded, err := unstakeFn.EncodeAbi()
+	encoded, err := contractsapi.ValidatorSet.Abi.Methods["withdraw"].Encode([]interface{}{})
 	if err != nil {
 		return err
 	}
@@ -101,34 +89,35 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return fmt.Errorf("unstake transaction failed on block: %d", receipt.BlockNumber)
+		return fmt.Errorf("withdraw transaction failed on block: %d", receipt.BlockNumber)
 	}
 
-	var (
-		withdrawalRegisteredEvent contractsapi.WithdrawalRegisteredEvent
-		foundLog                  bool
-	)
-
-	result := &unstakeResult{
+	result := &withdrawResult{
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
+	var (
+		withdrawalEvent contractsapi.WithdrawalEvent
+		foundLog        bool
+	)
+
 	// check the logs to check for the result
 	for _, log := range receipt.Logs {
-		doesMatch, err := withdrawalRegisteredEvent.ParseLog(log)
+		doesMatch, err := withdrawalEvent.ParseLog(log)
 		if err != nil {
 			return err
 		}
 
 		if doesMatch {
 			foundLog = true
+			result.amount = withdrawalEvent.Amount.Uint64()
 
 			break
 		}
 	}
 
 	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that unstake happened (withdrawal registered)")
+		return fmt.Errorf("could not find an appropriate log in receipt that withdraw happened on ValidatorSet")
 	}
 
 	outputter.WriteCommandResult(result)
