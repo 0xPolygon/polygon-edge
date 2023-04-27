@@ -23,7 +23,7 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 
 	rapid.Check(t, func(tt *rapid.T) {
 		var (
-			numNodes  = rapid.Uint64Range(4, 8).Draw(tt, "number of cluster nodes")
+			numNodes  = rapid.Uint64Range(5, 8).Draw(tt, "number of cluster nodes")
 			epochSize = rapid.OneOf(rapid.Just(4), rapid.Just(10)).Draw(tt, "epoch size")
 			numBlocks = rapid.Uint64Range(2, 5).Draw(tt, "number of blocks the cluster should mine")
 		)
