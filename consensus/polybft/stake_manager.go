@@ -26,6 +26,7 @@ var (
 // and updating validator set based on changed stake
 type StakeManager interface {
 	PostBlock(req *PostBlockRequest) error
+	PostEpoch(req *PostEpochRequest) error
 	UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error)
 }
 
@@ -34,6 +35,7 @@ type StakeManager interface {
 type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 	currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	return &ValidatorSetDelta{}, nil
@@ -71,6 +73,16 @@ func newStakeManager(
 		supernetManagerContract: supernetManagerAddr,
 		maxValidatorSetSize:     maxValidatorSetSize,
 	}
+}
+
+// PostEpoch saves the initial validator set to db
+func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
+	if req.NewEpochID != 1 {
+		return nil
+	}
+
+	// save initial validator set as full validator set in db
+	return s.state.StakeStore.insertFullValidatorSet(req.ValidatorSet.Accounts())
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)

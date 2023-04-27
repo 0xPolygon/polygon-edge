@@ -16,7 +16,41 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+func TestStakeManager_PostEpoch(t *testing.T) {
+	validators := newTestValidators(t, 5).getPublicIdentities()
+	state := newTestState(t)
+
+	stakeManager := &stakeManager{
+		logger:              hclog.NewNullLogger(),
+		state:               state,
+		maxValidatorSetSize: 10,
+	}
+
+	t.Run("First epoch", func(t *testing.T) {
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID:   1,
+			ValidatorSet: NewValidatorSet(validators, stakeManager.logger),
+		}))
+
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		require.NoError(t, err)
+		require.Len(t, fullValidatorSet, len(validators))
+	})
+
+	t.Run("Not first epoch", func(t *testing.T) {
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID:   2,
+			ValidatorSet: NewValidatorSet(validators, stakeManager.logger),
+		}))
+
+		_, err := state.StakeStore.getFullValidatorSet()
+		require.ErrorIs(t, errNoFullValidatorSet, err)
+	})
+}
+
 func TestStakeManager_PostBlock(t *testing.T) {
+	t.Parallel()
+
 	var (
 		allAliases        = []string{"A", "B", "C", "D", "E", "F"}
 		initialSetAliases = []string{"A", "B", "C", "D", "E"}
