@@ -300,6 +300,29 @@ func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error
 	return nil
 }
 
+func (t *TestBridge) finalizeGenesis(genesisPath string) error {
+	polybftConfig, _, err := readPolybftConfig(genesisPath)
+	if err != nil {
+		return fmt.Errorf("could not finalize genesis validators on supernet manager: %w", err)
+	}
+
+	args := []string{
+		"polybft",
+		"supernet",
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--private-key", rootHelper.TestAccountPrivKey,
+		"supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+		"--finalize-genesis-set",
+		"--enable-staking",
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to finalize genesis validators on supernet manager: %w", err)
+	}
+
+	return nil
+}
+
 func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, uint64, error) {
 	chainConfig, err := chain.ImportFromFile(genesisPath)
 	if err != nil {

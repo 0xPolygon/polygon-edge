@@ -468,6 +468,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// do initial staking for genesis validators on the rootchain
 		err = cluster.Bridge.initialStakingOfGenesisValidators(genesisPath)
 		require.NoError(t, err)
+
+		// finalize genesis validators on the rootchain
+		err = cluster.Bridge.finalizeGenesis(genesisPath)
+		require.NoError(t, err)
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
