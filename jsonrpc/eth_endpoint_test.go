@@ -263,7 +263,6 @@ func TestEth_TxnType(t *testing.T) {
 	}
 
 	// Setup Txn
-
 	args := &txnArgs{
 		From:      &addr1,
 		To:        &addr2,
@@ -289,12 +288,11 @@ func TestEth_TxnType(t *testing.T) {
 		Nonce:     0,
 		Type:      types.DynamicFeeTx,
 	}
+	res, err := DecodeTxn(args, store)
 
 	expectedRes.ComputeHash()
-	res, err := DecodeTxn(args, store)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRes, res)
-
 }
 
 func newTestEthEndpoint(store testStore) *Eth {
