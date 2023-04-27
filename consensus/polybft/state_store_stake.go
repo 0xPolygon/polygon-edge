@@ -13,7 +13,7 @@ var (
 	// key of the full validator set in bucket
 	fullValidatorSetKey = []byte("fullValidatorSet")
 	// error returned if full validator set does not exists in db
-	errorsNoFullValidatorSet = errors.New("full validator set not in db")
+	errNoFullValidatorSet = errors.New("full validator set not in db")
 )
 
 type StakeStore struct {
@@ -44,10 +44,11 @@ func (s *StakeStore) insertFullValidatorSet(fullValidatorSet AccountSet) error {
 // getFullValidatorSet returns full validator set from its bucket if exists
 func (s *StakeStore) getFullValidatorSet() (AccountSet, error) {
 	var fullValidatorSet AccountSet
+
 	err := s.db.View(func(tx *bolt.Tx) error {
 		raw := tx.Bucket(validatorSetBucket).Get(fullValidatorSetKey)
 		if raw == nil {
-			return errorsNoFullValidatorSet
+			return errNoFullValidatorSet
 		}
 
 		return fullValidatorSet.Unmarshal(raw)

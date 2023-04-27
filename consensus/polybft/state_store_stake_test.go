@@ -11,11 +11,9 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 	state := newTestState(t)
 
 	t.Run("No full validator set", func(t *testing.T) {
-		t.Parallel()
-
 		_, err := state.StakeStore.getFullValidatorSet()
 
-		require.ErrorIs(t, err, errorsNoFullValidatorSet)
+		require.ErrorIs(t, err, errNoFullValidatorSet)
 	})
 
 	t.Run("Insert validator set", func(t *testing.T) {

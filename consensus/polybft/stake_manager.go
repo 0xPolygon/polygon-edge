@@ -337,7 +337,6 @@ type stakeCounter struct {
 // newStakeCounter returns a new instance of stake counter
 func newStakeCounter(oldCurrentValidatorSet, oldFullValidatorSet AccountSet,
 	maxValidatorSetSize int) *stakeCounter {
-
 	stakeCounter := &stakeCounter{
 		stakeMap:               make(map[types.Address]*big.Int),
 		oldCurrentValidatorSet: make(map[types.Address]*expandedValidatorMetadata, len(oldCurrentValidatorSet)),
