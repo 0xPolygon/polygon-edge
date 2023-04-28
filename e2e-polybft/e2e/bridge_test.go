@@ -300,7 +300,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
 		framework.WithEpochSize(epochSize),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
@@ -470,7 +469,6 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithEpochSize(epochSize),
 		framework.WithPremine(receiversAddrs...))
