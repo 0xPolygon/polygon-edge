@@ -446,7 +446,6 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	premineAmount := ethgo.Ether(10)
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
 		framework.WithEpochReward(10000),
 		framework.WithEpochSize(5),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {

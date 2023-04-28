@@ -73,7 +73,7 @@ type TestClusterConfig struct {
 	PremineValidators    []string // address[:amount]
 	StakeAmounts         []string // address[:amount]
 	MintableNativeToken  bool
-	HasBridge            bool
+	WithoutBridge        bool
 	BootnodeCount        int
 	NonValidatorCount    int
 	WithLogs             bool
@@ -207,9 +207,9 @@ func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOp
 	}
 }
 
-func WithBridge() ClusterOption {
+func WithoutBridge() ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.HasBridge = true
+		h.WithoutBridge = true
 	}
 }
 
@@ -560,7 +560,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	if cluster.Config.HasBridge {
+	if !cluster.Config.WithoutBridge {
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
@@ -595,7 +595,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, true, cluster.Config.HasBridge && i == 1 /* relayer */)
+		cluster.InitTestServer(t, dir, true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {

@@ -52,7 +52,6 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
@@ -628,7 +627,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
 	// spin up a cluster with epoch size set to 5 blocks
-	cluster := framework.NewTestCluster(t, 5, framework.WithBridge(), framework.WithEpochSize(5))
+	cluster := framework.NewTestCluster(t, 5, framework.WithEpochSize(5))
 	defer cluster.Stop()
 
 	// initialize tx relayer used to query CheckpointManager smart contract
@@ -684,7 +683,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	)
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
 		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(1000))
 	defer cluster.Stop()
