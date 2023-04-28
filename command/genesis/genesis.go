@@ -174,7 +174,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.validators,
 			validatorsFlag,
 			[]string{},
-			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
+			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
 		)
 
 		cmd.Flags().StringArrayVar(

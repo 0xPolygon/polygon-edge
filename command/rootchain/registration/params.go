@@ -13,6 +13,7 @@ type registerParams struct {
 	accountConfig          string
 	supernetManagerAddress string
 	jsonRPC                string
+	chainId                int64
 }
 
 func (rp *registerParams) validateFlags() error {
@@ -27,6 +28,7 @@ func (rp *registerParams) validateFlags() error {
 
 type registerResult struct {
 	validatorAddress string
+	koskSignature    string
 }
 
 func (rr registerResult) GetOutput() string {
@@ -34,8 +36,9 @@ func (rr registerResult) GetOutput() string {
 
 	buffer.WriteString("\n[VALIDATOR REGISTRATION]\n")
 
-	vals := make([]string, 0, 1)
+	vals := make([]string, 0, 2)
 	vals = append(vals, fmt.Sprintf("Validator Address|%s", rr.validatorAddress))
+	vals = append(vals, fmt.Sprintf("KOSK Signature|%s", rr.koskSignature))
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")
 

@@ -1,7 +1,6 @@
 package registration
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -12,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -56,6 +54,13 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.SupernetManagerFlagDesc,
 	)
 
+	cmd.Flags().Int64Var(
+		&params.chainId,
+		polybftsecrets.ChainIDFlag,
+		command.DefaultChainID,
+		polybftsecrets.ChainIDFlagDesc,
+	)
+
 	helper.RegisterJSONRPCFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountConfigFlag, polybftsecrets.AccountDirFlag)
 }
@@ -85,22 +90,14 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	sRaw, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
+	koskSignature, err := bls.MakeKOSKSignature(
+		newValidatorAccount.Bls, newValidatorAccount.Address(),
+		params.chainId, bls.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
 	if err != nil {
 		return err
 	}
 
-	sb, err := hex.DecodeString(string(sRaw))
-	if err != nil {
-		return err
-	}
-
-	blsSignature, err := bls.UnmarshalSignature(sb)
-	if err != nil {
-		return err
-	}
-
-	receipt, err := registerValidator(txRelayer, newValidatorAccount, blsSignature)
+	receipt, err := registerValidator(txRelayer, newValidatorAccount, koskSignature)
 	if err != nil {
 		return err
 	}

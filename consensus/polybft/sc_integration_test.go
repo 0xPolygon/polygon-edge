@@ -19,7 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -265,7 +264,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
 	reward := uint64(math.Pow(10, 18))            // 1 token
 
-	supernetManagerAddr := types.StringToAddress("0x123456789")
 	validatorSets := make([]*testValidators, len(validatorSetSize), len(validatorSetSize))
 
 	// create all validator sets which will be used in test
@@ -284,7 +282,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// iterate through the validator set and do the test for each of them
 	for _, currentValidators := range validatorSets {
 		accSet := currentValidators.getPublicIdentities()
-		accSetPrivateKeys := currentValidators.getPrivateIdentities()
 
 		// validator data for polybft config
 		initValidators := make([]*Validator, accSet.Len())
@@ -304,20 +301,12 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Balance: validator.VotingPower,
 			}
 
-			signature, err := secretsHelper.MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address,
-				0, bls.DomainValidatorSet, supernetManagerAddr)
-			require.NoError(t, err)
-
-			signatureBytes, err := signature.Marshal()
-			require.NoError(t, err)
-
 			// create validator data for polybft config
 			initValidators[i] = &Validator{
-				Address:      validator.Address,
-				Balance:      validator.VotingPower,
-				Stake:        validator.VotingPower,
-				BlsKey:       hex.EncodeToString(validator.BlsKey.Marshal()),
-				BlsSignature: hex.EncodeToString(signatureBytes),
+				Address: validator.Address,
+				Balance: validator.VotingPower,
+				Stake:   validator.VotingPower,
+				BlsKey:  hex.EncodeToString(validator.BlsKey.Marshal()),
 			}
 		}
 

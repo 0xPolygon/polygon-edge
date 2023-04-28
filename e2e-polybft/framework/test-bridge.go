@@ -324,7 +324,7 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
 	return nil
 }
 
-func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTConfig) error {
+func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTConfig, chainID int64) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
@@ -343,6 +343,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTCon
 				args := []string{
 					"polybft",
 					"register-validator",
+					"--chain-id", strconv.FormatInt(chainID, 10),
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
@@ -361,7 +362,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTCon
 }
 
 func (t *TestBridge) initialStakingOfGenesisValidators(
-	polybftConfig *polybft.PolyBFTConfig, chainID uint64) error {
+	polybftConfig *polybft.PolyBFTConfig, chainID int64) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
@@ -385,7 +386,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
 					"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Stake.Uint64(), 10),
-					"--chain-id", strconv.FormatUint(chainID, 10),
+					"--chain-id", strconv.FormatInt(chainID, 10),
 					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 				}
 

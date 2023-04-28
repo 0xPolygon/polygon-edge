@@ -20,7 +20,6 @@ const (
 	networkFlag            = "network"
 	numFlag                = "num"
 	outputFlag             = "output"
-	supernetManagerFlag    = "supernet-manager"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -40,10 +39,6 @@ type initParams struct {
 	insecureLocalStore bool
 
 	output bool
-
-	chainID int64
-
-	supernetManagerAddr string
 }
 
 func (ip *initParams) validateFlags() error {
@@ -121,20 +116,6 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		false,
 		"the flag indicating to output existing secrets",
 	)
-
-	cmd.Flags().Int64Var(
-		&ip.chainID,
-		ChainIDFlag,
-		command.DefaultChainID,
-		ChainIDFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&ip.supernetManagerAddr,
-		supernetManagerFlag,
-		"",
-		"address of supernet manager contract",
-	)
 }
 
 func (ip *initParams) Execute() (Results, error) {
@@ -211,15 +192,6 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 				return generated, fmt.Errorf("error loading account: %w", err)
 			}
 		}
-
-		if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
-			if _, err = helper.InitValidatorBLSSignature(secretsManager, a,
-				ip.chainID, types.StringToAddress(ip.supernetManagerAddr)); err != nil {
-				return generated, fmt.Errorf("%w: error initializing validator-bls-signature", err)
-			}
-
-			generated = append(generated, secrets.ValidatorBLSSignature)
-		}
 	}
 
 	return generated, nil
@@ -244,12 +216,6 @@ func (ip *initParams) getResult(
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
 
-		s, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
-		if err != nil {
-			return nil, err
-		}
-
-		res.BLSSignature = string(s)
 		res.Generated = strings.Join(generated, ", ")
 
 		if ip.printPrivateKey {
