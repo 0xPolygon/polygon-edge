@@ -71,7 +71,7 @@ require (
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	golang.org/x/sync v0.1.0
 	gopkg.in/DataDog/dd-trace-go.v1 v1.49.1
-	pgregory.net/rapid v0.5.5
+	pgregory.net/rapid v0.5.7
 )
 
 require (
