@@ -265,6 +265,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
 	reward := uint64(math.Pow(10, 18))            // 1 token
 
+	supernetManagerAddr := types.StringToAddress("0x123456789")
 	validatorSets := make([]*testValidators, len(validatorSetSize), len(validatorSetSize))
 
 	// create all validator sets which will be used in test
@@ -303,7 +304,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Balance: validator.VotingPower,
 			}
 
-			signature, err := secretsHelper.MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address, 0, bls.DomainValidatorSet)
+			signature, err := secretsHelper.MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address,
+				0, bls.DomainValidatorSet, supernetManagerAddr)
 			require.NoError(t, err)
 
 			signatureBytes, err := signature.Marshal()

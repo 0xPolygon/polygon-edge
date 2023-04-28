@@ -20,6 +20,7 @@ const (
 	networkFlag            = "network"
 	numFlag                = "num"
 	outputFlag             = "output"
+	supernetManagerFlag    = "supernet-manager"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
@@ -41,6 +42,8 @@ type initParams struct {
 	output bool
 
 	chainID int64
+
+	supernetManagerAddr string
 }
 
 func (ip *initParams) validateFlags() error {
@@ -125,6 +128,13 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		command.DefaultChainID,
 		ChainIDFlagDesc,
 	)
+
+	cmd.Flags().StringVar(
+		&ip.supernetManagerAddr,
+		supernetManagerFlag,
+		"",
+		"address of supernet manager contract",
+	)
 }
 
 func (ip *initParams) Execute() (Results, error) {
@@ -203,7 +213,8 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 		}
 
 		if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
-			if _, err = helper.InitValidatorBLSSignature(secretsManager, a, ip.chainID); err != nil {
+			if _, err = helper.InitValidatorBLSSignature(secretsManager, a,
+				ip.chainID, types.StringToAddress(ip.supernetManagerAddr)); err != nil {
 				return generated, fmt.Errorf("%w: error initializing validator-bls-signature", err)
 			}
 

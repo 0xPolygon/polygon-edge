@@ -13,15 +13,16 @@ import (
 func Test_MakeKOSKSignature(t *testing.T) {
 	t.Parallel()
 
-	expected := "127cfb8e2512b447056f33b91fca6cb2a7039e8b330edc4e5e5287f1c58bba5206373a97c9f09db144c8db5681c39e013ee6039ebbe36e0448e9f704f2d326c0"
+	expected := "0c21af3d3c4f93df697eee94eeb6454ab025552e136d886424fb5ec5c5dc458a07308fd0f8add51e83aa8a016bd1995304002a71432233dfdbe84393d0a19730"
 	bytes, _ := hex.DecodeString("3139343634393730313533353434353137333331343333303931343932303731313035313730303336303738373134363131303435323837383335373237343933383834303135343336383231")
 
 	pk, err := bls.UnmarshalPrivateKey(bytes)
 	require.NoError(t, err)
 
+	supernetManagerAddr := types.StringToAddress("0x1010101")
 	address := types.BytesToAddress((pk.PublicKey().Marshal())[:types.AddressLength])
 
-	signature, err := MakeKOSKSignature(pk, address, 10, bls.DomainValidatorSet)
+	signature, err := MakeKOSKSignature(pk, address, 10, bls.DomainValidatorSet, supernetManagerAddr)
 	require.NoError(t, err)
 
 	signatureBytes, err := signature.Marshal()
@@ -29,7 +30,7 @@ func Test_MakeKOSKSignature(t *testing.T) {
 
 	assert.Equal(t, expected, hex.EncodeToString(signatureBytes))
 
-	signature, err = MakeKOSKSignature(pk, address, 100, bls.DomainValidatorSet)
+	signature, err = MakeKOSKSignature(pk, address, 100, bls.DomainValidatorSet, supernetManagerAddr)
 	require.NoError(t, err)
 
 	signatureBytes, err = signature.Marshal()

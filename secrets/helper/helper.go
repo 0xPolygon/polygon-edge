@@ -146,7 +146,8 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 }
 
 func InitValidatorBLSSignature(
-	secretsManager secrets.SecretsManager, account *wallet.Account, chainID int64) ([]byte, error) {
+	secretsManager secrets.SecretsManager, account *wallet.Account,
+	chainID int64, supernetManagerAddr types.Address) ([]byte, error) {
 	if secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
 		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSSignature)
 	}
@@ -157,6 +158,7 @@ func InitValidatorBLSSignature(
 		types.Address(account.Ecdsa.Address()),
 		chainID,
 		bls.DomainValidatorSet,
+		supernetManagerAddr,
 	)
 	if err != nil {
 		return nil, err
@@ -291,10 +293,10 @@ func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secre
 
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
 func MakeKOSKSignature(privateKey *bls.PrivateKey, address types.Address,
-	chainID int64, domain []byte) (*bls.Signature, error) {
+	chainID int64, domain []byte, supernetManagerAddr types.Address) (*bls.Signature, error) {
 	message, err := abi.Encode(
-		[]interface{}{address, big.NewInt(chainID)},
-		abi.MustNewType("tuple(address, uint256)"))
+		[]interface{}{address, supernetManagerAddr, big.NewInt(chainID)},
+		abi.MustNewType("tuple(address, address, uint256)"))
 	if err != nil {
 		return nil, err
 	}
