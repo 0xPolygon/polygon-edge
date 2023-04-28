@@ -1,6 +1,7 @@
 package registration
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -120,7 +121,14 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
+		koskSignatureRaw, err := koskSignature.Marshal()
+		if err != nil {
+			return err
+		}
+
+		result.koskSignature = hex.EncodeToString(koskSignatureRaw)
 		result.validatorAddress = validatorRegisteredEvent.Validator.String()
+
 		foundLog = true
 
 		break
