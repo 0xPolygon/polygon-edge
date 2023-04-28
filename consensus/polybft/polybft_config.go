@@ -262,9 +262,9 @@ type RewardsConfig struct {
 
 func (r *RewardsConfig) MarshalJSON() ([]byte, error) {
 	raw := &rewardsConfigRaw{
-		tokenAddress:  r.TokenAddress,
-		walletAddress: r.WalletAddress,
-		walletAmount:  types.EncodeBigInt(r.WalletAmount),
+		TokenAddress:  r.TokenAddress,
+		WalletAddress: r.WalletAddress,
+		WalletAmount:  types.EncodeBigInt(r.WalletAmount),
 	}
 
 	return json.Marshal(raw)
@@ -280,10 +280,10 @@ func (v *RewardsConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	v.TokenAddress = raw.tokenAddress
-	v.WalletAddress = raw.walletAddress
+	v.TokenAddress = raw.TokenAddress
+	v.WalletAddress = raw.WalletAddress
 
-	v.WalletAmount, err = types.ParseUint256orHex(raw.walletAmount)
+	v.WalletAmount, err = types.ParseUint256orHex(raw.WalletAmount)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (v *RewardsConfig) UnmarshalJSON(data []byte) error {
 }
 
 type rewardsConfigRaw struct {
-	tokenAddress  types.Address `json:"rewardTokenAddress"`
-	walletAddress types.Address `json:"rewardWalletAddress"`
-	walletAmount  *string       `json:"rewardWalletAmount"`
+	TokenAddress  types.Address `json:"rewardTokenAddress"`
+	WalletAddress types.Address `json:"rewardWalletAddress"`
+	WalletAmount  *string       `json:"rewardWalletAmount"`
 }

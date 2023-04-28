@@ -795,14 +795,20 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC721.Abi.Methods["ownerOf"], buf, o)
 }
 
-type CustomSupernetManagerConstructorFn struct {
-	StakeManager      types.Address `abi:"stakeManager"`
-	Bls               types.Address `abi:"bls"`
-	StateSender       types.Address `abi:"stateSender"`
-	Matic             types.Address `abi:"matic"`
-	ChildValidatorSet types.Address `abi:"childValidatorSet"`
-	ExitHelper        types.Address `abi:"exitHelper"`
-	Domain            string        `abi:"domain"`
+type InitializeCustomSupernetManagerFn struct {
+	StakeManager types.Address `abi:"stakeManager"`
+}
+
+func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["initialize"], buf, i)
 }
 
 type WhitelistValidatorsCustomSupernetManagerFn struct {
