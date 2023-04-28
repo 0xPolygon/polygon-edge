@@ -28,4 +28,12 @@ func Test_MakeKOSKSignature(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, expected, hex.EncodeToString(signatureBytes))
+
+	signature, err = MakeKOSKSignature(pk, types.StringToAddress("0x12345"), bls.DomainValidatorSet)
+	require.NoError(t, err)
+
+	signatureBytes, err = signature.Marshal()
+	require.NoError(t, err)
+
+	assert.NotEqual(t, expected, hex.EncodeToString(signatureBytes))
 }
