@@ -166,7 +166,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 				if params.mintRootToken {
 					// mint tokens to validator, so he is able to send them
-					mintTxn, err := helper.CreateMintTxn(validatorAcc, validatorAcc, rootTokenAddr, amount)
+					mintTxn, err := helper.CreateMintTxn(validatorAcc, rootTokenAddr, amount)
 					if err != nil {
 						return fmt.Errorf("mint transaction creation failed for validator: %s. err: %w", validatorAcc, err)
 					}

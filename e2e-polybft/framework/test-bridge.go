@@ -289,7 +289,7 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig *polybft.PolyBFTConfi
 		"rootchain",
 		"fund",
 		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
-		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
+		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize)),
 		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 		"--mint",
 	}

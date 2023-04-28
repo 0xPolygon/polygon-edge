@@ -163,7 +163,7 @@ func GetValidatorInfo(validatorAddr, supernetManagerAddr ethgo.Address,
 }
 
 // CreateMintTxn encodes parameters for mint function on rootchain token contract
-func CreateMintTxn(sender, receiver, rootTokenAddr types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+func CreateMintTxn(receiver, rootTokenAddr types.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     receiver,
 		Amount: amount,
@@ -177,7 +177,6 @@ func CreateMintTxn(sender, receiver, rootTokenAddr types.Address, amount *big.In
 	addr := ethgo.Address(rootTokenAddr)
 
 	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
 		To:    &addr,
 		Input: input,
 	}, nil
