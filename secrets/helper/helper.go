@@ -3,6 +3,7 @@ package helper
 import (
 	"errors"
 	"fmt"
+	"math/big"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -145,7 +146,7 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 }
 
 func InitValidatorBLSSignature(
-	secretsManager secrets.SecretsManager, account *wallet.Account) ([]byte, error) {
+	secretsManager secrets.SecretsManager, account *wallet.Account, chainID int64) ([]byte, error) {
 	if secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
 		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSSignature)
 	}
@@ -154,6 +155,7 @@ func InitValidatorBLSSignature(
 	s, err := MakeKOSKSignature(
 		account.Bls,
 		types.Address(account.Ecdsa.Address()),
+		chainID,
 		bls.DomainValidatorSet,
 	)
 	if err != nil {
@@ -288,9 +290,11 @@ func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secre
 }
 
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
-func MakeKOSKSignature(
-	privateKey *bls.PrivateKey, address types.Address, domain []byte) (*bls.Signature, error) {
-	message, err := addressTypeABI.Encode(address)
+func MakeKOSKSignature(privateKey *bls.PrivateKey, address types.Address,
+	chainID int64, domain []byte) (*bls.Signature, error) {
+	message, err := abi.Encode(
+		[]interface{}{address, big.NewInt(chainID)},
+		abi.MustNewType("tuple(address, uint256)"))
 	if err != nil {
 		return nil, err
 	}
