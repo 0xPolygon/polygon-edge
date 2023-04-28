@@ -456,7 +456,6 @@ func TestRecoverPublicKey(t *testing.T) {
 		require.ErrorIs(t, err, errHashOfInvalidLength)
 	})
 
-	// Commenting out below test to remove ZeroHash checks with crashes Nexon's Chainlink VRF contracts.
 	// t.Run("Zero hash", func(t *testing.T) {
 	// 	t.Parallel()
 

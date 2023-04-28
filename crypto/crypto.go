@@ -147,7 +147,6 @@ func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 		return nil, errHashOfInvalidLength
 	}
 
-	// Commenting out below if-statement to remove ZeroHash checks with crashes Nexon's Chainlink VRF contracts.
 	// if types.BytesToHash(hash) == types.ZeroHash {
 	// 	return nil, errZeroHash
 	// }
