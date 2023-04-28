@@ -21,6 +21,8 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+var addressTypeABI = abi.MustNewType("address")
+
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
 	return local.SecretsManagerFactory(
@@ -288,7 +290,7 @@ func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secre
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
 func MakeKOSKSignature(
 	privateKey *bls.PrivateKey, address types.Address, domain []byte) (*bls.Signature, error) {
-	message, err := abi.MustNewType("address").Encode(address)
+	message, err := addressTypeABI.Encode(address)
 	if err != nil {
 		return nil, err
 	}

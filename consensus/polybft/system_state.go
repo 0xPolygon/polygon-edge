@@ -68,7 +68,6 @@ func (s *SystemStateImpl) GetEpoch() (uint64, error) {
 	}
 
 	epochNumber, isOk := rawResult["0"].(*big.Int)
-	fmt.Println(rawResult)
 
 	if !isOk {
 		return 0, fmt.Errorf("failed to decode epoch")

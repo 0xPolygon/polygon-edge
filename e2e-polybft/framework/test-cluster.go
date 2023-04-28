@@ -18,7 +18,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -454,7 +453,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
-		polybftConfig, chainID, err := readPolybftConfig(genesisPath)
+		polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(genesisPath)
 		require.NoError(t, err)
 
 		// fund validators on the rootchain
@@ -899,18 +898,4 @@ func CopyDir(source, destination string) error {
 
 		return ioutil.WriteFile(filepath.Join(destination, relPath), data, 0600)
 	})
-}
-
-func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, uint64, error) {
-	chainConfig, err := chain.ImportFromFile(genesisPath)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read chain configuration: %w", err)
-	}
-
-	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to retrieve consensus configuration: %w", err)
-	}
-
-	return &consensusConfig, uint64(chainConfig.Params.ChainID), nil
 }

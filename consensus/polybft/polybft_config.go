@@ -50,13 +50,14 @@ type PolyBFTConfig struct {
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
-func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, error) {
+func LoadPolyBFTConfig(chainConfigFile string) (*PolyBFTConfig, uint64, error) {
 	chainCfg, err := chain.ImportFromFile(chainConfigFile)
 	if err != nil {
-		return PolyBFTConfig{}, err
+		return nil, 0, err
 	}
 
-	return GetPolyBFTConfig(chainCfg)
+	polybftConfig, err := GetPolyBFTConfig(chainCfg)
+	return &polybftConfig, uint64(chainCfg.Params.ChainID), err
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig

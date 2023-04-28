@@ -128,6 +128,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var (
 		lock   sync.Mutex
 		g, ctx = errgroup.WithContext(cmd.Context())
+		amount = ethgo.Ether(100)
 	)
 
 	for _, params := range paramsList {
@@ -150,7 +151,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				fundAddr := ethgo.Address(validatorAcc)
 				txn := &ethgo.Transaction{
 					To:    &fundAddr,
-					Value: ethgo.Ether(100),
+					Value: amount,
 				}
 
 				receipt, err := txRelayer.SendTransactionLocal(txn)
@@ -164,8 +165,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				}
 
 				if params.mintRootToken {
-					// mint tokens to depositor, so he is able to send them
-					mintTxn, err := helper.CreateMintTxn(validatorAcc, validatorAcc, rootTokenAddr, ethgo.Ether(100))
+					// mint tokens to validator, so he is able to send them
+					mintTxn, err := helper.CreateMintTxn(validatorAcc, validatorAcc, rootTokenAddr, amount)
 					if err != nil {
 						return fmt.Errorf("mint transaction creation failed for validator: %s. err: %w", validatorAcc, err)
 					}

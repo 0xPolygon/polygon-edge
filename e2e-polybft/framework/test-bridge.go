@@ -316,7 +316,7 @@ func (t *TestBridge) finalizeGenesis(polybftConfig *polybft.PolyBFTConfig) error
 		"supernet",
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--private-key", rootHelper.TestAccountPrivKey,
-		"supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
 		"--finalize-genesis-set",
 		"--enable-staking",
 	}
