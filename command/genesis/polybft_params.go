@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -79,6 +80,36 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		premineBalances[premineInfo.address] = premineInfo
 	}
 
+	var (
+		rewardTokenByteCode []byte
+		rewardWalletAddress = types.ZeroAddress
+		rewardWalletAmount  = big.NewInt(0)
+		rewardTokenAddr     = contracts.NativeERC20TokenContract
+	)
+
+	if p.rewardTokenCode == "" && p.rewardWallet != "" {
+		// native token is used as a reward token, and reward wallet is not a zero address
+		// so we need to add that address to premine map
+		premineInfo, err := parsePremineInfo(p.rewardWallet)
+		if err != nil {
+			return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+		}
+
+		premineBalances[premineInfo.address] = premineInfo
+		rewardWalletAddress = premineInfo.address
+		rewardWalletAmount = premineInfo.amount
+	}
+
+	if p.rewardTokenCode != "" {
+		bytes, err := hex.DecodeString(p.rewardTokenCode)
+		if err != nil {
+			return fmt.Errorf("could not decode reward token byte code '%s' : %w", p.rewardTokenCode, err)
+		}
+
+		rewardTokenByteCode = bytes
+		rewardTokenAddr = contracts.RewardTokenContract
+	}
+
 	initialValidators, err := p.getValidatorAccounts(premineBalances)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve genesis validators: %w", err)
@@ -110,6 +141,11 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		MintableNativeToken: p.mintableNativeToken,
 		NativeTokenConfig:   p.nativeTokenConfig,
 		MaxValidatorSetSize: p.maxNumValidators,
+		RewardConfig: &polybft.RewardsConfig{
+			TokenAddress:  rewardTokenAddr,
+			WalletAddress: rewardWalletAddress,
+			WalletAmount:  rewardWalletAmount,
+		},
 	}
 
 	chainConfig := &chain.Chain{
@@ -132,7 +168,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake, polyBftConfig)
+	allocs, err := p.deployContracts(totalStake, rewardTokenByteCode, polyBftConfig)
 	if err != nil {
 		return err
 	}
@@ -256,14 +292,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-//nolint:godox
 func (p *genesisParams) deployContracts(totalStake *big.Int,
+	rewardTokenByteCode []byte,
 	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
-		artifact            *artifact.Artifact
-		address             types.Address
-		constructorCallback func(artifact *artifact.Artifact,
-			polybftConfig *polybft.PolyBFTConfig) ([]byte, error)
+		artifact *artifact.Artifact
+		address  types.Address
 	}
 
 	genesisContracts := []*contractInfo{
@@ -318,64 +352,12 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.L2StateSenderContract,
 		},
 		{
-			// MockRewardToken contract
-			artifact: contractsapi.MockRewardToken,
-			address:  contracts.MockRewardTokenContract,
-		},
-		{
 			artifact: contractsapi.ValidatorSet,
 			address:  contracts.ValidatorSetContract,
-			constructorCallback: func(artifact *artifact.Artifact,
-				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				initialValidators := make([]*contractsapi.ValidatorInit, len(polybftConfig.InitialValidatorSet))
-				for i, validator := range polybftConfig.InitialValidatorSet {
-					initialValidators[i] = &contractsapi.ValidatorInit{
-						Addr:  validator.Address,
-						Stake: validator.Stake,
-					}
-				}
-
-				// TODO @goran-ethernal - we will remove once we change e2e tests
-				// since by RFC-201 we won't be able to start edge without bridge (root)
-				customSupernetManagerAddr := types.ZeroAddress
-				if polybftConfig.Bridge != nil {
-					customSupernetManagerAddr = polybftConfig.Bridge.CustomSupernetManagerAddr
-				}
-
-				constructor := &contractsapi.ValidatorSetConstructorFn{
-					StateSender:      contracts.L2StateSenderContract,
-					StateReceiver:    contracts.StateReceiverContract,
-					RootChainManager: customSupernetManagerAddr,
-					EpochSize_:       new(big.Int).SetUint64(polybftConfig.EpochSize),
-					InitalValidators: nil,
-				}
-
-				encoded, err := constructor.EncodeAbi()
-				if err != nil {
-					return nil, err
-				}
-
-				return append(artifact.Bytecode, encoded...), nil
-			},
 		},
 		{
 			artifact: contractsapi.RewardDistributor,
 			address:  contracts.RewardDistributorContract,
-			constructorCallback: func(artifact *artifact.Artifact,
-				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				constructor := &contractsapi.RewardDistributorConstructorFn{
-					RewardToken:  contracts.MockRewardTokenContract,
-					ValidatorSet: contracts.ValidatorSetContract,
-					BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
-				}
-
-				encoded, err := constructor.EncodeAbi()
-				if err != nil {
-					return nil, err
-				}
-
-				return append(artifact.Bytecode, encoded...), nil
-			},
 		},
 	}
 
@@ -387,23 +369,21 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
 
-	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
+	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
 
 	for _, contract := range genesisContracts {
-		code := contract.artifact.DeployedBytecode
-
-		if contract.constructorCallback != nil {
-			b, err := contract.constructorCallback(contract.artifact, polybftConfig)
-			if err != nil {
-				return nil, err
-			}
-
-			code = b
-		}
-
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
-			Code:    code,
+			Code:    contract.artifact.DeployedBytecode,
+		}
+	}
+
+	if rewardTokenByteCode != nil {
+		// if reward token is provided in genesis then, add it to allocations
+		// to RewardTokenContract address and update polybftConfig
+		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    rewardTokenByteCode,
 		}
 	}
 

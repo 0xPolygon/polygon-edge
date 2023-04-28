@@ -275,9 +275,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	type contractInfo struct {
-		name                string
-		artifact            *artifact.Artifact
-		constructorCallback func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error)
+		name     string
+		artifact *artifact.Artifact
 	}
 
 	rootchainConfig := &polybft.RootchainConfig{
@@ -370,58 +369,19 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		{
 			name:     stakeManagerName,
 			artifact: contractsapi.StakeManager,
-			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				constructor := &contractsapi.StakeManagerConstructorFn{MATIC_: cfg.RootNativeERC20Address}
-
-				encoded, err := constructor.EncodeAbi()
-				if err != nil {
-					return nil, err
-				}
-
-				return append(artifact.Bytecode, encoded...), nil
-			},
 		},
 		{
 			name:     customSupernetManagerName,
 			artifact: contractsapi.CustomSupernetManager,
-			constructorCallback: func(artifact *artifact.Artifact, cfg *polybft.RootchainConfig) ([]byte, error) {
-				constructor := &contractsapi.CustomSupernetManagerConstructorFn{
-					StakeManager:      cfg.StakeManagerAddress,
-					Bls:               cfg.BLSAddress,
-					StateSender:       cfg.StateSenderAddress,
-					Matic:             cfg.RootNativeERC20Address,
-					ChildValidatorSet: contracts.ValidatorSetContract,
-					ExitHelper:        cfg.ExitHelperAddress,
-					Domain:            bls.DomainValidatorSetString,
-				}
-
-				encoded, err := constructor.EncodeAbi()
-				if err != nil {
-					return nil, err
-				}
-
-				return append(artifact.Bytecode, encoded...), nil
-			},
 		},
 	}
 
 	allContracts = append(tokenContracts, allContracts...)
 
 	for _, contract := range allContracts {
-		input := contract.artifact.Bytecode
-
-		if contract.constructorCallback != nil {
-			b, err := contract.constructorCallback(contract.artifact, rootchainConfig)
-			if err != nil {
-				return nil, 0, err
-			}
-
-			input = b
-		}
-
 		txn := &ethgo.Transaction{
 			To:    nil, // contract deployment
-			Input: input,
+			Input: contract.artifact.Bytecode,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, deployerKey)
@@ -443,6 +403,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		populatorFn(rootchainConfig, contractAddr)
 
 		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contractAddr, receipt.TransactionHash))
+	}
+
+	// init StakeManager
+	if err := initializeStakeManager(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
+		return nil, 0, err
+	}
+
+	// init SupernetManager
+	if err := initializeSupernetManager(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
+		return nil, 0, err
 	}
 
 	chainID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
@@ -687,6 +657,62 @@ func initializeRootERC1155Predicate(cmdOutput command.OutputFormatter, txRelayer
 
 	cmdOutput.WriteCommandResult(&messageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC1155PredicateName),
+	})
+
+	return nil
+}
+
+// initializeStakeManager invokes initialize function on StakeManager contract
+func initializeStakeManager(cmdOutput command.OutputFormatter,
+	txRelayer txrelayer.TxRelayer,
+	rootchainConfig *polybft.RootchainConfig,
+	deployerKey ethgo.Key) error {
+	initFn := &contractsapi.InitializeStakeManagerFn{MATIC_: rootchainConfig.RootNativeERC20Address}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return err
+	}
+
+	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.StakeManagerAddress),
+		input, stakeManagerName, deployerKey); err != nil {
+		return err
+	}
+
+	cmdOutput.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, stakeManagerName),
+	})
+
+	return nil
+}
+
+// initializeSupernetManager invokes initialize function on CustomSupernetManager contract
+func initializeSupernetManager(cmdOutput command.OutputFormatter,
+	txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
+	deployerKey ethgo.Key) error {
+	// this is done without using go stubs, because CustomSupernetManager inherits
+	// SupernetManager which has another initialize function
+	// and generator keeps generating that parent initialize function
+	input, err := contractsapi.CustomSupernetManager.Abi.Methods["initialize"].Encode(map[string]interface{}{
+		"stakeManager":      rootchainConfig.StakeManagerAddress,
+		"bls":               rootchainConfig.BLSAddress,
+		"stateSender":       rootchainConfig.StateSenderAddress,
+		"matic":             rootchainConfig.RootNativeERC20Address,
+		"childValidatorSet": contracts.ValidatorSetContract,
+		"exitHelper":        rootchainConfig.ExitHelperAddress,
+		"domain":            bls.DomainValidatorSetString,
+	})
+	if err != nil {
+		return err
+	}
+
+	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.CustomSupernetManagerAddress),
+		input, customSupernetManagerName, deployerKey); err != nil {
+		return err
+	}
+
+	cmdOutput.WriteCommandResult(&messageResult{
+		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, customSupernetManagerName),
 	})
 
 	return nil

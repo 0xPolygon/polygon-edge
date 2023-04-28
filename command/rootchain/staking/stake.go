@@ -125,7 +125,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	stakeFn := contractsapi.StakeForStakeManagerFn{
 		ID:     new(big.Int).SetUint64(params.chainID),
 		Amount: new(big.Int).SetUint64(params.amount),
-		Data:   []byte{}, // we don't need to send anything in data
 	}
 
 	encoded, err := stakeFn.EncodeAbi()

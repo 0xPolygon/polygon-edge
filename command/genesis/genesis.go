@@ -232,6 +232,20 @@ func setFlags(cmd *cobra.Command) {
 			"",
 			"configuration of native token in format <name:symbol:decimals count>",
 		)
+
+		cmd.Flags().StringVar(
+			&params.rewardTokenCode,
+			rewardTokenCodeFlag,
+			"",
+			"hex encoded reward token byte code",
+		)
+
+		cmd.Flags().StringVar(
+			&params.rewardWallet,
+			rewardWalletFlag,
+			"",
+			"configuration of reward wallet in format <address:amount>",
+		)
 	}
 
 	// Access Control Lists

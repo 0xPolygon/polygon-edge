@@ -38,7 +38,6 @@ var (
 	StakeManager          *artifact.Artifact
 	RewardDistributor     *artifact.Artifact
 	ValidatorSet          *artifact.Artifact
-	MockRewardToken       *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
