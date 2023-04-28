@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -38,8 +39,8 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	return nil, args.Error(1)
 }
 
-func (t *txRelayerMock) GetGasPrice() (uint64, error) {
-	return 0, nil
+func (t *txRelayerMock) Client() *jsonrpc.Client {
+	return nil
 }
 
 func Test_executeStateSync(t *testing.T) {

@@ -55,13 +55,6 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.SupernetManagerFlagDesc,
 	)
 
-	cmd.Flags().Int64Var(
-		&params.chainID,
-		polybftsecrets.ChainIDFlag,
-		command.DefaultChainID,
-		polybftsecrets.ChainIDFlagDesc,
-	)
-
 	helper.RegisterJSONRPCFlag(cmd)
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountConfigFlag, polybftsecrets.AccountDirFlag)
 }
@@ -86,6 +79,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	rootChainID, err := txRelayer.Client().Eth().ChainID()
+	if err != nil {
+		return err
+	}
+
 	newValidatorAccount, err := wallet.NewAccountFromSecret(secretsManager)
 	if err != nil {
 		return err
@@ -93,7 +91,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	koskSignature, err := bls.MakeKOSKSignature(
 		newValidatorAccount.Bls, newValidatorAccount.Address(),
-		params.chainID, bls.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
+		rootChainID.Int64(), bls.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
 	if err != nil {
 		return err
 	}

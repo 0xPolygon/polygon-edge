@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 func TestStakeManager_PostEpoch(t *testing.T) {
@@ -304,6 +305,6 @@ func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*eth
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-func (d *dummyStakeTxRelayer) GetGasPrice() (uint64, error) {
-	return 0, nil
+func (t *dummyStakeTxRelayer) Client() *jsonrpc.Client {
+	return nil
 }

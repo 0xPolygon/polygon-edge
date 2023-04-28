@@ -94,7 +94,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("whitelist validator failed. Could not create tx relayer: %w", err)
 	}
 
-	gasPrice, err := txRelayer.GetGasPrice()
+	gasPrice, err := txRelayer.Client().Eth().GasPrice()
 	if err != nil {
 		return err
 	}

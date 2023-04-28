@@ -30,8 +30,8 @@ type TxRelayer interface {
 	// SendTransactionLocal sends non-signed transaction
 	// (this function is meant only for testing purposes and is about to be removed at some point)
 	SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error)
-	// GetGasPrice returns gas price on given chain
-	GetGasPrice() (uint64, error)
+	// Client returns jsonrpc client
+	Client() *jsonrpc.Client
 }
 
 var _ TxRelayer = (*TxRelayerImpl)(nil)
@@ -86,9 +86,9 @@ func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (
 	return t.waitForReceipt(txnHash)
 }
 
-// GetGasPrice returns gas price on given chain
-func (t *TxRelayerImpl) GetGasPrice() (uint64, error) {
-	return t.client.Eth().GasPrice()
+// Client returns jsonrpc client
+func (t *TxRelayerImpl) Client() *jsonrpc.Client {
+	return t.client
 }
 
 func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {

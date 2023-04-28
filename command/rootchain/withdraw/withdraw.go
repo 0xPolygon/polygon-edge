@@ -103,7 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	gasPrice, err := txRelayer.GetGasPrice()
+	gasPrice, err := txRelayer.Client().Eth().GasPrice()
 	if err != nil {
 		return err
 	}
