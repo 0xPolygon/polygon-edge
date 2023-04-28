@@ -260,10 +260,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 func (p *genesisParams) deployContracts(totalStake *big.Int,
 	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
-		artifact            *artifact.Artifact
-		address             types.Address
-		constructorCallback func(artifact *artifact.Artifact,
-			polybftConfig *polybft.PolyBFTConfig) ([]byte, error)
+		artifact *artifact.Artifact
+		address  types.Address
 	}
 
 	genesisContracts := []*contractInfo{
@@ -318,64 +316,12 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.L2StateSenderContract,
 		},
 		{
-			// MockRewardToken contract
-			artifact: contractsapi.MockRewardToken,
-			address:  contracts.MockRewardTokenContract,
-		},
-		{
 			artifact: contractsapi.ValidatorSet,
 			address:  contracts.ValidatorSetContract,
-			constructorCallback: func(artifact *artifact.Artifact,
-				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				initialValidators := make([]*contractsapi.ValidatorInit, len(polybftConfig.InitialValidatorSet))
-				for i, validator := range polybftConfig.InitialValidatorSet {
-					initialValidators[i] = &contractsapi.ValidatorInit{
-						Addr:  validator.Address,
-						Stake: validator.Stake,
-					}
-				}
-
-				// TODO @goran-ethernal - we will remove once we change e2e tests
-				// since by RFC-201 we won't be able to start edge without bridge (root)
-				customSupernetManagerAddr := types.ZeroAddress
-				if polybftConfig.Bridge != nil {
-					customSupernetManagerAddr = polybftConfig.Bridge.CustomSupernetManagerAddr
-				}
-
-				constructor := &contractsapi.ValidatorSetConstructorFn{
-					StateSender:      contracts.L2StateSenderContract,
-					StateReceiver:    contracts.StateReceiverContract,
-					RootChainManager: customSupernetManagerAddr,
-					EpochSize_:       new(big.Int).SetUint64(polybftConfig.EpochSize),
-					InitalValidators: nil,
-				}
-
-				encoded, err := constructor.EncodeAbi()
-				if err != nil {
-					return nil, err
-				}
-
-				return append(artifact.Bytecode, encoded...), nil
-			},
 		},
 		{
 			artifact: contractsapi.RewardDistributor,
 			address:  contracts.RewardDistributorContract,
-			constructorCallback: func(artifact *artifact.Artifact,
-				polybftConfig *polybft.PolyBFTConfig) ([]byte, error) {
-				constructor := &contractsapi.RewardDistributorConstructorFn{
-					RewardToken:  contracts.MockRewardTokenContract,
-					ValidatorSet: contracts.ValidatorSetContract,
-					BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
-				}
-
-				encoded, err := constructor.EncodeAbi()
-				if err != nil {
-					return nil, err
-				}
-
-				return append(artifact.Bytecode, encoded...), nil
-			},
 		},
 	}
 
@@ -390,20 +336,9 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
 
 	for _, contract := range genesisContracts {
-		code := contract.artifact.DeployedBytecode
-
-		if contract.constructorCallback != nil {
-			b, err := contract.constructorCallback(contract.artifact, polybftConfig)
-			if err != nil {
-				return nil, err
-			}
-
-			code = b
-		}
-
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
-			Code:    code,
+			Code:    contract.artifact.DeployedBytecode,
 		}
 	}
 

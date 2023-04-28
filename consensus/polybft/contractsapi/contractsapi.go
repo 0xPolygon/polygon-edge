@@ -805,18 +805,6 @@ type CustomSupernetManagerConstructorFn struct {
 	Domain            string        `abi:"domain"`
 }
 
-func (c *CustomSupernetManagerConstructorFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Constructor.ID()
-}
-
-func (c *CustomSupernetManagerConstructorFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Constructor.Inputs.Encode(c)
-}
-
-func (c *CustomSupernetManagerConstructorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Constructor, buf, c)
-}
-
 type WhitelistValidatorsCustomSupernetManagerFn struct {
 	Validators_ []ethgo.Address `abi:"validators_"`
 }
@@ -834,9 +822,8 @@ func (w *WhitelistValidatorsCustomSupernetManagerFn) DecodeAbi(buf []byte) error
 }
 
 type RegisterCustomSupernetManagerFn struct {
-	Validator_ types.Address `abi:"validator_"`
-	Signature  [2]*big.Int   `abi:"signature"`
-	Pubkey     [4]*big.Int   `abi:"pubkey"`
+	Signature [2]*big.Int `abi:"signature"`
+	Pubkey    [4]*big.Int `abi:"pubkey"`
 }
 
 func (r *RegisterCustomSupernetManagerFn) Sig() []byte {
@@ -908,20 +895,20 @@ func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(CustomSupernetManager.Abi.Events["AddedToWhitelist"], log, a)
 }
 
-type StakeManagerConstructorFn struct {
+type InitializeStakeManagerFn struct {
 	MATIC_ types.Address `abi:"MATIC_"`
 }
 
-func (s *StakeManagerConstructorFn) Sig() []byte {
-	return StakeManager.Abi.Constructor.ID()
+func (i *InitializeStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["initialize"].ID()
 }
 
-func (s *StakeManagerConstructorFn) EncodeAbi() ([]byte, error) {
-	return StakeManager.Abi.Constructor.Inputs.Encode(s)
+func (i *InitializeStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["initialize"].Encode(i)
 }
 
-func (s *StakeManagerConstructorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(StakeManager.Abi.Constructor, buf, s)
+func (i *InitializeStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["initialize"], buf, i)
 }
 
 type RegisterChildChainStakeManagerFn struct {
@@ -943,7 +930,6 @@ func (r *RegisterChildChainStakeManagerFn) DecodeAbi(buf []byte) error {
 type StakeForStakeManagerFn struct {
 	ID     *big.Int `abi:"id"`
 	Amount *big.Int `abi:"amount"`
-	Data   []byte   `abi:"data"`
 }
 
 func (s *StakeForStakeManagerFn) Sig() []byte {
@@ -1057,41 +1043,6 @@ func (s *StakeWithdrawnEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(StakeManager.Abi.Events["StakeWithdrawn"], log, s)
 }
 
-type ValidatorInit struct {
-	Addr  types.Address `abi:"addr"`
-	Stake *big.Int      `abi:"stake"`
-}
-
-var ValidatorInitABIType = abi.MustNewType("tuple(address addr,uint256 stake)")
-
-func (v *ValidatorInit) EncodeAbi() ([]byte, error) {
-	return ValidatorInitABIType.Encode(v)
-}
-
-func (v *ValidatorInit) DecodeAbi(buf []byte) error {
-	return decodeStruct(ValidatorInitABIType, buf, &v)
-}
-
-type ValidatorSetConstructorFn struct {
-	StateSender      types.Address    `abi:"stateSender"`
-	StateReceiver    types.Address    `abi:"stateReceiver"`
-	RootChainManager types.Address    `abi:"rootChainManager"`
-	EpochSize_       *big.Int         `abi:"epochSize_"`
-	InitalValidators []*ValidatorInit `abi:"initalValidators"`
-}
-
-func (v *ValidatorSetConstructorFn) Sig() []byte {
-	return ValidatorSet.Abi.Constructor.ID()
-}
-
-func (v *ValidatorSetConstructorFn) EncodeAbi() ([]byte, error) {
-	return ValidatorSet.Abi.Constructor.Inputs.Encode(v)
-}
-
-func (v *ValidatorSetConstructorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(ValidatorSet.Abi.Constructor, buf, v)
-}
-
 type Epoch struct {
 	StartBlock *big.Int   `abi:"startBlock"`
 	EndBlock   *big.Int   `abi:"endBlock"`
@@ -1139,6 +1090,41 @@ func (u *UnstakeValidatorSetFn) EncodeAbi() ([]byte, error) {
 
 func (u *UnstakeValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ValidatorSet.Abi.Methods["unstake"], buf, u)
+}
+
+type ValidatorInit struct {
+	Addr  types.Address `abi:"addr"`
+	Stake *big.Int      `abi:"stake"`
+}
+
+var ValidatorInitABIType = abi.MustNewType("tuple(address addr,uint256 stake)")
+
+func (v *ValidatorInit) EncodeAbi() ([]byte, error) {
+	return ValidatorInitABIType.Encode(v)
+}
+
+func (v *ValidatorInit) DecodeAbi(buf []byte) error {
+	return decodeStruct(ValidatorInitABIType, buf, &v)
+}
+
+type InitializeValidatorSetFn struct {
+	StateSender      types.Address    `abi:"stateSender"`
+	StateReceiver    types.Address    `abi:"stateReceiver"`
+	RootChainManager types.Address    `abi:"rootChainManager"`
+	EpochSize_       *big.Int         `abi:"epochSize_"`
+	InitalValidators []*ValidatorInit `abi:"initalValidators"`
+}
+
+func (i *InitializeValidatorSetFn) Sig() []byte {
+	return ValidatorSet.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeValidatorSetFn) EncodeAbi() ([]byte, error) {
+	return ValidatorSet.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeValidatorSetFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ValidatorSet.Abi.Methods["initialize"], buf, i)
 }
 
 type TransferEvent struct {
@@ -1206,22 +1192,23 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
 }
 
-type RewardDistributorConstructorFn struct {
+type InitializeRewardDistributorFn struct {
 	RewardToken  types.Address `abi:"rewardToken"`
+	RewardWallet types.Address `abi:"rewardWallet"`
 	ValidatorSet types.Address `abi:"validatorSet"`
 	BaseReward   *big.Int      `abi:"baseReward"`
 }
 
-func (r *RewardDistributorConstructorFn) Sig() []byte {
-	return RewardDistributor.Abi.Constructor.ID()
+func (i *InitializeRewardDistributorFn) Sig() []byte {
+	return RewardDistributor.Abi.Methods["initialize"].ID()
 }
 
-func (r *RewardDistributorConstructorFn) EncodeAbi() ([]byte, error) {
-	return RewardDistributor.Abi.Constructor.Inputs.Encode(r)
+func (i *InitializeRewardDistributorFn) EncodeAbi() ([]byte, error) {
+	return RewardDistributor.Abi.Methods["initialize"].Encode(i)
 }
 
-func (r *RewardDistributorConstructorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RewardDistributor.Abi.Constructor, buf, r)
+func (i *InitializeRewardDistributorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RewardDistributor.Abi.Methods["initialize"], buf, i)
 }
 
 type UptimeData struct {

@@ -146,9 +146,8 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 	}
 
 	registerFn := &contractsapi.RegisterCustomSupernetManagerFn{
-		Validator_: types.Address(account.Ecdsa.Address()),
-		Signature:  sigMarshal,
-		Pubkey:     account.Bls.PublicKey().ToBigInt(),
+		Signature: sigMarshal,
+		Pubkey:    account.Bls.PublicKey().ToBigInt(),
 	}
 
 	input, err := registerFn.EncodeAbi()

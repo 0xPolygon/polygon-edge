@@ -222,8 +222,9 @@ func main() {
 		{
 			"CustomSupernetManager",
 			gensc.CustomSupernetManager,
-			true,
+			false,
 			[]string{
+				"initialize",
 				"whitelistValidators",
 				"register",
 				"getValidator",
@@ -236,8 +237,9 @@ func main() {
 		{
 			"StakeManager",
 			gensc.StakeManager,
-			true,
+			false,
 			[]string{
+				"initialize",
 				"registerChildChain",
 				"stakeFor",
 				"releaseStakeOf",
@@ -252,10 +254,11 @@ func main() {
 		{
 			"ValidatorSet",
 			gensc.ValidatorSet,
-			true,
+			false,
 			[]string{
 				"commitEpoch",
 				"unstake",
+				"initialize",
 			},
 			[]string{
 				"Transfer",
@@ -266,8 +269,9 @@ func main() {
 		{
 			"RewardDistributor",
 			gensc.RewardDistributor,
-			true,
+			false,
 			[]string{
+				"initialize",
 				"distributeRewardFor",
 			},
 			[]string{},

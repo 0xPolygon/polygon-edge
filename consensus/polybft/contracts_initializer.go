@@ -19,6 +19,38 @@ const (
 	disabledBridgeRootPredicateAddr = "0xDEAD"
 )
 
+// getInitValidatorSetInput builds input parameters for ValidatorSet SC initialization
+func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
+	initialValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
+	for i, validator := range polyBFTConfig.InitialValidatorSet {
+		initialValidators[i] = &contractsapi.ValidatorInit{
+			Addr:  validator.Address,
+			Stake: validator.Stake,
+		}
+	}
+
+	initFn := &contractsapi.InitializeValidatorSetFn{
+		StateSender:      contracts.L2StateSenderContract,
+		StateReceiver:    contracts.StateReceiverContract,
+		RootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		EpochSize_:       new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		InitalValidators: initialValidators,
+	}
+
+	return initFn.EncodeAbi()
+}
+
+// getInitRewardDistributorInput builds input parameters for RewardDistributor SC initialization
+func getInitRewardDistributorInput(polybftConfig PolyBFTConfig) ([]byte, error) {
+	initFn := &contractsapi.InitializeRewardDistributorFn{
+		RewardToken:  contracts.MockRewardTokenContract,
+		ValidatorSet: contracts.ValidatorSetContract,
+		BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+	}
+
+	return initFn.EncodeAbi()
+}
+
 // getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
 func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	//nolint:godox
