@@ -324,7 +324,7 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
 	return nil
 }
 
-func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTConfig, chainID int64) error {
+func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
@@ -343,7 +343,6 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTCon
 				args := []string{
 					"polybft",
 					"register-validator",
-					"--chain-id", strconv.FormatInt(chainID, 10),
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),

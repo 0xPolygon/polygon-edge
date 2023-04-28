@@ -581,7 +581,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 
 		// register genesis validators on the rootchain
-		err = cluster.Bridge.registerGenesisValidators(polybftConfig, chainID)
+		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
 		require.NoError(t, err)
 
 		// do initial staking for genesis validators on the rootchain
