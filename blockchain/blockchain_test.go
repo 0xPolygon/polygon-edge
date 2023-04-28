@@ -955,7 +955,7 @@ func TestCalculateGasLimit(t *testing.T) {
 				t.Fatalf("unable to construct the blockchain, %v", blockchainErr)
 			}
 
-			b.config.Params = &chain.Params{
+			b.config.Chain.Params = &chain.Params{
 				BlockGasTarget: tt.blockGasTarget,
 			}
 

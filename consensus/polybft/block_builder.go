@@ -108,9 +108,8 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 		handler(b.header)
 	}
 
-	//nolint:godox
-	// TODO write trace
-	_, _, b.header.StateRoot = b.state.Commit()
+	_, trace, root := b.state.Commit()
+	b.header.StateRoot = root
 	b.header.GasUsed = b.state.TotalGas()
 
 	// build the block
@@ -125,6 +124,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 	return &types.FullBlock{
 		Block:    b.block,
 		Receipts: b.state.Receipts(),
+		Trace:    trace,
 	}, nil
 }
 

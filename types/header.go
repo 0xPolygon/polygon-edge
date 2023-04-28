@@ -94,6 +94,7 @@ type Body struct {
 type FullBlock struct {
 	Block    *Block
 	Receipts []*Receipt
+	Trace    *Trace
 }
 
 type Block struct {

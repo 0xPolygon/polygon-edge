@@ -267,7 +267,9 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// blockchain object
-	m.blockchain, err = blockchain.NewBlockchain(logger, db, config.Chain, nil, m.executor, signer)
+	blockchainConfig := &blockchain.Config{Chain: config.Chain, DataDir: config.DataDir}
+	m.blockchain, err = blockchain.NewBlockchain(logger, db, blockchainConfig, nil, m.executor, signer)
+
 	if err != nil {
 		return nil, err
 	}
