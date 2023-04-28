@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -61,6 +62,7 @@ var (
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper" +
 		" format <name:symbol:decimals count>")
+	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
 )
 
 type genesisParams struct {
@@ -144,6 +146,10 @@ func (p *genesisParams) validateFlags() error {
 
 	if p.isPolyBFTConsensus() {
 		if err := p.extractNativeTokenMetadata(); err != nil {
+			return err
+		}
+
+		if err := p.validateRewardWallet(); err != nil {
 			return err
 		}
 	}
@@ -435,6 +441,24 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	}
 
 	return stakingAccount, nil
+}
+
+// validateRewardWallet validates reward wallet flag
+func (p *genesisParams) validateRewardWallet() error {
+	if p.rewardWallet == "" {
+		return nil
+	}
+
+	premineInfo, err := parsePremineInfo(p.rewardWallet)
+	if err != nil {
+		return err
+	}
+
+	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
+		return errRewardWalletAmountZero
+	}
+
+	return nil
 }
 
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
