@@ -349,7 +349,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTCon
 				}
 
 				if err := t.cmdRun(args...); err != nil {
-					return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
+					return fmt.Errorf("failed to register genesis validator on supernet manager: %w", err)
 				}
 
 				return nil
