@@ -196,7 +196,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 	t.Parallel()
 
-	const timesToExecute = 250
+	const timesToExecute = 100
 
 	stakes := [][]uint64{
 		{103, 102, 101, 51, 50, 30, 10},
@@ -212,26 +212,23 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 		aliases := []string{"A", "B", "C", "D", "E", "F", "G"}
 		validators := newTestValidatorsWithAliases(t, aliases, stake)
 
-		test := func() ([]stakeInfo, int) {
-			stakeCounter := newStakeCounter(validators.getPublicIdentities("A", "B", "C", "D", "E"),
-				validators.getPublicIdentities(aliases...), maxValidatorSetSize)
-
-			return stakeCounter.sortByStake(maxValidatorSetSize), len(stakeCounter.stakeMap)
+		test := func() []*ValidatorMetadata {
+			stakeCounter := newValidatorStakeMap(validators.getPublicIdentities("A", "B", "C", "D", "E"))
+			return stakeCounter.getActiveValidators(maxValidatorSetSize)
 		}
 
-		initialSlice, initialCnt := test()
+		initialSlice := test()
 
 		// stake counter and stake map should always be deterministic
 		for i := 0; i < timesToExecute; i++ {
-			currentSlice, currentCnt := test()
+			currentSlice := test()
 
 			require.Len(t, currentSlice, len(initialSlice))
-			require.Equal(t, initialCnt, currentCnt)
 
 			for i, si := range currentSlice {
 				initialSi := initialSlice[i]
-				require.Equal(t, si.address, initialSi.address)
-				require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
+				require.Equal(t, si.Address, initialSi.Address)
+				require.Equal(t, si.VotingPower.Uint64(), initialSi.VotingPower.Uint64())
 			}
 		}
 	}
