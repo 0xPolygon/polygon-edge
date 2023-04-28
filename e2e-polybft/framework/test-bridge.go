@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
@@ -194,12 +193,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 }
 
 // fundRootchainValidators sends predefined amount of tokens to rootchain validators
-func (t *TestBridge) fundRootchainValidators(genesisPath string) error {
-	polybftConfig, _, err := readPolybftConfig(genesisPath)
-	if err != nil {
-		return fmt.Errorf("could not fund validators on rootchain: %w", err)
-	}
-
+func (t *TestBridge) fundRootchainValidators(polybftConfig *polybft.PolyBFTConfig) error {
 	args := []string{
 		"rootchain",
 		"fund",
@@ -216,12 +210,8 @@ func (t *TestBridge) fundRootchainValidators(genesisPath string) error {
 	return nil
 }
 
-func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address, genesisPath string) error {
-	polybftConfig, _, err := readPolybftConfig(genesisPath)
-	if err != nil {
-		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
-	}
-
+func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
+	polybftConfig *polybft.PolyBFTConfig) error {
 	addressesAsString := make([]string, len(validatorAddresses))
 	for i := 0; i < len(validatorAddresses); i++ {
 		addressesAsString[i] = validatorAddresses[i].String()
@@ -243,15 +233,10 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address, gen
 	return nil
 }
 
-func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
+func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
-	}
-
-	polybftConfig, _, err := readPolybftConfig(genesisPath)
-	if err != nil {
-		return fmt.Errorf("could not whitelist genesis validators on supernet manager: %w", err)
 	}
 
 	g, ctx := errgroup.WithContext(context.Background())
@@ -284,15 +269,11 @@ func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
 	return g.Wait()
 }
 
-func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error {
+func (t *TestBridge) initialStakingOfGenesisValidators(
+	polybftConfig *polybft.PolyBFTConfig, chainID uint64) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
-	}
-
-	polybftConfig, chainID, err := readPolybftConfig(genesisPath)
-	if err != nil {
-		return fmt.Errorf("could not do initial staking of genesis validators on stake manager: %w", err)
 	}
 
 	g, ctx := errgroup.WithContext(context.Background())
@@ -329,12 +310,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error
 	return g.Wait()
 }
 
-func (t *TestBridge) finalizeGenesis(genesisPath string) error {
-	polybftConfig, _, err := readPolybftConfig(genesisPath)
-	if err != nil {
-		return fmt.Errorf("could not finalize genesis validators on supernet manager: %w", err)
-	}
-
+func (t *TestBridge) finalizeGenesis(polybftConfig *polybft.PolyBFTConfig) error {
 	args := []string{
 		"polybft",
 		"supernet",
@@ -350,18 +326,4 @@ func (t *TestBridge) finalizeGenesis(genesisPath string) error {
 	}
 
 	return nil
-}
-
-func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, uint64, error) {
-	chainConfig, err := chain.ImportFromFile(genesisPath)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read chain configuration: %w", err)
-	}
-
-	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to retrieve consensus configuration: %w", err)
-	}
-
-	return &consensusConfig, uint64(chainConfig.Params.ChainID), nil
 }

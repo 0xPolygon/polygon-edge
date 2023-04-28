@@ -18,7 +18,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -452,24 +454,27 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
+		polybftConfig, chainID, err := readPolybftConfig(genesisPath)
+		require.NoError(t, err)
+
 		// fund validators on the rootchain
-		err = cluster.Bridge.fundRootchainValidators(genesisPath)
+		err = cluster.Bridge.fundRootchainValidators(polybftConfig)
 		require.NoError(t, err)
 
 		// whitelist genesis validators on the rootchain
-		err = cluster.Bridge.whitelistValidators(addresses, genesisPath)
+		err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
 		require.NoError(t, err)
 
 		// register genesis validators on the rootchain
-		err = cluster.Bridge.registerGenesisValidators(genesisPath)
+		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
 		require.NoError(t, err)
 
 		// do initial staking for genesis validators on the rootchain
-		err = cluster.Bridge.initialStakingOfGenesisValidators(genesisPath)
+		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig, chainID)
 		require.NoError(t, err)
 
 		// finalize genesis validators on the rootchain
-		err = cluster.Bridge.finalizeGenesis(genesisPath)
+		err = cluster.Bridge.finalizeGenesis(polybftConfig)
 		require.NoError(t, err)
 	}
 
@@ -894,4 +899,18 @@ func CopyDir(source, destination string) error {
 
 		return ioutil.WriteFile(filepath.Join(destination, relPath), data, 0600)
 	})
+}
+
+func readPolybftConfig(genesisPath string) (*polybft.PolyBFTConfig, uint64, error) {
+	chainConfig, err := chain.ImportFromFile(genesisPath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read chain configuration: %w", err)
+	}
+
+	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to retrieve consensus configuration: %w", err)
+	}
+
+	return &consensusConfig, uint64(chainConfig.Params.ChainID), nil
 }
