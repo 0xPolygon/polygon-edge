@@ -507,7 +507,7 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-func (t *dummyTxRelayer) Client() *jsonrpc.Client {
+func (d *dummyTxRelayer) Client() *jsonrpc.Client {
 	return nil
 }
 
