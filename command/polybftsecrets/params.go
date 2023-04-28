@@ -186,11 +186,6 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 			}
 
 			generated = append(generated, secrets.ValidatorKey, secrets.ValidatorBLSKey)
-		} else {
-			a, err = wallet.NewAccountFromSecret(secretsManager)
-			if err != nil {
-				return generated, fmt.Errorf("error loading account: %w", err)
-			}
 		}
 	}
 

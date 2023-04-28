@@ -13,7 +13,7 @@ type registerParams struct {
 	accountConfig          string
 	supernetManagerAddress string
 	jsonRPC                string
-	chainId                int64
+	chainID                int64
 }
 
 func (rp *registerParams) validateFlags() error {

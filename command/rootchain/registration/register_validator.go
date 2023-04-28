@@ -55,7 +55,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Int64Var(
-		&params.chainId,
+		&params.chainID,
 		polybftsecrets.ChainIDFlag,
 		command.DefaultChainID,
 		polybftsecrets.ChainIDFlagDesc,
@@ -92,7 +92,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	koskSignature, err := bls.MakeKOSKSignature(
 		newValidatorAccount.Bls, newValidatorAccount.Address(),
-		params.chainId, bls.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
+		params.chainID, bls.DomainValidatorSet, types.StringToAddress(params.supernetManagerAddress))
 	if err != nil {
 		return err
 	}
