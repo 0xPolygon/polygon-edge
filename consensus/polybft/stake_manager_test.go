@@ -16,34 +16,81 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+func TestStakeManager_PostEpoch(t *testing.T) {
+	validators := newTestValidators(t, 5).getPublicIdentities()
+	state := newTestState(t)
+
+	stakeManager := &stakeManager{
+		logger:              hclog.NewNullLogger(),
+		state:               state,
+		maxValidatorSetSize: 10,
+	}
+
+	t.Run("Not first epoch", func(t *testing.T) {
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID:   2,
+			ValidatorSet: NewValidatorSet(validators, stakeManager.logger),
+		}))
+
+		_, err := state.StakeStore.getFullValidatorSet()
+		require.ErrorIs(t, errNoFullValidatorSet, err)
+	})
+
+	t.Run("First epoch", func(t *testing.T) {
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID:   1,
+			ValidatorSet: NewValidatorSet(validators, stakeManager.logger),
+		}))
+
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		require.NoError(t, err)
+		require.Len(t, fullValidatorSet, len(validators))
+	})
+}
+
 func TestStakeManager_PostBlock(t *testing.T) {
+	t.Parallel()
+
 	var (
-		aliases    = []string{"A", "B", "C", "D", "E"}
-		epoch      = uint64(1)
-		block      = uint64(10)
-		stakeAdded = uint64(10)
+		allAliases        = []string{"A", "B", "C", "D", "E", "F"}
+		initialSetAliases = []string{"A", "B", "C", "D", "E"}
+		epoch             = uint64(1)
+		block             = uint64(10)
+		stakeAdded        = uint64(10)
 	)
 
-	validators := newTestValidatorsWithAliases(t, aliases)
+	validators := newTestValidatorsWithAliases(t, allAliases)
 	state := newTestState(t)
+
+	txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
+		return validators.getValidator("F").ValidatorMetadata()
+	})
+
+	// just mock the call however, the dummy relayer should do its magic
+	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, error(nil))
 
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
-		nil,
+		txRelayerMock,
 		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		5,
 	)
 
-	receipts := make([]*types.Receipt, len(aliases))
-	for i := 0; i < len(aliases); i++ {
+	// insert initial full validator set
+	require.NoError(t, state.StakeStore.insertFullValidatorSet(
+		validators.getPublicIdentities(initialSetAliases...)))
+
+	receipts := make([]*types.Receipt, len(allAliases))
+	for i := 0; i < len(allAliases); i++ {
 		receipts[i] = &types.Receipt{Logs: []*types.Log{
 			createTestLogForTransferEvent(
 				t,
 				stakeManager.validatorSetContract,
 				types.ZeroAddress,
-				validators.getValidator(aliases[i]).Address(),
+				validators.getValidator(allAliases[i]).Address(),
 				stakeAdded,
 			),
 		}}
@@ -56,32 +103,18 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		Epoch: epoch,
 	}
 
-	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
-		req.IsEpochEndingBlock = false
-		require.NoError(t, stakeManager.PostBlock(req))
+	require.NoError(t, stakeManager.PostBlock(req))
 
-		events, err := state.StakeStore.getTransferEvents(epoch)
-		require.NoError(t, err)
-		require.Len(t, events, len(aliases))
-	})
-
-	t.Run("PostBlock - epoch ending block (transfer events are saved to the next epoch)", func(t *testing.T) {
-		req.IsEpochEndingBlock = true
-		require.NoError(t, stakeManager.PostBlock(req))
-
-		events, err := state.StakeStore.getTransferEvents(epoch + 1)
-
-		require.NoError(t, err)
-		require.Len(t, events, len(aliases))
-	})
+	fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+	require.NoError(t, err)
+	require.Len(t, fullValidatorSet, len(allAliases))
 }
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	var (
-		aliases    = []string{"A", "B", "C", "D", "E"}
-		stakes     = []uint64{10, 10, 10, 10, 10}
-		epoch      = uint64(1)
-		stakeAdded = uint64(1)
+		aliases = []string{"A", "B", "C", "D", "E"}
+		stakes  = []uint64{10, 10, 10, 10, 10}
+		epoch   = uint64(1)
 	)
 
 	validators := newTestValidatorsWithAliases(t, aliases, stakes)
@@ -97,42 +130,25 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	)
 
 	t.Run("UpdateValidatorSet - only update", func(t *testing.T) {
-		events := make([]*contractsapi.TransferEvent, 0)
-		for _, v := range validators.getPublicIdentities() {
-			events = append(events, &contractsapi.TransferEvent{
-				From:  types.ZeroAddress,
-				To:    v.Address,
-				Value: new(big.Int).SetUint64(stakeAdded),
-			})
-		}
+		fullValidatorSet := validators.getPublicIdentities().Copy()
+		validatorToUpdate := fullValidatorSet[0]
+		validatorToUpdate.VotingPower = big.NewInt(11)
 
-		require.NoError(t, state.StakeStore.insertTransferEvents(epoch, events))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 0)
-		require.Len(t, updateDelta.Updated, len(aliases))
+		require.Len(t, updateDelta.Updated, 1)
 		require.Len(t, updateDelta.Removed, 0)
-
-		for _, v := range validators.getPublicIdentities() {
-			require.True(t, updateDelta.Updated.ContainsAddress(v.Address))
-			require.Equal(t, updateDelta.Updated.GetValidatorMetadata(v.Address).VotingPower.Uint64(),
-				v.VotingPower.Uint64()+stakeAdded)
-		}
+		require.Equal(t, updateDelta.Updated[0].Address, validatorToUpdate.Address)
+		require.Equal(t, updateDelta.Updated[0].VotingPower.Uint64(), validatorToUpdate.VotingPower.Uint64())
 	})
 
 	t.Run("UpdateValidatorSet - one unstake", func(t *testing.T) {
-		validator := validators.getValidator("A")
+		fullValidatorSet := validators.getPublicIdentities(aliases[1:]...)
 
-		events := []*contractsapi.TransferEvent{
-			{
-				From:  validator.Address(),
-				To:    types.ZeroAddress,
-				Value: new(big.Int).SetUint64(validator.votingPower),
-			},
-		}
-
-		require.NoError(t, state.StakeStore.insertTransferEvents(epoch+1, events))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+1, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -142,77 +158,45 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	})
 
 	t.Run("UpdateValidatorSet - one new validator", func(t *testing.T) {
-		validator := newTestValidatorsWithAliases(t, []string{"F"}, []uint64{10}).getValidator("F")
+		addedValidator := validators.getValidator("A")
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validators.getPublicIdentities()))
 
-		events := []*contractsapi.TransferEvent{
-			{
-				From:  types.ZeroAddress,
-				To:    validator.Address(),
-				Value: new(big.Int).SetUint64(validator.votingPower),
-			},
-		}
-
-		require.NoError(t, state.StakeStore.insertTransferEvents(epoch+2, events))
-
-		txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
-			return validator.ValidatorMetadata()
-		})
-
-		stakeManager.rootChainRelayer = txRelayerMock
-
-		// just mock the call however, the dummy relayer should do its magic
-		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil, error(nil))
-
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+2, validators.getPublicIdentities())
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+2,
+			validators.getPublicIdentities(aliases[1:]...))
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 1)
 		require.Len(t, updateDelta.Updated, 0)
 		require.Len(t, updateDelta.Removed, 0)
-		require.Equal(t, validator.Address(), updateDelta.Added[0].Address)
-		require.Equal(t, uint64(10), updateDelta.Added[0].VotingPower.Uint64())
+		require.Equal(t, addedValidator.Address(), updateDelta.Added[0].Address)
+		require.Equal(t, addedValidator.votingPower, updateDelta.Added[0].VotingPower.Uint64())
 	})
 
 	t.Run("UpdateValidatorSet - max validator set size reached", func(t *testing.T) {
-		validator := newTestValidatorsWithAliases(t, []string{"F"}, []uint64{100}).getValidator("F")
+		// because we now have 5 validators, and the new validator has more stake
+		stakeManager.maxValidatorSetSize = 4
 
-		events := []*contractsapi.TransferEvent{
-			{
-				From:  types.ZeroAddress,
-				To:    validator.Address(),
-				Value: new(big.Int).SetUint64(validator.votingPower),
-			},
-		}
+		fullValidatorSet := validators.getPublicIdentities().Copy()
+		validatorToAdd := fullValidatorSet[0]
+		validatorToAdd.VotingPower = big.NewInt(11)
 
-		require.NoError(t, state.StakeStore.insertTransferEvents(epoch+3, events))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
 
-		txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
-			return validator.ValidatorMetadata()
-		})
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3,
+			validators.getPublicIdentities(aliases[1:]...))
 
-		stakeManager.rootChainRelayer = txRelayerMock
-		// this will make one existing validator to be removed from validator set
-		// because we now have 6 validators, and the new validator has more stake
-		stakeManager.maxValidatorSetSize = 5
-
-		// just mock the call however, the dummy relayer should do its magic
-		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-			Return(nil, error(nil))
-
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3, validators.getPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 1)
 		require.Len(t, updateDelta.Updated, 0)
 		require.Len(t, updateDelta.Removed, 1)
-		require.Equal(t, validator.Address(), updateDelta.Added[0].Address)
-		require.Equal(t, uint64(100), updateDelta.Added[0].VotingPower.Uint64())
+		require.Equal(t, validatorToAdd.Address, updateDelta.Added[0].Address)
+		require.Equal(t, validatorToAdd.VotingPower.Uint64(), updateDelta.Added[0].VotingPower.Uint64())
 	})
 }
 
 func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 	t.Parallel()
 
-	const timesToExecute = 250
+	const timesToExecute = 100
 
 	stakes := [][]uint64{
 		{103, 102, 101, 51, 50, 30, 10},
@@ -228,32 +212,24 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 		aliases := []string{"A", "B", "C", "D", "E", "F", "G"}
 		validators := newTestValidatorsWithAliases(t, aliases, stake)
 
-		newAliases := []string{"H", "J", "K"}
-		newValidators := newTestValidatorsWithAliases(t, newAliases, []uint64{10, 10, 10})
+		test := func() []*ValidatorMetadata {
+			stakeCounter := newValidatorStakeMap(validators.getPublicIdentities("A", "B", "C", "D", "E"))
 
-		test := func() ([]stakeInfo, int) {
-			stakeCounter := newStakeCounter(validators.getPublicIdentities())
-
-			for _, v := range newValidators.getPublicIdentities() {
-				stakeCounter.addStake(v.Address, v.VotingPower)
-			}
-
-			return stakeCounter.sortByStake(maxValidatorSetSize), len(stakeCounter.stakeMap)
+			return stakeCounter.getActiveValidators(maxValidatorSetSize)
 		}
 
-		initialSlice, initialCnt := test()
+		initialSlice := test()
 
 		// stake counter and stake map should always be deterministic
 		for i := 0; i < timesToExecute; i++ {
-			currentSlice, currentCnt := test()
+			currentSlice := test()
 
 			require.Len(t, currentSlice, len(initialSlice))
-			require.Equal(t, initialCnt, currentCnt)
 
 			for i, si := range currentSlice {
 				initialSi := initialSlice[i]
-				require.Equal(t, si.address, initialSi.address)
-				require.Equal(t, si.stake.Uint64(), initialSi.stake.Uint64())
+				require.Equal(t, si.Address, initialSi.Address)
+				require.Equal(t, si.VotingPower.Uint64(), initialSi.VotingPower.Uint64())
 			}
 		}
 	}

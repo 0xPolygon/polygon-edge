@@ -1,17 +1,19 @@
 package polybft
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	bolt "go.etcd.io/bbolt"
 )
 
 var (
-	// bucket to store stake changed events
-	stakeChangeBucket = []byte("stakeChange")
+	// bucket to store full validator set
+	validatorSetBucket = []byte("fullValidatorSetBucket")
+	// key of the full validator set in bucket
+	fullValidatorSetKey = []byte("fullValidatorSet")
+	// error returned if full validator set does not exists in db
+	errNoFullValidatorSet = errors.New("full validator set not in db")
 )
 
 type StakeStore struct {
@@ -20,62 +22,37 @@ type StakeStore struct {
 
 // initialize creates necessary buckets in DB if they don't already exist
 func (s *StakeStore) initialize(tx *bolt.Tx) error {
-	if _, err := tx.CreateBucketIfNotExists(stakeChangeBucket); err != nil {
+	if _, err := tx.CreateBucketIfNotExists(validatorSetBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(epochsBucket), err)
 	}
 
 	return nil
 }
 
-// insertTransferEvents inserts provided transfer events to stake change bucket for given epoch
-func (s *StakeStore) insertTransferEvents(epoch uint64, transferEvents []*contractsapi.TransferEvent) error {
+// insertFullValidatorSet inserts full validator set to its bucket (or updates it if exists)
+func (s *StakeStore) insertFullValidatorSet(fullValidatorSet AccountSet) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		eventsInDB, err := s.getTransferEventsLocked(tx, epoch)
+		raw, err := fullValidatorSet.Marshal()
 		if err != nil {
 			return err
 		}
 
-		eventsInDB = append(eventsInDB, transferEvents...)
-
-		raw, err := json.Marshal(eventsInDB)
-		if err != nil {
-			return err
-		}
-
-		return tx.Bucket(stakeChangeBucket).Put(common.EncodeUint64ToBytes(epoch), raw)
+		return tx.Bucket(validatorSetBucket).Put(fullValidatorSetKey, raw)
 	})
 }
 
-// getTransferEvents returns a slice of transfer events (stake changed events) that happened in given epoch
-func (s *StakeStore) getTransferEvents(epoch uint64) ([]*contractsapi.TransferEvent, error) {
-	var transferEvents []*contractsapi.TransferEvent
+// getFullValidatorSet returns full validator set from its bucket if exists
+func (s *StakeStore) getFullValidatorSet() (AccountSet, error) {
+	var fullValidatorSet AccountSet
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		res, err := s.getTransferEventsLocked(tx, epoch)
-		if err != nil {
-			return err
+		raw := tx.Bucket(validatorSetBucket).Get(fullValidatorSetKey)
+		if raw == nil {
+			return errNoFullValidatorSet
 		}
-		transferEvents = res
 
-		return nil
+		return fullValidatorSet.Unmarshal(raw)
 	})
 
-	return transferEvents, err
-}
-
-// getTransferEventsLocked gets all transfer events from db associated with given epoch
-func (s *StakeStore) getTransferEventsLocked(tx *bolt.Tx, epoch uint64) ([]*contractsapi.TransferEvent, error) {
-	bucket := tx.Bucket(stakeChangeBucket)
-
-	v := bucket.Get(common.EncodeUint64ToBytes(epoch))
-	if v == nil {
-		return nil, nil
-	}
-
-	var transferEvents []*contractsapi.TransferEvent
-	if err := json.Unmarshal(v, &transferEvents); err != nil {
-		return nil, err
-	}
-
-	return transferEvents, nil
+	return fullValidatorSet, err
 }

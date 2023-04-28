@@ -206,55 +206,6 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 	return nil
 }
 
-// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	var addedValidators, updatedValidators AccountSet
-
-	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
-	removedValidators := map[types.Address]int{}
-
-	for i, validator := range oldValidatorSet {
-		if (validator.Address != types.Address{}) {
-			removedValidators[validator.Address] = i
-			oldValidatorSetMap[validator.Address] = validator
-		}
-	}
-
-	for _, newValidator := range newValidatorSet {
-		// Check if the validator is among both old and new validator set
-		oldValidator, validatorExists := oldValidatorSetMap[newValidator.Address]
-		if validatorExists {
-			if !oldValidator.EqualAddressAndBlsKey(newValidator) {
-				return nil, fmt.Errorf("validator '%s' found in both old and new validator set, but its BLS keys differ",
-					newValidator.Address.String())
-			}
-
-			// If it is, then discard it from removed validators...
-			delete(removedValidators, newValidator.Address)
-
-			if !oldValidator.Equals(newValidator) {
-				updatedValidators = append(updatedValidators, newValidator)
-			}
-		} else {
-			// ...otherwise it is added
-			addedValidators = append(addedValidators, newValidator)
-		}
-	}
-
-	removedValsBitmap := bitmap.Bitmap{}
-	for _, i := range removedValidators {
-		removedValsBitmap.Set(uint64(i))
-	}
-
-	delta := &ValidatorSetDelta{
-		Added:   addedValidators,
-		Updated: updatedValidators,
-		Removed: removedValsBitmap,
-	}
-
-	return delta, nil
-}
-
 // ValidatorSetDelta holds information about added and removed validators compared to the previous epoch
 type ValidatorSetDelta struct {
 	// Added is the slice of added validators

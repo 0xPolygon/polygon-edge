@@ -26,6 +26,7 @@ var (
 // and updating validator set based on changed stake
 type StakeManager interface {
 	PostBlock(req *PostBlockRequest) error
+	PostEpoch(req *PostEpochRequest) error
 	UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error)
 }
 
@@ -34,6 +35,7 @@ type StakeManager interface {
 type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 	currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
 	return &ValidatorSetDelta{}, nil
@@ -73,116 +75,123 @@ func newStakeManager(
 	}
 }
 
-// PostBlock is called on every insert of finalized block (either from consensus or syncer)
-// It will read any exit event that happened in block and insert it to state boltDb
-func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
-	epoch := req.Epoch
-
-	if req.IsEpochEndingBlock {
-		// transfer events that happened in epoch ending blocks,
-		// should be added to the bucket of the next epoch
-		epoch++
+// PostEpoch saves the initial validator set to db
+func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
+	if req.NewEpochID != 1 {
+		return nil
 	}
 
-	// commit exit events only when we finalize a block
-	events, err := s.getTransferEventsFromReceipts(epoch, req.FullBlock.Receipts)
+	// save initial validator set as full validator set in db
+	return s.state.StakeStore.insertFullValidatorSet(req.ValidatorSet.Accounts())
+}
+
+// PostBlock is called on every insert of finalized block (either from consensus or syncer)
+// It will read any transfer event that happened in block and update full validator set in db
+func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
+	events, err := s.getTransferEventsFromReceipts(req.FullBlock.Receipts)
 	if err != nil {
 		return err
 	}
 
-	if len(events) > 0 {
-		s.logger.Debug("Gotten transfer (stake changed) events from logs on block",
-			"eventsNum", len(events), "block", req.FullBlock.Block.Number())
+	if len(events) == 0 {
+		return nil
 	}
 
-	return s.state.StakeStore.insertTransferEvents(epoch, events)
-}
+	s.logger.Debug("Gotten transfer (stake changed) events from logs on block",
+		"eventsNum", len(events), "block", req.FullBlock.Block.Number())
 
-// UpdateValidatorSet returns an updated validator set
-// based on stake change (transfer) events from ValidatorSet contract
-func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	s.logger.Info("Calculating validators set update...", "epoch", epoch)
-
-	transferEvents, err := s.state.StakeStore.getTransferEvents(epoch)
+	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transfer events for epoch: %d. Error: %w", epoch, err)
+		return err
 	}
 
-	if len(transferEvents) == 0 {
-		s.logger.Info("Calculating validators set finished. No transfer events for given epoch.",
-			"epoch", epoch)
+	stakeMap := newValidatorStakeMap(fullValidatorSet)
 
-		return &ValidatorSetDelta{}, nil
-	}
-
-	// stake counter holds sorted stakes by current and (possible) new validators
-	// he will add to map current stake (voting power) of the current validators
-	// on object instantiation
-	stakeCounter := newStakeCounter(currentValidatorSet.Copy())
-
-	// update the stake counter with stake changes from transfer events
-	for _, event := range transferEvents {
+	for _, event := range events {
 		if event.IsStake() {
 			// then this amount was minted To validator address
-			stakeCounter.addStake(event.To, event.Value)
+			stakeMap.addStake(event.To, event.Value)
 		} else if event.IsUnstake() {
 			// then this amount was burned From validator address
-			stakeCounter.removeStake(event.From, event.Value)
+			stakeMap.removeStake(event.From, event.Value)
 		} else {
 			// this should not happen, but lets log it if it does
 			s.logger.Debug("Found a transfer event that represents neither stake nor unstake")
 		}
 	}
 
+	newFullValidatorSet := make(AccountSet, 0, len(stakeMap))
+
+	for addr, data := range stakeMap {
+		if data.BlsKey == nil {
+			newValidatorMetaData, err := s.getNewValidatorInfo(addr, data.VotingPower)
+			if err != nil {
+				s.logger.Warn("Could not get info for new validator", "epoch", req.Epoch, "address", addr)
+			} else {
+				data = newValidatorMetaData
+			}
+		}
+
+		data.IsActive = data.VotingPower.Cmp(bigZero) > 0
+		newFullValidatorSet = append(newFullValidatorSet, data)
+	}
+
+	return s.state.StakeStore.insertFullValidatorSet(newFullValidatorSet)
+}
+
+// UpdateValidatorSet returns an updated validator set
+// based on stake change (transfer) events from ValidatorSet contract
+func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+	s.logger.Info("Calculating validators set update...", "epoch", epoch)
+
+	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get full validators set. Epoch: %d. Error: %w", epoch, err)
+	}
+
+	// stake map that holds stakes for all validators
+	stakeMap := newValidatorStakeMap(fullValidatorSet)
+
+	// slice of all validator set
+	newValidatorSet := stakeMap.getActiveValidators(s.maxValidatorSetSize)
+	// set of all addresses that will be in next validator set
+	addressesSet := make(map[types.Address]struct{}, len(newValidatorSet))
+
+	for _, si := range newValidatorSet {
+		addressesSet[si.Address] = struct{}{}
+	}
+
 	removedBitmap := bitmap.Bitmap{}
 	updatedValidators := AccountSet{}
 	addedValidators := AccountSet{}
+	oldActiveMap := make(map[types.Address]*ValidatorMetadata)
 
-	// sort validators by stake since we update the validator set based on highest stakes
-	// this also returns sorted slice of validators (stake, address) pairs
-	stakeInfos := stakeCounter.sortByStake(s.maxValidatorSetSize)
-
-	for addr, v := range stakeCounter.currentValidatorSet {
-		// remove existing validators from validator set if they
-		// did not make it to the set
-		if _, exists := stakeCounter.stakeMap[addr]; !exists {
-			removedBitmap.Set(v.index)
+	for i, validator := range oldValidatorSet {
+		oldActiveMap[validator.Address] = validator
+		// remove existing validators from validator set if they did not make it to the set
+		if _, exists := addressesSet[validator.Address]; !exists {
+			removedBitmap.Set(uint64(i))
 		}
 	}
 
-	for _, stakeInfo := range stakeInfos {
-		// check if its a current validator
-		if currentValidator, exists := stakeCounter.currentValidatorSet[stakeInfo.address]; exists {
-			if stakeInfo.stake.Cmp(bigZero) == 0 {
-				// validator un-staked all, remove it from validator set
-				removedBitmap.Set(currentValidator.index)
-
-				s.logger.Debug("Validator removed from validator set since he unstaked all",
-					"validator", stakeInfo.address)
-			} else if stakeInfo.stake.Cmp(currentValidator.VotingPower) != 0 {
-				// validator updated its stake so put it in the updated validators list
-				currentValidator.VotingPower = new(big.Int).Set(stakeInfo.stake)
-				updatedValidators = append(updatedValidators, currentValidator.ValidatorMetadata)
-
-				s.logger.Debug("Validator updated its stake and remains in validator set",
-					"validator", stakeInfo.address, "newVotingPower", currentValidator.VotingPower)
-			} else {
-				// he did not change stake so he will remain in the validator set but will not be in delta
-				s.logger.Debug("Validator did not change its stake, but remains in validator set",
-					"validator", stakeInfo.address, "votingPower", currentValidator.VotingPower)
+	for _, newValidator := range newValidatorSet {
+		// check if its already in existing validator set
+		if oldValidator, exists := oldActiveMap[newValidator.Address]; exists {
+			if oldValidator.VotingPower.Cmp(newValidator.VotingPower) != 0 {
+				updatedValidators = append(updatedValidators, newValidator)
 			}
 		} else {
-			// its a new validator, add it to delta in added validators
-			validatorData, err := s.getNewValidatorInfo(stakeInfo.address, stakeInfo.stake)
-			if err != nil {
-				return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
-					stakeInfo.address, err)
+			if newValidator.BlsKey == nil {
+				validatorData, err := s.getNewValidatorInfo(newValidator.Address, newValidator.VotingPower)
+				if err != nil {
+					return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
+						newValidator.Address, err)
+				}
+
+				newValidator = validatorData
 			}
 
-			addedValidators = append(addedValidators, validatorData)
-
-			s.logger.Debug("New validator added to validator set",
-				"validator", stakeInfo.address, "votingPower", validatorData.VotingPower)
+			addedValidators = append(addedValidators, newValidator)
 		}
 	}
 
@@ -195,7 +204,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 	}
 
 	if s.logger.IsDebug() {
-		newValidatorSet, err := currentValidatorSet.Copy().ApplyDelta(delta)
+		newValidatorSet, err := oldValidatorSet.Copy().ApplyDelta(delta)
 		if err != nil {
 			return nil, err
 		}
@@ -207,8 +216,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, currentValidatorSet Acco
 }
 
 // getTransferEventsFromReceipts parses logs from receipts to find transfer events
-func (s *stakeManager) getTransferEventsFromReceipts(epoch uint64,
-	receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
+func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
 	events := make([]*contractsapi.TransferEvent, 0)
 
 	for i := 0; i < len(receipts); i++ {
@@ -295,86 +303,67 @@ func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int
 	}, nil
 }
 
-// stakeInfo holds info about validator stake
-type stakeInfo struct {
-	stake   *big.Int
-	address types.Address
-}
-type expandedValidatorMetadata struct {
-	*ValidatorMetadata
-	index uint64
-}
+// validatorStakeMap holds ValidatorMetadata for each validator address
+type validatorStakeMap map[types.Address]*ValidatorMetadata
 
-// stakeCounter sorts and returns stake info for all validators
-type stakeCounter struct {
-	stakeMap            map[types.Address]*big.Int
-	currentValidatorSet map[types.Address]*expandedValidatorMetadata
-}
+// newValidatorStakeMap returns a new instance of validatorStakeMap
+func newValidatorStakeMap(validatorSet AccountSet) validatorStakeMap {
+	stakeMap := make(validatorStakeMap, len(validatorSet))
 
-// newStakeCounter returns a new instance of stake counter
-func newStakeCounter(currentValidatorSet AccountSet) *stakeCounter {
-	stakeCounter := &stakeCounter{
-		stakeMap:            make(map[types.Address]*big.Int),
-		currentValidatorSet: make(map[types.Address]*expandedValidatorMetadata, len(currentValidatorSet)),
+	for _, v := range validatorSet {
+		stakeMap[v.Address] = v.Copy()
 	}
 
-	for i, v := range currentValidatorSet {
-		stakeCounter.stakeMap[v.Address] = new(big.Int).Set(v.VotingPower)
-		stakeCounter.currentValidatorSet[v.Address] = &expandedValidatorMetadata{
-			ValidatorMetadata: v,
-			index:             uint64(i),
+	return stakeMap
+}
+
+// addStake adds given amount to a validator defined by address
+func (sc *validatorStakeMap) addStake(address types.Address, amount *big.Int) {
+	if metadata, exists := (*sc)[address]; exists {
+		metadata.VotingPower.Add(metadata.VotingPower, amount)
+		metadata.IsActive = metadata.VotingPower.Cmp(bigZero) > 0
+	} else {
+		(*sc)[address] = &ValidatorMetadata{
+			VotingPower: new(big.Int).Set(amount),
+			Address:     address,
+			IsActive:    true,
+		}
+	}
+}
+
+// removeStake removes given amount from validator defined by address
+func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int) {
+	stakeData := (*sc)[address]
+	stakeData.VotingPower.Sub(stakeData.VotingPower, amount)
+	stakeData.IsActive = stakeData.VotingPower.Cmp(bigZero) > 0
+}
+
+// getActiveValidators returns all validators (*ValidatorMetadata) in sorted order
+func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) []*ValidatorMetadata {
+	activeValidators := make([]*ValidatorMetadata, 0, len(sc))
+
+	for _, v := range sc {
+		if v.VotingPower.Cmp(bigZero) > 0 {
+			activeValidators = append(activeValidators, v)
 		}
 	}
 
-	return stakeCounter
-}
+	sort.Slice(activeValidators, func(i, j int) bool {
+		v1, v2 := activeValidators[i], activeValidators[j]
 
-// addStake adds given amount for a validator to stake map
-func (sc *stakeCounter) addStake(address types.Address, amount *big.Int) {
-	if stakeInfo, exists := sc.stakeMap[address]; exists {
-		stakeInfo.Add(stakeInfo, amount)
-	} else {
-		sc.stakeMap[address] = new(big.Int).Set(amount)
-	}
-}
-
-// removeStake removes given amount for a validator from stake map
-func (sc *stakeCounter) removeStake(address types.Address, amount *big.Int) {
-	stakeInfo := sc.stakeMap[address]
-	stakeInfo.Sub(stakeInfo, amount)
-}
-
-// sortByStake returns all validator pairs (address, stake) in sorted order
-// also remove addresses from sc.stakeMap that are after maxValidatorSetSize
-func (sc *stakeCounter) sortByStake(maxValidatorSetSize int) []stakeInfo {
-	stakeInfos := make([]stakeInfo, 0, len(sc.stakeMap))
-	for k, v := range sc.stakeMap {
-		stakeInfos = append(stakeInfos, stakeInfo{
-			address: k,
-			stake:   v,
-		})
-	}
-
-	sort.Slice(stakeInfos, func(i, j int) bool {
-		v1, v2 := stakeInfos[i], stakeInfos[j]
-
-		switch v1.stake.Cmp(v2.stake) {
+		switch v1.VotingPower.Cmp(v2.VotingPower) {
 		case 1:
 			return true
 		case 0:
-			return bytes.Compare(v1.address[:], v2.address[:]) < 0
+			return bytes.Compare(v1.Address[:], v2.Address[:]) < 0
 		default:
 			return false
 		}
 	})
 
-	if len(stakeInfos) <= maxValidatorSetSize {
-		return stakeInfos
+	if len(activeValidators) <= maxValidatorSetSize {
+		return activeValidators
 	}
 
-	for _, si := range stakeInfos[maxValidatorSetSize:] {
-		delete(sc.stakeMap, si.address)
-	}
-
-	return stakeInfos[:maxValidatorSetSize]
+	return activeValidators[:maxValidatorSetSize]
 }
