@@ -292,7 +292,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-//nolint:godox
 func (p *genesisParams) deployContracts(totalStake *big.Int,
 	rewardTokenByteCode []byte,
 	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {

@@ -349,6 +349,10 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		initInput, err = getInitRewardDistributorInput(polyBFTConfig)
 		require.NoError(t, err)
 
+		// init RewardDistributor
+		err = initContract(contracts.ValidatorSetContract, initInput, "RewardDistributor", transition)
+		require.NoError(t, err)
+
 		// create input for commit epoch
 		commitEpoch := createTestCommitEpochInput(t, 1, polyBFTConfig.EpochSize)
 		input, err := commitEpoch.EncodeAbi()

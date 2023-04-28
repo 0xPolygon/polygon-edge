@@ -114,7 +114,6 @@ func getInitChildERC1155PredicateInput(config *BridgeConfig) ([]byte, error) {
 
 // mintRewardTokensToWalletAddress mints configured amount of reward tokens to reward wallet address
 func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *state.Transition) error {
-
 	if polyBFTConfig.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract ||
 		polyBFTConfig.RewardConfig.WalletAmount.Uint64() > 0 {
 		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
