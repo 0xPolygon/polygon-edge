@@ -71,6 +71,13 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.ChainIDFlagDesc,
 	)
 
+	cmd.Flags().StringVar(
+		&params.nativeRootTokenAddr,
+		rootHelper.NativeRootTokenFlag,
+		"",
+		rootHelper.NativeRootTokenFlagDesc,
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
@@ -100,6 +107,21 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	approveTxn, err := rootHelper.CreateApproveERC20Txn(new(big.Int).SetUint64(params.amount),
+		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.nativeRootTokenAddr))
+	if err != nil {
+		return err
+	}
+
+	receipt, err := txRelayer.SendTransaction(approveTxn, validatorAccount.Ecdsa)
+	if err != nil {
+		return err
+	}
+
+	if receipt.Status == uint64(types.ReceiptFailed) {
+		return fmt.Errorf("approve transaction failed on block %d", receipt.BlockNumber)
+	}
+
 	stakeFn := contractsapi.StakeForStakeManagerFn{
 		ID:     new(big.Int).SetUint64(params.chainID),
 		Amount: new(big.Int).SetUint64(params.amount),
@@ -116,11 +138,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		From:     validatorAccount.Ecdsa.Address(),
 		Input:    encoded,
 		To:       &stakeManagerAddr,
-		Value:    new(big.Int).SetUint64(params.amount),
 		GasPrice: gasPrice,
 	}
 
-	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
+	receipt, err = txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {
 		return err
 	}

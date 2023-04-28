@@ -39,8 +39,6 @@ type initParams struct {
 	insecureLocalStore bool
 
 	output bool
-
-	chainID int64
 }
 
 func (ip *initParams) validateFlags() error {
@@ -117,13 +115,6 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 		outputFlag,
 		false,
 		"the flag indicating to output existing secrets",
-	)
-
-	cmd.Flags().Int64Var(
-		&ip.chainID,
-		ChainIDFlag,
-		command.DefaultChainID,
-		ChainIDFlagDesc,
 	)
 }
 
@@ -203,7 +194,7 @@ func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string,
 		}
 
 		if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
-			if _, err = helper.InitValidatorBLSSignature(secretsManager, a, ip.chainID); err != nil {
+			if _, err = helper.InitValidatorBLSSignature(secretsManager, a); err != nil {
 				return generated, fmt.Errorf("%w: error initializing validator-bls-signature", err)
 			}
 

@@ -9,12 +9,13 @@ import (
 )
 
 type stakeParams struct {
-	accountDir       string
-	accountConfig    string
-	stakeManagerAddr string
-	jsonRPC          string
-	amount           uint64
-	chainID          uint64
+	accountDir          string
+	accountConfig       string
+	stakeManagerAddr    string
+	nativeRootTokenAddr string
+	jsonRPC             string
+	amount              uint64
+	chainID             uint64
 }
 
 func (sp *stakeParams) validateFlags() error {

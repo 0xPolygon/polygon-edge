@@ -13,19 +13,23 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 	dockertypes "github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 )
 
+//nolint:gosec
 const (
-	testAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
+	TestAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
 	TestModeFlag            = "test"
 	SupernetManagerFlag     = "supernet-manager"
 	SupernetManagerFlagDesc = "address of supernet manager contract"
 	StakeManagerFlag        = "stake-manager"
 	StakeManagerFlagDesc    = "address of stake manager contract"
+	NativeRootTokenFlag     = "native-root-token"
+	NativeRootTokenFlagDesc = "address of native root token"
 )
 
 var (
@@ -37,7 +41,7 @@ var (
 
 // GetRootchainPrivateKey initializes a private key from provided raw private key
 func GetRootchainPrivateKey(rawKey string) (ethgo.Key, error) {
-	privateKeyRaw := testAccountPrivKey
+	privateKeyRaw := TestAccountPrivKey
 	if rawKey != "" {
 		privateKeyRaw = rawKey
 	}
@@ -154,5 +158,48 @@ func GetValidatorInfo(validatorAddr, supernetManagerAddr ethgo.Address,
 		Stake:       decodedOutputsMap["stake"].(*big.Int),     //nolint:forcetypeassert
 		Active:      decodedOutputsMap["isActive"].(bool),      //nolint:forcetypeassert
 		Whitelisted: decodedOutputsMap["isWhitelisted"].(bool), //nolint:forcetypeassert
+	}, nil
+}
+
+// CreateMintTxn encodes parameters for mint function on rootchain token contract
+func CreateMintTxn(sender, receiver, rootTokenAddr types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+	mintFn := &contractsapi.MintRootERC20Fn{
+		To:     receiver,
+		Amount: amount,
+	}
+
+	input, err := mintFn.EncodeAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
+	}
+
+	addr := ethgo.Address(rootTokenAddr)
+
+	return &ethgo.Transaction{
+		From:  ethgo.Address(sender),
+		To:    &addr,
+		Input: input,
+	}, nil
+}
+
+// CreateApproveERC20Txn sends approve transaction
+// to ERC20 token for spender so that it is able to spend given tokens
+func CreateApproveERC20Txn(amount *big.Int,
+	spender, rootERC20Token types.Address) (*ethgo.Transaction, error) {
+	approveFnParams := &contractsapi.ApproveRootERC20Fn{
+		Spender: spender,
+		Amount:  amount,
+	}
+
+	input, err := approveFnParams.EncodeAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
+	}
+
+	addr := ethgo.Address(rootERC20Token)
+
+	return &ethgo.Transaction{
+		To:    &addr,
+		Input: input,
 	}, nil
 }

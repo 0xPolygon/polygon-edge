@@ -48,10 +48,9 @@ type whitelistResult struct {
 func (wr whitelistResult) GetOutput() string {
 	var buffer bytes.Buffer
 
+	buffer.WriteString("\n[WHITELIST VALIDATORS]\n")
+
 	vals := make([]string, len(wr.newValidatorAddresses))
-
-	buffer.WriteString("\n[WHITELIST VALIDATOR]\n")
-
 	for i, addr := range wr.newValidatorAddresses {
 		vals[i] = fmt.Sprintf("Validator address|%s", addr)
 	}

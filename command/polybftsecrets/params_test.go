@@ -29,7 +29,6 @@ func Test_initKeys(t *testing.T) {
 	ip := &initParams{
 		generatesAccount: false,
 		generatesNetwork: false,
-		chainID:          1,
 	}
 
 	_, err = ip.initKeys(sm)
@@ -83,7 +82,6 @@ func Test_getResult(t *testing.T) {
 		generatesAccount: true,
 		generatesNetwork: true,
 		printPrivateKey:  true,
-		chainID:          1,
 	}
 
 	_, err = ip.initKeys(sm)

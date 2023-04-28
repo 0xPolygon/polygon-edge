@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -351,23 +352,20 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
-	{
-		// run init accounts for validators
-		addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	// run init accounts for validators
+	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	require.NoError(t, err)
+
+	if cluster.Config.SecretsCallback != nil {
+		cluster.Config.SecretsCallback(addresses, cluster.Config)
+	}
+
+	if config.NonValidatorCount > 0 {
+		// run init accounts for non-validators
+		// we don't call secrets callback on non-validators,
+		// since we have nothing to premine nor stake for non validators
+		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
 		require.NoError(t, err)
-
-		if cluster.Config.SecretsCallback != nil {
-			cluster.Config.SecretsCallback(addresses, cluster.Config)
-		}
-
-		if config.NonValidatorCount > 0 {
-			// run init accounts for non-validators
-			_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
-			require.NoError(t, err)
-
-			// we don't call secrets callback on non-validators,
-			// since we have nothing to premine nor stake for non validators
-		}
 	}
 
 	genesisPath := path.Join(config.TmpDir, "genesis.json")
@@ -455,8 +453,27 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
+		polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(genesisPath)
+		require.NoError(t, err)
+
 		// fund validators on the rootchain
-		err = cluster.Bridge.fundRootchainValidators()
+		err = cluster.Bridge.fundRootchainValidators(polybftConfig)
+		require.NoError(t, err)
+
+		// whitelist genesis validators on the rootchain
+		err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
+		require.NoError(t, err)
+
+		// register genesis validators on the rootchain
+		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
+		require.NoError(t, err)
+
+		// do initial staking for genesis validators on the rootchain
+		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig, chainID)
+		require.NoError(t, err)
+
+		// finalize genesis validators on the rootchain
+		err = cluster.Bridge.finalizeGenesis(polybftConfig)
 		require.NoError(t, err)
 	}
 
