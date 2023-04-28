@@ -20,6 +20,7 @@ import (
 	"github.com/umbracle/ethgo/wallet"
 )
 
+//nolint:gosec
 const (
 	TestAccountPrivKey      = "aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d"
 	TestModeFlag            = "test"

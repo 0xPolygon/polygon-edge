@@ -258,6 +258,7 @@ func (t *TestBridge) registerGenesisValidators(genesisPath string) error {
 
 	for _, secret := range validatorSecrets {
 		secret := secret
+
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
@@ -299,6 +300,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(genesisPath string) error
 	for i, secret := range validatorSecrets {
 		secret := secret
 		i := i
+
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():

@@ -361,11 +361,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	if config.NonValidatorCount > 0 {
 		// run init accounts for non-validators
-		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
-		require.NoError(t, err)
-
 		// we don't call secrets callback on non-validators,
 		// since we have nothing to premine nor stake for non validators
+		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
+		require.NoError(t, err)
 	}
 
 	genesisPath := path.Join(config.TmpDir, "genesis.json")
