@@ -341,6 +341,7 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 // getActiveValidators returns all validators (*ValidatorMetadata) in sorted order
 func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) []*ValidatorMetadata {
 	activeValidators := make([]*ValidatorMetadata, 0, len(sc))
+
 	for _, v := range sc {
 		if v.VotingPower.Cmp(bigZero) > 0 {
 			activeValidators = append(activeValidators, v)

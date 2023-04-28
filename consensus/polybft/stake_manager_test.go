@@ -214,6 +214,7 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 
 		test := func() []*ValidatorMetadata {
 			stakeCounter := newValidatorStakeMap(validators.getPublicIdentities("A", "B", "C", "D", "E"))
+
 			return stakeCounter.getActiveValidators(maxValidatorSetSize)
 		}
 
