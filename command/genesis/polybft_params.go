@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -79,6 +80,36 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		premineBalances[premineInfo.address] = premineInfo
 	}
 
+	var (
+		rewardTokenByteCode []byte
+		rewardWalletAddress = types.ZeroAddress
+		rewardWalletAmount  = big.NewInt(0)
+		rewardTokenAddr     = contracts.NativeERC20TokenContract
+	)
+
+	if rewardTokenCodeFlag == "" && rewardWalletFlag != "" {
+		// native token is used as a reward token, and reward wallet is not a zero address
+		// so we need to add that address to premine map
+		premineInfo, err := parsePremineInfo(p.rewardWallet)
+		if err != nil {
+			return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+		}
+
+		premineBalances[premineInfo.address] = premineInfo
+		rewardWalletAddress = premineInfo.address
+		rewardWalletAmount = premineInfo.amount
+	}
+
+	if rewardTokenCodeFlag != "" {
+		bytes, err := hex.DecodeString(p.rewardTokenCode)
+		if err != nil {
+			return fmt.Errorf("could not decode reward token byte code '%s' : %w", p.rewardTokenCode, err)
+		}
+
+		rewardTokenByteCode = bytes
+		rewardTokenAddr = contracts.RewardTokenContract
+	}
+
 	initialValidators, err := p.getValidatorAccounts(premineBalances)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve genesis validators: %w", err)
@@ -110,6 +141,11 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		MintableNativeToken: p.mintableNativeToken,
 		NativeTokenConfig:   p.nativeTokenConfig,
 		MaxValidatorSetSize: p.maxNumValidators,
+		RewardConfig: &polybft.RewardsConfig{
+			TokenAddress:  rewardTokenAddr,
+			WalletAddress: rewardWalletAddress,
+			WalletAmount:  rewardWalletAmount,
+		},
 	}
 
 	chainConfig := &chain.Chain{
@@ -132,7 +168,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake, polyBftConfig)
+	allocs, err := p.deployContracts(totalStake, rewardTokenByteCode, polyBftConfig)
 	if err != nil {
 		return err
 	}
@@ -258,6 +294,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 //nolint:godox
 func (p *genesisParams) deployContracts(totalStake *big.Int,
+	rewardTokenByteCode []byte,
 	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
 		artifact *artifact.Artifact
@@ -333,12 +370,21 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
 
-	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
+	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
 
 	for _, contract := range genesisContracts {
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
 			Code:    contract.artifact.DeployedBytecode,
+		}
+	}
+
+	if rewardTokenByteCode != nil {
+		// if reward token is provided in genesis then, add it to allocations
+		// to RewardTokenContract address and update polybftConfig
+		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    rewardTokenByteCode,
 		}
 	}
 

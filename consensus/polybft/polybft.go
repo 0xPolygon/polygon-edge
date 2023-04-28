@@ -128,6 +128,10 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
+			return err
+		}
+
 		// initialize RewardDistributor SC
 		input, err = getInitRewardDistributorInput(polyBFTConfig)
 		if err != nil {

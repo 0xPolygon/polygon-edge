@@ -37,6 +37,8 @@ const (
 	maxValidatorCount     = "max-validator-count"
 	mintableTokenFlag     = "mintable-native-token"
 	nativeTokenConfigFlag = "native-token-config"
+	rewardTokenCodeFlag   = "reward-token-code"
+	rewardWalletFlag      = "reward-wallet"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -121,6 +123,10 @@ type genesisParams struct {
 	mintableNativeToken  bool
 	nativeTokenConfigRaw string
 	nativeTokenConfig    *polybft.TokenConfig
+
+	// rewards
+	rewardTokenCode string
+	rewardWallet    string
 }
 
 func (p *genesisParams) validateFlags() error {

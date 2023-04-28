@@ -47,6 +47,9 @@ type PolyBFTConfig struct {
 
 	// MaxValidatorSetSize indicates the maximum size of validator set
 	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
+
+	// RewardConfig defines rewards configuration
+	RewardConfig *RewardsConfig `json:"rewardConfig"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
@@ -243,4 +246,53 @@ type TokenConfig struct {
 	Name     string `json:"name"`
 	Symbol   string `json:"symbol"`
 	Decimals uint8  `json:"decimals"`
+}
+
+type RewardsConfig struct {
+
+	// TokenAddress is the address of reward token on child chain
+	TokenAddress types.Address
+
+	// WalletAddress is the address of reward wallet on child chain
+	WalletAddress types.Address
+
+	// WalletAmount is the amount of tokens in reward wallet
+	WalletAmount *big.Int
+}
+
+func (r *RewardsConfig) MarshalJSON() ([]byte, error) {
+	raw := &rewardsConfigRaw{
+		tokenAddress:  r.TokenAddress,
+		walletAddress: r.WalletAddress,
+		walletAmount:  types.EncodeBigInt(r.WalletAmount),
+	}
+
+	return json.Marshal(raw)
+}
+
+func (v *RewardsConfig) UnmarshalJSON(data []byte) error {
+	var (
+		raw rewardsConfigRaw
+		err error
+	)
+
+	if err = json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	v.TokenAddress = raw.tokenAddress
+	v.WalletAddress = raw.walletAddress
+
+	v.WalletAmount, err = types.ParseUint256orHex(raw.walletAmount)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type rewardsConfigRaw struct {
+	tokenAddress  types.Address `json:"rewardTokenAddress"`
+	walletAddress types.Address `json:"rewardWalletAddress"`
+	walletAmount  *string       `json:"rewardWalletAmount"`
 }
