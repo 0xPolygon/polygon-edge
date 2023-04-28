@@ -795,20 +795,26 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC721.Abi.Methods["ownerOf"], buf, o)
 }
 
-type InitializeCustomSupernetManagerFn struct {
-	StakeManager types.Address `abi:"stakeManager"`
+type InitializeNewCustomSupernetManagerFn struct {
+	StakeManager      types.Address `abi:"stakeManager"`
+	Bls               types.Address `abi:"bls"`
+	StateSender       types.Address `abi:"stateSender"`
+	Matic             types.Address `abi:"matic"`
+	ChildValidatorSet types.Address `abi:"childValidatorSet"`
+	ExitHelper        types.Address `abi:"exitHelper"`
+	Domain            string        `abi:"domain"`
 }
 
-func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["initialize"].ID()
+func (i *InitializeNewCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["initializeNew"].ID()
 }
 
-func (i *InitializeCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["initialize"].Encode(i)
+func (i *InitializeNewCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["initializeNew"].Encode(i)
 }
 
-func (i *InitializeCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["initialize"], buf, i)
+func (i *InitializeNewCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["initializeNew"], buf, i)
 }
 
 type WhitelistValidatorsCustomSupernetManagerFn struct {
