@@ -57,6 +57,7 @@ func LoadPolyBFTConfig(chainConfigFile string) (*PolyBFTConfig, uint64, error) {
 	}
 
 	polybftConfig, err := GetPolyBFTConfig(chainCfg)
+
 	return &polybftConfig, uint64(chainCfg.Params.ChainID), err
 }
 
