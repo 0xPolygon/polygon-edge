@@ -87,7 +87,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		rewardTokenAddr     = contracts.NativeERC20TokenContract
 	)
 
-	if params.rewardTokenCode == "" && p.rewardWallet != "" {
+	if p.rewardTokenCode == "" && p.rewardWallet != "" {
 		// native token is used as a reward token, and reward wallet is not a zero address
 		// so we need to add that address to premine map
 		premineInfo, err := parsePremineInfo(p.rewardWallet)
@@ -100,7 +100,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		rewardWalletAmount = premineInfo.amount
 	}
 
-	if params.rewardTokenCode != "" {
+	if p.rewardTokenCode != "" {
 		bytes, err := hex.DecodeString(p.rewardTokenCode)
 		if err != nil {
 			return fmt.Errorf("could not decode reward token byte code '%s' : %w", p.rewardTokenCode, err)
