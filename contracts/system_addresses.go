@@ -44,6 +44,14 @@ var (
 	ConsolePrecompile = types.StringToAddress("0x000000000000000000636F6e736F6c652e6c6f67")
 	// AllowListContractsAddr is the address of the contract deployer allow list
 	AllowListContractsAddr = types.StringToAddress("0x0200000000000000000000000000000000000000")
+	// BlockListContractsAddr is the address of the contract deployer block list
+	BlockListContractsAddr = types.StringToAddress("0x0300000000000000000000000000000000000000")
 	// AllowListTransactionsAddr is the address of the transactions allow list
 	AllowListTransactionsAddr = types.StringToAddress("0x0200000000000000000000000000000000000002")
+	// BlockListTransactionsAddr is the address of the transactions block list
+	BlockListTransactionsAddr = types.StringToAddress("0x0300000000000000000000000000000000000002")
+	// AllowListBridgeAddr is the address of the bridge allow list
+	AllowListBridgeAddr = types.StringToAddress("0x0200000000000000000000000000000000000004")
+	// BlockListBridgeAddr is the address of the bridge block list
+	BlockListBridgeAddr = types.StringToAddress("0x0300000000000000000000000000000000000004")
 )

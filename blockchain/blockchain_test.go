@@ -1335,3 +1335,59 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 		assert.ErrorIs(t, err, errUnableToExecute)
 	})
 }
+
+func TestBlockchain_CalculateBaseFee(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		blockNumber          uint64
+		parentBaseFee        uint64
+		parentGasLimit       uint64
+		parentGasUsed        uint64
+		expectedBaseFee      uint64
+		elasticityMultiplier uint64
+	}{
+		{6, chain.GenesisBaseFee, 20000000, 10000000, chain.GenesisBaseFee, 2}, // usage == target
+		{6, chain.GenesisBaseFee, 20000000, 10000000, 1125000000, 4},           // usage == target
+		{6, chain.GenesisBaseFee, 20000000, 9000000, 987500000, 2},             // usage below target
+		{6, chain.GenesisBaseFee, 20000000, 9000000, 1100000000, 4},            // usage below target
+		{6, chain.GenesisBaseFee, 20000000, 11000000, 1012500000, 2},           // usage above target
+		{6, chain.GenesisBaseFee, 20000000, 11000000, 1150000000, 4},           // usage above target
+		{6, chain.GenesisBaseFee, 20000000, 20000000, 1125000000, 2},           // usage full
+		{6, chain.GenesisBaseFee, 20000000, 20000000, 1375000000, 4},           // usage full
+		{6, chain.GenesisBaseFee, 20000000, 0, 875000000, 2},                   // usage 0
+		{6, chain.GenesisBaseFee, 20000000, 0, 875000000, 4},                   // usage 0
+	}
+
+	for i, test := range tests {
+		test := test
+
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
+
+			fork := chain.Fork(5)
+			blockchain := Blockchain{
+				config: &chain.Chain{
+					Params: &chain.Params{
+						Forks: &chain.Forks{
+							London: &fork,
+						},
+					},
+					Genesis: &chain.Genesis{
+						BaseFeeEM: test.elasticityMultiplier,
+					},
+				},
+			}
+
+			parent := &types.Header{
+				Number:   test.blockNumber,
+				GasLimit: test.parentGasLimit,
+				GasUsed:  test.parentGasUsed,
+				BaseFee:  test.parentBaseFee,
+			}
+
+			got := blockchain.CalculateBaseFee(parent)
+			assert.Equal(t, test.expectedBaseFee, got, fmt.Sprintf("expected %d, got %d", test.expectedBaseFee, got))
+		})
+	}
+}

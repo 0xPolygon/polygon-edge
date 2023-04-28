@@ -21,7 +21,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18.x
+          go-version: 1.19.x
 
       - name: Prepare
         id: prepare
@@ -48,7 +48,7 @@ jobs:
           		--rm-dist --skip-validate
         env:
           PACKAGE_NAME: github.com/0xPolygon/polygon-edge
-          GOLANG_CROSS_VERSION: v1.18.3
+          GOLANG_CROSS_VERSION: v1.19.5
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}

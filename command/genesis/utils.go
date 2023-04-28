@@ -120,6 +120,24 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 	return trackerStartBlocksConfig, nil
 }
 
+// parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
+func parseBurnContractInfo(burnContractInfoRaw string) (uint64, types.Address, error) {
+	// <block>:<address>
+	burnContractParts := strings.Split(burnContractInfoRaw, ":")
+	if len(burnContractParts) != 2 {
+		return 0, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>")
+	}
+
+	blockRaw := burnContractParts[0]
+
+	block, err := types.ParseUint256orHex(&blockRaw)
+	if err != nil {
+		return 0, types.ZeroAddress, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
+	}
+
+	return block.Uint64(), types.StringToAddress(burnContractParts[1]), nil
+}
+
 // GetValidatorKeyFiles returns file names which has validator secrets
 func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 	if rootDir == "" {

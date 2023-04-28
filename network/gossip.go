@@ -26,7 +26,7 @@ type Topic struct {
 	topic     *pubsub.Topic
 	typ       reflect.Type
 	closeCh   chan struct{}
-	closed    *uint64
+	closed    atomic.Bool
 	waitGroup sync.WaitGroup
 }
 
@@ -40,7 +40,7 @@ func (t *Topic) createObj() proto.Message {
 }
 
 func (t *Topic) Close() {
-	if atomic.SwapUint64(t.closed, 1) > 0 {
+	if t.closed.Swap(true) {
 		// Already closed.
 		return
 	}
@@ -71,7 +71,7 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 	}
 
 	// Mark topic active.
-	atomic.StoreUint64(t.closed, 0)
+	t.closed.Store(false)
 
 	go t.readLoop(sub, handler)
 
@@ -126,8 +126,8 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 		topic:   topic,
 		typ:     reflect.TypeOf(obj).Elem(),
 		closeCh: make(chan struct{}),
-		closed:  new(uint64),
 	}
+	tt.closed.Store(false)
 
 	return tt, nil
 }

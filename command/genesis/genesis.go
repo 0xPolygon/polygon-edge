@@ -73,6 +73,13 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringArrayVar(
+		&params.burnContracts,
+		burnContractFlag,
+		[]string{},
+		"the burn contract blocks and addresses (format: <block>:<address>)",
+	)
+
+	cmd.Flags().StringArrayVar(
 		&params.bootnodes,
 		command.BootnodeFlag,
 		[]string{},
@@ -227,7 +234,7 @@ func setFlags(cmd *cobra.Command) {
 		)
 	}
 
-	// Allow list
+	// Access Control Lists
 	{
 		cmd.Flags().StringArrayVar(
 			&params.contractDeployerAllowListAdmin,
@@ -244,6 +251,20 @@ func setFlags(cmd *cobra.Command) {
 		)
 
 		cmd.Flags().StringArrayVar(
+			&params.contractDeployerBlockListAdmin,
+			contractDeployerBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the contract deployer block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerBlockListEnabled,
+			contractDeployerBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the contract deployer block list",
+		)
+
+		cmd.Flags().StringArrayVar(
 			&params.transactionsAllowListAdmin,
 			transactionsAllowListAdminFlag,
 			[]string{},
@@ -255,6 +276,48 @@ func setFlags(cmd *cobra.Command) {
 			transactionsAllowListEnabledFlag,
 			[]string{},
 			"list of addresses to enable by default in the transactions allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsBlockListAdmin,
+			transactionsBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the transactions block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsBlockListEnabled,
+			transactionsBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the transactions block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeAllowListAdmin,
+			bridgeAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the bridge allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeAllowListEnabled,
+			bridgeAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the bridge allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeBlockListAdmin,
+			bridgeBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the bridge block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeBlockListEnabled,
+			bridgeBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the bridge block list",
 		)
 	}
 }

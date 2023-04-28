@@ -3,9 +3,13 @@ package bridge
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/0xPolygon/polygon-edge/command/bridge/deposit"
+	depositERC1155 "github.com/0xPolygon/polygon-edge/command/bridge/deposit/erc1155"
+	depositERC20 "github.com/0xPolygon/polygon-edge/command/bridge/deposit/erc20"
+	depositERC721 "github.com/0xPolygon/polygon-edge/command/bridge/deposit/erc721"
 	"github.com/0xPolygon/polygon-edge/command/bridge/exit"
-	"github.com/0xPolygon/polygon-edge/command/bridge/withdraw"
+	withdrawERC1155 "github.com/0xPolygon/polygon-edge/command/bridge/withdraw/erc1155"
+	withdrawERC20 "github.com/0xPolygon/polygon-edge/command/bridge/withdraw/erc20"
+	withdrawERC721 "github.com/0xPolygon/polygon-edge/command/bridge/withdraw/erc721"
 )
 
 // GetCommand creates "bridge" helper command
@@ -22,10 +26,18 @@ func GetCommand() *cobra.Command {
 
 func registerSubcommands(baseCmd *cobra.Command) {
 	baseCmd.AddCommand(
-		// bridge deposit
-		deposit.GetCommand(),
-		// bridge withdraw
-		withdraw.GetCommand(),
+		// bridge deposit-erc20
+		depositERC20.GetCommand(),
+		// bridge deposit-erc721
+		depositERC721.GetCommand(),
+		// bridge deposit-erc1155
+		depositERC1155.GetCommand(),
+		// bridge withdraw-erc20
+		withdrawERC20.GetCommand(),
+		// bridge withdraw-erc721
+		withdrawERC721.GetCommand(),
+		// bridge withdraw-erc1155
+		withdrawERC1155.GetCommand(),
 		// bridge exit
 		exit.GetCommand(),
 	)

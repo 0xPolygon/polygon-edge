@@ -83,7 +83,9 @@ type BridgeConfig struct {
 	ExitHelperAddr            types.Address `json:"exitHelperAddress"`
 	RootERC20PredicateAddr    types.Address `json:"erc20PredicateAddress"`
 	RootNativeERC20Addr       types.Address `json:"nativeERC20Address"`
+	RootERC721Addr            types.Address `json:"erc721Address"`
 	RootERC721PredicateAddr   types.Address `json:"erc721PredicateAddress"`
+	RootERC1155Addr           types.Address `json:"erc1155Address"`
 	RootERC1155PredicateAddr  types.Address `json:"erc1155PredicateAddress"`
 	CustomSupernetManagerAddr types.Address `json:"customSupernetManagerAddr"`
 	StakeManagerAddr          types.Address `json:"stakeManagerAddr"`
@@ -209,8 +211,10 @@ type RootchainConfig struct {
 	ERC20TemplateAddress         types.Address
 	RootERC721PredicateAddress   types.Address
 	RootERC721Address            types.Address
+	RootERC721TemplateAddress    types.Address
 	RootERC1155PredicateAddress  types.Address
 	RootERC1155Address           types.Address
+	ERC1155TemplateAddress       types.Address
 	CustomSupernetManagerAddress types.Address
 	StakeManagerAddress          types.Address
 }
@@ -225,7 +229,9 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		ExitHelperAddr:            r.ExitHelperAddress,
 		RootERC20PredicateAddr:    r.RootERC20PredicateAddress,
 		RootNativeERC20Addr:       r.RootNativeERC20Address,
+		RootERC721Addr:            r.RootERC721Address,
 		RootERC721PredicateAddr:   r.RootERC721PredicateAddress,
+		RootERC1155Addr:           r.RootERC1155Address,
 		RootERC1155PredicateAddr:  r.RootERC1155PredicateAddress,
 		CustomSupernetManagerAddr: r.CustomSupernetManagerAddress,
 		StakeManagerAddr:          r.StakeManagerAddress,

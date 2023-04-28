@@ -131,10 +131,6 @@ func main() {
 			"child/validator/ValidatorSet.sol",
 			"ValidatorSet",
 		},
-		{
-			"mocks/MockRewardToken.sol",
-			"MockRewardToken",
-		},
 	}
 
 	for _, v := range readContracts {

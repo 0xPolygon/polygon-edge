@@ -197,11 +197,6 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	MockRewardToken, err = artifact.DecodeArtifact([]byte(MockRewardTokenArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 func readTestContractContent(contractFileName string) []byte {

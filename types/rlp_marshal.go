@@ -1,6 +1,8 @@
 package types
 
 import (
+	"math/big"
+
 	"github.com/umbracle/fastrlp"
 )
 
@@ -90,6 +92,8 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
 	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
 	vv.Set(arena.NewCopyBytes(h.Nonce[:]))
+
+	vv.Set(arena.NewUint(h.BaseFee))
 
 	return vv
 }
@@ -188,8 +192,25 @@ func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
 func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
+	// Specify zero chain ID as per spec.
+	// This is needed to have the same format as other EVM chains do.
+	// There is no chain ID in the TX object, so it is always 0 here just to be compatible.
+	// Check Transaction1559Payload there https://eips.ethereum.org/EIPS/eip-1559#specification
+	if t.Type == DynamicFeeTx {
+		vv.Set(arena.NewBigInt(big.NewInt(0)))
+	}
+
 	vv.Set(arena.NewUint(t.Nonce))
-	vv.Set(arena.NewBigInt(t.GasPrice))
+
+	if t.Type == DynamicFeeTx {
+		// Add EIP-1559 related fields.
+		// For non-dynamic-fee-tx gas price is used.
+		vv.Set(arena.NewBigInt(t.GasTipCap))
+		vv.Set(arena.NewBigInt(t.GasFeeCap))
+	} else {
+		vv.Set(arena.NewBigInt(t.GasPrice))
+	}
+
 	vv.Set(arena.NewUint(t.Gas))
 
 	// Address may be empty
@@ -201,6 +222,14 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 	vv.Set(arena.NewBigInt(t.Value))
 	vv.Set(arena.NewCopyBytes(t.Input))
+
+	// Specify access list as per spec.
+	// This is needed to have the same format as other EVM chains do.
+	// There is no access list feature here, so it is always empty just to be compatible.
+	// Check Transaction1559Payload there https://eips.ethereum.org/EIPS/eip-1559#specification
+	if t.Type == DynamicFeeTx {
+		vv.Set(arena.NewArray())
+	}
 
 	// signature values
 	vv.Set(arena.NewBigInt(t.V))

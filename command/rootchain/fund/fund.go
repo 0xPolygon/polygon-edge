@@ -60,8 +60,8 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&jsonRPCAddress,
 		jsonRPCFlag,
-		"http://127.0.0.1:8545",
-		"the JSON RPC rootchain IP address (e.g. http://127.0.0.1:8545)",
+		txrelayer.DefaultRPCAddress,
+		"the rootchain JSON RPC endpoint",
 	)
 
 	cmd.Flags().StringVar(

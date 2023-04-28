@@ -1,4 +1,4 @@
-package withdraw
+package erc20
 
 import (
 	"bytes"
@@ -22,32 +22,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const (
-	jsonRPCFlag        = "json-rpc"
-	childPredicateFlag = "child-predicate"
-	childTokenFlag     = "child-token"
-)
-
-type withdrawParams struct {
-	*common.ERC20BridgeParams
-	childPredicateAddr string
-	childTokenAddr     string
-	jsonRPCAddress     string
-}
-
 var (
-	wp *withdrawParams = &withdrawParams{
-		ERC20BridgeParams: &common.ERC20BridgeParams{},
-	}
+	wp *common.ERC20BridgeParams = common.NewERC20BridgeParams()
 )
 
 // GetCommand returns the bridge withdraw command
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc20",
-		Short:   "Withdraws tokens from the child chain to the root chain",
-		PreRunE: preRun,
-		Run:     run,
+		Short:   "Withdraws ERC 20 tokens from the child chain to the root chain",
+		PreRunE: preRunCommand,
+		Run:     runCommand,
 	}
 
 	withdrawCmd.Flags().StringVar(
@@ -72,22 +57,22 @@ func GetCommand() *cobra.Command {
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childPredicateAddr,
-		childPredicateFlag,
+		&wp.PredicateAddr,
+		common.ChildPredicateFlag,
 		contracts.ChildERC20PredicateContract.String(),
 		"ERC20 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.childTokenAddr,
-		childTokenFlag,
+		&wp.TokenAddr,
+		common.ChildTokenFlag,
 		contracts.NativeERC20TokenContract.String(),
 		"ERC20 child chain token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
-		&wp.jsonRPCAddress,
-		jsonRPCFlag,
+		&wp.JSONRPCAddr,
+		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
 	)
@@ -98,15 +83,15 @@ func GetCommand() *cobra.Command {
 	return withdrawCmd
 }
 
-func preRun(cmd *cobra.Command, _ []string) error {
-	if err := wp.ValidateFlags(); err != nil {
+func preRunCommand(cmd *cobra.Command, _ []string) error {
+	if err := wp.Validate(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func run(cmd *cobra.Command, _ []string) {
+func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
@@ -124,7 +109,7 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
 
@@ -179,7 +164,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(
-		&withdrawERC20Result{
+		&withdrawResult{
 			Sender:       senderAccount.Address().String(),
 			Receivers:    wp.Receivers,
 			Amounts:      wp.Amounts,
@@ -191,7 +176,7 @@ func run(cmd *cobra.Command, _ []string) {
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
 func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	withdrawToFn := &contractsapi.WithdrawToChildERC20PredicateFn{
-		ChildToken: types.StringToAddress(wp.childTokenAddr),
+		ChildToken: types.StringToAddress(wp.TokenAddr),
 		Receiver:   receiver,
 		Amount:     amount,
 	}
@@ -201,7 +186,7 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(types.StringToAddress(wp.childPredicateAddr))
+	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
 	return &ethgo.Transaction{
 		To:    &addr,
@@ -214,12 +199,12 @@ func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	var exitEvent contractsapi.L2StateSyncedEvent
 	for _, log := range receipt.Logs {
 		doesMatch, err := exitEvent.ParseLog(log)
-		if !doesMatch {
-			continue
-		}
-
 		if err != nil {
 			return nil, err
+		}
+
+		if !doesMatch {
+			continue
 		}
 
 		return exitEvent.ID, nil
@@ -228,7 +213,7 @@ func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	return nil, errors.New("failed to find exit event log")
 }
 
-type withdrawERC20Result struct {
+type withdrawResult struct {
 	Sender       string   `json:"sender"`
 	Receivers    []string `json:"receivers"`
 	Amounts      []string `json:"amounts"`
@@ -236,7 +221,7 @@ type withdrawERC20Result struct {
 	BlockNumbers []string `json:"blockNumbers"`
 }
 
-func (r *withdrawERC20Result) GetOutput() string {
+func (r *withdrawResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 5)
@@ -246,7 +231,7 @@ func (r *withdrawERC20Result) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))
 
-	buffer.WriteString("\n[WITHDRAW ERC20]\n")
+	buffer.WriteString("\n[WITHDRAW ERC 20]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 

@@ -12,7 +12,7 @@ import (
 // All methods assume the (correct) lock is held.
 type accountQueue struct {
 	sync.RWMutex
-	wLock uint32
+	wLock atomic.Bool
 	queue minNonceQueue
 }
 
@@ -27,18 +27,17 @@ func newAccountQueue() *accountQueue {
 }
 
 func (q *accountQueue) lock(write bool) {
-	switch write {
-	case true:
+	if write {
 		q.Lock()
-		atomic.StoreUint32(&q.wLock, 1)
-	case false:
+	} else {
 		q.RLock()
-		atomic.StoreUint32(&q.wLock, 0)
 	}
+
+	q.wLock.Store(write)
 }
 
 func (q *accountQueue) unlock() {
-	if atomic.SwapUint32(&q.wLock, 0) == 1 {
+	if q.wLock.Swap(false) {
 		q.Unlock()
 	} else {
 		q.RUnlock()
@@ -145,93 +144,6 @@ func (q *minNonceQueue) Push(x interface{}) {
 }
 
 func (q *minNonceQueue) Pop() interface{} {
-	old := q
-	n := len(*old)
-	x := (*old)[n-1]
-	*q = (*old)[0 : n-1]
-
-	return x
-}
-
-type pricedQueue struct {
-	queue maxPriceQueue
-}
-
-func newPricedQueue() *pricedQueue {
-	q := pricedQueue{
-		queue: make(maxPriceQueue, 0),
-	}
-
-	heap.Init(&q.queue)
-
-	return &q
-}
-
-// clear empties the underlying queue.
-func (q *pricedQueue) clear() {
-	q.queue = q.queue[:0]
-}
-
-// Pushes the given transactions onto the queue.
-func (q *pricedQueue) push(tx *types.Transaction) {
-	heap.Push(&q.queue, tx)
-}
-
-// Pop removes the first transaction from the queue
-// or nil if the queue is empty.
-func (q *pricedQueue) pop() *types.Transaction {
-	if q.length() == 0 {
-		return nil
-	}
-
-	transaction, ok := heap.Pop(&q.queue).(*types.Transaction)
-	if !ok {
-		return nil
-	}
-
-	return transaction
-}
-
-// length returns the number of transactions in the queue.
-func (q *pricedQueue) length() uint64 {
-	return uint64(q.queue.Len())
-}
-
-// transactions sorted by gas price (descending)
-type maxPriceQueue []*types.Transaction
-
-/* Queue methods required by the heap interface */
-
-func (q *maxPriceQueue) Peek() *types.Transaction {
-	if q.Len() == 0 {
-		return nil
-	}
-
-	return (*q)[0]
-}
-
-func (q *maxPriceQueue) Len() int {
-	return len(*q)
-}
-
-func (q *maxPriceQueue) Swap(i, j int) {
-	(*q)[i], (*q)[j] = (*q)[j], (*q)[i]
-}
-
-func (q *maxPriceQueue) Less(i, j int) bool {
-	return (*q)[i].GasPrice.Uint64() > (*q)[j].GasPrice.Uint64()
-}
-
-func (q *maxPriceQueue) Push(x interface{}) {
-	transaction, ok := x.(*types.Transaction)
-	if !ok {
-		return
-	}
-
-	*q = append(*q, transaction)
-}
-
-func (q *maxPriceQueue) Pop() interface{} {
 	old := q
 	n := len(*old)
 	x := (*old)[n-1]

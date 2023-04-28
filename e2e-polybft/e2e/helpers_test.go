@@ -11,15 +11,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/contract"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/contract"
 	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
@@ -69,7 +73,7 @@ func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr e
 		return nil, err
 	}
 
-	validatorsCount, err := types.ParseUint64orHex(&validatorsCountRaw)
+	validatorsCount, err := common.ParseUint64orHex(&validatorsCountRaw)
 	if err != nil {
 		return nil, err
 	}
@@ -285,4 +289,16 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 			return nil
 		}
 	}
+}
+
+func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Address, addr types.Address, role addresslist.Role) {
+	t.Helper()
+	out := cluster.Call(t, contract, addresslist.ReadAddressListFunc, addr)
+
+	num, ok := out["0"].(*big.Int)
+	if !ok {
+		t.Fatal("unexpected")
+	}
+
+	require.Equal(t, role.Uint64(), num.Uint64())
 }

@@ -1,6 +1,7 @@
 ---
 name: E2E tests
 on:  # yamllint disable-line rule:truthy
+  workflow_dispatch:
   workflow_call:
     outputs:
       workflow_output:
@@ -17,14 +18,15 @@ jobs:
     outputs:
       e2eibft_output_failure: ${{ steps.run_e2eibft_failure.outputs.test_output }}
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
           submodules: recursive
 
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18.x
+          go-version: 1.19.x
 
       - name: Run tests
         run: make test-e2e
