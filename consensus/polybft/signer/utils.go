@@ -1,11 +1,18 @@
 package bls
 
 import (
+	"bytes"
 	"crypto/rand"
+	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
+)
+
+var (
+	addressABIType = abi.MustNewType("address")
+	uint256ABIType = abi.MustNewType("uint256")
 )
 
 // GenerateBlsKey creates a random private and its corresponding public keys
@@ -53,13 +60,24 @@ func MarshalMessageToBigInt(message, domain []byte) ([2]*big.Int, error) {
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
 func MakeKOSKSignature(privateKey *PrivateKey, address types.Address,
 	chainID int64, domain []byte, supernetManagerAddr types.Address) (*Signature, error) {
-	message, err := abi.Encode(
-		[]interface{}{address, supernetManagerAddr, big.NewInt(chainID)},
-		abi.MustNewType("tuple(address, address, uint256)"))
+	spenderABI, err := addressABIType.Encode(address)
 	if err != nil {
 		return nil, err
 	}
 
+	supernetManagerABI, err := addressABIType.Encode(supernetManagerAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	chainIDABI, err := uint256ABIType.Encode(big.NewInt(chainID))
+	if err != nil {
+		return nil, err
+	}
+
+	message := bytes.Join([][]byte{spenderABI[12:], supernetManagerABI[12:], chainIDABI}, nil)
+	fmt.Println(message)
+
 	// abi.Encode adds 12 zero bytes before actual address bytes
-	return privateKey.Sign(message[12:], domain)
+	return privateKey.Sign(message, domain)
 }

@@ -387,7 +387,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	}
 
 	// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
-	allocations[contracts.ValidatorSetContract].Balance = totalStake
+	// allocations[contracts.ValidatorSetContract].Balance = totalStake
 
 	return allocations, nil
 }

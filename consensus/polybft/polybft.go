@@ -138,7 +138,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		if err = initContract(contracts.ValidatorSetContract, input, "ValidatorSet", transition); err != nil {
+		if err = initContract(contracts.RewardDistributorContract, input, "RewardDistributor", transition); err != nil {
 			return err
 		}
 
