@@ -629,7 +629,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	defer cluster.Stop()
 
 	// initialize tx relayer used to query CheckpointManager smart contract
-	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
@@ -638,7 +638,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	testCheckpointBlockNumber := func(expectedCheckpointBlock uint64) (bool, error) {
-		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
+		actualCheckpointBlock, err := getCheckpointBlockNumber(rootChainRelayer, checkpointManagerAddr)
 		if err != nil {
 			return false, err
 		}
@@ -686,7 +686,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	defer cluster.Stop()
 
 	// load polybft config
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
@@ -733,7 +733,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		originalValidatorStorage[validator.Address] = validator
 
 		// stake rewards
-		require.NoError(t, cluster.Servers[idx].Stake(validator.WithdrawableRewards.Uint64()))
+		require.NoError(t, cluster.Servers[idx].Stake(validator.WithdrawableRewards.Uint64(), *polybftCfg, chainID, cluster.Bridge.JSONRPCAddr()))
 	})
 
 	// wait a two more epochs, so that stake is registered and two more checkpoints are sent.

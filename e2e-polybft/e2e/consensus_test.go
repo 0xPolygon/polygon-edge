@@ -137,6 +137,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
+	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
 	//nolint:godox
 	// TODO - @goran-ethernal update this check once e2e tests get fixed
 	// systemState := polybft.NewSystemState(
@@ -233,7 +236,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, secondValidator.RegisterValidator(secondValidatorDataDir, ""))
 
 	// stake manually for the second validator
-	require.NoError(t, secondValidator.Stake(newValidatorStake.Uint64()))
+	require.NoError(t, secondValidator.Stake(newValidatorStake.Uint64(), *polybftCfg, chainID, cluster.Bridge.JSONRPCAddr()))
 
 	validators := polybft.AccountSet{}
 	// assert that new validator is among validator set
@@ -277,9 +280,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	nextValidatorsHash, err := nextValidators.Hash()
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, nextValidatorsHash)
-
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
 
 	// query the first validator
 	firstValidatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),

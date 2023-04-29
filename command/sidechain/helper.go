@@ -89,6 +89,11 @@ func GetValidatorInfo(supernetManager, validatorAddr ethgo.Address,
 		return nil, fmt.Errorf("could not convert decoded outputs to map")
 	}
 
+	innerMap, ok := decodedOutputsMap["0"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not convert decoded outputs map to inner map")
+	}
+
 	withdrawableFn := contractsapi.ValidatorSet.Abi.GetMethod("withdrawable")
 
 	encode, err = withdrawableFn.Encode([]interface{}{validatorAddr})
@@ -109,10 +114,10 @@ func GetValidatorInfo(supernetManager, validatorAddr ethgo.Address,
 	//nolint:forcetypeassert
 	vInfo := &polybft.ValidatorInfo{
 		Address:             validatorAddr.Address(),
-		Stake:               decodedOutputsMap["stake"].(*big.Int),
+		Stake:               innerMap["stake"].(*big.Int),
 		WithdrawableRewards: withdrawableRewards,
-		IsActive:            decodedOutputsMap["isActive"].(bool),
-		IsWhitelisted:       decodedOutputsMap["isWhitelisted"].(bool),
+		IsActive:            innerMap["isActive"].(bool),
+		IsWhitelisted:       innerMap["isWhitelisted"].(bool),
 	}
 
 	return vInfo, nil

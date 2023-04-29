@@ -181,14 +181,19 @@ func (t *TestServer) Stop() {
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(amount uint64) error {
+// TODO: unify with test-bridge.initialStakingOfGenesisValidators
+//
+//nolint:godox
+func (t *TestServer) Stake(amount uint64, polybftConfig polybft.PolyBFTConfig, chainID int64, jsonRPC string) error {
 	args := []string{
 		"polybft",
 		"stake",
+		"--jsonrpc", jsonRPC,
+		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
-		"--jsonrpc", t.JSONRPCAddr(),
 		"--amount", strconv.FormatUint(amount, 10),
-		"--self",
+		"--chain-id", strconv.FormatInt(chainID, 10),
+		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
@@ -202,7 +207,6 @@ func (t *TestServer) Unstake(amount uint64) error {
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--amount", strconv.FormatUint(amount, 10),
-		"--self",
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
