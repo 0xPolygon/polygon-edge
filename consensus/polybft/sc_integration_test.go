@@ -290,8 +290,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			contracts.ValidatorSetContract: {
 				Code: contractsapi.ValidatorSet.DeployedBytecode,
 			},
-			contracts.RewardDistributorContract: {
-				Code: contractsapi.RewardDistributor.DeployedBytecode,
+			contracts.RewardPoolContract: {
+				Code: contractsapi.RewardPool.DeployedBytecode,
 			},
 		}
 
@@ -337,11 +337,11 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		err = initContract(contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
 		require.NoError(t, err)
 
-		initInput, err = getInitRewardDistributorInput(polyBFTConfig)
+		initInput, err = getInitRewardPoolInput(polyBFTConfig)
 		require.NoError(t, err)
 
-		// init RewardDistributor
-		err = initContract(contracts.ValidatorSetContract, initInput, "RewardDistributor", transition)
+		// init RewardPool
+		err = initContract(contracts.ValidatorSetContract, initInput, "RewardPool", transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch
@@ -360,7 +360,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardDistributorContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -378,7 +378,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardDistributorContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 	}

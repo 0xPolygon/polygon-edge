@@ -40,9 +40,9 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	return initFn.EncodeAbi()
 }
 
-// getInitRewardDistributorInput builds input parameters for RewardDistributor SC initialization
-func getInitRewardDistributorInput(polybftConfig PolyBFTConfig) ([]byte, error) {
-	initFn := &contractsapi.InitializeRewardDistributorFn{
+// getInitRewardPoolInput builds input parameters for RewardPool SC initialization
+func getInitRewardPoolInput(polybftConfig PolyBFTConfig) ([]byte, error) {
+	initFn := &contractsapi.InitializeRewardPoolFn{
 		RewardToken:  polybftConfig.RewardConfig.TokenAddress,
 		RewardWallet: polybftConfig.RewardConfig.WalletAddress,
 		ValidatorSet: contracts.ValidatorSetContract,

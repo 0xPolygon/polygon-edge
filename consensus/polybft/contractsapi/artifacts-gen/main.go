@@ -124,8 +124,8 @@ func main() {
 			"StakeManager",
 		},
 		{
-			"child/validator/RewardDistributor.sol",
-			"RewardDistributor",
+			"child/validator/RewardPool.sol",
+			"RewardPool",
 		},
 		{
 			"child/validator/ValidatorSet.sol",

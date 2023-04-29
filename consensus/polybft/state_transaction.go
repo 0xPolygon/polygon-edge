@@ -171,7 +171,7 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 	var (
 		commitFn            contractsapi.CommitStateReceiverFn
 		commitEpochFn       contractsapi.CommitEpochValidatorSetFn
-		distributeRewardsFn contractsapi.DistributeRewardForRewardDistributorFn
+		distributeRewardsFn contractsapi.DistributeRewardForRewardPoolFn
 		obj                 contractsapi.StateTransactionInput
 	)
 
@@ -183,7 +183,7 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 		obj = &contractsapi.CommitEpochValidatorSetFn{}
 	} else if bytes.Equal(sig, distributeRewardsFn.Sig()) {
 		// distribute rewards
-		obj = &contractsapi.DistributeRewardForRewardDistributorFn{}
+		obj = &contractsapi.DistributeRewardForRewardPoolFn{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}

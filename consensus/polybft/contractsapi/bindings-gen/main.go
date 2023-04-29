@@ -267,8 +267,8 @@ func main() {
 			},
 		},
 		{
-			"RewardDistributor",
-			gensc.RewardDistributor,
+			"RewardPool",
+			gensc.RewardPool,
 			false,
 			[]string{
 				"initialize",

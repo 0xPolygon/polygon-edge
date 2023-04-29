@@ -1201,47 +1201,31 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
 }
 
-type InitializeRewardDistributorFn struct {
+type InitializeRewardPoolFn struct {
 	RewardToken  types.Address `abi:"rewardToken"`
 	RewardWallet types.Address `abi:"rewardWallet"`
 	ValidatorSet types.Address `abi:"validatorSet"`
 	BaseReward   *big.Int      `abi:"baseReward"`
 }
 
-func (i *InitializeRewardDistributorFn) Sig() []byte {
-	return RewardDistributor.Abi.Methods["initialize"].ID()
+func (i *InitializeRewardPoolFn) Sig() []byte {
+	return RewardPool.Abi.Methods["initialize"].ID()
 }
 
-func (i *InitializeRewardDistributorFn) EncodeAbi() ([]byte, error) {
-	return RewardDistributor.Abi.Methods["initialize"].Encode(i)
+func (i *InitializeRewardPoolFn) EncodeAbi() ([]byte, error) {
+	return RewardPool.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeRewardDistributorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RewardDistributor.Abi.Methods["initialize"], buf, i)
+func (i *InitializeRewardPoolFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RewardPool.Abi.Methods["initialize"], buf, i)
 }
 
-type UptimeData struct {
+type Uptime struct {
 	Validator    types.Address `abi:"validator"`
 	SignedBlocks *big.Int      `abi:"signedBlocks"`
 }
 
-var UptimeDataABIType = abi.MustNewType("tuple(address validator,uint256 signedBlocks)")
-
-func (u *UptimeData) EncodeAbi() ([]byte, error) {
-	return UptimeDataABIType.Encode(u)
-}
-
-func (u *UptimeData) DecodeAbi(buf []byte) error {
-	return decodeStruct(UptimeDataABIType, buf, &u)
-}
-
-type Uptime struct {
-	EpochID     *big.Int      `abi:"epochId"`
-	UptimeData  []*UptimeData `abi:"uptimeData"`
-	TotalBlocks *big.Int      `abi:"totalBlocks"`
-}
-
-var UptimeABIType = abi.MustNewType("tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks)")
+var UptimeABIType = abi.MustNewType("tuple(address validator,uint256 signedBlocks)")
 
 func (u *Uptime) EncodeAbi() ([]byte, error) {
 	return UptimeABIType.Encode(u)
@@ -1251,19 +1235,19 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 	return decodeStruct(UptimeABIType, buf, &u)
 }
 
-type DistributeRewardForRewardDistributorFn struct {
-	EpochID *big.Int `abi:"epochId"`
-	Uptime  *Uptime  `abi:"uptime"`
+type DistributeRewardForRewardPoolFn struct {
+	EpochID *big.Int  `abi:"epochId"`
+	Uptime  []*Uptime `abi:"uptime"`
 }
 
-func (d *DistributeRewardForRewardDistributorFn) Sig() []byte {
-	return RewardDistributor.Abi.Methods["distributeRewardFor"].ID()
+func (d *DistributeRewardForRewardPoolFn) Sig() []byte {
+	return RewardPool.Abi.Methods["distributeRewardFor"].ID()
 }
 
-func (d *DistributeRewardForRewardDistributorFn) EncodeAbi() ([]byte, error) {
-	return RewardDistributor.Abi.Methods["distributeRewardFor"].Encode(d)
+func (d *DistributeRewardForRewardPoolFn) EncodeAbi() ([]byte, error) {
+	return RewardPool.Abi.Methods["distributeRewardFor"].Encode(d)
 }
 
-func (d *DistributeRewardForRewardDistributorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RewardDistributor.Abi.Methods["distributeRewardFor"], buf, d)
+func (d *DistributeRewardForRewardPoolFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RewardPool.Abi.Methods["distributeRewardFor"], buf, d)
 }

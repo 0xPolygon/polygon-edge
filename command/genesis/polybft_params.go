@@ -355,8 +355,8 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.ValidatorSetContract,
 		},
 		{
-			artifact: contractsapi.RewardDistributor,
-			address:  contracts.RewardDistributorContract,
+			artifact: contractsapi.RewardPool,
+			address:  contracts.RewardPoolContract,
 		},
 	}
 

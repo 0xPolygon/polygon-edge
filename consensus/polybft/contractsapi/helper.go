@@ -1,8 +1,6 @@
 package contractsapi
 
 import (
-	"math/big"
-
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 )
@@ -29,18 +27,9 @@ func (sse *StateSyncedEvent) EncodeAbi() ([]byte, error) {
 	return stateSyncABIType.Encode([]interface{}{sse})
 }
 
-// AddValidatorUptime is an extension (helper) function on a generated Uptime type
-// that adds uptime data for given validator to Uptime struct
-func (u *Uptime) AddValidatorUptime(address types.Address, count int64) {
-	u.UptimeData = append(u.UptimeData, &UptimeData{
-		Validator:    address,
-		SignedBlocks: big.NewInt(count),
-	})
-}
-
 var (
 	_ StateTransactionInput = &CommitEpochValidatorSetFn{}
-	_ StateTransactionInput = &DistributeRewardForRewardDistributorFn{}
+	_ StateTransactionInput = &DistributeRewardForRewardPoolFn{}
 )
 
 // IsStake indicates if transfer event (from ERC20 implementation) mints tokens to a non zero address
