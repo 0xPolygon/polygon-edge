@@ -255,7 +255,8 @@ func (t *TestServer) WithdrawChild() error {
 }
 
 // WithdrawChild withdraws available balance from child chain
-func (t *TestServer) WithdrawRoot(recipient string, amount uint64, stakeManager ethgo.Address, bridgeJSONRPC string) error {
+func (t *TestServer) WithdrawRoot(recipient string, amount uint64,
+	stakeManager ethgo.Address, bridgeJSONRPC string) error {
 	args := []string{
 		"polybft",
 		"withdraw-root",
