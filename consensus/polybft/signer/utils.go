@@ -3,7 +3,6 @@ package bls
 import (
 	"bytes"
 	"crypto/rand"
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -75,9 +74,9 @@ func MakeKOSKSignature(privateKey *PrivateKey, address types.Address,
 		return nil, err
 	}
 
+	// ethgo pads address to 32 bytes, but solidity doesn't (keeps it 20 bytes)
+	// that's why we are skipping first 12 bytes
 	message := bytes.Join([][]byte{spenderABI[12:], supernetManagerABI[12:], chainIDABI}, nil)
-	fmt.Println(message)
 
-	// abi.Encode adds 12 zero bytes before actual address bytes
 	return privateKey.Sign(message, domain)
 }
