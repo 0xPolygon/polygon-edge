@@ -3,7 +3,6 @@ package sidechain
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -60,14 +59,5 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 //
 //nolint:godox
 func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	return nil, nil
-}
-
-// GetDelegatorReward queries delegator reward for given validator and delegator addresses
-// TODO - @goran-ethernal depricate this function once we change e2e tests
-//
-//nolint:godox
-func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address,
-	txRelayer txrelayer.TxRelayer) (*big.Int, error) {
 	return nil, nil
 }
