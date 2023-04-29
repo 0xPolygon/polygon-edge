@@ -180,12 +180,15 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	initialValidators := extra.Validators.Added
 
 	// owner whitelists both new validators
-	require.NoError(t, owner.WhitelistValidator(firstValidatorAddr.String(), ownerSecrets))
-	require.NoError(t, owner.WhitelistValidator(secondValidatorAddr.String(), ownerSecrets))
-
+	require.NoError(t, owner.WhitelistValidators([]string{
+		firstValidatorAddr.String(),
+		secondValidatorAddr.String(),
+	}, polybftCfg.Bridge.CustomSupernetManagerAddr))
 	// start the first and the second validator
-	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+1), true, false)
-	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+2), true, false)
+	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+1),
+		cluster.Bridge.JSONRPCAddr(), true, false)
+	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSize+2),
+		cluster.Bridge.JSONRPCAddr(), true, false)
 
 	ownerAcc, err := sidechain.GetAccountFromDir(path.Join(cluster.Config.TmpDir, ownerSecrets))
 	require.NoError(t, err)
@@ -230,13 +233,13 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	newValidatorStake := ethgo.Ether(10)
 
 	// register the first validator with stake
-	require.NoError(t, firstValidator.RegisterValidator(firstValidatorDataDir, newValidatorStake.String()))
+	require.NoError(t, firstValidator.RegisterValidator(polybftCfg.Bridge.CustomSupernetManagerAddr))
 
 	// register the second validator without stake
-	require.NoError(t, secondValidator.RegisterValidator(secondValidatorDataDir, ""))
+	require.NoError(t, secondValidator.RegisterValidator(polybftCfg.Bridge.CustomSupernetManagerAddr))
 
 	// stake manually for the second validator
-	require.NoError(t, secondValidator.Stake(newValidatorStake.Uint64(), *polybftCfg, chainID, cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, secondValidator.Stake(newValidatorStake.Uint64(), *polybftCfg, chainID))
 
 	validators := polybft.AccountSet{}
 	// assert that new validator is among validator set
