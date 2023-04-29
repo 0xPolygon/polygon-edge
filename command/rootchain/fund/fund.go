@@ -2,7 +2,6 @@ package fund
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -47,10 +46,10 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().StringVar(
 		&params.amount,
 		amountFlag,
-		0,
+		"",
 		"tokens amount which is funded to validator on a root chain",
 	)
 
@@ -141,7 +140,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	fundAddr := ethgo.Address(validatorAddr)
 	txn := &ethgo.Transaction{
 		To:       &fundAddr,
-		Value:    new(big.Int).SetUint64(params.amount),
+		Value:    params.amountValue,
 		GasPrice: gasPrice,
 	}
 
@@ -165,7 +164,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	if params.mintRootToken {
 		// mint tokens to validator, so he is able to send them
-		mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, new(big.Int).SetUint64(params.amount))
+		mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, params.amountValue)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("mint transaction creation failed for validator: %s. err: %w", validatorAddr, err))
 

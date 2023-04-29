@@ -734,7 +734,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		originalValidatorStorage[validator.Address] = validator
 
 		// stake rewards
-		require.NoError(t, cluster.Servers[idx].Stake(validator.WithdrawableRewards.Uint64(), *polybftCfg, chainID))
+		require.NoError(t, cluster.Servers[idx].Stake(*polybftCfg, chainID, validator.WithdrawableRewards))
 	})
 
 	// wait a two more epochs, so that stake is registered and two more checkpoints are sent.

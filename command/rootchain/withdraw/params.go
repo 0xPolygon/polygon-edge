@@ -3,6 +3,7 @@ package withdraw
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -18,10 +19,16 @@ type withdrawParams struct {
 	jsonRPC          string
 	stakeManagerAddr string
 	addressTo        string
-	amount           uint64
+	amount           string
+
+	amountValue *big.Int
 }
 
-func (v *withdrawParams) validateFlags() error {
+func (v *withdrawParams) validateFlags() (err error) {
+	if v.amountValue, err = helper.ParseAmount(v.amount); err != nil {
+		return err
+	}
+
 	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.accountConfig)
 }
 

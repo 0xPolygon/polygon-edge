@@ -2,7 +2,6 @@ package withdraw
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -61,10 +60,10 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.StakeManagerFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().StringVar(
 		&params.amount,
 		sidechainHelper.AmountFlag,
-		0,
+		"",
 		"amount to withdraw",
 	)
 
@@ -95,7 +94,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	withdrawFn := &contractsapi.WithdrawStakeStakeManagerFn{
 		To:     types.StringToAddress(params.addressTo),
-		Amount: new(big.Int).SetUint64(params.amount),
+		Amount: params.amountValue,
 	}
 
 	encoded, err := withdrawFn.EncodeAbi()

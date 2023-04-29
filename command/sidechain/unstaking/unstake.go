@@ -2,7 +2,6 @@ package unstaking
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -48,10 +47,10 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().StringVar(
 		&params.amount,
 		sidechainHelper.AmountFlag,
-		0,
+		"",
 		"amount to unstake from validator",
 	)
 
@@ -80,7 +79,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	unstakeFn := &contractsapi.UnstakeValidatorSetFn{
-		Amount: new(big.Int).SetUint64(params.amount),
+		Amount: params.amountValue,
 	}
 
 	encoded, err := unstakeFn.EncodeAbi()

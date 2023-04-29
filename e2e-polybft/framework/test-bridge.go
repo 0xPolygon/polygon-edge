@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"path"
 	"strconv"
 	"strings"
@@ -291,16 +292,11 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig *polybft.PolyBFTConfi
 	}
 
 	for i, secret := range validatorSecrets {
-		args := []string{
-			"rootchain",
-			"fund",
-			"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-			"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Balance.Uint64(), 10),
-			"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-			"--mint",
-		}
-
-		if err := t.cmdRun(args...); err != nil {
+		err := t.FundSingleValidator(
+			polybftConfig.Bridge.RootNativeERC20Addr,
+			path.Join(t.clusterConfig.TmpDir, secret),
+			polybftConfig.InitialValidatorSet[i].Balance)
+		if err != nil {
 			return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 		}
 	}
@@ -391,7 +387,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Stake.Uint64(), 10),
+					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
 					"--chain-id", strconv.FormatInt(chainID, 10),
 					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 				}
@@ -421,6 +417,24 @@ func (t *TestBridge) finalizeGenesis(polybftConfig *polybft.PolyBFTConfig) error
 
 	if err := t.cmdRun(args...); err != nil {
 		return fmt.Errorf("failed to finalize genesis validators on supernet manager: %w", err)
+	}
+
+	return nil
+}
+
+// FundSingleValidator sends tokens to a rootchain validators
+func (t *TestBridge) FundSingleValidator(tookenAddress types.Address, secretsPath string, amount *big.Int) error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--" + polybftsecrets.AccountDirFlag, secretsPath,
+		"--amount", amount.String(),
+		"--native-root-token", tookenAddress.String(),
+		"--mint",
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to fund a validator on the rootchain: %w", err)
 	}
 
 	return nil

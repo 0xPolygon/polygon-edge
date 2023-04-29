@@ -207,17 +207,14 @@ func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, tokensAmou
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-// TODO: unify with test-bridge.initialStakingOfGenesisValidators
-//
-//nolint:godox
-func (t *TestServer) Stake(amount uint64, polybftConfig polybft.PolyBFTConfig, chainID int64) error {
+func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, chainID int64, amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"stake",
 		"--jsonrpc", t.BridgeJSONRPCAddr(),
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
-		"--amount", strconv.FormatUint(amount, 10),
+		"--amount", amount.String(),
 		"--chain-id", strconv.FormatInt(chainID, 10),
 		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 	}
@@ -281,14 +278,14 @@ func (t *TestServer) WithdrawChildChain() error {
 }
 
 // WithdrawRootChain withdraws available balance from root chain
-func (t *TestServer) WithdrawRootChain(recipient string, amount uint64,
+func (t *TestServer) WithdrawRootChain(recipient string, amount *big.Int,
 	stakeManager ethgo.Address, bridgeJSONRPC string) error {
 	args := []string{
 		"polybft",
 		"withdraw-root",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--to", recipient,
-		"--amount", strconv.FormatUint(amount, 10),
+		"--amount", amount.String(),
 		"--stake-manager", stakeManager.String(),
 		"--jsonrpc", bridgeJSONRPC,
 	}
