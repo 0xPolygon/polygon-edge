@@ -242,45 +242,31 @@ func (t *TestServer) WhitelistValidator(address, secrets string) error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("whitelist-validator"))
 }
 
-// Delegate delegates given amount by the account in secrets to validatorAddr validator
-func (t *TestServer) Delegate(amount uint64, secrets string, validatorAddr ethgo.Address) error {
+// WithdrawChild withdraws available balance from child chain
+func (t *TestServer) WithdrawChild() error {
 	args := []string{
 		"polybft",
-		"stake",
-		"--" + polybftsecrets.AccountDirFlag, secrets,
+		"withdraw-child",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--delegate", validatorAddr.String(),
-		"--amount", strconv.FormatUint(amount, 10),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("delegation"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-child"))
 }
 
-// Undelegate undelegates given amount by the account in secrets from validatorAddr validator
-func (t *TestServer) Undelegate(amount uint64, secrets string, validatorAddr ethgo.Address) error {
+// WithdrawChild withdraws available balance from child chain
+func (t *TestServer) WithdrawRoot(recipient string, amount uint64, stakeManager ethgo.Address, bridgeJSONRPC string) error {
 	args := []string{
 		"polybft",
-		"unstake",
-		"--" + polybftsecrets.AccountDirFlag, secrets,
-		"--undelegate", validatorAddr.String(),
+		"withdraw-root",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
+		"--to", recipient,
 		"--amount", strconv.FormatUint(amount, 10),
-		"--jsonrpc", t.JSONRPCAddr(),
+		"--stake-manager", stakeManager.String(),
+		"--jsonrpc", bridgeJSONRPC,
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("delegation"))
-}
-
-// Withdraw withdraws available balance to provided recipient address
-func (t *TestServer) Withdraw(secrets string, recipient ethgo.Address) error {
-	args := []string{
-		"polybft",
-		"withdraw",
-		"--" + polybftsecrets.AccountDirFlag, secrets,
-		"--to", recipient.String(),
-		"--jsonrpc", t.JSONRPCAddr(),
-	}
-
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdrawal"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-root"))
 }
 
 // HasValidatorSealed checks whether given validator has signed at least single block for the given range of blocks

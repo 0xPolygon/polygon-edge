@@ -406,7 +406,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	t.Logf("Balance (before withdrawal)=%s\n", oldValidatorBalance)
 
 	// withdraw (stake + rewards)
-	require.NoError(t, srv.Withdraw(validatorSecrets, validatorAddr))
+	require.NoError(t, srv.WithdrawChild())
 
 	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
@@ -440,80 +440,6 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 			t.Fatalf("not expected to find validator %v in the current validator set", validator.Address)
 		}
 	}
-}
-
-func TestE2E_Consensus_CorrectnessOfExtraValidatorsShouldNotDependOnDelegate(t *testing.T) {
-	const (
-		validatorSecrets = "test-chain-1"
-		delegatorSecrets = "test-chain-delegator"
-		epochSize        = 5
-		validatorCount   = 4
-		blockTime        = 2 * time.Second
-	)
-
-	cluster := framework.NewTestCluster(t, validatorCount,
-		framework.WithEpochReward(100000),
-		framework.WithEpochSize(epochSize))
-	defer cluster.Stop()
-
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
-	require.NoError(t, err)
-
-	// init delegator account
-	_, err = cluster.InitSecrets(delegatorSecrets, 1)
-	require.NoError(t, err)
-
-	cluster.WaitForReady(t)
-
-	// extract delegator's secrets
-	delegatorSecretsPath := path.Join(cluster.Config.TmpDir, delegatorSecrets)
-	delegatorAcc, err := sidechain.GetAccountFromDir(delegatorSecretsPath)
-	require.NoError(t, err)
-
-	delegatorAddr := delegatorAcc.Ecdsa.Address()
-
-	// extract validator's secrets
-	validatorSecretsPath := path.Join(cluster.Config.TmpDir, validatorSecrets)
-
-	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecretsPath)
-	require.NoError(t, err)
-
-	validatorAddr := validatorAcc.Ecdsa.Address()
-
-	fundAmount := ethgo.Ether(250)
-
-	// fund delegator
-	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
-		From:  validatorAddr,
-		To:    &delegatorAddr,
-		Value: fundAmount,
-	}, validatorAcc.Ecdsa)
-	require.NoError(t, err)
-	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
-
-	endCh, waitCh := make(chan struct{}), make(chan struct{})
-
-	delegationAmount := ethgo.Ether(1).Uint64()
-	// delegate tokens to validator in the loop to be sure that the stake of validator will be changed at end of epoch block
-	go func() {
-		for {
-			err = cluster.Servers[0].Delegate(delegationAmount, validatorSecretsPath, validatorAddr)
-			require.NoError(t, err)
-
-			select {
-			case <-endCh:
-				close(waitCh)
-
-				return
-			case <-time.After(blockTime / 2):
-			}
-		}
-	}()
-
-	require.NoError(t, cluster.WaitForBlock(6, 30*time.Second))
-
-	close(endCh)
-	<-waitCh
 }
 
 func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {

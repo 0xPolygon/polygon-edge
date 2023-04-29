@@ -21,8 +21,8 @@ var params withdrawParams
 
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
-		Use:     "withdraw",
-		Short:   "Withdraws sender's withdrawable amount to specified address",
+		Use:     "withdraw-root",
+		Short:   "Withdraws sender's withdrawable amount to specified address on the root chain",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
