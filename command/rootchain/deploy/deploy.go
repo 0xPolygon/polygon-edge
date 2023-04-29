@@ -690,10 +690,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 func initializeSupernetManager(cmdOutput command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
-	// this is done without using go stubs, because CustomSupernetManager inherits
-	// SupernetManager which has another initialize function
-	// and generator keeps generating that parent initialize function
-	initNewFn := &contractsapi.InitializeNewCustomSupernetManagerFn{
+	initFn := &contractsapi.InitializeCustomSupernetManagerFn{
 		StakeManager:      rootchainConfig.StakeManagerAddress,
 		Bls:               rootchainConfig.BLSAddress,
 		StateSender:       rootchainConfig.StateSenderAddress,
@@ -703,7 +700,7 @@ func initializeSupernetManager(cmdOutput command.OutputFormatter,
 		Domain:            bls.DomainValidatorSetString,
 	}
 
-	input, err := initNewFn.EncodeAbi()
+	input, err := initFn.EncodeAbi()
 	if err != nil {
 		return err
 	}

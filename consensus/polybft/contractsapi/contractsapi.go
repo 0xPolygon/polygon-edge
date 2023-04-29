@@ -494,7 +494,6 @@ type InitializeRootERC1155PredicateFn struct {
 	NewExitHelper            types.Address `abi:"newExitHelper"`
 	NewChildERC1155Predicate types.Address `abi:"newChildERC1155Predicate"`
 	NewChildTokenTemplate    types.Address `abi:"newChildTokenTemplate"`
-	NativeTokenRootAddress   types.Address `abi:"nativeTokenRootAddress"`
 }
 
 func (i *InitializeRootERC1155PredicateFn) Sig() []byte {
@@ -621,7 +620,6 @@ func (w *WithdrawBatchChildERC1155PredicateFn) DecodeAbi(buf []byte) error {
 
 type InitializeChildERC1155Fn struct {
 	RootToken_ types.Address `abi:"rootToken_"`
-	Name_      string        `abi:"name_"`
 	Uri_       string        `abi:"uri_"`
 }
 
@@ -795,7 +793,7 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC721.Abi.Methods["ownerOf"], buf, o)
 }
 
-type InitializeNewCustomSupernetManagerFn struct {
+type InitializeCustomSupernetManagerFn struct {
 	StakeManager      types.Address `abi:"stakeManager"`
 	Bls               types.Address `abi:"bls"`
 	StateSender       types.Address `abi:"stateSender"`
@@ -805,16 +803,16 @@ type InitializeNewCustomSupernetManagerFn struct {
 	Domain            string        `abi:"domain"`
 }
 
-func (i *InitializeNewCustomSupernetManagerFn) Sig() []byte {
-	return CustomSupernetManager.Abi.Methods["initializeNew"].ID()
+func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
+	return CustomSupernetManager.Abi.Methods["initialize"].ID()
 }
 
-func (i *InitializeNewCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
-	return CustomSupernetManager.Abi.Methods["initializeNew"].Encode(i)
+func (i *InitializeCustomSupernetManagerFn) EncodeAbi() ([]byte, error) {
+	return CustomSupernetManager.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeNewCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(CustomSupernetManager.Abi.Methods["initializeNew"], buf, i)
+func (i *InitializeCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CustomSupernetManager.Abi.Methods["initialize"], buf, i)
 }
 
 type WhitelistValidatorsCustomSupernetManagerFn struct {
@@ -1184,7 +1182,6 @@ func (w *WithdrawalRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 
 type WithdrawalEvent struct {
 	Account types.Address `abi:"account"`
-	To      types.Address `abi:"to"`
 	Amount  *big.Int      `abi:"amount"`
 }
 

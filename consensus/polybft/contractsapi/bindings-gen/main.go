@@ -224,7 +224,7 @@ func main() {
 			gensc.CustomSupernetManager,
 			false,
 			[]string{
-				"initializeNew",
+				"initialize",
 				"whitelistValidators",
 				"register",
 				"getValidator",
