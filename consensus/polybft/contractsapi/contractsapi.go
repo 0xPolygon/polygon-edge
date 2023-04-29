@@ -660,6 +660,44 @@ func (w *WithdrawToChildERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
 }
 
+type InitializeChildERC20PredicateAccessListFn struct {
+	NewL2StateSender          types.Address `abi:"newL2StateSender"`
+	NewStateReceiver          types.Address `abi:"newStateReceiver"`
+	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
+	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
+	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
+}
+
+func (i *InitializeChildERC20PredicateAccessListFn) Sig() []byte {
+	return ChildERC20PredicateAccessList.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildERC20PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC20PredicateAccessList.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC20PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20PredicateAccessList.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawToChildERC20PredicateAccessListFn struct {
+	ChildToken types.Address `abi:"childToken"`
+	Receiver   types.Address `abi:"receiver"`
+	Amount     *big.Int      `abi:"amount"`
+}
+
+func (w *WithdrawToChildERC20PredicateAccessListFn) Sig() []byte {
+	return ChildERC20PredicateAccessList.Abi.Methods["withdrawTo"].ID()
+}
+
+func (w *WithdrawToChildERC20PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC20PredicateAccessList.Abi.Methods["withdrawTo"].Encode(w)
+}
+
+func (w *WithdrawToChildERC20PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20PredicateAccessList.Abi.Methods["withdrawTo"], buf, w)
+}
+
 type InitializeNativeERC20Fn struct {
 	Predicate_ types.Address `abi:"predicate_"`
 	RootToken_ types.Address `abi:"rootToken_"`

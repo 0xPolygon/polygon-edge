@@ -129,9 +129,16 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize ChildERC20Predicate SC
-		input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
-		if err != nil {
-			return err
+		if polyBFTConfig.BridgeAllowListActive || polyBFTConfig.BridgeBlockListActive {
+			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig.Bridge)
+			if err != nil {
+				return err
+			}
+		} else {
+			input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
+			if err != nil {
+				return err
+			}
 		}
 
 		if err = initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition); err != nil {

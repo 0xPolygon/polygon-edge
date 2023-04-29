@@ -71,6 +71,30 @@ func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	return params.EncodeAbi()
 }
 
+// getInitChildERC20PredicateInput builds input parameters for ChildERC20Predicate SC initialization
+func getInitChildERC20PredicateAccessListInput(config *BridgeConfig) ([]byte, error) {
+	//nolint:godox
+	// to be fixed with EVM-541
+	// TODO: @Stefan-Ethernal Temporary workaround just to be able to run cluster in non-bridge mode, until SC is fixed
+	rootERC20PredicateAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)
+	rootERC20Addr := types.ZeroAddress
+
+	if config != nil {
+		rootERC20PredicateAddr = config.RootERC20PredicateAddr
+		rootERC20Addr = config.RootNativeERC20Addr
+	}
+
+	params := &contractsapi.InitializeChildERC20PredicateAccessListFn{
+		NewL2StateSender:          contracts.L2StateSenderContract,
+		NewStateReceiver:          contracts.StateReceiverContract,
+		NewRootERC20Predicate:     rootERC20PredicateAddr,
+		NewChildTokenTemplate:     contracts.ChildERC20Contract,
+		NewNativeTokenRootAddress: rootERC20Addr,
+	}
+
+	return params.EncodeAbi()
+}
+
 // getInitChildERC721PredicateInput builds input parameters for ChildERC721Predicate SC initialization
 func getInitChildERC721PredicateInput(config *BridgeConfig) ([]byte, error) {
 	rootERC721PredicateAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)

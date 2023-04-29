@@ -112,6 +112,15 @@ func main() {
 			[]string{},
 		},
 		{
+			"ChildERC20PredicateAccessList",
+			gensc.ChildERC20PredicateAccessList,
+			[]string{
+				"initialize",
+				"withdrawTo",
+			},
+			[]string{},
+		},
+		{
 			"NativeERC20",
 			gensc.NativeERC20,
 			[]string{

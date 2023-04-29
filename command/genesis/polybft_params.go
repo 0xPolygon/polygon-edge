@@ -105,10 +105,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          initialValidators[0].Address,
-		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
-		MintableNativeToken: p.mintableNativeToken,
-		NativeTokenConfig:   p.nativeTokenConfig,
+		Governance:            initialValidators[0].Address,
+		InitialTrieRoot:       types.StringToHash(p.initialStateRoot),
+		MintableNativeToken:   p.mintableNativeToken,
+		NativeTokenConfig:     p.nativeTokenConfig,
+		BridgeAllowListActive: len(p.bridgeAllowListAdmin) != 0,
+		BridgeBlockListActive: len(p.bridgeBlockListAdmin) != 0,
 	}
 
 	chainConfig := &chain.Chain{
@@ -279,11 +281,6 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			address:  contracts.ChildERC20Contract,
 		},
 		{
-			// ChildERC20Predicate contract
-			artifact: contractsapi.ChildERC20Predicate,
-			address:  contracts.ChildERC20PredicateContract,
-		},
-		{
 			// ChildERC721 token contract
 			artifact: contractsapi.ChildERC721,
 			address:  contracts.ChildERC721Contract,
@@ -326,6 +323,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
+	}
+
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.ChildERC20PredicateAccessList, address: contracts.ChildERC20PredicateContract})
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.ChildERC20Predicate, address: contracts.ChildERC20PredicateContract})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
