@@ -368,64 +368,76 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	//nolint:godox
-	// TODO - @goran-ethernal update this once e2e tests get fixed
-	// systemState := polybft.NewSystemState(
-	// 	contracts.ValidatorSetContract,
-	// 	contracts.StateReceiverContract,
-	// 	&e2eStateProvider{txRelayer: txRelayer})
-
 	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecrets)
 	require.NoError(t, err)
 
 	validatorAddr := validatorAcc.Ecdsa.Address()
 
-	// wait for one epoch to accumulate validator rewards
-	require.NoError(t, cluster.WaitForBlock(5, 20*time.Second))
+	// wait for some rewards to get accumulated
+	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*3, time.Minute))
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
 		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
+	require.True(t, validatorInfo.IsActive)
 
 	initialStake := validatorInfo.Stake
 	t.Logf("Stake (before unstake)=%d\n", initialStake)
 
+	reward := validatorInfo.WithdrawableRewards
+	t.Logf("Rewards=%d\n", reward)
+	require.Greater(t, reward.Uint64(), uint64(0))
+
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
 	require.NoError(t, srv.Unstake(initialStake.Uint64()))
 
-	// wait end of epoch
-	require.NoError(t, cluster.WaitForBlock(10, 20*time.Second))
+	// wait for one epoch to withdraw from child
+	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*4, time.Minute))
 
-	//nolint:godox
-	// TODO - @goran-ethernal update this check once e2e tests get fixed
-	// validatorSet, err := systemState.GetValidatorSet()
-	// require.NoError(t, err)
+	// withdraw from child
+	require.NoError(t, srv.WithdrawChildChain())
 
-	// // assert that validator isn't present in new validator set
-	// require.Equal(t, 4, validatorSet.Len())
+	currentBlock, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+	require.NoError(t, err)
 
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	require.NoError(t, err)
+
+	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
+
+	currentEpoch := currentExtra.Checkpoint.EpochNumber
+
+	// wait for checkpoint to be submitted
+	require.NoError(t, waitForRootchainEpoch(currentEpoch, time.Minute,
+		rootChainRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
+
+	// send exit transaction to exit helper
+	err = cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, 1, srv.BridgeJSONRPCAddr(), srv.JSONRPCAddr())
+	require.NoError(t, err)
+
+	// make sure exit event is processed successfully
+	isProcessed, err := isExitEventProcessed(1, ethgo.Address(polybftCfg.Bridge.ExitHelperAddr), rootChainRelayer)
+	require.NoError(t, err)
+	require.True(t, isProcessed, "exit event with was not processed")
+
+	// check that validator is no longer active (out of validator set)
 	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
 		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
+	require.False(t, validatorInfo.IsActive)
+	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
 
-	reward := validatorInfo.WithdrawableRewards
-	t.Logf("Rewards=%d\n", reward)
 	t.Logf("Stake (after unstake)=%d\n", validatorInfo.Stake)
-	require.Greater(t, reward.Uint64(), uint64(0))
 
-	oldValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
-	require.NoError(t, err)
-	t.Logf("Balance (before withdrawal)=%s\n", oldValidatorBalance)
-
-	// withdraw (stake + rewards)
-	require.NoError(t, srv.WithdrawChildChain())
+	// withdraw pending rewards
+	require.NoError(t, srv.WithdrawRewards())
 
 	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
-	t.Logf("Balance (after withdrawal)=%s\n", newValidatorBalance)
-	require.True(t, newValidatorBalance.Cmp(oldValidatorBalance) > 0)
+	t.Logf("Balance (after withdrawal of rewards)=%s\n", newValidatorBalance)
+	require.True(t, newValidatorBalance.Cmp(big.NewInt(0)) > 0)
 
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)

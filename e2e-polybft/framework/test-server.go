@@ -235,7 +235,7 @@ func (t *TestServer) Unstake(amount uint64) error {
 		"--amount", strconv.FormatUint(amount, 10),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("unstake"))
 }
 
 // RegisterValidator is a wrapper function which registers new validator on a root chain
@@ -294,6 +294,18 @@ func (t *TestServer) WithdrawRootChain(recipient string, amount uint64,
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-root"))
+}
+
+// WithdrawRewards withdraws pending rewards for given validator on RewardPool contract
+func (t *TestServer) WithdrawRewards() error {
+	args := []string{
+		"polybft",
+		"withdraw-rewards",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
+		"--jsonrpc", t.JSONRPCAddr(),
+	}
+
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-rewards"))
 }
 
 // HasValidatorSealed checks whether given validator has signed at least single block for the given range of blocks
