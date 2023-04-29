@@ -66,9 +66,6 @@ func isExitEventProcessed(exitEventID uint64, exitHelper ethgo.Address, rootTxRe
 }
 
 // getRootchainValidators queries rootchain validator set
-// TODO: Update
-//
-//nolint:godox
 func getRootchainValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
 	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
 		checkpointManagerAddr, ethgo.ZeroAddress, "currentValidatorSetLength")
