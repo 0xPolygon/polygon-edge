@@ -420,7 +420,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	t.Logf("Balance (before withdrawal)=%s\n", oldValidatorBalance)
 
 	// withdraw (stake + rewards)
-	require.NoError(t, srv.WithdrawChild())
+	require.NoError(t, srv.WithdrawChildChain())
 
 	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)

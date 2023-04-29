@@ -188,6 +188,24 @@ func (t *TestServer) Stop() {
 	t.node = nil
 }
 
+// RootchainFund funds given validator account on the rootchain
+func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, tokensAmount uint64) error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
+		"--native-root-token", rootNativeERC20Addr.String(),
+		"--amount", strconv.FormatUint(tokensAmount, 10),
+		"--mint",
+	}
+
+	if err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge")); err != nil {
+		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+	}
+
+	return nil
+}
+
 // Stake stakes given amount to validator account encapsulated by given server instance
 // TODO: unify with test-bridge.initialStakingOfGenesisValidators
 //
@@ -230,11 +248,11 @@ func (t *TestServer) RegisterValidator(supernetManagerAddr types.Address) error 
 		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("register-validator"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
 }
 
-// WhitelistValidators invokes whitelist-validator helper CLI command,
-// which sends whitelist transaction to ChildValidatorSet
+// WhitelistValidators invokes whitelist-validators helper CLI command,
+// that whitelists validators on the root chain
 func (t *TestServer) WhitelistValidators(addresses []string, supernetManager types.Address) error {
 	args := []string{
 		"polybft",
@@ -247,11 +265,11 @@ func (t *TestServer) WhitelistValidators(addresses []string, supernetManager typ
 		args = append(args, "--addresses", addr)
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("whitelist-validators"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
 }
 
-// WithdrawChild withdraws available balance from child chain
-func (t *TestServer) WithdrawChild() error {
+// WithdrawChildChain withdraws available balance from child chain
+func (t *TestServer) WithdrawChildChain() error {
 	args := []string{
 		"polybft",
 		"withdraw-child",
@@ -262,8 +280,8 @@ func (t *TestServer) WithdrawChild() error {
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-child"))
 }
 
-// WithdrawChild withdraws available balance from child chain
-func (t *TestServer) WithdrawRoot(recipient string, amount uint64,
+// WithdrawRootChain withdraws available balance from root chain
+func (t *TestServer) WithdrawRootChain(recipient string, amount uint64,
 	stakeManager ethgo.Address, bridgeJSONRPC string) error {
 	args := []string{
 		"polybft",

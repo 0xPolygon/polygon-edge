@@ -2,6 +2,8 @@ package fund
 
 import (
 	"errors"
+	"fmt"
+	"os"
 
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -9,7 +11,7 @@ import (
 )
 
 const (
-	numFlag           = "num"
+	amountFlag        = "amount"
 	jsonRPCFlag       = "json-rpc"
 	mintRootTokenFlag = "mint"
 )
@@ -23,9 +25,11 @@ var (
 type fundParams struct {
 	dataDir             string
 	configPath          string
+	amount              uint64
 	nativeRootTokenAddr string
 	deployerPrivateKey  string
 	mintRootToken       bool
+	jsonRPCAddress      string
 
 	secretsManager secrets.SecretsManager
 	secretsConfig  *secrets.SecretsManagerConfig
@@ -34,6 +38,18 @@ type fundParams struct {
 func (fp *fundParams) validateFlags() error {
 	if fp.dataDir == "" && fp.configPath == "" {
 		return errInvalidParams
+	}
+
+	if fp.dataDir != "" {
+		if _, err := os.Stat(fp.dataDir); err != nil {
+			return fmt.Errorf("invalid validators secrets path ('%s') provided. Error: %w", fp.dataDir, err)
+		}
+	}
+
+	if fp.configPath != "" {
+		if _, err := os.Stat(fp.configPath); err != nil {
+			return fmt.Errorf("invalid validators secrets config path ('%s') provided. Error: %w", fp.configPath, err)
+		}
 	}
 
 	return nil

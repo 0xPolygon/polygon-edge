@@ -285,17 +285,24 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 
 // fundRootchainValidators sends predefined amount of tokens to rootchain validators
 func (t *TestBridge) fundRootchainValidators(polybftConfig *polybft.PolyBFTConfig) error {
-	args := []string{
-		"rootchain",
-		"fund",
-		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
-		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize)),
-		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-		"--mint",
+	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
+	if err != nil {
+		return fmt.Errorf("could not get validator secrets on initial rootchain funding of genesis validators: %w", err)
 	}
 
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+	for i, secret := range validatorSecrets {
+		args := []string{
+			"rootchain",
+			"fund",
+			"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
+			"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Balance.Uint64(), 10),
+			"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+			"--mint",
+		}
+
+		if err := t.cmdRun(args...); err != nil {
+			return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+		}
 	}
 
 	return nil
