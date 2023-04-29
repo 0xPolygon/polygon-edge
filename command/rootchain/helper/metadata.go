@@ -124,17 +124,17 @@ func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error
 
 // GetValidatorInfo queries SupernetManager smart contract on root
 // and retrieves validator info for given address
-func GetValidatorInfo(validatorAddr, supernetManagerAddr ethgo.Address,
-	txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	getValidatorMethod := contractsapi.CustomSupernetManager.Abi.GetMethod("validators")
+func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeManagerAddr types.Address,
+	chainID uint64, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+	caller := ethgo.Address(contracts.SystemCaller)
+	getValidatorMethod := contractsapi.CustomSupernetManager.Abi.GetMethod("getValidator")
 
 	encode, err := getValidatorMethod.Encode([]interface{}{validatorAddr})
 	if err != nil {
 		return nil, err
 	}
 
-	response, err := txRelayer.Call(ethgo.Address(contracts.SystemCaller),
-		supernetManagerAddr, encode)
+	response, err := txRelayer.Call(caller, ethgo.Address(supernetManagerAddr), encode)
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +154,40 @@ func GetValidatorInfo(validatorAddr, supernetManagerAddr ethgo.Address,
 		return nil, fmt.Errorf("could not convert decoded outputs to map")
 	}
 
-	return &polybft.ValidatorInfo{
-		Address:       validatorAddr.Address(),
-		Stake:         decodedOutputsMap["stake"].(*big.Int),     //nolint:forcetypeassert
-		IsActive:      decodedOutputsMap["isActive"].(bool),      //nolint:forcetypeassert
-		IsWhitelisted: decodedOutputsMap["isWhitelisted"].(bool), //nolint:forcetypeassert
-	}, nil
+	innerMap, ok := decodedOutputsMap["0"].(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not convert decoded outputs map to inner map")
+	}
+
+	validatorInfo := &polybft.ValidatorInfo{
+		Address:       validatorAddr,
+		IsActive:      innerMap["isActive"].(bool),      //nolint:forcetypeassert
+		IsWhitelisted: innerMap["isWhitelisted"].(bool), //nolint:forcetypeassert
+	}
+
+	stakeOfFn := &contractsapi.StakeOfStakeManagerFn{
+		ID:        new(big.Int).SetUint64(chainID),
+		Validator: types.Address(validatorAddr),
+	}
+
+	encode, err = stakeOfFn.EncodeAbi()
+	if err != nil {
+		return nil, err
+	}
+
+	response, err = txRelayer.Call(caller, ethgo.Address(stakeManagerAddr), encode)
+	if err != nil {
+		return nil, err
+	}
+
+	stake, err := types.ParseUint256orHex(&response)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorInfo.Stake = stake
+
+	return validatorInfo, nil
 }
 
 // CreateMintTxn encodes parameters for mint function on rootchain token contract

@@ -716,8 +716,9 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
 		for i, validatorAddr := range votingPowerChangeValidators {
 			// query validator info
-			validatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
-				validatorAddr, rootChainRelayer, childChainRelayer)
+			validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
+				polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+				uint64(chainID), rootChainRelayer, childChainRelayer)
 			require.NoError(t, err)
 
 			handler(i, validatorInfo)

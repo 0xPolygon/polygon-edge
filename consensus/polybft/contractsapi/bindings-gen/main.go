@@ -244,6 +244,7 @@ func main() {
 				"stakeFor",
 				"releaseStakeOf",
 				"withdrawStake",
+				"stakeOf",
 			},
 			[]string{
 				"ChildManagerRegistered",

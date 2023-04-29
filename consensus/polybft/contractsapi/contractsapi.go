@@ -988,6 +988,23 @@ func (w *WithdrawStakeStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["withdrawStake"], buf, w)
 }
 
+type StakeOfStakeManagerFn struct {
+	Validator types.Address `abi:"validator"`
+	ID        *big.Int      `abi:"id"`
+}
+
+func (s *StakeOfStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["stakeOf"].ID()
+}
+
+func (s *StakeOfStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["stakeOf"].Encode(s)
+}
+
+func (s *StakeOfStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["stakeOf"], buf, s)
+}
+
 type ChildManagerRegisteredEvent struct {
 	ID      *big.Int      `abi:"id"`
 	Manager types.Address `abi:"manager"`

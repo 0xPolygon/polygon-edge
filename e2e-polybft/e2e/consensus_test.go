@@ -285,8 +285,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, nextValidatorsHash)
 
 	// query the first validator
-	firstValidatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
-		firstValidatorAddr, rootChainRelayer, childChainRelayer)
+	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr,
+		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// assert the first validator's stake
@@ -294,8 +295,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, newValidatorStake, firstValidatorInfo.Stake)
 
 	// query the second validatorr
-	secondValidatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
-		secondValidatorAddr, rootChainRelayer, childChainRelayer)
+	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr,
+		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// assert the second validator's stake
@@ -308,8 +310,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(currentBlock+3*epochSize, 2*time.Minute))
 
 	// query the first validator info again
-	firstValidatorInfo, err = sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
-		firstValidatorAddr, rootChainRelayer, childChainRelayer)
+	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr,
+		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// check if the first validator has signed any prposals
@@ -323,8 +326,9 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	}
 
 	// query the second validator info again
-	secondValidatorInfo, err = sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
-		secondValidatorAddr, rootChainRelayer, childChainRelayer)
+	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr,
+		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// check if the second validator has signed any prposals
@@ -352,6 +356,9 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		}),
 	)
 
+	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
 	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
 	srv := cluster.Servers[0]
 
@@ -376,7 +383,9 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait for one epoch to accumulate validator rewards
 	require.NoError(t, cluster.WaitForBlock(5, 20*time.Second))
 
-	validatorInfo, err := sidechain.GetValidatorInfo(ethgo.ZeroAddress, validatorAddr, rootChainRelayer, childChainRelayer)
+	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
+		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	initialStake := validatorInfo.Stake
@@ -396,7 +405,9 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// // assert that validator isn't present in new validator set
 	// require.Equal(t, 4, validatorSet.Len())
 
-	validatorInfo, err = sidechain.GetValidatorInfo(ethgo.ZeroAddress, validatorAddr, rootChainRelayer, childChainRelayer)
+	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
+		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
+		uint64(chainID), rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	reward := validatorInfo.WithdrawableRewards
@@ -417,9 +428,6 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.True(t, newValidatorBalance.Cmp(oldValidatorBalance) > 0)
 
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
