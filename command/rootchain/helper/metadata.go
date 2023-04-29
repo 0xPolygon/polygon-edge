@@ -159,10 +159,11 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 		return nil, fmt.Errorf("could not convert decoded outputs map to inner map")
 	}
 
+	//nolint:forcetypeassert
 	validatorInfo := &polybft.ValidatorInfo{
 		Address:       validatorAddr,
-		IsActive:      innerMap["isActive"].(bool),      //nolint:forcetypeassert
-		IsWhitelisted: innerMap["isWhitelisted"].(bool), //nolint:forcetypeassert
+		IsActive:      innerMap["isActive"].(bool),
+		IsWhitelisted: innerMap["isWhitelisted"].(bool),
 	}
 
 	stakeOfFn := &contractsapi.StakeOfStakeManagerFn{
