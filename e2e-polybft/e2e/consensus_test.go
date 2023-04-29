@@ -131,7 +131,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	// first validator is the owner of ChildValidator set smart contract
 	owner := cluster.Servers[0]
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
+	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(owner.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	//nolint:godox
@@ -188,7 +191,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	initialBalance := ethgo.Ether(500000)
 
 	// send some tokens from the owner to the first validator so that the first validator can register and stake
-	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
+	receipt, err := childChainRelayer.SendTransaction(&ethgo.Transaction{
 		From:  ownerAcc.Ecdsa.Address(),
 		To:    &firstValidatorAddr,
 		Value: initialBalance,
@@ -197,7 +200,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
 	// send some tokens from the owner to the second validator so that the second validator can register and stake
-	receipt, err = txRelayer.SendTransaction(&ethgo.Transaction{
+	receipt, err = childChainRelayer.SendTransaction(&ethgo.Transaction{
 		From:                 ownerAcc.Ecdsa.Address(),
 		To:                   &secondValidatorAddr,
 		Value:                initialBalance,
@@ -275,21 +278,26 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, extra.Checkpoint.NextValidatorsHash, nextValidatorsHash)
 
+	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
 	// query the first validator
-	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr, txRelayer)
+	firstValidatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
+		firstValidatorAddr, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// assert the first validator's stake
-	t.Logf("First validator stake=%d\n", firstValidatorInfo.TotalStake)
-	require.Equal(t, newValidatorStake, firstValidatorInfo.TotalStake)
+	t.Logf("First validator stake=%d\n", firstValidatorInfo.Stake)
+	require.Equal(t, newValidatorStake, firstValidatorInfo.Stake)
 
 	// query the second validatorr
-	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr, txRelayer)
+	secondValidatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
+		secondValidatorAddr, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// assert the second validator's stake
-	t.Logf("Second validator stake=%d\n", secondValidatorInfo.TotalStake)
-	require.Equal(t, newValidatorStake, secondValidatorInfo.TotalStake)
+	t.Logf("Second validator stake=%d\n", secondValidatorInfo.Stake)
+	require.Equal(t, newValidatorStake, secondValidatorInfo.Stake)
 
 	// wait 3 more epochs, so that rewards get accumulated to the registered validator account
 	currentBlock, err := owner.JSONRPC().Eth().BlockNumber()
@@ -297,7 +305,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(currentBlock+3*epochSize, 2*time.Minute))
 
 	// query the first validator info again
-	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr, txRelayer)
+	firstValidatorInfo, err = sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
+		firstValidatorAddr, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// check if the first validator has signed any prposals
@@ -311,7 +320,8 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	}
 
 	// query the second validator info again
-	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr, txRelayer)
+	secondValidatorInfo, err = sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
+		secondValidatorAddr, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	// check if the second validator has signed any prposals
@@ -338,10 +348,14 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 			}
 		}),
 	)
+
 	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
 	srv := cluster.Servers[0]
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	//nolint:godox
@@ -359,10 +373,10 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// wait for one epoch to accumulate validator rewards
 	require.NoError(t, cluster.WaitForBlock(5, 20*time.Second))
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, txRelayer)
+	validatorInfo, err := sidechain.GetValidatorInfo(ethgo.ZeroAddress, validatorAddr, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
-	initialStake := validatorInfo.TotalStake
+	initialStake := validatorInfo.Stake
 	t.Logf("Stake (before unstake)=%d\n", initialStake)
 
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
@@ -379,12 +393,12 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// // assert that validator isn't present in new validator set
 	// require.Equal(t, 4, validatorSet.Len())
 
-	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr, txRelayer)
+	validatorInfo, err = sidechain.GetValidatorInfo(ethgo.ZeroAddress, validatorAddr, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 
 	reward := validatorInfo.WithdrawableRewards
 	t.Logf("Rewards=%d\n", reward)
-	t.Logf("Stake (after unstake)=%d\n", validatorInfo.TotalStake)
+	t.Logf("Stake (after unstake)=%d\n", validatorInfo.Stake)
 	require.Greater(t, reward.Uint64(), uint64(0))
 
 	oldValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)

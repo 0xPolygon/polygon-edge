@@ -685,7 +685,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		framework.WithEpochReward(1000))
 	defer cluster.Stop()
 
-	// load polybftCfg file
+	// load polybft config
 	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
@@ -703,12 +703,11 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		votingPowerChangeValidators[i] = validator.Ecdsa.Address()
 	}
 
-	// L2 tx relayer (for sending stake transaction and querying validator)
-	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	// Rootchain tx relayer (for querying checkpoints)
+	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	// L1 tx relayer (for querying checkpoints)
-	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
 	// waiting two epochs, so that some rewards get accumulated
@@ -717,7 +716,8 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
 		for i, validatorAddr := range votingPowerChangeValidators {
 			// query validator info
-			validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr, l2Relayer)
+			validatorInfo, err := sidechain.GetValidatorInfo(ethgo.Address(polybftCfg.Bridge.CustomSupernetManagerAddr),
+				validatorAddr, rootChainRelayer, childChainRelayer)
 			require.NoError(t, err)
 
 			handler(i, validatorInfo)
@@ -728,7 +728,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
 		t.Logf("[Validator#%d] Voting power (original)=%d, rewards=%d\n",
-			idx+1, validator.TotalStake, validator.WithdrawableRewards)
+			idx+1, validator.Stake, validator.WithdrawableRewards)
 
 		originalValidatorStorage[validator.Address] = validator
 
@@ -741,17 +741,17 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(finalBlockNumber, 1*time.Minute))
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
-		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.TotalStake)
+		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.Stake)
 
 		previousValidatorInfo := originalValidatorStorage[validator.Address]
-		stakedAmount := new(big.Int).Add(previousValidatorInfo.WithdrawableRewards, previousValidatorInfo.TotalStake)
+		stakedAmount := new(big.Int).Add(previousValidatorInfo.WithdrawableRewards, previousValidatorInfo.Stake)
 
 		// assert that total stake has increased by staked amount
-		require.Equal(t, stakedAmount, validator.TotalStake)
+		require.Equal(t, stakedAmount, validator.Stake)
 	})
 
 	require.NoError(t, cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
-		actualCheckpointBlock, err := getCheckpointBlockNumber(l1Relayer, checkpointManagerAddr)
+		actualCheckpointBlock, err := getCheckpointBlockNumber(rootChainRelayer, checkpointManagerAddr)
 		if err != nil {
 			return false, err
 		}

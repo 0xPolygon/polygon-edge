@@ -21,11 +21,9 @@ import (
 type ValidatorInfo struct {
 	Address             ethgo.Address
 	Stake               *big.Int
-	TotalStake          *big.Int
-	Commission          *big.Int
 	WithdrawableRewards *big.Int
-	Active              bool
-	Whitelisted         bool
+	IsActive            bool
+	IsWhitelisted       bool
 }
 
 // SystemState is an interface to interact with the consensus system contracts in the chain

@@ -155,10 +155,10 @@ func GetValidatorInfo(validatorAddr, supernetManagerAddr ethgo.Address,
 	}
 
 	return &polybft.ValidatorInfo{
-		Address:     validatorAddr.Address(),
-		Stake:       decodedOutputsMap["stake"].(*big.Int),     //nolint:forcetypeassert
-		Active:      decodedOutputsMap["isActive"].(bool),      //nolint:forcetypeassert
-		Whitelisted: decodedOutputsMap["isWhitelisted"].(bool), //nolint:forcetypeassert
+		Address:       validatorAddr.Address(),
+		Stake:         decodedOutputsMap["stake"].(*big.Int),     //nolint:forcetypeassert
+		IsActive:      decodedOutputsMap["isActive"].(bool),      //nolint:forcetypeassert
+		IsWhitelisted: decodedOutputsMap["isWhitelisted"].(bool), //nolint:forcetypeassert
 	}, nil
 }
 
