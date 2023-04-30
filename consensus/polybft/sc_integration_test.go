@@ -254,8 +254,6 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 }
 
 func TestIntegration_CommitEpoch(t *testing.T) {
-	t.Skip("SKIP FOR NOW")
-
 	t.Parallel()
 
 	// init validator sets
@@ -263,6 +261,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
 	reward := uint64(math.Pow(10, 18))            // 1 token
+	walletAddress := types.StringToAddress("1234889893")
 
 	validatorSets := make([]*testValidators, len(validatorSetSize), len(validatorSetSize))
 
@@ -293,6 +292,12 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			contracts.RewardPoolContract: {
 				Code: contractsapi.RewardPool.DeployedBytecode,
 			},
+			contracts.NativeERC20TokenContract: {
+				Code: contractsapi.NativeERC20.DeployedBytecode,
+			},
+			walletAddress: {
+				Balance: new(big.Int).SetUint64(intialBalance),
+			},
 		}
 
 		for i, validator := range accSet {
@@ -319,8 +324,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			Governance: currentValidators.toValidatorSet().validators.GetAddresses()[0],
 			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
-				WalletAddress: types.ZeroAddress,
-				WalletAmount:  big.NewInt(0),
+				WalletAddress: walletAddress,
+				WalletAmount:  new(big.Int).SetUint64(intialBalance),
 			},
 			Bridge: &BridgeConfig{
 				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
@@ -341,12 +346,25 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init RewardPool
-		err = initContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "RewardPool", transition)
+		err = initContract(contracts.SystemCaller, contracts.RewardPoolContract, initInput, "RewardPool", transition)
+		require.NoError(t, err)
+
+		// approve root token
+		approveFn := &contractsapi.ApproveRootERC20Fn{
+			Spender: contracts.RewardPoolContract,
+			Amount:  polyBFTConfig.RewardConfig.WalletAmount,
+		}
+
+		input, err := approveFn.EncodeAbi()
+		require.NoError(t, err)
+
+		err = initContract(polyBFTConfig.RewardConfig.WalletAddress,
+			polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch
 		commitEpoch := createTestCommitEpochInput(t, 1, polyBFTConfig.EpochSize)
-		input, err := commitEpoch.EncodeAbi()
+		input, err = commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
 		// call commit epoch
