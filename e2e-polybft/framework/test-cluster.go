@@ -50,7 +50,10 @@ const (
 	nonValidatorPrefix = "test-non-validator-"
 )
 
-var startTime int64
+var (
+	startTime            int64
+	testRewardWalletAddr = types.StringToAddress("0xFFFFFFFF")
+)
 
 func init() {
 	startTime = time.Now().UTC().UnixMilli()
@@ -448,6 +451,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
+			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
 		}
 

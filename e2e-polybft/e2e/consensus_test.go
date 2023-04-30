@@ -354,6 +354,11 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecrets)
 	require.NoError(t, err)
 
+	cluster.WaitForReady(t)
+
+	initialValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
+	require.NoError(t, err)
+
 	validatorAddr := validatorAcc.Ecdsa.Address()
 
 	// wait for some rewards to get accumulated
@@ -420,7 +425,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
 	t.Logf("Balance (after withdrawal of rewards)=%s\n", newValidatorBalance)
-	require.True(t, newValidatorBalance.Cmp(big.NewInt(0)) > 0)
+	require.True(t, newValidatorBalance.Cmp(initialValidatorBalance) > 0)
 
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)

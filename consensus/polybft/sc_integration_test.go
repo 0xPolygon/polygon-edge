@@ -334,14 +334,14 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init ChildValidatorSet
-		err = initContract(contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
+		err = initContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
 		require.NoError(t, err)
 
 		initInput, err = getInitRewardPoolInput(polyBFTConfig)
 		require.NoError(t, err)
 
 		// init RewardPool
-		err = initContract(contracts.ValidatorSetContract, initInput, "RewardPool", transition)
+		err = initContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "RewardPool", transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch
