@@ -13,6 +13,7 @@ import (
 	"github.com/umbracle/ethgo"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -675,24 +676,19 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 
 func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	const (
-		votingPowerChanges = 3
+		votingPowerChanges = 2
 		epochSize          = 5
 		finalBlockNumber   = 4 * epochSize
-		validatorSetSize   = 5
 	)
 
-	cluster := framework.NewTestCluster(t, validatorSetSize,
+	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize),
-		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())))
+		framework.WithEpochReward(1000000))
 	defer cluster.Stop()
-
-	cluster.WaitForReady(t)
 
 	// load polybft config
 	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
-
-	// checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
 
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
 	require.NoError(t, err)
@@ -706,117 +702,85 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		votingPowerChangeValidators[i] = validator.Ecdsa.Address()
 	}
 
-	// Rootchain tx relayer (for querying checkpoints)
-	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	// child chain tx relayer
+	childRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
-	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	// root chain tx relayer
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	// waiting two epochs, so that some rewards get accumulated
-	require.NoError(t, cluster.WaitForBlock(epochSize*2, time.Minute))
+	require.NoError(t, cluster.WaitForBlock(2*epochSize, 1*time.Minute))
 
-	bigZero := big.NewInt(0)
+	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
+		for i, validatorAddr := range votingPowerChangeValidators {
+			// query validator info
+			validatorInfo, err := sidechain.GetValidatorInfo(
+				validatorAddr,
+				polybftCfg.Bridge.CustomSupernetManagerAddr,
+				polybftCfg.Bridge.StakeManagerAddr,
+				chainID,
+				rootRelayer,
+				childRelayer)
+			require.NoError(t, err)
 
-	// query how much a validator has rewards
-	srv := cluster.Servers[0]
-	validatorAcc, err := sidechain.GetAccountFromDir(srv.DataDir())
-	require.NoError(t, err)
+			handler(i, validatorInfo)
+		}
+	}
 
-	validatorAddr := validatorAcc.Ecdsa.Address()
+	// validatorsMap holds only changed validators
+	validatorsMap := make(map[ethgo.Address]*polybft.ValidatorInfo, votingPowerChanges)
 
-	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
-		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
-	require.NoError(t, err)
-	require.True(t, validatorInfo.IsActive)
-	require.True(t, validatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
+	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
+		t.Logf("[Validator#%d] Voting power (original)=%d, rewards=%d\n",
+			idx+1, validator.Stake, validator.WithdrawableRewards)
 
-	balanceBeforeRewardsWithdraw, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
-	require.NoError(t, err)
+		validatorsMap[validator.Address] = validator
+		validatorSrv := cluster.Servers[idx]
 
-	// withdraw rewards
-	require.NoError(t, srv.WithdrawRewards())
+		// fund validators (send accumulated rewards amount)
+		require.NoError(t, validatorSrv.RootchainFund(polybftCfg.Bridge.RootNativeERC20Addr, validator.WithdrawableRewards))
 
-	// check that balance is updated
-	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
-	require.NoError(t, err)
-	require.True(t, newValidatorBalance.Cmp(balanceBeforeRewardsWithdraw) > 0)
+		// stake previously funded amount
+		require.NoError(t, validatorSrv.Stake(*polybftCfg, chainID, validator.WithdrawableRewards))
+	})
 
-	rawKey, err := validatorAcc.Ecdsa.MarshallPrivateKey()
-	require.NoError(t, err)
+	// wait a one more epochs, so that stake is registered and two more checkpoints are sent.
+	// Blocks are still produced, although voting power is slightly changed.
+	require.NoError(t, cluster.WaitForBlock(3*epochSize, 1*time.Minute))
 
-	// send withdraw transaction
-	err = cluster.Bridge.Withdraw(
-		common.ERC20,
-		hex.EncodeToString(rawKey),
-		validatorAddr.String(),
-		validatorInfo.WithdrawableRewards.String(),
-		"",
-		srv.JSONRPCAddr(),
-		contracts.NativeERC20TokenContract)
-	require.NoError(t, err)
+	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
+		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.Stake)
 
-	currentBlock, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+		previousValidatorInfo := validatorsMap[validator.Address]
+		stakedAmount := new(big.Int).Add(previousValidatorInfo.WithdrawableRewards, previousValidatorInfo.Stake)
+
+		// assert that total stake has increased by staked amount
+		require.Equal(t, stakedAmount, validator.Stake)
+
+		validatorsMap[validator.Address] = validator
+	})
+
+	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
 	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
 	require.NoError(t, err)
 
-	currentEpoch := currentExtra.Checkpoint.EpochNumber
+	targetEpoch := currentExtra.Checkpoint.EpochNumber + 1
+	require.NoError(t, waitForRootchainEpoch(targetEpoch+1, 2*time.Minute,
+		rootRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
-	require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
-		rootChainRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
-
-	// send exit transaction to exit helper
-	err = cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, 1,
-		srv.BridgeJSONRPCAddr(), srv.JSONRPCAddr())
+	// make sure that correct validator set is submitted to the checkpoint manager
+	checkpointValidators, err := getCheckpointManagerValidators(rootRelayer, ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr))
 	require.NoError(t, err)
 
-	// make sure exit event is processed successfully
-	isProcessed, err := isExitEventProcessed(1, ethgo.Address(polybftCfg.Bridge.ExitHelperAddr), rootChainRelayer)
-	require.NoError(t, err)
-	require.True(t, isProcessed, "exit event was not processed")
-
-	// stake manually for the first validator
-	require.NoError(t, srv.Stake(*polybftCfg, chainID, validatorInfo.WithdrawableRewards))
-
-	// check if stake updated on root
-	updatedValidatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
-		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
-	require.NoError(t, err)
-	require.True(t, updatedValidatorInfo.IsActive)
-
-	expectedStake := validatorInfo.Stake.Sub(validatorInfo.Stake, validatorInfo.WithdrawableRewards)
-	require.True(t, updatedValidatorInfo.Stake.Cmp(expectedStake) == 0)
-
-	// wait for couple of epochs so that stake gets bridged
-	require.NoError(t, cluster.WaitForBlock(epochSize*4, time.Minute))
-
-	// check if the validators are added to active validator set
-	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
-
-	rootchainValidators := []*polybft.ValidatorInfo{}
-	err = cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
-		rootchainValidators, err = getRootchainValidators(rootChainRelayer, checkpointManagerAddr)
-		if err != nil {
-			return true, err
-		}
-
-		return len(rootchainValidators) == validatorSetSize, nil
-	})
-
-	// check if the updated stake (voting power went through consensus)
-	var updatedValidator *polybft.ValidatorInfo
-	for _, v := range rootchainValidators {
-		if v.Address == validatorAddr {
-			updatedValidator = v
-
-			break
+	for _, checkpointValidator := range checkpointValidators {
+		if validator, ok := validatorsMap[checkpointValidator.Address]; ok {
+			require.Equal(t, validator.Stake, checkpointValidator.Stake)
+		} else {
+			require.Equal(t, command.DefaultPremineBalance, checkpointValidator.Stake)
 		}
 	}
-
-	require.NotNil(t, updatedValidator)
-	require.True(t, updatedValidator.Stake.Cmp(expectedStake) == 0)
 }
