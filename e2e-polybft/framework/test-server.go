@@ -223,13 +223,13 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, chainID int64, a
 }
 
 // Unstake unstakes given amount from validator account encapsulated by given server instance
-func (t *TestServer) Unstake(amount uint64) error {
+func (t *TestServer) Unstake(amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"unstake",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--amount", strconv.FormatUint(amount, 10),
+		"--amount", amount.String(),
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("unstake"))

@@ -236,7 +236,6 @@ type TokenConfig struct {
 }
 
 type RewardsConfig struct {
-
 	// TokenAddress is the address of reward token on child chain
 	TokenAddress types.Address
 

@@ -103,6 +103,7 @@ func TestE2E_Consensus_BulkDrop(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(epochSize+1, 2*time.Minute))
 }
 
+//nolint:wsl
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	const (
 		validatorSize = 5
@@ -372,7 +373,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.Greater(t, reward.Uint64(), uint64(0))
 
 	// unstake entire balance (which should remove validator from the validator set in next epoch)
-	require.NoError(t, srv.Unstake(initialStake.Uint64()))
+	require.NoError(t, srv.Unstake(initialStake))
 
 	// wait for one epoch to withdraw from child
 	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*4, time.Minute))
@@ -477,7 +478,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 
 	validatorsAddrs := make([]types.Address, validatorCount)
 	initialStake := ethgo.Gwei(1)
-	initialBalance := int64(0)
+	initialBalance := ethgo.Ether(100000)
 
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
@@ -552,7 +553,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		require.NoError(t, err)
 
 		t.Logf("Post-mint balance: %v=%d\n", addr, balance)
-		require.Equal(t, new(big.Int).Add(mintAmount, big.NewInt(initialBalance)), balance)
+		require.Equal(t, new(big.Int).Add(mintAmount, initialBalance), balance)
 	}
 
 	minterBalance, err := targetJSONRPC.Eth().GetBalance(minterAcc.Ecdsa.Address(), ethgo.Latest)
