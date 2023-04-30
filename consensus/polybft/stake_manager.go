@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
@@ -82,7 +83,11 @@ func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 	}
 
 	// save initial validator set as full validator set in db
-	return s.state.StakeStore.insertFullValidatorSet(req.ValidatorSet.Accounts())
+	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
+		BlockID:    0,
+		EpochID:    1,
+		Validators: newValidatorStakeMap(req.ValidatorSet.Accounts()),
+	})
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
@@ -105,7 +110,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	stakeMap := newValidatorStakeMap(fullValidatorSet)
+	stakeMap := fullValidatorSet.Validators
 
 	for _, event := range events {
 		if event.IsStake() {
@@ -120,23 +125,24 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		}
 	}
 
-	newFullValidatorSet := make(AccountSet, 0, len(stakeMap))
-
 	for addr, data := range stakeMap {
 		if data.BlsKey == nil {
 			newValidatorMetaData, err := s.getNewValidatorInfo(addr, data.VotingPower)
 			if err != nil {
 				s.logger.Warn("Could not get info for new validator", "epoch", req.Epoch, "address", addr)
 			} else {
-				data = newValidatorMetaData
+				data.BlsKey = newValidatorMetaData.BlsKey
 			}
 		}
 
 		data.IsActive = data.VotingPower.Cmp(bigZero) > 0
-		newFullValidatorSet = append(newFullValidatorSet, data)
 	}
 
-	return s.state.StakeStore.insertFullValidatorSet(newFullValidatorSet)
+	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
+		EpochID:    req.Epoch,
+		BlockID:    req.FullBlock.Block.Number(),
+		Validators: stakeMap,
+	})
 }
 
 // UpdateValidatorSet returns an updated validator set
@@ -150,7 +156,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountS
 	}
 
 	// stake map that holds stakes for all validators
-	stakeMap := newValidatorStakeMap(fullValidatorSet)
+	stakeMap := fullValidatorSet.Validators
 
 	// slice of all validator set
 	newValidatorSet := stakeMap.getActiveValidators(s.maxValidatorSetSize)
@@ -301,6 +307,20 @@ func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int
 		BlsKey:      pubKey,
 		IsActive:    true,
 	}, nil
+}
+
+type validatorSetState struct {
+	BlockID    uint64            `json:"block"`
+	EpochID    uint64            `json:"epoch"`
+	Validators validatorStakeMap `json:"validators"`
+}
+
+func (vs validatorSetState) Marshal() ([]byte, error) {
+	return json.Marshal(vs)
+}
+
+func (vs *validatorSetState) Unmarshal(b []byte) error {
+	return json.Unmarshal(b, vs)
 }
 
 // validatorStakeMap holds ValidatorMetadata for each validator address

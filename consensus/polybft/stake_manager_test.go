@@ -45,7 +45,9 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
-		require.Len(t, fullValidatorSet, len(validators))
+		require.Len(t, fullValidatorSet.Validators, len(validators))
+		require.Equal(t, uint64(1), fullValidatorSet.EpochID)
+		require.Equal(t, uint64(0), fullValidatorSet.BlockID)
 	})
 }
 
@@ -81,8 +83,9 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	)
 
 	// insert initial full validator set
-	require.NoError(t, state.StakeStore.insertFullValidatorSet(
-		validators.getPublicIdentities(initialSetAliases...)))
+	require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+		Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
+	}))
 
 	receipts := make([]*types.Receipt, len(allAliases))
 	for i := 0; i < len(allAliases); i++ {
@@ -108,7 +111,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 	fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 	require.NoError(t, err)
-	require.Len(t, fullValidatorSet, len(allAliases))
+	require.Len(t, fullValidatorSet.Validators, len(allAliases))
 }
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
@@ -135,7 +138,9 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		validatorToUpdate := fullValidatorSet[0]
 		validatorToUpdate.VotingPower = big.NewInt(11)
 
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -149,7 +154,9 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	t.Run("UpdateValidatorSet - one unstake", func(t *testing.T) {
 		fullValidatorSet := validators.getPublicIdentities(aliases[1:]...)
 
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+1, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -160,7 +167,10 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 
 	t.Run("UpdateValidatorSet - one new validator", func(t *testing.T) {
 		addedValidator := validators.getValidator("A")
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validators.getPublicIdentities()))
+
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.getPublicIdentities()),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+2,
 			validators.getPublicIdentities(aliases[1:]...))
@@ -180,7 +190,9 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		validatorToAdd := fullValidatorSet[0]
 		validatorToAdd.VotingPower = big.NewInt(11)
 
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3,
 			validators.getPublicIdentities(aliases[1:]...))
