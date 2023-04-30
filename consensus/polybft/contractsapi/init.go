@@ -14,28 +14,30 @@ const (
 
 var (
 	// core-contracts smart contracts
-	CheckpointManager             *artifact.Artifact
-	ExitHelper                    *artifact.Artifact
-	StateSender                   *artifact.Artifact
-	RootERC20Predicate            *artifact.Artifact
-	RootERC721Predicate           *artifact.Artifact
-	RootERC1155Predicate          *artifact.Artifact
-	BLS                           *artifact.Artifact
-	BLS256                        *artifact.Artifact
-	System                        *artifact.Artifact
-	Merkle                        *artifact.Artifact
-	ChildValidatorSet             *artifact.Artifact
-	NativeERC20                   *artifact.Artifact
-	NativeERC20Mintable           *artifact.Artifact
-	StateReceiver                 *artifact.Artifact
-	ChildERC20                    *artifact.Artifact
-	ChildERC20Predicate           *artifact.Artifact
-	ChildERC20PredicateAccessList *artifact.Artifact
-	ChildERC721                   *artifact.Artifact
-	ChildERC721Predicate          *artifact.Artifact
-	ChildERC1155                  *artifact.Artifact
-	ChildERC1155Predicate         *artifact.Artifact
-	L2StateSender                 *artifact.Artifact
+	CheckpointManager               *artifact.Artifact
+	ExitHelper                      *artifact.Artifact
+	StateSender                     *artifact.Artifact
+	RootERC20Predicate              *artifact.Artifact
+	RootERC721Predicate             *artifact.Artifact
+	RootERC1155Predicate            *artifact.Artifact
+	BLS                             *artifact.Artifact
+	BLS256                          *artifact.Artifact
+	System                          *artifact.Artifact
+	Merkle                          *artifact.Artifact
+	ChildValidatorSet               *artifact.Artifact
+	NativeERC20                     *artifact.Artifact
+	NativeERC20Mintable             *artifact.Artifact
+	StateReceiver                   *artifact.Artifact
+	ChildERC20                      *artifact.Artifact
+	ChildERC20Predicate             *artifact.Artifact
+	ChildERC20PredicateAccessList   *artifact.Artifact
+	ChildERC721                     *artifact.Artifact
+	ChildERC721Predicate            *artifact.Artifact
+	ChildERC721PredicateAccessList  *artifact.Artifact
+	ChildERC1155                    *artifact.Artifact
+	ChildERC1155Predicate           *artifact.Artifact
+	ChildERC1155PredicateAccessList *artifact.Artifact
+	L2StateSender                   *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -135,12 +137,22 @@ func init() {
 		log.Fatal(err)
 	}
 
+	ChildERC721PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC721PredicateAccessListArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ChildERC1155, err = artifact.DecodeArtifact([]byte(ChildERC1155Artifact))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	ChildERC1155Predicate, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildERC1155PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateAccessListArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

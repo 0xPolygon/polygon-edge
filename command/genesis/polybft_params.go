@@ -286,19 +286,9 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			address:  contracts.ChildERC721Contract,
 		},
 		{
-			// ChildERC721Predicate token contract
-			artifact: contractsapi.ChildERC721Predicate,
-			address:  contracts.ChildERC721PredicateContract,
-		},
-		{
 			// ChildERC1155 contract
 			artifact: contractsapi.ChildERC1155,
 			address:  contracts.ChildERC1155Contract,
-		},
-		{
-			// ChildERC1155Predicate token contract
-			artifact: contractsapi.ChildERC1155Predicate,
-			address:  contracts.ChildERC1155PredicateContract,
 		},
 		{
 			// BLS contract
@@ -328,9 +318,21 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.ChildERC20PredicateAccessList, address: contracts.ChildERC20PredicateContract})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.ChildERC721PredicateAccessList, address: contracts.ChildERC721PredicateContract})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.ChildERC1155PredicateAccessList, address: contracts.ChildERC1155PredicateContract})
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.ChildERC20Predicate, address: contracts.ChildERC20PredicateContract})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.ChildERC721Predicate, address: contracts.ChildERC721PredicateContract})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{artifact: contractsapi.ChildERC1155Predicate, address: contracts.ChildERC1155PredicateContract})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))

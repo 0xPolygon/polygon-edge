@@ -184,6 +184,15 @@ func main() {
 			[]string{},
 		},
 		{
+			"ChildERC1155PredicateAccessList",
+			gensc.ChildERC1155PredicateAccessList,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
 			"ChildERC1155",
 			gensc.ChildERC1155,
 			[]string{
@@ -213,6 +222,15 @@ func main() {
 		{
 			"ChildERC721Predicate",
 			gensc.ChildERC721Predicate,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC721PredicateAccessList",
+			gensc.ChildERC721PredicateAccessList,
 			[]string{
 				"initialize",
 				"withdrawBatch",
