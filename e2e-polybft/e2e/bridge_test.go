@@ -745,10 +745,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		require.NoError(t, validatorSrv.Stake(polybftCfg, chainID, validator.WithdrawableRewards))
 	})
 
-	// wait one more epochs, so that stake is registered and two more checkpoints are sent.
-	// Blocks are still produced, although voting power is slightly changed.
-	// require.NoError(t, cluster.WaitForBlock(3*epochSize, 1*time.Minute))
-
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
 		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.Stake)
 
