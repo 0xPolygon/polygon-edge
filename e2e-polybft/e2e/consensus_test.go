@@ -329,7 +329,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	premineAmount := ethgo.Ether(10)
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithEpochReward(10000),
+		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
 		framework.WithEpochSize(5),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
@@ -342,7 +342,6 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
-	validatorSecrets := path.Join(cluster.Config.TmpDir, "test-chain-1")
 	srv := cluster.Servers[0]
 
 	childChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(srv.JSONRPCAddr()))
@@ -351,13 +350,14 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecrets)
+	validatorAcc, err := sidechain.GetAccountFromDir(srv.DataDir())
 	require.NoError(t, err)
 
 	cluster.WaitForReady(t)
 
 	initialValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
+	t.Logf("Balance (before unstake)=%d\n", initialValidatorBalance)
 
 	validatorAddr := validatorAcc.Ecdsa.Address()
 
@@ -419,13 +419,17 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	t.Logf("Stake (after unstake)=%d\n", validatorInfo.Stake)
 
+	balanceBeforeRewardsWithdraw, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
+	require.NoError(t, err)
+	t.Logf("Balance (before withdraw rewards)=%d\n", balanceBeforeRewardsWithdraw)
+
 	// withdraw pending rewards
 	require.NoError(t, srv.WithdrawRewards())
 
 	newValidatorBalance, err := srv.JSONRPC().Eth().GetBalance(validatorAcc.Ecdsa.Address(), ethgo.Latest)
 	require.NoError(t, err)
 	t.Logf("Balance (after withdrawal of rewards)=%s\n", newValidatorBalance)
-	require.True(t, newValidatorBalance.Cmp(initialValidatorBalance) > 0)
+	require.True(t, newValidatorBalance.Cmp(balanceBeforeRewardsWithdraw) > 0)
 
 	l1Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
