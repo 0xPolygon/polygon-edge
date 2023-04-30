@@ -678,7 +678,6 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	const (
 		votingPowerChanges = 2
 		epochSize          = 5
-		finalBlockNumber   = 4 * epochSize
 	)
 
 	cluster := framework.NewTestCluster(t, 5,
@@ -746,9 +745,9 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		require.NoError(t, validatorSrv.Stake(polybftCfg, chainID, validator.WithdrawableRewards))
 	})
 
-	// wait a one more epochs, so that stake is registered and two more checkpoints are sent.
+	// wait one more epochs, so that stake is registered and two more checkpoints are sent.
 	// Blocks are still produced, although voting power is slightly changed.
-	require.NoError(t, cluster.WaitForBlock(3*epochSize, 1*time.Minute))
+	// require.NoError(t, cluster.WaitForBlock(3*epochSize, 1*time.Minute))
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
 		t.Logf("[Validator#%d] Voting power (after stake)=%d\n", idx+1, validator.Stake)
@@ -762,6 +761,14 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		validatorsMap[validator.Address] = validator
 	})
 
+	currentBlockNum, err := childRelayer.Client().Eth().BlockNumber()
+	require.NoError(t, err)
+
+	// wait for next epoch-ending block as the starting point,
+	// in order to be able to easier track checkpoints submission
+	endOfEpochBlockNum := currentBlockNum + epochSize - (currentBlockNum % epochSize)
+	require.NoError(t, cluster.WaitForBlock(endOfEpochBlockNum, 1*time.Minute))
+
 	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
@@ -769,7 +776,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	require.NoError(t, err)
 
 	targetEpoch := currentExtra.Checkpoint.EpochNumber + 1
-	require.NoError(t, waitForRootchainEpoch(targetEpoch+1, 2*time.Minute,
+	require.NoError(t, waitForRootchainEpoch(targetEpoch, 2*time.Minute,
 		rootRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 	// make sure that correct validator set is submitted to the checkpoint manager
