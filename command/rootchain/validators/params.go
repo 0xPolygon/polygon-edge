@@ -14,7 +14,7 @@ type validatorInfoParams struct {
 	jsonRPC                string
 	supernetManagerAddress string
 	stakeManagerAddress    string
-	chainID                uint64
+	chainID                int64
 }
 
 func (v *validatorInfoParams) validateFlags() error {

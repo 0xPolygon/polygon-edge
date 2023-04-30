@@ -125,7 +125,7 @@ func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error
 // GetValidatorInfo queries SupernetManager smart contract on root
 // and retrieves validator info for given address
 func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeManagerAddr types.Address,
-	chainID uint64, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+	chainID int64, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
 	caller := ethgo.Address(contracts.SystemCaller)
 	getValidatorMethod := contractsapi.CustomSupernetManager.Abi.GetMethod("getValidator")
 
@@ -167,7 +167,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 	}
 
 	stakeOfFn := &contractsapi.StakeOfStakeManagerFn{
-		ID:        new(big.Int).SetUint64(chainID),
+		ID:        new(big.Int).SetInt64(chainID),
 		Validator: types.Address(validatorAddr),
 	}
 

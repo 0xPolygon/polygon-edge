@@ -60,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.StakeManagerFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().Int64Var(
 		&params.chainID,
 		polybftsecrets.ChainIDFlag,
 		0,

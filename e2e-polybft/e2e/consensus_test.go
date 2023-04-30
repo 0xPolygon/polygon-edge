@@ -159,7 +159,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.Equal(t, validatorSetSize+2, len(validatorSecrets))
 
 	// collect owners validator secrets
-	//ownerSecrets := validatorSecrets[0]
 	firstValidatorSecrets := validatorSecrets[validatorSetSize]
 	secondValidatorSecrets := validatorSecrets[validatorSetSize+1]
 
@@ -168,9 +167,6 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	_, err = polybft.GetIbftExtra(genesisBlock.ExtraData)
 	require.NoError(t, err)
-
-	// on genesis block all validators are marked as added, which makes initial validator set
-	//initialValidators := extra.Validators.Added
 
 	// owner whitelists both new validators
 	require.NoError(t, owner.WhitelistValidators([]string{
@@ -219,21 +215,21 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, secondValidator.RegisterValidator(polybftConfig.Bridge.CustomSupernetManagerAddr))
 
 	// stake manually for the first validator
-	require.NoError(t, firstValidator.Stake(*polybftConfig, chainID, initialStake))
+	require.NoError(t, firstValidator.Stake(polybftConfig, chainID, initialStake))
 
 	// stake manually for the second validator
-	require.NoError(t, secondValidator.Stake(*polybftConfig, chainID, initialStake))
+	require.NoError(t, secondValidator.Stake(polybftConfig, chainID, initialStake))
 
 	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
+		chainID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.Stake.Cmp(initialStake) == 0)
 
 	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
+		chainID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
@@ -246,7 +242,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	// check if the validators are added to active validator set
 	rootchainValidators := []*polybft.ValidatorInfo{}
 	err = cluster.Bridge.WaitUntil(time.Second, time.Minute, func() (bool, error) {
-		rootchainValidators, err = getRootchainValidators(rootChainRelayer, checkpointManagerAddr)
+		rootchainValidators, err = getCheckpointManagerValidators(rootChainRelayer, checkpointManagerAddr)
 		if err != nil {
 			return true, err
 		}
@@ -281,14 +277,14 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
+		chainID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
 
 	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
+		chainID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
@@ -335,7 +331,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
+		chainID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, validatorInfo.IsActive)
 
@@ -381,7 +377,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// check that validator is no longer active (out of validator set)
 	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		uint64(chainID), rootChainRelayer, childChainRelayer)
+		chainID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.False(t, validatorInfo.IsActive)
 	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
@@ -409,7 +405,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// (execute it multiple times if needed, because it is unknown in advance how much time it is going to take until checkpoint is submitted)
 	rootchainValidators := []*polybft.ValidatorInfo{}
 	err = cluster.Bridge.WaitUntil(time.Second, 10*time.Second, func() (bool, error) {
-		rootchainValidators, err = getRootchainValidators(l1Relayer, checkpointManagerAddr)
+		rootchainValidators, err = getCheckpointManagerValidators(l1Relayer, checkpointManagerAddr)
 		if err != nil {
 			return true, err
 		}

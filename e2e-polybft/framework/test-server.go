@@ -52,7 +52,6 @@ type TestServer struct {
 	clusterConfig *TestClusterConfig
 	config        *TestServerConfig
 	node          *node
-	bridgeJSONRPC string
 }
 
 func (t *TestServer) GrpcAddr() string {
@@ -189,13 +188,14 @@ func (t *TestServer) Stop() {
 }
 
 // RootchainFund funds given validator account on the rootchain
-func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, tokensAmount uint64) error {
+func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, amount *big.Int) error {
 	args := []string{
 		"rootchain",
 		"fund",
 		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
+		"--json-rpc", t.BridgeJSONRPCAddr(),
 		"--native-root-token", rootNativeERC20Addr.String(),
-		"--amount", strconv.FormatUint(tokensAmount, 10),
+		"--amount", amount.String(),
 		"--mint",
 	}
 

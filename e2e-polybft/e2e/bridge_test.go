@@ -743,7 +743,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		require.NoError(t, validatorSrv.RootchainFund(polybftCfg.Bridge.RootNativeERC20Addr, validator.WithdrawableRewards))
 
 		// stake previously funded amount
-		require.NoError(t, validatorSrv.Stake(*polybftCfg, chainID, validator.WithdrawableRewards))
+		require.NoError(t, validatorSrv.Stake(polybftCfg, chainID, validator.WithdrawableRewards))
 	})
 
 	// wait a one more epochs, so that stake is registered and two more checkpoints are sent.
