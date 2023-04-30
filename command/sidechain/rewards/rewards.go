@@ -84,7 +84,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	ammount, err := types.ParseUint256orHex(&response)
+	amount, err := types.ParseUint256orHex(&response)
 	if err != nil {
 		return err
 	}
@@ -112,7 +112,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	result := &withdrawRewardResult{
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
-		rewardAmount:     ammount.Uint64(),
+		rewardAmount:     amount.Uint64(),
 	}
 
 	outputter.WriteCommandResult(result)
