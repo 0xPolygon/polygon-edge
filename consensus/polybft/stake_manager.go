@@ -128,6 +128,8 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		}
 	}
 
+	// this is a temporary solution (a workaround) for a bug where amount
+	// in transfer event is not correctly generated (unknown 4 bytes are added to begging of Data array)
 	if len(updatedValidatorsBalance) > 0 {
 		provider, err := s.blockchain.GetStateProviderForBlock(req.FullBlock.Block.Header)
 		if err != nil {
