@@ -356,6 +356,12 @@ func (p *genesisParams) generateGenesis() error {
 }
 
 func (p *genesisParams) initGenesisConfig() error {
+	// Disable london hardfork if burn contract address is not provided
+	enabledForks := chain.AllForksEnabled
+	if len(p.burnContracts) == 0 {
+		enabledForks.London = nil
+	}
+
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Genesis: &chain.Genesis{
@@ -364,25 +370,28 @@ func (p *genesisParams) initGenesisConfig() error {
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  p.extraData,
 			GasUsed:    command.DefaultGenesisGasUsed,
-			BaseFee:    command.DefaultGenesisBaseFee,
-			BaseFeeEM:  command.DefaultGenesisBaseFeeEM,
 		},
 		Params: &chain.Params{
-			ChainID:      int64(p.chainID),
-			Forks:        chain.AllForksEnabled,
-			Engine:       p.consensusEngineConfig,
-			BurnContract: map[uint64]string{},
+			ChainID: int64(p.chainID),
+			Forks:   enabledForks,
+			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}
 
-	for _, burnContract := range p.burnContracts {
-		block, address, err := parseBurnContractInfo(burnContract)
-		if err != nil {
-			return err
-		}
+	if len(p.burnContracts) > 0 {
+		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
-		chainConfig.Params.BurnContract[block] = address.String()
+		for _, burnContract := range p.burnContracts {
+			block, address, err := parseBurnContractInfo(burnContract)
+			if err != nil {
+				return err
+			}
+
+			chainConfig.Params.BurnContract[block] = address.String()
+		}
 	}
 
 	// Predeploy staking smart contract if needed
