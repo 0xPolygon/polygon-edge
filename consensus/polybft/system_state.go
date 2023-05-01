@@ -63,7 +63,6 @@ func (s *SystemStateImpl) GetStakeOnValidatorSet(validatorAddr types.Address) (*
 	}
 
 	balance, isOk := rawResult["0"].(*big.Int)
-
 	if !isOk {
 		return nil, fmt.Errorf("failed to decode balance")
 	}

@@ -116,13 +116,13 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 
 	stakeMap := fullValidatorSet.Validators
 
-	updatedValidatorsBalance := make(map[types.Address]struct{}, 0)
+	updatedValidatorsStake := make(map[types.Address]struct{}, 0)
 
 	for _, event := range events {
 		if event.IsStake() {
-			updatedValidatorsBalance[event.To] = struct{}{}
+			updatedValidatorsStake[event.To] = struct{}{}
 		} else if event.IsUnstake() {
-			updatedValidatorsBalance[event.From] = struct{}{}
+			updatedValidatorsStake[event.From] = struct{}{}
 		} else {
 			s.logger.Debug("Found a transfer event that represents neither stake nor unstake")
 		}
@@ -130,7 +130,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 
 	// this is a temporary solution (a workaround) for a bug where amount
 	// in transfer event is not correctly generated (unknown 4 bytes are added to begging of Data array)
-	if len(updatedValidatorsBalance) > 0 {
+	if len(updatedValidatorsStake) > 0 {
 		provider, err := s.blockchain.GetStateProviderForBlock(req.FullBlock.Block.Header)
 		if err != nil {
 			return err
@@ -138,17 +138,17 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 
 		systemState := s.blockchain.GetSystemState(provider)
 
-		for a := range updatedValidatorsBalance {
-			balance, err := systemState.GetStakeOnValidatorSet(a)
+		for a := range updatedValidatorsStake {
+			stake, err := systemState.GetStakeOnValidatorSet(a)
 			if err != nil {
 				return fmt.Errorf("could not retrieve balance of validator %v on ValidatorSet", a)
 			}
 
 			validator, exists := stakeMap[a]
 			if !exists {
-				stakeMap.setStake(a, balance)
+				stakeMap.setStake(a, stake)
 			} else {
-				validator.VotingPower = balance
+				validator.VotingPower = stake
 				validator.IsActive = validator.VotingPower.Cmp(bigZero) > 0
 			}
 		}
