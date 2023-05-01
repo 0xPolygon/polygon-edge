@@ -490,11 +490,13 @@ func (*{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
-	if (!{{.ContractName}}.Abi.Events["{{.Name}}"].Match(log)) {
+	logCopy := log.Copy()
+
+	if (!{{.ContractName}}.Abi.Events["{{.Name}}"].Match(logCopy)) {
 		return false, nil
 	}
 
-	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
+	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], logCopy, {{.Sig}})
 }`
 
 	inputs := map[string]interface{}{
