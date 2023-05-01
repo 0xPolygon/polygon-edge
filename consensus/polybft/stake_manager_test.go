@@ -59,11 +59,18 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		initialSetAliases = []string{"A", "B", "C", "D", "E"}
 		epoch             = uint64(1)
 		block             = uint64(10)
-		stakeAdded        = uint64(10)
+		newStake          = uint64(100)
 	)
 
 	validators := newTestValidatorsWithAliases(t, allAliases)
 	state := newTestState(t)
+
+	systemStateMock := new(systemStateMock)
+	systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(newStake)), nil).Times(len(allAliases))
+
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 
 	txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
 		return validators.getValidator("F").ValidatorMetadata()
@@ -76,6 +83,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
+		blockchainMock,
 		txRelayerMock,
 		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
@@ -95,7 +103,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 				stakeManager.validatorSetContract,
 				types.ZeroAddress,
 				validators.getValidator(allAliases[i]).Address(),
-				stakeAdded,
+				newStake,
 			),
 		}}
 		receipts[i].SetStatus(types.ReceiptSuccess)
@@ -112,6 +120,12 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 	require.NoError(t, err)
 	require.Len(t, fullValidatorSet.Validators, len(allAliases))
+	for _, v := range fullValidatorSet.Validators {
+		require.Equal(t, newStake, v.VotingPower.Uint64())
+	}
+
+	systemStateMock.AssertExpectations(t)
+	blockchainMock.AssertExpectations(t)
 }
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
@@ -127,6 +141,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
+		nil,
 		nil,
 		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),

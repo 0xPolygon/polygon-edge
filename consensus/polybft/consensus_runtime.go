@@ -221,7 +221,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,8 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 	c.stakeManager = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
-		txRelayer,
+		c.config.blockchain,
+		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.ValidatorSetContract,
 		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
