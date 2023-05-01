@@ -162,7 +162,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	if len(p.burnContracts) > 0 {
-		chainConfig.Params.BurnContract = map[uint64]string{}
+		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
 		for _, burnContract := range p.burnContracts {
 			block, addr, err := parseBurnContractInfo(burnContract)
@@ -204,8 +204,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		ExtraData:  genesisExtraData,
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
-		BaseFee:    chain.GenesisBaseFee,
-		BaseFeeEM:  chain.GenesisBaseFeeEM,
 	}
 
 	if len(p.contractDeployerAllowListAdmin) != 0 {
@@ -260,6 +258,13 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			AdminAddresses:   stringSliceToAddressSlice(p.bridgeBlockListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.bridgeBlockListEnabled),
 		}
+	}
+
+	if len(p.burnContracts) > 0 {
+		// only populate base fee and base fee multiplier values if burn contract(s)
+		// is provided
+		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)

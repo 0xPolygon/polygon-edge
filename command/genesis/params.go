@@ -382,7 +382,7 @@ func (p *genesisParams) initGenesisConfig() error {
 	if len(p.burnContracts) > 0 {
 		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
 		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
-		chainConfig.Params.BurnContract = map[uint64]string{}
+		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
 		for _, burnContract := range p.burnContracts {
 			block, address, err := parseBurnContractInfo(burnContract)
