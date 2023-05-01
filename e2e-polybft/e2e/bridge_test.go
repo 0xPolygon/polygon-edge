@@ -760,10 +760,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	currentBlockNum, err := childRelayer.Client().Eth().BlockNumber()
 	require.NoError(t, err)
 
-	// wait for next epoch-ending block as the starting point,
-	// in order to be able to easier track checkpoints submission
-	endOfEpochBlockNum := currentBlockNum + epochSize - (currentBlockNum % epochSize)
-	require.NoError(t, cluster.WaitForBlock(endOfEpochBlockNum, 1*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 1*time.Minute))
 
 	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
