@@ -257,6 +257,7 @@ func TestTransaction_Encoding(t *testing.T) {
 		tt := mockTxn()
 		tt.GasTipCap = &gasTipCap
 		tt.GasFeeCap = &gasFeeCap
+		tt.Type = argUint64(types.DynamicFeeTx)
 
 		testTransaction("testsuite/transaction-eip1559.json", tt)
 	})
