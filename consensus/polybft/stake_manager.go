@@ -117,6 +117,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	stakeMap := fullValidatorSet.Validators
 
 	updatedValidatorsBalance := make(map[types.Address]struct{}, 0)
+
 	for _, event := range events {
 		if event.IsStake() {
 			updatedValidatorsBalance[event.To] = struct{}{}
@@ -359,6 +360,7 @@ func newValidatorStakeMap(validatorSet AccountSet) validatorStakeMap {
 // setStake sets given amount of stake to a validator defined by address
 func (sc *validatorStakeMap) setStake(address types.Address, amount *big.Int) {
 	isActive := amount.Cmp(bigZero) > 0
+
 	if metadata, exists := (*sc)[address]; exists {
 		metadata.VotingPower = amount
 		metadata.IsActive = isActive

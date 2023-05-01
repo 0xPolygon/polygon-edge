@@ -120,6 +120,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 	require.NoError(t, err)
 	require.Len(t, fullValidatorSet.Validators, len(allAliases))
+
 	for _, v := range fullValidatorSet.Validators {
 		require.Equal(t, newStake, v.VotingPower.Uint64())
 	}
