@@ -666,6 +666,9 @@ type InitializeChildERC20PredicateAccessListFn struct {
 	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
 	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
 	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
+	UseAllowList              bool          `abi:"useAllowList"`
+	UseBlockList              bool          `abi:"useBlockList"`
+	NewOwner                  types.Address `abi:"newOwner"`
 }
 
 func (i *InitializeChildERC20PredicateAccessListFn) Sig() []byte {

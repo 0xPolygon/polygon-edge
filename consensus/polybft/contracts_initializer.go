@@ -90,6 +90,9 @@ func getInitChildERC20PredicateAccessListInput(config PolyBFTConfig) ([]byte, er
 		NewRootERC20Predicate:     rootERC20PredicateAddr,
 		NewChildTokenTemplate:     contracts.ChildERC20Contract,
 		NewNativeTokenRootAddress: rootERC20Addr,
+		UseAllowList:              config.BridgeAllowListActive,
+		UseBlockList:              config.BridgeBlockListActive,
+		NewOwner:                  contracts.SystemCaller,
 	}
 
 	return params.EncodeAbi()
