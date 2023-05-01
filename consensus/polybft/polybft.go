@@ -128,10 +128,35 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// initialize ChildERC20Predicate SC
+		// initialize Predicate SCs
 		if polyBFTConfig.BridgeAllowListActive || polyBFTConfig.BridgeBlockListActive {
-			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig.Bridge)
+			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig)
 			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.ChildERC20PredicateContract, input,
+				"ChildERC20PredicateAccessList", transition); err != nil {
+				return err
+			}
+
+			input, err = getInitChildERC721PredicateAccessListInput(polyBFTConfig)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.ChildERC20PredicateContract, input,
+				"ChildERC721PredicateAccessList", transition); err != nil {
+				return err
+			}
+
+			input, err = getInitChildERC1155PredicateAccessListInput(polyBFTConfig)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.ChildERC1155PredicateContract, input,
+				"ChildERC20PredicateAccessList", transition); err != nil {
 				return err
 			}
 		} else {
@@ -139,10 +164,33 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			if err != nil {
 				return err
 			}
-		}
 
-		if err = initContract(contracts.ChildERC20PredicateContract, input, "ChildERC20Predicate", transition); err != nil {
-			return err
+			if err = initContract(contracts.ChildERC20PredicateContract, input,
+				"ChildERC20Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize ChildERC721Predicate SC
+			input, err = getInitChildERC721PredicateInput(polyBFTConfig.Bridge)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.ChildERC721PredicateContract, input,
+				"ChildERC721Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize ChildERC1155Predicate SC
+			input, err = getInitChildERC1155PredicateInput(polyBFTConfig.Bridge)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.ChildERC1155PredicateContract, input,
+				"ChildERC1155Predicate", transition); err != nil {
+				return err
+			}
 		}
 
 		rootNativeERC20Token := types.ZeroAddress
@@ -187,28 +235,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			if err = initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
 				return err
 			}
-		}
-
-		// initialize ChildERC721Predicate SC
-		input, err = getInitChildERC721PredicateInput(polyBFTConfig.Bridge)
-		if err != nil {
-			return err
-		}
-
-		if err = initContract(contracts.ChildERC721PredicateContract, input,
-			"ChildERC721Predicate", transition); err != nil {
-			return err
-		}
-
-		// initialize ChildERC1155Predicate SC
-		input, err = getInitChildERC1155PredicateInput(polyBFTConfig.Bridge)
-		if err != nil {
-			return err
-		}
-
-		if err = initContract(contracts.ChildERC1155PredicateContract, input,
-			"ChildERC1155Predicate", transition); err != nil {
-			return err
 		}
 
 		return nil

@@ -961,6 +961,8 @@ type InitializeChildERC1155PredicateAccessListFn struct {
 	NewStateReceiver        types.Address `abi:"newStateReceiver"`
 	NewRootERC1155Predicate types.Address `abi:"newRootERC1155Predicate"`
 	NewChildTokenTemplate   types.Address `abi:"newChildTokenTemplate"`
+	UseAllowList            bool          `abi:"useAllowList"`
+	UseBlockList            bool          `abi:"useBlockList"`
 	NewOwner                types.Address `abi:"newOwner"`
 }
 
@@ -1141,6 +1143,8 @@ type InitializeChildERC721PredicateAccessListFn struct {
 	NewStateReceiver       types.Address `abi:"newStateReceiver"`
 	NewRootERC721Predicate types.Address `abi:"newRootERC721Predicate"`
 	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
+	UseAllowList           bool          `abi:"useAllowList"`
+	UseBlockList           bool          `abi:"useBlockList"`
 	NewOwner               types.Address `abi:"newOwner"`
 }
 
