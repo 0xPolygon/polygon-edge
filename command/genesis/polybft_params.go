@@ -147,14 +147,19 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		},
 	}
 
+	// Disable london hardfork if burn contract address is not provided
+	enabledForks := chain.AllForksEnabled
+	if len(p.burnContracts) == 0 {
+		enabledForks.London = nil
+	}
+
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Params: &chain.Params{
-			Forks: chain.AllForksEnabled,
+			Forks: enabledForks,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BurnContract: map[uint64]string{},
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -191,13 +196,17 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	for _, burnContract := range p.burnContracts {
-		block, addr, err := parseBurnContractInfo(burnContract)
-		if err != nil {
-			return err
-		}
+	if len(p.burnContracts) > 0 {
+		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
-		chainConfig.Params.BurnContract[block] = addr.String()
+		for _, burnContract := range p.burnContracts {
+			block, addr, err := parseBurnContractInfo(burnContract)
+			if err != nil {
+				return err
+			}
+
+			chainConfig.Params.BurnContract[block] = addr.String()
+		}
 	}
 
 	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))
@@ -230,8 +239,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		ExtraData:  genesisExtraData,
 		GasUsed:    command.DefaultGenesisGasUsed,
 		Mixhash:    polybft.PolyBFTMixDigest,
-		BaseFee:    chain.GenesisBaseFee,
-		BaseFeeEM:  chain.GenesisBaseFeeEM,
 	}
 
 	if len(p.contractDeployerAllowListAdmin) != 0 {
@@ -286,6 +293,13 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			AdminAddresses:   stringSliceToAddressSlice(p.bridgeBlockListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.bridgeBlockListEnabled),
 		}
+	}
+
+	if len(p.burnContracts) > 0 {
+		// only populate base fee and base fee multiplier values if burn contract(s)
+		// is provided
+		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
