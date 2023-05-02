@@ -189,6 +189,7 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	return object.Account.Balance
 }
 
+// EmitLog appends log to logs tree storage
 func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	log := &types.Log{
 		Address: addr,
@@ -209,25 +210,9 @@ func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	txn.txn.Insert(logIndex, logs)
 }
 
-// AddLog adds a new log
-func (txn *Txn) AddLog(log *types.Log) {
-	var logs []*types.Log
-
-	data, exists := txn.txn.Get(logIndex)
-	if !exists {
-		logs = []*types.Log{}
-	} else {
-		logs = data.([]*types.Log) //nolint:forcetypeassert
-	}
-
-	logs = append(logs, log)
-	txn.txn.Insert(logIndex, logs)
-}
-
 // State
 
-var zeroHash types.Hash
-
+// SetStorage sets the storage of an address
 func (txn *Txn) SetStorage(
 	addr types.Address,
 	key types.Hash,
@@ -247,9 +232,9 @@ func (txn *Txn) SetStorage(
 	legacyGasMetering := !config.Istanbul && (config.Petersburg || !config.Constantinople)
 
 	if legacyGasMetering {
-		if oldValue == zeroHash {
+		if oldValue == types.ZeroHash {
 			return runtime.StorageAdded
-		} else if value == zeroHash {
+		} else if value == types.ZeroHash {
 			txn.AddRefund(15000)
 
 			return runtime.StorageDeleted
@@ -259,11 +244,11 @@ func (txn *Txn) SetStorage(
 	}
 
 	if original == current {
-		if original == zeroHash { // create slot (2.1.1)
+		if original == types.ZeroHash { // create slot (2.1.1)
 			return runtime.StorageAdded
 		}
 
-		if value == zeroHash { // delete slot (2.1.2b)
+		if value == types.ZeroHash { // delete slot (2.1.2b)
 			txn.AddRefund(15000)
 
 			return runtime.StorageDeleted
@@ -272,16 +257,16 @@ func (txn *Txn) SetStorage(
 		return runtime.StorageModified
 	}
 
-	if original != zeroHash { // Storage slot was populated before this transaction started
-		if current == zeroHash { // recreate slot (2.2.1.1)
+	if original != types.ZeroHash { // Storage slot was populated before this transaction started
+		if current == types.ZeroHash { // recreate slot (2.2.1.1)
 			txn.SubRefund(15000)
-		} else if value == zeroHash { // delete slot (2.2.1.2)
+		} else if value == types.ZeroHash { // delete slot (2.2.1.2)
 			txn.AddRefund(15000)
 		}
 	}
 
 	if original == value {
-		if original == zeroHash { // reset to original nonexistent slot (2.2.2.1)
+		if original == types.ZeroHash { // reset to original nonexistent slot (2.2.2.1)
 			// Storage was used as memory (allocation and deallocation occurred within the same contract)
 			if config.Istanbul {
 				txn.AddRefund(19200)
@@ -311,7 +296,7 @@ func (txn *Txn) SetState(
 			object.Txn = iradix.New().Txn()
 		}
 
-		if value == zeroHash {
+		if value == types.ZeroHash {
 			object.Txn.Insert(key.Bytes(), nil)
 		} else {
 			object.Txn.Insert(key.Bytes(), value.Bytes())
@@ -383,6 +368,7 @@ func (txn *Txn) SetCode(addr types.Address, code []byte) {
 	})
 }
 
+// GetCode gets the code on a given address
 func (txn *Txn) GetCode(addr types.Address) []byte {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
