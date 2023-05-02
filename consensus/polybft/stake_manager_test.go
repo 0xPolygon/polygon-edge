@@ -46,8 +46,8 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
 		require.Len(t, fullValidatorSet.Validators, len(validators))
-		require.Equal(t, uint64(1), fullValidatorSet.EpochID)
-		require.Equal(t, uint64(0), fullValidatorSet.BlockID)
+		require.Equal(t, uint64(0), fullValidatorSet.EpochID)
+		require.Equal(t, uint64(0), fullValidatorSet.BlockNumber)
 	})
 }
 

@@ -85,9 +85,9 @@ func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 
 	// save initial validator set as full validator set in db
 	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
-		BlockID:    0,
-		EpochID:    1,
-		Validators: newValidatorStakeMap(req.ValidatorSet.Accounts()),
+		BlockNumber: 0,
+		EpochID:     0,
+		Validators:  newValidatorStakeMap(req.ValidatorSet.Accounts()),
 	})
 }
 
@@ -138,9 +138,9 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	}
 
 	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
-		EpochID:    req.Epoch,
-		BlockID:    req.FullBlock.Block.Number(),
-		Validators: stakeMap,
+		EpochID:     req.Epoch,
+		BlockNumber: req.FullBlock.Block.Number(),
+		Validators:  stakeMap,
 	})
 }
 
@@ -302,9 +302,9 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 }
 
 type validatorSetState struct {
-	BlockID    uint64            `json:"block"`
-	EpochID    uint64            `json:"epoch"`
-	Validators validatorStakeMap `json:"validators"`
+	BlockNumber uint64            `json:"block"`
+	EpochID     uint64            `json:"epoch"`
+	Validators  validatorStakeMap `json:"validators"`
 }
 
 func (vs validatorSetState) Marshal() ([]byte, error) {
