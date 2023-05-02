@@ -157,6 +157,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		stakeManager := types.StringToAddress(params.stakeManagerAddress)
 		callerAddr := types.Address(ownerKey.Address())
+
 		for _, v := range consensusConfig.InitialValidatorSet {
 			finalizedStake, err := getFinalizedStake(callerAddr, v.Address, stakeManager,
 				chainConfig.Params.ChainID, txRelayer)
