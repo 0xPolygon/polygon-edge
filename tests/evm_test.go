@@ -28,7 +28,7 @@ var mainnetChainConfig = chain.Params{
 	},
 }
 
-var vmTests = "VMTests"
+var vmTests = "GeneralStateTests/VMTests"
 
 type VMCase struct {
 	Info *info `json:"_info"`
