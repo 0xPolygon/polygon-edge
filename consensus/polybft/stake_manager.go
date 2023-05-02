@@ -144,13 +144,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 				return fmt.Errorf("could not retrieve balance of validator %v on ValidatorSet", a)
 			}
 
-			validator, exists := stakeMap[a]
-			if !exists {
-				stakeMap.setStake(a, stake)
-			} else {
-				validator.VotingPower = stake
-				validator.IsActive = validator.VotingPower.Cmp(bigZero) > 0
-			}
+			stakeMap.setStake(a, stake)
 		}
 	}
 
