@@ -219,6 +219,7 @@ func mockTxn() *transaction {
 		BlockHash:   &types.ZeroHash,
 		BlockNumber: argUintPtr(1),
 		TxIndex:     argUintPtr(2),
+		Type:        argUint64(types.LegacyTx),
 	}
 
 	return tt
@@ -256,6 +257,7 @@ func TestTransaction_Encoding(t *testing.T) {
 		tt := mockTxn()
 		tt.GasTipCap = &gasTipCap
 		tt.GasFeeCap = &gasFeeCap
+		tt.Type = argUint64(types.DynamicFeeTx)
 
 		testTransaction("testsuite/transaction-eip1559.json", tt)
 	})
