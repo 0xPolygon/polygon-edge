@@ -92,13 +92,11 @@ func (*StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !StateReceiver.Abi.Events["StateSyncResult"].Match(logCopy) {
+	if !StateReceiver.Abi.Events["StateSyncResult"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], logCopy, s)
+	return true, decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
 }
 
 type NewCommitmentEvent struct {
@@ -116,13 +114,11 @@ func (*NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !StateReceiver.Abi.Events["NewCommitment"].Match(logCopy) {
+	if !StateReceiver.Abi.Events["NewCommitment"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(StateReceiver.Abi.Events["NewCommitment"], logCopy, n)
+	return true, decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
 }
 
 type SyncStateStateSenderFn struct {
@@ -158,13 +154,11 @@ func (*StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !StateSender.Abi.Events["StateSynced"].Match(logCopy) {
+	if !StateSender.Abi.Events["StateSynced"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(StateSender.Abi.Events["StateSynced"], logCopy, s)
+	return true, decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
 }
 
 type L2StateSyncedEvent struct {
@@ -183,13 +177,11 @@ func (*L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !L2StateSender.Abi.Events["L2StateSynced"].Match(logCopy) {
+	if !L2StateSender.Abi.Events["L2StateSynced"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], logCopy, l)
+	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
 }
 
 type CheckpointMetadata struct {
@@ -886,13 +878,11 @@ func (*ValidatorRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !CustomSupernetManager.Abi.Events["ValidatorRegistered"].Match(logCopy) {
+	if !CustomSupernetManager.Abi.Events["ValidatorRegistered"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(CustomSupernetManager.Abi.Events["ValidatorRegistered"], logCopy, v)
+	return true, decodeEvent(CustomSupernetManager.Abi.Events["ValidatorRegistered"], log, v)
 }
 
 type AddedToWhitelistEvent struct {
@@ -908,13 +898,11 @@ func (*AddedToWhitelistEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !CustomSupernetManager.Abi.Events["AddedToWhitelist"].Match(logCopy) {
+	if !CustomSupernetManager.Abi.Events["AddedToWhitelist"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(CustomSupernetManager.Abi.Events["AddedToWhitelist"], logCopy, a)
+	return true, decodeEvent(CustomSupernetManager.Abi.Events["AddedToWhitelist"], log, a)
 }
 
 type InitializeStakeManagerFn struct {
@@ -1031,13 +1019,11 @@ func (*ChildManagerRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (c *ChildManagerRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !StakeManager.Abi.Events["ChildManagerRegistered"].Match(logCopy) {
+	if !StakeManager.Abi.Events["ChildManagerRegistered"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(StakeManager.Abi.Events["ChildManagerRegistered"], logCopy, c)
+	return true, decodeEvent(StakeManager.Abi.Events["ChildManagerRegistered"], log, c)
 }
 
 type StakeAddedEvent struct {
@@ -1055,13 +1041,11 @@ func (*StakeAddedEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (s *StakeAddedEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !StakeManager.Abi.Events["StakeAdded"].Match(logCopy) {
+	if !StakeManager.Abi.Events["StakeAdded"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(StakeManager.Abi.Events["StakeAdded"], logCopy, s)
+	return true, decodeEvent(StakeManager.Abi.Events["StakeAdded"], log, s)
 }
 
 type StakeWithdrawnEvent struct {
@@ -1079,13 +1063,11 @@ func (*StakeWithdrawnEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (s *StakeWithdrawnEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !StakeManager.Abi.Events["StakeWithdrawn"].Match(logCopy) {
+	if !StakeManager.Abi.Events["StakeWithdrawn"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(StakeManager.Abi.Events["StakeWithdrawn"], logCopy, s)
+	return true, decodeEvent(StakeManager.Abi.Events["StakeWithdrawn"], log, s)
 }
 
 type Epoch struct {
@@ -1187,13 +1169,11 @@ func (*TransferEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (t *TransferEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !ValidatorSet.Abi.Events["Transfer"].Match(logCopy) {
+	if !ValidatorSet.Abi.Events["Transfer"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(ValidatorSet.Abi.Events["Transfer"], logCopy, t)
+	return true, decodeEvent(ValidatorSet.Abi.Events["Transfer"], log, t)
 }
 
 type WithdrawalRegisteredEvent struct {
@@ -1210,13 +1190,11 @@ func (*WithdrawalRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (w *WithdrawalRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !ValidatorSet.Abi.Events["WithdrawalRegistered"].Match(logCopy) {
+	if !ValidatorSet.Abi.Events["WithdrawalRegistered"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(ValidatorSet.Abi.Events["WithdrawalRegistered"], logCopy, w)
+	return true, decodeEvent(ValidatorSet.Abi.Events["WithdrawalRegistered"], log, w)
 }
 
 type WithdrawalEvent struct {
@@ -1233,13 +1211,11 @@ func (*WithdrawalEvent) Encode(inputs interface{}) ([]byte, error) {
 }
 
 func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	logCopy := log.Copy()
-
-	if !ValidatorSet.Abi.Events["Withdrawal"].Match(logCopy) {
+	if !ValidatorSet.Abi.Events["Withdrawal"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], logCopy, w)
+	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
 }
 
 type InitializeRewardPoolFn struct {
