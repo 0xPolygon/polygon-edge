@@ -86,11 +86,13 @@ It has a native support for running bridge, which enables running cross-chain tr
     --stake-manager <address_of_StakeManager_contract> --native-root-token <address_of_native_root_token>
     ```
 
-10. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts **This command is for testing purposes only.**
+10. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts.
 
     ```bash
     $ polygon-edge polybft supernet --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
+    --genesis <path_to_genesis_file> \
     --supernet-manager <address_of_SupernetManager_contract> \
+    --stake-manager <address_of_StakeManager_contract> \
     --finalize-genesis --enable-staking
     ```
 

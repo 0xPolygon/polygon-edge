@@ -404,13 +404,15 @@ func (t *TestBridge) initialStakingOfGenesisValidators(
 	return g.Wait()
 }
 
-func (t *TestBridge) finalizeGenesis(polybftConfig polybft.PolyBFTConfig) error {
+func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.PolyBFTConfig) error {
 	args := []string{
 		"polybft",
 		"supernet",
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--private-key", rootHelper.TestAccountPrivKey,
+		"--genesis", genesisPath,
 		"--supernet-manager", polybftConfig.Bridge.CustomSupernetManagerAddr.String(),
+		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--finalize-genesis-set",
 		"--enable-staking",
 	}

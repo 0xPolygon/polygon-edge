@@ -30,6 +30,9 @@ const (
 	StakeManagerFlagDesc    = "address of stake manager contract"
 	NativeRootTokenFlag     = "native-root-token"
 	NativeRootTokenFlagDesc = "address of native root token"
+	GenesisPathFlag         = "genesis"
+	GenesisPathFlagDesc     = "genesis file path, which contains chain configuration"
+	DefaultGenesisPath      = "./genesis.json"
 )
 
 var (

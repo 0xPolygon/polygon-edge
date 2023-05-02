@@ -2,6 +2,8 @@ package supernet
 
 import (
 	"bytes"
+	"fmt"
+	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -18,6 +20,8 @@ type supernetParams struct {
 	privateKey             string
 	jsonRPC                string
 	supernetManagerAddress string
+	stakeManagerAddress    string
+	genesisPath            string
 	finalizeGenesisSet     bool
 	enableStaking          bool
 }
@@ -25,6 +29,10 @@ type supernetParams struct {
 func (sp *supernetParams) validateFlags() error {
 	if sp.privateKey == "" {
 		return sidechainHelper.ValidateSecretFlags(sp.accountDir, sp.accountConfig)
+	}
+
+	if _, err := os.Stat(sp.genesisPath); err != nil {
+		return fmt.Errorf("provided genesis path '%s' is invalid. Error: %w ", sp.genesisPath, err)
 	}
 
 	// validate jsonrpc address

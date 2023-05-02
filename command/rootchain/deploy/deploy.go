@@ -111,9 +111,9 @@ func GetCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(
 		&params.genesisPath,
-		genesisPathFlag,
-		defaultGenesisPath,
-		"genesis file path, which contains chain configuration",
+		helper.GenesisPathFlag,
+		helper.DefaultGenesisPath,
+		helper.GenesisPathFlagDesc,
 	)
 
 	cmd.Flags().StringVar(

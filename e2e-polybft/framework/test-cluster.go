@@ -593,7 +593,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 
 		// finalize genesis validators on the rootchain
-		err = cluster.Bridge.finalizeGenesis(polybftConfig)
+		err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
 		require.NoError(t, err)
 	}
 
