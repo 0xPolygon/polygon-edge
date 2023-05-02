@@ -907,6 +907,10 @@ func opGasLimit(c *state) {
 	c.push1().SetInt64(c.host.GetTxContext().GasLimit)
 }
 
+func opBaseFee(c *state) {
+	c.push1().SetUint64(c.host.GetTxContext().BaseFee.Uint64())
+}
+
 func opSelfDestruct(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)
