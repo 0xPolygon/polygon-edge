@@ -2,9 +2,11 @@ package polybft
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sort"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -82,7 +84,11 @@ func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 	}
 
 	// save initial validator set as full validator set in db
-	return s.state.StakeStore.insertFullValidatorSet(req.ValidatorSet.Accounts())
+	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
+		BlockNumber: 0,
+		EpochID:     0,
+		Validators:  newValidatorStakeMap(req.ValidatorSet.Accounts()),
+	})
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
@@ -105,7 +111,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	stakeMap := newValidatorStakeMap(fullValidatorSet)
+	stakeMap := fullValidatorSet.Validators
 
 	for _, event := range events {
 		if event.IsStake() {
@@ -120,23 +126,22 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		}
 	}
 
-	newFullValidatorSet := make(AccountSet, 0, len(stakeMap))
-
 	for addr, data := range stakeMap {
 		if data.BlsKey == nil {
-			newValidatorMetaData, err := s.getNewValidatorInfo(addr, data.VotingPower)
+			data.BlsKey, err = s.getBlsKey(data.Address)
 			if err != nil {
 				s.logger.Warn("Could not get info for new validator", "epoch", req.Epoch, "address", addr)
-			} else {
-				data = newValidatorMetaData
 			}
 		}
 
 		data.IsActive = data.VotingPower.Cmp(bigZero) > 0
-		newFullValidatorSet = append(newFullValidatorSet, data)
 	}
 
-	return s.state.StakeStore.insertFullValidatorSet(newFullValidatorSet)
+	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
+		EpochID:     req.Epoch,
+		BlockNumber: req.FullBlock.Block.Number(),
+		Validators:  stakeMap,
+	})
 }
 
 // UpdateValidatorSet returns an updated validator set
@@ -150,7 +155,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountS
 	}
 
 	// stake map that holds stakes for all validators
-	stakeMap := newValidatorStakeMap(fullValidatorSet)
+	stakeMap := fullValidatorSet.Validators
 
 	// slice of all validator set
 	newValidatorSet := stakeMap.getActiveValidators(s.maxValidatorSetSize)
@@ -182,13 +187,11 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountS
 			}
 		} else {
 			if newValidator.BlsKey == nil {
-				validatorData, err := s.getNewValidatorInfo(newValidator.Address, newValidator.VotingPower)
+				newValidator.BlsKey, err = s.getBlsKey(newValidator.Address)
 				if err != nil {
 					return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
 						newValidator.Address, err)
 				}
-
-				newValidator = validatorData
 			}
 
 			addedValidators = append(addedValidators, newValidator)
@@ -247,8 +250,8 @@ func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) 
 	return events, nil
 }
 
-// getValidatorInfo returns data for new validator (bls key, is active) from the supernet contract
-func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int) (*ValidatorMetadata, error) {
+// getBlsKey returns bls key for validator from the supernet contract
+func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) {
 	getValidatorFn := &contractsapi.GetValidatorCustomSupernetManagerFn{
 		Validator_: address,
 	}
@@ -295,12 +298,21 @@ func (s *stakeManager) getNewValidatorInfo(address types.Address, stake *big.Int
 		return nil, fmt.Errorf("failed to unmarshal BLS public key: %w", err)
 	}
 
-	return &ValidatorMetadata{
-		Address:     address,
-		VotingPower: stake,
-		BlsKey:      pubKey,
-		IsActive:    true,
-	}, nil
+	return pubKey, nil
+}
+
+type validatorSetState struct {
+	BlockNumber uint64            `json:"block"`
+	EpochID     uint64            `json:"epoch"`
+	Validators  validatorStakeMap `json:"validators"`
+}
+
+func (vs validatorSetState) Marshal() ([]byte, error) {
+	return json.Marshal(vs)
+}
+
+func (vs *validatorSetState) Unmarshal(b []byte) error {
+	return json.Unmarshal(b, vs)
 }
 
 // validatorStakeMap holds ValidatorMetadata for each validator address
@@ -339,8 +351,8 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 }
 
 // getActiveValidators returns all validators (*ValidatorMetadata) in sorted order
-func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) []*ValidatorMetadata {
-	activeValidators := make([]*ValidatorMetadata, 0, len(sc))
+func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) AccountSet {
+	activeValidators := make(AccountSet, 0, len(sc))
 
 	for _, v := range sc {
 		if v.VotingPower.Cmp(bigZero) > 0 {
@@ -366,4 +378,20 @@ func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) []*Vali
 	}
 
 	return activeValidators[:maxValidatorSetSize]
+}
+
+func (sc validatorStakeMap) String() string {
+	var sb strings.Builder
+
+	for _, x := range sc {
+		bls := ""
+		if x.BlsKey != nil {
+			bls = hex.EncodeToString(x.BlsKey.Marshal())
+		}
+
+		sb.WriteString(fmt.Sprintf("%s:%s:%s:%t\n",
+			x.Address, x.VotingPower, bls, x.IsActive))
+	}
+
+	return sb.String()
 }

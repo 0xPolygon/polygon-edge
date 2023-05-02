@@ -18,23 +18,33 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 
 	t.Run("Insert validator set", func(t *testing.T) {
 		validators := newTestValidators(t, 5).getPublicIdentities()
-		err := state.StakeStore.insertFullValidatorSet(validators)
 
-		assert.NoError(t, err)
+		assert.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			BlockNumber: 100,
+			EpochID:     10,
+			Validators:  newValidatorStakeMap(validators),
+		}))
 
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
-		assert.Len(t, fullValidatorSet, len(validators))
+		assert.Equal(t, uint64(100), fullValidatorSet.BlockNumber)
+		assert.Equal(t, uint64(10), fullValidatorSet.EpochID)
+		assert.Len(t, fullValidatorSet.Validators, len(validators))
 	})
 
 	t.Run("Update validator set", func(t *testing.T) {
 		validators := newTestValidators(t, 10).getPublicIdentities()
-		err := state.StakeStore.insertFullValidatorSet(validators)
 
-		assert.NoError(t, err)
+		assert.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			BlockNumber: 40,
+			EpochID:     4,
+			Validators:  newValidatorStakeMap(validators),
+		}))
 
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
-		assert.Len(t, fullValidatorSet, len(validators))
+		assert.Len(t, fullValidatorSet.Validators, len(validators))
+		assert.Equal(t, uint64(40), fullValidatorSet.BlockNumber)
+		assert.Equal(t, uint64(4), fullValidatorSet.EpochID)
 	})
 }

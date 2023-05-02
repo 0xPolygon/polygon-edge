@@ -235,7 +235,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
 
 	// wait for the stake to be bridged
-	require.NoError(t, cluster.WaitForBlock(polybftConfig.EpochSize*2, time.Minute))
+	require.NoError(t, cluster.WaitForBlock(polybftConfig.EpochSize*4, time.Minute))
 
 	checkpointManagerAddr := ethgo.Address(polybftConfig.Bridge.CheckpointManagerAddr)
 
