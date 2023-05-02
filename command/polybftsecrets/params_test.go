@@ -37,16 +37,14 @@ func Test_initKeys(t *testing.T) {
 	assert.False(t, fileExists(path.Join(dir, "consensus/validator.key")))
 	assert.False(t, fileExists(path.Join(dir, "consensus/validator-bls.key")))
 	assert.False(t, fileExists(path.Join(dir, "libp2p/libp2p.key")))
-	assert.False(t, fileExists(path.Join(dir, "consensus/validator.sig")))
 
 	ip.generatesAccount = true
 	res, err := ip.initKeys(sm)
 	require.NoError(t, err)
-	assert.Len(t, res, 3)
+	assert.Len(t, res, 2)
 
 	assert.True(t, fileExists(path.Join(dir, "consensus/validator.key")))
 	assert.True(t, fileExists(path.Join(dir, "consensus/validator-bls.key")))
-	assert.True(t, fileExists(path.Join(dir, "consensus/validator.sig")))
 	assert.False(t, fileExists(path.Join(dir, "libp2p/libp2p.key")))
 
 	ip.generatesNetwork = true
@@ -90,13 +88,7 @@ func Test_getResult(t *testing.T) {
 	res, err := ip.getResult(sm, []string{})
 	require.NoError(t, err)
 
-	// Test BLS signature
 	sir := res.(*SecretsInitResult) //nolint:forcetypeassert
-	ds, err := hex.DecodeString(sir.BLSSignature)
-	require.NoError(t, err)
-
-	_, err = bls.UnmarshalSignature(ds)
-	require.NoError(t, err)
 
 	// Test public key serialization
 	privKey, err := hex.DecodeString(sir.PrivateKey)

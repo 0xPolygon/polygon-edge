@@ -3,6 +3,7 @@ package staking
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -14,14 +15,19 @@ type stakeParams struct {
 	stakeManagerAddr    string
 	nativeRootTokenAddr string
 	jsonRPC             string
-	amount              uint64
 	chainID             uint64
+	amount              string
+
+	amountValue *big.Int
 }
 
-func (sp *stakeParams) validateFlags() error {
+func (sp *stakeParams) validateFlags() (err error) {
+	if sp.amountValue, err = helper.ParseAmount(sp.amount); err != nil {
+		return err
+	}
+
 	// validate jsonrpc address
-	_, err := helper.ParseJSONRPCAddress(sp.jsonRPC)
-	if err != nil {
+	if _, err := helper.ParseJSONRPCAddress(sp.jsonRPC); err != nil {
 		return fmt.Errorf("failed to parse json rpc address. Error: %w", err)
 	}
 

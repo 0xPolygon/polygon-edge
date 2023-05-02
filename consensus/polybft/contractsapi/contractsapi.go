@@ -494,7 +494,6 @@ type InitializeRootERC1155PredicateFn struct {
 	NewExitHelper            types.Address `abi:"newExitHelper"`
 	NewChildERC1155Predicate types.Address `abi:"newChildERC1155Predicate"`
 	NewChildTokenTemplate    types.Address `abi:"newChildTokenTemplate"`
-	NativeTokenRootAddress   types.Address `abi:"nativeTokenRootAddress"`
 }
 
 func (i *InitializeRootERC1155PredicateFn) Sig() []byte {
@@ -621,7 +620,6 @@ func (w *WithdrawBatchChildERC1155PredicateFn) DecodeAbi(buf []byte) error {
 
 type InitializeChildERC1155Fn struct {
 	RootToken_ types.Address `abi:"rootToken_"`
-	Name_      string        `abi:"name_"`
 	Uri_       string        `abi:"uri_"`
 }
 
@@ -796,7 +794,13 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 }
 
 type InitializeCustomSupernetManagerFn struct {
-	StakeManager types.Address `abi:"stakeManager"`
+	StakeManager      types.Address `abi:"stakeManager"`
+	Bls               types.Address `abi:"bls"`
+	StateSender       types.Address `abi:"stateSender"`
+	Matic             types.Address `abi:"matic"`
+	ChildValidatorSet types.Address `abi:"childValidatorSet"`
+	ExitHelper        types.Address `abi:"exitHelper"`
+	Domain            string        `abi:"domain"`
 }
 
 func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
@@ -982,6 +986,23 @@ func (w *WithdrawStakeStakeManagerFn) EncodeAbi() ([]byte, error) {
 
 func (w *WithdrawStakeStakeManagerFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(StakeManager.Abi.Methods["withdrawStake"], buf, w)
+}
+
+type StakeOfStakeManagerFn struct {
+	Validator types.Address `abi:"validator"`
+	ID        *big.Int      `abi:"id"`
+}
+
+func (s *StakeOfStakeManagerFn) Sig() []byte {
+	return StakeManager.Abi.Methods["stakeOf"].ID()
+}
+
+func (s *StakeOfStakeManagerFn) EncodeAbi() ([]byte, error) {
+	return StakeManager.Abi.Methods["stakeOf"].Encode(s)
+}
+
+func (s *StakeOfStakeManagerFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(StakeManager.Abi.Methods["stakeOf"], buf, s)
 }
 
 type ChildManagerRegisteredEvent struct {
@@ -1178,7 +1199,6 @@ func (w *WithdrawalRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 
 type WithdrawalEvent struct {
 	Account types.Address `abi:"account"`
-	To      types.Address `abi:"to"`
 	Amount  *big.Int      `abi:"amount"`
 }
 
@@ -1198,47 +1218,31 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
 }
 
-type InitializeRewardDistributorFn struct {
+type InitializeRewardPoolFn struct {
 	RewardToken  types.Address `abi:"rewardToken"`
 	RewardWallet types.Address `abi:"rewardWallet"`
 	ValidatorSet types.Address `abi:"validatorSet"`
 	BaseReward   *big.Int      `abi:"baseReward"`
 }
 
-func (i *InitializeRewardDistributorFn) Sig() []byte {
-	return RewardDistributor.Abi.Methods["initialize"].ID()
+func (i *InitializeRewardPoolFn) Sig() []byte {
+	return RewardPool.Abi.Methods["initialize"].ID()
 }
 
-func (i *InitializeRewardDistributorFn) EncodeAbi() ([]byte, error) {
-	return RewardDistributor.Abi.Methods["initialize"].Encode(i)
+func (i *InitializeRewardPoolFn) EncodeAbi() ([]byte, error) {
+	return RewardPool.Abi.Methods["initialize"].Encode(i)
 }
 
-func (i *InitializeRewardDistributorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RewardDistributor.Abi.Methods["initialize"], buf, i)
+func (i *InitializeRewardPoolFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RewardPool.Abi.Methods["initialize"], buf, i)
 }
 
-type UptimeData struct {
+type Uptime struct {
 	Validator    types.Address `abi:"validator"`
 	SignedBlocks *big.Int      `abi:"signedBlocks"`
 }
 
-var UptimeDataABIType = abi.MustNewType("tuple(address validator,uint256 signedBlocks)")
-
-func (u *UptimeData) EncodeAbi() ([]byte, error) {
-	return UptimeDataABIType.Encode(u)
-}
-
-func (u *UptimeData) DecodeAbi(buf []byte) error {
-	return decodeStruct(UptimeDataABIType, buf, &u)
-}
-
-type Uptime struct {
-	EpochID     *big.Int      `abi:"epochId"`
-	UptimeData  []*UptimeData `abi:"uptimeData"`
-	TotalBlocks *big.Int      `abi:"totalBlocks"`
-}
-
-var UptimeABIType = abi.MustNewType("tuple(uint256 epochId,tuple(address validator,uint256 signedBlocks)[] uptimeData,uint256 totalBlocks)")
+var UptimeABIType = abi.MustNewType("tuple(address validator,uint256 signedBlocks)")
 
 func (u *Uptime) EncodeAbi() ([]byte, error) {
 	return UptimeABIType.Encode(u)
@@ -1248,19 +1252,19 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 	return decodeStruct(UptimeABIType, buf, &u)
 }
 
-type DistributeRewardForRewardDistributorFn struct {
-	EpochID *big.Int `abi:"epochId"`
-	Uptime  *Uptime  `abi:"uptime"`
+type DistributeRewardForRewardPoolFn struct {
+	EpochID *big.Int  `abi:"epochId"`
+	Uptime  []*Uptime `abi:"uptime"`
 }
 
-func (d *DistributeRewardForRewardDistributorFn) Sig() []byte {
-	return RewardDistributor.Abi.Methods["distributeRewardFor"].ID()
+func (d *DistributeRewardForRewardPoolFn) Sig() []byte {
+	return RewardPool.Abi.Methods["distributeRewardFor"].ID()
 }
 
-func (d *DistributeRewardForRewardDistributorFn) EncodeAbi() ([]byte, error) {
-	return RewardDistributor.Abi.Methods["distributeRewardFor"].Encode(d)
+func (d *DistributeRewardForRewardPoolFn) EncodeAbi() ([]byte, error) {
+	return RewardPool.Abi.Methods["distributeRewardFor"].Encode(d)
 }
 
-func (d *DistributeRewardForRewardDistributorFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(RewardDistributor.Abi.Methods["distributeRewardFor"], buf, d)
+func (d *DistributeRewardForRewardPoolFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(RewardPool.Abi.Methods["distributeRewardFor"], buf, d)
 }

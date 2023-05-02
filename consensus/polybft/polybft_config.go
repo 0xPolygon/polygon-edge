@@ -53,15 +53,18 @@ type PolyBFTConfig struct {
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
-func LoadPolyBFTConfig(chainConfigFile string) (*PolyBFTConfig, uint64, error) {
+func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, int64, error) {
 	chainCfg, err := chain.ImportFromFile(chainConfigFile)
 	if err != nil {
-		return nil, 0, err
+		return PolyBFTConfig{}, 0, err
 	}
 
 	polybftConfig, err := GetPolyBFTConfig(chainCfg)
+	if err != nil {
+		return PolyBFTConfig{}, 0, err
+	}
 
-	return &polybftConfig, uint64(chainCfg.Params.ChainID), err
+	return polybftConfig, chainCfg.Params.ChainID, err
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
@@ -106,23 +109,21 @@ type Validator struct {
 	Address       types.Address
 	BlsPrivateKey *bls.PrivateKey
 	BlsKey        string
-	BlsSignature  string
 	Balance       *big.Int
 	Stake         *big.Int
 	MultiAddr     string
 }
 
 type validatorRaw struct {
-	Address      types.Address `json:"address"`
-	BlsKey       string        `json:"blsKey"`
-	BlsSignature string        `json:"blsSignature"`
-	Balance      *string       `json:"balance"`
-	Stake        *string       `json:"stake"`
-	MultiAddr    string        `json:"multiAddr"`
+	Address   types.Address `json:"address"`
+	BlsKey    string        `json:"blsKey"`
+	Balance   *string       `json:"balance"`
+	Stake     *string       `json:"stake"`
+	MultiAddr string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 	raw.Stake = types.EncodeBigInt(v.Stake)
 
@@ -141,7 +142,6 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
-	v.BlsSignature = raw.BlsSignature
 	v.MultiAddr = raw.MultiAddr
 
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
@@ -165,16 +165,6 @@ func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
 	}
 
 	return bls.UnmarshalPublicKey(decoded)
-}
-
-// UnmarshalBLSSignature unmarshals the hex encoded BLS signature
-func (v *Validator) UnmarshalBLSSignature() (*bls.Signature, error) {
-	decoded, err := hex.DecodeString(v.BlsSignature)
-	if err != nil {
-		return nil, err
-	}
-
-	return bls.UnmarshalSignature(decoded)
 }
 
 // ToValidatorMetadata creates ValidatorMetadata instance
@@ -249,7 +239,6 @@ type TokenConfig struct {
 }
 
 type RewardsConfig struct {
-
 	// TokenAddress is the address of reward token on child chain
 	TokenAddress types.Address
 

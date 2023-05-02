@@ -690,18 +690,17 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 func initializeSupernetManager(cmdOutput command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
-	// this is done without using go stubs, because CustomSupernetManager inherits
-	// SupernetManager which has another initialize function
-	// and generator keeps generating that parent initialize function
-	input, err := contractsapi.CustomSupernetManager.Abi.Methods["initialize"].Encode(map[string]interface{}{
-		"stakeManager":      rootchainConfig.StakeManagerAddress,
-		"bls":               rootchainConfig.BLSAddress,
-		"stateSender":       rootchainConfig.StateSenderAddress,
-		"matic":             rootchainConfig.RootNativeERC20Address,
-		"childValidatorSet": contracts.ValidatorSetContract,
-		"exitHelper":        rootchainConfig.ExitHelperAddress,
-		"domain":            bls.DomainValidatorSetString,
-	})
+	initFn := &contractsapi.InitializeCustomSupernetManagerFn{
+		StakeManager:      rootchainConfig.StakeManagerAddress,
+		Bls:               rootchainConfig.BLSAddress,
+		StateSender:       rootchainConfig.StateSenderAddress,
+		Matic:             rootchainConfig.RootNativeERC20Address,
+		ChildValidatorSet: contracts.ValidatorSetContract,
+		ExitHelper:        rootchainConfig.ExitHelperAddress,
+		Domain:            bls.DomainValidatorSetString,
+	}
+
+	input, err := initFn.EncodeAbi()
 	if err != nil {
 		return err
 	}

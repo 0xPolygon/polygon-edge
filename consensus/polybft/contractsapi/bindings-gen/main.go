@@ -244,6 +244,7 @@ func main() {
 				"stakeFor",
 				"releaseStakeOf",
 				"withdrawStake",
+				"stakeOf",
 			},
 			[]string{
 				"ChildManagerRegistered",
@@ -267,8 +268,8 @@ func main() {
 			},
 		},
 		{
-			"RewardDistributor",
-			gensc.RewardDistributor,
+			"RewardPool",
+			gensc.RewardPool,
 			false,
 			[]string{
 				"initialize",

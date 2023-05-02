@@ -13,19 +13,12 @@ import (
 
 // ValidatorInfo is data transfer object which holds validator information,
 // provided by smart contract
-// TODO - @goran-ethernal deprecate this struct once we change e2e tests
-// we will instead use the contractsapi generated stub once we remove old
-// ChildValidatorSet contract and its stubs
-//
-//nolint:godox
 type ValidatorInfo struct {
 	Address             ethgo.Address
 	Stake               *big.Int
-	TotalStake          *big.Int
-	Commission          *big.Int
 	WithdrawableRewards *big.Int
-	Active              bool
-	Whitelisted         bool
+	IsActive            bool
+	IsWhitelisted       bool
 }
 
 // SystemState is an interface to interact with the consensus system contracts in the chain
@@ -34,6 +27,8 @@ type SystemState interface {
 	GetEpoch() (uint64, error)
 	// GetNextCommittedIndex retrieves next committed bridge state sync index
 	GetNextCommittedIndex() (uint64, error)
+	// GetStakeOnValidatorSet retrieves stake of given validator on ValidatorSet contract
+	GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error)
 }
 
 var _ SystemState = &SystemStateImpl{}
@@ -58,6 +53,21 @@ func NewSystemState(valSetAddr types.Address, stateRcvAddr types.Address, provid
 	)
 
 	return s
+}
+
+// GetStakeOnValidatorSet retrieves stake of given validator on ValidatorSet contract
+func (s *SystemStateImpl) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
+	rawResult, err := s.validatorContract.Call("balanceOf", ethgo.Latest, validatorAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	balance, isOk := rawResult["0"].(*big.Int)
+	if !isOk {
+		return nil, fmt.Errorf("failed to decode balance")
+	}
+
+	return balance, nil
 }
 
 // GetEpoch retrieves current epoch number from the smart contract

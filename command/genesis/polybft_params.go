@@ -59,7 +59,6 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
-	blsSignatureLength = 128
 )
 
 var (
@@ -356,8 +355,8 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.ValidatorSetContract,
 		},
 		{
-			artifact: contractsapi.RewardDistributor,
-			address:  contracts.RewardDistributorContract,
+			artifact: contractsapi.RewardPool,
+			address:  contracts.RewardPoolContract,
 		},
 	}
 
@@ -386,9 +385,6 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			Code:    rewardTokenByteCode,
 		}
 	}
-
-	// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
-	allocations[contracts.ValidatorSetContract].Balance = totalStake
 
 	return allocations, nil
 }
@@ -424,9 +420,9 @@ func (p *genesisParams) getValidatorAccounts(
 		validators := make([]*polybft.Validator, len(p.validators))
 		for i, validator := range p.validators {
 			parts := strings.Split(validator, ":")
-			if len(parts) != 4 {
+			if len(parts) != 3 {
 				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
-					"<P2P multi address:ECDSA address:public BLS key:BLS signature>, but got %d part(s)",
+					"<P2P multi address:ECDSA address:public BLS key>, but got %d part(s)",
 					len(parts))
 			}
 
@@ -444,18 +440,13 @@ func (p *genesisParams) getValidatorAccounts(
 				return nil, fmt.Errorf("invalid BLS key: %s", parts[2])
 			}
 
-			if len(parts[3]) != blsSignatureLength {
-				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
-			}
-
 			addr := types.StringToAddress(trimmedAddress)
 			validators[i] = &polybft.Validator{
-				MultiAddr:    parts[0],
-				Address:      addr,
-				BlsKey:       trimmedBLSKey,
-				BlsSignature: parts[3],
-				Balance:      getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
-				Stake:        getPremineAmount(addr, stakeMap, command.DefaultStake),
+				MultiAddr: parts[0],
+				Address:   addr,
+				BlsKey:    trimmedBLSKey,
+				Balance:   getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
+				Stake:     getPremineAmount(addr, stakeMap, command.DefaultStake),
 			}
 		}
 

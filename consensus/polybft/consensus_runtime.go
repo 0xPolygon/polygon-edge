@@ -221,7 +221,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,8 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 	c.stakeManager = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
-		txRelayer,
+		c.config.blockchain,
+		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.ValidatorSetContract,
 		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
@@ -498,7 +499,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
 	epoch *epochMetadata,
 ) (*contractsapi.CommitEpochValidatorSetFn,
-	*contractsapi.DistributeRewardForRewardDistributorFn, error) {
+	*contractsapi.DistributeRewardForRewardPoolFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -556,11 +557,6 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 	}
 
-	uptime := &contractsapi.Uptime{
-		EpochID:     new(big.Int).SetUint64(epochID),
-		TotalBlocks: big.NewInt(totalBlocks),
-	}
-
 	// include the data in the uptime counter in a deterministic way
 	addrSet := []types.Address{}
 
@@ -568,12 +564,17 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		addrSet = append(addrSet, addr)
 	}
 
+	uptime := make([]*contractsapi.Uptime, len(addrSet))
+
 	sort.Slice(addrSet, func(i, j int) bool {
 		return bytes.Compare(addrSet[i][:], addrSet[j][:]) > 0
 	})
 
-	for _, addr := range addrSet {
-		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
+	for i, addr := range addrSet {
+		uptime[i] = &contractsapi.Uptime{
+			Validator:    addr,
+			SignedBlocks: new(big.Int).SetInt64(uptimeCounter[addr]),
+		}
 	}
 
 	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
@@ -585,7 +586,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		},
 	}
 
-	distributeRewards := &contractsapi.DistributeRewardForRewardDistributorFn{
+	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
 		EpochID: new(big.Int).SetUint64(epochID),
 		Uptime:  uptime,
 	}

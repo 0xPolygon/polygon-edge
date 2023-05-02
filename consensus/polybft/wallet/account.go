@@ -7,6 +7,7 @@ import (
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -115,4 +116,8 @@ func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {
 	}
 
 	return wallet.ParsePrivateKey(ecdsaRaw)
+}
+
+func (a Account) Address() types.Address {
+	return types.Address(a.Ecdsa.Address())
 }

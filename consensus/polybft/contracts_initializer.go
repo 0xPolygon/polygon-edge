@@ -40,9 +40,9 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	return initFn.EncodeAbi()
 }
 
-// getInitRewardDistributorInput builds input parameters for RewardDistributor SC initialization
-func getInitRewardDistributorInput(polybftConfig PolyBFTConfig) ([]byte, error) {
-	initFn := &contractsapi.InitializeRewardDistributorFn{
+// getInitRewardPoolInput builds input parameters for RewardPool SC initialization
+func getInitRewardPoolInput(polybftConfig PolyBFTConfig) ([]byte, error) {
+	initFn := &contractsapi.InitializeRewardPoolFn{
 		RewardToken:  polybftConfig.RewardConfig.TokenAddress,
 		RewardWallet: polybftConfig.RewardConfig.WalletAddress,
 		ValidatorSet: contracts.ValidatorSetContract,
@@ -114,14 +114,8 @@ func getInitChildERC1155PredicateInput(config *BridgeConfig) ([]byte, error) {
 
 // mintRewardTokensToWalletAddress mints configured amount of reward tokens to reward wallet address
 func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *state.Transition) error {
-	if polyBFTConfig.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract {
-		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
-		// for given wallet address to it since this is done in premine
-		return nil
-	}
-
 	approveFn := &contractsapi.ApproveRootERC20Fn{
-		Spender: polyBFTConfig.RewardConfig.WalletAddress,
+		Spender: contracts.RewardPoolContract,
 		Amount:  polyBFTConfig.RewardConfig.WalletAmount,
 	}
 
@@ -130,8 +124,15 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	if err = initContract(polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition); err != nil {
+	if err = initContract(polyBFTConfig.RewardConfig.WalletAddress,
+		polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition); err != nil {
 		return err
+	}
+
+	if polyBFTConfig.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract {
+		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
+		// for given wallet address to it since this is done in premine
+		return nil
 	}
 
 	mintFn := &contractsapi.MintRootERC20Fn{
@@ -144,11 +145,11 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	return initContract(polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+	return initContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
 }
 
-func initContract(to types.Address, input []byte, contractName string, transition *state.Transition) error {
-	result := transition.Call2(contracts.SystemCaller, to, input,
+func initContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) error {
+	result := transition.Call2(from, to, input,
 		big.NewInt(0), 100_000_000)
 
 	if result.Failed() {

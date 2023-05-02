@@ -3,13 +3,16 @@ package sidechain
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 )
 
@@ -55,19 +58,34 @@ func GetAccountFromDir(accountDir string) (*wallet.Account, error) {
 	return GetAccount(accountDir, "")
 }
 
-// GetValidatorInfo queries ChildValidatorSet smart contract and retrieves validator info for given address
-// TODO - @goran-ethernal depricate this function once we change e2e tests
-//
-//nolint:godox
-func GetValidatorInfo(validatorAddr ethgo.Address, txRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
-	return nil, nil
-}
+// GetValidatorInfo queries CustomSupernetManager, StakeManager and RewardPool smart contracts
+// to retrieve validator info for given address
+func GetValidatorInfo(validatorAddr ethgo.Address, supernetManager, stakeManager types.Address,
+	chainID int64, rootRelayer, childRelayer txrelayer.TxRelayer) (*polybft.ValidatorInfo, error) {
+	validatorInfo, err := rootHelper.GetValidatorInfo(validatorAddr, supernetManager, stakeManager,
+		chainID, rootRelayer)
+	if err != nil {
+		return nil, err
+	}
 
-// GetDelegatorReward queries delegator reward for given validator and delegator addresses
-// TODO - @goran-ethernal depricate this function once we change e2e tests
-//
-//nolint:godox
-func GetDelegatorReward(validatorAddr ethgo.Address, delegatorAddr ethgo.Address,
-	txRelayer txrelayer.TxRelayer) (*big.Int, error) {
-	return nil, nil
+	withdrawableFn := contractsapi.RewardPool.Abi.GetMethod("pendingRewards")
+
+	encode, err := withdrawableFn.Encode([]interface{}{validatorAddr})
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := childRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.RewardPoolContract), encode)
+	if err != nil {
+		return nil, err
+	}
+
+	withdrawableRewards, err := types.ParseUint256orHex(&response)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorInfo.WithdrawableRewards = withdrawableRewards
+
+	return validatorInfo, nil
 }

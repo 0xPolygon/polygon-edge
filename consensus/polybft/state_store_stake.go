@@ -30,7 +30,7 @@ func (s *StakeStore) initialize(tx *bolt.Tx) error {
 }
 
 // insertFullValidatorSet inserts full validator set to its bucket (or updates it if exists)
-func (s *StakeStore) insertFullValidatorSet(fullValidatorSet AccountSet) error {
+func (s *StakeStore) insertFullValidatorSet(fullValidatorSet validatorSetState) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		raw, err := fullValidatorSet.Marshal()
 		if err != nil {
@@ -42,8 +42,8 @@ func (s *StakeStore) insertFullValidatorSet(fullValidatorSet AccountSet) error {
 }
 
 // getFullValidatorSet returns full validator set from its bucket if exists
-func (s *StakeStore) getFullValidatorSet() (AccountSet, error) {
-	var fullValidatorSet AccountSet
+func (s *StakeStore) getFullValidatorSet() (validatorSetState, error) {
+	var fullValidatorSet validatorSetState
 
 	err := s.db.View(func(tx *bolt.Tx) error {
 		raw := tx.Bucket(validatorSetBucket).Get(fullValidatorSetKey)

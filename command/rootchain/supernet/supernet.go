@@ -99,7 +99,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	gasPrice, err := txRelayer.GetGasPrice()
+	gasPrice, err := txRelayer.Client().Eth().GasPrice()
 	if err != nil {
 		return err
 	}

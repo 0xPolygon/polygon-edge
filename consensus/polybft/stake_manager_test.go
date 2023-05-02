@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 func TestStakeManager_PostEpoch(t *testing.T) {
@@ -44,7 +45,9 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
-		require.Len(t, fullValidatorSet, len(validators))
+		require.Len(t, fullValidatorSet.Validators, len(validators))
+		require.Equal(t, uint64(0), fullValidatorSet.EpochID)
+		require.Equal(t, uint64(0), fullValidatorSet.BlockNumber)
 	})
 }
 
@@ -56,11 +59,18 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		initialSetAliases = []string{"A", "B", "C", "D", "E"}
 		epoch             = uint64(1)
 		block             = uint64(10)
-		stakeAdded        = uint64(10)
+		newStake          = uint64(100)
 	)
 
 	validators := newTestValidatorsWithAliases(t, allAliases)
 	state := newTestState(t)
+
+	systemStateMock := new(systemStateMock)
+	systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(newStake)), nil).Times(len(allAliases))
+
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
+	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 
 	txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
 		return validators.getValidator("F").ValidatorMetadata()
@@ -73,6 +83,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
+		blockchainMock,
 		txRelayerMock,
 		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
@@ -80,8 +91,9 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	)
 
 	// insert initial full validator set
-	require.NoError(t, state.StakeStore.insertFullValidatorSet(
-		validators.getPublicIdentities(initialSetAliases...)))
+	require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+		Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
+	}))
 
 	receipts := make([]*types.Receipt, len(allAliases))
 	for i := 0; i < len(allAliases); i++ {
@@ -91,7 +103,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 				stakeManager.validatorSetContract,
 				types.ZeroAddress,
 				validators.getValidator(allAliases[i]).Address(),
-				stakeAdded,
+				newStake,
 			),
 		}}
 		receipts[i].SetStatus(types.ReceiptSuccess)
@@ -107,7 +119,14 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 	fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 	require.NoError(t, err)
-	require.Len(t, fullValidatorSet, len(allAliases))
+	require.Len(t, fullValidatorSet.Validators, len(allAliases))
+
+	for _, v := range fullValidatorSet.Validators {
+		require.Equal(t, newStake, v.VotingPower.Uint64())
+	}
+
+	systemStateMock.AssertExpectations(t)
+	blockchainMock.AssertExpectations(t)
 }
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
@@ -124,6 +143,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		hclog.NewNullLogger(),
 		state,
 		nil,
+		nil,
 		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		10,
@@ -134,7 +154,9 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		validatorToUpdate := fullValidatorSet[0]
 		validatorToUpdate.VotingPower = big.NewInt(11)
 
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -148,7 +170,9 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	t.Run("UpdateValidatorSet - one unstake", func(t *testing.T) {
 		fullValidatorSet := validators.getPublicIdentities(aliases[1:]...)
 
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+1, validators.getPublicIdentities())
 		require.NoError(t, err)
@@ -159,7 +183,10 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 
 	t.Run("UpdateValidatorSet - one new validator", func(t *testing.T) {
 		addedValidator := validators.getValidator("A")
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validators.getPublicIdentities()))
+
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.getPublicIdentities()),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+2,
 			validators.getPublicIdentities(aliases[1:]...))
@@ -179,7 +206,9 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		validatorToAdd := fullValidatorSet[0]
 		validatorToAdd.VotingPower = big.NewInt(11)
 
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(fullValidatorSet))
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
 
 		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3,
 			validators.getPublicIdentities(aliases[1:]...))
@@ -304,6 +333,6 @@ func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*eth
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-func (d *dummyStakeTxRelayer) GetGasPrice() (uint64, error) {
-	return 0, nil
+func (d *dummyStakeTxRelayer) Client() *jsonrpc.Client {
+	return nil
 }

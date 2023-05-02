@@ -195,9 +195,11 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 func convertLog(log *types.Log) *ethgo.Log {
 	l := &ethgo.Log{
 		Address: ethgo.Address(log.Address),
-		Data:    log.Data,
+		Data:    make([]byte, len(log.Data)),
 		Topics:  make([]ethgo.Hash, len(log.Topics)),
 	}
+
+	copy(l.Data, log.Data)
 
 	for i, topic := range log.Topics {
 		l.Topics[i] = ethgo.Hash(topic)

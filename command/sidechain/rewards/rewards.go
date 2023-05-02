@@ -1,4 +1,4 @@
-package unstaking
+package rewards
 
 import (
 	"fmt"
@@ -16,12 +16,12 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var params unstakeParams
+var params withdrawRewardsParams
 
 func GetCommand() *cobra.Command {
 	unstakeCmd := &cobra.Command{
-		Use:     "unstake",
-		Short:   "Unstakes the amount sent for validator or undelegates amount from validator",
+		Use:     "withdraw-rewards",
+		Short:   "Withdraws pending rewards on child chain for given validator",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
@@ -47,13 +47,6 @@ func setFlags(cmd *cobra.Command) {
 		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.Flags().StringVar(
-		&params.amount,
-		sidechainHelper.AmountFlag,
-		"",
-		"amount to unstake from validator",
-	)
-
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
@@ -72,25 +65,39 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	validatorAddr := validatorAccount.Ecdsa.Address()
+	rewardPoolAddr := ethgo.Address(contracts.RewardPoolContract)
+
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
 		txrelayer.WithReceiptTimeout(150*time.Millisecond))
 	if err != nil {
 		return err
 	}
 
-	unstakeFn := &contractsapi.UnstakeValidatorSetFn{
-		Amount: params.amountValue,
+	encoded, err := contractsapi.RewardPool.Abi.Methods["pendingRewards"].Encode([]interface{}{validatorAddr})
+	if err != nil {
+		return err
 	}
 
-	encoded, err := unstakeFn.EncodeAbi()
+	response, err := txRelayer.Call(validatorAddr, rewardPoolAddr, encoded)
+	if err != nil {
+		return err
+	}
+
+	amount, err := types.ParseUint256orHex(&response)
+	if err != nil {
+		return err
+	}
+
+	encoded, err = contractsapi.RewardPool.Abi.Methods["withdrawReward"].Encode([]interface{}{})
 	if err != nil {
 		return err
 	}
 
 	txn := &ethgo.Transaction{
-		From:     validatorAccount.Ecdsa.Address(),
+		From:     validatorAddr,
 		Input:    encoded,
-		To:       (*ethgo.Address)(&contracts.ValidatorSetContract),
+		To:       &rewardPoolAddr,
 		GasPrice: sidechainHelper.DefaultGasPrice,
 	}
 
@@ -100,35 +107,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return fmt.Errorf("unstake transaction failed on block: %d", receipt.BlockNumber)
+		return fmt.Errorf("withdraw transaction failed on block: %d", receipt.BlockNumber)
 	}
 
-	var (
-		withdrawalRegisteredEvent contractsapi.WithdrawalRegisteredEvent
-		foundLog                  bool
-	)
-
-	result := &unstakeResult{
+	result := &withdrawRewardResult{
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
-	}
-
-	// check the logs to check for the result
-	for _, log := range receipt.Logs {
-		doesMatch, err := withdrawalRegisteredEvent.ParseLog(log)
-		if err != nil {
-			return err
-		}
-
-		if doesMatch {
-			foundLog = true
-			result.amount = withdrawalRegisteredEvent.Amount.Uint64()
-
-			break
-		}
-	}
-
-	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that unstake happened (withdrawal registered)")
+		rewardAmount:     amount.Uint64(),
 	}
 
 	outputter.WriteCommandResult(result)

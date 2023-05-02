@@ -57,10 +57,10 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.StakeManagerFlagDesc,
 	)
 
-	cmd.Flags().Uint64Var(
+	cmd.Flags().StringVar(
 		&params.amount,
 		sidechainHelper.AmountFlag,
-		0,
+		"",
 		"amount to stake",
 	)
 
@@ -102,12 +102,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	gasPrice, err := txRelayer.GetGasPrice()
+	gasPrice, err := txRelayer.Client().Eth().GasPrice()
 	if err != nil {
 		return err
 	}
 
-	approveTxn, err := rootHelper.CreateApproveERC20Txn(new(big.Int).SetUint64(params.amount),
+	approveTxn, err := rootHelper.CreateApproveERC20Txn(params.amountValue,
 		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.nativeRootTokenAddr))
 	if err != nil {
 		return err
@@ -124,7 +124,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	stakeFn := contractsapi.StakeForStakeManagerFn{
 		ID:     new(big.Int).SetUint64(params.chainID),
-		Amount: new(big.Int).SetUint64(params.amount),
+		Amount: params.amountValue,
 	}
 
 	encoded, err := stakeFn.EncodeAbi()

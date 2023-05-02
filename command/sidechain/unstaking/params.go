@@ -3,6 +3,7 @@ package unstaking
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
@@ -16,10 +17,16 @@ type unstakeParams struct {
 	accountDir    string
 	accountConfig string
 	jsonRPC       string
-	amount        uint64
+	amount        string
+
+	amountValue *big.Int
 }
 
-func (v *unstakeParams) validateFlags() error {
+func (v *unstakeParams) validateFlags() (err error) {
+	if v.amountValue, err = helper.ParseAmount(v.amount); err != nil {
+		return err
+	}
+
 	return sidechainHelper.ValidateSecretFlags(v.accountDir, v.accountConfig)
 }
 

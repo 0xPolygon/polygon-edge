@@ -733,7 +733,7 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 	stateBlock.Block.Header.Timestamp = uint64(time.Now().UTC().Unix())
 	stateBlock.Block.Transactions = []*types.Transaction{
 		createStateTransactionWithData(contracts.ValidatorSetContract, commitEpochTxInput),
-		createStateTransactionWithData(contracts.RewardDistributorContract, distributeRewardsTxInput),
+		createStateTransactionWithData(contracts.RewardPoolContract, distributeRewardsTxInput),
 	}
 
 	proposal := stateBlock.Block.MarshalRLP()

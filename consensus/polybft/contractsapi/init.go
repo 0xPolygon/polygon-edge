@@ -36,7 +36,7 @@ var (
 	L2StateSender         *artifact.Artifact
 	CustomSupernetManager *artifact.Artifact
 	StakeManager          *artifact.Artifact
-	RewardDistributor     *artifact.Artifact
+	RewardPool            *artifact.Artifact
 	ValidatorSet          *artifact.Artifact
 
 	// test smart contracts
@@ -187,7 +187,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	RewardDistributor, err = artifact.DecodeArtifact([]byte(RewardDistributorArtifact))
+	RewardPool, err = artifact.DecodeArtifact([]byte(RewardPoolArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

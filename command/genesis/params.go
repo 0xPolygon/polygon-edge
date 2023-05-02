@@ -446,7 +446,11 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 // validateRewardWallet validates reward wallet flag
 func (p *genesisParams) validateRewardWallet() error {
 	if p.rewardWallet == "" {
-		return nil
+		return errors.New("reward wallet address must be defined")
+	}
+
+	if p.rewardWallet == types.AddressToString(types.ZeroAddress) {
+		return errors.New("reward wallet address must not be zero address")
 	}
 
 	premineInfo, err := parsePremineInfo(p.rewardWallet)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"path"
 	"strconv"
 	"strings"
@@ -284,25 +285,27 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 }
 
 // fundRootchainValidators sends predefined amount of tokens to rootchain validators
-func (t *TestBridge) fundRootchainValidators(polybftConfig *polybft.PolyBFTConfig) error {
-	args := []string{
-		"rootchain",
-		"fund",
-		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix),
-		"--num", strconv.Itoa(int(t.clusterConfig.ValidatorSetSize) + t.clusterConfig.NonValidatorCount),
-		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
-		"--mint",
+func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig) error {
+	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
+	if err != nil {
+		return fmt.Errorf("could not get validator secrets on initial rootchain funding of genesis validators: %w", err)
 	}
 
-	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+	for i, secret := range validatorSecrets {
+		err := t.FundSingleValidator(
+			polybftConfig.Bridge.RootNativeERC20Addr,
+			path.Join(t.clusterConfig.TmpDir, secret),
+			polybftConfig.InitialValidatorSet[i].Balance)
+		if err != nil {
+			return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
-	polybftConfig *polybft.PolyBFTConfig) error {
+	polybftConfig polybft.PolyBFTConfig) error {
 	addressesAsString := make([]string, len(validatorAddresses))
 	for i := 0; i < len(validatorAddresses); i++ {
 		addressesAsString[i] = validatorAddresses[i].String()
@@ -324,7 +327,7 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
 	return nil
 }
 
-func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTConfig) error {
+func (t *TestBridge) registerGenesisValidators(polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
@@ -349,7 +352,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTCon
 				}
 
 				if err := t.cmdRun(args...); err != nil {
-					return fmt.Errorf("failed to whitelist genesis validators on supernet manager: %w", err)
+					return fmt.Errorf("failed to register genesis validator on supernet manager: %w", err)
 				}
 
 				return nil
@@ -361,7 +364,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig *polybft.PolyBFTCon
 }
 
 func (t *TestBridge) initialStakingOfGenesisValidators(
-	polybftConfig *polybft.PolyBFTConfig, chainID uint64) error {
+	polybftConfig polybft.PolyBFTConfig, chainID int64) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
@@ -384,8 +387,8 @@ func (t *TestBridge) initialStakingOfGenesisValidators(
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", strconv.FormatUint(polybftConfig.InitialValidatorSet[i].Stake.Uint64(), 10),
-					"--chain-id", strconv.FormatUint(chainID, 10),
+					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
+					"--chain-id", strconv.FormatInt(chainID, 10),
 					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 				}
 
@@ -401,7 +404,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(
 	return g.Wait()
 }
 
-func (t *TestBridge) finalizeGenesis(polybftConfig *polybft.PolyBFTConfig) error {
+func (t *TestBridge) finalizeGenesis(polybftConfig polybft.PolyBFTConfig) error {
 	args := []string{
 		"polybft",
 		"supernet",
@@ -414,6 +417,24 @@ func (t *TestBridge) finalizeGenesis(polybftConfig *polybft.PolyBFTConfig) error
 
 	if err := t.cmdRun(args...); err != nil {
 		return fmt.Errorf("failed to finalize genesis validators on supernet manager: %w", err)
+	}
+
+	return nil
+}
+
+// FundSingleValidator sends tokens to a rootchain validators
+func (t *TestBridge) FundSingleValidator(tookenAddress types.Address, secretsPath string, amount *big.Int) error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--" + polybftsecrets.AccountDirFlag, secretsPath,
+		"--amount", amount.String(),
+		"--native-root-token", tookenAddress.String(),
+		"--mint",
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to fund a validator on the rootchain: %w", err)
 	}
 
 	return nil

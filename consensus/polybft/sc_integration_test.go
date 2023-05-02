@@ -19,7 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	secretsHelper "github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -255,8 +254,6 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 }
 
 func TestIntegration_CommitEpoch(t *testing.T) {
-	t.Skip("SKIP FOR NOW")
-
 	t.Parallel()
 
 	// init validator sets
@@ -264,8 +261,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
 	reward := uint64(math.Pow(10, 18))            // 1 token
+	walletAddress := types.StringToAddress("1234889893")
 
-	supernetManagerAddr := types.StringToAddress("0x123456789")
 	validatorSets := make([]*testValidators, len(validatorSetSize), len(validatorSetSize))
 
 	// create all validator sets which will be used in test
@@ -284,7 +281,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// iterate through the validator set and do the test for each of them
 	for _, currentValidators := range validatorSets {
 		accSet := currentValidators.getPublicIdentities()
-		accSetPrivateKeys := currentValidators.getPrivateIdentities()
 
 		// validator data for polybft config
 		initValidators := make([]*Validator, accSet.Len())
@@ -293,8 +289,14 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			contracts.ValidatorSetContract: {
 				Code: contractsapi.ValidatorSet.DeployedBytecode,
 			},
-			contracts.RewardDistributorContract: {
-				Code: contractsapi.RewardDistributor.DeployedBytecode,
+			contracts.RewardPoolContract: {
+				Code: contractsapi.RewardPool.DeployedBytecode,
+			},
+			contracts.NativeERC20TokenContract: {
+				Code: contractsapi.NativeERC20.DeployedBytecode,
+			},
+			walletAddress: {
+				Balance: new(big.Int).SetUint64(intialBalance),
 			},
 		}
 
@@ -304,20 +306,12 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				Balance: validator.VotingPower,
 			}
 
-			signature, err := secretsHelper.MakeKOSKSignature(accSetPrivateKeys[i].Bls, validator.Address,
-				0, bls.DomainValidatorSet, supernetManagerAddr)
-			require.NoError(t, err)
-
-			signatureBytes, err := signature.Marshal()
-			require.NoError(t, err)
-
 			// create validator data for polybft config
 			initValidators[i] = &Validator{
-				Address:      validator.Address,
-				Balance:      validator.VotingPower,
-				Stake:        validator.VotingPower,
-				BlsKey:       hex.EncodeToString(validator.BlsKey.Marshal()),
-				BlsSignature: hex.EncodeToString(signatureBytes),
+				Address: validator.Address,
+				Balance: validator.VotingPower,
+				Stake:   validator.VotingPower,
+				BlsKey:  hex.EncodeToString(validator.BlsKey.Marshal()),
 			}
 		}
 
@@ -330,8 +324,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			Governance: currentValidators.toValidatorSet().validators.GetAddresses()[0],
 			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
-				WalletAddress: types.ZeroAddress,
-				WalletAmount:  big.NewInt(0),
+				WalletAddress: walletAddress,
+				WalletAmount:  new(big.Int).SetUint64(intialBalance),
 			},
 			Bridge: &BridgeConfig{
 				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
@@ -345,19 +339,32 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init ChildValidatorSet
-		err = initContract(contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
+		err = initContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
 		require.NoError(t, err)
 
-		initInput, err = getInitRewardDistributorInput(polyBFTConfig)
+		initInput, err = getInitRewardPoolInput(polyBFTConfig)
 		require.NoError(t, err)
 
-		// init RewardDistributor
-		err = initContract(contracts.ValidatorSetContract, initInput, "RewardDistributor", transition)
+		// init RewardPool
+		err = initContract(contracts.SystemCaller, contracts.RewardPoolContract, initInput, "RewardPool", transition)
+		require.NoError(t, err)
+
+		// approve root token
+		approveFn := &contractsapi.ApproveRootERC20Fn{
+			Spender: contracts.RewardPoolContract,
+			Amount:  polyBFTConfig.RewardConfig.WalletAmount,
+		}
+
+		input, err := approveFn.EncodeAbi()
+		require.NoError(t, err)
+
+		err = initContract(polyBFTConfig.RewardConfig.WalletAddress,
+			polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch
 		commitEpoch := createTestCommitEpochInput(t, 1, polyBFTConfig.EpochSize)
-		input, err := commitEpoch.EncodeAbi()
+		input, err = commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
 		// call commit epoch
@@ -371,7 +378,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardDistributorContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
@@ -389,7 +396,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// call reward distributor
-		result = transition.Call2(contracts.SystemCaller, contracts.RewardDistributorContract, input, big.NewInt(0), 10000000000)
+		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 	}

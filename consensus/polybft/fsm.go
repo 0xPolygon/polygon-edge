@@ -76,7 +76,7 @@ type fsm struct {
 	// distributeRewardsInput holds info about validators work in a single epoch
 	// mainly, how many blocks they signed during given epoch
 	// It is populated only for epoch-ending blocks.
-	distributeRewardsInput *contractsapi.DistributeRewardForRewardDistributorFn
+	distributeRewardsInput *contractsapi.DistributeRewardForRewardPoolFn
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -252,7 +252,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
 }
 
-// createDistributeRewardsTx create a StateTransaction, which invokes RewardDistributor smart contract
+// createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
 // and sends all the necessary metadata to it.
 func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 	input, err := f.distributeRewardsInput.EncodeAbi()
@@ -260,7 +260,7 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.RewardDistributorContract, input), nil
+	return createStateTransactionWithData(contracts.RewardPoolContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -467,7 +467,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if err := f.verifyCommitEpochTx(tx); err != nil {
 				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
 			}
-		case *contractsapi.DistributeRewardForRewardDistributorFn:
+		case *contractsapi.DistributeRewardForRewardPoolFn:
 			if distributeRewardsTxExists {
 				// if we already validated distribute rewards tx,
 				// that means someone added more than one distribute rewards tx to block,
