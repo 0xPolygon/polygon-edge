@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/wallet"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -20,6 +21,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -51,10 +53,16 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
+	admin, _ := wallet.GenerateKey()
+	adminAddr := types.Address(admin.Address())
+
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
-		framework.WithEpochSize(epochSize))
+		framework.WithEpochSize(epochSize),
+		framework.WithBridgeAllowListAdmin(adminAddr),
+		framework.WithBridgeBlockListAdmin(adminAddr),
+	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -125,6 +133,25 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(t, err)
 
 		// send withdraw transaction
+		err = cluster.Bridge.Withdraw(
+			common.ERC20,
+			hex.EncodeToString(rawKey),
+			strings.Join(receivers[:], ","),
+			strings.Join(amounts[:], ","),
+			"",
+			validatorSrv.JSONRPCAddr(),
+			contracts.NativeERC20TokenContract)
+		require.Error(t, err)
+
+		{
+			input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{receivers[0]})
+
+			adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListBridgeAddr, input)
+			require.NoError(t, adminSetTxn.Wait())
+			expectRole(t, cluster, contracts.AllowListBridgeAddr, types.StringToAddress(receivers[0]), addresslist.EnabledRole)
+		}
+
+		// try to withdraw again
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(rawKey),
