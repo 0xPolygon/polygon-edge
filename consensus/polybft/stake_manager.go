@@ -51,6 +51,7 @@ type stakeManager struct {
 	logger                  hclog.Logger
 	state                   *State
 	rootChainRelayer        txrelayer.TxRelayer
+	blockchain              blockchainBackend
 	key                     ethgo.Key
 	validatorSetContract    types.Address
 	supernetManagerContract types.Address
@@ -61,7 +62,8 @@ type stakeManager struct {
 func newStakeManager(
 	logger hclog.Logger,
 	state *State,
-	relayer txrelayer.TxRelayer,
+	blockchain blockchainBackend,
+	rootchainRelayer txrelayer.TxRelayer,
 	key ethgo.Key,
 	validatorSetAddr, supernetManagerAddr types.Address,
 	maxValidatorSetSize int,
@@ -69,7 +71,8 @@ func newStakeManager(
 	return &stakeManager{
 		logger:                  logger,
 		state:                   state,
-		rootChainRelayer:        relayer,
+		blockchain:              blockchain,
+		rootChainRelayer:        rootchainRelayer,
 		key:                     key,
 		validatorSetContract:    validatorSetAddr,
 		supernetManagerContract: supernetManagerAddr,
@@ -113,16 +116,35 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 
 	stakeMap := fullValidatorSet.Validators
 
+	updatedValidatorsStake := make(map[types.Address]struct{}, 0)
+
 	for _, event := range events {
 		if event.IsStake() {
-			// then this amount was minted To validator address
-			stakeMap.addStake(event.To, event.Value)
+			updatedValidatorsStake[event.To] = struct{}{}
 		} else if event.IsUnstake() {
-			// then this amount was burned From validator address
-			stakeMap.removeStake(event.From, event.Value)
+			updatedValidatorsStake[event.From] = struct{}{}
 		} else {
-			// this should not happen, but lets log it if it does
 			s.logger.Debug("Found a transfer event that represents neither stake nor unstake")
+		}
+	}
+
+	// this is a temporary solution (a workaround) for a bug where amount
+	// in transfer event is not correctly generated (unknown 4 bytes are added to begging of Data array)
+	if len(updatedValidatorsStake) > 0 {
+		provider, err := s.blockchain.GetStateProviderForBlock(req.FullBlock.Block.Header)
+		if err != nil {
+			return err
+		}
+
+		systemState := s.blockchain.GetSystemState(provider)
+
+		for a := range updatedValidatorsStake {
+			stake, err := systemState.GetStakeOnValidatorSet(a)
+			if err != nil {
+				return fmt.Errorf("could not retrieve balance of validator %v on ValidatorSet", a)
+			}
+
+			stakeMap.setStake(a, stake)
 		}
 	}
 
@@ -234,7 +256,9 @@ func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) 
 
 			var transferEvent contractsapi.TransferEvent
 
-			doesMatch, err := transferEvent.ParseLog(convertLog(log))
+			convertedLog := convertLog(log)
+
+			doesMatch, err := transferEvent.ParseLog(convertedLog)
 			if err != nil {
 				return nil, err
 			}
@@ -329,25 +353,20 @@ func newValidatorStakeMap(validatorSet AccountSet) validatorStakeMap {
 	return stakeMap
 }
 
-// addStake adds given amount to a validator defined by address
-func (sc *validatorStakeMap) addStake(address types.Address, amount *big.Int) {
+// setStake sets given amount of stake to a validator defined by address
+func (sc *validatorStakeMap) setStake(address types.Address, amount *big.Int) {
+	isActive := amount.Cmp(bigZero) > 0
+
 	if metadata, exists := (*sc)[address]; exists {
-		metadata.VotingPower.Add(metadata.VotingPower, amount)
-		metadata.IsActive = metadata.VotingPower.Cmp(bigZero) > 0
+		metadata.VotingPower = amount
+		metadata.IsActive = isActive
 	} else {
 		(*sc)[address] = &ValidatorMetadata{
 			VotingPower: new(big.Int).Set(amount),
 			Address:     address,
-			IsActive:    true,
+			IsActive:    isActive,
 		}
 	}
-}
-
-// removeStake removes given amount from validator defined by address
-func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int) {
-	stakeData := (*sc)[address]
-	stakeData.VotingPower.Sub(stakeData.VotingPower, amount)
-	stakeData.IsActive = stakeData.VotingPower.Cmp(bigZero) > 0
 }
 
 // getActiveValidators returns all validators (*ValidatorMetadata) in sorted order
