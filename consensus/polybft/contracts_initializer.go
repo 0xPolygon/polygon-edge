@@ -84,15 +84,23 @@ func getInitChildERC20PredicateAccessListInput(config PolyBFTConfig) ([]byte, er
 		rootERC20Addr = config.Bridge.RootNativeERC20Addr
 	}
 
+	// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
+	owner := contracts.SystemCaller
+	if config.BridgeAllowListAdmin != types.ZeroAddress {
+		owner = config.BridgeAllowListAdmin
+	} else if config.BridgeBlockListAdmin != types.ZeroAddress {
+		owner = config.BridgeBlockListAdmin
+	}
+
 	params := &contractsapi.InitializeChildERC20PredicateAccessListFn{
 		NewL2StateSender:          contracts.L2StateSenderContract,
 		NewStateReceiver:          contracts.StateReceiverContract,
 		NewRootERC20Predicate:     rootERC20PredicateAddr,
 		NewChildTokenTemplate:     contracts.ChildERC20Contract,
 		NewNativeTokenRootAddress: rootERC20Addr,
-		UseAllowList:              config.BridgeAllowListActive,
-		UseBlockList:              config.BridgeBlockListActive,
-		NewOwner:                  contracts.SystemCaller,
+		UseAllowList:              config.BridgeAllowListAdmin != types.ZeroAddress,
+		UseBlockList:              config.BridgeBlockListAdmin != types.ZeroAddress,
+		NewOwner:                  owner,
 	}
 
 	return params.EncodeAbi()
@@ -124,14 +132,22 @@ func getInitChildERC721PredicateAccessListInput(config PolyBFTConfig) ([]byte, e
 		rootERC721PredicateAccessListAddr = config.Bridge.RootERC721PredicateAddr
 	}
 
+	// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
+	owner := contracts.SystemCaller
+	if config.BridgeAllowListAdmin != types.ZeroAddress {
+		owner = config.BridgeAllowListAdmin
+	} else if config.BridgeBlockListAdmin != types.ZeroAddress {
+		owner = config.BridgeBlockListAdmin
+	}
+
 	params := &contractsapi.InitializeChildERC721PredicateAccessListFn{
 		NewL2StateSender:       contracts.L2StateSenderContract,
 		NewStateReceiver:       contracts.StateReceiverContract,
 		NewRootERC721Predicate: rootERC721PredicateAccessListAddr,
 		NewChildTokenTemplate:  contracts.ChildERC721Contract,
-		UseAllowList:           config.BridgeAllowListActive,
-		UseBlockList:           config.BridgeBlockListActive,
-		NewOwner:               contracts.SystemCaller,
+		UseAllowList:           config.BridgeAllowListAdmin != types.ZeroAddress,
+		UseBlockList:           config.BridgeBlockListAdmin != types.ZeroAddress,
+		NewOwner:               owner,
 	}
 
 	return params.EncodeAbi()
@@ -163,14 +179,22 @@ func getInitChildERC1155PredicateAccessListInput(config PolyBFTConfig) ([]byte, 
 		rootERC1155PredicateAccessListAddr = config.Bridge.RootERC1155PredicateAddr
 	}
 
+	// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
+	owner := contracts.SystemCaller
+	if config.BridgeAllowListAdmin != types.ZeroAddress {
+		owner = config.BridgeAllowListAdmin
+	} else if config.BridgeBlockListAdmin != types.ZeroAddress {
+		owner = config.BridgeBlockListAdmin
+	}
+
 	params := &contractsapi.InitializeChildERC1155PredicateAccessListFn{
 		NewL2StateSender:        contracts.L2StateSenderContract,
 		NewStateReceiver:        contracts.StateReceiverContract,
 		NewRootERC1155Predicate: rootERC1155PredicateAccessListAddr,
 		NewChildTokenTemplate:   contracts.ChildERC1155Contract,
-		UseAllowList:            config.BridgeAllowListActive,
-		UseBlockList:            config.BridgeBlockListActive,
-		NewOwner:                contracts.SystemCaller,
+		UseAllowList:            config.BridgeAllowListAdmin != types.ZeroAddress,
+		UseBlockList:            config.BridgeBlockListAdmin != types.ZeroAddress,
+		NewOwner:                owner,
 	}
 
 	return params.EncodeAbi()

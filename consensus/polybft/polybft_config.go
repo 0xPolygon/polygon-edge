@@ -45,10 +45,10 @@ type PolyBFTConfig struct {
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
 	// BridgeAllowListActive indicates whether bridge allow list is active
-	BridgeAllowListActive bool `json:"-"`
+	BridgeAllowListAdmin types.Address `json:"bridgeAllowListAdmin"`
 
 	// BridgeBlockListActive indicates whether bridge block list is active
-	BridgeBlockListActive bool `json:"-"`
+	BridgeBlockListAdmin types.Address `json:"bridgeBlockListAdmin"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 }

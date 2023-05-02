@@ -129,7 +129,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize Predicate SCs
-		if polyBFTConfig.BridgeAllowListActive || polyBFTConfig.BridgeBlockListActive {
+		if polyBFTConfig.BridgeAllowListAdmin != types.ZeroAddress || polyBFTConfig.BridgeBlockListAdmin != types.ZeroAddress {
 			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig)
 			if err != nil {
 				return err
@@ -145,7 +145,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC20PredicateContract, input,
+			if err = initContract(contracts.ChildERC721PredicateContract, input,
 				"ChildERC721PredicateAccessList", transition); err != nil {
 				return err
 			}
@@ -156,7 +156,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			if err = initContract(contracts.ChildERC1155PredicateContract, input,
-				"ChildERC20PredicateAccessList", transition); err != nil {
+				"ChildERC1155PredicateAccessList", transition); err != nil {
 				return err
 			}
 		} else {

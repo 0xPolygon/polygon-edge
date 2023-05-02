@@ -98,6 +98,18 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	// check if there are Bridge Allow List Admins and Bridge Block List Admins
+	// and if there are, get the first address as the Admin
+	var bridgeAllowListAdmin types.Address
+	if len(p.bridgeAllowListAdmin) > 0 {
+		bridgeAllowListAdmin = types.StringToAddress(p.bridgeAllowListAdmin[0])
+	}
+
+	var bridgeBlockListAdmin types.Address
+	if len(p.bridgeBlockListAdmin) > 0 {
+		bridgeBlockListAdmin = types.StringToAddress(p.bridgeBlockListAdmin[0])
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -105,12 +117,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:            initialValidators[0].Address,
-		InitialTrieRoot:       types.StringToHash(p.initialStateRoot),
-		MintableNativeToken:   p.mintableNativeToken,
-		NativeTokenConfig:     p.nativeTokenConfig,
-		BridgeAllowListActive: len(p.bridgeAllowListAdmin) != 0,
-		BridgeBlockListActive: len(p.bridgeBlockListAdmin) != 0,
+		Governance:           initialValidators[0].Address,
+		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
+		MintableNativeToken:  p.mintableNativeToken,
+		NativeTokenConfig:    p.nativeTokenConfig,
+		BridgeAllowListAdmin: bridgeAllowListAdmin,
+		BridgeBlockListAdmin: bridgeBlockListAdmin,
 	}
 
 	chainConfig := &chain.Chain{
