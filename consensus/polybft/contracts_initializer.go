@@ -135,12 +135,9 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return nil
 	}
 
-	mintFn := &contractsapi.MintRootERC20Fn{
-		To:     polyBFTConfig.RewardConfig.WalletAddress,
-		Amount: polyBFTConfig.RewardConfig.WalletAmount,
-	}
+	mintFn := abi.MustNewMethod("function mint(address, uint256)")
 
-	input, err = mintFn.EncodeAbi()
+	input, err = mintFn.Encode([]interface{}{polyBFTConfig.RewardConfig.WalletAddress, polyBFTConfig.RewardConfig.WalletAmount})
 	if err != nil {
 		return err
 	}

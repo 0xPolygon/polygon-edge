@@ -20,6 +20,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -111,7 +112,8 @@ type TestClusterConfig struct {
 	InitialTrieDB    string
 	InitialStateRoot types.Hash
 
-	IsPropertyTest bool
+	IsPropertyTest  bool
+	TestRewardToken string
 
 	logsDirOnce sync.Once
 }
@@ -359,6 +361,12 @@ func WithNativeTokenConfig(tokenConfigRaw string) ClusterOption {
 	}
 }
 
+func WithTestRewardToken() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TestRewardToken = hex.EncodeToString(contractsapi.TestRewardToken.DeployedBytecode)
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -453,6 +461,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+		}
+
+		if cluster.Config.TestRewardToken != "" {
+			args = append(args, "--reward-token-code", cluster.Config.TestRewardToken)
 		}
 
 		// add optional genesis flags

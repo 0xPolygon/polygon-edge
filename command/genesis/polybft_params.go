@@ -93,9 +93,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// native token is used as a reward token, and reward wallet is not a zero address
 		// so we need to add that address to premine map
 		premineBalances[walletPremineInfo.address] = walletPremineInfo
-	}
-
-	if p.rewardTokenCode != "" {
+	} else {
 		bytes, err := hex.DecodeString(p.rewardTokenCode)
 		if err != nil {
 			return fmt.Errorf("could not decode reward token byte code '%s' : %w", p.rewardTokenCode, err)

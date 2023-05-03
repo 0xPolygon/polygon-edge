@@ -38,6 +38,8 @@ var (
 	StakeManager          *artifact.Artifact
 	RewardPool            *artifact.Artifact
 	ValidatorSet          *artifact.Artifact
+	RootERC721            *artifact.Artifact
+	RootERC1155           *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -45,8 +47,7 @@ var (
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
 	TestSimple             *artifact.Artifact
-	RootERC721             *artifact.Artifact
-	RootERC1155            *artifact.Artifact
+	TestRewardToken        *artifact.Artifact
 )
 
 func init() {
@@ -173,6 +174,11 @@ func init() {
 	}
 
 	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestRewardToken, err = artifact.DecodeArtifact(readTestContractContent("TestRewardToken.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
