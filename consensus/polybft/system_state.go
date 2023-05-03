@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -99,24 +98,4 @@ func (s *SystemStateImpl) GetNextCommittedIndex() (uint64, error) {
 	}
 
 	return nextCommittedIndex.Uint64() + 1, nil
-}
-
-func buildLogsFromReceipts(entry []*types.Receipt, header *types.Header) []*types.Log {
-	var logs []*types.Log
-
-	for _, taskReceipt := range entry {
-		for _, taskLog := range taskReceipt.Logs {
-			log := new(types.Log)
-			*log = *taskLog
-
-			data := map[string]interface{}{
-				"Hash":   header.Hash,
-				"Number": header.Number,
-			}
-			log.Data, _ = json.Marshal(&data)
-			logs = append(logs, log)
-		}
-	}
-
-	return logs
 }
