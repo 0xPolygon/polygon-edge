@@ -137,7 +137,8 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 
 	mintFn := abi.MustNewMethod("function mint(address, uint256)")
 
-	input, err = mintFn.Encode([]interface{}{polyBFTConfig.RewardConfig.WalletAddress, polyBFTConfig.RewardConfig.WalletAmount})
+	input, err = mintFn.Encode([]interface{}{polyBFTConfig.RewardConfig.WalletAddress,
+		polyBFTConfig.RewardConfig.WalletAmount})
 	if err != nil {
 		return err
 	}
