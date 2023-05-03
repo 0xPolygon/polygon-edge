@@ -908,7 +908,11 @@ func opGasLimit(c *state) {
 }
 
 func opBaseFee(c *state) {
-	c.push1().SetUint64(c.host.GetTxContext().BaseFee.Uint64())
+	var baseFee uint64
+	if baseFeeInt := c.host.GetTxContext().BaseFee; baseFeeInt != nil && baseFeeInt.BitLen() > 0 {
+		baseFee = c.host.GetTxContext().BaseFee.Uint64()
+	}
+	c.push1().SetUint64(baseFee)
 }
 
 func opSelfDestruct(c *state) {
