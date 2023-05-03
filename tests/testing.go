@@ -23,6 +23,7 @@ const TESTS = "./tests"
 
 type info struct {
 	Comment     string `json:"comment"`
+	Solidity    string `json:"solidity"`
 	FilledWith  string `json:"filledwith"`
 	LllcVersion string `json:"lllcversion"`
 	Source      string `json:"source"`
@@ -30,6 +31,7 @@ type info struct {
 }
 
 type env struct {
+	BaseFee    string `json:"currentBaseFee"`
 	Coinbase   string `json:"currentCoinbase"`
 	Difficulty string `json:"currentDifficulty"`
 	GasLimit   string `json:"currentGasLimit"`
@@ -141,6 +143,7 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 
 	return &types.Header{
 		Miner:      miner[:],
+		BaseFee:    stringToUint64T(t, e.BaseFee),
 		Difficulty: stringToUint64T(t, e.Difficulty),
 		GasLimit:   stringToUint64T(t, e.GasLimit),
 		Number:     stringToUint64T(t, e.Number),
