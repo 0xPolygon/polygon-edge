@@ -2,112 +2,59 @@ package fund
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
-	"os"
 
 	cmdhelper "github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
-	amountFlag        = "amount"
+	addressesFlag     = "addresses"
+	amountsFlag       = "amounts"
 	jsonRPCFlag       = "json-rpc"
 	mintRootTokenFlag = "mint"
 )
 
 var (
-	errInvalidConfig   = errors.New("invalid secrets configuration")
-	errInvalidParams   = errors.New("no config file or data directory passed in")
-	errUnsupportedType = errors.New("unsupported secrets manager")
+	errNoAddressesProvided = errors.New("no addresses provided")
+	errInconsistentLength  = errors.New("validator addresses and amounts must be equal length")
 )
 
 type fundParams struct {
-	dataDir             string
-	configPath          string
-	amount              string
+	addresses           []string
+	amounts             []string
 	nativeRootTokenAddr string
 	deployerPrivateKey  string
 	mintRootToken       bool
 	jsonRPCAddress      string
 
-	secretsManager secrets.SecretsManager
-	secretsConfig  *secrets.SecretsManagerConfig
-
-	amountValue *big.Int
+	amountValues []*big.Int
 }
 
-func (fp *fundParams) validateFlags() (err error) {
-	if fp.amountValue, err = cmdhelper.ParseAmount(fp.amount); err != nil {
-		return err
+func (fp *fundParams) validateFlags() error {
+	if len(fp.addresses) == 0 {
+		return errNoAddressesProvided
 	}
 
-	if fp.dataDir == "" && fp.configPath == "" {
-		return errInvalidParams
+	if len(fp.amounts) != len(fp.addresses) {
+		return errInconsistentLength
 	}
 
-	if fp.dataDir != "" {
-		if _, err := os.Stat(fp.dataDir); err != nil {
-			return fmt.Errorf("invalid validators secrets path ('%s') provided. Error: %w", fp.dataDir, err)
+	for _, addr := range fp.addresses {
+		if err := types.IsValidAddress(addr); err != nil {
+			return err
 		}
 	}
 
-	if fp.configPath != "" {
-		if _, err := os.Stat(fp.configPath); err != nil {
-			return fmt.Errorf("invalid validators secrets config path ('%s') provided. Error: %w", fp.configPath, err)
-		}
-	}
-
-	return nil
-}
-
-func (fp *fundParams) hasConfigPath() bool {
-	return fp.configPath != ""
-}
-
-func (fp *fundParams) initSecretsManager() error {
-	var err error
-	if fp.hasConfigPath() {
-		if err = fp.parseConfig(); err != nil {
+	fp.amountValues = make([]*big.Int, len(fp.amounts))
+	for i, amountRaw := range fp.amounts {
+		amountValue, err := cmdhelper.ParseAmount(amountRaw)
+		if err != nil {
 			return err
 		}
 
-		fp.secretsManager, err = helper.InitCloudSecretsManager(fp.secretsConfig)
-
-		return err
+		fp.amountValues[i] = amountValue
 	}
-
-	return fp.initLocalSecretsManager()
-}
-
-func (fp *fundParams) parseConfig() error {
-	secretsConfig, readErr := secrets.ReadConfig(fp.configPath)
-	if readErr != nil {
-		return errInvalidConfig
-	}
-
-	if !secrets.SupportedServiceManager(secretsConfig.Type) {
-		return errUnsupportedType
-	}
-
-	fp.secretsConfig = secretsConfig
 
 	return nil
-}
-
-func (fp *fundParams) initLocalSecretsManager() error {
-	local, err := helper.SetupLocalSecretsManager(fp.dataDir)
-	if err != nil {
-		return err
-	}
-
-	fp.secretsManager = local
-
-	return nil
-}
-
-func (fp *fundParams) getValidatorAccount() (types.Address, error) {
-	return helper.LoadValidatorAddress(fp.secretsManager)
 }

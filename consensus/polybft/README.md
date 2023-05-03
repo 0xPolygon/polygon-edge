@@ -61,7 +61,9 @@ It has a native support for running bridge, which enables running cross-chain tr
 6. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**
 
     ```bash
-    $ polygon-edge rootchain fund --data-dir ./test-chain-1
+    $ polygon-edge rootchain fund \
+        --addresses 0x1234567890123456789012345678901234567890 \
+        --amounts 200000000000000000000
     ```
 
 7. Whitelist validators on rootchain - in order for validators to be able to be registered on the SupernetManager contract on rootchain. Note that only deployer of SupernetManager contract (the one who run the deploy command) can whitelist validators on rootchain. He can use either its hex encoded private key, or data-dir flag if he has secerets initialized:

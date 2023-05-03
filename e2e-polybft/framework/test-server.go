@@ -12,11 +12,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"google.golang.org/grpc"
@@ -49,6 +50,7 @@ func getOpenPortForServer() int64 {
 type TestServer struct {
 	t *testing.T
 
+	address       types.Address
 	clusterConfig *TestClusterConfig
 	config        *TestServerConfig
 	node          *node
@@ -115,14 +117,21 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 
 	if config.DataDir == "" {
 		dataDir, err := ioutil.TempDir("/tmp", "edge-e2e-")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		config.DataDir = dataDir
 	}
 
+	secretsManager, err := polybftsecrets.GetSecretsManager(config.DataDir, "", true)
+	require.NoError(t, err)
+
+	key, err := wallet.GetEcdsaFromSecret(secretsManager)
+	require.NoError(t, err)
+
 	srv := &TestServer{
 		t:             t,
 		clusterConfig: clusterConfig,
+		address:       types.Address(key.Address()),
 		config:        config,
 	}
 	srv.Start()
@@ -192,10 +201,10 @@ func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, amount *bi
 	args := []string{
 		"rootchain",
 		"fund",
-		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
+		"--addresses", t.address.String(),
+		"--amounts", amount.String(),
 		"--json-rpc", t.BridgeJSONRPCAddr(),
 		"--native-root-token", rootNativeERC20Addr.String(),
-		"--amount", amount.String(),
 		"--mint",
 	}
 
