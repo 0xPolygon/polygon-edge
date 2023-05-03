@@ -13,7 +13,7 @@ contract TestWriteBlockMetadata {
         data.push(block.gaslimit);
         data.push(block.chainid);
         coinbase = block.coinbase;
-        // data.push(block.basefee);
+        data.push(block.basefee);
         // hash = blockhash(block.number);
     }
 }
