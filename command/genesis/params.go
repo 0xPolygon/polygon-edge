@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -37,6 +38,8 @@ const (
 	maxValidatorCount     = "max-validator-count"
 	mintableTokenFlag     = "mintable-native-token"
 	nativeTokenConfigFlag = "native-token-config"
+	rewardTokenCodeFlag   = "reward-token-code"
+	rewardWalletFlag      = "reward-wallet"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -59,6 +62,7 @@ var (
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper" +
 		" format <name:symbol:decimals count>")
+	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
 )
 
 type genesisParams struct {
@@ -121,6 +125,10 @@ type genesisParams struct {
 	mintableNativeToken  bool
 	nativeTokenConfigRaw string
 	nativeTokenConfig    *polybft.TokenConfig
+
+	// rewards
+	rewardTokenCode string
+	rewardWallet    string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -138,6 +146,10 @@ func (p *genesisParams) validateFlags() error {
 
 	if p.isPolyBFTConsensus() {
 		if err := p.extractNativeTokenMetadata(); err != nil {
+			return err
+		}
+
+		if err := p.validateRewardWallet(); err != nil {
 			return err
 		}
 	}
@@ -356,6 +368,12 @@ func (p *genesisParams) generateGenesis() error {
 }
 
 func (p *genesisParams) initGenesisConfig() error {
+	// Disable london hardfork if burn contract address is not provided
+	enabledForks := chain.AllForksEnabled
+	if len(p.burnContracts) == 0 {
+		enabledForks.London = nil
+	}
+
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Genesis: &chain.Genesis{
@@ -364,25 +382,28 @@ func (p *genesisParams) initGenesisConfig() error {
 			Alloc:      map[types.Address]*chain.GenesisAccount{},
 			ExtraData:  p.extraData,
 			GasUsed:    command.DefaultGenesisGasUsed,
-			BaseFee:    command.DefaultGenesisBaseFee,
-			BaseFeeEM:  command.DefaultGenesisBaseFeeEM,
 		},
 		Params: &chain.Params{
-			ChainID:      int64(p.chainID),
-			Forks:        chain.AllForksEnabled,
-			Engine:       p.consensusEngineConfig,
-			BurnContract: map[uint64]string{},
+			ChainID: int64(p.chainID),
+			Forks:   enabledForks,
+			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}
 
-	for _, burnContract := range p.burnContracts {
-		block, address, err := parseBurnContractInfo(burnContract)
-		if err != nil {
-			return err
-		}
+	if len(p.burnContracts) > 0 {
+		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
-		chainConfig.Params.BurnContract[block] = address.String()
+		for _, burnContract := range p.burnContracts {
+			block, address, err := parseBurnContractInfo(burnContract)
+			if err != nil {
+				return err
+			}
+
+			chainConfig.Params.BurnContract[block] = address.String()
+		}
 	}
 
 	// Predeploy staking smart contract if needed
@@ -429,6 +450,28 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	}
 
 	return stakingAccount, nil
+}
+
+// validateRewardWallet validates reward wallet flag
+func (p *genesisParams) validateRewardWallet() error {
+	if p.rewardWallet == "" {
+		return errors.New("reward wallet address must be defined")
+	}
+
+	if p.rewardWallet == types.AddressToString(types.ZeroAddress) {
+		return errors.New("reward wallet address must not be zero address")
+	}
+
+	premineInfo, err := parsePremineInfo(p.rewardWallet)
+	if err != nil {
+		return err
+	}
+
+	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
+		return errRewardWalletAmountZero
+	}
+
+	return nil
 }
 
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)

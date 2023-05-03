@@ -216,6 +216,11 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		arg.Gas = argUintPtr(0)
 	}
 
+	txType := types.LegacyTx
+	if arg.Type != nil {
+		txType = types.TxType(*arg.Type)
+	}
+
 	txn := &types.Transaction{
 		From:      *arg.From,
 		Gas:       uint64(*arg.Gas),
@@ -225,6 +230,7 @@ func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 		Value:     new(big.Int).SetBytes(*arg.Value),
 		Input:     input,
 		Nonce:     uint64(*arg.Nonce),
+		Type:      txType,
 	}
 
 	if arg.To != nil {

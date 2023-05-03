@@ -50,6 +50,12 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block, callback func(*state.Transition) error) (*types.FullBlock, error) {
 	args := m.Called(parent, block, callback)
 
+	if callback != nil {
+		if err := callback(nil); err != nil {
+			return nil, err
+		}
+	}
+
 	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
 }
 
@@ -204,19 +210,10 @@ type systemStateMock struct {
 	mock.Mock
 }
 
-func (m *systemStateMock) GetValidatorSet() (AccountSet, error) {
+func (m *systemStateMock) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
 	args := m.Called()
-	if len(args) == 1 {
-		accountSet, _ := args.Get(0).(AccountSet)
 
-		return accountSet, nil
-	} else if len(args) == 2 {
-		accountSet, _ := args.Get(0).(AccountSet)
-
-		return accountSet, args.Error(1)
-	}
-
-	panic("systemStateMock.GetValidatorSet doesn't support such combination of arguments") //nolint:gocritic
+	return args.Get(0).(*big.Int), args.Error(1) //nolint:forcetypeassert
 }
 
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {

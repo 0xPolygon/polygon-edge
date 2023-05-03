@@ -242,6 +242,59 @@ func TestEth_GetNextNonce(t *testing.T) {
 	}
 }
 
+func TestEth_TxnType(t *testing.T) {
+	// Set up the mock accounts
+	accounts := []struct {
+		address types.Address
+		account *Account
+	}{
+		{
+			types.StringToAddress("123"),
+			&Account{
+				Nonce: 5,
+			},
+		},
+	}
+
+	// Set up the mock store
+	store := newMockStore()
+	for _, acc := range accounts {
+		store.SetAccount(acc.address, acc.account)
+	}
+
+	// Setup Txn
+	args := &txnArgs{
+		From:      &addr1,
+		To:        &addr2,
+		Gas:       toArgUint64Ptr(21000),
+		GasPrice:  toArgBytesPtr(big.NewInt(10000).Bytes()),
+		GasTipCap: toArgBytesPtr(big.NewInt(10000).Bytes()),
+		GasFeeCap: toArgBytesPtr(big.NewInt(10000).Bytes()),
+		Value:     toArgBytesPtr(oneEther.Bytes()),
+		Data:      nil,
+		Nonce:     toArgUint64Ptr(0),
+		Type:      toArgUint64Ptr(uint64(types.DynamicFeeTx)),
+	}
+
+	expectedRes := &types.Transaction{
+		From:      addr1,
+		To:        &addr2,
+		Gas:       21000,
+		GasPrice:  big.NewInt(10000),
+		GasTipCap: big.NewInt(10000),
+		GasFeeCap: big.NewInt(10000),
+		Value:     oneEther,
+		Input:     []byte{},
+		Nonce:     0,
+		Type:      types.DynamicFeeTx,
+	}
+	res, err := DecodeTxn(args, store)
+
+	expectedRes.ComputeHash()
+	assert.NoError(t, err)
+	assert.Equal(t, expectedRes, res)
+}
+
 func newTestEthEndpoint(store testStore) *Eth {
 	return &Eth{
 		hclog.NewNullLogger(), store, 100, nil, 0,

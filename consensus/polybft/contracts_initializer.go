@@ -19,35 +19,40 @@ const (
 	disabledBridgeRootPredicateAddr = "0xDEAD"
 )
 
-// getInitChildValidatorSetInput builds input parameters for ChildValidatorSet SC initialization
-func getInitChildValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
-	apiValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
-
+// getInitValidatorSetInput builds input parameters for ValidatorSet SC initialization
+func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
+	initialValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
-		validatorData, err := validator.ToValidatorInitAPIBinding()
-		if err != nil {
-			return nil, err
+		initialValidators[i] = &contractsapi.ValidatorInit{
+			Addr:  validator.Address,
+			Stake: validator.Stake,
 		}
-
-		apiValidators[i] = validatorData
 	}
 
-	params := &contractsapi.InitializeChildValidatorSetFn{
-		Init: &contractsapi.InitStruct{
-			EpochReward:   new(big.Int).SetUint64(polyBFTConfig.EpochReward),
-			MinStake:      big.NewInt(minStake),
-			MinDelegation: big.NewInt(minDelegation),
-			EpochSize:     new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		},
-		NewBls:     contracts.BLSContract,
-		Governance: polyBFTConfig.Governance,
-		Validators: apiValidators,
+	initFn := &contractsapi.InitializeValidatorSetFn{
+		StateSender:      contracts.L2StateSenderContract,
+		StateReceiver:    contracts.StateReceiverContract,
+		RootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		EpochSize_:       new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		InitalValidators: initialValidators,
 	}
 
-	return params.EncodeAbi()
+	return initFn.EncodeAbi()
 }
 
-// getInitChildERC20PredicateInput builds input parameters for ChildERC20Predicate SC initialization
+// getInitRewardPoolInput builds input parameters for RewardPool SC initialization
+func getInitRewardPoolInput(polybftConfig PolyBFTConfig) ([]byte, error) {
+	initFn := &contractsapi.InitializeRewardPoolFn{
+		RewardToken:  polybftConfig.RewardConfig.TokenAddress,
+		RewardWallet: polybftConfig.RewardConfig.WalletAddress,
+		ValidatorSet: contracts.ValidatorSetContract,
+		BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+	}
+
+	return initFn.EncodeAbi()
+}
+
+// getInitChildERC20PredicateInput builds input parameters for ERC20Predicate SC initialization
 func getInitChildERC20PredicateInput(config *BridgeConfig) ([]byte, error) {
 	//nolint:godox
 	// to be fixed with EVM-541
@@ -202,8 +207,42 @@ func getInitChildERC1155PredicateAccessListInput(config PolyBFTConfig) ([]byte, 
 	return params.EncodeAbi()
 }
 
-func initContract(to types.Address, input []byte, contractName string, transition *state.Transition) error {
-	result := transition.Call2(contracts.SystemCaller, to, input,
+// mintRewardTokensToWalletAddress mints configured amount of reward tokens to reward wallet address
+func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *state.Transition) error {
+	approveFn := &contractsapi.ApproveRootERC20Fn{
+		Spender: contracts.RewardPoolContract,
+		Amount:  polyBFTConfig.RewardConfig.WalletAmount,
+	}
+
+	input, err := approveFn.EncodeAbi()
+	if err != nil {
+		return err
+	}
+
+	if err = initContract(polyBFTConfig.RewardConfig.WalletAddress,
+		polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition); err != nil {
+		return err
+	}
+
+	if polyBFTConfig.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract {
+		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
+		// for given wallet address to it since this is done in premine
+		return nil
+	}
+
+	mintFn := abi.MustNewMethod("function mint(address, uint256)")
+
+	input, err = mintFn.Encode([]interface{}{polyBFTConfig.RewardConfig.WalletAddress,
+		polyBFTConfig.RewardConfig.WalletAmount})
+	if err != nil {
+		return err
+	}
+
+	return initContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+}
+
+func initContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) error {
+	result := transition.Call2(from, to, input,
 		big.NewInt(0), 100_000_000)
 
 	if result.Failed() {

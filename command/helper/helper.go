@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"net/url"
 	"time"
@@ -249,4 +250,13 @@ func SetRequiredFlags(cmd *cobra.Command, requiredFlags []string) {
 	for _, requiredFlag := range requiredFlags {
 		_ = cmd.MarkFlagRequired(requiredFlag)
 	}
+}
+
+func ParseAmount(amount string) (*big.Int, error) {
+	result, ok := new(big.Int).SetString(amount, 0)
+	if !ok || result.Cmp(big.NewInt(0)) <= 0 {
+		return nil, fmt.Errorf("amount %s should be numerical value greater than zero", amount)
+	}
+
+	return result, nil
 }

@@ -400,7 +400,7 @@ func (s *Server) runDial() {
 		//nolint:godox
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently (to be fixed in EVM-541)
+		// maxDials requests concurrently (to be fixed in EVM-543)
 		for s.connectionCounts.HasFreeOutboundConn() {
 			tt := s.dialQueue.PopTask()
 			if tt == nil {

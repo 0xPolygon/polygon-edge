@@ -187,7 +187,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	}
 }
 
-func TestE2E_TxPool_TransactionWithHeaderInstuctions(t *testing.T) {
+func TestE2E_TxPool_TransactionWithHeaderInstructions(t *testing.T) {
 	sidechainKey, err := wallet.GenerateKey()
 	require.NoError(t, err)
 

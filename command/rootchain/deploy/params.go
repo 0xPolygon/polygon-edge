@@ -6,14 +6,11 @@ import (
 )
 
 const (
-	genesisPathFlag = "genesis"
 	deployerKeyFlag = "deployer-key"
 	jsonRPCFlag     = "json-rpc"
 	erc20AddrFlag   = "erc20-token"
 	erc721AddrFlag  = "erc721-token"
 	erc1155AddrFlag = "erc1155-token"
-
-	defaultGenesisPath = "./genesis.json"
 )
 
 type deployParams struct {

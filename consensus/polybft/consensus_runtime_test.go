@@ -228,6 +228,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
 		stateSyncManager:  &dummyStateSyncManager{},
 		checkpointManager: &dummyCheckpointManager{},
+		stakeManager:      &dummyStakeManager{},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
@@ -421,6 +422,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		lastBuiltBlock:     lastBuiltBlock,
 		stateSyncManager:   &dummyStateSyncManager{},
 		checkpointManager:  &dummyCheckpointManager{},
+		stakeManager:       &dummyStakeManager{},
 	}
 
 	err := runtime.FSM()
@@ -579,12 +581,14 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	commitEpochInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock, consensusRuntime.epoch)
+	commitEpochInput, distributeRewardsInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock,
+		consensusRuntime.epoch)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, commitEpochInput)
 	assert.Equal(t, uint64(epoch), commitEpochInput.ID.Uint64())
 	assert.Equal(t, uint64(epochStartBlock), commitEpochInput.Epoch.StartBlock.Uint64())
 	assert.Equal(t, uint64(epochEndBlock), commitEpochInput.Epoch.EndBlock.Uint64())
+	assert.Equal(t, uint64(epoch), distributeRewardsInput.EpochID.Uint64())
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)

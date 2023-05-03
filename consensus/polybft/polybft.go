@@ -118,13 +118,29 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		// initialize ChildValidatorSet SC
-		input, err := getInitChildValidatorSetInput(polyBFTConfig)
+		// initialize ValidatorSet SC
+		input, err := getInitValidatorSetInput(polyBFTConfig)
 		if err != nil {
 			return err
 		}
 
-		if err = initContract(contracts.ValidatorSetContract, input, "ChildValidatorSet", transition); err != nil {
+		if err = initContract(contracts.SystemCaller,
+			contracts.ValidatorSetContract, input, "ValidatorSet", transition); err != nil {
+			return err
+		}
+
+		if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize RewardPool SC
+		input, err = getInitRewardPoolInput(polyBFTConfig)
+		if err != nil {
+			return err
+		}
+
+		if err = initContract(contracts.SystemCaller,
+			contracts.RewardPoolContract, input, "RewardPool", transition); err != nil {
 			return err
 		}
 
@@ -136,7 +152,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC20PredicateContract, input,
+			if err = initContract(contracts.SystemCaller, contracts.ChildERC20PredicateContract, input,
 				"ChildERC20PredicateAccessList", transition); err != nil {
 				return err
 			}
@@ -146,7 +162,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC721PredicateContract, input,
+			if err = initContract(contracts.SystemCaller, contracts.ChildERC721PredicateContract, input,
 				"ChildERC721PredicateAccessList", transition); err != nil {
 				return err
 			}
@@ -156,7 +172,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC1155PredicateContract, input,
+			if err = initContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
 				"ChildERC1155PredicateAccessList", transition); err != nil {
 				return err
 			}
@@ -166,7 +182,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC20PredicateContract, input,
+			if err = initContract(contracts.SystemCaller, contracts.ChildERC20PredicateContract, input,
 				"ChildERC20Predicate", transition); err != nil {
 				return err
 			}
@@ -177,7 +193,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC721PredicateContract, input,
+			if err = initContract(contracts.SystemCaller, contracts.ChildERC721PredicateContract, input,
 				"ChildERC721Predicate", transition); err != nil {
 				return err
 			}
@@ -188,7 +204,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.ChildERC1155PredicateContract, input,
+			if err = initContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
 				"ChildERC1155Predicate", transition); err != nil {
 				return err
 			}
@@ -215,7 +231,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
+			if err = initContract(contracts.SystemCaller,
+				contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
 				return err
 			}
 		} else {
@@ -233,7 +250,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
+			if err = initContract(contracts.SystemCaller,
+				contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
 				return err
 			}
 		}
@@ -376,6 +394,8 @@ func (p *Polybft) startConsensusProtocol() {
 	if !p.waitForNPeers() {
 		return
 	}
+
+	p.logger.Debug("peers connected")
 
 	newBlockSub := p.blockchain.SubscribeEvents()
 	defer newBlockSub.Close()
