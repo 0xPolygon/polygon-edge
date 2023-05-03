@@ -107,6 +107,9 @@ func ReadRootchainIP() (string, error) {
 	return fmt.Sprintf("http://%s:%s", ports[0].HostIP, ports[0].HostPort), nil
 }
 
+// GetECDSAKey returns the key based on provided parameters
+// If private key is provided, it will return that key
+// if not, it will return the key from the secrets manager
 func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error) {
 	if privateKey != "" {
 		key, err := GetRootchainPrivateKey(privateKey)

@@ -251,7 +251,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	})
 }
 
-// / deployContracts deploys and initializes rootchain smart contracts
+// deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	initialValidators []*polybft.Validator) (*polybft.RootchainConfig, int64, error) {
 	// if the bridge contract is not created, we have to deploy all the contracts

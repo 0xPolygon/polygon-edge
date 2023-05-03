@@ -101,22 +101,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	var (
-		depositorKey  ethgo.Key
-		rootTokenAddr types.Address
-	)
-
-	if params.mintRootToken {
-		depositorKey, err = helper.GetRootchainPrivateKey(params.deployerPrivateKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize depositor private key: %w", err))
-
-			return
-		}
-
-		rootTokenAddr = types.StringToAddress(params.nativeRootTokenAddr)
-	}
-
 	if err := params.initSecretsManager(); err != nil {
 		outputter.SetError(err)
 
@@ -163,6 +147,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if params.mintRootToken {
+		depositorKey, err := helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to initialize depositor private key: %w", err))
+
+			return
+		}
+
+		rootTokenAddr := types.StringToAddress(params.nativeRootTokenAddr)
+
 		// mint tokens to validator, so he is able to send them
 		mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, params.amountValue)
 		if err != nil {
