@@ -79,24 +79,20 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		premineBalances[premineInfo.address] = premineInfo
 	}
 
+	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
+	if err != nil {
+		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+	}
+
 	var (
 		rewardTokenByteCode []byte
-		rewardWalletAddress = types.ZeroAddress
-		rewardWalletAmount  = big.NewInt(0)
 		rewardTokenAddr     = contracts.NativeERC20TokenContract
 	)
 
-	if p.rewardTokenCode == "" && p.rewardWallet != "" {
+	if p.rewardTokenCode == "" {
 		// native token is used as a reward token, and reward wallet is not a zero address
 		// so we need to add that address to premine map
-		premineInfo, err := parsePremineInfo(p.rewardWallet)
-		if err != nil {
-			return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
-		}
-
-		premineBalances[premineInfo.address] = premineInfo
-		rewardWalletAddress = premineInfo.address
-		rewardWalletAmount = premineInfo.amount
+		premineBalances[walletPremineInfo.address] = walletPremineInfo
 	}
 
 	if p.rewardTokenCode != "" {
@@ -142,8 +138,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		MaxValidatorSetSize: p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
-			WalletAddress: rewardWalletAddress,
-			WalletAmount:  rewardWalletAmount,
+			WalletAddress: walletPremineInfo.address,
+			WalletAmount:  walletPremineInfo.amount,
 		},
 	}
 
