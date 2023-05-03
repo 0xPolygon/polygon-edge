@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -792,7 +791,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
-	admin, _ := wallet.GenerateKey()
+	admin, _ := ethgow.GenerateKey()
 	adminAddr := types.Address(admin.Address())
 
 	cluster := framework.NewTestCluster(t, 5,

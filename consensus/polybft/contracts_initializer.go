@@ -124,7 +124,8 @@ func getInitChildERC721PredicateInput(config *BridgeConfig) ([]byte, error) {
 	return params.EncodeAbi()
 }
 
-// getInitChildERC721PredicateAccessListInput builds input parameters for ChildERC721PredicateAccessList SC initialization
+// getInitChildERC721PredicateAccessListInput builds input parameters
+// for ChildERC721PredicateAccessList SC initialization
 func getInitChildERC721PredicateAccessListInput(config PolyBFTConfig) ([]byte, error) {
 	rootERC721PredicateAccessListAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)
 
@@ -171,7 +172,8 @@ func getInitChildERC1155PredicateInput(config *BridgeConfig) ([]byte, error) {
 	return params.EncodeAbi()
 }
 
-// getInitChildERC1155PredicateAccessListInput builds input parameters for ChildERC1155PredicateAccessList SC initialization
+// getInitChildERC1155PredicateAccessListInput builds input parameters
+// for ChildERC1155PredicateAccessList SC initialization
 func getInitChildERC1155PredicateAccessListInput(config PolyBFTConfig) ([]byte, error) {
 	rootERC1155PredicateAccessListAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)
 

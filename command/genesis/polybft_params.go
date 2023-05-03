@@ -329,22 +329,40 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.ChildERC20PredicateAccessList, address: contracts.ChildERC20PredicateContract})
+			&contractInfo{
+				artifact: contractsapi.ChildERC20PredicateAccessList,
+				address:  contracts.ChildERC20PredicateContract,
+			})
 
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.ChildERC721PredicateAccessList, address: contracts.ChildERC721PredicateContract})
+			&contractInfo{
+				artifact: contractsapi.ChildERC721PredicateAccessList,
+				address:  contracts.ChildERC721PredicateContract,
+			})
 
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.ChildERC1155PredicateAccessList, address: contracts.ChildERC1155PredicateContract})
+			&contractInfo{
+				artifact: contractsapi.ChildERC1155PredicateAccessList,
+				address:  contracts.ChildERC1155PredicateContract,
+			})
 	} else {
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.ChildERC20Predicate, address: contracts.ChildERC20PredicateContract})
+			&contractInfo{
+				artifact: contractsapi.ChildERC20Predicate,
+				address:  contracts.ChildERC20PredicateContract,
+			})
 
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.ChildERC721Predicate, address: contracts.ChildERC721PredicateContract})
+			&contractInfo{
+				artifact: contractsapi.ChildERC721Predicate,
+				address:  contracts.ChildERC721PredicateContract,
+			})
 
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.ChildERC1155Predicate, address: contracts.ChildERC1155PredicateContract})
+			&contractInfo{
+				artifact: contractsapi.ChildERC1155Predicate,
+				address:  contracts.ChildERC1155PredicateContract,
+			})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
