@@ -60,73 +60,205 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		epoch             = uint64(1)
 		block             = uint64(10)
 		newStake          = uint64(100)
+		zeroStake         = uint64(0)
+		firstValidator    = uint64(0)
+		secondValidator   = uint64(1)
 	)
 
 	validators := newTestValidatorsWithAliases(t, allAliases)
 	state := newTestState(t)
+	t.Run("PostBlock - unstake to zero", func(t *testing.T) {
+		t.Parallel()
+		systemStateMock := new(systemStateMock)
+		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(zeroStake)), nil).Once()
 
-	systemStateMock := new(systemStateMock)
-	systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(newStake)), nil).Times(len(allAliases))
+		blockchainMock := new(blockchainMock)
+		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
+		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-	blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
+		stakeManager := newStakeManager(
+			hclog.NewNullLogger(),
+			state,
+			blockchainMock,
+			nil,
+			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
+			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			5,
+		)
 
-	txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
-		return validators.getValidator("F").ValidatorMetadata()
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
+		}))
+
+		receipt := &types.Receipt{
+			Logs: []*types.Log{
+				createTestLogForTransferEvent(
+					t,
+					stakeManager.validatorSetContract,
+					validators.getValidator(initialSetAliases[firstValidator]).Address(),
+					types.ZeroAddress,
+					zeroStake,
+				),
+			},
+		}
+
+		receipt.SetStatus(types.ReceiptSuccess)
+
+		req := &PostBlockRequest{
+			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
+				Receipts: []*types.Receipt{receipt},
+			},
+			Epoch: epoch,
+		}
+
+		require.NoError(t, stakeManager.PostBlock(req))
+
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		require.NoError(t, err)
+		var firstValidatorMeta *ValidatorMetadata
+		firstValidatorMeta = nil
+		for _, validator := range fullValidatorSet.Validators {
+			if validator.Address.String() == validators.getValidator(initialSetAliases[firstValidator]).Address().String() {
+				firstValidatorMeta = validator
+			}
+		}
+		require.NotNil(t, firstValidatorMeta)
+		require.Equal(t, bigZero, firstValidatorMeta.VotingPower)
+		require.False(t, firstValidatorMeta.IsActive)
+
+		systemStateMock.AssertExpectations(t)
+		blockchainMock.AssertExpectations(t)
+	})
+	t.Run("PostBlock - add stake to one validator", func(t *testing.T) {
+		t.Parallel()
+		systemStateMock := new(systemStateMock)
+		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(250), nil).Once()
+
+		blockchainMock := new(blockchainMock)
+		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
+		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
+
+		stakeManager := newStakeManager(
+			hclog.NewNullLogger(),
+			state,
+			blockchainMock,
+			nil,
+			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
+			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			5,
+		)
+
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
+		}))
+
+		receipt := &types.Receipt{
+			Logs: []*types.Log{
+				createTestLogForTransferEvent(
+					t,
+					stakeManager.validatorSetContract,
+					types.ZeroAddress,
+					validators.getValidator(initialSetAliases[secondValidator]).Address(),
+					250,
+				),
+			},
+		}
+
+		receipt.SetStatus(types.ReceiptSuccess)
+
+		req := &PostBlockRequest{
+			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
+				Receipts: []*types.Receipt{receipt},
+			},
+			Epoch: epoch,
+		}
+
+		require.NoError(t, stakeManager.PostBlock(req))
+
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		require.NoError(t, err)
+		var firstValidaotor *ValidatorMetadata
+		firstValidaotor = nil
+		for _, validator := range fullValidatorSet.Validators {
+			if validator.Address.String() == validators.getValidator(initialSetAliases[secondValidator]).Address().String() {
+				firstValidaotor = validator
+			}
+		}
+		require.NotNil(t, firstValidaotor)
+		require.Equal(t, big.NewInt(250), firstValidaotor.VotingPower)
+		require.True(t, firstValidaotor.IsActive)
+
+		systemStateMock.AssertExpectations(t)
+		blockchainMock.AssertExpectations(t)
 	})
 
-	// just mock the call however, the dummy relayer should do its magic
-	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, error(nil))
+	t.Run("PostBlock - add validator and stake", func(t *testing.T) {
+		t.Parallel()
+		systemStateMock := new(systemStateMock)
+		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(newStake)), nil).Times(len(allAliases))
 
-	stakeManager := newStakeManager(
-		hclog.NewNullLogger(),
-		state,
-		blockchainMock,
-		txRelayerMock,
-		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
-		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
-		5,
-	)
+		blockchainMock := new(blockchainMock)
+		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
+		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
 
-	// insert initial full validator set
-	require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-		Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
-	}))
+		txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
+			return validators.getValidator("F").ValidatorMetadata()
+		})
 
-	receipts := make([]*types.Receipt, len(allAliases))
-	for i := 0; i < len(allAliases); i++ {
-		receipts[i] = &types.Receipt{Logs: []*types.Log{
-			createTestLogForTransferEvent(
-				t,
-				stakeManager.validatorSetContract,
-				types.ZeroAddress,
-				validators.getValidator(allAliases[i]).Address(),
-				newStake,
-			),
-		}}
-		receipts[i].SetStatus(types.ReceiptSuccess)
-	}
+		// just mock the call however, the dummy relayer should do its magic
+		txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, error(nil))
 
-	req := &PostBlockRequest{
-		FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
-			Receipts: receipts},
-		Epoch: epoch,
-	}
+		stakeManager := newStakeManager(
+			hclog.NewNullLogger(),
+			state,
+			blockchainMock,
+			txRelayerMock,
+			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
+			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			5,
+		)
 
-	require.NoError(t, stakeManager.PostBlock(req))
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
+		}))
 
-	fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
-	require.NoError(t, err)
-	require.Len(t, fullValidatorSet.Validators, len(allAliases))
+		receipts := make([]*types.Receipt, len(allAliases))
+		for i := 0; i < len(allAliases); i++ {
+			receipts[i] = &types.Receipt{Logs: []*types.Log{
+				createTestLogForTransferEvent(
+					t,
+					stakeManager.validatorSetContract,
+					types.ZeroAddress,
+					validators.getValidator(allAliases[i]).Address(),
+					newStake,
+				),
+			}}
+			receipts[i].SetStatus(types.ReceiptSuccess)
+		}
 
-	for _, v := range fullValidatorSet.Validators {
-		require.Equal(t, newStake, v.VotingPower.Uint64())
-	}
+		req := &PostBlockRequest{
+			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
+				Receipts: receipts},
+			Epoch: epoch,
+		}
 
-	systemStateMock.AssertExpectations(t)
-	blockchainMock.AssertExpectations(t)
+		require.NoError(t, stakeManager.PostBlock(req))
+
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		require.NoError(t, err)
+		require.Len(t, fullValidatorSet.Validators, len(allAliases))
+
+		for _, v := range fullValidatorSet.Validators {
+			require.Equal(t, newStake, v.VotingPower.Uint64())
+		}
+
+		systemStateMock.AssertExpectations(t)
+		blockchainMock.AssertExpectations(t)
+	})
 }
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
@@ -197,6 +329,50 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		require.Equal(t, addedValidator.Address(), updateDelta.Added[0].Address)
 		require.Equal(t, addedValidator.votingPower, updateDelta.Added[0].VotingPower.Uint64())
 	})
+	t.Run("UpdateValidatorSet - remove some stake", func(t *testing.T) {
+		fullValidatorSet := validators.getPublicIdentities().Copy()
+		validatorToUpdate := fullValidatorSet[2]
+		validatorToUpdate.VotingPower = big.NewInt(5)
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
+
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3, validators.getPublicIdentities())
+		require.NoError(t, err)
+		require.Len(t, updateDelta.Added, 0)
+		require.Len(t, updateDelta.Updated, 1)
+		require.Len(t, updateDelta.Removed, 0)
+		require.Equal(t, updateDelta.Updated[0].Address, validatorToUpdate.Address)
+		require.Equal(t, updateDelta.Updated[0].VotingPower.Uint64(), validatorToUpdate.VotingPower.Uint64())
+	})
+	t.Run("UpdateValidatorSet - remove entire stake", func(t *testing.T) {
+		fullValidatorSet := validators.getPublicIdentities().Copy()
+		validatorToUpdate := fullValidatorSet[3]
+		validatorToUpdate.VotingPower = bigZero
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
+
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+4, validators.getPublicIdentities())
+		require.NoError(t, err)
+		require.Len(t, updateDelta.Added, 0)
+		require.Len(t, updateDelta.Updated, 0)
+		require.Len(t, updateDelta.Removed, 1)
+	})
+	t.Run("UpdateValidatorSet - voting power negative", func(t *testing.T) {
+		fullValidatorSet := validators.getPublicIdentities().Copy()
+		validatorsToUpdate := fullValidatorSet[4]
+		validatorsToUpdate.VotingPower = bigZero
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(fullValidatorSet),
+		}))
+
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+5, validators.getPublicIdentities())
+		require.NoError(t, err)
+		require.Len(t, updateDelta.Added, 0)
+		require.Len(t, updateDelta.Updated, 0)
+		require.Len(t, updateDelta.Removed, 1)
+	})
 
 	t.Run("UpdateValidatorSet - max validator set size reached", func(t *testing.T) {
 		// because we now have 5 validators, and the new validator has more stake
@@ -210,7 +386,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3,
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+6,
 			validators.getPublicIdentities(aliases[1:]...))
 
 		require.NoError(t, err)
