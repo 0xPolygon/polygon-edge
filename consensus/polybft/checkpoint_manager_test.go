@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -504,6 +505,10 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	args := d.Called(txn)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
+}
+
+func (d *dummyTxRelayer) Client() *jsonrpc.Client {
+	return nil
 }
 
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {

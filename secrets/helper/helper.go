@@ -3,10 +3,7 @@ package helper
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -21,6 +18,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/umbracle/ethgo/abi"
 )
+
+var addressTypeABI = abi.MustNewType("address")
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
@@ -143,39 +142,6 @@ func InitNetworkingPrivateKey(secretsManager secrets.SecretsManager) (libp2pCryp
 	return libp2pKey, keyErr
 }
 
-func InitValidatorBLSSignature(
-	secretsManager secrets.SecretsManager, account *wallet.Account, chainID int64) ([]byte, error) {
-	if secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
-		return nil, fmt.Errorf(`secrets "%s" has been already initialized`, secrets.ValidatorBLSSignature)
-	}
-
-	// Generate the signature
-	s, err := MakeKOSKSignature(
-		account.Bls,
-		types.Address(account.Ecdsa.Address()),
-		chainID,
-		bls.DomainValidatorSet,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	sb, err := s.Marshal()
-	if err != nil {
-		return nil, err
-	}
-
-	// Write the signature to the secrets manager storage
-	if err := secretsManager.SetSecret(
-		secrets.ValidatorBLSSignature,
-		[]byte(hex.EncodeToString(sb)),
-	); err != nil {
-		return nil, err
-	}
-
-	return sb, nil
-}
-
 // LoadValidatorAddress loads ECDSA key by SecretsManager and returns validator address
 func LoadValidatorAddress(secretsManager secrets.SecretsManager) (types.Address, error) {
 	if !secretsManager.HasSecret(secrets.ValidatorKey) {
@@ -243,17 +209,6 @@ func LoadNodeID(secretsManager secrets.SecretsManager) (string, error) {
 	return nodeID.String(), nil
 }
 
-// LoadBLSSignature loads BLS Signature from SecretsManager and returns it
-func LoadBLSSignature(secretsManager secrets.SecretsManager) (string, error) {
-	if !secretsManager.HasSecret(secrets.ValidatorBLSSignature) {
-		return "", nil
-	}
-
-	s, err := secretsManager.GetSecret(secrets.ValidatorBLSSignature)
-
-	return string(s), err
-}
-
 // InitCloudSecretsManager returns the cloud secrets manager from the provided config
 func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secrets.SecretsManager, error) {
 	var secretsManager secrets.SecretsManager
@@ -285,18 +240,4 @@ func InitCloudSecretsManager(secretsConfig *secrets.SecretsManagerConfig) (secre
 	}
 
 	return secretsManager, nil
-}
-
-// MakeKOSKSignature creates KOSK signature which prevents rogue attack
-func MakeKOSKSignature(
-	privateKey *bls.PrivateKey, address types.Address, chainID int64, domain []byte) (*bls.Signature, error) {
-	message, err := abi.Encode(
-		[]interface{}{address, big.NewInt(chainID)},
-		abi.MustNewType("tuple(address, uint256)"))
-	if err != nil {
-		return nil, err
-	}
-
-	// abi.Encode adds 12 zero bytes before actual address bytes
-	return privateKey.Sign(message[12:], domain)
 }

@@ -143,7 +143,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	if dp.testMode {
 		// mint tokens to depositor, so he is able to send them
-		mintTxn, err := createMintTxn(types.Address(depositorAddr), types.Address(depositorAddr), aggregateAmount)
+		mintTxn, err := helper.CreateMintTxn(types.Address(depositorAddr),
+			types.StringToAddress(dp.TokenAddr), aggregateAmount)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
 
@@ -165,7 +166,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// approve root erc20 predicate
-	approveTxn, err := createApproveERC20PredicateTxn(aggregateAmount,
+	approveTxn, err := helper.CreateApproveERC20Txn(aggregateAmount,
 		types.StringToAddress(dp.PredicateAddr),
 		types.StringToAddress(dp.TokenAddr))
 	if err != nil {
@@ -248,49 +249,6 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 
 	return &ethgo.Transaction{
 		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
-}
-
-// createMintTxn encodes parameters for mint function on rootchain token contract
-func createMintTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
-	mintFn := &contractsapi.MintRootERC20Fn{
-		To:     receiver,
-		Amount: amount,
-	}
-
-	input, err := mintFn.EncodeAbi()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
-	}
-
-	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
-
-	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
-}
-
-// createApproveERC20PredicateTxn sends approve transaction
-// to ERC20 token for ERC20 predicate so that it is able to spend given tokens
-func createApproveERC20PredicateTxn(amount *big.Int,
-	rootERC20Predicate, rootERC20Token types.Address) (*ethgo.Transaction, error) {
-	approveFnParams := &contractsapi.ApproveRootERC20Fn{
-		Spender: rootERC20Predicate,
-		Amount:  amount,
-	}
-
-	input, err := approveFnParams.EncodeAbi()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
-	}
-
-	addr := ethgo.Address(rootERC20Token)
-
-	return &ethgo.Transaction{
 		To:    &addr,
 		Input: input,
 	}, nil

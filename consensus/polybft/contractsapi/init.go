@@ -24,7 +24,6 @@ var (
 	BLS256                *artifact.Artifact
 	System                *artifact.Artifact
 	Merkle                *artifact.Artifact
-	ChildValidatorSet     *artifact.Artifact
 	NativeERC20           *artifact.Artifact
 	NativeERC20Mintable   *artifact.Artifact
 	StateReceiver         *artifact.Artifact
@@ -35,6 +34,12 @@ var (
 	ChildERC1155          *artifact.Artifact
 	ChildERC1155Predicate *artifact.Artifact
 	L2StateSender         *artifact.Artifact
+	CustomSupernetManager *artifact.Artifact
+	StakeManager          *artifact.Artifact
+	RewardPool            *artifact.Artifact
+	ValidatorSet          *artifact.Artifact
+	RootERC721            *artifact.Artifact
+	RootERC1155           *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -42,8 +47,7 @@ var (
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
 	TestSimple             *artifact.Artifact
-	RootERC721             *artifact.Artifact
-	RootERC1155            *artifact.Artifact
+	TestRewardToken        *artifact.Artifact
 )
 
 func init() {
@@ -139,11 +143,6 @@ func init() {
 		log.Fatal(err)
 	}
 
-	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	NativeERC20, err = artifact.DecodeArtifact([]byte(NativeERC20Artifact))
 	if err != nil {
 		log.Fatal(err)
@@ -175,6 +174,31 @@ func init() {
 	}
 
 	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestRewardToken, err = artifact.DecodeArtifact(readTestContractContent("TestRewardToken.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	CustomSupernetManager, err = artifact.DecodeArtifact([]byte(CustomSupernetManagerArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	StakeManager, err = artifact.DecodeArtifact([]byte(StakeManagerArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RewardPool, err = artifact.DecodeArtifact([]byte(RewardPoolArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ValidatorSet, err = artifact.DecodeArtifact([]byte(ValidatorSetArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

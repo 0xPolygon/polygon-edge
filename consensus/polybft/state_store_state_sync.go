@@ -59,10 +59,6 @@ func (s *StateSyncStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncProofsBucket), err)
 	}
 
-	if _, err := tx.CreateBucketIfNotExists(messageVotesBucket); err != nil {
-		return fmt.Errorf("failed to create bucket=%s: %w", string(messageVotesBucket), err)
-	}
-
 	return nil
 }
 
@@ -224,11 +220,7 @@ func (s *StateSyncStore) insertMessageVote(epoch uint64, key []byte, vote *Messa
 			return err
 		}
 
-		if err := bucket.Put(key, raw); err != nil {
-			return err
-		}
-
-		return nil
+		return bucket.Put(key, raw)
 	})
 
 	if err != nil {
@@ -277,21 +269,6 @@ func (s *StateSyncStore) getMessageVotesLocked(tx *bolt.Tx, epoch uint64, hash [
 	}
 
 	return signatures, nil
-}
-
-// getNestedBucketInEpoch returns a nested (child) bucket from db associated with given epoch
-func getNestedBucketInEpoch(tx *bolt.Tx, epoch uint64, bucketKey []byte) (*bolt.Bucket, error) {
-	epochBucket, err := getEpochBucket(tx, epoch)
-	if err != nil {
-		return nil, err
-	}
-
-	bucket := epochBucket.Bucket(bucketKey)
-	if bucket == nil {
-		return nil, fmt.Errorf("could not find %v bucket for epoch: %v", string(bucketKey), epoch)
-	}
-
-	return bucket, nil
 }
 
 // insertStateSyncProofs inserts the provided state sync proofs to db

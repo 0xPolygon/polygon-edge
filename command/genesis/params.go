@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -37,6 +38,8 @@ const (
 	maxValidatorCount     = "max-validator-count"
 	mintableTokenFlag     = "mintable-native-token"
 	nativeTokenConfigFlag = "native-token-config"
+	rewardTokenCodeFlag   = "reward-token-code"
+	rewardWalletFlag      = "reward-wallet"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -59,6 +62,7 @@ var (
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper" +
 		" format <name:symbol:decimals count>")
+	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
 )
 
 type genesisParams struct {
@@ -121,6 +125,10 @@ type genesisParams struct {
 	mintableNativeToken  bool
 	nativeTokenConfigRaw string
 	nativeTokenConfig    *polybft.TokenConfig
+
+	// rewards
+	rewardTokenCode string
+	rewardWallet    string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -138,6 +146,10 @@ func (p *genesisParams) validateFlags() error {
 
 	if p.isPolyBFTConsensus() {
 		if err := p.extractNativeTokenMetadata(); err != nil {
+			return err
+		}
+
+		if err := p.validateRewardWallet(); err != nil {
 			return err
 		}
 	}
@@ -438,6 +450,28 @@ func (p *genesisParams) predeployStakingSC() (*chain.GenesisAccount, error) {
 	}
 
 	return stakingAccount, nil
+}
+
+// validateRewardWallet validates reward wallet flag
+func (p *genesisParams) validateRewardWallet() error {
+	if p.rewardWallet == "" {
+		return errors.New("reward wallet address must be defined")
+	}
+
+	if p.rewardWallet == types.AddressToString(types.ZeroAddress) {
+		return errors.New("reward wallet address must not be zero address")
+	}
+
+	premineInfo, err := parsePremineInfo(p.rewardWallet)
+	if err != nil {
+		return err
+	}
+
+	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
+		return errRewardWalletAmountZero
+	}
+
+	return nil
 }
 
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)

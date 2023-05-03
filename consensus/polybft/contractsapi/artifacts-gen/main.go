@@ -24,10 +24,6 @@ func main() {
 		Name string
 	}{
 		{
-			"child/ChildValidatorSet.sol",
-			"ChildValidatorSet",
-		},
-		{
 			"child/L2StateSender.sol",
 			"L2StateSender",
 		},
@@ -118,6 +114,22 @@ func main() {
 		{
 			"root/RootERC1155Predicate.sol",
 			"RootERC1155Predicate",
+		},
+		{
+			"root/staking/CustomSupernetManager.sol",
+			"CustomSupernetManager",
+		},
+		{
+			"root/staking/StakeManager.sol",
+			"StakeManager",
+		},
+		{
+			"child/validator/RewardPool.sol",
+			"RewardPool",
+		},
+		{
+			"child/validator/ValidatorSet.sol",
+			"ValidatorSet",
 		},
 	}
 

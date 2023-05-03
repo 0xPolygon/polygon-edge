@@ -28,7 +28,6 @@ type SecretsInitResult struct {
 	NodeID        string        `json:"node_id"`
 	PrivateKey    string        `json:"private_key"`
 	BLSPrivateKey string        `json:"bls_private_key"`
-	BLSSignature  string        `json:"bls_signature"`
 	Insecure      bool          `json:"insecure"`
 	Generated     string        `json:"generated"`
 }
@@ -61,13 +60,6 @@ func (r *SecretsInitResult) GetOutput() string {
 		vals = append(
 			vals,
 			fmt.Sprintf("BLS Public key|%s", r.BLSPubkey),
-		)
-	}
-
-	if r.BLSSignature != "" {
-		vals = append(
-			vals,
-			fmt.Sprintf("BLS Signature|%s", r.BLSSignature),
 		)
 	}
 
