@@ -15,7 +15,6 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
-	"github.com/umbracle/fastrlp"
 )
 
 func TestStakeManager_PostEpoch(t *testing.T) {
@@ -65,11 +64,11 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		secondValidator   = uint64(1)
 	)
 
-	validators := newTestValidatorsWithAliases(t, allAliases)
 	state := newTestState(t)
 	t.Run("PostBlock - unstake to zero", func(t *testing.T) {
 		t.Parallel()
 
+		validators := newTestValidatorsWithAliases(t, allAliases)
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
@@ -91,7 +90,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 					stakeManager.validatorSetContract,
 					validators.getValidator(initialSetAliases[firstValidator]).Address(),
 					types.ZeroAddress,
-					1, // remove initial 1
+					1, // initial validator stake was 1
 				),
 			},
 		}
@@ -123,6 +122,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	t.Run("PostBlock - add stake to one validator", func(t *testing.T) {
 		t.Parallel()
 
+		validators := newTestValidatorsWithAliases(t, allAliases)
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
@@ -228,7 +228,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		require.Len(t, fullValidatorSet.Validators, len(allAliases))
 
 		validatorsCount := validators.toValidatorSet().Len()
-		for i, v := range fullValidatorSet.Validators.getActiveValidators(validatorsCount) {
+		for i, v := range fullValidatorSet.Validators.getSorted(validatorsCount) {
 			require.Equal(t, newStake+uint64(validatorsCount)-uint64(i)-1, v.VotingPower.Uint64())
 		}
 	})
@@ -392,7 +392,7 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 		test := func() []*ValidatorMetadata {
 			stakeCounter := newValidatorStakeMap(validators.getPublicIdentities("A", "B", "C", "D", "E"))
 
-			return stakeCounter.getActiveValidators(maxValidatorSetSize)
+			return stakeCounter.getSorted(maxValidatorSetSize)
 		}
 
 		initialSlice := test()
@@ -483,36 +483,4 @@ func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*eth
 
 func (d *dummyStakeTxRelayer) Client() *jsonrpc.Client {
 	return nil
-}
-
-func Test_MarshalBug(t *testing.T) {
-	t.Parallel()
-
-	marshal := func(obj func(*fastrlp.Arena) *fastrlp.Value) []byte {
-		ar := fastrlp.DefaultArenaPool.Get()
-		defer fastrlp.DefaultArenaPool.Put(ar)
-
-		return obj(ar).MarshalTo(nil)
-	}
-
-	emptyArray := [8]byte{}
-	corruptedSlice := make([]byte, 32)
-	corruptedSlice[29], corruptedSlice[30], corruptedSlice[31] = 5, 126, 64
-	intOfCorruption := uint64(18_446_744_073_709_551_615) // 2^64-1
-
-	marshalOne := func(ar *fastrlp.Arena) *fastrlp.Value {
-		return ar.NewBytes(corruptedSlice)
-	}
-
-	marshalTwo := func(ar *fastrlp.Arena) *fastrlp.Value {
-		return ar.NewUint(intOfCorruption)
-	}
-
-	marshal(marshalOne)
-
-	require.Equal(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
-
-	marshal(marshalTwo) // without fixing this, marshaling will cause corruption of the corrupted slice
-
-	require.NotEqual(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
 }

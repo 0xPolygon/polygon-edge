@@ -128,7 +128,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 			stakeMap.removeStake(event.From, event.Value)
 		} else {
 			// this should not happen, but lets log it if it does
-			s.logger.Debug("Found a transfer event that represents neither stake nor unstake")
+			s.logger.Warn("Found a transfer event that represents neither stake nor unstake")
 		}
 	}
 
@@ -166,7 +166,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountS
 	stakeMap := fullValidatorSet.Validators
 
 	// slice of all validator set
-	newValidatorSet := stakeMap.getActiveValidators(s.maxValidatorSetSize)
+	newValidatorSet := stakeMap.getSorted(s.maxValidatorSetSize)
 	// set of all addresses that will be in next validator set
 	addressesSet := make(map[types.Address]struct{}, len(newValidatorSet))
 
@@ -354,8 +354,8 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 	stakeData.IsActive = stakeData.VotingPower.Cmp(bigZero) > 0
 }
 
-// getActiveValidators returns all validators (*ValidatorMetadata) in sorted order
-func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) AccountSet {
+// getSorted returns all validators (*ValidatorMetadata) in sorted order
+func (sc validatorStakeMap) getSorted(maxValidatorSetSize int) AccountSet {
 	activeValidators := make(AccountSet, 0, len(sc))
 
 	for _, v := range sc {
@@ -387,7 +387,7 @@ func (sc validatorStakeMap) getActiveValidators(maxValidatorSetSize int) Account
 func (sc validatorStakeMap) String() string {
 	var sb strings.Builder
 
-	for _, x := range sc {
+	for _, x := range sc.getSorted(len(sc)) {
 		bls := ""
 		if x.BlsKey != nil {
 			bls = hex.EncodeToString(x.BlsKey.Marshal())
