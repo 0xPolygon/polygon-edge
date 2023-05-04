@@ -210,12 +210,6 @@ type systemStateMock struct {
 	mock.Mock
 }
 
-func (m *systemStateMock) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
-	args := m.Called()
-
-	return args.Get(0).(*big.Int), args.Error(1) //nolint:forcetypeassert
-}
-
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {
 	args := m.Called()
 
