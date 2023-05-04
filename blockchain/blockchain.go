@@ -1299,7 +1299,7 @@ func (b *Blockchain) writeTrace(trace *types.Trace, blockNumber uint64) error {
 
 	consensusDir := filepath.Join(b.config.DataDir, "consensus")
 	if err := ioutil.WriteFile(
-		filepath.Join(consensusDir, fmt.Sprintf("trace_%d", blockNumber))+".json", raw, 0600); err != nil {
+		filepath.Join(consensusDir, fmt.Sprintf("trace_%d.json", blockNumber)), raw, 0600); err != nil {
 		return err
 	}
 
