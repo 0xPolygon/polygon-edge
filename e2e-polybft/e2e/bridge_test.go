@@ -55,8 +55,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
-		framework.WithEpochSize(epochSize),
-	)
+		framework.WithEpochSize(epochSize))
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -126,7 +125,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
 		require.NoError(t, err)
 
-		// try to withdraw again
+		// send withdraw transaction
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(rawKey),
@@ -894,7 +893,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
 		require.NoError(t, err)
 
-		// send withdraw transaction
+		// send withdraw transaction. 
+        // It should fail because sender is not white-listed.
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(rawKey),
