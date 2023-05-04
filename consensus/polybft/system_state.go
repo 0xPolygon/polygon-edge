@@ -26,8 +26,6 @@ type SystemState interface {
 	GetEpoch() (uint64, error)
 	// GetNextCommittedIndex retrieves next committed bridge state sync index
 	GetNextCommittedIndex() (uint64, error)
-	// GetStakeOnValidatorSet retrieves stake of given validator on ValidatorSet contract
-	GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error)
 }
 
 var _ SystemState = &SystemStateImpl{}
@@ -52,21 +50,6 @@ func NewSystemState(valSetAddr types.Address, stateRcvAddr types.Address, provid
 	)
 
 	return s
-}
-
-// GetStakeOnValidatorSet retrieves stake of given validator on ValidatorSet contract
-func (s *SystemStateImpl) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
-	rawResult, err := s.validatorContract.Call("balanceOf", ethgo.Latest, validatorAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	balance, isOk := rawResult["0"].(*big.Int)
-	if !isOk {
-		return nil, fmt.Errorf("failed to decode balance")
-	}
-
-	return balance, nil
 }
 
 // GetEpoch retrieves current epoch number from the smart contract

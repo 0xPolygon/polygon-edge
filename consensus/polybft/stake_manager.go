@@ -106,10 +106,6 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	s.logger.Debug("Gotten transfer (stake changed) events from logs on block",
 		"eventsNum", len(events), "block", req.FullBlock.Block.Number())
 
-	for _, e := range events {
-		s.logger.Debug("Transfer event", "From", e.From, "To", e.To, "Value", e.Value)
-	}
-
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
 	if err != nil {
 		return err
@@ -121,9 +117,13 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 
 	for _, event := range events {
 		if event.IsStake() {
+			s.logger.Debug("Stake transfer event", "To", event.To, "Value", event.Value)
+
 			// then this amount was minted To validator address
 			stakeMap.addStake(event.To, event.Value)
 		} else if event.IsUnstake() {
+			s.logger.Debug("Unstake transfer event", "From", event.From, "Value", event.Value)
+
 			// then this amount was burned From validator address
 			stakeMap.removeStake(event.From, event.Value)
 		} else {
@@ -242,11 +242,7 @@ func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) 
 
 			var transferEvent contractsapi.TransferEvent
 
-			s.logger.Debug("Transfer event log before parse", "Log", log.Data)
-
-			convertedLog := convertLog(log)
-
-			doesMatch, err := transferEvent.ParseLog(convertedLog)
+			doesMatch, err := transferEvent.ParseLog(convertLog(log))
 			if err != nil {
 				return nil, err
 			}
@@ -254,8 +250,6 @@ func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) 
 			if !doesMatch {
 				continue
 			}
-
-			s.logger.Debug("Transfer event log after parse", "Log", log.Data)
 
 			events = append(events, &transferEvent)
 		}
@@ -293,10 +287,6 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 		return nil, err
 	}
 
-	//nolint:godox
-	// TODO - @goran-ethernal change this to use the generated stub
-	// once we remove old ChildValidatorSet stubs and generate new ones
-	// from the new contract
 	output, ok := decoded.(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("could not convert decoded outputs to map")
