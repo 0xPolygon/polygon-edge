@@ -84,6 +84,7 @@ func getInitChildERC20PredicateAccessListInput(config PolyBFTConfig) ([]byte, er
 	rootERC20PredicateAddr := types.StringToAddress(disabledBridgeRootPredicateAddr)
 	rootERC20Addr := types.ZeroAddress
 
+	// TODO: This can be removed as we'll always have a bridge config
 	if config.Bridge != nil {
 		rootERC20PredicateAddr = config.Bridge.RootERC20PredicateAddr
 		rootERC20Addr = config.Bridge.RootNativeERC20Addr

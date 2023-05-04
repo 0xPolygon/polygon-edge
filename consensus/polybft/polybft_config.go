@@ -43,10 +43,10 @@ type PolyBFTConfig struct {
 	// NativeTokenConfig defines name, symbol and decimal count of the native token
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
-	// BridgeAllowListActive indicates whether bridge allow list is active
+	// BridgeAllowListAdmin indicates whether bridge allow list is active
 	BridgeAllowListAdmin types.Address `json:"bridgeAllowListAdmin"`
 
-	// BridgeBlockListActive indicates whether bridge block list is active
+	// BridgeBlockListAdmin indicates whether bridge block list is active
 	BridgeBlockListAdmin types.Address `json:"bridgeBlockListAdmin"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
