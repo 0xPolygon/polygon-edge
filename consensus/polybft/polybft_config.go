@@ -37,9 +37,6 @@ type PolyBFTConfig struct {
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
 
-	// MintableNativeToken denotes whether mintable native token is used
-	MintableNativeToken bool `json:"mintableNative"`
-
 	// NativeTokenConfig defines name, symbol and decimal count of the native token
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
@@ -242,6 +239,7 @@ type TokenConfig struct {
 	Name     string `json:"name"`
 	Symbol   string `json:"symbol"`
 	Decimals uint8  `json:"decimals"`
+	Mintable bool   `json:"mintable"`
 }
 
 type RewardsConfig struct {

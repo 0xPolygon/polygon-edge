@@ -215,7 +215,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
 		}
 
-		if polyBFTConfig.MintableNativeToken {
+		if polyBFTConfig.NativeTokenConfig.Mintable {
 			// initialize NativeERC20Mintable SC
 			params := &contractsapi.InitializeNativeERC20MintableFn{
 				Predicate_: contracts.ChildERC20PredicateContract,
