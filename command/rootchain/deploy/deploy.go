@@ -100,6 +100,53 @@ var (
 			rootchainConfig.StakeManagerAddress = addr
 		},
 	}
+
+	// initializersMap maps rootchain contract names to initializer function callbacks
+	initializersMap = map[string]func(command.OutputFormatter, txrelayer.TxRelayer,
+		*polybft.RootchainConfig, ethgo.Key) error{
+		stakeManagerName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+
+			return initializeStakeManager(fmt, relayer, config, key)
+		},
+		customSupernetManagerName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+
+			return initializeSupernetManager(fmt, relayer, config, key)
+		},
+		exitHelperName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+
+			return initializeExitHelper(fmt, relayer, config, key)
+		},
+		rootERC20PredicateName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+
+			return initializeRootERC20Predicate(fmt, relayer, config, key)
+		},
+		rootERC721PredicateName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+
+			return initializeRootERC721Predicate(fmt, relayer, config, key)
+		},
+		rootERC1155PredicateName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+
+			return initializeRootERC1155Predicate(fmt, relayer, config, key)
+		},
+	}
 )
 
 // GetCommand returns the rootchain deploy command
@@ -255,7 +302,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
-	initialValidators []*polybft.Validator, ctx context.Context) (*polybft.RootchainConfig, int64, error) {
+	initialValidators []*polybft.Validator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
@@ -379,11 +426,12 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	allContracts = append(tokenContracts, allContracts...)
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, ctx := errgroup.WithContext(cmdCtx)
 	resultsCh := make(chan *deployContractResult, len(allContracts))
 
 	for _, contract := range allContracts {
 		contract := contract
+
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
@@ -429,16 +477,31 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		outputter.WriteCommandResult(result)
 	}
 
-	// init StakeManager
-	if err := initializeStakeManager(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
+	g, ctx = errgroup.WithContext(cmdCtx)
+
+	for _, contract := range allContracts {
+		contract := contract
+
+		initializer, exists := initializersMap[contract.name]
+		if !exists {
+			continue
+		}
+
+		g.Go(func() error {
+			select {
+			case <-cmdCtx.Done():
+				return cmdCtx.Err()
+			default:
+				return initializer(outputter, txRelayer, rootchainConfig, deployerKey)
+			}
+		})
+	}
+
+	if err := g.Wait(); err != nil {
 		return nil, 0, err
 	}
 
-	// init SupernetManager
-	if err := initializeSupernetManager(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
-		return nil, 0, err
-	}
-
+	// register supernets manager on stake manager
 	chainID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
 	if err != nil {
 		return nil, 0, err
@@ -448,26 +511,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	if err := initializeCheckpointManager(outputter, txRelayer, chainID,
 		initialValidators, rootchainConfig, deployerKey); err != nil {
 		return nil, 0, err
-	}
-
-	// init ExitHelper
-	if err := initializeExitHelper(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
-		return nil, 0, err
-	}
-
-	// init RootERC20Predicate
-	if err := initializeRootERC20Predicate(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
-		return nil, 0, err
-	}
-
-	// init RootERC721Predicate
-	if err := initializeRootERC721Predicate(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
-		return nil, 0, err
-	}
-
-	// init RootERC1155Predicate
-	if err := initializeRootERC1155Predicate(outputter, txRelayer, rootchainConfig, deployerKey); err != nil {
-		return rootchainConfig, 0, err
 	}
 
 	return rootchainConfig, chainID, nil
