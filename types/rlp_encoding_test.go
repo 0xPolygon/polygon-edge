@@ -388,5 +388,5 @@ func Test_MarshalBug(t *testing.T) {
 
 	marshal(marshalTwo) // without fixing this, marshaling will cause corruption of the corrupted slice
 
-	require.NotEqual(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
+	require.Equal(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
 }
