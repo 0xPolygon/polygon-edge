@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math/big"
@@ -8,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -213,7 +215,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	rootchainCfg, chainID, err := deployContracts(outputter, client, consensusConfig.InitialValidatorSet)
+	rootchainCfg, chainID, err := deployContracts(outputter, client, consensusConfig.InitialValidatorSet, cmd.Context())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
@@ -253,8 +255,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
-	initialValidators []*polybft.Validator) (*polybft.RootchainConfig, int64, error) {
-	// if the bridge contract is not created, we have to deploy all the contracts
+	initialValidators []*polybft.Validator, ctx context.Context) (*polybft.RootchainConfig, int64, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
@@ -378,31 +379,54 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 	allContracts = append(tokenContracts, allContracts...)
 
+	g, ctx := errgroup.WithContext(ctx)
+	resultsCh := make(chan *deployContractResult, len(allContracts))
+
 	for _, contract := range allContracts {
-		txn := &ethgo.Transaction{
-			To:    nil, // contract deployment
-			Input: contract.artifact.Bytecode,
-		}
+		contract := contract
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				txn := &ethgo.Transaction{
+					To:    nil, // contract deployment
+					Input: contract.artifact.Bytecode,
+				}
 
-		receipt, err := txRelayer.SendTransaction(txn, deployerKey)
-		if err != nil {
-			return nil, 0, err
-		}
+				receipt, err := txRelayer.SendTransaction(txn, deployerKey)
+				if err != nil {
+					return err
+				}
 
-		if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-			return nil, 0, fmt.Errorf("deployment of %s contract failed", contract.name)
-		}
+				if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
+					return fmt.Errorf("deployment of %s contract failed", contract.name)
+				}
 
-		contractAddr := types.Address(receipt.ContractAddress)
+				resultsCh <- newDeployContractsResult(contract.name,
+					types.Address(receipt.ContractAddress),
+					receipt.TransactionHash)
 
-		populatorFn, ok := metadataPopulatorMap[contract.name]
+				return nil
+			}
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, 0, err
+	}
+
+	close(resultsCh)
+
+	for result := range resultsCh {
+		populatorFn, ok := metadataPopulatorMap[result.Name]
 		if !ok {
-			return nil, 0, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", contract.name)
+			return nil, 0, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)
 		}
 
-		populatorFn(rootchainConfig, contractAddr)
+		populatorFn(rootchainConfig, result.Address)
 
-		outputter.WriteCommandResult(newDeployContractsResult(contract.name, contractAddr, receipt.TransactionHash))
+		outputter.WriteCommandResult(result)
 	}
 
 	// init StakeManager
