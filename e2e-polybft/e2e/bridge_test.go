@@ -907,8 +907,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 		{
 			input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{senderAccount.Ecdsa.Address()})
-			adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListBridgeAddr, input)
-			require.NoError(t, adminSetTxn.Wait())
+			enableSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListBridgeAddr, input)
+			require.NoError(t, enableSetTxn.Wait())
 			expectRole(t, cluster, contracts.AllowListBridgeAddr, types.Address(senderAccount.Ecdsa.Address()), addresslist.EnabledRole)
 		}
 
@@ -925,8 +925,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 		{
 			input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{senderAccount.Ecdsa.Address()})
-			adminSetTxn := cluster.MethodTxn(t, admin, contracts.BlockListBridgeAddr, input)
-			require.NoError(t, adminSetTxn.Wait())
+			disableSetTxn := cluster.MethodTxn(t, admin, contracts.BlockListBridgeAddr, input)
+			require.NoError(t, disableSetTxn.Wait())
 			expectRole(t, cluster, contracts.BlockListBridgeAddr, types.Address(senderAccount.Ecdsa.Address()), addresslist.EnabledRole)
 		}
 
