@@ -354,7 +354,7 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 	stakeData.IsActive = stakeData.VotingPower.Cmp(bigZero) > 0
 }
 
-// getSorted returns all validators (*ValidatorMetadata) in sorted order
+// getSorted returns validators (*ValidatorMetadata) in sorted order
 func (sc validatorStakeMap) getSorted(maxValidatorSetSize int) AccountSet {
 	activeValidators := make(AccountSet, 0, len(sc))
 
