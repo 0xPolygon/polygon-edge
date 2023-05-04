@@ -908,7 +908,13 @@ func opGasLimit(c *state) {
 }
 
 func opBaseFee(c *state) {
-	baseFee := big.NewInt(0).Set(c.host.GetTxContext().BaseFee)
+	if !c.config.London {
+		c.exit(errOpCodeNotFound)
+
+		return
+	}
+
+	baseFee := new(big.Int).Set(c.host.GetTxContext().BaseFee)
 	c.push1().SetUint64(baseFee.Uint64())
 }
 
