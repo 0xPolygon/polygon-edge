@@ -35,7 +35,6 @@ type env struct {
 	GasLimit   string `json:"currentGasLimit"`
 	Number     string `json:"currentNumber"`
 	Timestamp  string `json:"currentTimestamp"`
-	BaseFee    string `json:"currentBaseFee"`
 }
 
 func remove0xPrefix(str string) string {
@@ -80,17 +79,6 @@ func stringToBigInt(str string) (*big.Int, error) {
 	}
 
 	return n, nil
-}
-
-func stringToBigIntT(t *testing.T, str string) *big.Int {
-	t.Helper()
-
-	n, err := stringToBigInt(str)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return n
 }
 
 func stringToAddressT(t *testing.T, str string) types.Address {
@@ -157,7 +145,6 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 		GasLimit:   stringToUint64T(t, e.GasLimit),
 		Number:     stringToUint64T(t, e.Number),
 		Timestamp:  stringToUint64T(t, e.Timestamp),
-		BaseFee:    stringToUint64T(t, e.BaseFee),
 	}
 }
 
@@ -170,7 +157,6 @@ func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 		GasLimit:   stringToInt64T(t, e.GasLimit),
 		Number:     stringToInt64T(t, e.Number),
 		Timestamp:  stringToInt64T(t, e.Timestamp),
-		BaseFee:    stringToBigIntT(t, e.BaseFee),
 	}
 }
 
