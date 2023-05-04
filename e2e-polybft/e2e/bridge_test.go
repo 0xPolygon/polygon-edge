@@ -893,8 +893,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
 		require.NoError(t, err)
 
-		// send withdraw transaction. 
-        // It should fail because sender is not white-listed.
+		// send withdraw transaction.
+		// It should fail because sender is not white-listed.
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(rawKey),
