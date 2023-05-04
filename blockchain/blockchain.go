@@ -1,9 +1,12 @@
 package blockchain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -46,8 +49,8 @@ type Blockchain struct {
 	executor  Executor
 	txSigner  TxSigner
 
-	config  *chain.Chain // Config containing chain information
-	genesis types.Hash   // The hash of the genesis block
+	config  *Config    // Config containing chain information
+	genesis types.Hash // The hash of the genesis block
 
 	headersCache    *lru.Cache // LRU cache for the headers
 	difficultyCache *lru.Cache // LRU cache for the difficulty
@@ -101,6 +104,7 @@ type BlockResult struct {
 	Root     types.Hash
 	Receipts []*types.Receipt
 	TotalGas uint64
+	Trace    *types.Trace
 }
 
 // updateGasPriceAvg updates the rolling average value of the gas price
@@ -185,7 +189,7 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 func NewBlockchain(
 	logger hclog.Logger,
 	db storage.Storage,
-	config *chain.Chain,
+	config *Config,
 	consensus Verifier,
 	executor Executor,
 	txSigner TxSigner,
@@ -249,7 +253,7 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 
 		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != b.config.Genesis.Hash() {
+		if b.genesis != b.config.Chain.Genesis.Hash() {
 			return fmt.Errorf("genesis file does not match current genesis")
 		}
 
@@ -274,12 +278,12 @@ func (b *Blockchain) ComputeGenesis() error {
 		b.setCurrentHeader(header, diff)
 	} else {
 		// empty storage, write the genesis
-		if err := b.writeGenesis(b.config.Genesis); err != nil {
+		if err := b.writeGenesis(b.config.Chain.Genesis); err != nil {
 			return err
 		}
 	}
 
-	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
+	b.logger.Info("genesis", "hash", b.config.Chain.Genesis.Hash())
 
 	return nil
 }
@@ -326,7 +330,7 @@ func (b *Blockchain) CurrentTD() *big.Int {
 
 // Config returns the blockchain configuration
 func (b *Blockchain) Config() *chain.Params {
-	return b.config.Params
+	return b.config.Chain.Params
 }
 
 // GetHeader returns the block header using the hash
@@ -671,17 +675,17 @@ func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) (*types.FullBlock,
 	}
 
 	// Do the initial block verification
-	receipts, err := b.verifyBlock(block)
+	blockResult, err := b.verifyBlock(block)
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.FullBlock{Block: block, Receipts: receipts}, nil
+	return &types.FullBlock{Block: block, Receipts: blockResult.Receipts, Trace: blockResult.Trace}, nil
 }
 
 // verifyBlock does the base (common) block verification steps by
 // verifying the block body as well as the parent information
-func (b *Blockchain) verifyBlock(block *types.Block) ([]*types.Receipt, error) {
+func (b *Blockchain) verifyBlock(block *types.Block) (*BlockResult, error) {
 	// Make sure the block is present
 	if block == nil {
 		return nil, ErrNoBlock
@@ -693,12 +697,12 @@ func (b *Blockchain) verifyBlock(block *types.Block) ([]*types.Receipt, error) {
 	}
 
 	// Make sure the block body data is valid
-	receipts, err := b.verifyBlockBody(block)
+	blockResult, err := b.verifyBlockBody(block)
 	if err != nil {
 		return nil, err
 	}
 
-	return receipts, nil
+	return blockResult, nil
 }
 
 // verifyBlockParent makes sure that the child block is in line
@@ -756,7 +760,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 // - The trie roots match up (state, transactions, receipts, uncles)
 // - The receipts match up
 // - The execution result matches up
-func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, error) {
+func (b *Blockchain) verifyBlockBody(block *types.Block) (*BlockResult, error) {
 	// Make sure the Uncles root matches up
 	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
 		b.logger.Error(fmt.Sprintf(
@@ -790,7 +794,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, erro
 		return nil, fmt.Errorf("unable to verify block execution result, %w", err)
 	}
 
-	return blockResult.Receipts, nil
+	return blockResult, nil
 }
 
 // verifyBlockResult verifies that the block transaction execution result
@@ -844,9 +848,7 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	//nolint:godox
-	// TODO write trace ?
-	_, _, root := txn.Commit()
+	_, trace, root := txn.Commit()
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())
@@ -855,6 +857,7 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		Root:     root,
 		Receipts: txn.Receipts(),
 		TotalGas: txn.TotalGas(),
+		Trace:    trace,
 	}, nil
 }
 
@@ -890,6 +893,11 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
 	if err := b.db.WriteReceipts(block.Hash(), fblock.Receipts); err != nil {
+		return err
+	}
+
+	// write the trace
+	if err := b.writeTrace(fblock.Trace, header.Number); err != nil {
 		return err
 	}
 
@@ -1276,6 +1284,22 @@ func (b *Blockchain) writeFork(header *types.Header) error {
 
 	newForks = append(newForks, header.Hash)
 	if err := b.db.WriteForks(newForks); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// writeTrace writes the block trace to the file
+func (b *Blockchain) writeTrace(trace *types.Trace, blockNumber uint64) error {
+	raw, err := json.Marshal(trace)
+	if err != nil {
+		return err
+	}
+
+	consensusDir := filepath.Join(b.config.DataDir, "consensus")
+	if err := ioutil.WriteFile(
+		filepath.Join(consensusDir, fmt.Sprintf("trace_%d.json", blockNumber)), raw, 0600); err != nil {
 		return err
 	}
 

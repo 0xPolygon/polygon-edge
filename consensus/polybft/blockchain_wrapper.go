@@ -106,9 +106,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		}
 	}
 
-	//nolint:godox
-	// TODO write trace
-	_, _, root := transition.Commit()
+	_, trace, root := transition.Commit()
 
 	if root != block.Header.StateRoot {
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Header.StateRoot)
@@ -124,6 +122,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	return &types.FullBlock{
 		Block:    builtBlock,
 		Receipts: transition.Receipts(),
+		Trace:    trace,
 	}, nil
 }
 
