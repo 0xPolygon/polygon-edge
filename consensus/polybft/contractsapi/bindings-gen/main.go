@@ -102,6 +102,7 @@ func main() {
 		{
 			"ChildERC20PredicateAccessList",
 			gensc.ChildERC20PredicateAccessList,
+			false,
 			[]string{
 				"initialize",
 				"withdrawTo",
@@ -181,6 +182,7 @@ func main() {
 		{
 			"ChildERC1155PredicateAccessList",
 			gensc.ChildERC1155PredicateAccessList,
+			false,
 			[]string{
 				"initialize",
 				"withdrawBatch",
@@ -230,6 +232,7 @@ func main() {
 		{
 			"ChildERC721PredicateAccessList",
 			gensc.ChildERC721PredicateAccessList,
+			false,
 			[]string{
 				"initialize",
 				"withdrawBatch",

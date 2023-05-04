@@ -817,7 +817,6 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	adminAddr := types.Address(admin.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBridge(),
 		framework.WithNumBlockConfirmations(numBlockConfirmations),
 		framework.WithEpochSize(epochSize),
 		framework.WithBridgeAllowListAdmin(adminAddr),
@@ -828,7 +827,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
