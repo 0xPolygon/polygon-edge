@@ -48,6 +48,10 @@ func main() {
 			"ChildERC20Predicate",
 		},
 		{
+			"child/ChildERC20PredicateAccessList.sol",
+			"ChildERC20PredicateAccessList",
+		},
+		{
 			"child/ChildERC721.sol",
 			"ChildERC721",
 		},
@@ -56,12 +60,20 @@ func main() {
 			"ChildERC721Predicate",
 		},
 		{
+			"child/ChildERC721PredicateAccessList.sol",
+			"ChildERC721PredicateAccessList",
+		},
+		{
 			"child/ChildERC1155.sol",
 			"ChildERC1155",
 		},
 		{
 			"child/ChildERC1155Predicate.sol",
 			"ChildERC1155Predicate",
+		},
+		{
+			"child/ChildERC1155PredicateAccessList.sol",
+			"ChildERC1155PredicateAccessList",
 		},
 		{
 			"child/System.sol",

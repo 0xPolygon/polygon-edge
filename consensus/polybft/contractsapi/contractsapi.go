@@ -360,6 +360,47 @@ func (w *WithdrawToChildERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
 }
 
+type InitializeChildERC20PredicateAccessListFn struct {
+	NewL2StateSender          types.Address `abi:"newL2StateSender"`
+	NewStateReceiver          types.Address `abi:"newStateReceiver"`
+	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
+	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
+	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
+	UseAllowList              bool          `abi:"useAllowList"`
+	UseBlockList              bool          `abi:"useBlockList"`
+	NewOwner                  types.Address `abi:"newOwner"`
+}
+
+func (i *InitializeChildERC20PredicateAccessListFn) Sig() []byte {
+	return ChildERC20PredicateAccessList.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildERC20PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC20PredicateAccessList.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC20PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20PredicateAccessList.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawToChildERC20PredicateAccessListFn struct {
+	ChildToken types.Address `abi:"childToken"`
+	Receiver   types.Address `abi:"receiver"`
+	Amount     *big.Int      `abi:"amount"`
+}
+
+func (w *WithdrawToChildERC20PredicateAccessListFn) Sig() []byte {
+	return ChildERC20PredicateAccessList.Abi.Methods["withdrawTo"].ID()
+}
+
+func (w *WithdrawToChildERC20PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC20PredicateAccessList.Abi.Methods["withdrawTo"].Encode(w)
+}
+
+func (w *WithdrawToChildERC20PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20PredicateAccessList.Abi.Methods["withdrawTo"], buf, w)
+}
+
 type InitializeNativeERC20Fn struct {
 	Predicate_ types.Address `abi:"predicate_"`
 	RootToken_ types.Address `abi:"rootToken_"`
@@ -618,6 +659,47 @@ func (w *WithdrawBatchChildERC1155PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC1155Predicate.Abi.Methods["withdrawBatch"], buf, w)
 }
 
+type InitializeChildERC1155PredicateAccessListFn struct {
+	NewL2StateSender        types.Address `abi:"newL2StateSender"`
+	NewStateReceiver        types.Address `abi:"newStateReceiver"`
+	NewRootERC1155Predicate types.Address `abi:"newRootERC1155Predicate"`
+	NewChildTokenTemplate   types.Address `abi:"newChildTokenTemplate"`
+	UseAllowList            bool          `abi:"useAllowList"`
+	UseBlockList            bool          `abi:"useBlockList"`
+	NewOwner                types.Address `abi:"newOwner"`
+}
+
+func (i *InitializeChildERC1155PredicateAccessListFn) Sig() []byte {
+	return ChildERC1155PredicateAccessList.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildERC1155PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC1155PredicateAccessList.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC1155PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC1155PredicateAccessList.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawBatchChildERC1155PredicateAccessListFn struct {
+	ChildToken types.Address   `abi:"childToken"`
+	Receivers  []ethgo.Address `abi:"receivers"`
+	TokenIDs   []*big.Int      `abi:"tokenIds"`
+	Amounts    []*big.Int      `abi:"amounts"`
+}
+
+func (w *WithdrawBatchChildERC1155PredicateAccessListFn) Sig() []byte {
+	return ChildERC1155PredicateAccessList.Abi.Methods["withdrawBatch"].ID()
+}
+
+func (w *WithdrawBatchChildERC1155PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC1155PredicateAccessList.Abi.Methods["withdrawBatch"].Encode(w)
+}
+
+func (w *WithdrawBatchChildERC1155PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC1155PredicateAccessList.Abi.Methods["withdrawBatch"], buf, w)
+}
+
 type InitializeChildERC1155Fn struct {
 	RootToken_ types.Address `abi:"rootToken_"`
 	Uri_       string        `abi:"uri_"`
@@ -757,6 +839,46 @@ func (w *WithdrawBatchChildERC721PredicateFn) EncodeAbi() ([]byte, error) {
 
 func (w *WithdrawBatchChildERC721PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildERC721Predicate.Abi.Methods["withdrawBatch"], buf, w)
+}
+
+type InitializeChildERC721PredicateAccessListFn struct {
+	NewL2StateSender       types.Address `abi:"newL2StateSender"`
+	NewStateReceiver       types.Address `abi:"newStateReceiver"`
+	NewRootERC721Predicate types.Address `abi:"newRootERC721Predicate"`
+	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
+	UseAllowList           bool          `abi:"useAllowList"`
+	UseBlockList           bool          `abi:"useBlockList"`
+	NewOwner               types.Address `abi:"newOwner"`
+}
+
+func (i *InitializeChildERC721PredicateAccessListFn) Sig() []byte {
+	return ChildERC721PredicateAccessList.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildERC721PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC721PredicateAccessList.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildERC721PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC721PredicateAccessList.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawBatchChildERC721PredicateAccessListFn struct {
+	ChildToken types.Address   `abi:"childToken"`
+	Receivers  []ethgo.Address `abi:"receivers"`
+	TokenIDs   []*big.Int      `abi:"tokenIds"`
+}
+
+func (w *WithdrawBatchChildERC721PredicateAccessListFn) Sig() []byte {
+	return ChildERC721PredicateAccessList.Abi.Methods["withdrawBatch"].ID()
+}
+
+func (w *WithdrawBatchChildERC721PredicateAccessListFn) EncodeAbi() ([]byte, error) {
+	return ChildERC721PredicateAccessList.Abi.Methods["withdrawBatch"].Encode(w)
+}
+
+func (w *WithdrawBatchChildERC721PredicateAccessListFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC721PredicateAccessList.Abi.Methods["withdrawBatch"], buf, w)
 }
 
 type InitializeChildERC721Fn struct {

@@ -122,6 +122,18 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	// check if there are Bridge Allow List Admins and Bridge Block List Admins
+	// and if there are, get the first address as the Admin
+	var bridgeAllowListAdmin types.Address
+	if len(p.bridgeAllowListAdmin) > 0 {
+		bridgeAllowListAdmin = types.StringToAddress(p.bridgeAllowListAdmin[0])
+	}
+
+	var bridgeBlockListAdmin types.Address
+	if len(p.bridgeBlockListAdmin) > 0 {
+		bridgeBlockListAdmin = types.StringToAddress(p.bridgeBlockListAdmin[0])
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -129,11 +141,13 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          initialValidators[0].Address,
-		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
-		MintableNativeToken: p.mintableNativeToken,
-		NativeTokenConfig:   p.nativeTokenConfig,
-		MaxValidatorSetSize: p.maxNumValidators,
+		Governance:           initialValidators[0].Address,
+		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
+		MintableNativeToken:  p.mintableNativeToken,
+		NativeTokenConfig:    p.nativeTokenConfig,
+		BridgeAllowListAdmin: bridgeAllowListAdmin,
+		BridgeBlockListAdmin: bridgeBlockListAdmin,
+		MaxValidatorSetSize:  p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
@@ -319,29 +333,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			address:  contracts.ChildERC20Contract,
 		},
 		{
-			// ChildERC20Predicate contract
-			artifact: contractsapi.ChildERC20Predicate,
-			address:  contracts.ChildERC20PredicateContract,
-		},
-		{
 			// ChildERC721 token contract
 			artifact: contractsapi.ChildERC721,
 			address:  contracts.ChildERC721Contract,
 		},
 		{
-			// ChildERC721Predicate token contract
-			artifact: contractsapi.ChildERC721Predicate,
-			address:  contracts.ChildERC721PredicateContract,
-		},
-		{
 			// ChildERC1155 contract
 			artifact: contractsapi.ChildERC1155,
 			address:  contracts.ChildERC1155Contract,
-		},
-		{
-			// ChildERC1155Predicate token contract
-			artifact: contractsapi.ChildERC1155Predicate,
-			address:  contracts.ChildERC1155PredicateContract,
 		},
 		{
 			// BLS contract
@@ -374,6 +373,44 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
+	}
+
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC20PredicateAccessList,
+				address:  contracts.ChildERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC721PredicateAccessList,
+				address:  contracts.ChildERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC1155PredicateAccessList,
+				address:  contracts.ChildERC1155PredicateContract,
+			})
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC20Predicate,
+				address:  contracts.ChildERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC721Predicate,
+				address:  contracts.ChildERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC1155Predicate,
+				address:  contracts.ChildERC1155PredicateContract,
+			})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
