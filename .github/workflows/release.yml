@@ -12,6 +12,8 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_CONFIG: $HOME/.docker
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -58,4 +60,3 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_EDGE_GITHUB_URL }}
-          DOCKER_CONFIG: $HOME/.docker
