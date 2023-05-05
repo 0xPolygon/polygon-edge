@@ -12,9 +12,10 @@ import (
 )
 
 const (
-	defaultGasPrice   = 1879048192 // 0x70000000
-	defaultGasLimit   = 5242880    // 0x500000
+	DefaultGasPrice   = 1879048192 // 0x70000000
+	DefaultGasLimit   = 5242880    // 0x500000
 	DefaultRPCAddress = "http://127.0.0.1:8545"
+	numRetries        = 1000
 )
 
 var (
@@ -29,6 +30,8 @@ type TxRelayer interface {
 	// SendTransactionLocal sends non-signed transaction
 	// (this function is meant only for testing purposes and is about to be removed at some point)
 	SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error)
+	// Client returns jsonrpc client
+	Client() *jsonrpc.Client
 }
 
 var _ TxRelayer = (*TxRelayerImpl)(nil)
@@ -43,7 +46,7 @@ type TxRelayerImpl struct {
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
-		ipAddress:      "http://127.0.0.1:8545",
+		ipAddress:      DefaultRPCAddress,
 		receiptTimeout: 50 * time.Millisecond,
 	}
 	for _, opt := range opts {
@@ -83,6 +86,11 @@ func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (
 	return t.waitForReceipt(txnHash)
 }
 
+// Client returns jsonrpc client
+func (t *TxRelayerImpl) Client() *jsonrpc.Client {
+	return t.client
+}
+
 func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -95,11 +103,11 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	txn.Nonce = nonce
 
 	if txn.GasPrice == 0 {
-		txn.GasPrice = defaultGasPrice
+		txn.GasPrice = DefaultGasPrice
 	}
 
 	if txn.Gas == 0 {
-		txn.Gas = defaultGasLimit
+		txn.Gas = DefaultGasLimit
 	}
 
 	chainID, err := t.client.Eth().ChainID()
@@ -133,8 +141,8 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	}
 
 	txn.From = accounts[0]
-	txn.Gas = defaultGasLimit
-	txn.GasPrice = defaultGasPrice
+	txn.Gas = DefaultGasLimit
+	txn.GasPrice = DefaultGasPrice
 
 	txnHash, err := t.client.Eth().SendTransaction(txn)
 	if err != nil {
@@ -159,7 +167,7 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 			return receipt, nil
 		}
 
-		if count > 100 {
+		if count > numRetries {
 			return nil, fmt.Errorf("timeout while waiting for transaction %s to be processed", hash)
 		}
 

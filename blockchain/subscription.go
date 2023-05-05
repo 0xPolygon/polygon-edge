@@ -19,28 +19,19 @@ type Subscription interface {
 // FOR TESTING PURPOSES //
 
 type MockSubscription struct {
-	eventCh chan *Event
+	*subscription
 }
 
 func NewMockSubscription() *MockSubscription {
-	return &MockSubscription{eventCh: make(chan *Event)}
+	return &MockSubscription{
+		subscription: &subscription{
+			updateCh: make(chan *Event),
+			closeCh:  make(chan void),
+		},
+	}
 }
-
 func (m *MockSubscription) Push(e *Event) {
-	m.eventCh <- e
-}
-
-func (m *MockSubscription) GetEventCh() chan *Event {
-	return m.eventCh
-}
-
-func (m *MockSubscription) GetEvent() *Event {
-	evnt := <-m.eventCh
-
-	return evnt
-}
-
-func (m *MockSubscription) Close() {
+	m.updateCh <- e
 }
 
 // subscription is the Blockchain event subscription object
@@ -51,31 +42,17 @@ type subscription struct {
 
 // GetEventCh creates a new event channel, and returns it
 func (s *subscription) GetEventCh() chan *Event {
-	eventCh := make(chan *Event)
-
-	go func() {
-		for {
-			evnt := s.GetEvent()
-			if evnt == nil {
-				return
-			}
-			eventCh <- evnt
-		}
-	}()
-
-	return eventCh
+	return s.updateCh
 }
 
 // GetEvent returns the event from the subscription (BLOCKING)
 func (s *subscription) GetEvent() *Event {
-	for {
-		// Wait for an update
-		select {
-		case ev := <-s.updateCh:
-			return ev
-		case <-s.closeCh:
-			return nil
-		}
+	// Wait for an update
+	select {
+	case ev := <-s.updateCh:
+		return ev
+	case <-s.closeCh:
+		return nil
 	}
 }
 
@@ -172,11 +149,7 @@ func (e *eventStream) newUpdateCh() chan *Event {
 	e.Lock()
 	defer e.Unlock()
 
-	ch := make(chan *Event, 1)
-
-	if e.updateCh == nil {
-		e.updateCh = make([]chan *Event, 0)
-	}
+	ch := make(chan *Event, 5)
 
 	e.updateCh = append(e.updateCh, ch)
 
@@ -190,9 +163,6 @@ func (e *eventStream) push(event *Event) {
 
 	// Notify the listeners
 	for _, update := range e.updateCh {
-		select {
-		case update <- event:
-		default:
-		}
+		update <- event
 	}
 }

@@ -31,7 +31,7 @@ func (s serverType) String() string {
 	case serverWS:
 		return "ws"
 	default:
-		panic("BUG: Not expected")
+		panic("BUG: Not expected") //nolint:gocritic
 	}
 }
 
@@ -72,20 +72,26 @@ type Config struct {
 
 // NewJSONRPC returns the JSONRPC http server
 func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
+	d, err := newDispatcher(
+		logger,
+		config.Store,
+		&dispatcherParams{
+			chainID:                 config.ChainID,
+			chainName:               config.ChainName,
+			priceLimit:              config.PriceLimit,
+			jsonRPCBatchLengthLimit: config.BatchLengthLimit,
+			blockRangeLimit:         config.BlockRangeLimit,
+		},
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
 	srv := &JSONRPC{
-		logger: logger.Named("jsonrpc"),
-		config: config,
-		dispatcher: newDispatcher(
-			logger,
-			config.Store,
-			&dispatcherParams{
-				chainID:                 config.ChainID,
-				chainName:               config.ChainName,
-				priceLimit:              config.PriceLimit,
-				jsonRPCBatchLengthLimit: config.BatchLengthLimit,
-				blockRangeLimit:         config.BlockRangeLimit,
-			},
-		),
+		logger:     logger.Named("jsonrpc"),
+		config:     config,
+		dispatcher: d,
 	}
 
 	// start http server

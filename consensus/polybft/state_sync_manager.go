@@ -59,12 +59,14 @@ func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Pro
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr   types.Address
-	jsonrpcAddr       string
-	dataDir           string
-	topic             topic
-	key               *wallet.Key
-	maxCommitmentSize uint64
+	stateSenderAddr       types.Address
+	stateSenderStartBlock uint64
+	jsonrpcAddr           string
+	dataDir               string
+	topic                 topic
+	key                   *wallet.Key
+	maxCommitmentSize     uint64
+	numBlockConfirmations uint64
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -92,10 +94,10 @@ type topic interface {
 	Subscribe(handler func(obj interface{}, from peer.ID)) error
 }
 
-// NewStateSyncManager creates a new instance of state sync manager
-func NewStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
+// newStateSyncManager creates a new instance of state sync manager
+func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
 	s := &stateSyncManager{
-		logger:  logger.Named("state-sync-manager"),
+		logger:  logger,
 		state:   state,
 		config:  config,
 		closeCh: make(chan struct{}),
@@ -125,11 +127,13 @@ func (s *stateSyncManager) Close() {
 func (s *stateSyncManager) initTracker() error {
 	ctx, cancelFn := context.WithCancel(context.Background())
 
-	tracker := tracker.NewEventTracker(
+	evtTracker := tracker.NewEventTracker(
 		path.Join(s.config.dataDir, "/deposit.db"),
 		s.config.jsonrpcAddr,
 		ethgo.Address(s.config.stateSenderAddr),
 		s,
+		s.config.numBlockConfirmations,
+		s.config.stateSenderStartBlock,
 		s.logger)
 
 	go func() {
@@ -137,7 +141,7 @@ func (s *stateSyncManager) initTracker() error {
 		cancelFn()
 	}()
 
-	return tracker.Start(ctx)
+	return evtTracker.Start(ctx)
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)
@@ -171,21 +175,21 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	valSet := s.validatorSet
 	s.lock.RUnlock()
 
-	if valSet == nil || msg.EpochNumber < epoch {
-		// Epoch metadata is undefined or received message for some of the older epochs
+	if valSet == nil || msg.EpochNumber != epoch {
+		// Epoch metadata is undefined or received a message for the irrelevant epoch
 		return nil
 	}
 
-	if !valSet.Includes(types.StringToAddress(msg.NodeID)) {
-		return fmt.Errorf("validator is not among the active validator set")
+	if err := s.verifyVoteSignature(valSet, types.StringToAddress(msg.From), msg.Signature, msg.Hash); err != nil {
+		return fmt.Errorf("error verifying vote signature: %w", err)
 	}
 
 	msgVote := &MessageSignature{
-		From:      msg.NodeID,
+		From:      msg.From,
 		Signature: msg.Signature,
 	}
 
-	numSignatures, err := s.state.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
+	numSignatures, err := s.state.StateSyncStore.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
 	if err != nil {
 		return fmt.Errorf("error inserting message vote: %w", err)
 	}
@@ -193,16 +197,39 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 	s.logger.Info(
 		"deliver message",
 		"hash", hex.EncodeToString(msg.Hash),
-		"sender", msg.NodeID,
+		"sender", msg.From,
 		"signatures", numSignatures,
 	)
 
 	return nil
 }
 
+// Verifies signature of the message against the public key of the signer and checks if the signer is a validator
+func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types.Address, signature []byte,
+	hash []byte) error {
+	validator := valSet.Accounts().GetValidatorMetadata(signer)
+	if validator == nil {
+		return fmt.Errorf("unable to resolve validator %s", signer)
+	}
+
+	unmarshaledSignature, err := bls.UnmarshalSignature(signature)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal signature from signer %s, %w", signer.String(), err)
+	}
+
+	if !unmarshaledSignature.Verify(validator.BlsKey, hash, bls.DomainStateReceiver) {
+		return fmt.Errorf("incorrect signature from %s", signer)
+	}
+
+	return nil
+}
+
 // AddLog saves the received log from event tracker if it matches a state sync event ABI
 func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
-	if !stateTransferEventABI.Match(eventLog) {
+	event := &contractsapi.StateSyncedEvent{}
+
+	doesMatch, err := event.ParseLog(eventLog)
+	if !doesMatch {
 		return
 	}
 
@@ -213,15 +240,13 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 		"index", eventLog.LogIndex,
 	)
 
-	event := &contractsapi.StateSyncedEvent{}
-
-	if err := event.ParseLog(eventLog); err != nil {
+	if err != nil {
 		s.logger.Error("could not decode state sync event", "err", err)
 
 		return
 	}
 
-	if err := s.state.insertStateSyncEvent(event); err != nil {
+	if err := s.state.StateSyncStore.insertStateSyncEvent(event); err != nil {
 		s.logger.Error("could not save state sync event to boltDb", "err", err)
 
 		return
@@ -288,7 +313,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 	}
 
 	// get all the votes from the database for this commitment
-	votes, err := s.state.getMessageVotes(commitment.Epoch, commitmentHash.Bytes())
+	votes, err := s.state.StateSyncStore.getMessageVotes(commitment.Epoch, commitmentHash.Bytes())
 	if err != nil {
 		return Signature{}, nil, err
 	}
@@ -296,7 +321,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 	var signatures bls.Signatures
 
 	publicKeys := make([][]byte, 0)
-	bitmap := bitmap.Bitmap{}
+	bmap := bitmap.Bitmap{}
 	signers := make(map[types.Address]struct{}, 0)
 
 	for _, vote := range votes {
@@ -310,7 +335,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 			return Signature{}, nil, err
 		}
 
-		bitmap.Set(uint64(index))
+		bmap.Set(uint64(index))
 
 		signatures = append(signatures, signature)
 		publicKeys = append(publicKeys, validatorsMetadata[index].BlsKey.Marshal())
@@ -328,7 +353,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 
 	result := Signature{
 		AggregatedSignature: aggregatedSignature,
-		Bitmap:              bitmap,
+		Bitmap:              bmap,
 	}
 
 	return result, publicKeys, nil
@@ -371,7 +396,7 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 		return nil
 	}
 
-	if err := s.state.insertCommitmentMessage(commitment); err != nil {
+	if err := s.state.StateSyncStore.insertCommitmentMessage(commitment); err != nil {
 		return fmt.Errorf("insert commitment message error: %w", err)
 	}
 
@@ -391,7 +416,7 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 
 // GetStateSyncProof returns the proof for the state sync
 func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
-	stateSyncProof, err := s.state.getStateSyncProof(stateSyncID)
+	stateSyncProof, err := s.state.StateSyncStore.getStateSyncProof(stateSyncID)
 	if err != nil {
 		return types.Proof{}, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
 	}
@@ -400,7 +425,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 		// check if we might've missed a commitment. if it is so, we didn't build proofs for it while syncing
 		// if we are all synced up, commitment will be saved through PostBlock, but we wont have proofs,
 		// so we will build them now and save them to db so that we have proofs for missed commitment
-		commitment, err := s.state.getCommitmentForStateSync(stateSyncID)
+		commitment, err := s.state.StateSyncStore.getCommitmentForStateSync(stateSyncID)
 		if err != nil {
 			return types.Proof{}, fmt.Errorf("cannot find commitment for StateSync id %d: %w", stateSyncID, err)
 		}
@@ -409,7 +434,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 			return types.Proof{}, fmt.Errorf("cannot build proofs for commitment for StateSync id %d: %w", stateSyncID, err)
 		}
 
-		stateSyncProof, err = s.state.getStateSyncProof(stateSyncID)
+		stateSyncProof, err = s.state.StateSyncStore.getStateSyncProof(stateSyncID)
 		if err != nil {
 			return types.Proof{}, fmt.Errorf("cannot get state sync proof for StateSync id %d: %w", stateSyncID, err)
 		}
@@ -434,20 +459,28 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 		"toIndex", to,
 	)
 
-	events, err := s.state.getStateSyncEventsForCommitment(from, to)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(from, to)
 	if err != nil {
 		return fmt.Errorf("failed to get state sync events for commitment to build proofs. Error: %w", err)
 	}
 
 	tree, err := createMerkleTree(events)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not create merkle tree. error: %w", err)
 	}
 
 	stateSyncProofs := make([]*StateSyncProof, len(events))
 
 	for i, event := range events {
-		p := tree.GenerateProof(uint64(i), 0)
+		leaf, err := event.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("could not encode state sync event. error: %w", err)
+		}
+
+		p, err := tree.GenerateProof(leaf)
+		if err != nil {
+			return fmt.Errorf("error generating proof for event: %v. error: %w", event.ID, err)
+		}
 
 		stateSyncProofs[i] = &StateSyncProof{
 			Proof:     p,
@@ -461,7 +494,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 		"toIndex", to,
 	)
 
-	return s.state.insertStateSyncProofs(stateSyncProofs)
+	return s.state.StateSyncStore.insertStateSyncProofs(stateSyncProofs)
 }
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
@@ -472,7 +505,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	epoch := s.epoch
 	fromIndex := s.nextCommittedIndex
 
-	stateSyncEvents, err := s.state.getStateSyncEventsForCommitment(fromIndex,
+	stateSyncEvents, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(fromIndex,
 		fromIndex+s.config.maxCommitmentSize-1)
 	if err != nil && !errors.Is(err, errNotEnoughStateSyncs) {
 		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
@@ -501,7 +534,7 @@ func (s *stateSyncManager) buildCommitment() error {
 
 	hashBytes := hash.Bytes()
 
-	signature, err := s.config.key.Sign(hashBytes)
+	signature, err := s.config.key.SignWithDomain(hashBytes, bls.DomainStateReceiver)
 	if err != nil {
 		return fmt.Errorf("failed to sign commitment message. Error: %w", err)
 	}
@@ -511,7 +544,7 @@ func (s *stateSyncManager) buildCommitment() error {
 		Signature: signature,
 	}
 
-	if _, err = s.state.insertMessageVote(epoch, hashBytes, sig); err != nil {
+	if _, err = s.state.StateSyncStore.insertMessageVote(epoch, hashBytes, sig); err != nil {
 		return fmt.Errorf(
 			"failed to insert signature for hash=%v to the state. Error: %w",
 			hex.EncodeToString(hashBytes),
@@ -523,7 +556,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	s.multicast(&TransportMessage{
 		Hash:        hashBytes,
 		Signature:   signature,
-		NodeID:      s.config.key.String(),
+		From:        s.config.key.String(),
 		EpochNumber: epoch,
 	})
 

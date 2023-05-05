@@ -28,7 +28,6 @@ var PolyBFTMixDigest = types.StringToHash("adce6e5230abe012342a44e4e9b6d05997d6f
 // Extra defines the structure of the extra field for Istanbul
 type Extra struct {
 	Validators *ValidatorSetDelta
-	Seal       []byte
 	Parent     *Signature
 	Committed  *Signature
 	Checkpoint *CheckpointData
@@ -38,7 +37,7 @@ type Extra struct {
 func (i *Extra) MarshalRLPTo(dst []byte) []byte {
 	ar := &fastrlp.Arena{}
 
-	return i.MarshalRLPWith(ar).MarshalTo(dst)
+	return append(make([]byte, ExtraVanity), i.MarshalRLPWith(ar).MarshalTo(dst)...)
 }
 
 // MarshalRLPWith defines the marshal function implementation for Extra
@@ -52,21 +51,14 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(i.Validators.MarshalRLPWith(ar))
 	}
 
-	// Seal
-	if len(i.Seal) == 0 {
-		vv.Set(ar.NewNull())
-	} else {
-		vv.Set(ar.NewBytes(i.Seal))
-	}
-
-	// ParentSeal
+	// Parent Signatures
 	if i.Parent == nil {
 		vv.Set(ar.NewNullArray())
 	} else {
 		vv.Set(i.Parent.MarshalRLPWith(ar))
 	}
 
-	// CommittedSeal
+	// Committed Signatures
 	if i.Committed == nil {
 		vv.Set(ar.NewNullArray())
 	} else {
@@ -85,12 +77,12 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 // UnmarshalRLP defines the unmarshal function wrapper for Extra
 func (i *Extra) UnmarshalRLP(input []byte) error {
-	return fastrlp.UnmarshalRLP(input, i)
+	return fastrlp.UnmarshalRLP(input[ExtraVanity:], i)
 }
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
-	const expectedElements = 5
+	const expectedElements = 4
 
 	elems, err := v.GetElems()
 	if err != nil {
@@ -109,33 +101,26 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 		}
 	}
 
-	// Seal
-	if elems[1].Len() > 0 {
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return err
-		}
-	}
-
-	// Parent
-	if elems[2].Elems() > 0 {
+	// Parent Signatures
+	if elems[1].Elems() > 0 {
 		i.Parent = &Signature{}
-		if err := i.Parent.UnmarshalRLPWith(elems[2]); err != nil {
+		if err := i.Parent.UnmarshalRLPWith(elems[1]); err != nil {
 			return err
 		}
 	}
 
-	// Committed
-	if elems[3].Elems() > 0 {
+	// Committed Signatures
+	if elems[2].Elems() > 0 {
 		i.Committed = &Signature{}
-		if err := i.Committed.UnmarshalRLPWith(elems[3]); err != nil {
+		if err := i.Committed.UnmarshalRLPWith(elems[2]); err != nil {
 			return err
 		}
 	}
 
 	// Checkpoint
-	if elems[4].Elems() > 0 {
+	if elems[3].Elems() > 0 {
 		i.Checkpoint = &CheckpointData{}
-		if err := i.Checkpoint.UnmarshalRLPWith(elems[4]); err != nil {
+		if err := i.Checkpoint.UnmarshalRLPWith(elems[3]); err != nil {
 			return err
 		}
 	}
@@ -186,21 +171,6 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
-// ValidateDelta validates validator set delta provided in the Extra
-// with the one being calculated by the validator itself
-func (i *Extra) ValidateDelta(oldValidators AccountSet, newValidators AccountSet) error {
-	delta, err := createValidatorSetDelta(oldValidators, newValidators)
-	if err != nil {
-		return err
-	}
-
-	if !i.Validators.Equals(delta) {
-		return fmt.Errorf("validator set delta is invalid")
-	}
-
-	return nil
-}
-
 // ValidateParentSignatures validates signatures for parent block
 func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
 	parent *types.Header, parentExtra *Extra, chainID uint64, domain []byte, logger hclog.Logger) error {
@@ -234,55 +204,6 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 	}
 
 	return nil
-}
-
-// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	var addedValidators, updatedValidators AccountSet
-
-	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
-	removedValidators := map[types.Address]int{}
-
-	for i, validator := range oldValidatorSet {
-		if (validator.Address != types.Address{}) {
-			removedValidators[validator.Address] = i
-			oldValidatorSetMap[validator.Address] = validator
-		}
-	}
-
-	for _, newValidator := range newValidatorSet {
-		// Check if the validator is among both old and new validator set
-		oldValidator, validatorExists := oldValidatorSetMap[newValidator.Address]
-		if validatorExists {
-			if !oldValidator.EqualAddressAndBlsKey(newValidator) {
-				return nil, fmt.Errorf("validator '%s' found in both old and new validator set, but its BLS keys differ",
-					newValidator.Address.String())
-			}
-
-			// If it is, then discard it from removed validators...
-			delete(removedValidators, newValidator.Address)
-
-			if !oldValidator.Equals(newValidator) {
-				updatedValidators = append(updatedValidators, newValidator)
-			}
-		} else {
-			// ...otherwise it is added
-			addedValidators = append(addedValidators, newValidator)
-		}
-	}
-
-	removedValsBitmap := bitmap.Bitmap{}
-	for _, i := range removedValidators {
-		removedValsBitmap.Set(uint64(i))
-	}
-
-	delta := &ValidatorSetDelta{
-		Added:   addedValidators,
-		Updated: updatedValidators,
-		Removed: removedValsBitmap,
-	}
-
-	return delta, nil
 }
 
 // ValidatorSetDelta holds information about added and removed validators compared to the previous epoch
@@ -417,7 +338,7 @@ func (d *ValidatorSetDelta) Copy() *ValidatorSetDelta {
 
 // fmt.Stringer interface implementation
 func (d *ValidatorSetDelta) String() string {
-	return fmt.Sprintf("Added %v Removed %v Updated %v", d.Added, d.Removed, d.Updated)
+	return fmt.Sprintf("Added: \n%v Removed: %v\n Updated: \n%v", d.Added, d.Removed, d.Updated)
 }
 
 // Signature represents aggregated signatures of signers accompanied with a bitmap
@@ -487,7 +408,6 @@ func (s *Signature) Verify(validators AccountSet, hash types.Hash, domain []byte
 		blsPublicKeys[i] = validator.BlsKey
 	}
 
-	// TODO: refactor AggregatedSignature
 	aggs, err := bls.UnmarshalSignature(s.AggregatedSignature)
 	if err != nil {
 		return err
@@ -690,7 +610,6 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 		Parent:     extra.Parent,
 		Validators: extra.Validators,
 		Checkpoint: extra.Checkpoint,
-		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
 
@@ -698,15 +617,14 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 }
 
 // GetIbftExtra returns the istanbul extra data field from the passed in header
-func GetIbftExtra(extraB []byte) (*Extra, error) {
-	if len(extraB) < ExtraVanity {
-		return nil, fmt.Errorf("wrong extra size: %d", len(extraB))
+func GetIbftExtra(extraRaw []byte) (*Extra, error) {
+	if len(extraRaw) < ExtraVanity {
+		return nil, fmt.Errorf("wrong extra size: %d", len(extraRaw))
 	}
 
-	data := extraB[ExtraVanity:]
 	extra := &Extra{}
 
-	if err := extra.UnmarshalRLP(data); err != nil {
+	if err := extra.UnmarshalRLP(extraRaw); err != nil {
 		return nil, err
 	}
 

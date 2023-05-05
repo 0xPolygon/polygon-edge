@@ -109,10 +109,10 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (d *Dev) writeTransactions(baseFee, gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
-	d.txpool.Prepare()
+	d.txpool.Prepare(baseFee)
 
 	for {
 		tx := d.txpool.Peek()
@@ -120,7 +120,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			break
 		}
 
-		if tx.ExceedsBlockGasLimit(gasLimit) {
+		if tx.Gas > gasLimit {
 			d.txpool.Drop(tx)
 
 			continue
@@ -158,7 +158,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		ParentHash: parent.Hash,
 		Number:     num + 1,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-		Timestamp:  uint64(time.Now().Unix()),
+		Timestamp:  uint64(time.Now().UTC().Unix()),
 	}
 
 	// calculate gas limit based on parent header
@@ -167,7 +167,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
+	baseFee := d.blockchain.CalculateBaseFee(parent)
+
 	header.GasLimit = gasLimit
+	header.BaseFee = baseFee
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
@@ -180,7 +183,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	txns := d.writeTransactions(gasLimit, transition)
+	txns := d.writeTransactions(baseFee, gasLimit, transition)
 
 	// Commit the changes
 	_, root := transition.Commit()
@@ -245,4 +248,8 @@ func (d *Dev) Close() error {
 
 func (d *Dev) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
+}
+
+func (d *Dev) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
 }

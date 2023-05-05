@@ -7,7 +7,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/spf13/cobra"
@@ -17,7 +16,7 @@ func GetCommand() *cobra.Command {
 	genesisCmd := &cobra.Command{
 		Use:     "genesis",
 		Short:   "Generates the genesis configuration file with the passed in parameters",
-		PreRunE: runPreRun,
+		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
@@ -61,7 +60,7 @@ func setFlags(cmd *cobra.Command) {
 		premineFlag,
 		[]string{},
 		fmt.Sprintf(
-			"the premined accounts and balances (format: <address>:<balance>). Default premined balance: %s",
+			"the premined accounts and balances (format: <address>[:<balance>]). Default premined balance: %d",
 			command.DefaultPremineBalance,
 		),
 	)
@@ -71,6 +70,13 @@ func setFlags(cmd *cobra.Command) {
 		blockGasLimitFlag,
 		command.DefaultGenesisGasLimit,
 		"the maximum amount of gas used by all transactions in a block",
+	)
+
+	cmd.Flags().StringArrayVar(
+		&params.burnContracts,
+		burnContractFlag,
+		[]string{},
+		"the burn contract blocks and addresses (format: <block>:<address>)",
 	)
 
 	cmd.Flags().StringArrayVar(
@@ -151,18 +157,38 @@ func setFlags(cmd *cobra.Command) {
 	// PolyBFT
 	{
 		cmd.Flags().StringVar(
-			&params.manifestPath,
-			manifestPathFlag,
-			defaultManifestPath,
-			"the manifest file path, which contains genesis metadata",
+			&params.validatorsPath,
+			validatorsPathFlag,
+			"./",
+			"root path containing polybft validators secrets",
 		)
 
-		cmd.Flags().IntVar(
-			&params.validatorSetSize,
-			validatorSetSizeFlag,
-			defaultValidatorSetSize,
-			"the total number of validators",
+		cmd.Flags().StringVar(
+			&params.validatorsPrefixPath,
+			validatorsPrefixFlag,
+			defaultValidatorPrefixPath,
+			"folder prefix names for polybft validators secrets",
 		)
+
+		cmd.Flags().StringArrayVar(
+			&params.validators,
+			validatorsFlag,
+			[]string{},
+			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.stakes,
+			stakeFlag,
+			[]string{},
+			fmt.Sprintf(
+				"validators staked amount (format: <address>[:<amount>]). Default stake amount: %d",
+				command.DefaultStake,
+			),
+		)
+
+		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
+		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPrefixFlag)
 
 		cmd.Flags().Uint64Var(
 			&params.sprintSize,
@@ -178,20 +204,6 @@ func setFlags(cmd *cobra.Command) {
 			"the predefined period which determines block creation frequency",
 		)
 
-		cmd.Flags().StringVar(
-			&params.smartContractsRootPath,
-			smartContractsRootPathFlag,
-			contracts.ContractsRootFolder,
-			"the smart contracts folder",
-		)
-
-		cmd.Flags().StringVar(
-			&params.bridgeJSONRPCAddr,
-			bridgeFlag,
-			"",
-			"the rootchain JSON RPC IP address. If present, node is running in bridge mode.",
-		)
-
 		cmd.Flags().Uint64Var(
 			&params.epochReward,
 			epochRewardFlag,
@@ -199,7 +211,121 @@ func setFlags(cmd *cobra.Command) {
 			"reward size for block sealing",
 		)
 
-		cmd.Flags().Lookup(bridgeFlag).NoOptDefVal = "http://127.0.0.1:8545"
+		// regenesis flag that allows to start from non-empty database
+		cmd.Flags().StringVar(
+			&params.initialStateRoot,
+			trieRootFlag,
+			"",
+			"trie root from the corresponding triedb",
+		)
+
+		cmd.Flags().StringVar(
+			&params.nativeTokenConfigRaw,
+			nativeTokenConfigFlag,
+			"",
+			"configuration of native token in format <name:symbol:decimals count:mintable flag>",
+		)
+
+		cmd.Flags().StringVar(
+			&params.rewardTokenCode,
+			rewardTokenCodeFlag,
+			"",
+			"hex encoded reward token byte code",
+		)
+
+		cmd.Flags().StringVar(
+			&params.rewardWallet,
+			rewardWalletFlag,
+			"",
+			"configuration of reward wallet in format <address:amount>",
+		)
+	}
+
+	// Access Control Lists
+	{
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListAdmin,
+			contractDeployerAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the contract deployer allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerAllowListEnabled,
+			contractDeployerAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the contract deployer allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerBlockListAdmin,
+			contractDeployerBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the contract deployer block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.contractDeployerBlockListEnabled,
+			contractDeployerBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the contract deployer block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsAllowListAdmin,
+			transactionsAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the transactions allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsAllowListEnabled,
+			transactionsAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the transactions allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsBlockListAdmin,
+			transactionsBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the transactions block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.transactionsBlockListEnabled,
+			transactionsBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the transactions block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeAllowListAdmin,
+			bridgeAllowListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the bridge allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeAllowListEnabled,
+			bridgeAllowListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the bridge allow list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeBlockListAdmin,
+			bridgeBlockListAdminFlag,
+			[]string{},
+			"list of addresses to use as admin accounts in the bridge block list",
+		)
+
+		cmd.Flags().StringArrayVar(
+			&params.bridgeBlockListEnabled,
+			bridgeBlockListEnabledFlag,
+			[]string{},
+			"list of addresses to enable by default in the bridge block list",
+		)
 	}
 }
 
@@ -217,7 +343,7 @@ func setLegacyFlags(cmd *cobra.Command) {
 	_ = cmd.Flags().MarkHidden(chainIDFlagLEGACY)
 }
 
-func runPreRun(cmd *cobra.Command, _ []string) error {
+func preRunCommand(cmd *cobra.Command, _ []string) error {
 	if err := params.validateFlags(); err != nil {
 		return err
 	}
@@ -234,7 +360,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var err error
 
 	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftChainConfig()
+		err = params.generatePolyBftChainConfig(outputter)
 	} else {
 		err = params.generateGenesis()
 	}

@@ -36,5 +36,10 @@ func InitializeOutputter(cmd *cobra.Command) OutputFormatter {
 }
 
 func shouldOutputJSON(baseCmd *cobra.Command) bool {
-	return baseCmd.Flag(JSONOutputFlag).Changed
+	jsonOutputFlag := baseCmd.Flag(JSONOutputFlag)
+	if jsonOutputFlag == nil {
+		return false
+	}
+
+	return jsonOutputFlag.Changed
 }

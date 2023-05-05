@@ -279,9 +279,14 @@ func newTestTransition(
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
+		BurnContract: map[uint64]string{
+			0: types.ZeroAddress.String(),
+		},
 	}, st, hclog.NewNullLogger())
 
-	rootHash := ex.WriteGenesis(nil)
+	rootHash, err := ex.WriteGenesis(nil, types.Hash{})
+	assert.NoError(t, err)
+
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
 		return func(i uint64) types.Hash {
 			return rootHash

@@ -10,6 +10,7 @@ import (
 
 	manet "github.com/multiformats/go-multiaddr/net"
 
+	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/grpc"
@@ -44,6 +45,11 @@ func interceptor(
 	_ *grpc.UnaryServerInfo,
 	handler grpc.UnaryHandler,
 ) (interface{}, error) {
+	// Validate request
+	if err := validate.ValidateRequest(req); err != nil {
+		return nil, err
+	}
+
 	// Grab the peer info from the connection
 	contextPeer, ok := grpcPeer.FromContext(ctx)
 	if !ok {
@@ -68,7 +74,7 @@ func interceptor(
 	)
 }
 
-func (g *GrpcStream) Client(stream network.Stream) *grpc.ClientConn {
+func (g *GrpcStream) Client(stream network.Stream) (*grpc.ClientConn, error) {
 	return WrapClient(stream)
 }
 
@@ -118,18 +124,12 @@ func (g *GrpcStream) Close() error {
 
 // --- conn ---
 
-func WrapClient(s network.Stream) *grpc.ClientConn {
+func WrapClient(s network.Stream) (*grpc.ClientConn, error) {
 	opts := grpc.WithContextDialer(func(ctx context.Context, peerIdStr string) (net.Conn, error) {
 		return &streamConn{s}, nil
 	})
-	conn, err := grpc.Dial("", grpc.WithTransportCredentials(insecure.NewCredentials()), opts)
 
-	if err != nil {
-		// TODO: this should not fail at all
-		panic(err)
-	}
-
-	return conn
+	return grpc.Dial("", grpc.WithTransportCredentials(insecure.NewCredentials()), opts)
 }
 
 // streamConn represents a net.Conn wrapped to be compatible with net.conn

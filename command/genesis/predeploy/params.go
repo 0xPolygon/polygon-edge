@@ -101,10 +101,15 @@ func isReservedAddress(address types.Address) bool {
 }
 
 func (p *predeployParams) verifyMinAddress() error {
-	var (
-		address    = hex.DecodeHexToBig(p.address.String())
-		addressMin = hex.DecodeHexToBig(predeployAddressMin.String())
-	)
+	address, err := hex.DecodeHexToBig(p.address.String())
+	if err != nil {
+		return err
+	}
+
+	addressMin, err := hex.DecodeHexToBig(predeployAddressMin.String())
+	if err != nil {
+		return err
+	}
 
 	if address.Cmp(addressMin) < 0 {
 		return errInvalidAddress

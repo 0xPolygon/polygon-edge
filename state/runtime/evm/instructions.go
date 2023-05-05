@@ -1145,7 +1145,7 @@ func opCall(op OpCode) instruction {
 			callType = runtime.StaticCall
 
 		default:
-			panic("not expected")
+			panic("not expected") //nolint:gocritic
 		}
 
 		contract, offset, size, err := c.buildCallContract(op)
@@ -1333,7 +1333,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 		return nil, nil
 	}
 
-	// Consume memory resize gas (TODO, change with get2)
+	// Consume memory resize gas (TODO, change with get2) (to be fixed in EVM-528) //nolint:godox
 	if !c.consumeGas(gasCost) {
 		return nil, nil
 	}

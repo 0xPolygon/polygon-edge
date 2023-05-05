@@ -33,12 +33,13 @@ const (
 	blockGasTargetFlag           = "block-gas-target"
 	secretsConfigFlag            = "secrets-config"
 	restoreFlag                  = "restore"
-	blockTimeFlag                = "block-time"
 	devIntervalFlag              = "dev-interval"
 	devFlag                      = "dev"
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
-	relayerFlag                  = "relayer"
+
+	relayerFlag               = "relayer"
+	numBlockConfirmationsFlag = "num-block-confirmations"
 )
 
 // Flags that are deprecated, but need to be preserved for
@@ -177,10 +178,11 @@ func (p *serverParams) generateConfig() *server.Config {
 		MaxAccountEnqueued: p.rawConfig.TxPool.MaxAccountEnqueued,
 		SecretsManager:     p.secretsConfig,
 		RestoreFile:        p.getRestoreFilePath(),
-		BlockTime:          p.rawConfig.BlockTime,
 		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
 		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,
-		Relayer:            p.relayer,
+
+		Relayer:               p.relayer,
+		NumBlockConfirmations: p.rawConfig.NumBlockConfirmations,
 	}
 }

@@ -70,7 +70,8 @@ func (e *blake2f) run(input []byte, _ types.Address, _ runtime.Host) ([]byte, er
 	return res, nil
 }
 
-// TODO: Move this to own repo and include the assembly code from the Go repo
+//nolint:godox
+// TODO: Move this to own repo and include the assembly code from the Go repo (to be fixed in EVM-527)
 // Copied from keep-network/blake2f
 
 // IV is an initialization vector for BLAKE2b

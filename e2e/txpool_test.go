@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/umbracle/ethgo"
 
@@ -23,7 +26,7 @@ import (
 
 var (
 	oneEth = framework.EthToWei(1)
-	signer = crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer = crypto.NewSigner(chain.AllForksEnabled.At(0), 100)
 )
 
 type generateTxReqParams struct {
@@ -32,24 +35,33 @@ type generateTxReqParams struct {
 	referenceKey  *ecdsa.PrivateKey
 	toAddress     types.Address
 	gasPrice      *big.Int
+	gasFeeCap     *big.Int
+	gasTipCap     *big.Int
 	value         *big.Int
 	t             *testing.T
 }
 
 func generateTx(params generateTxReqParams) *types.Transaction {
-	signedTx, signErr := signer.SignTx(&types.Transaction{
-		Nonce:    params.nonce,
-		From:     params.referenceAddr,
-		To:       &params.toAddress,
-		GasPrice: params.gasPrice,
-		Gas:      1000000,
-		Value:    params.value,
-		V:        big.NewInt(27), // it is necessary to encode in rlp
-	}, params.referenceKey)
-
-	if signErr != nil {
-		params.t.Fatalf("Unable to sign transaction, %v", signErr)
+	unsignedTx := &types.Transaction{
+		Nonce: params.nonce,
+		From:  params.referenceAddr,
+		To:    &params.toAddress,
+		Gas:   1000000,
+		Value: params.value,
+		V:     big.NewInt(27), // it is necessary to encode in rlp
 	}
+
+	if params.gasPrice != nil {
+		unsignedTx.Type = types.LegacyTx
+		unsignedTx.GasPrice = params.gasPrice
+	} else {
+		unsignedTx.Type = types.DynamicFeeTx
+		unsignedTx.GasFeeCap = params.gasFeeCap
+		unsignedTx.GasTipCap = params.gasTipCap
+	}
+
+	signedTx, err := signer.SignTx(unsignedTx, params.referenceKey)
+	require.NoError(params.t, err, "Unable to sign transaction")
 
 	return signedTx
 }
@@ -67,33 +79,64 @@ func generateReq(params generateTxReqParams) *txpoolOp.AddTxnReq {
 
 func TestTxPool_ErrorCodes(t *testing.T) {
 	gasPrice := big.NewInt(10000)
+	gasFeeCap := big.NewInt(1000000000)
+	gasTipCap := big.NewInt(100000000)
 	devInterval := 5
 
 	testTable := []struct {
 		name           string
 		defaultBalance *big.Int
 		txValue        *big.Int
+		gasPrice       *big.Int
+		gasFeeCap      *big.Int
+		gasTipCap      *big.Int
 		expectedError  error
 	}{
 		{
 			// Test scenario:
-			// Add tx with nonce 0
+			// Add legacy tx with nonce 0
 			// -> Check if tx has been parsed
 			// Add tx with nonce 0
 			// -> tx shouldn't be added, since the nonce is too low
-			"ErrNonceTooLow",
-			framework.EthToWei(10),
-			oneEth,
-			txpool.ErrNonceTooLow,
+			name:           "ErrNonceTooLow - legacy",
+			defaultBalance: framework.EthToWei(10),
+			txValue:        oneEth,
+			gasPrice:       gasPrice,
+			expectedError:  txpool.ErrNonceTooLow,
 		},
 		{
 			// Test scenario:
-			// Add tx with insufficient funds
+			// Add dynamic fee tx with nonce 0
+			// -> Check if tx has been parsed
+			// Add tx with nonce 0
+			// -> tx shouldn't be added, since the nonce is too low
+			name:           "ErrNonceTooLow - dynamic fees",
+			defaultBalance: framework.EthToWei(10),
+			txValue:        oneEth,
+			gasFeeCap:      gasFeeCap,
+			gasTipCap:      gasTipCap,
+			expectedError:  txpool.ErrNonceTooLow,
+		},
+		{
+			// Test scenario:
+			// Add legacy tx with insufficient funds
 			// -> Tx should be discarded because of low funds
-			"ErrInsufficientFunds",
-			framework.EthToWei(1),
-			framework.EthToWei(5),
-			txpool.ErrInsufficientFunds,
+			name:           "ErrInsufficientFunds - legacy",
+			defaultBalance: framework.EthToWei(1),
+			txValue:        framework.EthToWei(5),
+			gasPrice:       gasPrice,
+			expectedError:  txpool.ErrInsufficientFunds,
+		},
+		{
+			// Test scenario:
+			// Add dynamic fee tx with insufficient funds
+			// -> Tx should be discarded because of low funds
+			name:           "ErrInsufficientFunds - dynamic fee",
+			defaultBalance: framework.EthToWei(1),
+			txValue:        framework.EthToWei(5),
+			gasFeeCap:      gasFeeCap,
+			gasTipCap:      gasTipCap,
+			expectedError:  txpool.ErrInsufficientFunds,
 		},
 	}
 
@@ -119,7 +162,9 @@ func TestTxPool_ErrorCodes(t *testing.T) {
 				referenceAddr: referenceAddr,
 				referenceKey:  referenceKey,
 				toAddress:     toAddress,
-				gasPrice:      gasPrice,
+				gasPrice:      testCase.gasPrice,
+				gasFeeCap:     testCase.gasFeeCap,
+				gasTipCap:     testCase.gasTipCap,
 				value:         testCase.txValue,
 				t:             t,
 			})
@@ -188,7 +233,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	client := srv.JSONRPC()
 
 	// Required default values
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	signer := crypto.NewEIP155Signer(100, true)
 
 	// TxPool client
 	clt := srv.TxnPoolOperator()
@@ -340,7 +385,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	// 1. Send a first valid transaction with gasLimit = block gas limit - 1
 	//
 	// 2. Send a second transaction with gasLimit = block gas limit / 2. Since there is not enough gas remaining,
-	// the transaction will be pushed back to the pending queue so that is can be executed in the next block.
+	// the transaction will be pushed back to the pending queue so that can be executed in the next block.
 	//
 	// 3. Send a third - valid - transaction, both the previous one and this one should be executed.
 	//
@@ -367,13 +412,15 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			From:     senderAddress,
 		},
 		{
-			Nonce:    2,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
-			Gas:      22000,
-			To:       &receiverAddress,
-			Value:    oneEth,
-			V:        big.NewInt(27),
-			From:     senderAddress,
+			Type:      types.DynamicFeeTx,
+			Nonce:     2,
+			GasFeeCap: big.NewInt(10000000000),
+			GasTipCap: big.NewInt(1000000000),
+			Gas:       22000,
+			To:        &receiverAddress,
+			Value:     oneEth,
+			V:         big.NewInt(27),
+			From:      senderAddress,
 		},
 	}
 

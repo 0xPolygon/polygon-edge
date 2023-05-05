@@ -109,6 +109,10 @@ type StateObject struct {
 	Deleted   bool
 	DirtyCode bool
 	Txn       *iradix.Txn
+
+	// withFakeStorage signals whether the state object
+	// is using the override full state
+	withFakeStorage bool
 }
 
 func (s *StateObject) Empty() bool {
@@ -126,6 +130,7 @@ func (s *StateObject) Copy() *StateObject {
 	ss.Deleted = s.Deleted
 	ss.DirtyCode = s.DirtyCode
 	ss.Code = s.Code
+	ss.withFakeStorage = s.withFakeStorage
 
 	if s.Txn != nil {
 		ss.Txn = s.Txn.CommitOnly().Txn()
@@ -143,7 +148,8 @@ type Object struct {
 	Nonce    uint64
 	Deleted  bool
 
-	// TODO: Move this to executor
+	//nolint:godox
+	// TODO: Move this to executor (to be fixed in EVM-527)
 	DirtyCode bool
 	Code      []byte
 

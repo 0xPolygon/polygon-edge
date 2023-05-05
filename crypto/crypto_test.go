@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKeyEncoding(t *testing.T) {
@@ -404,7 +405,7 @@ func TestPrivateKeyRead(t *testing.T) {
 }
 
 func TestPrivateKeyGeneration(t *testing.T) {
-	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().Unix(), 10) + ".key"
+	tempFile := "./privateKeyTesting-" + strconv.FormatInt(time.Now().UTC().Unix(), 10) + ".key"
 
 	t.Cleanup(func() {
 		_ = os.Remove(tempFile)
@@ -434,4 +435,48 @@ func TestPrivateKeyGeneration(t *testing.T) {
 
 	assert.True(t, writtenKey.Equal(readKey))
 	assert.Equal(t, writtenAddress.String(), readAddress.String())
+}
+
+func TestRecoverPublicKey(t *testing.T) {
+	t.Parallel()
+
+	testSignature := []byte{1, 2, 3}
+
+	t.Run("Empty hash", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := RecoverPubkey(testSignature, []byte{})
+		require.ErrorIs(t, err, errHashOfInvalidLength)
+	})
+
+	t.Run("Hash of non appropriate length", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := RecoverPubkey(testSignature, []byte{0, 1})
+		require.ErrorIs(t, err, errHashOfInvalidLength)
+	})
+
+	t.Run("Zero hash", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := RecoverPubkey(testSignature, types.ZeroHash[:])
+		require.ErrorIs(t, err, errZeroHash)
+	})
+
+	t.Run("Ok signature and hash", func(t *testing.T) {
+		t.Parallel()
+
+		hash := types.BytesToHash([]byte{0, 1, 2})
+
+		privateKey, err := GenerateECDSAKey()
+		require.NoError(t, err)
+
+		signature, err := Sign(privateKey, hash.Bytes())
+		require.NoError(t, err)
+
+		publicKey, err := RecoverPubkey(signature, hash.Bytes())
+		require.NoError(t, err)
+
+		require.True(t, privateKey.PublicKey.Equal(publicKey))
+	})
 }

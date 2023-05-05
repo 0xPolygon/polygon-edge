@@ -1,14 +1,11 @@
 package polybft
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"sort"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
@@ -19,20 +16,19 @@ import (
 type ValidatorInfo struct {
 	Address             ethgo.Address
 	Stake               *big.Int
-	TotalStake          *big.Int
-	Commission          *big.Int
 	WithdrawableRewards *big.Int
-	Active              bool
+	IsActive            bool
+	IsWhitelisted       bool
 }
 
 // SystemState is an interface to interact with the consensus system contracts in the chain
 type SystemState interface {
-	// GetValidatorSet retrieves current validator set from the smart contract
-	GetValidatorSet() (AccountSet, error)
 	// GetEpoch retrieves current epoch number from the smart contract
 	GetEpoch() (uint64, error)
 	// GetNextCommittedIndex retrieves next committed bridge state sync index
 	GetNextCommittedIndex() (uint64, error)
+	// GetStakeOnValidatorSet retrieves stake of given validator on ValidatorSet contract
+	GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error)
 }
 
 var _ SystemState = &SystemStateImpl{}
@@ -44,14 +40,14 @@ type SystemStateImpl struct {
 }
 
 // NewSystemState initializes new instance of systemState which abstracts smart contracts functions
-func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemStateImpl {
+func NewSystemState(valSetAddr types.Address, stateRcvAddr types.Address, provider contract.Provider) *SystemStateImpl {
 	s := &SystemStateImpl{}
 	s.validatorContract = contract.NewContract(
-		ethgo.Address(config.ValidatorSetAddr),
-		contractsapi.ChildValidatorSet.Abi, contract.WithProvider(provider),
+		ethgo.Address(valSetAddr),
+		contractsapi.ValidatorSet.Abi, contract.WithProvider(provider),
 	)
 	s.sidechainBridgeContract = contract.NewContract(
-		ethgo.Address(config.StateReceiverAddr),
+		ethgo.Address(stateRcvAddr),
 		contractsapi.StateReceiver.Abi,
 		contract.WithProvider(provider),
 	)
@@ -59,59 +55,19 @@ func NewSystemState(config *PolyBFTConfig, provider contract.Provider) *SystemSt
 	return s
 }
 
-// GetValidatorSet retrieves current validator set from the smart contract
-func (s *SystemStateImpl) GetValidatorSet() (AccountSet, error) {
-	output, err := s.validatorContract.Call("getCurrentValidatorSet", ethgo.Latest)
+// GetStakeOnValidatorSet retrieves stake of given validator on ValidatorSet contract
+func (s *SystemStateImpl) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
+	rawResult, err := s.validatorContract.Call("balanceOf", ethgo.Latest, validatorAddr)
 	if err != nil {
 		return nil, err
 	}
 
-	res := AccountSet{}
-
-	addresses, isOk := output["0"].([]ethgo.Address)
+	balance, isOk := rawResult["0"].(*big.Int)
 	if !isOk {
-		return nil, fmt.Errorf("failed to decode addresses of the current validator set")
+		return nil, fmt.Errorf("failed to decode balance")
 	}
 
-	queryValidator := func(addr ethgo.Address) (*ValidatorMetadata, error) {
-		output, err := s.validatorContract.Call("getValidator", ethgo.Latest, addr)
-		if err != nil {
-			return nil, fmt.Errorf("failed to call getValidator function: %w", err)
-		}
-
-		pubKey, err := bls.UnmarshalPublicKeyFromBigInt(output["blsKey"].([4]*big.Int))
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal BLS public key: %w", err)
-		}
-
-		totalStake, ok := output["totalStake"].(*big.Int)
-		if !ok {
-			return nil, fmt.Errorf("failed to decode total stake")
-		}
-
-		return &ValidatorMetadata{
-			Address:     types.Address(addr),
-			BlsKey:      pubKey,
-			VotingPower: new(big.Int).Set(totalStake),
-		}, nil
-	}
-
-	for _, index := range addresses {
-		val, err := queryValidator(index)
-		if err != nil {
-			return nil, err
-		}
-
-		res = append(res, val)
-	}
-
-	// It is important to keep validator ordered by addresses, because of internal storage on SC
-	// which changes original ordering of sent validators
-	sort.Slice(res, func(i, j int) bool {
-		return bytes.Compare(res[i].Address[:], res[j].Address[:]) < 0
-	})
-
-	return res, nil
+	return balance, nil
 }
 
 // GetEpoch retrieves current epoch number from the smart contract
@@ -122,6 +78,7 @@ func (s *SystemStateImpl) GetEpoch() (uint64, error) {
 	}
 
 	epochNumber, isOk := rawResult["0"].(*big.Int)
+
 	if !isOk {
 		return 0, fmt.Errorf("failed to decode epoch")
 	}

@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"sort"
 	"strconv"
+	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -49,6 +50,12 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block, callback func(*state.Transition) error) (*types.FullBlock, error) {
 	args := m.Called(parent, block, callback)
 
+	if callback != nil {
+		if err := callback(nil); err != nil {
+			return nil, err
+		}
+	}
+
 	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
 }
 
@@ -86,7 +93,7 @@ func (m *blockchainMock) GetHeaderByNumber(number uint64) (*types.Header, bool) 
 		return args.Get(0).(*types.Header), args.Get(1).(bool) //nolint:forcetypeassert
 	}
 
-	panic("Unsupported mock for GetHeaderByNumber")
+	panic("Unsupported mock for GetHeaderByNumber") //nolint:gocritic
 }
 
 func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) {
@@ -104,11 +111,11 @@ func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 		return h, h != nil
 	}
 
-	panic("Unsupported mock for GetHeaderByHash")
+	panic("Unsupported mock for GetHeaderByHash") //nolint:gocritic
 }
 
-func (m *blockchainMock) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
-	args := m.Called(config, provider)
+func (m *blockchainMock) GetSystemState(provider contract.Provider) SystemState {
+	args := m.Called(provider)
 
 	return args.Get(0).(SystemState) //nolint:forcetypeassert
 }
@@ -144,7 +151,7 @@ func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.
 		return accountSet, args.Error(1)
 	}
 
-	panic("polybftBackendMock.GetValidators doesn't support such combination of arguments")
+	panic("polybftBackendMock.GetValidators doesn't support such combination of arguments") //nolint:gocritic
 }
 
 var _ blockBuilder = (*blockBuilderMock)(nil)
@@ -203,19 +210,10 @@ type systemStateMock struct {
 	mock.Mock
 }
 
-func (m *systemStateMock) GetValidatorSet() (AccountSet, error) {
+func (m *systemStateMock) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
 	args := m.Called()
-	if len(args) == 1 {
-		accountSet, _ := args.Get(0).(AccountSet)
 
-		return accountSet, nil
-	} else if len(args) == 2 {
-		accountSet, _ := args.Get(0).(AccountSet)
-
-		return accountSet, args.Error(1)
-	}
-
-	panic("systemStateMock.GetValidatorSet doesn't support such combination of arguments")
+	return args.Get(0).(*big.Int), args.Error(1) //nolint:forcetypeassert
 }
 
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {
@@ -281,16 +279,20 @@ type testValidators struct {
 	validators map[string]*testValidator
 }
 
-func newTestValidators(validatorsCount int) *testValidators {
+func newTestValidators(t *testing.T, validatorsCount int) *testValidators {
+	t.Helper()
+
 	aliases := make([]string, validatorsCount)
 	for i := 0; i < validatorsCount; i++ {
 		aliases[i] = strconv.Itoa(i)
 	}
 
-	return newTestValidatorsWithAliases(aliases)
+	return newTestValidatorsWithAliases(t, aliases)
 }
 
-func newTestValidatorsWithAliases(aliases []string, votingPowers ...[]uint64) *testValidators {
+func newTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers ...[]uint64) *testValidators {
+	t.Helper()
+
 	validators := map[string]*testValidator{}
 
 	for i, alias := range aliases {
@@ -299,15 +301,17 @@ func newTestValidatorsWithAliases(aliases []string, votingPowers ...[]uint64) *t
 			votingPower = votingPowers[0][i]
 		}
 
-		validators[alias] = newTestValidator(alias, votingPower)
+		validators[alias] = newTestValidator(t, alias, votingPower)
 	}
 
 	return &testValidators{validators: validators}
 }
 
-func (v *testValidators) create(alias string, votingPower uint64) {
+func (v *testValidators) create(t *testing.T, alias string, votingPower uint64) {
+	t.Helper()
+
 	if _, ok := v.validators[alias]; !ok {
-		v.validators[alias] = newTestValidator(alias, votingPower)
+		v.validators[alias] = newTestValidator(t, alias, votingPower)
 	}
 }
 
@@ -361,7 +365,7 @@ func (v *testValidators) getPrivateIdentities(aliases ...string) (res []*wallet.
 func (v *testValidators) getValidator(alias string) *testValidator {
 	vv, ok := v.validators[alias]
 	if !ok {
-		panic(fmt.Sprintf("BUG: validator %s does not exist", alias))
+		panic(fmt.Sprintf("Validator %s does not exist", alias)) //nolint:gocritic
 	}
 
 	return vv
@@ -394,11 +398,13 @@ type testValidator struct {
 	votingPower uint64
 }
 
-func newTestValidator(alias string, votingPower uint64) *testValidator {
+func newTestValidator(t *testing.T, alias string, votingPower uint64) *testValidator {
+	t.Helper()
+
 	return &testValidator{
 		alias:       alias,
 		votingPower: votingPower,
-		account:     wallet.GenerateAccount(),
+		account:     generateTestAccount(t),
 	}
 }
 
@@ -407,7 +413,7 @@ func (v *testValidator) Address() types.Address {
 }
 
 func (v *testValidator) Key() *wallet.Key {
-	return wallet.NewKey(v.account, bls.DomainCheckpointManager)
+	return wallet.NewKey(v.account)
 }
 
 func (v *testValidator) paramsValidator() *Validator {
@@ -417,6 +423,7 @@ func (v *testValidator) paramsValidator() *Validator {
 		Address: v.Address(),
 		BlsKey:  hex.EncodeToString(bls),
 		Balance: big.NewInt(1000),
+		Stake:   big.NewInt(1000),
 	}
 }
 
@@ -428,10 +435,10 @@ func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
 	}
 }
 
-func (v *testValidator) mustSign(hash []byte) *bls.Signature {
-	signature, err := v.account.Bls.Sign(hash, bls.DomainCheckpointManager)
+func (v *testValidator) mustSign(hash, domain []byte) *bls.Signature {
+	signature, err := v.account.Bls.Sign(hash, domain)
 	if err != nil {
-		panic(fmt.Sprintf("BUG: failed to sign: %v", err))
+		panic(fmt.Sprintf("BUG: failed to sign: %v", err)) //nolint:gocritic
 	}
 
 	return signature
@@ -478,8 +485,8 @@ type txPoolMock struct {
 	mock.Mock
 }
 
-func (tp *txPoolMock) Prepare() {
-	tp.Called()
+func (tp *txPoolMock) Prepare(baseFee uint64) {
+	tp.Called(baseFee)
 }
 
 func (tp *txPoolMock) Length() uint64 {

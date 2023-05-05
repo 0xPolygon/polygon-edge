@@ -562,35 +562,41 @@ func TestTraceCall(t *testing.T) {
 	t.Parallel()
 
 	var (
-		from     = types.StringToAddress("1")
-		to       = types.StringToAddress("2")
-		gas      = argUint64(10000)
-		gasPrice = argBytes(new(big.Int).SetUint64(10).Bytes())
-		value    = argBytes(new(big.Int).SetUint64(1000).Bytes())
-		data     = argBytes([]byte("data"))
-		input    = argBytes([]byte("input"))
-		nonce    = argUint64(1)
+		from      = types.StringToAddress("1")
+		to        = types.StringToAddress("2")
+		gas       = argUint64(10000)
+		gasPrice  = argBytes(new(big.Int).SetUint64(10).Bytes())
+		gasTipCap = argBytes(new(big.Int).SetUint64(10).Bytes())
+		gasFeeCap = argBytes(new(big.Int).SetUint64(10).Bytes())
+		value     = argBytes(new(big.Int).SetUint64(1000).Bytes())
+		data      = argBytes([]byte("data"))
+		input     = argBytes([]byte("input"))
+		nonce     = argUint64(1)
 
 		blockNumber = BlockNumber(testBlock10.Number())
 
 		txArg = &txnArgs{
-			From:     &from,
-			To:       &to,
-			Gas:      &gas,
-			GasPrice: &gasPrice,
-			Value:    &value,
-			Data:     &data,
-			Input:    &input,
-			Nonce:    &nonce,
+			From:      &from,
+			To:        &to,
+			Gas:       &gas,
+			GasPrice:  &gasPrice,
+			GasTipCap: &gasTipCap,
+			GasFeeCap: &gasFeeCap,
+			Value:     &value,
+			Data:      &data,
+			Input:     &input,
+			Nonce:     &nonce,
 		}
 		decodedTx = &types.Transaction{
-			Nonce:    uint64(nonce),
-			GasPrice: new(big.Int).SetBytes([]byte(gasPrice)),
-			Gas:      uint64(gas),
-			To:       &to,
-			Value:    new(big.Int).SetBytes([]byte(value)),
-			Input:    data,
-			From:     from,
+			Nonce:     uint64(nonce),
+			GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
+			GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
+			GasFeeCap: new(big.Int).SetBytes([]byte(gasFeeCap)),
+			Gas:       uint64(gas),
+			To:        &to,
+			Value:     new(big.Int).SetBytes([]byte(value)),
+			Input:     data,
+			From:      from,
 		}
 	)
 

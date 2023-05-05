@@ -70,7 +70,7 @@ func (txn *Txn) Snapshot() int {
 // RevertToSnapshot reverts to a given snapshot
 func (txn *Txn) RevertToSnapshot(id int) {
 	if id > len(txn.snapshots) {
-		panic("")
+		panic("") //nolint:gocritic
 	}
 
 	tree := txn.snapshots[id]
@@ -189,6 +189,7 @@ func (txn *Txn) GetBalance(addr types.Address) *big.Int {
 	return object.Account.Balance
 }
 
+// EmitLog appends log to logs tree storage
 func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	log := &types.Log{
 		Address: addr,
@@ -209,25 +210,9 @@ func (txn *Txn) EmitLog(addr types.Address, topics []types.Hash, data []byte) {
 	txn.txn.Insert(logIndex, logs)
 }
 
-// AddLog adds a new log
-func (txn *Txn) AddLog(log *types.Log) {
-	var logs []*types.Log
-
-	data, exists := txn.txn.Get(logIndex)
-	if !exists {
-		logs = []*types.Log{}
-	} else {
-		logs = data.([]*types.Log) //nolint:forcetypeassert
-	}
-
-	logs = append(logs, log)
-	txn.txn.Insert(logIndex, logs)
-}
-
 // State
 
-var zeroHash types.Hash
-
+// SetStorage sets the storage of an address
 func (txn *Txn) SetStorage(
 	addr types.Address,
 	key types.Hash,
@@ -247,9 +232,9 @@ func (txn *Txn) SetStorage(
 	legacyGasMetering := !config.Istanbul && (config.Petersburg || !config.Constantinople)
 
 	if legacyGasMetering {
-		if oldValue == zeroHash {
+		if oldValue == types.ZeroHash {
 			return runtime.StorageAdded
-		} else if value == zeroHash {
+		} else if value == types.ZeroHash {
 			txn.AddRefund(15000)
 
 			return runtime.StorageDeleted
@@ -259,11 +244,11 @@ func (txn *Txn) SetStorage(
 	}
 
 	if original == current {
-		if original == zeroHash { // create slot (2.1.1)
+		if original == types.ZeroHash { // create slot (2.1.1)
 			return runtime.StorageAdded
 		}
 
-		if value == zeroHash { // delete slot (2.1.2b)
+		if value == types.ZeroHash { // delete slot (2.1.2b)
 			txn.AddRefund(15000)
 
 			return runtime.StorageDeleted
@@ -272,16 +257,16 @@ func (txn *Txn) SetStorage(
 		return runtime.StorageModified
 	}
 
-	if original != zeroHash { // Storage slot was populated before this transaction started
-		if current == zeroHash { // recreate slot (2.2.1.1)
+	if original != types.ZeroHash { // Storage slot was populated before this transaction started
+		if current == types.ZeroHash { // recreate slot (2.2.1.1)
 			txn.SubRefund(15000)
-		} else if value == zeroHash { // delete slot (2.2.1.2)
+		} else if value == types.ZeroHash { // delete slot (2.2.1.2)
 			txn.AddRefund(15000)
 		}
 	}
 
 	if original == value {
-		if original == zeroHash { // reset to original nonexistent slot (2.2.2.1)
+		if original == types.ZeroHash { // reset to original nonexistent slot (2.2.2.1)
 			// Storage was used as memory (allocation and deallocation occurred within the same contract)
 			if config.Istanbul {
 				txn.AddRefund(19200)
@@ -311,7 +296,7 @@ func (txn *Txn) SetState(
 			object.Txn = iradix.New().Txn()
 		}
 
-		if value == zeroHash {
+		if value == types.ZeroHash {
 			object.Txn.Insert(key.Bytes(), nil)
 		} else {
 			object.Txn.Insert(key.Bytes(), value.Bytes())
@@ -337,6 +322,10 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 			//nolint:forcetypeassert
 			return types.BytesToHash(val.([]byte))
 		}
+	}
+
+	if object.withFakeStorage {
+		return types.Hash{}
 	}
 
 	return txn.snapshot.GetStorage(addr, object.Account.Root, key)
@@ -379,6 +368,7 @@ func (txn *Txn) SetCode(addr types.Address, code []byte) {
 	})
 }
 
+// GetCode gets the code on a given address
 func (txn *Txn) GetCode(addr types.Address) []byte {
 	object, exists := txn.getStateObject(addr)
 	if !exists {
@@ -388,7 +378,8 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	if object.DirtyCode {
 		return object.Code
 	}
-	// TODO; Should we move this to state?
+	//nolint:godox
+	// TODO; Should we move this to state? (to be fixed in EVM-527)
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {
@@ -483,13 +474,26 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 	return txn.snapshot.GetStorage(addr, obj.Account.Root, key)
 }
 
+// SetFullStorage is used to replace the full state of the address.
+// Only used for debugging on the override jsonrpc endpoint.
+func (txn *Txn) SetFullStorage(addr types.Address, state map[types.Hash]types.Hash) {
+	for k, v := range state {
+		txn.SetState(addr, k, v)
+	}
+
+	txn.upsertAccount(addr, true, func(object *StateObject) {
+		object.withFakeStorage = true
+	})
+}
+
 func (txn *Txn) TouchAccount(addr types.Address) {
 	txn.upsertAccount(addr, true, func(obj *StateObject) {
 
 	})
 }
 
-// TODO, check panics with this ones
+//nolint:godox
+// TODO, check panics with this ones (to be fixed in EVM-528)
 
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
@@ -551,13 +555,13 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	for _, k := range remove {
 		v, ok := txn.txn.Get(k)
 		if !ok {
-			panic("it should not happen")
+			panic("it should not happen") //nolint:gocritic
 		}
 
 		obj, ok := v.(*StateObject)
 
 		if !ok {
-			panic("it should not happen")
+			panic("it should not happen") //nolint:gocritic
 		}
 
 		obj2 := obj.Copy()

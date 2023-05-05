@@ -92,9 +92,14 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 	commitment, commitmentSigned, stateSyncs := buildCommitmentAndStateSyncs(t, eventsCount, epoch, 0)
 	require.Equal(t, uint64(10), commitment.EndID.Sub(commitment.EndID, commitment.StartID).Uint64())
 
-	for i, stateSync := range stateSyncs {
-		proof := commitment.MerkleTree.GenerateProof(uint64(i), 0)
-		execute := &contractsapi.ExecuteFunction{
+	for _, stateSync := range stateSyncs {
+		leaf, err := stateSync.EncodeAbi()
+		require.NoError(t, err)
+
+		proof, err := commitment.MerkleTree.GenerateProof(leaf)
+		require.NoError(t, err)
+
+		execute := &contractsapi.ExecuteStateReceiverFn{
 			Proof: proof,
 			Obj:   (*contractsapi.StateSync)(stateSync),
 		}
@@ -102,7 +107,7 @@ func TestCommitmentMessage_VerifyProof(t *testing.T) {
 		inputData, err := execute.EncodeAbi()
 		require.NoError(t, err)
 
-		executionStateSync := &contractsapi.ExecuteFunction{}
+		executionStateSync := &contractsapi.ExecuteStateReceiverFn{}
 		require.NoError(t, executionStateSync.DecodeAbi(inputData))
 		require.Equal(t, stateSync.ID.Uint64(), executionStateSync.Obj.ID.Uint64())
 		require.Equal(t, stateSync.Sender, executionStateSync.Obj.Sender)
@@ -136,7 +141,11 @@ func TestCommitmentMessage_VerifyProof_StateSyncHashNotEqualToProof(t *testing.T
 	tree, err := createMerkleTree(stateSyncs)
 	require.NoError(t, err)
 
-	proof := tree.GenerateProof(0, 0)
+	leaf, err := stateSyncs[0].EncodeAbi()
+	require.NoError(t, err)
+
+	proof, err := tree.GenerateProof(leaf)
+	require.NoError(t, err)
 
 	commitment := &CommitmentMessageSigned{
 		Message: &contractsapi.StateSyncCommitment{
@@ -177,8 +186,8 @@ func TestStateTransaction_Signature(t *testing.T) {
 		sig string
 	}{
 		{
-			contractsapi.ChildValidatorSet.Abi.GetMethod("commitEpoch"),
-			"410899c9",
+			contractsapi.ValidatorSet.Abi.GetMethod("commitEpoch"),
+			"0f50287c",
 		},
 	}
 	for _, c := range cases {
@@ -191,17 +200,12 @@ func TestStateTransaction_Encoding(t *testing.T) {
 	t.Parallel()
 
 	cases := []contractsapi.StateTransactionInput{
-		&contractsapi.CommitEpochFunction{
+		&contractsapi.CommitEpochValidatorSetFn{
 			ID: big.NewInt(1),
 			Epoch: &contractsapi.Epoch{
 				StartBlock: big.NewInt(1),
 				EndBlock:   big.NewInt(10),
 				EpochRoot:  types.Hash{},
-			},
-			Uptime: &contractsapi.Uptime{
-				EpochID:     big.NewInt(1),
-				TotalBlocks: big.NewInt(10),
-				UptimeData:  []*contractsapi.UptimeData{},
 			},
 		},
 	}

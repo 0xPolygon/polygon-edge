@@ -12,8 +12,8 @@ import (
 func Test_RecoverAddressFromSignature(t *testing.T) {
 	t.Parallel()
 
-	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
-		key := NewKey(account, bls.DomainCheckpointManager)
+	for _, account := range []*Account{generateTestAccount(t), generateTestAccount(t), generateTestAccount(t)} {
+		key := NewKey(account)
 		msgNoSig := &proto.Message{
 			From:    key.Address().Bytes(),
 			Type:    proto.MessageType_COMMIT,
@@ -37,9 +37,9 @@ func Test_Sign(t *testing.T) {
 
 	msg := []byte("some message")
 
-	for _, account := range []*Account{GenerateAccount(), GenerateAccount()} {
-		key := NewKey(account, bls.DomainCheckpointManager)
-		ser, err := key.Sign(msg)
+	for _, account := range []*Account{generateTestAccount(t), generateTestAccount(t)} {
+		key := NewKey(account)
+		ser, err := key.SignWithDomain(msg, bls.DomainCheckpointManager)
 
 		require.NoError(t, err)
 
@@ -53,8 +53,8 @@ func Test_Sign(t *testing.T) {
 func Test_String(t *testing.T) {
 	t.Parallel()
 
-	for _, account := range []*Account{GenerateAccount(), GenerateAccount(), GenerateAccount()} {
-		key := NewKey(account, bls.DomainCheckpointManager)
+	for _, account := range []*Account{generateTestAccount(t), generateTestAccount(t), generateTestAccount(t)} {
+		key := NewKey(account)
 		assert.Equal(t, key.Address().String(), key.String())
 	}
 }

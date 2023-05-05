@@ -2,11 +2,11 @@ package withdraw
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -16,40 +16,38 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var (
-	params           withdrawParams
-	withdrawEventABI = contractsapi.ChildValidatorSet.Abi.Events["Withdrawal"]
-)
+var params withdrawParams
 
 func GetCommand() *cobra.Command {
-	withdrawCmd := &cobra.Command{
-		Use:     "withdraw",
-		Short:   "Withdraws sender's withdrawable amount to specified address",
+	unstakeCmd := &cobra.Command{
+		Use:     "withdraw-child",
+		Short:   "Withdraws pending withdrawals on child chain for given validator",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	setFlags(withdrawCmd)
+	helper.RegisterJSONRPCFlag(unstakeCmd)
+	setFlags(unstakeCmd)
 
-	return withdrawCmd
+	return unstakeCmd
 }
 
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.accountDir,
-		sidechainHelper.AccountDirFlag,
+		polybftsecrets.AccountDirFlag,
 		"",
-		"the directory path where validator key is stored",
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.addressTo,
-		addressToFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		"address where to withdraw withdrawable amount",
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	helper.RegisterJSONRPCFlag(cmd)
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -62,7 +60,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	validatorAccount, err := sidechainHelper.GetAccountFromDir(params.accountDir)
+	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.accountConfig)
 	if err != nil {
 		return err
 	}
@@ -73,8 +71,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	encoded, err := contractsapi.ChildValidatorSet.Abi.Methods["withdraw"].Encode(
-		[]interface{}{ethgo.HexToAddress(params.addressTo)})
+	encoded, err := contractsapi.ValidatorSet.Abi.Methods["withdraw"].Encode([]interface{}{})
 	if err != nil {
 		return err
 	}
@@ -91,33 +88,36 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("withdraw transaction failed on block %d", receipt.BlockNumber)
+	if receipt.Status != uint64(types.ReceiptSuccess) {
+		return fmt.Errorf("withdraw transaction failed on block: %d", receipt.BlockNumber)
 	}
 
 	result := &withdrawResult{
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
-	var foundLog bool
+	var (
+		withdrawalEvent contractsapi.WithdrawalEvent
+		foundLog        bool
+	)
 
+	// check the logs to check for the result
 	for _, log := range receipt.Logs {
-		if withdrawEventABI.Match(log) {
-			event, err := withdrawEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
+		doesMatch, err := withdrawalEvent.ParseLog(log)
+		if err != nil {
+			return err
+		}
 
-			result.amount = event["amount"].(*big.Int).Uint64()       //nolint:forcetypeassert
-			result.withdrawnTo = event["to"].(ethgo.Address).String() //nolint:forcetypeassert
+		if doesMatch {
 			foundLog = true
+			result.amount = withdrawalEvent.Amount.Uint64()
 
 			break
 		}
 	}
 
 	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that withdrawal happened")
+		return fmt.Errorf("could not find an appropriate log in receipt that withdraw happened on ValidatorSet")
 	}
 
 	outputter.WriteCommandResult(result)

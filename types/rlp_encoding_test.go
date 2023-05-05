@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -134,34 +135,121 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
 	originalTx := &Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(11),
-		Gas:      11,
-		To:       &addrTo,
-		From:     addrFrom,
-		Value:    big.NewInt(1),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(25),
-		S:        big.NewInt(26),
-		R:        big.NewInt(27),
+		Nonce:     0,
+		GasPrice:  big.NewInt(11),
+		GasFeeCap: big.NewInt(12),
+		GasTipCap: big.NewInt(13),
+		Gas:       11,
+		To:        &addrTo,
+		From:      addrFrom,
+		Value:     big.NewInt(1),
+		Input:     []byte{1, 2},
+		V:         big.NewInt(25),
+		S:         big.NewInt(26),
+		R:         big.NewInt(27),
 	}
 
 	txTypes := []TxType{
 		StateTx,
 		LegacyTx,
+		DynamicFeeTx,
 	}
 
 	for _, v := range txTypes {
-		originalTx.Type = v
-		originalTx.ComputeHash()
+		t.Run(v.String(), func(t *testing.T) {
+			originalTx.Type = v
+			originalTx.ComputeHash()
 
-		txRLP := originalTx.MarshalRLP()
+			txRLP := originalTx.MarshalRLP()
 
-		unmarshalledTx := new(Transaction)
-		assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
+			unmarshalledTx := new(Transaction)
+			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
-		unmarshalledTx.ComputeHash()
-		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+			unmarshalledTx.ComputeHash()
+			assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+			assert.Equal(t, originalTx.Hash, unmarshalledTx.Hash)
+		})
+	}
+}
+
+func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
+	t.Parallel()
+
+	txTypes := []TxType{
+		StateTx,
+		LegacyTx,
+		DynamicFeeTx,
+	}
+
+	for _, txType := range txTypes {
+		txType := txType
+		testTable := []struct {
+			name          string
+			expectedErr   bool
+			omittedValues map[string]bool
+			fromAddrSet   bool
+		}{
+			{
+				name:        fmt.Sprintf("[%s] Insuficient params", txType),
+				expectedErr: true,
+				omittedValues: map[string]bool{
+					"Nonce":    true,
+					"GasPrice": true,
+				},
+			},
+			{
+				name:        fmt.Sprintf("[%s] Missing From", txType),
+				expectedErr: false,
+				omittedValues: map[string]bool{
+					"ChainID":    txType != DynamicFeeTx,
+					"GasTipCap":  txType != DynamicFeeTx,
+					"GasFeeCap":  txType != DynamicFeeTx,
+					"GasPrice":   txType == DynamicFeeTx,
+					"AccessList": txType != DynamicFeeTx,
+					"From":       txType != StateTx,
+				},
+				fromAddrSet: txType == StateTx,
+			},
+			{
+				name:        fmt.Sprintf("[%s] Address set for state tx only", txType),
+				expectedErr: false,
+				omittedValues: map[string]bool{
+					"ChainID":    txType != DynamicFeeTx,
+					"GasTipCap":  txType != DynamicFeeTx,
+					"GasFeeCap":  txType != DynamicFeeTx,
+					"GasPrice":   txType == DynamicFeeTx,
+					"AccessList": txType != DynamicFeeTx,
+					"From":       txType != StateTx,
+				},
+				fromAddrSet: txType == StateTx,
+			},
+		}
+
+		for _, tt := range testTable {
+			tt := tt
+
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				arena := fastrlp.DefaultArenaPool.Get()
+				parser := fastrlp.DefaultParserPool.Get()
+				testData := testRLPData(arena, tt.omittedValues)
+				v, err := parser.Parse(testData)
+				assert.Nil(t, err)
+
+				unmarshalledTx := &Transaction{Type: txType}
+
+				if tt.expectedErr {
+					assert.Error(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
+				} else {
+					assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
+					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From) != 0 && unmarshalledTx.From != ZeroAddress, unmarshalledTx.Type.String(), unmarshalledTx.From)
+				}
+
+				fastrlp.DefaultParserPool.Put(parser)
+				fastrlp.DefaultArenaPool.Put(arena)
+			})
+		}
 	}
 }
 
@@ -178,6 +266,10 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 		{
 			name:   "LegacyTx",
 			txType: LegacyTx,
+		},
+		{
+			name:   "DynamicFeeTx",
+			txType: DynamicFeeTx,
 		},
 		{
 			name:        "undefined type",
@@ -199,4 +291,69 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 			assert.Equal(t, tt.txType, txType)
 		}
 	}
+}
+
+func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
+	vv := arena.NewArray()
+
+	if omit, _ := omitValues["ChainID"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(0)))
+	}
+
+	if omit, _ := omitValues["Nonce"]; !omit {
+		vv.Set(arena.NewUint(10))
+	}
+
+	if omit, _ := omitValues["GasTipCap"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(11)))
+	}
+
+	if omit, _ := omitValues["GasFeeCap"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(11)))
+	}
+
+	if omit, _ := omitValues["GasPrice"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(11)))
+	}
+
+	if omit, _ := omitValues["Gas"]; !omit {
+		vv.Set(arena.NewUint(12))
+	}
+
+	if omit, _ := omitValues["To"]; !omit {
+		vv.Set(arena.NewBytes((StringToAddress("13")).Bytes()))
+	}
+
+	if omit, _ := omitValues["Value"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(14)))
+	}
+
+	if omit, _ := omitValues["Input"]; !omit {
+		vv.Set(arena.NewCopyBytes([]byte{1, 2}))
+	}
+
+	if omit, _ := omitValues["AccessList"]; !omit {
+		vv.Set(arena.NewArray())
+	}
+
+	if omit, _ := omitValues["V"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(15)))
+	}
+
+	if omit, _ := omitValues["R"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(16)))
+	}
+
+	if omit, _ := omitValues["S"]; !omit {
+		vv.Set(arena.NewBigInt(big.NewInt(17)))
+	}
+
+	if omit, _ := omitValues["From"]; !omit {
+		vv.Set(arena.NewBytes((StringToAddress("18")).Bytes()))
+	}
+
+	var testData []byte
+	testData = vv.MarshalTo(testData)
+
+	return testData
 }

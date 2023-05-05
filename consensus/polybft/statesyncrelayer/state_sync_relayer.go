@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"net"
 	"path"
 	"strings"
@@ -21,17 +20,16 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
-var commitEvent = contractsapi.StateReceiver.Abi.Events["NewCommitment"]
-
 type StateSyncRelayer struct {
-	dataDir           string
-	rpcEndpoint       string
-	stateReceiverAddr ethgo.Address
-	logger            hcf.Logger
-	client            *jsonrpc.Client
-	txRelayer         txrelayer.TxRelayer
-	key               ethgo.Key
-	closeCh           chan struct{}
+	dataDir                string
+	rpcEndpoint            string
+	stateReceiverAddr      ethgo.Address
+	eventTrackerStartBlock uint64
+	logger                 hcf.Logger
+	client                 *jsonrpc.Client
+	txRelayer              txrelayer.TxRelayer
+	key                    ethgo.Key
+	closeCh                chan struct{}
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -40,7 +38,7 @@ func sanitizeRPCEndpoint(rpcEndpoint string) string {
 		if err == nil {
 			rpcEndpoint = fmt.Sprintf("http://%s:%s", "127.0.0.1", port)
 		} else {
-			rpcEndpoint = "http://127.0.0.1:8545"
+			rpcEndpoint = txrelayer.DefaultRPCAddress
 		}
 	}
 
@@ -51,6 +49,7 @@ func NewRelayer(
 	dataDir string,
 	rpcEndpoint string,
 	stateReceiverAddr ethgo.Address,
+	stateReceiverTrackerStartBlock uint64,
 	logger hcf.Logger,
 	key ethgo.Key,
 ) *StateSyncRelayer {
@@ -70,14 +69,15 @@ func NewRelayer(
 	}
 
 	return &StateSyncRelayer{
-		dataDir:           dataDir,
-		rpcEndpoint:       endpoint,
-		stateReceiverAddr: stateReceiverAddr,
-		logger:            logger,
-		client:            client,
-		txRelayer:         txRelayer,
-		key:               key,
-		closeCh:           make(chan struct{}),
+		dataDir:                dataDir,
+		rpcEndpoint:            endpoint,
+		stateReceiverAddr:      stateReceiverAddr,
+		logger:                 logger,
+		client:                 client,
+		txRelayer:              txRelayer,
+		key:                    key,
+		closeCh:                make(chan struct{}),
+		eventTrackerStartBlock: stateReceiverTrackerStartBlock,
 	}
 }
 
@@ -87,6 +87,8 @@ func (r *StateSyncRelayer) Start() error {
 		r.rpcEndpoint,
 		r.stateReceiverAddr,
 		r,
+		0, // sidechain (Polygon POS) is instant finality, so no need to wait
+		r.eventTrackerStartBlock,
 		r.logger,
 	)
 
@@ -106,52 +108,42 @@ func (r *StateSyncRelayer) Stop() {
 }
 
 func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
-	r.logger.Info("Received a log", "log", log)
+	r.logger.Debug("Received a log", "log", log)
 
-	if commitEvent.Match(log) {
-		vals, err := commitEvent.ParseLog(log)
+	var commitEvent contractsapi.NewCommitmentEvent
+
+	doesMatch, err := commitEvent.ParseLog(log)
+	if !doesMatch {
+		return
+	}
+
+	if err != nil {
+		r.logger.Error("Failed to parse log", "err", err)
+
+		return
+	}
+
+	startID := commitEvent.StartID.Uint64()
+	endID := commitEvent.EndID.Uint64()
+
+	r.logger.Info("Execute commitment", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
+
+	for i := startID; i <= endID; i++ {
+		// query the state sync proof
+		stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
 		if err != nil {
-			r.logger.Error("Failed to parse log", "err", err)
+			r.logger.Error("Failed to query state sync proof", "err", err)
 
-			return
+			continue
 		}
 
-		var (
-			startID, endID *big.Int
-			ok             bool
-		)
+		if err := r.executeStateSync(stateSyncProof); err != nil {
+			r.logger.Error("Failed to execute state sync", "err", err)
 
-		if startID, ok = vals["startId"].(*big.Int); !ok {
-			r.logger.Error("Failed to parse startId")
-
-			return
+			continue
 		}
 
-		if endID, ok = vals["endId"].(*big.Int); !ok {
-			r.logger.Error("Failed to parse endId")
-
-			return
-		}
-
-		r.logger.Info("Commit", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
-
-		for i := startID.Uint64(); i <= endID.Uint64(); i++ {
-			// query the state sync proof
-			stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
-			if err != nil {
-				r.logger.Error("Failed to query state sync proof", "err", err)
-
-				continue
-			}
-
-			if err := r.executeStateSync(stateSyncProof); err != nil {
-				r.logger.Error("Failed to execute state sync", "err", err)
-
-				continue
-			}
-
-			r.logger.Info("State sync executed", "stateSyncID", i)
-		}
+		r.logger.Info("State sync executed", "ID", i)
 	}
 }
 
@@ -185,15 +177,14 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 	// event from the marshaled map
 	raw, err := json.Marshal(sseMap)
 	if err != nil {
-		return fmt.Errorf("marshal the state sync map from to byte array failed. Error: %w", err)
+		return fmt.Errorf("failed to marshal state sync map into JSON. Error: %w", err)
 	}
 
-	err = json.Unmarshal(raw, &sse)
-	if err != nil {
-		return fmt.Errorf("unmarshal of state sync from map failed. Error: %w", err)
+	if err = json.Unmarshal(raw, &sse); err != nil {
+		return fmt.Errorf("failed to unmarshal state sync event from JSON. Error: %w", err)
 	}
 
-	execute := &contractsapi.ExecuteFunction{
+	execute := &contractsapi.ExecuteStateReceiverFn{
 		Proof: proof.Data,
 		Obj:   sse,
 	}

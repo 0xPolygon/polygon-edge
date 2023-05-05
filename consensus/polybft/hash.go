@@ -19,7 +19,6 @@ func setupHeaderHashFunc() {
 			// the extra field the seal and committed seal items
 			extra, err := GetIbftExtraClean(h.ExtraData)
 			if err != nil {
-				// TODO: log error?
 				return types.ZeroHash
 			}
 

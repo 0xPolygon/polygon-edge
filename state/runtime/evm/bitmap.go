@@ -35,7 +35,7 @@ func (b *bitmap) setCode(code []byte) {
 			// push op
 			i += int(c) - 0x60 + 2
 		} else {
-			if c == 0x5B {
+			if c == JUMPDEST {
 				// jumpdest
 				b.set(uint64(i))
 			}

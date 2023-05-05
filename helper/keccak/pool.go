@@ -38,7 +38,7 @@ func (p *Pool) Put(k *Keccak) {
 // Keccak256 hashes a src with keccak-256
 func Keccak256(dst, src []byte) []byte {
 	h := DefaultKeccakPool.Get()
-	h.Write(src)
+	h.Write(src) //nolint:errcheck
 	dst = h.Sum(dst)
 	DefaultKeccakPool.Put(h)
 
@@ -48,6 +48,16 @@ func Keccak256(dst, src []byte) []byte {
 // Keccak256Rlp hashes a fastrlp.Value with keccak-256
 func Keccak256Rlp(dst []byte, src *fastrlp.Value) []byte {
 	h := DefaultKeccakPool.Get()
+	dst = h.WriteRlp(dst, src)
+	DefaultKeccakPool.Put(h)
+
+	return dst
+}
+
+// PrefixedKeccak256Rlp hashes a fastrlp.Value using keccak-256 with the given prefix
+func PrefixedKeccak256Rlp(prefix, dst []byte, src *fastrlp.Value) []byte {
+	h := DefaultKeccakPool.Get()
+	_, _ = h.Write(prefix)
 	dst = h.WriteRlp(dst, src)
 	DefaultKeccakPool.Put(h)
 

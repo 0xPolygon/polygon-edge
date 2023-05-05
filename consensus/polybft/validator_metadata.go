@@ -1,13 +1,13 @@
 package polybft
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -26,6 +26,7 @@ type ValidatorMetadata struct {
 	Address     types.Address
 	BlsKey      *bls.PublicKey
 	VotingPower *big.Int
+	IsActive    bool
 }
 
 // Equals checks ValidatorMetadata equality
@@ -34,7 +35,7 @@ func (v *ValidatorMetadata) Equals(b *ValidatorMetadata) bool {
 		return false
 	}
 
-	return v.EqualAddressAndBlsKey(b) && v.VotingPower.Cmp(b.VotingPower) == 0
+	return v.EqualAddressAndBlsKey(b) && v.VotingPower.Cmp(b.VotingPower) == 0 && v.IsActive == b.IsActive
 }
 
 // EqualAddressAndBlsKey checks ValidatorMetadata equality against Address and BlsKey fields
@@ -55,6 +56,7 @@ func (v *ValidatorMetadata) Copy() *ValidatorMetadata {
 		Address:     types.BytesToAddress(v.Address[:]),
 		BlsKey:      blsKey,
 		VotingPower: new(big.Int).Set(v.VotingPower),
+		IsActive:    v.IsActive,
 	}
 }
 
@@ -67,6 +69,8 @@ func (v *ValidatorMetadata) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(ar.NewCopyBytes(v.BlsKey.Marshal()))
 	// VotingPower
 	vv.Set(ar.NewBigInt(v.VotingPower))
+	// IsActive
+	vv.Set(ar.NewBool(v.IsActive))
 
 	return vv
 }
@@ -78,8 +82,8 @@ func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
 		return err
 	}
 
-	if num := len(elems); num != 3 {
-		return fmt.Errorf("incorrect elements count to decode validator account, expected 3 but found %d", num)
+	if num := len(elems); num != 4 {
+		return fmt.Errorf("incorrect elements count to decode validator account, expected 4 but found %d", num)
 	}
 
 	// Address
@@ -93,33 +97,39 @@ func (v *ValidatorMetadata) UnmarshalRLPWith(val *fastrlp.Value) error {
 	// BlsKey
 	blsKeyRaw, err := elems[1].GetBytes(nil)
 	if err != nil {
-		return fmt.Errorf("expected 'BlsKey' encoded as bytes. Error: %w", err)
+		return fmt.Errorf("expected 'BlsKey' encoded as bytes: %w", err)
 	}
 
 	blsKey, err := bls.UnmarshalPublicKey(blsKeyRaw)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal BLS public key. Error: %w", err)
+		return fmt.Errorf("failed to unmarshal BLS public key: %w", err)
 	}
 
 	v.BlsKey = blsKey
 
 	// VotingPower
 	votingPower := new(big.Int)
-
-	err = elems[2].GetBigInt(votingPower)
-	if err != nil {
-		return fmt.Errorf("expected 'Voting power' encoded as big int. Error: %w", err)
+	if err = elems[2].GetBigInt(votingPower); err != nil {
+		return fmt.Errorf("expected 'VotingPower' encoded as big int: %w", err)
 	}
 
 	v.VotingPower = new(big.Int).Set(votingPower)
+
+	// IsActive
+	isActive, err := elems[3].GetBool()
+	if err != nil {
+		return fmt.Errorf("expected 'IsActive' encoded as bool: %w", err)
+	}
+
+	v.IsActive = isActive
 
 	return nil
 }
 
 // fmt.Stringer implementation
 func (v *ValidatorMetadata) String() string {
-	return fmt.Sprintf("Address=%v; Voting Power=%d; BLS Key=%v;",
-		v.Address.String(), v.VotingPower, hex.EncodeToString(v.BlsKey.Marshal()))
+	return fmt.Sprintf("Address=%v; Is Active=%v; Voting Power=%d; BLS Key=%v;",
+		v.Address.String(), v.IsActive, v.VotingPower, hex.EncodeToString(v.BlsKey.Marshal()))
 }
 
 // AccountSet is a type alias for slice of ValidatorMetadata instances
@@ -142,12 +152,12 @@ func (as AccountSet) Equals(other AccountSet) bool {
 
 // fmt.Stringer implementation
 func (as AccountSet) String() string {
-	metadataString := make([]string, len(as))
-	for i, v := range as {
-		metadataString[i] = v.String()
+	var buf bytes.Buffer
+	for _, v := range as {
+		buf.WriteString(fmt.Sprintf("%s\n", v.String()))
 	}
 
-	return strings.Join(metadataString, "\n")
+	return buf.String()
 }
 
 // GetAddresses aggregates addresses for given AccountSet

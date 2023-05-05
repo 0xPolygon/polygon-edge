@@ -11,7 +11,7 @@ import (
 )
 
 func TestWeb3EndpointSha3(t *testing.T) {
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		newMockStore(),
 		&dispatcherParams{
@@ -39,7 +39,7 @@ func TestWeb3EndpointClientVersion(t *testing.T) {
 		chainID   = uint64(100)
 	)
 
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		newMockStore(),
 		&dispatcherParams{

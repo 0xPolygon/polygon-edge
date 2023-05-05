@@ -56,6 +56,10 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
+	ErrInvalidTxType           = errors.New("invalid tx type")
+	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
+	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
+	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
 )
 
 // indicates origin of a transaction
@@ -169,7 +173,11 @@ type TxPool struct {
 
 	// flag indicating if the current node is a sealer,
 	// and should therefore gossip transactions
-	sealing uint32
+	sealing atomic.Bool
+
+	// baseFee is the base fee of the current head.
+	// This is needed to sort transactions by price
+	baseFee uint64
 
 	// Event manager for txpool events
 	eventManager *eventManager
@@ -330,21 +338,7 @@ func (p *TxPool) SetSigner(s signer) {
 
 // SetSealing sets the sealing flag
 func (p *TxPool) SetSealing(sealing bool) {
-	newValue := uint32(0)
-	if sealing {
-		newValue = 1
-	}
-
-	atomic.CompareAndSwapUint32(
-		&p.sealing,
-		p.sealing,
-		newValue,
-	)
-}
-
-// sealing returns the current set sealing flag
-func (p *TxPool) getSealing() bool {
-	return atomic.LoadUint32(&p.sealing) == 1
+	p.sealing.CompareAndSwap(p.sealing.Load(), sealing)
 }
 
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
@@ -375,11 +369,14 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 
 // Prepare generates all the transactions
 // ready for execution. (primaries)
-func (p *TxPool) Prepare() {
+func (p *TxPool) Prepare(baseFee uint64) {
 	// clear from previous round
 	if p.executables.length() != 0 {
 		p.executables.clear()
 	}
+
+	// set base fee
+	p.updateBaseFee(baseFee)
 
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
@@ -565,7 +562,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 	// reset accounts with the new state
 	p.resetAccounts(stateNonces)
 
-	if !p.getSealing() {
+	if !p.sealing.Load() {
 		// only non-validator cleanup inactive accounts
 		p.updateAccountSkipsCounts(stateNonces)
 	}
@@ -574,6 +571,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // validateTx ensures the transaction conforms to specific
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
+	// Check the transaction type. State transactions are not expected to be added to the pool
+	if tx.Type == types.StateTx {
+		return ErrInvalidTxType
+	}
+
 	// Check the transaction size to overcome DOS Attacks
 	if uint64(len(tx.MarshalRLP())) > txMaxSize {
 		return ErrOversizedData
@@ -610,14 +612,43 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrSmartContractRestricted
 		}
 
-		if p.forks.EIP158 && len(tx.Input) > state.SpuriousDragonMaxCodeSize {
+		if p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
 			return runtime.ErrMaxCodeSizeExceeded
 		}
 	}
 
-	// Reject underpriced transactions
-	if tx.IsUnderpriced(p.priceLimit) {
-		return ErrUnderpriced
+	if tx.Type == types.DynamicFeeTx {
+		// Reject dynamic fee tx if london hardfork is not enabled
+		if !p.forks.London {
+			return ErrInvalidTxType
+		}
+
+		// Check EIP-1559-related fields and make sure they are correct
+		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
+			return ErrUnderpriced
+		}
+
+		if tx.GasFeeCap.BitLen() > 256 {
+			return ErrFeeCapVeryHigh
+		}
+
+		if tx.GasTipCap.BitLen() > 256 {
+			return ErrTipVeryHigh
+		}
+
+		if tx.GasFeeCap.Cmp(tx.GasTipCap) < 0 {
+			return ErrTipAboveFeeCap
+		}
+
+		// Reject underpriced transactions
+		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
+			return ErrUnderpriced
+		}
+	} else {
+		// Legacy approach to check if the given tx is not underpriced
+		if tx.GetGasPrice(p.GetBaseFee()).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+			return ErrUnderpriced
+		}
 	}
 
 	// Grab the state root for the latest block
@@ -719,7 +750,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// check for overflow
-	if p.gauge.read()+slotsRequired(tx) > p.gauge.max {
+	if slotsRequired(tx) > p.gauge.max-p.gauge.read() {
 		return ErrTxPoolOverflow
 	}
 
@@ -798,7 +829,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 // addGossipTx handles receiving transactions
 // gossiped by the network.
 func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
-	if !p.getSealing() {
+	if !p.sealing.Load() {
 		return
 	}
 
@@ -950,6 +981,12 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
+}
+
+// updateBaseFee updates base fee in the tx pool and priced queue
+func (p *TxPool) updateBaseFee(baseFee uint64) {
+	atomic.StoreUint64(&p.baseFee, baseFee)
+	atomic.StoreUint64(&p.executables.queue.baseFee, baseFee)
 }
 
 // toHash returns the hash(es) of given transaction(s)

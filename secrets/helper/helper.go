@@ -16,7 +16,10 @@ import (
 	"github.com/hashicorp/go-hclog"
 	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/umbracle/ethgo/abi"
 )
+
+var addressTypeABI = abi.MustNewType("address")
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {

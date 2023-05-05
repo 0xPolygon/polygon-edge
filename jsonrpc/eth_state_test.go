@@ -616,8 +616,8 @@ func getExampleStore() *mockSpecialStore {
 // the latest block gas limit for the upper bound, or the specified
 // gas limit in the transaction
 func TestEth_EstimateGas_GasLimit(t *testing.T) {
-	// TODO Make this test run in parallel when the race
-	// condition is fixed in gas estimation
+	//nolint:godox
+	// TODO Make this test run in parallel when the race condition is fixed in gas estimation (to be fixed in EVM-523)
 	store := getExampleStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
@@ -840,7 +840,7 @@ func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime 
 	return chain.ForksInTime{}
 }
 
-func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
+func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction, overrides types.StateOverride) (*runtime.ExecutionResult, error) {
 	if m.applyTxnHook != nil {
 		return m.applyTxnHook(header, txn)
 	}

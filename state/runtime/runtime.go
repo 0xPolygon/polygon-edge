@@ -11,15 +11,17 @@ import (
 
 // TxContext is the context of the transaction
 type TxContext struct {
-	GasPrice   types.Hash
-	Origin     types.Address
-	Coinbase   types.Address
-	Number     int64
-	Timestamp  int64
-	GasLimit   int64
-	ChainID    int64
-	Difficulty types.Hash
-	Tracer     tracer.Tracer
+	GasPrice     types.Hash
+	Origin       types.Address
+	Coinbase     types.Address
+	Number       int64
+	Timestamp    int64
+	GasLimit     int64
+	ChainID      int64
+	Difficulty   types.Hash
+	Tracer       tracer.Tracer
+	BaseFee      *big.Int
+	BurnContract types.Address
 }
 
 // StorageStatus is the status of the storage access
@@ -51,7 +53,7 @@ func (s StorageStatus) String() string {
 	case StorageDeleted:
 		return "StorageDeleted"
 	default:
-		panic("BUG: storage status not found")
+		panic("BUG: storage status not found") //nolint:gocritic
 	}
 }
 
@@ -60,6 +62,7 @@ type Host interface {
 	AccountExists(addr types.Address) bool
 	GetStorage(addr types.Address, key types.Hash) types.Hash
 	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
+	SetState(addr types.Address, key types.Hash, value types.Hash)
 	GetBalance(addr types.Address) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash
@@ -138,6 +141,7 @@ var (
 	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
 	ErrUnauthorizedCaller       = errors.New("unauthorized caller")
 	ErrInvalidInputData         = errors.New("invalid input data")
+	ErrNotAuth                  = errors.New("not in allow list")
 )
 
 type CallType int

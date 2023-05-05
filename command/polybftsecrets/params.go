@@ -2,8 +2,8 @@ package polybftsecrets
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -14,33 +14,20 @@ import (
 )
 
 const (
-	dataPathFlag   = "data-dir"
-	configFlag     = "config"
-	accountFlag    = "account"
-	privateKeyFlag = "private"
-	networkFlag    = "network"
-	numFlag        = "num"
+	accountFlag            = "account"
+	privateKeyFlag         = "private"
+	insecureLocalStoreFlag = "insecure"
+	networkFlag            = "network"
+	numFlag                = "num"
+	outputFlag             = "output"
 
 	// maxInitNum is the maximum value for "num" flag
 	maxInitNum = 30
-
-	insecureLocalStore = "insecure"
-)
-
-var (
-	errInvalidNum                     = fmt.Errorf("num flag value should be between 1 and %d", maxInitNum)
-	errInvalidConfig                  = errors.New("invalid secrets configuration")
-	errInvalidParams                  = errors.New("no config file or data directory passed in")
-	errUnsupportedType                = errors.New("unsupported secrets manager")
-	errSecureLocalStoreNotImplemented = errors.New(
-		"use a secrets backend, or supply an --insecure flag " +
-			"to store the private keys locally on the filesystem, " +
-			"avoid doing so in production")
 )
 
 type initParams struct {
-	dataPath   string
-	configPath string
+	accountDir    string
+	accountConfig string
 
 	generatesAccount bool
 	generatesNetwork bool
@@ -50,15 +37,17 @@ type initParams struct {
 	numberOfSecrets int
 
 	insecureLocalStore bool
+
+	output bool
 }
 
 func (ip *initParams) validateFlags() error {
 	if ip.numberOfSecrets < 1 || ip.numberOfSecrets > maxInitNum {
-		return errInvalidNum
+		return ErrInvalidNum
 	}
 
-	if ip.dataPath == "" && ip.configPath == "" {
-		return errInvalidParams
+	if ip.accountDir == "" && ip.accountConfig == "" {
+		return ErrInvalidParams
 	}
 
 	return nil
@@ -66,18 +55,17 @@ func (ip *initParams) validateFlags() error {
 
 func (ip *initParams) setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
-		&ip.dataPath,
-		dataPathFlag,
+		&ip.accountDir,
+		AccountDirFlag,
 		"",
-		"the directory for the Polygon Edge data if the local FS is used",
+		AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&ip.configPath,
-		configFlag,
+		&ip.accountConfig,
+		AccountConfigFlag,
 		"",
-		"the path to the SecretsManager config file, "+
-			"if omitted, the local FS secrets manager is used",
+		AccountConfigFlagDesc,
 	)
 
 	cmd.Flags().IntVar(
@@ -89,10 +77,10 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 
 	// Don't accept data-dir and config flags because they are related to different secrets managers.
 	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
-	cmd.MarkFlagsMutuallyExclusive(dataPathFlag, configFlag)
+	cmd.MarkFlagsMutuallyExclusive(AccountDirFlag, AccountConfigFlag)
 
 	// num flag should be used with data-dir flag only so it should not be used with config flag.
-	cmd.MarkFlagsMutuallyExclusive(numFlag, configFlag)
+	cmd.MarkFlagsMutuallyExclusive(numFlag, AccountConfigFlag)
 
 	cmd.Flags().BoolVar(
 		&ip.generatesAccount,
@@ -117,9 +105,16 @@ func (ip *initParams) setFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(
 		&ip.insecureLocalStore,
-		insecureLocalStore,
+		insecureLocalStoreFlag,
 		false,
 		"the flag indicating should the secrets stored on the local storage be encrypted",
+	)
+
+	cmd.Flags().BoolVar(
+		&ip.output,
+		outputFlag,
+		false,
+		"the flag indicating to output existing secrets",
 	)
 }
 
@@ -127,27 +122,30 @@ func (ip *initParams) Execute() (Results, error) {
 	results := make(Results, ip.numberOfSecrets)
 
 	for i := 0; i < ip.numberOfSecrets; i++ {
-		configDir, dataDir := ip.configPath, ip.dataPath
+		configDir, dataDir := ip.accountConfig, ip.accountDir
 
 		if ip.numberOfSecrets > 1 {
-			dataDir = fmt.Sprintf("%s%d", ip.dataPath, i+1)
+			dataDir = fmt.Sprintf("%s%d", ip.accountDir, i+1)
 		}
 
 		if configDir != "" && ip.numberOfSecrets > 1 {
-			configDir = fmt.Sprintf("%s%d", ip.configPath, i+1)
+			configDir = fmt.Sprintf("%s%d", ip.accountConfig, i+1)
 		}
 
-		secretManager, err := getSecretsManager(dataDir, configDir, ip.insecureLocalStore)
+		secretManager, err := GetSecretsManager(dataDir, configDir, ip.insecureLocalStore)
 		if err != nil {
 			return results, err
 		}
 
-		err = ip.initKeys(secretManager)
-		if err != nil {
-			return results, err
+		var gen []string
+		if !ip.output {
+			gen, err = ip.initKeys(secretManager)
+			if err != nil {
+				return results, err
+			}
 		}
 
-		res, err := ip.getResult(secretManager)
+		res, err := ip.getResult(secretManager, gen)
 		if err != nil {
 			return results, err
 		}
@@ -158,30 +156,47 @@ func (ip *initParams) Execute() (Results, error) {
 	return results, nil
 }
 
-func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) error {
+func (ip *initParams) initKeys(secretsManager secrets.SecretsManager) ([]string, error) {
+	var generated []string
+
 	if ip.generatesNetwork {
-		if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
-			return err
+		if !secretsManager.HasSecret(secrets.NetworkKey) {
+			if _, err := helper.InitNetworkingPrivateKey(secretsManager); err != nil {
+				return generated, fmt.Errorf("error initializing network-key: %w", err)
+			}
+
+			generated = append(generated, secrets.NetworkKey)
 		}
 	}
 
 	if ip.generatesAccount {
-		if secretsManager.HasSecret(secrets.ValidatorKey) {
-			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorKey)
-		}
+		var (
+			a   *wallet.Account
+			err error
+		)
 
-		if secretsManager.HasSecret(secrets.ValidatorBLSKey) {
-			return fmt.Errorf("secrets '%s' has been already initialized", secrets.ValidatorBLSKey)
-		}
+		if !secretsManager.HasSecret(secrets.ValidatorKey) && !secretsManager.HasSecret(secrets.ValidatorBLSKey) {
+			a, err = wallet.GenerateAccount()
+			if err != nil {
+				return generated, fmt.Errorf("error generating account: %w", err)
+			}
 
-		return wallet.GenerateAccount().Save(secretsManager)
+			if err = a.Save(secretsManager); err != nil {
+				return generated, fmt.Errorf("error saving account: %w", err)
+			}
+
+			generated = append(generated, secrets.ValidatorKey, secrets.ValidatorBLSKey)
+		}
 	}
 
-	return nil
+	return generated, nil
 }
 
 // getResult gets keys from secret manager and return result to display
-func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.CommandResult, error) {
+func (ip *initParams) getResult(
+	secretsManager secrets.SecretsManager,
+	generated []string,
+) (command.CommandResult, error) {
 	var (
 		res = &SecretsInitResult{}
 		err error
@@ -196,6 +211,8 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 		res.Address = types.Address(account.Ecdsa.Address())
 		res.BLSPubkey = hex.EncodeToString(account.Bls.PublicKey().Marshal())
 
+		res.Generated = strings.Join(generated, ", ")
+
 		if ip.printPrivateKey {
 			pk, err := account.Ecdsa.MarshallPrivateKey()
 			if err != nil {
@@ -203,6 +220,13 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 			}
 
 			res.PrivateKey = hex.EncodeToString(pk)
+
+			blspk, err := account.Bls.Marshal()
+			if err != nil {
+				return nil, err
+			}
+
+			res.BLSPrivateKey = hex.EncodeToString(blspk)
 		}
 	}
 
@@ -215,28 +239,4 @@ func (ip *initParams) getResult(secretsManager secrets.SecretsManager) (command.
 	res.Insecure = ip.insecureLocalStore
 
 	return res, nil
-}
-
-func getSecretsManager(dataPath, configPath string, insecureLocalStore bool) (secrets.SecretsManager, error) {
-	if configPath != "" {
-		secretsConfig, readErr := secrets.ReadConfig(configPath)
-		if readErr != nil {
-			return nil, errInvalidConfig
-		}
-
-		if !secrets.SupportedServiceManager(secretsConfig.Type) {
-			return nil, errUnsupportedType
-		}
-
-		return helper.InitCloudSecretsManager(secretsConfig)
-	}
-
-	//Storing secrets on a local file system should only be allowed with --insecure flag,
-	//to raise awareness that it should be only used in development/testing environments.
-	//Production setups should use one of the supported secrets managers
-	if !insecureLocalStore {
-		return nil, errSecureLocalStoreNotImplemented
-	}
-
-	return helper.SetupLocalSecretsManager(dataPath)
 }

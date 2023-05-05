@@ -2,11 +2,11 @@ package unstaking
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -16,11 +16,7 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-var (
-	params             unstakeParams
-	unstakeEventABI    = contractsapi.ChildValidatorSet.Abi.Events["Unstaked"]
-	undelegateEventABI = contractsapi.ChildValidatorSet.Abi.Events["Undelegated"]
-)
+var params unstakeParams
 
 func GetCommand() *cobra.Command {
 	unstakeCmd := &cobra.Command{
@@ -39,33 +35,26 @@ func GetCommand() *cobra.Command {
 func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.accountDir,
-		sidechainHelper.AccountDirFlag,
+		polybftsecrets.AccountDirFlag,
 		"",
-		"the directory path where sender account secrets are stored",
-	)
-
-	cmd.Flags().BoolVar(
-		&params.self,
-		sidechainHelper.SelfFlag,
-		false,
-		"indicates if its a self unstake action",
-	)
-
-	cmd.Flags().Uint64Var(
-		&params.amount,
-		sidechainHelper.AmountFlag,
-		0,
-		"amount to unstake or undelegate amount from validator",
+		polybftsecrets.AccountDirFlagDesc,
 	)
 
 	cmd.Flags().StringVar(
-		&params.undelegateAddress,
-		undelegateAddressFlag,
+		&params.accountConfig,
+		polybftsecrets.AccountConfigFlag,
 		"",
-		"account address from which amount will be undelegated",
+		polybftsecrets.AccountConfigFlagDesc,
 	)
 
-	cmd.MarkFlagsMutuallyExclusive(sidechainHelper.SelfFlag, undelegateAddressFlag)
+	cmd.Flags().StringVar(
+		&params.amount,
+		sidechainHelper.AmountFlag,
+		"",
+		"amount to unstake from validator",
+	)
+
+	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -78,7 +67,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	validatorAccount, err := sidechainHelper.GetAccountFromDir(params.accountDir)
+	validatorAccount, err := sidechainHelper.GetAccount(params.accountDir, params.accountConfig)
 	if err != nil {
 		return err
 	}
@@ -89,18 +78,13 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	var encoded []byte
-	if params.self {
-		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["unstake"].Encode([]interface{}{params.amount})
-		if err != nil {
-			return err
-		}
-	} else {
-		encoded, err = contractsapi.ChildValidatorSet.Abi.Methods["undelegate"].Encode(
-			[]interface{}{ethgo.HexToAddress(params.undelegateAddress), params.amount})
-		if err != nil {
-			return err
-		}
+	unstakeFn := &contractsapi.UnstakeValidatorSetFn{
+		Amount: params.amountValue,
+	}
+
+	encoded, err := unstakeFn.EncodeAbi()
+	if err != nil {
+		return err
 	}
 
 	txn := &ethgo.Transaction{
@@ -115,47 +99,36 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("unstake transaction failed on block %d", receipt.BlockNumber)
+	if receipt.Status != uint64(types.ReceiptSuccess) {
+		return fmt.Errorf("unstake transaction failed on block: %d", receipt.BlockNumber)
 	}
+
+	var (
+		withdrawalRegisteredEvent contractsapi.WithdrawalRegisteredEvent
+		foundLog                  bool
+	)
 
 	result := &unstakeResult{
 		validatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
-	var foundLog bool
-
 	// check the logs to check for the result
 	for _, log := range receipt.Logs {
-		if unstakeEventABI.Match(log) {
-			event, err := unstakeEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
+		doesMatch, err := withdrawalRegisteredEvent.ParseLog(log)
+		if err != nil {
+			return err
+		}
 
-			result.isSelfUnstake = true
-			result.amount = event["amount"].(*big.Int).Uint64() //nolint:forcetypeassert
-
+		if doesMatch {
 			foundLog = true
-
-			break
-		} else if undelegateEventABI.Match(log) {
-			event, err := undelegateEventABI.ParseLog(log)
-			if err != nil {
-				return err
-			}
-
-			result.amount = event["amount"].(*big.Int).Uint64()                  //nolint:forcetypeassert
-			result.undelegatedFrom = event["validator"].(ethgo.Address).String() //nolint:forcetypeassert
-
-			foundLog = true
+			result.amount = withdrawalRegisteredEvent.Amount.Uint64()
 
 			break
 		}
 	}
 
 	if !foundLog {
-		return fmt.Errorf("could not find an appropriate log in receipt that unstake or undelegate happened")
+		return fmt.Errorf("could not find an appropriate log in receipt that unstake happened (withdrawal registered)")
 	}
 
 	outputter.WriteCommandResult(result)

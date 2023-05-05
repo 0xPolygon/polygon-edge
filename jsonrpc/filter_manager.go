@@ -265,7 +265,8 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 	// start blockstream with the current header
 	header := store.Header()
 
-	// TODO: Make Header return jsonrpc.block object directly
+	//nolint:godox
+	// TODO: Make Header return jsonrpc.block object directly (to be fixed in EVM-524)
 	block := toBlock(&types.Block{Header: header}, false)
 	m.blockStream = newBlockStream(block)
 
@@ -570,7 +571,7 @@ func (f *FilterManager) refreshFilterTimeout(filter *filterBase) {
 
 // addFilterTimeout set timeout and add to heap
 func (f *FilterManager) addFilterTimeout(filter *filterBase) {
-	filter.expiresAt = time.Now().Add(f.timeout)
+	filter.expiresAt = time.Now().UTC().Add(f.timeout)
 	f.timeouts.addFilter(filter)
 	f.emitSignalToUpdateCh()
 }

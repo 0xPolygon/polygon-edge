@@ -123,7 +123,7 @@ func (c *state) Halt() {
 
 func (c *state) exit(err error) {
 	if err == nil {
-		panic("cannot stop with none")
+		return
 	}
 
 	c.stop = true

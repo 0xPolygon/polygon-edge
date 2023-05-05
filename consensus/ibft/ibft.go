@@ -34,16 +34,15 @@ const (
 )
 
 var (
-	ErrInvalidHookParam             = errors.New("invalid IBFT hook param passed in")
-	ErrProposerSealByNonValidator   = errors.New("proposer seal by non-validator")
-	ErrInvalidMixHash               = errors.New("invalid mixhash")
-	ErrInvalidSha3Uncles            = errors.New("invalid sha3 uncles")
-	ErrWrongDifficulty              = errors.New("wrong difficulty")
-	ErrParentCommittedSealsNotFound = errors.New("parent committed seals not found")
+	ErrInvalidHookParam           = errors.New("invalid IBFT hook param passed in")
+	ErrProposerSealByNonValidator = errors.New("proposer seal by non-validator")
+	ErrInvalidMixHash             = errors.New("invalid mixhash")
+	ErrInvalidSha3Uncles          = errors.New("invalid sha3 uncles")
+	ErrWrongDifficulty            = errors.New("wrong difficulty")
 )
 
 type txPoolInterface interface {
-	Prepare()
+	Prepare(uint64)
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
@@ -550,6 +549,11 @@ func (i *backendIBFT) SetHeaderHash() {
 // GetBridgeProvider returns an instance of BridgeDataProvider
 func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
+}
+
+// FilterExtra is the implementation of Consensus interface
+func (i *backendIBFT) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
 }
 
 // updateCurrentModules updates Signer, Hooks, and Validators

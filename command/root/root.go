@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/0xPolygon/polygon-edge/command/backup"
+	"github.com/0xPolygon/polygon-edge/command/bridge"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/ibft"
@@ -14,8 +15,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
 	"github.com/0xPolygon/polygon-edge/command/polybft"
-	"github.com/0xPolygon/polygon-edge/command/polybftmanifest"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/command/regenesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain"
 	"github.com/0xPolygon/polygon-edge/command/secrets"
 	"github.com/0xPolygon/polygon-edge/command/server"
@@ -60,7 +61,8 @@ func (rc *RootCommand) registerSubCommands() {
 		license.GetCommand(),
 		polybftsecrets.GetCommand(),
 		polybft.GetCommand(),
-		polybftmanifest.GetCommand(),
+		bridge.GetCommand(),
+		regenesis.GetCommand(),
 	)
 }
 

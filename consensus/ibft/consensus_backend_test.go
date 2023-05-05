@@ -13,7 +13,7 @@ func TestIBFTBackend_CalculateHeaderTimestamp(t *testing.T) {
 	t.Parallel()
 
 	// Reference time
-	now := time.Unix(time.Now().Unix(), 0) // Round down
+	now := time.Unix(time.Now().UTC().Unix(), 0) // Round down
 
 	testTable := []struct {
 		name            string
@@ -66,7 +66,7 @@ func TestIBFTBackend_RoundUpTime(t *testing.T) {
 	t.Parallel()
 
 	// Reference time
-	now := time.Now()
+	now := time.Now().UTC()
 
 	calcExpected := func(time int64, multiple int64) int64 {
 		if time%multiple == 0 {

@@ -29,7 +29,6 @@ func BuildBlock(params BuildBlockParams) *types.Block {
 		header.ReceiptsRoot = buildroot.CalculateReceiptsRoot(params.Receipts)
 	}
 
-	// TODO: Compute uncles
 	header.Sha3Uncles = types.EmptyUncleHash
 	header.ComputeHash()
 

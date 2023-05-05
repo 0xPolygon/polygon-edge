@@ -20,35 +20,32 @@ case "$1" in
          "ibft")
          if [ -f "$GENESIS_PATH" ]; then
               echo "Secrets have already been generated."
-          else
+         else
               echo "Generating secrets..."
               secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"
               echo "Generating IBFT Genesis file..."
-              cd /data && /polygon-edge/polygon-edge genesis  $CHAIN_CUSTOM_OPTIONS \
+              cd /data && /polygon-edge/polygon-edge genesis $CHAIN_CUSTOM_OPTIONS \
                 --dir genesis.json \
                 --consensus ibft \
                 --ibft-validators-prefix-path data- \
-                --validator-set-size=4 \
-                --bootnode /dns4/node-1/tcp/1478/p2p/$(echo $secrets | jq -r '.[0] | .node_id') \
-                --bootnode /dns4/node-2/tcp/1478/p2p/$(echo $secrets | jq -r '.[1] | .node_id') \
+                --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
+                --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')"
+         fi
               ;;
           "polybft")
               echo "Generating PolyBFT secrets..."
               secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"
 
-              echo "Generating manifest..."
-              "$POLYGON_EDGE_BIN" manifest --path /data/manifest.json --validators-path /data --validators-prefix data-
-
               echo "Generating PolyBFT Genesis file..."
               "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
                 --dir /data/genesis.json \
                 --consensus polybft \
-                --manifest /data/manifest.json \
-                --validator-set-size=4 \
-                --bootnode /dns4/node-1/tcp/1478/p2p/$(echo $secrets | jq -r '.[0] | .node_id') \
-                --bootnode /dns4/node-2/tcp/1478/p2p/$(echo $secrets | jq -r '.[1] | .node_id')
+                --validators-path /data \ 
+                --validators-prefix data- \
+                --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
+                --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')"
               ;;
       esac
       ;;

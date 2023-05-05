@@ -26,6 +26,9 @@ type Header struct {
 	MixHash      Hash
 	Nonce        Nonce
 	Hash         Hash
+
+	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
+	BaseFee uint64
 }
 
 func (h *Header) Equal(hh *Header) bool {
@@ -75,6 +78,7 @@ func (h *Header) Copy() *Header {
 		GasLimit:     h.GasLimit,
 		GasUsed:      h.GasUsed,
 		Timestamp:    h.Timestamp,
+		BaseFee:      h.BaseFee,
 	}
 
 	newHeader.Miner = make([]byte, len(h.Miner))
@@ -102,7 +106,7 @@ type Block struct {
 	Uncles       []*Header
 
 	// Cache
-	size atomic.Value // *uint64
+	size atomic.Pointer[uint64]
 }
 
 func (b *Block) Hash() Hash {
@@ -134,12 +138,7 @@ func (b *Block) Size() uint64 {
 		return size
 	}
 
-	sizeVal, ok := sizePtr.(*uint64)
-	if !ok {
-		return 0
-	}
-
-	return *sizeVal
+	return *sizePtr
 }
 
 func (b *Block) String() string {

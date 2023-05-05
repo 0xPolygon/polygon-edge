@@ -5,5 +5,3 @@
 [submodule "core-contracts"]
 	path = core-contracts
 	url = https://github.com/0xPolygon/core-contracts
-	shallow = true
-	branch = feat-polybft-release

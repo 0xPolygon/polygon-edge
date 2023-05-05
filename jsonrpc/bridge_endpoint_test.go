@@ -11,7 +11,7 @@ import (
 func TestBridgeEndpoint(t *testing.T) {
 	store := newMockStore()
 
-	dispatcher := newDispatcher(
+	dispatcher := newTestDispatcher(t,
 		hclog.NewNullLogger(),
 		store,
 		&dispatcherParams{
@@ -26,7 +26,7 @@ func TestBridgeEndpoint(t *testing.T) {
 
 	msg := []byte(`{
 		"method": "bridge_generateExitProof",
-		"params": ["0x0001", "0x0001", "0x0002"],
+		"params": ["0x0001"],
 		"id": 1
 	}`)
 

@@ -10,12 +10,12 @@ bindata:
 
 .PHONY: protoc
 protoc:
-	protoc --go_out=. --go-grpc_out=. ./server/proto/*.proto
-	#protoc --go_out=. --go-grpc_out=. ./protocol/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./network/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./txpool/proto/*.proto
-	protoc --go_out=. --go-grpc_out=. ./consensus/ibft/**/*.proto
-	protoc --go_out=. --go-grpc_out=. ./consensus/polybft/**/*.proto
+	protoc --go_out=. --go-grpc_out=. -I . -I=./validate --validate_out="lang=go:." \
+	 ./server/proto/*.proto \
+	 ./network/proto/*.proto \
+	 ./txpool/proto/*.proto	\
+	 ./consensus/ibft/**/*.proto \
+	 ./consensus/polybft/**/*.proto
 
 .PHONY: build
 build:
@@ -40,7 +40,11 @@ generate-bsd-licenses:
 
 .PHONY: test
 test:
-	go test -coverprofile coverage.out -timeout=20m `go list ./... | grep -v e2e`
+	go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
+
+.PHONY: fuzz-test
+fuzz-test:
+	./scripts/fuzzAll
 
 .PHONY: test-e2e
 test-e2e:
@@ -54,7 +58,14 @@ test-e2e:
 test-e2e-polybft:
     # We can not build with race because of a bug in boltdb dependency
 	go build -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/...
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
+	go test -v -timeout=1h ./e2e-polybft/e2e/...
+
+.PHONY: test-property-polybft
+test-property-polybft:
+    # We can not build with race because of a bug in boltdb dependency
+	go build -o artifacts/polygon-edge .
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/...
 
 .PHONY: compile-core-contracts
 compile-core-contracts:

@@ -185,13 +185,6 @@ func setFlags(cmd *cobra.Command) {
 		"maximum number of enqueued transactions per account",
 	)
 
-	cmd.Flags().Uint64Var(
-		&params.rawConfig.BlockTime,
-		blockTimeFlag,
-		defaultConfig.BlockTime,
-		"minimum block time in seconds (at least 1s)",
-	)
-
 	cmd.Flags().StringArrayVar(
 		&params.corsAllowedOrigins,
 		corsOriginFlag,
@@ -226,6 +219,13 @@ func setFlags(cmd *cobra.Command) {
 		relayerFlag,
 		defaultConfig.Relayer,
 		"start the state sync relayer service (PolyBFT only)",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.NumBlockConfirmations,
+		numBlockConfirmationsFlag,
+		defaultConfig.NumBlockConfirmations,
+		"minimal number of child blocks required for the parent block to be considered final",
 	)
 
 	setLegacyFlags(cmd)

@@ -1,21 +1,24 @@
 package polybft
 
 import (
+	"encoding/hex"
 	"errors"
 	"math/big"
 	"strconv"
 	"testing"
 
 	"github.com/umbracle/ethgo/abi"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -33,7 +36,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	var aliases = []string{"A", "B", "C", "D", "E"}
 
-	validators := newTestValidatorsWithAliases(aliases)
+	validators := newTestValidatorsWithAliases(t, aliases)
 	validatorsMetadata := validators.getPublicIdentities()
 	txRelayerMock := newDummyTxRelayer(t)
 	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
@@ -58,7 +61,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	validators.iterAcct(aliases, func(t *testValidator) {
 		bitmap.Set(idx)
-		signatures = append(signatures, t.mustSign(dummyMsg))
+		signatures = append(signatures, t.mustSign(dummyMsg, bls.DomainCheckpointManager))
 		idx++
 	})
 
@@ -77,7 +80,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 			extra.Checkpoint = checkpoint
 			extra.Committed = &Signature{Bitmap: bitmap, AggregatedSignature: signature}
 			header = &types.Header{
-				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
+				ExtraData: extra.MarshalRLPTo(nil),
 			}
 			epochNumber++
 		} else {
@@ -96,7 +99,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
 		key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
-		txRelayer:        txRelayerMock,
+		rootChainRelayer: txRelayerMock,
 		consensusBackend: backendMock,
 		blockchain:       blockchainMock,
 		logger:           hclog.NewNullLogger(),
@@ -119,8 +122,8 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 
 	const epochSize = uint64(10)
 
-	currentValidators := newTestValidatorsWithAliases([]string{"A", "B", "C", "D"})
-	nextValidators := newTestValidatorsWithAliases([]string{"E", "F", "G", "H"})
+	currentValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
+	nextValidators := newTestValidatorsWithAliases(t, []string{"E", "F", "G", "H"})
 	header := &types.Header{Number: 50}
 	checkpoint := &CheckpointData{
 		BlockRound:  1,
@@ -136,7 +139,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	var signatures bls.Signatures
 
 	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signatures = append(signatures, v.mustSign(proposalHash))
+		signatures = append(signatures, v.mustSign(proposalHash, bls.DomainCheckpointManager))
 		bmp.Set(i)
 		i++
 	})
@@ -149,7 +152,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 		AggregatedSignature: aggSignature,
 		Bitmap:              bmp,
 	}
-	header.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+	header.ExtraData = extra.MarshalRLPTo(nil)
 	header.ComputeHash()
 
 	backendMock := new(polybftBackendMock)
@@ -163,7 +166,7 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
-	submit := &contractsapi.SubmitFunction{}
+	submit := &contractsapi.SubmitCheckpointManagerFn{}
 	require.NoError(t, submit.DecodeAbi(checkpointDataEncoded))
 
 	require.Equal(t, new(big.Int).SetUint64(checkpoint.EpochNumber), submit.Checkpoint.Epoch)
@@ -210,11 +213,13 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 				Return(c.checkpointID, c.returnError).
 				Once()
+			acc, err := wallet.GenerateAccount()
+			require.NoError(t, err)
 
 			checkpointMgr := &checkpointManager{
-				txRelayer: txRelayerMock,
-				key:       wallet.GenerateAccount().Ecdsa,
-				logger:    hclog.NewNullLogger(),
+				rootChainRelayer: txRelayerMock,
+				key:              acc.Ecdsa,
+				logger:           hclog.NewNullLogger(),
 			}
 			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
 			if c.errSubstring == "" {
@@ -295,6 +300,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		receipts[i] = &types.Receipt{Logs: []*types.Log{
 			createTestLogForExitEvent(t, uint64(i)),
 		}}
+		receipts[i].SetStatus(types.ReceiptSuccess)
 	}
 
 	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}, Receipts: receipts},
@@ -307,7 +313,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.IsEpochEndingBlock = false
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -320,12 +326,13 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.IsEpochEndingBlock = true
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
-			return exitEvent.BlockNumber == block
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+			return exitEvent.BlockNumber == block+1
 		})
 
 		require.NoError(t, err)
 		require.Len(t, exitEvents, numOfReceipts)
+		require.Equal(t, uint64(block+1), exitEvents[0].BlockNumber)
 		require.Equal(t, uint64(epoch+1), exitEvents[0].EpochNumber)
 	})
 }
@@ -341,12 +348,12 @@ func TestCheckpointManager_BuildEventRoot(t *testing.T) {
 	state := newTestState(t)
 	checkpointManager := &checkpointManager{state: state}
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
 
 	t.Run("Get exit event root hash", func(t *testing.T) {
 		t.Parallel()
 
-		tree, err := NewMerkleTree(encodedEvents)
+		tree, err := createExitTree(encodedEvents)
 		require.NoError(t, err)
 
 		hash, err := checkpointManager.BuildEventRoot(1)
@@ -367,30 +374,59 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	t.Parallel()
 
 	const (
-		numOfBlocks         = 10
-		numOfEventsPerBlock = 2
+		numOfBlocks           = 10
+		numOfEventsPerBlock   = 2
+		correctBlockToGetExit = 1
+		futureBlockToGetExit  = 2
 	)
 
 	state := newTestState(t)
-	checkpointManager := &checkpointManager{
-		state: state,
+
+	// setup mocks for valid case
+	foundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+		"isFound":         true,
+		"checkpointBlock": 1,
+	})
+	require.NoError(t, err)
+
+	getCheckpointBlockFn := &contractsapi.GetCheckpointBlockCheckpointManagerFn{
+		BlockNumber: new(big.Int).SetUint64(correctBlockToGetExit),
 	}
 
-	encodedEvents := setupExitEventsForProofVerification(t, state, numOfBlocks, numOfEventsPerBlock)
+	input, err := getCheckpointBlockFn.EncodeAbi()
+	require.NoError(t, err)
+
+	dummyTxRelayer := newDummyTxRelayer(t)
+	dummyTxRelayer.On("Call", ethgo.ZeroAddress, ethgo.ZeroAddress, input).
+		Return(hex.EncodeToString(foundCheckpointReturn), error(nil))
+
+	// create checkpoint manager and insert exit events
+	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
+		createTestKey(t)),
+		0,
+		types.ZeroAddress,
+		dummyTxRelayer,
+		nil,
+		nil,
+		hclog.NewNullLogger(),
+		state)
+
+	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := encodeExitEvents(t, exitEvents)
 	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
 
 	// manually create merkle tree for a desired checkpoint to verify the generated proof
-	tree, err := NewMerkleTree(checkpointEvents)
+	tree, err := merkle.NewMerkleTree(checkpointEvents)
 	require.NoError(t, err)
 
-	proof, err := checkpointManager.GenerateExitProof(1, 1, 1)
+	proof, err := checkpointMgr.GenerateExitProof(correctBlockToGetExit)
 	require.NoError(t, err)
 	require.NotNil(t, proof)
 
 	t.Run("Generate and validate exit proof", func(t *testing.T) {
 		t.Parallel()
 		// verify generated proof on desired tree
-		require.NoError(t, VerifyProof(1, encodedEvents[1], proof.Data, tree.Hash()))
+		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], proof.Data, tree.Hash()))
 	})
 
 	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
@@ -402,14 +438,36 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 		invalidProof[0][0]++
 
 		// verify generated proof on desired tree
-		require.ErrorContains(t, VerifyProof(1, encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+		require.ErrorContains(t, merkle.VerifyProof(correctBlockToGetExit,
+			encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
 	})
 
 	t.Run("Generate exit proof - no event", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := checkpointManager.GenerateExitProof(21, 1, 1)
+		_, err := checkpointMgr.GenerateExitProof(21)
 		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
+
+	t.Run("Generate exit proof - future lookup where checkpoint not yet submitted", func(t *testing.T) {
+		t.Parallel()
+
+		// setup mocks for invalid case
+		notFoundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+			"isFound":         false,
+			"checkpointBlock": 0,
+		})
+		require.NoError(t, err)
+
+		getCheckpointBlockFn.BlockNumber = new(big.Int).SetUint64(futureBlockToGetExit)
+		inputTwo, err := getCheckpointBlockFn.EncodeAbi()
+		require.NoError(t, err)
+
+		dummyTxRelayer.On("Call", ethgo.ZeroAddress, ethgo.ZeroAddress, inputTwo).
+			Return(hex.EncodeToString(notFoundCheckpointReturn), error(nil))
+
+		_, err = checkpointMgr.GenerateExitProof(futureBlockToGetExit)
+		require.ErrorContains(t, err, "checkpoint block not found for exit ID")
 	})
 }
 
@@ -449,10 +507,14 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
+func (d *dummyTxRelayer) Client() *jsonrpc.Client {
+	return nil
+}
+
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 	t.Helper()
 
-	submit := &contractsapi.SubmitFunction{}
+	submit := &contractsapi.SubmitCheckpointManagerFn{}
 	require.NoError(t, submit.DecodeAbi(input))
 
 	return submit.Checkpoint.BlockNumber.Uint64()
@@ -461,9 +523,11 @@ func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {
 func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	t.Helper()
 
+	var exitEvent contractsapi.L2StateSyncedEvent
+
 	topics := make([]types.Hash, 4)
-	topics[0] = types.Hash(exitEventABI.ID())
-	topics[1] = types.BytesToHash(itob(exitEventID))
+	topics[0] = types.Hash(exitEvent.Sig())
+	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
 	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
 	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
 	someType := abi.MustNewType("tuple(string firstName, string lastName)")

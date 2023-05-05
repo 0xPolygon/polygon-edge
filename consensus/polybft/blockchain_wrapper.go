@@ -54,7 +54,7 @@ type blockchainBackend interface {
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
 	// GetSystemState creates a new instance of SystemState interface
-	GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState
+	GetSystemState(provider contract.Provider) SystemState
 
 	SubscribeEvents() blockchain.Subscription
 
@@ -95,7 +95,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 
 	// apply transactions from block
 	for _, tx := range block.Transactions {
-		if err := transition.Write(tx); err != nil {
+		if err = transition.Write(tx); err != nil {
 			return nil, fmt.Errorf("process block tx error, tx = %v, err = %w", tx.Hash, err)
 		}
 	}
@@ -165,14 +165,15 @@ func (p *blockchainWrapper) NewBlockBuilder(
 		Coinbase:  coinbase,
 		Executor:  p.executor,
 		GasLimit:  gasLimit,
+		BaseFee:   p.blockchain.CalculateBaseFee(parent),
 		TxPool:    txPool,
 		Logger:    logger,
 	}), nil
 }
 
 // GetSystemState is an implementation of blockchainBackend interface
-func (p *blockchainWrapper) GetSystemState(config *PolyBFTConfig, provider contract.Provider) SystemState {
-	return NewSystemState(config, provider)
+func (p *blockchainWrapper) GetSystemState(provider contract.Provider) SystemState {
+	return NewSystemState(contracts.ValidatorSetContract, contracts.StateReceiverContract, provider)
 }
 
 func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
@@ -208,5 +209,5 @@ func (s *stateProvider) Call(addr ethgo.Address, input []byte, opts *contract.Ca
 // Txn is part of the contract.Provider interface to make Ethereum transactions. We disable this function
 // since the system state does not make any transaction
 func (s *stateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, error) {
-	panic(errSendTxnUnsupported)
+	return nil, errSendTxnUnsupported
 }

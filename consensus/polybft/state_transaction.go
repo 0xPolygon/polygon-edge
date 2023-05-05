@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -20,7 +21,7 @@ const (
 // PendingCommitment holds merkle trie of bridge transactions accompanied by epoch number
 type PendingCommitment struct {
 	*contractsapi.StateSyncCommitment
-	MerkleTree *MerkleTree
+	MerkleTree *merkle.MerkleTree
 	Epoch      uint64
 }
 
@@ -79,12 +80,17 @@ func (cm *CommitmentMessageSigned) VerifyStateSyncProof(proof []types.Hash,
 		return errors.New("no state sync event")
 	}
 
+	if stateSync.ID.Uint64() < cm.Message.StartID.Uint64() ||
+		stateSync.ID.Uint64() > cm.Message.EndID.Uint64() {
+		return errors.New("invalid state sync ID")
+	}
+
 	hash, err := stateSync.EncodeAbi()
 	if err != nil {
 		return err
 	}
 
-	return VerifyProof(stateSync.ID.Uint64()-cm.Message.StartID.Uint64(),
+	return merkle.VerifyProof(stateSync.ID.Uint64()-cm.Message.StartID.Uint64(),
 		hash, proof, cm.Message.Root)
 }
 
@@ -101,7 +107,7 @@ func (cm *CommitmentMessageSigned) EncodeAbi() ([]byte, error) {
 		return nil, err
 	}
 
-	commit := &contractsapi.CommitFunction{
+	commit := &contractsapi.CommitStateReceiverFn{
 		Commitment: cm.Message,
 		Signature:  cm.AggSignature.AggregatedSignature,
 		Bitmap:     blsVerificationPart,
@@ -116,7 +122,7 @@ func (cm *CommitmentMessageSigned) DecodeAbi(txData []byte) error {
 		return fmt.Errorf("invalid commitment data, len = %d", len(txData))
 	}
 
-	commit := contractsapi.CommitFunction{}
+	commit := contractsapi.CommitStateReceiverFn{}
 
 	err := commit.DecodeAbi(txData)
 	if err != nil {
@@ -162,14 +168,22 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 
 	sig := txData[:abiMethodIDLength]
 
-	var obj contractsapi.StateTransactionInput
+	var (
+		commitFn            contractsapi.CommitStateReceiverFn
+		commitEpochFn       contractsapi.CommitEpochValidatorSetFn
+		distributeRewardsFn contractsapi.DistributeRewardForRewardPoolFn
+		obj                 contractsapi.StateTransactionInput
+	)
 
-	if bytes.Equal(sig, contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
+	if bytes.Equal(sig, commitFn.Sig()) {
 		// bridge commitment
 		obj = &CommitmentMessageSigned{}
-	} else if bytes.Equal(sig, contractsapi.ChildValidatorSet.Abi.Methods["commitEpoch"].ID()) {
+	} else if bytes.Equal(sig, commitEpochFn.Sig()) {
 		// commit epoch
-		obj = &contractsapi.CommitEpochFunction{}
+		obj = &contractsapi.CommitEpochValidatorSetFn{}
+	} else if bytes.Equal(sig, distributeRewardsFn.Sig()) {
+		// distribute rewards
+		obj = &contractsapi.DistributeRewardForRewardPoolFn{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}
@@ -182,11 +196,12 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 }
 
 func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageSigned, error) {
+	var commitFn contractsapi.CommitStateReceiverFn
 	for _, tx := range txs {
 		// skip non state CommitmentMessageSigned transactions
 		if tx.Type != types.StateTx ||
 			len(tx.Input) < abiMethodIDLength ||
-			!bytes.Equal(tx.Input[:abiMethodIDLength], contractsapi.StateReceiver.Abi.Methods["commit"].ID()) {
+			!bytes.Equal(tx.Input[:abiMethodIDLength], commitFn.Sig()) {
 			continue
 		}
 
@@ -202,7 +217,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 	return nil, nil
 }
 
-func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*MerkleTree, error) {
+func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*merkle.MerkleTree, error) {
 	ssh := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {
@@ -214,5 +229,5 @@ func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*Merkle
 		ssh[i] = data
 	}
 
-	return NewMerkleTree(ssh)
+	return merkle.NewMerkleTree(ssh)
 }
