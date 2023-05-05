@@ -140,14 +140,15 @@ func IsValidAddress(address string) error {
 		address = address[2:]
 	}
 
-	// check if the address has the correct length
-	if len(address) != 2*AddressLength {
-		return fmt.Errorf("address %s has invalid length", address)
+	// decode the address
+	decodedAddress, err := hex.DecodeString(address)
+	if err != nil {
+		return fmt.Errorf("address %s contains invalid characters", address)
 	}
 
-	// decode the address
-	if _, err := hex.DecodeString(address); err != nil {
-		return fmt.Errorf("address %s contains invalid characters", address)
+	// check if the address has the correct length
+	if len(decodedAddress) != AddressLength {
+		return fmt.Errorf("address %s has invalid length", address)
 	}
 
 	return nil
