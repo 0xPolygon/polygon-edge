@@ -272,8 +272,11 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.True(t, isFirstValidatorFound)
 	require.True(t, isSecondValidatorFound)
 
+	currentBlock, err := owner.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
+	require.NoError(t, err)
+
 	// wait for couple of epochs to have some rewards accumulated
-	require.NoError(t, cluster.WaitForBlock(polybftConfig.EpochSize*7, time.Minute))
+	require.NoError(t, cluster.WaitForBlock(currentBlock.Number+(polybftConfig.EpochSize*2), time.Minute))
 
 	bigZero := big.NewInt(0)
 

@@ -427,9 +427,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	allContracts = append(tokenContracts, allContracts...)
 
 	g, ctx := errgroup.WithContext(cmdCtx)
-	resultsCh := make(chan *deployContractResult, len(allContracts))
+	results := make([]*deployContractResult, len(allContracts))
 
-	for _, contract := range allContracts {
+	for i, contract := range allContracts {
+		i := i
 		contract := contract
 
 		g.Go(func() error {
@@ -444,14 +445,14 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 
 				receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed sending %s contract deploy transaction: %w", contract.name, err)
 				}
 
 				if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
 					return fmt.Errorf("deployment of %s contract failed", contract.name)
 				}
 
-				resultsCh <- newDeployContractsResult(contract.name,
+				results[i] = newDeployContractsResult(contract.name,
 					types.Address(receipt.ContractAddress),
 					receipt.TransactionHash)
 
@@ -461,12 +462,20 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	if err := g.Wait(); err != nil {
+		_, _ = outputter.Write([]byte("[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"))
+
+		for _, result := range results {
+			if result != nil {
+				// In case an error happened, some of the indices may not be populated.
+				// Filter those out.
+				outputter.WriteCommandResult(result)
+			}
+		}
+
 		return nil, 0, err
 	}
 
-	close(resultsCh)
-
-	for result := range resultsCh {
+	for _, result := range results {
 		populatorFn, ok := metadataPopulatorMap[result.Name]
 		if !ok {
 			return nil, 0, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)

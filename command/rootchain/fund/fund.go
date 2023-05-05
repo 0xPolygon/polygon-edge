@@ -107,7 +107,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		rootTokenAddr = types.StringToAddress(params.nativeRootTokenAddr)
 	}
 
-	cmdResults := make(chan command.CommandResult, len(params.addresses))
+	results := make([]command.CommandResult, len(params.addresses))
 	g, ctx := errgroup.WithContext(cmd.Context())
 
 	for i := 0; i < len(params.addresses); i++ {
@@ -153,7 +153,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					}
 				}
 
-				cmdResults <- &result{
+				results[i] = &result{
 					ValidatorAddr: validatorAddr,
 					TxHash:        types.Hash(receipt.TransactionHash),
 					IsMinted:      params.mintRootToken,
@@ -166,15 +166,17 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	if err := g.Wait(); err != nil {
 		outputter.SetError(err)
+		_, _ = outputter.Write([]byte("[ROOTCHAIN FUND] Successfully funded following accounts\n"))
+
+		for _, result := range results {
+			if result != nil {
+				// In case an error happened, some of the indices may not be populated.
+				// Filter those out.
+				outputter.SetCommandResult(result)
+			}
+		}
 
 		return
-	}
-
-	close(cmdResults)
-
-	results := []command.CommandResult{}
-	for result := range cmdResults {
-		results = append(results, result)
 	}
 
 	outputter.SetCommandResult(command.Results(results))
