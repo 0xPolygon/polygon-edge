@@ -462,7 +462,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	if err := g.Wait(); err != nil {
-		_, _ = outputter.Write([]byte("[ROOTCHAIN - DEPLOY] Succesfully deployed the following contracts\n"))
+		_, _ = outputter.Write([]byte("[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"))
 
 		for _, result := range results {
 			outputter.WriteCommandResult(result)
