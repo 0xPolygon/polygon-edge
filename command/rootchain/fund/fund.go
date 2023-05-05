@@ -167,7 +167,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	if err := g.Wait(); err != nil {
 		outputter.SetError(err)
 		_, _ = outputter.Write([]byte("[ROOTCHAIN FUND] Successfully funded following accounts\n"))
-		outputter.SetCommandResult(command.Results(results))
+
+		for _, result := range results {
+			if result != nil {
+				// In case an error happened, some of the indices may not be populated.
+				// Filter those out.
+				outputter.SetCommandResult(result)
+			}
+		}
 
 		return
 	}
