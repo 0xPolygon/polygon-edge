@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -32,25 +33,18 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(
-		&params.dataDir,
-		polybftsecrets.AccountDirFlag,
-		"",
-		polybftsecrets.AccountDirFlagDesc,
+	cmd.Flags().StringSliceVar(
+		&params.addresses,
+		addressesFlag,
+		nil,
+		"validator addresses",
 	)
 
-	cmd.Flags().StringVar(
-		&params.configPath,
-		polybftsecrets.AccountConfigFlag,
-		"",
-		polybftsecrets.AccountConfigFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.amount,
-		amountFlag,
-		"",
-		"tokens amount which is funded to validator on a root chain",
+	cmd.Flags().StringSliceVar(
+		&params.amounts,
+		amountsFlag,
+		nil,
+		"token amounts which is funded to validator on a root chain",
 	)
 
 	cmd.Flags().StringVar(
@@ -80,10 +74,6 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		polybftsecrets.PrivateKeyFlagDesc,
 	)
-
-	// Don't accept data-dir and config flags because they are related to different secrets managers.
-	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
-	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
 }
 
 func preRunCommand(_ *cobra.Command, _ []string) error {
@@ -101,91 +91,91 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if err := params.initSecretsManager(); err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	validatorAddr, err := params.getValidatorAccount()
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	gasPrice, err := txRelayer.Client().Eth().GasPrice()
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	fundAddr := ethgo.Address(validatorAddr)
-	txn := &ethgo.Transaction{
-		To:       &fundAddr,
-		Value:    params.amountValue,
-		GasPrice: gasPrice,
-	}
-
-	receipt, err := txRelayer.SendTransactionLocal(txn)
-	if err != nil {
-		outputter.SetError(err)
-
-		return
-	}
-
-	if receipt.Status == uint64(types.ReceiptFailed) {
-		_, _ = outputter.Write([]byte(fmt.Sprintf("failed to fund validator '%s'", validatorAddr.String())))
-
-		return
-	}
-
-	result := &result{
-		ValidatorAddr: validatorAddr,
-		TxHash:        types.Hash(receipt.TransactionHash),
-	}
+	var (
+		deployerKey   ethgo.Key
+		rootTokenAddr types.Address
+	)
 
 	if params.mintRootToken {
-		depositorKey, err := helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+		deployerKey, err = helper.GetRootchainPrivateKey(params.deployerPrivateKey)
 		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize depositor private key: %w", err))
+			outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 
 			return
 		}
 
-		rootTokenAddr := types.StringToAddress(params.nativeRootTokenAddr)
-
-		// mint tokens to validator, so he is able to send them
-		mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, params.amountValue)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("mint transaction creation failed for validator: %s. err: %w", validatorAddr, err))
-
-			return
-		}
-
-		mintTxn.GasPrice, err = txRelayer.Client().Eth().GasPrice()
-		if err != nil {
-			outputter.SetError(err)
-
-			return
-		}
-
-		receipt, err := txRelayer.SendTransaction(mintTxn, depositorKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s. err: %w", validatorAddr, err))
-
-			return
-		}
-
-		if receipt.Status == uint64(types.ReceiptFailed) {
-			outputter.SetError(fmt.Errorf("failed to mint tokens to depositor %s", validatorAddr))
-
-			return
-		}
-
-		result.IsMinted = true
+		rootTokenAddr = types.StringToAddress(params.nativeRootTokenAddr)
 	}
 
-	outputter.SetCommandResult(command.Results([]command.CommandResult{result}))
+	cmdResults := make(chan command.CommandResult, len(params.addresses))
+	g, ctx := errgroup.WithContext(cmd.Context())
+
+	for i := 0; i < len(params.addresses); i++ {
+		i := i
+
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+
+			default:
+				validatorAddr := types.StringToAddress(params.addresses[i])
+				fundAddr := ethgo.Address(validatorAddr)
+				txn := &ethgo.Transaction{
+					To:    &fundAddr,
+					Value: params.amountValues[i],
+				}
+
+				receipt, err := txRelayer.SendTransactionLocal(txn)
+				if err != nil {
+					return fmt.Errorf("failed to send fund validator '%s' transaction: %w", validatorAddr, err)
+				}
+
+				if receipt.Status == uint64(types.ReceiptFailed) {
+					return fmt.Errorf("failed to fund validator '%s'", validatorAddr)
+				}
+
+				if params.mintRootToken {
+					// mint tokens to validator, so he is able to send them
+					mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, params.amountValues[i])
+					if err != nil {
+						return fmt.Errorf("failed to create mint native tokens transaction for validator '%s'. err: %w",
+							validatorAddr, err)
+					}
+
+					receipt, err := txRelayer.SendTransaction(mintTxn, deployerKey)
+					if err != nil {
+						return fmt.Errorf("failed to send mint native tokens transaction to validator '%s'. err: %w", validatorAddr, err)
+					}
+
+					if receipt.Status == uint64(types.ReceiptFailed) {
+						return fmt.Errorf("failed to mint native tokens to validator '%s'", validatorAddr)
+					}
+				}
+
+				cmdResults <- &result{
+					ValidatorAddr: validatorAddr,
+					TxHash:        types.Hash(receipt.TransactionHash),
+					IsMinted:      params.mintRootToken,
+				}
+			}
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		outputter.SetError(err)
+
+		return
+	}
+
+	close(cmdResults)
+
+	results := []command.CommandResult{}
+	for result := range cmdResults {
+		results = append(results, result)
+	}
+
+	outputter.SetCommandResult(command.Results(results))
 }

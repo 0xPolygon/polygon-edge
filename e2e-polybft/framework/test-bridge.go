@@ -17,6 +17,7 @@ import (
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"golang.org/x/sync/errgroup"
 )
@@ -291,14 +292,17 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig
 		return fmt.Errorf("could not get validator secrets on initial rootchain funding of genesis validators: %w", err)
 	}
 
+	balances := make([]*big.Int, len(polybftConfig.InitialValidatorSet))
+	secrets := make([]string, len(validatorSecrets))
+
 	for i, secret := range validatorSecrets {
-		err := t.FundSingleValidator(
-			polybftConfig.Bridge.RootNativeERC20Addr,
-			path.Join(t.clusterConfig.TmpDir, secret),
-			polybftConfig.InitialValidatorSet[i].Balance)
-		if err != nil {
-			return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
-		}
+		secrets[i] = path.Join(t.clusterConfig.TmpDir, secret)
+		balances[i] = polybftConfig.InitialValidatorSet[i].Balance
+	}
+
+	if err := t.FundValidators(polybftConfig.Bridge.RootNativeERC20Addr,
+		secrets, balances); err != nil {
+		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
 
 	return nil
@@ -424,19 +428,36 @@ func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.P
 	return nil
 }
 
-// FundSingleValidator sends tokens to a rootchain validators
-func (t *TestBridge) FundSingleValidator(tookenAddress types.Address, secretsPath string, amount *big.Int) error {
+// FundValidators sends tokens to a rootchain validators
+func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
+	if len(secretsPaths) != len(amounts) {
+		return errors.New("expected the same length of secrets paths and amounts")
+	}
+
 	args := []string{
 		"rootchain",
 		"fund",
-		"--" + polybftsecrets.AccountDirFlag, secretsPath,
-		"--amount", amount.String(),
 		"--native-root-token", tookenAddress.String(),
 		"--mint",
 	}
 
+	for i := 0; i < len(secretsPaths); i++ {
+		secretsManager, err := polybftsecrets.GetSecretsManager(secretsPaths[i], "", true)
+		if err != nil {
+			return err
+		}
+
+		key, err := wallet.GetEcdsaFromSecret(secretsManager)
+		if err != nil {
+			return err
+		}
+
+		args = append(args, "--addresses", key.Address().String())
+		args = append(args, "--amounts", amounts[i].String())
+	}
+
 	if err := t.cmdRun(args...); err != nil {
-		return fmt.Errorf("failed to fund a validator on the rootchain: %w", err)
+		return err
 	}
 
 	return nil
