@@ -490,20 +490,13 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		return errInvalidTokenParams
 	}
 
-	p.nativeTokenConfig = &polybft.TokenConfig{
-		Name:       defaultNativeTokenName,
-		Symbol:     defaultNativeTokenSymbol,
-		Decimals:   defaultNativeTokenDecimals,
-		IsMintable: false,
-	}
-
-	p.nativeTokenConfig.Name = strings.TrimSpace(params[0])
-	if p.nativeTokenConfig.Name == "" {
+	name := strings.TrimSpace(params[0])
+	if name == "" {
 		return errInvalidTokenParams
 	}
 
-	p.nativeTokenConfig.Symbol = strings.TrimSpace(params[1])
-	if p.nativeTokenConfig.Symbol == "" {
+	symbol := strings.TrimSpace(params[1])
+	if symbol == "" {
 		return errInvalidTokenParams
 	}
 
@@ -512,14 +505,17 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		return errInvalidTokenParams
 	}
 
-	p.nativeTokenConfig.Decimals = uint8(decimals)
-
 	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
 	if err != nil {
 		return errInvalidTokenParams
 	}
 
-	p.nativeTokenConfig.IsMintable = isMintable
+	p.nativeTokenConfig = &polybft.TokenConfig{
+		Name:       name,
+		Symbol:     symbol,
+		Decimals:   uint8(decimals),
+		IsMintable: isMintable,
+	}
 
 	return nil
 }
