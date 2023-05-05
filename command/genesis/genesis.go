@@ -223,8 +223,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.nativeTokenConfigRaw,
 			nativeTokenConfigFlag,
 			"",
-			"configuration of native token in format <name:symbol:decimals:mintable count>"+
-				"or <name:symbol:decimals:mintable count> if using mintable token",
+			"configuration of native token in format <name:symbol:decimals count:mintable flag>",
 		)
 
 		cmd.Flags().StringVar(

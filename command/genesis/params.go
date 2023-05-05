@@ -40,11 +40,10 @@ const (
 	rewardTokenCodeFlag   = "reward-token-code"
 	rewardWalletFlag      = "reward-wallet"
 
-	defaultNativeTokenName          = "Polygon"
-	defaultNativeTokenSymbol        = "MATIC"
-	defaultNativeTokenDecimals      = uint8(18)
-	nativeTokenParamsNumber         = 3
-	nativeTokenParamsMintableNumber = 4
+	defaultNativeTokenName     = "Polygon"
+	defaultNativeTokenSymbol   = "MATIC"
+	defaultNativeTokenDecimals = uint8(18)
+	nativeTokenParamsNumber    = 4
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -60,8 +59,8 @@ var (
 	errValidatorsNotSpecified = errors.New("validator information not specified")
 	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
-	errInvalidTokenParams     = errors.New("native token params were not submitted in proper" +
-		" format <name:symbol:decimals count> or mintable format <name:symbol:decimals count:mintable> ")
+	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format " +
+		"(<name:symbol:decimals count:mintable flag>)")
 	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
 )
 
@@ -477,26 +476,25 @@ func (p *genesisParams) validateRewardWallet() error {
 func (p *genesisParams) extractNativeTokenMetadata() error {
 	if p.nativeTokenConfigRaw == "" {
 		p.nativeTokenConfig = &polybft.TokenConfig{
-			Name:     defaultNativeTokenName,
-			Symbol:   defaultNativeTokenSymbol,
-			Decimals: defaultNativeTokenDecimals,
-			Mintable: false,
+			Name:       defaultNativeTokenName,
+			Symbol:     defaultNativeTokenSymbol,
+			Decimals:   defaultNativeTokenDecimals,
+			IsMintable: false,
 		}
 
 		return nil
 	}
 
 	params := strings.Split(p.nativeTokenConfigRaw, ":")
-	// 3 parameters without mintable param or 4 parameters with mintable
-	if len(params) != nativeTokenParamsNumber && len(params) != nativeTokenParamsMintableNumber {
+	if len(params) != nativeTokenParamsNumber {
 		return errInvalidTokenParams
 	}
 
 	p.nativeTokenConfig = &polybft.TokenConfig{
-		Name:     defaultNativeTokenName,
-		Symbol:   defaultNativeTokenSymbol,
-		Decimals: defaultNativeTokenDecimals,
-		Mintable: false,
+		Name:       defaultNativeTokenName,
+		Symbol:     defaultNativeTokenSymbol,
+		Decimals:   defaultNativeTokenDecimals,
+		IsMintable: false,
 	}
 
 	p.nativeTokenConfig.Name = strings.TrimSpace(params[0])
@@ -516,11 +514,12 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 
 	p.nativeTokenConfig.Decimals = uint8(decimals)
 
-	if strings.TrimSpace(params[3]) == "mintable" && len(params) == nativeTokenParamsMintableNumber {
-		p.nativeTokenConfig.Mintable = true
-	} else if len(params) == nativeTokenParamsMintableNumber {
+	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
+	if err != nil {
 		return errInvalidTokenParams
 	}
+
+	p.nativeTokenConfig.IsMintable = isMintable
 
 	return nil
 }

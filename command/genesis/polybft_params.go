@@ -366,7 +366,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 		},
 	}
 
-	if !params.nativeTokenConfig.Mintable {
+	if !params.nativeTokenConfig.IsMintable {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
 	} else {
