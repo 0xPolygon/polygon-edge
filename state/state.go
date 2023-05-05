@@ -116,7 +116,9 @@ type StateObject struct {
 }
 
 func (s *StateObject) Empty() bool {
-	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, types.EmptyCodeHash.Bytes())
+	return s.Account.Nonce == 0 &&
+		s.Account.Balance.Sign() == 0 &&
+		bytes.Equal(s.Account.CodeHash, types.EmptyCodeHash.Bytes())
 }
 
 // Copy makes a copy of the state object

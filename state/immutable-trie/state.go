@@ -50,6 +50,7 @@ func (s *State) GetCode(hash types.Hash) ([]byte, bool) {
 	if hash == types.EmptyCodeHash {
 		return []byte{}, true
 	}
+
 	return s.storage.GetCode(hash)
 }
 
