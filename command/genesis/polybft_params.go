@@ -143,7 +143,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		// use 1st account as governance address
 		Governance:           initialValidators[0].Address,
 		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
-		MintableNativeToken:  p.mintableNativeToken,
 		NativeTokenConfig:    p.nativeTokenConfig,
 		BridgeAllowListAdmin: bridgeAllowListAdmin,
 		BridgeBlockListAdmin: bridgeBlockListAdmin,
@@ -367,7 +366,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 		},
 	}
 
-	if !params.mintableNativeToken {
+	if !params.nativeTokenConfig.IsMintable {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
 	} else {

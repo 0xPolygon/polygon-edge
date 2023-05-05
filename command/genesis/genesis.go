@@ -219,18 +219,11 @@ func setFlags(cmd *cobra.Command) {
 			"trie root from the corresponding triedb",
 		)
 
-		cmd.Flags().BoolVar(
-			&params.mintableNativeToken,
-			mintableTokenFlag,
-			false,
-			"flag indicate whether mintable or non-mintable native token is deployed",
-		)
-
 		cmd.Flags().StringVar(
 			&params.nativeTokenConfigRaw,
 			nativeTokenConfigFlag,
 			"",
-			"configuration of native token in format <name:symbol:decimals count>",
+			"configuration of native token in format <name:symbol:decimals count:mintable flag>",
 		)
 
 		cmd.Flags().StringVar(
