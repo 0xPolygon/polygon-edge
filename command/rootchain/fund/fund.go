@@ -107,7 +107,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		rootTokenAddr = types.StringToAddress(params.nativeRootTokenAddr)
 	}
 
-	// cmdResCh := make(chan command.CommandResult, len(params.addresses))
 	results := make([]command.CommandResult, len(params.addresses))
 	g, ctx := errgroup.WithContext(cmd.Context())
 
