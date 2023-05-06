@@ -184,7 +184,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	t.Run("multiple deposit batches per epoch", func(t *testing.T) {
 		const (
-			depositsSubset = 2
+			depositsSubset = 1
 		)
 
 		initialBlockNum, err := childEthEndpoint.BlockNumber()

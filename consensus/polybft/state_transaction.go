@@ -218,7 +218,7 @@ func getCommitmentMessageSignedTx(txs []*types.Transaction) (*CommitmentMessageS
 }
 
 func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*merkle.MerkleTree, error) {
-	ssh := make([][]byte, len(stateSyncEvents))
+	stateSyncData := make([][]byte, len(stateSyncEvents))
 
 	for i, sse := range stateSyncEvents {
 		data, err := sse.EncodeAbi()
@@ -226,8 +226,13 @@ func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*merkle
 			return nil, err
 		}
 
-		ssh[i] = data
+		stateSyncData[i] = data
 	}
 
-	return merkle.NewMerkleTree(ssh)
+	if len(stateSyncEvents) == 1 {
+		//nolint:makezero
+		stateSyncData = append(stateSyncData, nil)
+	}
+
+	return merkle.NewMerkleTree(stateSyncData)
 }
