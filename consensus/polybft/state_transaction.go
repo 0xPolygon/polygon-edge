@@ -231,7 +231,7 @@ func createMerkleTree(stateSyncEvents []*contractsapi.StateSyncedEvent) (*merkle
 
 	if len(stateSyncEvents) == 1 {
 		//nolint:makezero
-		stateSyncData = append(stateSyncData, nil)
+		stateSyncData = append(stateSyncData, []byte{})
 	}
 
 	return merkle.NewMerkleTree(stateSyncData)

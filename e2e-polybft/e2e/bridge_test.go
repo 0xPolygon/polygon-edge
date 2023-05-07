@@ -233,7 +233,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		lastCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
 		require.NoError(t, err)
-		require.Equal(t, uint64(initialCommittedID+depositsSubset), lastCommittedID)
+		require.Equal(t, initialCommittedID+depositsSubset, lastCommittedID)
 
 		// send some more transactions to the bridge to build another commitment in epoch
 		require.NoError(
