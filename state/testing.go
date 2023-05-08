@@ -9,20 +9,22 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var addr1 = types.StringToAddress("1")
-var addr2 = types.StringToAddress("2")
+var (
+	addr1 = types.StringToAddress("1")
+	addr2 = types.StringToAddress("2")
 
-var hash0 = types.StringToHash("0")
-var hash1 = types.StringToHash("1")
-var hash2 = types.StringToHash("2")
+	hash0 = types.StringToHash("0")
+	hash1 = types.StringToHash("1")
+	hash2 = types.StringToHash("2")
 
-var defaultPreState = map[types.Address]*PreState{
-	addr1: {
-		State: map[types.Hash]types.Hash{
-			hash1: hash1,
+	defaultPreState = map[types.Address]*PreState{
+		addr1: {
+			State: map[types.Hash]types.Hash{
+				hash1: hash1,
+			},
 		},
-	},
-}
+	}
+)
 
 // PreState is the account prestate
 type PreState struct {
@@ -41,62 +43,62 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 	t.Parallel()
 
-	t.Run("", func(t *testing.T) {
+	t.Run("write state", func(t *testing.T) {
 		t.Parallel()
 
 		testWriteState(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("write empty state", func(t *testing.T) {
 		t.Parallel()
 
 		testWriteEmptyState(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("update state with empty", func(t *testing.T) {
 		t.Parallel()
 
 		testUpdateStateWithEmpty(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("suicide account in pre-state", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideAccountInPreState(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("suicide account", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideAccount(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("suicide account with data", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideAccountWithData(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("suicide coinbase", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideCoinbase(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("suicide with intermediate commit", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideWithIntermediateCommit(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("restart refunds", func(t *testing.T) {
 		t.Parallel()
 
 		testRestartRefunds(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("change pre-state account balance to zero", func(t *testing.T) {
 		t.Parallel()
 
 		testChangePrestateAccountBalanceToZero(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("change account balance to zero", func(t *testing.T) {
 		t.Parallel()
 
 		testChangeAccountBalanceToZero(t, buildPreState)
 	})
-	t.Run("", func(t *testing.T) {
+	t.Run("delete common state root", func(t *testing.T) {
 		t.Parallel()
 
 		testDeleteCommonStateRoot(t, buildPreState)
