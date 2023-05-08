@@ -147,12 +147,12 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		// check if there are Bridge Allow List Admins and Bridge Block List Admins
 		// and if there are, get the first address as the Admin
 		var bridgeAllowListAdmin types.Address
-		if len(config.Params.BridgeAllowList.AdminAddresses) > 0 {
+		if config.Params.BridgeAllowList != nil && len(config.Params.BridgeAllowList.AdminAddresses) > 0 {
 			bridgeAllowListAdmin = config.Params.BridgeAllowList.AdminAddresses[0]
 		}
 
 		var bridgeBlockListAdmin types.Address
-		if len(config.Params.BridgeBlockList.AdminAddresses) > 0 {
+		if config.Params.BridgeBlockList != nil && len(config.Params.BridgeBlockList.AdminAddresses) > 0 {
 			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
 		}
 
