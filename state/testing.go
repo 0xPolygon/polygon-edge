@@ -101,6 +101,11 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 
 		testDeleteCommonStateRoot(t, buildPreState)
 	})
+	t.Run("get code empty code hash", func(t *testing.T) {
+		t.Parallel()
+
+		testGetCodeEmptyCodeHash(t, buildPreState)
+	})
 }
 
 func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
@@ -338,4 +343,14 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 
 	txn = newTxn(snap)
 	assert.False(t, txn.Exist(addr1))
+}
+
+func testGetCodeEmptyCodeHash(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
+	snap := buildPreState(nil)
+
+	code, ok := snap.GetCode(types.EmptyCodeHash)
+	assert.Empty(t, code)
+	assert.True(t, ok)
 }
