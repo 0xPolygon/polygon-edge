@@ -147,10 +147,6 @@ func RecoverPubkey(signature, hash []byte) (*ecdsa.PublicKey, error) {
 		return nil, errHashOfInvalidLength
 	}
 
-	if types.BytesToHash(hash) == types.ZeroHash {
-		return nil, errZeroHash
-	}
-
 	size := len(signature)
 	term := byte(27)
 
