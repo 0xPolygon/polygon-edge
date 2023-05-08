@@ -1,6 +1,7 @@
 package genesis
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -58,7 +59,6 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
-	blsSignatureLength = 128
 )
 
 var (
@@ -77,6 +77,30 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 
 		premineBalances[premineInfo.address] = premineInfo
+	}
+
+	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
+	if err != nil {
+		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+	}
+
+	var (
+		rewardTokenByteCode []byte
+		rewardTokenAddr     = contracts.NativeERC20TokenContract
+	)
+
+	if p.rewardTokenCode == "" {
+		// native token is used as a reward token, and reward wallet is not a zero address
+		// so we need to add that address to premine map
+		premineBalances[walletPremineInfo.address] = walletPremineInfo
+	} else {
+		bytes, err := hex.DecodeString(p.rewardTokenCode)
+		if err != nil {
+			return fmt.Errorf("could not decode reward token byte code '%s' : %w", p.rewardTokenCode, err)
+		}
+
+		rewardTokenByteCode = bytes
+		rewardTokenAddr = contracts.RewardTokenContract
 	}
 
 	initialValidators, err := p.getValidatorAccounts(premineBalances)
@@ -98,6 +122,18 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	// check if there are Bridge Allow List Admins and Bridge Block List Admins
+	// and if there are, get the first address as the Admin
+	var bridgeAllowListAdmin types.Address
+	if len(p.bridgeAllowListAdmin) > 0 {
+		bridgeAllowListAdmin = types.StringToAddress(p.bridgeAllowListAdmin[0])
+	}
+
+	var bridgeBlockListAdmin types.Address
+	if len(p.bridgeBlockListAdmin) > 0 {
+		bridgeBlockListAdmin = types.StringToAddress(p.bridgeBlockListAdmin[0])
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -105,10 +141,17 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          initialValidators[0].Address,
-		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
-		MintableNativeToken: p.mintableNativeToken,
-		NativeTokenConfig:   p.nativeTokenConfig,
+		Governance:           initialValidators[0].Address,
+		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:    p.nativeTokenConfig,
+		BridgeAllowListAdmin: bridgeAllowListAdmin,
+		BridgeBlockListAdmin: bridgeBlockListAdmin,
+		MaxValidatorSetSize:  p.maxNumValidators,
+		RewardConfig: &polybft.RewardsConfig{
+			TokenAddress:  rewardTokenAddr,
+			WalletAddress: walletPremineInfo.address,
+			WalletAmount:  walletPremineInfo.amount,
+		},
 	}
 
 	// Disable london hardfork if burn contract address is not provided
@@ -120,8 +163,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Params: &chain.Params{
-			ChainID: int64(p.chainID),
-			Forks:   enabledForks,
+			Forks: enabledForks,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
@@ -137,7 +179,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake)
+	allocs, err := p.deployContracts(totalStake, rewardTokenByteCode, polyBftConfig)
 	if err != nil {
 		return err
 	}
@@ -270,18 +312,15 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]*chain.GenesisAccount, error) {
+func (p *genesisParams) deployContracts(totalStake *big.Int,
+	rewardTokenByteCode []byte,
+	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
 		artifact *artifact.Artifact
 		address  types.Address
 	}
 
 	genesisContracts := []*contractInfo{
-		{
-			// ChildValidatorSet contract
-			artifact: contractsapi.ChildValidatorSet,
-			address:  contracts.ValidatorSetContract,
-		},
 		{
 			// State receiver contract
 			artifact: contractsapi.StateReceiver,
@@ -293,29 +332,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			address:  contracts.ChildERC20Contract,
 		},
 		{
-			// ChildERC20Predicate contract
-			artifact: contractsapi.ChildERC20Predicate,
-			address:  contracts.ChildERC20PredicateContract,
-		},
-		{
 			// ChildERC721 token contract
 			artifact: contractsapi.ChildERC721,
 			address:  contracts.ChildERC721Contract,
 		},
 		{
-			// ChildERC721Predicate token contract
-			artifact: contractsapi.ChildERC721Predicate,
-			address:  contracts.ChildERC721PredicateContract,
-		},
-		{
 			// ChildERC1155 contract
 			artifact: contractsapi.ChildERC1155,
 			address:  contracts.ChildERC1155Contract,
-		},
-		{
-			// ChildERC1155Predicate token contract
-			artifact: contractsapi.ChildERC1155Predicate,
-			address:  contracts.ChildERC1155PredicateContract,
 		},
 		{
 			// BLS contract
@@ -332,9 +356,17 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			artifact: contractsapi.L2StateSender,
 			address:  contracts.L2StateSenderContract,
 		},
+		{
+			artifact: contractsapi.ValidatorSet,
+			address:  contracts.ValidatorSetContract,
+		},
+		{
+			artifact: contractsapi.RewardPool,
+			address:  contracts.RewardPoolContract,
+		},
 	}
 
-	if !params.mintableNativeToken {
+	if !params.nativeTokenConfig.IsMintable {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
 	} else {
@@ -342,7 +374,45 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
 	}
 
-	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts))
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC20PredicateAccessList,
+				address:  contracts.ChildERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC721PredicateAccessList,
+				address:  contracts.ChildERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC1155PredicateAccessList,
+				address:  contracts.ChildERC1155PredicateContract,
+			})
+	} else {
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC20Predicate,
+				address:  contracts.ChildERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC721Predicate,
+				address:  contracts.ChildERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.ChildERC1155Predicate,
+				address:  contracts.ChildERC1155PredicateContract,
+			})
+	}
+
+	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
 
 	for _, contract := range genesisContracts {
 		allocations[contract.address] = &chain.GenesisAccount{
@@ -351,8 +421,14 @@ func (p *genesisParams) deployContracts(totalStake *big.Int) (map[types.Address]
 		}
 	}
 
-	// ChildValidatorSet must have funds pre-allocated, because of withdrawal workflow
-	allocations[contracts.ValidatorSetContract].Balance = totalStake
+	if rewardTokenByteCode != nil {
+		// if reward token is provided in genesis then, add it to allocations
+		// to RewardTokenContract address and update polybftConfig
+		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    rewardTokenByteCode,
+		}
+	}
 
 	return allocations, nil
 }
@@ -388,9 +464,9 @@ func (p *genesisParams) getValidatorAccounts(
 		validators := make([]*polybft.Validator, len(p.validators))
 		for i, validator := range p.validators {
 			parts := strings.Split(validator, ":")
-			if len(parts) != 4 {
+			if len(parts) != 3 {
 				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
-					"<P2P multi address:ECDSA address:public BLS key:BLS signature>, but got %d part(s)",
+					"<P2P multi address:ECDSA address:public BLS key>, but got %d part(s)",
 					len(parts))
 			}
 
@@ -408,18 +484,13 @@ func (p *genesisParams) getValidatorAccounts(
 				return nil, fmt.Errorf("invalid BLS key: %s", parts[2])
 			}
 
-			if len(parts[3]) != blsSignatureLength {
-				return nil, fmt.Errorf("invalid BLS signature: %s", parts[3])
-			}
-
 			addr := types.StringToAddress(trimmedAddress)
 			validators[i] = &polybft.Validator{
-				MultiAddr:    parts[0],
-				Address:      addr,
-				BlsKey:       trimmedBLSKey,
-				BlsSignature: parts[3],
-				Balance:      getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
-				Stake:        getPremineAmount(addr, stakeMap, command.DefaultStake),
+				MultiAddr: parts[0],
+				Address:   addr,
+				BlsKey:    trimmedBLSKey,
+				Balance:   getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
+				Stake:     getPremineAmount(addr, stakeMap, command.DefaultStake),
 			}
 		}
 

@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -112,6 +113,9 @@ type consensusRuntime struct {
 	// manager for state sync bridge transactions
 	stateSyncManager StateSyncManager
 
+	// manager for handling validator stake change and updating validator set
+	stakeManager StakeManager
+
 	// logger instance
 	logger hcf.Logger
 }
@@ -136,6 +140,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if err := runtime.initCheckpointManager(log); err != nil {
+		return nil, err
+	}
+
+	if err := runtime.initStakeManager(log); err != nil {
 		return nil, err
 	}
 
@@ -211,6 +219,27 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	return nil
 }
 
+// initStakeManager initializes stake manager
+func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+	if err != nil {
+		return err
+	}
+
+	c.stakeManager = newStakeManager(
+		logger.Named("stake-manager"),
+		c.state,
+		c.config.blockchain,
+		rootRelayer,
+		wallet.NewEcdsaSigner(c.config.Key),
+		contracts.ValidatorSetContract,
+		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
+	)
+
+	return nil
+}
+
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
@@ -278,6 +307,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 		c.logger.Error("Could not update proposer calculator", "err", err)
+	}
+
+	// handle transfer events that happened in block
+	if err := c.stakeManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in stake manager", "err", err)
 	}
 
 	if isEndOfEpoch {
@@ -358,9 +392,14 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfEpoch {
-		ff.commitEpochInput, err = c.calculateCommitEpochInput(parent, epoch)
+		ff.commitEpochInput, ff.distributeRewardsInput, err = c.calculateCommitEpochInput(parent, epoch)
 		if err != nil {
 			return fmt.Errorf("cannot calculate commit epoch info: %w", err)
+		}
+
+		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number, epoch.Validators.Copy())
+		if err != nil {
+			return fmt.Errorf("cannot update validator set on epoch ending: %w", err)
 		}
 	}
 
@@ -443,6 +482,10 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
+	if err := c.stakeManager.PostEpoch(reqObj); err != nil {
+		return nil, err
+	}
+
 	return &epochMetadata{
 		Number:            epochNumber,
 		Validators:        validatorSet,
@@ -454,7 +497,9 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 // in the current epoch, and ending at the last block of previous epoch
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
-	epoch *epochMetadata) (*contractsapi.CommitEpochChildValidatorSetFn, error) {
+	epoch *epochMetadata,
+) (*contractsapi.CommitEpochValidatorSetFn,
+	*contractsapi.DistributeRewardForRewardPoolFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -477,18 +522,18 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 
 	blockExtra, err := GetIbftExtra(currentBlock.ExtraData)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// calculate uptime for current epoch
 	for blockHeader.Number > epoch.FirstBlockInEpoch {
 		if err := getSealersForBlock(blockExtra, epoch.Validators); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -498,23 +543,18 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		for i := 0; i < commitEpochLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			if err := getSealersForBlock(blockExtra, validators); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
-	}
-
-	uptime := &contractsapi.Uptime{
-		EpochID:     new(big.Int).SetUint64(epochID),
-		TotalBlocks: big.NewInt(totalBlocks),
 	}
 
 	// include the data in the uptime counter in a deterministic way
@@ -524,25 +564,34 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		addrSet = append(addrSet, addr)
 	}
 
+	uptime := make([]*contractsapi.Uptime, len(addrSet))
+
 	sort.Slice(addrSet, func(i, j int) bool {
 		return bytes.Compare(addrSet[i][:], addrSet[j][:]) > 0
 	})
 
-	for _, addr := range addrSet {
-		uptime.AddValidatorUptime(addr, uptimeCounter[addr])
+	for i, addr := range addrSet {
+		uptime[i] = &contractsapi.Uptime{
+			Validator:    addr,
+			SignedBlocks: new(big.Int).SetInt64(uptimeCounter[addr]),
+		}
 	}
 
-	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
+	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
 			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
-		Uptime: uptime,
 	}
 
-	return commitEpoch, nil
+	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
+		EpochID: new(big.Int).SetUint64(epochID),
+		Uptime:  uptime,
+	}
+
+	return commitEpoch, distributeRewards, nil
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function

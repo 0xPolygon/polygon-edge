@@ -171,21 +171,6 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
-// ValidateDelta validates validator set delta provided in the Extra
-// with the one being calculated by the validator itself
-func (i *Extra) ValidateDelta(oldValidators AccountSet, newValidators AccountSet) error {
-	delta, err := createValidatorSetDelta(oldValidators, newValidators)
-	if err != nil {
-		return err
-	}
-
-	if !i.Validators.Equals(delta) {
-		return fmt.Errorf("validator set delta is invalid")
-	}
-
-	return nil
-}
-
 // ValidateParentSignatures validates signatures for parent block
 func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
 	parent *types.Header, parentExtra *Extra, chainID uint64, domain []byte, logger hclog.Logger) error {
@@ -219,55 +204,6 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 	}
 
 	return nil
-}
-
-// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	var addedValidators, updatedValidators AccountSet
-
-	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
-	removedValidators := map[types.Address]int{}
-
-	for i, validator := range oldValidatorSet {
-		if (validator.Address != types.Address{}) {
-			removedValidators[validator.Address] = i
-			oldValidatorSetMap[validator.Address] = validator
-		}
-	}
-
-	for _, newValidator := range newValidatorSet {
-		// Check if the validator is among both old and new validator set
-		oldValidator, validatorExists := oldValidatorSetMap[newValidator.Address]
-		if validatorExists {
-			if !oldValidator.EqualAddressAndBlsKey(newValidator) {
-				return nil, fmt.Errorf("validator '%s' found in both old and new validator set, but its BLS keys differ",
-					newValidator.Address.String())
-			}
-
-			// If it is, then discard it from removed validators...
-			delete(removedValidators, newValidator.Address)
-
-			if !oldValidator.Equals(newValidator) {
-				updatedValidators = append(updatedValidators, newValidator)
-			}
-		} else {
-			// ...otherwise it is added
-			addedValidators = append(addedValidators, newValidator)
-		}
-	}
-
-	removedValsBitmap := bitmap.Bitmap{}
-	for _, i := range removedValidators {
-		removedValsBitmap.Set(uint64(i))
-	}
-
-	delta := &ValidatorSetDelta{
-		Added:   addedValidators,
-		Updated: updatedValidators,
-		Removed: removedValsBitmap,
-	}
-
-	return delta, nil
 }
 
 // ValidatorSetDelta holds information about added and removed validators compared to the previous epoch

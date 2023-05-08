@@ -9,6 +9,10 @@ var (
 	BLSContract = types.StringToAddress("0x102")
 	// MerkleContract is an address of Merkle contract on the child chain
 	MerkleContract = types.StringToAddress("0x103")
+	// RewardTokenContract is an address of reward token on child chain
+	RewardTokenContract = types.StringToAddress("0x104")
+	// RewardPoolContract is an address of RewardPoolContract contract on the child chain
+	RewardPoolContract = types.StringToAddress("0x105")
 	// StateReceiverContract is an address of bridge contract on the child chain
 	StateReceiverContract = types.StringToAddress("0x1001")
 	// NativeERC20TokenContract is an address of bridge contract (used for transferring ERC20 native tokens on child chain)

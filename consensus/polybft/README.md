@@ -23,11 +23,13 @@ It has a native support for running bridge, which enables running cross-chain tr
    It contains initial validator set as well and there are two ways to specify it:
 
    - all the validators information are present in local storage of single host and therefore directory if provided using `--validators-path` flag and validators folder prefix names using `--validators-prefix` flag
+   - for reward distribution to work, user must define a reward wallet address with its balance. Wallet address is used to distribute reward tokens from that address to validators that signed blocks in that epoch.
 
     ```bash
     $ polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10 \
         [--validators-path ./] [--validators-prefix test-chain-] \
-        [--consensus polybft]
+        [--consensus polybft] \
+        [--reward-wallet adress:amount]
     ```
 
    - validators information are scafollded on multiple hosts and therefore necessary information are supplied using `--validators` flag. Validator information needs to be supplied in the strictly following format:
@@ -59,10 +61,44 @@ It has a native support for running bridge, which enables running cross-chain tr
 6. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**
 
     ```bash
-    $ polygon-edge rootchain fund --data-dir test-chain- --num 4
+    $ polygon-edge rootchain fund \
+        --addresses 0x1234567890123456789012345678901234567890 \
+        --amounts 200000000000000000000
     ```
 
-7. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
+7. Whitelist validators on rootchain - in order for validators to be able to be registered on the SupernetManager contract on rootchain. Note that only deployer of SupernetManager contract (the one who run the deploy command) can whitelist validators on rootchain. He can use either its hex encoded private key, or data-dir flag if he has secerets initialized:
+
+    ```bash
+    $ polygon-edge polybft whitelist-validators --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
+    --addresses <addresses_of_validators> --supernet-manager <address_of_SupernetManager_contract>
+    ```
+
+8. Register validators on rootchain - each validator registers itself on SupernetManager. **This command is for testing purposes only.**
+
+    ```bash
+    $ polygon-edge polybft register-validator --data-dir ./test-chain-1 \
+    --supernet-manager <address_of_SupernetManager_contract>
+    ```
+
+9. Initial staking on rootchain - each validator needs to do initial staking on rootchain (StakeManager) contract. **This command is for testing purposes only.**
+
+    ```bash
+    $ polygon-edge polybft stake --data-dir ./test-chain-1 --chain-id <id_of_child_chain_from_genesis> \
+    --amount <amount_of_tokens_to_stake> \
+    --stake-manager <address_of_StakeManager_contract> --native-root-token <address_of_native_root_token>
+    ```
+
+10. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts.
+
+    ```bash
+    $ polygon-edge polybft supernet --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
+    --genesis <path_to_genesis_file> \
+    --supernet-manager <address_of_SupernetManager_contract> \
+    --stake-manager <address_of_StakeManager_contract> \
+    --finalize-genesis --enable-staking
+    ```
+
+11. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
 
     ```bash
     $ polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 \

@@ -2,29 +2,28 @@ package fund
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
-	params         fundParams
-	fundNumber     int
-	jsonRPCAddress string
+	params fundParams
 )
 
 // GetCommand returns the rootchain fund command
 func GetCommand() *cobra.Command {
 	rootchainFundCmd := &cobra.Command{
 		Use:     "fund",
-		Short:   "Fund funds all the genesis addresses",
-		PreRunE: runPreRun,
+		Short:   "Fund validator account with given tokens amount",
+		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
@@ -34,44 +33,50 @@ func GetCommand() *cobra.Command {
 }
 
 func setFlags(cmd *cobra.Command) {
-	cmd.Flags().StringVar(
-		&params.dataDir,
-		dataDirFlag,
-		"",
-		"the directory for the Polygon Edge data if the local FS is used",
+	cmd.Flags().StringSliceVar(
+		&params.addresses,
+		addressesFlag,
+		nil,
+		"validator addresses",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&params.amounts,
+		amountsFlag,
+		nil,
+		"token amounts which is funded to validator on a root chain",
 	)
 
 	cmd.Flags().StringVar(
-		&params.configPath,
-		configFlag,
-		"",
-		"the path to the SecretsManager config file, "+
-			"if omitted, the local FS secrets manager is used",
-	)
-
-	cmd.Flags().IntVar(
-		&fundNumber,
-		numFlag,
-		1,
-		"the flag indicating the number of accounts to be funded",
-	)
-
-	cmd.Flags().StringVar(
-		&jsonRPCAddress,
+		&params.jsonRPCAddress,
 		jsonRPCFlag,
 		txrelayer.DefaultRPCAddress,
 		"the rootchain JSON RPC endpoint",
 	)
 
-	// Don't accept data-dir and config flags because they are related to different secrets managers.
-	// data-dir is about the local FS as secrets storage, config is about remote secrets manager.
-	cmd.MarkFlagsMutuallyExclusive(dataDirFlag, configFlag)
+	cmd.Flags().StringVar(
+		&params.nativeRootTokenAddr,
+		helper.NativeRootTokenFlag,
+		"",
+		helper.NativeRootTokenFlagDesc,
+	)
 
-	// num flag should be used with data-dir flag only so it should not be used with config flag.
-	cmd.MarkFlagsMutuallyExclusive(numFlag, configFlag)
+	cmd.Flags().BoolVar(
+		&params.mintRootToken,
+		mintRootTokenFlag,
+		false,
+		"indicates if root token deployer should mint root tokens to given validators",
+	)
+
+	cmd.Flags().StringVar(
+		&params.deployerPrivateKey,
+		polybftsecrets.PrivateKeyFlag,
+		"",
+		polybftsecrets.PrivateKeyFlagDesc,
+	)
 }
 
-func runPreRun(_ *cobra.Command, _ []string) error {
+func preRunCommand(_ *cobra.Command, _ []string) error {
 	return params.validateFlags()
 }
 
@@ -79,10 +84,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	paramsList := getParamsList()
-	resList := make(command.Results, 0)
-
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(jsonRPCAddress))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPCAddress))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 
@@ -90,75 +92,92 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	var (
-		lock   sync.Mutex
-		g, ctx = errgroup.WithContext(cmd.Context())
+		deployerKey   ethgo.Key
+		rootTokenAddr types.Address
 	)
 
-	for _, params := range paramsList {
-		params := params
+	if params.mintRootToken {
+		deployerKey, err = helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
+
+			return
+		}
+
+		rootTokenAddr = types.StringToAddress(params.nativeRootTokenAddr)
+	}
+
+	results := make([]command.CommandResult, len(params.addresses))
+	g, ctx := errgroup.WithContext(cmd.Context())
+
+	for i := 0; i < len(params.addresses); i++ {
+		i := i
 
 		g.Go(func() error {
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
+
 			default:
-				if err := params.initSecretsManager(); err != nil {
-					return err
-				}
-
-				validatorAcc, err := params.getValidatorAccount()
-				if err != nil {
-					return err
-				}
-
-				fundAddr := ethgo.Address(validatorAcc)
+				validatorAddr := types.StringToAddress(params.addresses[i])
+				fundAddr := ethgo.Address(validatorAddr)
 				txn := &ethgo.Transaction{
 					To:    &fundAddr,
-					Value: ethgo.Ether(100),
+					Value: params.amountValues[i],
 				}
 
 				receipt, err := txRelayer.SendTransactionLocal(txn)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to send fund validator '%s' transaction: %w", validatorAddr, err)
 				}
 
-				lock.Lock()
+				if receipt.Status == uint64(types.ReceiptFailed) {
+					return fmt.Errorf("failed to fund validator '%s'", validatorAddr)
+				}
 
-				resList = append(resList, &result{
-					ValidatorAddr: validatorAcc,
+				if params.mintRootToken {
+					// mint tokens to validator, so he is able to send them
+					mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, params.amountValues[i])
+					if err != nil {
+						return fmt.Errorf("failed to create mint native tokens transaction for validator '%s'. err: %w",
+							validatorAddr, err)
+					}
+
+					receipt, err := txRelayer.SendTransaction(mintTxn, deployerKey)
+					if err != nil {
+						return fmt.Errorf("failed to send mint native tokens transaction to validator '%s'. err: %w", validatorAddr, err)
+					}
+
+					if receipt.Status == uint64(types.ReceiptFailed) {
+						return fmt.Errorf("failed to mint native tokens to validator '%s'", validatorAddr)
+					}
+				}
+
+				results[i] = &result{
+					ValidatorAddr: validatorAddr,
 					TxHash:        types.Hash(receipt.TransactionHash),
-				})
-
-				lock.Unlock()
-
-				return nil
+					IsMinted:      params.mintRootToken,
+				}
 			}
+
+			return nil
 		})
 	}
 
-	if err = g.Wait(); err != nil {
-		outputter.SetError(fmt.Errorf("fund command failed. error: %w", err))
+	if err := g.Wait(); err != nil {
+		outputter.SetError(err)
+		_, _ = outputter.Write([]byte("[ROOTCHAIN FUND] Successfully funded following accounts\n"))
+
+		for _, result := range results {
+			if result != nil {
+				// In case an error happened, some of the indices may not be populated.
+				// Filter those out.
+				outputter.SetCommandResult(result)
+			}
+		}
 
 		return
 	}
 
-	outputter.SetCommandResult(resList)
-}
-
-// getParamsList creates a list of initParams with num elements.
-// This function basically copies the given initParams but updating dataDir by applying an index.
-func getParamsList() []fundParams {
-	if fundNumber == 1 {
-		return []fundParams{params}
-	}
-
-	paramsList := make([]fundParams, fundNumber)
-	for i := 1; i <= fundNumber; i++ {
-		paramsList[i-1] = fundParams{
-			dataDir:    fmt.Sprintf("%s%d", params.dataDir, i),
-			configPath: params.configPath,
-		}
-	}
-
-	return paramsList
+	outputter.SetCommandResult(command.Results(results))
 }

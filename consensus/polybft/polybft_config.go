@@ -7,7 +7,6 @@ import (
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -38,23 +37,37 @@ type PolyBFTConfig struct {
 	// Governance is the initial governance address
 	Governance types.Address `json:"governance"`
 
-	// MintableNativeToken denotes whether mintable native token is used
-	MintableNativeToken bool `json:"mintableNative"`
-
 	// NativeTokenConfig defines name, symbol and decimal count of the native token
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
 
+	// BridgeAllowListAdmin indicates whether bridge allow list is active
+	BridgeAllowListAdmin types.Address `json:"bridgeAllowListAdmin"`
+
+	// BridgeBlockListAdmin indicates whether bridge block list is active
+	BridgeBlockListAdmin types.Address `json:"bridgeBlockListAdmin"`
+
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
+
+	// MaxValidatorSetSize indicates the maximum size of validator set
+	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
+
+	// RewardConfig defines rewards configuration
+	RewardConfig *RewardsConfig `json:"rewardConfig"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
-func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, error) {
+func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, int64, error) {
 	chainCfg, err := chain.ImportFromFile(chainConfigFile)
 	if err != nil {
-		return PolyBFTConfig{}, err
+		return PolyBFTConfig{}, 0, err
 	}
 
-	return GetPolyBFTConfig(chainCfg)
+	polybftConfig, err := GetPolyBFTConfig(chainCfg)
+	if err != nil {
+		return PolyBFTConfig{}, 0, err
+	}
+
+	return polybftConfig, chainCfg.Params.ChainID, err
 }
 
 // GetPolyBFTConfig deserializes provided chain config and returns PolyBFTConfig
@@ -74,15 +87,17 @@ func GetPolyBFTConfig(chainConfig *chain.Chain) (PolyBFTConfig, error) {
 
 // BridgeConfig is the rootchain configuration, needed for bridging
 type BridgeConfig struct {
-	StateSenderAddr          types.Address `json:"stateSenderAddress"`
-	CheckpointManagerAddr    types.Address `json:"checkpointManagerAddress"`
-	ExitHelperAddr           types.Address `json:"exitHelperAddress"`
-	RootERC20PredicateAddr   types.Address `json:"erc20PredicateAddress"`
-	RootNativeERC20Addr      types.Address `json:"nativeERC20Address"`
-	RootERC721Addr           types.Address `json:"erc721Address"`
-	RootERC721PredicateAddr  types.Address `json:"erc721PredicateAddress"`
-	RootERC1155Addr          types.Address `json:"erc1155Address"`
-	RootERC1155PredicateAddr types.Address `json:"erc1155PredicateAddress"`
+	StateSenderAddr           types.Address `json:"stateSenderAddress"`
+	CheckpointManagerAddr     types.Address `json:"checkpointManagerAddress"`
+	ExitHelperAddr            types.Address `json:"exitHelperAddress"`
+	RootERC20PredicateAddr    types.Address `json:"erc20PredicateAddress"`
+	RootNativeERC20Addr       types.Address `json:"nativeERC20Address"`
+	RootERC721Addr            types.Address `json:"erc721Address"`
+	RootERC721PredicateAddr   types.Address `json:"erc721PredicateAddress"`
+	RootERC1155Addr           types.Address `json:"erc1155Address"`
+	RootERC1155PredicateAddr  types.Address `json:"erc1155PredicateAddress"`
+	CustomSupernetManagerAddr types.Address `json:"customSupernetManagerAddr"`
+	StakeManagerAddr          types.Address `json:"stakeManagerAddr"`
 
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
 	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
@@ -97,23 +112,21 @@ type Validator struct {
 	Address       types.Address
 	BlsPrivateKey *bls.PrivateKey
 	BlsKey        string
-	BlsSignature  string
 	Balance       *big.Int
 	Stake         *big.Int
 	MultiAddr     string
 }
 
 type validatorRaw struct {
-	Address      types.Address `json:"address"`
-	BlsKey       string        `json:"blsKey"`
-	BlsSignature string        `json:"blsSignature"`
-	Balance      *string       `json:"balance"`
-	Stake        *string       `json:"stake"`
-	MultiAddr    string        `json:"multiAddr"`
+	Address   types.Address `json:"address"`
+	BlsKey    string        `json:"blsKey"`
+	Balance   *string       `json:"balance"`
+	Stake     *string       `json:"stake"`
+	MultiAddr string        `json:"multiAddr"`
 }
 
 func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr, BlsSignature: v.BlsSignature}
+	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr}
 	raw.Balance = types.EncodeBigInt(v.Balance)
 	raw.Stake = types.EncodeBigInt(v.Stake)
 
@@ -132,7 +145,6 @@ func (v *Validator) UnmarshalJSON(data []byte) error {
 
 	v.Address = raw.Address
 	v.BlsKey = raw.BlsKey
-	v.BlsSignature = raw.BlsSignature
 	v.MultiAddr = raw.MultiAddr
 
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
@@ -156,41 +168,6 @@ func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
 	}
 
 	return bls.UnmarshalPublicKey(decoded)
-}
-
-// UnmarshalBLSSignature unmarshals the hex encoded BLS signature
-func (v *Validator) UnmarshalBLSSignature() (*bls.Signature, error) {
-	decoded, err := hex.DecodeString(v.BlsSignature)
-	if err != nil {
-		return nil, err
-	}
-
-	return bls.UnmarshalSignature(decoded)
-}
-
-// ToValidatorInitAPIBinding converts Validator to instance of contractsapi.ValidatorInit
-func (v Validator) ToValidatorInitAPIBinding() (*contractsapi.ValidatorInit, error) {
-	blsSignature, err := v.UnmarshalBLSSignature()
-	if err != nil {
-		return nil, err
-	}
-
-	signBigInts, err := blsSignature.ToBigInt()
-	if err != nil {
-		return nil, err
-	}
-
-	pubKey, err := v.UnmarshalBLSPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	return &contractsapi.ValidatorInit{
-		Addr:      v.Address,
-		Pubkey:    pubKey.ToBigInt(),
-		Signature: signBigInts,
-		Stake:     new(big.Int).Set(v.Stake),
-	}, nil
 }
 
 // ToValidatorMetadata creates ValidatorMetadata instance
@@ -220,20 +197,22 @@ func (v *Validator) String() string {
 type RootchainConfig struct {
 	JSONRPCAddr string
 
-	StateSenderAddress          types.Address
-	CheckpointManagerAddress    types.Address
-	BLSAddress                  types.Address
-	BN256G2Address              types.Address
-	ExitHelperAddress           types.Address
-	RootERC20PredicateAddress   types.Address
-	RootNativeERC20Address      types.Address
-	ERC20TemplateAddress        types.Address
-	RootERC721PredicateAddress  types.Address
-	RootERC721Address           types.Address
-	RootERC721TemplateAddress   types.Address
-	RootERC1155PredicateAddress types.Address
-	RootERC1155Address          types.Address
-	ERC1155TemplateAddress      types.Address
+	StateSenderAddress           types.Address
+	CheckpointManagerAddress     types.Address
+	BLSAddress                   types.Address
+	BN256G2Address               types.Address
+	ExitHelperAddress            types.Address
+	RootERC20PredicateAddress    types.Address
+	RootNativeERC20Address       types.Address
+	ERC20TemplateAddress         types.Address
+	RootERC721PredicateAddress   types.Address
+	RootERC721Address            types.Address
+	RootERC721TemplateAddress    types.Address
+	RootERC1155PredicateAddress  types.Address
+	RootERC1155Address           types.Address
+	ERC1155TemplateAddress       types.Address
+	CustomSupernetManagerAddress types.Address
+	StakeManagerAddress          types.Address
 }
 
 // ToBridgeConfig creates BridgeConfig instance
@@ -241,21 +220,72 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 	return &BridgeConfig{
 		JSONRPCEndpoint: r.JSONRPCAddr,
 
-		StateSenderAddr:          r.StateSenderAddress,
-		CheckpointManagerAddr:    r.CheckpointManagerAddress,
-		ExitHelperAddr:           r.ExitHelperAddress,
-		RootERC20PredicateAddr:   r.RootERC20PredicateAddress,
-		RootNativeERC20Addr:      r.RootNativeERC20Address,
-		RootERC721Addr:           r.RootERC721Address,
-		RootERC721PredicateAddr:  r.RootERC721PredicateAddress,
-		RootERC1155Addr:          r.RootERC1155Address,
-		RootERC1155PredicateAddr: r.RootERC1155PredicateAddress,
+		StateSenderAddr:           r.StateSenderAddress,
+		CheckpointManagerAddr:     r.CheckpointManagerAddress,
+		ExitHelperAddr:            r.ExitHelperAddress,
+		RootERC20PredicateAddr:    r.RootERC20PredicateAddress,
+		RootNativeERC20Addr:       r.RootNativeERC20Address,
+		RootERC721Addr:            r.RootERC721Address,
+		RootERC721PredicateAddr:   r.RootERC721PredicateAddress,
+		RootERC1155Addr:           r.RootERC1155Address,
+		RootERC1155PredicateAddr:  r.RootERC1155PredicateAddress,
+		CustomSupernetManagerAddr: r.CustomSupernetManagerAddress,
+		StakeManagerAddr:          r.StakeManagerAddress,
 	}
 }
 
 // TokenConfig is the configuration of native token used by edge network
 type TokenConfig struct {
-	Name     string `json:"name"`
-	Symbol   string `json:"symbol"`
-	Decimals uint8  `json:"decimals"`
+	Name       string `json:"name"`
+	Symbol     string `json:"symbol"`
+	Decimals   uint8  `json:"decimals"`
+	IsMintable bool   `json:"isMintable"`
+}
+
+type RewardsConfig struct {
+	// TokenAddress is the address of reward token on child chain
+	TokenAddress types.Address
+
+	// WalletAddress is the address of reward wallet on child chain
+	WalletAddress types.Address
+
+	// WalletAmount is the amount of tokens in reward wallet
+	WalletAmount *big.Int
+}
+
+func (r *RewardsConfig) MarshalJSON() ([]byte, error) {
+	raw := &rewardsConfigRaw{
+		TokenAddress:  r.TokenAddress,
+		WalletAddress: r.WalletAddress,
+		WalletAmount:  types.EncodeBigInt(r.WalletAmount),
+	}
+
+	return json.Marshal(raw)
+}
+
+func (r *RewardsConfig) UnmarshalJSON(data []byte) error {
+	var (
+		raw rewardsConfigRaw
+		err error
+	)
+
+	if err = json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	r.TokenAddress = raw.TokenAddress
+	r.WalletAddress = raw.WalletAddress
+
+	r.WalletAmount, err = types.ParseUint256orHex(raw.WalletAmount)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type rewardsConfigRaw struct {
+	TokenAddress  types.Address `json:"rewardTokenAddress"`
+	WalletAddress types.Address `json:"rewardWalletAddress"`
+	WalletAmount  *string       `json:"rewardWalletAmount"`
 }

@@ -133,6 +133,27 @@ func StringToBytes(str string) []byte {
 	return b
 }
 
+// IsValidAddress checks if provided string is a valid Ethereum address
+func IsValidAddress(address string) error {
+	// remove 0x prefix if it exists
+	if strings.HasPrefix(address, "0x") {
+		address = address[2:]
+	}
+
+	// decode the address
+	decodedAddress, err := hex.DecodeString(address)
+	if err != nil {
+		return fmt.Errorf("address %s contains invalid characters", address)
+	}
+
+	// check if the address has the correct length
+	if len(decodedAddress) != AddressLength {
+		return fmt.Errorf("address %s has invalid length", address)
+	}
+
+	return nil
+}
+
 // UnmarshalText parses a hash in hex syntax.
 func (h *Hash) UnmarshalText(input []byte) error {
 	*h = BytesToHash(StringToBytes(string(input)))

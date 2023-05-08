@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	outputter := command.InitializeOutputter(GetCommand())
 
 	require.NotPanics(t, func() {
-		_, err = deployContracts(outputter, client, 10, []*polybft.Validator{})
+		_, _, err = deployContracts(outputter, client, []*polybft.Validator{}, context.Background())
 	})
 	require.NoError(t, err)
 }

@@ -30,9 +30,18 @@ type blockBuilder interface {
 var (
 	errCommitEpochTxDoesNotExist   = errors.New("commit epoch transaction is not found in the epoch ending block")
 	errCommitEpochTxNotExpected    = errors.New("didn't expect commit epoch transaction in a non epoch ending block")
-	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed in an epoch ending block")
-	errProposalDontMatch           = errors.New("failed to insert proposal, because the validated proposal " +
+	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed " +
+		"in an epoch ending block")
+	errDistributeRewardsTxDoesNotExist = errors.New("distribute rewards transaction is " +
+		"not found in the epoch ending block")
+	errDistributeRewardsTxNotExpected = errors.New("didn't expect distribute rewards transaction " +
+		"in a non epoch ending block")
+	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is " +
+		"allowed in an epoch ending block")
+	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
+	errValidatorSetDeltaMismatch        = errors.New("validator set delta mismatch")
+	errValidatorsUpdateInNonEpochEnding = errors.New("trying to update validator set in a non epoch ending block")
 )
 
 type fsm struct {
@@ -60,10 +69,14 @@ type fsm struct {
 	// epochNumber denotes current epoch number
 	epochNumber uint64
 
-	// commitEpochInput holds info about validators performance during single epoch
-	// (namely how many times each validator signed block during epoch).
+	// commitEpochInput holds info about a single epoch
 	// It is populated only for epoch-ending blocks.
-	commitEpochInput *contractsapi.CommitEpochChildValidatorSetFn
+	commitEpochInput *contractsapi.CommitEpochValidatorSetFn
+
+	// distributeRewardsInput holds info about validators work in a single epoch
+	// mainly, how many blocks they signed during given epoch
+	// It is populated only for epoch-ending blocks.
+	distributeRewardsInput *contractsapi.DistributeRewardForRewardPoolFn
 
 	// isEndOfEpoch indicates if epoch reached its end
 	isEndOfEpoch bool
@@ -82,6 +95,9 @@ type fsm struct {
 
 	// exitEventRootHash is the calculated root hash for given checkpoint block
 	exitEventRootHash types.Hash
+
+	// newValidatorsDelta carries the updates of validator set on epoch ending block
+	newValidatorsDelta *ValidatorSetDelta
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -112,6 +128,15 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		if err := f.blockBuilder.WriteTx(tx); err != nil {
 			return nil, fmt.Errorf("failed to apply commit epoch transaction: %w", err)
 		}
+
+		tx, err = f.createDistributeRewardsTx()
+		if err != nil {
+			return nil, err
+		}
+
+		if err := f.blockBuilder.WriteTx(tx); err != nil {
+			return nil, fmt.Errorf("failed to apply distribute rewards transaction: %w", err)
+		}
 	}
 
 	if f.config.IsBridgeEnabled() {
@@ -123,26 +148,13 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	// fill the block with transactions
 	f.blockBuilder.Fill()
 
-	// update extra validators if needed, but only after all transactions has been written
-	// each transaction can update state and therefore change validators stake for example
 	if f.isEndOfEpoch {
-		nextValidators, err = f.getCurrentValidators(f.blockBuilder.GetState())
+		nextValidators, err = nextValidators.ApplyDelta(f.newValidatorsDelta)
 		if err != nil {
 			return nil, err
 		}
 
-		validatorsDelta, err := createValidatorSetDelta(f.validators.Accounts(), nextValidators)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create validator set delta: %w", err)
-		}
-
-		extra.Validators = validatorsDelta
-		f.logger.Trace("[FSM Build Proposal]", "Validators Delta", validatorsDelta)
-
-		nextValidators, err = f.getValidatorsTransition(validatorsDelta)
-		if err != nil {
-			return nil, err
-		}
+		extra.Validators = f.newValidatorsDelta
 	}
 
 	currentValidatorsHash, err := f.validators.Accounts().Hash()
@@ -218,23 +230,13 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 }
 
 // getValidatorsTransition applies delta to the current validators,
-// as ChildValidatorSet SC returns validators in different order than the one kept on the Edge
 func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, error) {
 	nextValidators, err := f.validators.Accounts().ApplyDelta(delta)
 	if err != nil {
 		return nil, err
 	}
 
-	if f.logger.IsDebug() {
-		var buf bytes.Buffer
-		for _, v := range nextValidators {
-			if _, err := buf.WriteString(fmt.Sprintf("%s\n", v.String())); err != nil {
-				return nil, err
-			}
-		}
-
-		f.logger.Debug("getValidatorsTransition", "Next validators", buf.String())
-	}
+	f.logger.Debug("getValidatorsTransition", "Next validators", nextValidators)
 
 	return nextValidators, nil
 }
@@ -248,6 +250,17 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 	}
 
 	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
+}
+
+// createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
+// and sends all the necessary metadata to it.
+func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
+	input, err := f.distributeRewardsInput.EncodeAbi()
+	if err != nil {
+		return nil, err
+	}
+
+	return createStateTransactionWithData(contracts.RewardPoolContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -320,13 +333,12 @@ func (f *fsm) Validate(proposal []byte) error {
 
 	validateExtraData := func(transition *state.Transition) error {
 		if f.isEndOfEpoch {
-			if nextValidators, err = f.getCurrentValidators(transition); err != nil {
-				return err
+			if !extra.Validators.Equals(f.newValidatorsDelta) {
+				return errValidatorSetDeltaMismatch
 			}
-		}
-
-		if err := extra.ValidateDelta(currentValidators, nextValidators); err != nil {
-			return err
+		} else if !extra.Validators.IsEmpty() {
+			// delta should be empty in non epoch ending blocks
+			return errValidatorsUpdateInNonEpochEnding
 		}
 
 		nextValidators, err = f.getValidatorsTransition(extra.Validators)
@@ -392,8 +404,9 @@ func (f *fsm) ValidateSender(msg *proto.Message) error {
 
 func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	var (
-		commitmentTxExists  bool
-		commitEpochTxExists bool
+		commitmentTxExists        bool
+		commitEpochTxExists       bool
+		distributeRewardsTxExists bool
 	)
 
 	for _, tx := range transactions {
@@ -441,7 +454,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if !verified {
 				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
-		case *contractsapi.CommitEpochChildValidatorSetFn:
+		case *contractsapi.CommitEpochValidatorSetFn:
 			if commitEpochTxExists {
 				// if we already validated commit epoch tx,
 				// that means someone added more than one commit epoch tx to block,
@@ -454,15 +467,36 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if err := f.verifyCommitEpochTx(tx); err != nil {
 				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
 			}
+		case *contractsapi.DistributeRewardForRewardPoolFn:
+			if distributeRewardsTxExists {
+				// if we already validated distribute rewards tx,
+				// that means someone added more than one distribute rewards tx to block,
+				// which is invalid
+				return errDistributeRewardsTxSingleExpected
+			}
+
+			distributeRewardsTxExists = true
+
+			if err := f.verifyDistributeRewardsTx(tx); err != nil {
+				return fmt.Errorf("error while verifying distribute rewards transaction. error: %w", err)
+			}
 		default:
 			return fmt.Errorf("invalid state transaction data type: %v", stateTxData)
 		}
 	}
 
-	if f.isEndOfEpoch && !commitEpochTxExists {
-		// this is a check if commit epoch transaction is not in the list of transactions at all
-		// but it should be
-		return errCommitEpochTxDoesNotExist
+	if f.isEndOfEpoch {
+		if !commitEpochTxExists {
+			// this is a check if commit epoch transaction is not in the list of transactions at all
+			// but it should be
+			return errCommitEpochTxDoesNotExist
+		}
+
+		if !distributeRewardsTxExists {
+			// this is a check if distribute rewards transaction is not in the list of transactions at all
+			// but it should be
+			return errDistributeRewardsTxDoesNotExist
+		}
 	}
 
 	return nil
@@ -551,19 +585,6 @@ func (f *fsm) ValidatorSet() ValidatorSet {
 	return f.validators
 }
 
-// getCurrentValidators queries smart contract on the given block height and returns currently active validator set
-func (f *fsm) getCurrentValidators(pendingBlockState *state.Transition) (AccountSet, error) {
-	provider := f.backend.GetStateProvider(pendingBlockState)
-	systemState := f.backend.GetSystemState(provider)
-
-	newValidators, err := systemState.GetValidatorSet()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve validator set for current block: %w", err)
-	}
-
-	return newValidators, nil
-}
-
 // verifyCommitEpochTx creates commit epoch transaction and compares its hash with the one extracted from the block.
 func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 	if f.isEndOfEpoch {
@@ -584,6 +605,29 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 	}
 
 	return errCommitEpochTxNotExpected
+}
+
+// verifyDistributeRewardsTx creates distribute rewards transaction
+// and compares its hash with the one extracted from the block.
+func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) error {
+	if f.isEndOfEpoch {
+		localDistributeRewardsTx, err := f.createDistributeRewardsTx()
+		if err != nil {
+			return err
+		}
+
+		if distributeRewardsTx.Hash != localDistributeRewardsTx.Hash {
+			return fmt.Errorf(
+				"invalid distribute rewards transaction. Expected '%s', but got '%s' distribute rewards hash",
+				localDistributeRewardsTx.Hash,
+				distributeRewardsTx.Hash,
+			)
+		}
+
+		return nil
+	}
+
+	return errDistributeRewardsTxNotExpected
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {

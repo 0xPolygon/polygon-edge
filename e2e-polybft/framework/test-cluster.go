@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -49,7 +51,10 @@ const (
 	nonValidatorPrefix = "test-non-validator-"
 )
 
-var startTime int64
+var (
+	startTime            int64
+	testRewardWalletAddr = types.StringToAddress("0xFFFFFFFF")
+)
 
 func init() {
 	startTime = time.Now().UTC().UnixMilli()
@@ -71,8 +76,7 @@ type TestClusterConfig struct {
 	Premine              []string // address[:amount]
 	PremineValidators    []string // address[:amount]
 	StakeAmounts         []string // address[:amount]
-	MintableNativeToken  bool
-	HasBridge            bool
+	WithoutBridge        bool
 	BootnodeCount        int
 	NonValidatorCount    int
 	WithLogs             bool
@@ -107,7 +111,8 @@ type TestClusterConfig struct {
 	InitialTrieDB    string
 	InitialStateRoot types.Hash
 
-	IsPropertyTest bool
+	IsPropertyTest  bool
+	TestRewardToken string
 
 	logsDirOnce sync.Once
 }
@@ -194,21 +199,15 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 	}
 }
 
-func WithMintableNativeToken(mintableToken bool) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.MintableNativeToken = mintableToken
-	}
-}
-
 func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.SecretsCallback = fn
 	}
 }
 
-func WithBridge() ClusterOption {
+func WithoutBridge() ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.HasBridge = true
+		h.WithoutBridge = true
 	}
 }
 
@@ -355,6 +354,12 @@ func WithNativeTokenConfig(tokenConfigRaw string) ClusterOption {
 	}
 }
 
+func WithTestRewardToken() ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.TestRewardToken = hex.EncodeToString(contractsapi.TestRewardToken.DeployedBytecode)
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -418,23 +423,20 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Config.ValidatorSetSize = uint64(validatorsCount)
 	}
 
-	{
-		// run init accounts for validators
-		addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	// run init accounts for validators
+	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	require.NoError(t, err)
+
+	if cluster.Config.SecretsCallback != nil {
+		cluster.Config.SecretsCallback(addresses, cluster.Config)
+	}
+
+	if config.NonValidatorCount > 0 {
+		// run init accounts for non-validators
+		// we don't call secrets callback on non-validators,
+		// since we have nothing to premine nor stake for non validators
+		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
 		require.NoError(t, err)
-
-		if cluster.Config.SecretsCallback != nil {
-			cluster.Config.SecretsCallback(addresses, cluster.Config)
-		}
-
-		if config.NonValidatorCount > 0 {
-			// run init accounts for non-validators
-			_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
-			require.NoError(t, err)
-
-			// we don't call secrets callback on non-validators,
-			// since we have nothing to premine nor stake for non validators
-		}
 	}
 
 	genesisPath := path.Join(config.TmpDir, "genesis.json")
@@ -450,7 +452,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--epoch-size", strconv.Itoa(cluster.Config.EpochSize),
 			"--epoch-reward", strconv.Itoa(cluster.Config.EpochReward),
 			"--premine", "0x0000000000000000000000000000000000000000",
+			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+		}
+
+		if cluster.Config.TestRewardToken != "" {
+			args = append(args, "--reward-token-code", cluster.Config.TestRewardToken)
 		}
 
 		// add optional genesis flags
@@ -462,10 +469,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for _, premine := range cluster.Config.Premine {
 				args = append(args, "--premine", premine)
 			}
-		}
-
-		if cluster.Config.MintableNativeToken {
-			args = append(args, "--mintable-native-token")
 		}
 
 		if len(cluster.Config.BurnContracts) != 0 {
@@ -562,7 +565,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	if cluster.Config.HasBridge {
+	if !cluster.Config.WithoutBridge {
 		// start bridge
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
@@ -571,26 +574,47 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
+		polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(genesisPath)
+		require.NoError(t, err)
+
 		// fund validators on the rootchain
-		err = cluster.Bridge.fundRootchainValidators()
+		err = cluster.Bridge.fundRootchainValidators(polybftConfig)
+		require.NoError(t, err)
+
+		// whitelist genesis validators on the rootchain
+		err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
+		require.NoError(t, err)
+
+		// register genesis validators on the rootchain
+		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
+		require.NoError(t, err)
+
+		// do initial staking for genesis validators on the rootchain
+		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig, chainID)
+		require.NoError(t, err)
+
+		// finalize genesis validators on the rootchain
+		err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
 		require.NoError(t, err)
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, true, cluster.Config.HasBridge && i == 1 /* relayer */)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
+			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, false, false /* relayer */)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
+			false, false /* relayer */)
 	}
 
 	return cluster
 }
 
 func (c *TestCluster) InitTestServer(t *testing.T,
-	dataDir string, isValidator bool, relayer bool) {
+	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -603,7 +627,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		}
 	}
 
-	srv := NewTestServer(t, c.Config, func(config *TestServerConfig) {
+	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
 		config.DataDir = dataDir
 		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
@@ -611,6 +635,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.LogLevel = logLevel
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
+		config.BridgeJSONRPC = bridgeJSONRPC
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

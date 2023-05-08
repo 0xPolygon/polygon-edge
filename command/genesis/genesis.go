@@ -174,7 +174,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.validators,
 			validatorsFlag,
 			[]string{},
-			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>:<BLS signature>)",
+			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
 		)
 
 		cmd.Flags().StringArrayVar(
@@ -219,18 +219,25 @@ func setFlags(cmd *cobra.Command) {
 			"trie root from the corresponding triedb",
 		)
 
-		cmd.Flags().BoolVar(
-			&params.mintableNativeToken,
-			mintableTokenFlag,
-			false,
-			"flag indicate whether mintable or non-mintable native token is deployed",
-		)
-
 		cmd.Flags().StringVar(
 			&params.nativeTokenConfigRaw,
 			nativeTokenConfigFlag,
 			"",
-			"configuration of native token in format <name:symbol:decimals count>",
+			"configuration of native token in format <name:symbol:decimals count:mintable flag>",
+		)
+
+		cmd.Flags().StringVar(
+			&params.rewardTokenCode,
+			rewardTokenCodeFlag,
+			"",
+			"hex encoded reward token byte code",
+		)
+
+		cmd.Flags().StringVar(
+			&params.rewardWallet,
+			rewardWalletFlag,
+			"",
+			"configuration of reward wallet in format <address:amount>",
 		)
 	}
 

@@ -24,10 +24,6 @@ func main() {
 		Name string
 	}{
 		{
-			"child/ChildValidatorSet.sol",
-			"ChildValidatorSet",
-		},
-		{
 			"child/L2StateSender.sol",
 			"L2StateSender",
 		},
@@ -52,6 +48,10 @@ func main() {
 			"ChildERC20Predicate",
 		},
 		{
+			"child/ChildERC20PredicateAccessList.sol",
+			"ChildERC20PredicateAccessList",
+		},
+		{
 			"child/ChildERC721.sol",
 			"ChildERC721",
 		},
@@ -60,12 +60,20 @@ func main() {
 			"ChildERC721Predicate",
 		},
 		{
+			"child/ChildERC721PredicateAccessList.sol",
+			"ChildERC721PredicateAccessList",
+		},
+		{
 			"child/ChildERC1155.sol",
 			"ChildERC1155",
 		},
 		{
 			"child/ChildERC1155Predicate.sol",
 			"ChildERC1155Predicate",
+		},
+		{
+			"child/ChildERC1155PredicateAccessList.sol",
+			"ChildERC1155PredicateAccessList",
 		},
 		{
 			"child/System.sol",
@@ -118,6 +126,22 @@ func main() {
 		{
 			"root/RootERC1155Predicate.sol",
 			"RootERC1155Predicate",
+		},
+		{
+			"root/staking/CustomSupernetManager.sol",
+			"CustomSupernetManager",
+		},
+		{
+			"root/staking/StakeManager.sol",
+			"StakeManager",
+		},
+		{
+			"child/validator/RewardPool.sol",
+			"RewardPool",
+		},
+		{
+			"child/validator/ValidatorSet.sol",
+			"ValidatorSet",
 		},
 	}
 

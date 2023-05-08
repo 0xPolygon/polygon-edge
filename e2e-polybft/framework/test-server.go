@@ -4,19 +4,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"path"
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"google.golang.org/grpc"
@@ -33,6 +34,7 @@ type TestServerConfig struct {
 	LogLevel              string
 	Relayer               bool
 	NumBlockConfirmations uint64
+	BridgeJSONRPC         string
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -48,6 +50,7 @@ func getOpenPortForServer() int64 {
 type TestServer struct {
 	t *testing.T
 
+	address       types.Address
 	clusterConfig *TestClusterConfig
 	config        *TestServerConfig
 	node          *node
@@ -59,6 +62,10 @@ func (t *TestServer) GrpcAddr() string {
 
 func (t *TestServer) JSONRPCAddr() string {
 	return fmt.Sprintf("http://%s:%d", hostIP, t.config.JSONRPCPort)
+}
+
+func (t *TestServer) BridgeJSONRPCAddr() string {
+	return t.config.BridgeJSONRPC
 }
 
 func (t *TestServer) JSONRPC() *jsonrpc.Client {
@@ -92,14 +99,16 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
-func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback TestServerConfigCallback) *TestServer {
+func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
+	bridgeJSONRPC string, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
 	config := &TestServerConfig{
-		Name:        uuid.New().String(),
-		JSONRPCPort: getOpenPortForServer(),
-		GRPCPort:    getOpenPortForServer(),
-		P2PPort:     getOpenPortForServer(),
+		Name:          uuid.New().String(),
+		JSONRPCPort:   getOpenPortForServer(),
+		GRPCPort:      getOpenPortForServer(),
+		P2PPort:       getOpenPortForServer(),
+		BridgeJSONRPC: bridgeJSONRPC,
 	}
 
 	if callback != nil {
@@ -108,14 +117,21 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig, callback Test
 
 	if config.DataDir == "" {
 		dataDir, err := ioutil.TempDir("/tmp", "edge-e2e-")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		config.DataDir = dataDir
 	}
 
+	secretsManager, err := polybftsecrets.GetSecretsManager(config.DataDir, "", true)
+	require.NoError(t, err)
+
+	key, err := wallet.GetEcdsaFromSecret(secretsManager)
+	require.NoError(t, err)
+
 	srv := &TestServer{
 		t:             t,
 		clusterConfig: clusterConfig,
+		address:       types.Address(key.Address()),
 		config:        config,
 	}
 	srv.Start()
@@ -180,103 +196,122 @@ func (t *TestServer) Stop() {
 	t.node = nil
 }
 
+// RootchainFund funds given validator account on the rootchain
+func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, amount *big.Int) error {
+	args := []string{
+		"rootchain",
+		"fund",
+		"--addresses", t.address.String(),
+		"--amounts", amount.String(),
+		"--json-rpc", t.BridgeJSONRPCAddr(),
+		"--native-root-token", rootNativeERC20Addr.String(),
+		"--mint",
+	}
+
+	if err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge")); err != nil {
+		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+	}
+
+	return nil
+}
+
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(amount uint64) error {
+func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, chainID int64, amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"stake",
+		"--jsonrpc", t.BridgeJSONRPCAddr(),
+		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
-		"--jsonrpc", t.JSONRPCAddr(),
-		"--amount", strconv.FormatUint(amount, 10),
-		"--self",
+		"--amount", amount.String(),
+		"--chain-id", strconv.FormatInt(chainID, 10),
+		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 	}
 
 	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
 }
 
 // Unstake unstakes given amount from validator account encapsulated by given server instance
-func (t *TestServer) Unstake(amount uint64) error {
+func (t *TestServer) Unstake(amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"unstake",
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--amount", strconv.FormatUint(amount, 10),
-		"--self",
+		"--amount", amount.String(),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("stake"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("unstake"))
 }
 
-// RegisterValidator is a wrapper function which registers new validator with given balance and stake
-func (t *TestServer) RegisterValidator(secrets string, stake string) error {
+// RegisterValidator is a wrapper function which registers new validator on a root chain
+func (t *TestServer) RegisterValidator(supernetManagerAddr types.Address) error {
 	args := []string{
 		"polybft",
 		"register-validator",
-		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secrets),
-		"--jsonrpc", t.JSONRPCAddr(),
+		"--jsonrpc", t.BridgeJSONRPCAddr(),
+		"--supernet-manager", supernetManagerAddr.String(),
+		"--" + polybftsecrets.AccountDirFlag, t.DataDir(),
 	}
 
-	if stake != "" {
-		args = append(args, "--stake", stake)
-	}
-
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("register-validator"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
 }
 
-// WhitelistValidator invokes whitelist-validator helper CLI command,
-// which sends whitelist transaction to ChildValidatorSet
-func (t *TestServer) WhitelistValidator(address, secrets string) error {
+// WhitelistValidators invokes whitelist-validators helper CLI command,
+// that whitelists validators on the root chain
+func (t *TestServer) WhitelistValidators(addresses []string, supernetManager types.Address) error {
 	args := []string{
 		"polybft",
-		"whitelist-validator",
-		"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secrets),
-		"--address", address,
-		"--jsonrpc", t.JSONRPCAddr(),
+		"whitelist-validators",
+		"--private-key", rootHelper.TestAccountPrivKey,
+		"--jsonrpc", t.BridgeJSONRPCAddr(),
+		"--supernet-manager", supernetManager.String(),
+	}
+	for _, addr := range addresses {
+		args = append(args, "--addresses", addr)
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("whitelist-validator"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge"))
 }
 
-// Delegate delegates given amount by the account in secrets to validatorAddr validator
-func (t *TestServer) Delegate(amount uint64, secrets string, validatorAddr ethgo.Address) error {
+// WithdrawChildChain withdraws available balance from child chain
+func (t *TestServer) WithdrawChildChain() error {
 	args := []string{
 		"polybft",
-		"stake",
-		"--" + polybftsecrets.AccountDirFlag, secrets,
+		"withdraw-child",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
-		"--delegate", validatorAddr.String(),
-		"--amount", strconv.FormatUint(amount, 10),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("delegation"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-child"))
 }
 
-// Undelegate undelegates given amount by the account in secrets from validatorAddr validator
-func (t *TestServer) Undelegate(amount uint64, secrets string, validatorAddr ethgo.Address) error {
+// WithdrawRootChain withdraws available balance from root chain
+func (t *TestServer) WithdrawRootChain(recipient string, amount *big.Int,
+	stakeManager ethgo.Address, bridgeJSONRPC string) error {
 	args := []string{
 		"polybft",
-		"unstake",
-		"--" + polybftsecrets.AccountDirFlag, secrets,
-		"--undelegate", validatorAddr.String(),
-		"--amount", strconv.FormatUint(amount, 10),
-		"--jsonrpc", t.JSONRPCAddr(),
+		"withdraw-root",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
+		"--to", recipient,
+		"--amount", amount.String(),
+		"--stake-manager", stakeManager.String(),
+		"--jsonrpc", bridgeJSONRPC,
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("delegation"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-root"))
 }
 
-// Withdraw withdraws available balance to provided recipient address
-func (t *TestServer) Withdraw(secrets string, recipient ethgo.Address) error {
+// WithdrawRewards withdraws pending rewards for given validator on RewardPool contract
+func (t *TestServer) WithdrawRewards() error {
 	args := []string{
 		"polybft",
-		"withdraw",
-		"--" + polybftsecrets.AccountDirFlag, secrets,
-		"--to", recipient.String(),
+		"withdraw-rewards",
+		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--jsonrpc", t.JSONRPCAddr(),
 	}
 
-	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdrawal"))
+	return runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("withdraw-rewards"))
 }
 
 // HasValidatorSealed checks whether given validator has signed at least single block for the given range of blocks
