@@ -939,7 +939,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			"",
 			validatorSrv.JSONRPCAddr(),
 			contracts.NativeERC20TokenContract)
-		require.Error(t, err)
+		require.ErrorContains(t, err, "failed to execute withdrawal")
 
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
