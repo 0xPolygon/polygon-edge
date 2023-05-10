@@ -343,6 +343,14 @@
       "created_at": "2023-04-28T06:30:33Z",
       "repoId": 287542207,
       "pullRequestNo": 1448
+    },
+    {
+      "name": "dusan-maksimovic",
+      "id": 94966669,
+      "comment_id": 1542226230,
+      "created_at": "2023-05-10T13:36:33Z",
+      "repoId": 287542207,
+      "pullRequestNo": 1493
     }
   ]
 }
