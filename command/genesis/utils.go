@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
@@ -176,13 +176,13 @@ func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 }
 
 // ReadValidatorsByPrefix reads validators secrets on a given root directory and with given folder prefix
-func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
+func ReadValidatorsByPrefix(dir, prefix string) ([]*validator.GenesisValidator, error) {
 	validatorKeyFiles, err := GetValidatorKeyFiles(dir, prefix)
 	if err != nil {
 		return nil, err
 	}
 
-	validators := make([]*polybft.Validator, len(validatorKeyFiles))
+	validators := make([]*validator.GenesisValidator, len(validatorKeyFiles))
 
 	for i, file := range validatorKeyFiles {
 		path := filepath.Join(dir, file)
@@ -192,7 +192,7 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*polybft.Validator, error) {
 			return nil, err
 		}
 
-		validators[i] = &polybft.Validator{
+		validators[i] = &validator.GenesisValidator{
 			Address:       types.Address(account.Ecdsa.Address()),
 			BlsPrivateKey: account.Bls,
 			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),

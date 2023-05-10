@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -31,7 +32,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	)
 
 	updateHeaderExtra := func(header *types.Header,
-		validators *ValidatorSetDelta,
+		validators *validator.ValidatorSetDelta,
 		parentSignature *Signature,
 		checkpointData *CheckpointData,
 		committedAccounts []*wallet.Account) *Signature {
@@ -61,17 +62,17 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create all validators
-	validators := newTestValidators(t, allValidatorsSize)
+	validators := validator.NewTestValidators(t, allValidatorsSize)
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{
-		InitialValidatorSet: validators.getParamValidators(),
+		InitialValidatorSet: validators.GetParamValidators(),
 		EpochSize:           fixedEpochSize,
 		SprintSize:          5,
 	}
 
-	validatorSet := validators.getPublicIdentities()
-	accounts := validators.getPrivateIdentities()
+	validatorSet := validators.GetPublicIdentities()
+	accounts := validators.GetPrivateIdentities()
 
 	// calculate validators before and after the end of the first epoch
 	validatorSetParent, validatorSetCurrent := validatorSet[:len(validatorSet)-1], validatorSet[1:]

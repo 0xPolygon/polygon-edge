@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -79,11 +80,11 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64,
 }
 
 func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
-	validatorSet AccountSet, epochSize uint64) *contractsapi.DistributeRewardForRewardPoolFn {
+	validatorSet validator.AccountSet, epochSize uint64) *contractsapi.DistributeRewardForRewardPoolFn {
 	t.Helper()
 
 	if validatorSet == nil {
-		validatorSet = newTestValidators(t, 5).getPublicIdentities()
+		validatorSet = validator.NewTestValidators(t, 5).GetPublicIdentities()
 	}
 
 	uptime := make([]*contractsapi.Uptime, len(validatorSet))
@@ -176,10 +177,10 @@ func generateTestAccount(t *testing.T) *wallet.Account {
 }
 
 // createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	var addedValidators, updatedValidators AccountSet
+func createValidatorSetDelta(oldValidatorSet, newValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
+	var addedValidators, updatedValidators validator.AccountSet
 
-	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
+	oldValidatorSetMap := make(map[types.Address]*validator.ValidatorMetadata)
 	removedValidators := map[types.Address]int{}
 
 	for i, validator := range oldValidatorSet {
@@ -215,7 +216,7 @@ func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*Vali
 		removedValsBitmap.Set(uint64(i))
 	}
 
-	delta := &ValidatorSetDelta{
+	delta := &validator.ValidatorSetDelta{
 		Added:   addedValidators,
 		Updated: updatedValidators,
 		Removed: removedValsBitmap,

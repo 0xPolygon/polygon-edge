@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -315,7 +316,7 @@ func (t *TestServer) WithdrawRewards() error {
 }
 
 // HasValidatorSealed checks whether given validator has signed at least single block for the given range of blocks
-func (t *TestServer) HasValidatorSealed(firstBlock, lastBlock uint64, validators polybft.AccountSet,
+func (t *TestServer) HasValidatorSealed(firstBlock, lastBlock uint64, validators validator.AccountSet,
 	validatorAddr ethgo.Address) (bool, error) {
 	rpcClient := t.JSONRPC()
 	for i := firstBlock + 1; i <= lastBlock; i++ {

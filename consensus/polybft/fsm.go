@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -58,7 +59,7 @@ type fsm struct {
 	polybftBackend polybftBackend
 
 	// validators is the list of validators for this round
-	validators ValidatorSet
+	validators validator.ValidatorSet
 
 	// proposerSnapshot keeps information about new proposer
 	proposerSnapshot *ProposerSnapshot
@@ -97,7 +98,7 @@ type fsm struct {
 	exitEventRootHash types.Hash
 
 	// newValidatorsDelta carries the updates of validator set on epoch ending block
-	newValidatorsDelta *ValidatorSetDelta
+	newValidatorsDelta *validator.ValidatorSetDelta
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -230,7 +231,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 }
 
 // getValidatorsTransition applies delta to the current validators,
-func (f *fsm) getValidatorsTransition(delta *ValidatorSetDelta) (AccountSet, error) {
+func (f *fsm) getValidatorsTransition(delta *validator.ValidatorSetDelta) (validator.AccountSet, error) {
 	nextValidators, err := f.validators.Accounts().ApplyDelta(delta)
 	if err != nil {
 		return nil, err
@@ -581,7 +582,7 @@ func (f *fsm) Height() uint64 {
 }
 
 // ValidatorSet returns the validator set for the current round
-func (f *fsm) ValidatorSet() ValidatorSet {
+func (f *fsm) ValidatorSet() validator.ValidatorSet {
 	return f.validators
 }
 
