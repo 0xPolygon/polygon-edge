@@ -45,7 +45,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlag,
 		command.DefaultChainID,
-		"the ID of the chain",
+		"the ID of the chain (only used for IBFT consensus)",
 	)
 
 	cmd.Flags().StringVar(
