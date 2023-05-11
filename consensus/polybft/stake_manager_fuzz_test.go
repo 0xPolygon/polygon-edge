@@ -18,23 +18,23 @@ import (
 	go_fuzz_utils "github.com/trailofbits/go-fuzz-utils"
 )
 
-func FuzzTestStakeManager_PostEpoch(f *testing.F) {
+func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 	state := newTestStateF(f)
 
 	seeds := []struct {
-		EpochId    uint64
+		EpochID    uint64
 		Validators AccountSet
 	}{
 		{
-			EpochId:    0,
+			EpochID:    0,
 			Validators: newTestValidatorsF(f, 6).getPublicIdentities(),
 		},
 		{
-			EpochId:    1,
+			EpochID:    1,
 			Validators: newTestValidatorsF(f, 42).getPublicIdentities(),
 		},
 		{
-			EpochId:    42,
+			EpochID:    42,
 			Validators: newTestValidatorsF(f, 6).getPublicIdentities(),
 		},
 	}
@@ -45,7 +45,6 @@ func FuzzTestStakeManager_PostEpoch(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-
 		stakeManager := &stakeManager{
 			logger:              hclog.NewNullLogger(),
 			state:               state,
@@ -56,7 +55,7 @@ func FuzzTestStakeManager_PostEpoch(f *testing.F) {
 		if err != nil {
 			return
 		}
-		newEpochId, err := tp.GetUint64()
+		newEpochID, err := tp.GetUint64()
 		if err != nil {
 			return
 		}
@@ -66,8 +65,8 @@ func FuzzTestStakeManager_PostEpoch(f *testing.F) {
 			return
 		}
 
-		stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID: newEpochId,
+		_ = stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID: newEpochID,
 			ValidatorSet: NewValidatorSet(
 				validators,
 				stakeManager.logger,
@@ -76,13 +75,13 @@ func FuzzTestStakeManager_PostEpoch(f *testing.F) {
 	})
 }
 
-func FuzzTestStakeManager_PostBlock(f *testing.F) {
+func FuzzTestStakeManagerPostBlock(f *testing.F) {
 	var (
 		allAliases        = []string{"A", "B", "C", "D", "E", "F"}
 		initialSetAliases = []string{"A", "B", "C", "D", "E"}
+		validators        = newTestValidatorsWithAliasesF(f, allAliases)
+		state             = newTestStateF(f)
 	)
-	validators := newTestValidatorsWithAliasesF(f, allAliases)
-	state := newTestStateF(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		t.Parallel()
@@ -101,12 +100,12 @@ func FuzzTestStakeManager_PostBlock(f *testing.F) {
 		if err != nil {
 			return
 		}
-		validatorId, err := tp.GetUint64()
+		validatorID, err := tp.GetUint64()
 		if err != nil {
 			return
 		}
 
-		if validatorId > uint64(len(initialSetAliases)-1) {
+		if validatorID > uint64(len(initialSetAliases)-1) {
 			t.Skip()
 		}
 
@@ -143,9 +142,9 @@ func FuzzTestStakeManager_PostBlock(f *testing.F) {
 				createTestLogForTransferEvent(
 					t,
 					stakeManager.validatorSetContract,
-					validators.getValidator(initialSetAliases[validatorId]).Address(),
+					validators.getValidator(initialSetAliases[validatorID]).Address(),
 					types.ZeroAddress,
-					uint64(stakeValue),
+					stakeValue,
 				),
 			},
 		}
@@ -156,11 +155,11 @@ func FuzzTestStakeManager_PostBlock(f *testing.F) {
 			},
 			Epoch: epoch,
 		}
-		stakeManager.PostBlock(req)
+		_ = stakeManager.PostBlock(req)
 	})
 }
 
-func FuzzTestStakeManager_UpdateValidatorSet(f *testing.F) {
+func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	var (
 		aliases = []string{"A", "B", "C", "D", "E"}
 		stakes  = []uint64{10, 10, 10, 10, 10}
@@ -200,14 +199,13 @@ func FuzzTestStakeManager_UpdateValidatorSet(f *testing.F) {
 			return
 		}
 
-		stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities(aliases[x:]...))
+		_, _ = stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities(aliases[x:]...))
 
 		fullValidatorSet := validators.getPublicIdentities().Copy()
 		validatorToUpdate := fullValidatorSet[x]
 		validatorToUpdate.VotingPower = big.NewInt(votingPower)
 
-		stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
-
+		_, _ = stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
 	})
 }
 
