@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"embed"
 	"encoding/json"
 	"math/big"
 	"os"
@@ -19,16 +20,19 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-var mainnetChainConfig = chain.Params{
-	Forks: &chain.Forks{
-		Homestead: chain.NewFork(1150000),
-		EIP150:    chain.NewFork(2463000),
-		EIP158:    chain.NewFork(2675000),
-		Byzantium: chain.NewFork(4370000),
-	},
-}
+var (
+	//go:embed tests/GeneralStateTests/VMTests/*
+	vmTestsFS embed.FS
 
-var vmTests = "GeneralStateTests/VMTests"
+	mainnetChainConfig = chain.Params{
+		Forks: &chain.Forks{
+			Homestead: chain.NewFork(1150000),
+			EIP150:    chain.NewFork(2463000),
+			EIP158:    chain.NewFork(2675000),
+			Byzantium: chain.NewFork(4370000),
+		},
+	}
+)
 
 type VMCase struct {
 	Info *info `json:"_info"`
@@ -43,7 +47,7 @@ type VMCase struct {
 	Pre  map[types.Address]*chain.GenesisAccount `json:"pre"`
 }
 
-func testVMCase(t *testing.T, name string, c *VMCase) {
+func testVMCase(t *testing.T, c *VMCase) {
 	t.Helper()
 
 	env := c.Env.ToEnv(t)
@@ -139,7 +143,7 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 func TestEVM(t *testing.T) {
 	t.Parallel()
 
-	folders, err := listFolders(vmTests)
+	folders, err := listFolders(vmTestsFS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +175,7 @@ func TestEVM(t *testing.T) {
 				}
 
 				var vmcases map[string]*VMCase
-				if err := json.Unmarshal(data, &vmcases); err != nil {
+				if err = json.Unmarshal(data, &vmcases); err != nil {
 					t.Fatal(err)
 				}
 
@@ -181,7 +185,8 @@ func TestEVM(t *testing.T) {
 
 						continue
 					}
-					testVMCase(t, name, cc)
+
+					testVMCase(t, cc)
 				}
 			})
 		}

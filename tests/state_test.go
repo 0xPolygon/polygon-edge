@@ -2,6 +2,7 @@ package tests
 
 import (
 	"bytes"
+	"embed"
 	"encoding/json"
 	"math/big"
 	"os"
@@ -16,19 +17,21 @@ import (
 )
 
 var (
-	stateTests       = "GeneralStateTests"
-	legacyStateTests = "LegacyTests/Constantinople/GeneralStateTests"
+	//go:embed tests/GeneralStateTests/*
+	stateTestsFS embed.FS
+
+	//go:embed tests/LegacyTests/Constantinople/GeneralStateTests/*
+	legacyStateTestsFS embed.FS
+
+	ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 )
 
 type stateCase struct {
-	Info        *info                                   `json:"_info"`
 	Env         *env                                    `json:"env"`
 	Pre         map[types.Address]*chain.GenesisAccount `json:"pre"`
 	Post        map[string]postState                    `json:"post"`
 	Transaction *stTransaction                          `json:"transaction"`
 }
-
-var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 
 func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, index int, p postEntry) {
 	t.Helper()
@@ -40,7 +43,18 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 
 	env := c.Env.ToEnv(t)
 
-	msg, err := c.Transaction.At(p.Indexes)
+	var baseFee *big.Int
+	if config.IsLondon(0) {
+		if c.Env.BaseFee != "" {
+			baseFee = stringToBigIntT(t, c.Env.BaseFee)
+		} else {
+			// Retesteth uses `0x10` for genesis baseFee. Therefore, it defaults to
+			// parent - 2 : 0xa as the basefee for 'this' context.
+			baseFee = big.NewInt(0x0a)
+		}
+	}
+
+	msg, err := c.Transaction.At(p.Indexes, baseFee)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +62,13 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	s, snapshot, pastRoot := buildState(c.Pre)
 	forks := config.At(uint64(env.Number))
 
-	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
+	xxx := state.NewExecutor(&chain.Params{
+		Forks:   config,
+		ChainID: 1,
+		BurnContract: map[uint64]string{
+			0: types.ZeroAddress.String(),
+		},
+	}, s, hclog.NewNullLogger())
 
 	xxx.PostHook = func(t *state.Transition) {
 		if name == "failed_tx_xcf416c53" {
@@ -114,7 +134,7 @@ func TestState(t *testing.T) {
 
 	// There are two folders in spec tests, one for the current tests for the Istanbul fork
 	// and one for the legacy tests for the other forks
-	folders, err := listFolders(stateTests, legacyStateTests)
+	folders, err := listFolders(stateTestsFS, legacyStateTestsFS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +172,7 @@ func TestState(t *testing.T) {
 				}
 
 				var c map[string]stateCase
-				if err := json.Unmarshal(data, &c); err != nil {
+				if err = json.Unmarshal(data, &c); err != nil {
 					t.Fatal(err)
 				}
 
