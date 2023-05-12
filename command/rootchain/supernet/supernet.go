@@ -3,6 +3,7 @@ package supernet
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -136,13 +137,17 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			GasPrice: gasPrice,
 		}
 
-		receipt, err := txRelayer.SendTransaction(txn, ownerKey)
-		if err != nil {
-			return fmt.Errorf("finalizing genesis validator set failed. Error: %w", err)
-		}
+		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
+			receipt, err := txRelayer.SendTransaction(txn, ownerKey)
+			if err != nil {
+				return fmt.Errorf("finalizing genesis validator set failed. Error: %w", err)
+			}
 
-		if receipt.Status == uint64(types.ReceiptFailed) {
-			return fmt.Errorf("finalizing genesis validator set transaction failed on block %d", receipt.BlockNumber)
+			if receipt.Status == uint64(types.ReceiptFailed) {
+				return fmt.Errorf("finalizing genesis validator set transaction failed on block %d", receipt.BlockNumber)
+			}
+		} else if !strings.Contains(err.Error(), "execution reverted: GenesisLib: already finalized") {
+			return err
 		}
 
 		chainConfig, err := chain.ImportFromFile(params.genesisPath)
