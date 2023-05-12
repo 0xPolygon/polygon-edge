@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path"
 	"sync"
 
@@ -42,6 +41,7 @@ type StateSyncManager interface {
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
+	SyncError() chan error
 }
 
 var _ StateSyncManager = (*dummyStateSyncManager)(nil)
@@ -51,6 +51,7 @@ type dummyStateSyncManager struct{}
 
 func (n *dummyStateSyncManager) Init() error                                   { return nil }
 func (n *dummyStateSyncManager) Close()                                        {}
+func (n *dummyStateSyncManager) SyncError() chan error                         { return nil }
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
 func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
 func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
@@ -78,8 +79,9 @@ type stateSyncManager struct {
 	logger hclog.Logger
 	state  *State
 
-	config  *stateSyncConfig
-	closeCh chan struct{}
+	config    *stateSyncConfig
+	closeCh   chan struct{}
+	syncErrCh chan error
 
 	// per epoch fields
 	lock               sync.RWMutex
@@ -98,10 +100,11 @@ type topic interface {
 // newStateSyncManager creates a new instance of state sync manager
 func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
 	s := &stateSyncManager{
-		logger:  logger,
-		state:   state,
-		config:  config,
-		closeCh: make(chan struct{}),
+		logger:    logger,
+		state:     state,
+		config:    config,
+		closeCh:   make(chan struct{}),
+		syncErrCh: make(chan error),
 	}
 
 	return s, nil
@@ -143,20 +146,11 @@ func (s *stateSyncManager) initTracker() error {
 	}()
 
 	// Start Event Tracker and handle sync errors
-	err, syncErrCh := evtTracker.Start(ctx)
+	var err error
+	err, s.syncErrCh = evtTracker.Start(ctx)
 	if err != nil {
 		return err
 	}
-	go func() {
-		// Sync errors are fatal for the sync manager
-		if err := <-syncErrCh; err != nil {
-			s.logger.Error("failed to sync state manager", "error", err)
-			// NOTE: it would be better to either cancel a root context or
-			// propagate an error to main which results in root context cancellation
-			// and exit via main.
-			os.Exit(1)
-		}
-	}()
 
 	return nil
 }
@@ -601,4 +595,8 @@ func (s *stateSyncManager) multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
+}
+
+func (r *stateSyncManager) SyncError() chan error {
+	return r.syncErrCh
 }

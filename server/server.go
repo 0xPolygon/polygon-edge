@@ -938,6 +938,10 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 	return s.network.JoinPeer(rawPeerMultiaddr)
 }
 
+func (s *Server) Error() chan error {
+	return common.Merge(s.consensus.SyncError(), s.stateSyncRelayer.SyncError())
+}
+
 // Close closes the Minimal server (blockchain, networking, consensus)
 func (s *Server) Close() {
 	// Close the blockchain layer

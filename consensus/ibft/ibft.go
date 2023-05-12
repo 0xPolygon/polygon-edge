@@ -687,3 +687,7 @@ func (i *backendIBFT) ValidateExtraDataFormat(header *types.Header) error {
 
 	return err
 }
+
+func (i *backendIBFT) SyncError() chan error {
+	return nil
+}

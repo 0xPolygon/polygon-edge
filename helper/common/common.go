@@ -30,6 +30,20 @@ var (
 	errInvalidDuration = errors.New("invalid duration")
 )
 
+func Merge(l, r chan error) chan error {
+	merge := make(chan error)
+	go func() {
+		select {
+		case err := <-l:
+			merge <- err
+		case err := <-r:
+			merge <- err
+		}
+		close(merge)
+	}()
+	return merge
+}
+
 // Min returns the strictly lower number
 func Min(a, b uint64) uint64 {
 	if a < b {

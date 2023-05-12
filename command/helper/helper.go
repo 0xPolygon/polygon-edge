@@ -1,12 +1,14 @@
 package helper
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -40,13 +42,25 @@ const (
 // HandleSignals is a helper method for handling signals sent to the console
 // Like stop, error, etc.
 func HandleSignals(
+	ctx context.Context,
 	closeFn func(),
 	outputter command.OutputFormatter,
 ) error {
 	signalCh := common.GetTerminationSignalCh()
-	sig := <-signalCh
+	var sig os.Signal
+	var err error
+	select {
+	case sig = <-signalCh:
+	case <-ctx.Done():
+		err = ctx.Err()
+	}
 
-	closeMessage := fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
+	var closeMessage string
+	if err != nil {
+		closeMessage = fmt.Sprintf("\n[ERROR] Context done: %v\n", err)
+	} else {
+		closeMessage = fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
+	}
 	closeMessage += "Gracefully shutting down client...\n"
 
 	outputter.SetCommandResult(

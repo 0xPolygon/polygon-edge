@@ -253,3 +253,7 @@ func (d *Dev) GetBridgeProvider() consensus.BridgeDataProvider {
 func (d *Dev) FilterExtra(extra []byte) ([]byte, error) {
 	return extra, nil
 }
+
+func (d *Dev) SyncError() chan error {
+	return nil
+}

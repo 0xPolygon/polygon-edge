@@ -1,7 +1,10 @@
 package server
 
 import (
+	"context"
 	"fmt"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -313,5 +316,18 @@ func runServerLoop(
 		return err
 	}
 
-	return helper.HandleSignals(serverInstance.Close, outputter)
+	// Block on signals or errors
+	g, ctx := errgroup.WithContext(context.Background())
+	g.Go(func() error {
+		return helper.HandleSignals(ctx, serverInstance.Close, outputter)
+	})
+	g.Go(func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case err := <-serverInstance.Error():
+			return err
+		}
+	})
+	return g.Wait()
 }

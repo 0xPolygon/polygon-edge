@@ -41,10 +41,11 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	setupHeaderHashFunc()
 
 	polybft := &Polybft{
-		config:  params,
-		closeCh: make(chan struct{}),
-		logger:  logger,
-		txPool:  params.TxPool,
+		config:    params,
+		closeCh:   make(chan struct{}),
+		syncErrCh: make(chan error),
+		logger:    logger,
+		txPool:    params.TxPool,
 	}
 
 	// initialize polybft consensus config
@@ -64,6 +65,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 type Polybft struct {
 	// closeCh is used to signal that consensus protocol is stopped
 	closeCh chan struct{}
+
+	syncErrCh chan error
 
 	// ibft is the ibft engine
 	ibft *IBFTConsensusWrapper
@@ -362,6 +365,7 @@ func (p *Polybft) Start() error {
 
 		if err := p.syncer.Sync(blockHandler); err != nil {
 			p.logger.Error("blocks synchronization failed", "error", err)
+			p.syncErrCh <- err
 		}
 	}()
 
@@ -592,4 +596,8 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 // Filters extra data to not contain Committed field
 func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
+}
+
+func (p *Polybft) SyncError() chan error {
+	return common.Merge(p.syncErrCh, p.runtime.stateSyncManager.SyncError())
 }

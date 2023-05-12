@@ -48,6 +48,8 @@ type Consensus interface {
 
 	// Close closes the connection
 	Close() error
+
+	SyncError() chan error
 }
 
 // Config is the configuration for the consensus

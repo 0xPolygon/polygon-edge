@@ -30,6 +30,7 @@ type StateSyncRelayer struct {
 	txRelayer              txrelayer.TxRelayer
 	key                    ethgo.Key
 	closeCh                chan struct{}
+	syncErrCh              chan error
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -77,6 +78,7 @@ func NewRelayer(
 		txRelayer:              txRelayer,
 		key:                    key,
 		closeCh:                make(chan struct{}),
+		syncErrCh:              make(chan error),
 		eventTrackerStartBlock: stateReceiverTrackerStartBlock,
 	}
 }
@@ -100,17 +102,11 @@ func (r *StateSyncRelayer) Start() error {
 	}()
 
 	// Start Event Tracker and handle sync errors
-	err, syncErrCh := et.Start(ctx)
+	var err error
+	err, r.syncErrCh = et.Start(ctx)
 	if err != nil {
 		return err
 	}
-	go func() {
-		// Sync errors are not fatal for the relayer
-		if err := <-syncErrCh; err != nil {
-			r.logger.Error("failed to sync relayer", "error", err)
-		}
-	}()
-
 	return nil
 }
 
@@ -225,4 +221,8 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 	}
 
 	return nil
+}
+
+func (r *StateSyncRelayer) SyncError() chan error {
+	return r.syncErrCh
 }

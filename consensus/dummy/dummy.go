@@ -88,3 +88,7 @@ func (d *Dummy) run() {
 	// do nothing
 	<-d.closeCh
 }
+
+func (d *Dummy) SyncError() chan error {
+	return nil
+}
