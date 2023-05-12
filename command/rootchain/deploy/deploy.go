@@ -19,7 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	val "github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -303,7 +303,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
-	initialValidators []*val.GenesisValidator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, error) {
+	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
@@ -601,7 +601,7 @@ func initializeCheckpointManager(
 	cmdOutput command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer,
 	chainID int64,
-	validators []*val.GenesisValidator,
+	validators []*validator.GenesisValidator,
 	rootchainCfg *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
 	validatorSet, err := validatorSetToABISlice(cmdOutput, validators)
@@ -818,27 +818,27 @@ func sendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []
 // validatorSetToABISlice converts given validators to generic map
 // which is used for ABI encoding validator set being sent to the rootchain contract
 func validatorSetToABISlice(o command.OutputFormatter,
-	validators []*val.GenesisValidator) ([]*contractsapi.Validator, error) {
-	accSet := make(val.AccountSet, len(validators))
+	validators []*validator.GenesisValidator) ([]*contractsapi.Validator, error) {
+	accSet := make(validator.AccountSet, len(validators))
 
 	if _, err := o.Write([]byte(fmt.Sprintf("%s [VALIDATORS]\n", contractsDeploymentTitle))); err != nil {
 		return nil, err
 	}
 
-	for i, validator := range validators {
-		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", validator))); err != nil {
+	for i, val := range validators {
+		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", val))); err != nil {
 			return nil, err
 		}
 
-		blsKey, err := validator.UnmarshalBLSPublicKey()
+		blsKey, err := val.UnmarshalBLSPublicKey()
 		if err != nil {
 			return nil, err
 		}
 
-		accSet[i] = &val.ValidatorMetadata{
-			Address:     validator.Address,
+		accSet[i] = &validator.ValidatorMetadata{
+			Address:     val.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(validator.Stake),
+			VotingPower: new(big.Int).Set(val.Stake),
 		}
 	}
 
