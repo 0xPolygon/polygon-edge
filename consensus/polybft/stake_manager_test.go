@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 
@@ -511,4 +512,14 @@ func (d *dummyStakeTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*eth
 
 func (d *dummyStakeTxRelayer) Client() *jsonrpc.Client {
 	return nil
+}
+
+// SumbitTransaction signs given transaction by provided key and sends it to the blockchain without waiting for the receipt
+func (d *dummyStakeTxRelayer) SumbitTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+	return ethgo.ZeroHash, errors.New("SumbitTransaction is not implemented")
+}
+
+// WaitForReceipt waits for tx receipt (this is only for testing purposes)
+func (d *dummyStakeTxRelayer) WaitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
+	return nil, errors.New("WaitForReceipt is not implemented")
 }

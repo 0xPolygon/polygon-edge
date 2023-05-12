@@ -48,7 +48,7 @@ func getOpenPortForServer() int64 {
 }
 
 type TestServer struct {
-	t *testing.T
+	t testing.TB
 
 	address       types.Address
 	clusterConfig *TestClusterConfig
@@ -99,9 +99,9 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
-func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
+func NewTestServer(tb testing.TB, clusterConfig *TestClusterConfig,
 	bridgeJSONRPC string, callback TestServerConfigCallback) *TestServer {
-	t.Helper()
+	tb.Helper()
 
 	config := &TestServerConfig{
 		Name:          uuid.New().String(),
@@ -117,19 +117,19 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 
 	if config.DataDir == "" {
 		dataDir, err := ioutil.TempDir("/tmp", "edge-e2e-")
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		config.DataDir = dataDir
 	}
 
 	secretsManager, err := polybftsecrets.GetSecretsManager(config.DataDir, "", true)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	key, err := wallet.GetEcdsaFromSecret(secretsManager)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	srv := &TestServer{
-		t:             t,
+		t:             tb,
 		clusterConfig: clusterConfig,
 		address:       types.Address(key.Address()),
 		config:        config,

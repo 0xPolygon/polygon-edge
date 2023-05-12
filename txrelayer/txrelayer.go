@@ -30,6 +30,11 @@ type TxRelayer interface {
 	// SendTransactionLocal sends non-signed transaction
 	// (this function is meant only for testing purposes and is about to be removed at some point)
 	SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error)
+	// Waits for tx receipt to be written to the blockchain
+	WaitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error)
+	// SumbitTransaction signs given transaction by provided key and sends it to the blockchain
+	// without waiting for the receipt
+	SumbitTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error)
 	// Client returns jsonrpc client
 	Client() *jsonrpc.Client
 }
@@ -78,12 +83,12 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 
 // SendTransaction signs given transaction by provided key and sends it to the blockchain
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
-	txnHash, err := t.sendTransactionLocked(txn, key)
+	txnHash, err := t.SumbitTransaction(txn, key)
 	if err != nil {
 		return nil, err
 	}
 
-	return t.waitForReceipt(txnHash)
+	return t.WaitForReceipt(txnHash)
 }
 
 // Client returns jsonrpc client
@@ -91,7 +96,9 @@ func (t *TxRelayerImpl) Client() *jsonrpc.Client {
 	return t.client
 }
 
-func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+// SumbitTransaction signs given transaction by provided key and sends it to the blockchain
+// without waiting for the receipt
+func (t *TxRelayerImpl) SumbitTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
@@ -149,10 +156,10 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 		return nil, err
 	}
 
-	return t.waitForReceipt(txnHash)
+	return t.WaitForReceipt(txnHash)
 }
 
-func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
+func (t *TxRelayerImpl) WaitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
 	count := uint(0)
 
 	for {
