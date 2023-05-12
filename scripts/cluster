@@ -42,20 +42,15 @@ function initRootchain() {
   echo "${deployout}"
   rootERC20=$(echo ${deployout} | grep -A 1 RootERC20 | awk -F ' ' '{print $4}')
 
-  stakeManagerAddr=$(cat genesis.json | jq '.params.engine.polybft.bridge.stakeManagerAddr')
-  customSupernetManagerAddr=$(cat genesis.json | jq '.params.engine.polybft.bridge.customSupernetManagerAddr')
-  chainID=$(cat genesis.json | jq '.params.chainID')
+  stakeManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr')
+  customSupernetManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')
+  chainID=$(cat genesis.json | jq -r '.params.chainID')
 
   ./polygon-edge rootchain fund \
     --native-root-token ${rootERC20} \
     --mint \
     --addresses ${address1},${address2},${address3},${address4} \
     --amounts 1000000000000000000000000,1000000000000000000000000,1000000000000000000000000,1000000000000000000000000
-
-  echo $address1
-  echo $address2
-  echo $address3
-  echo $address4
 
   ./polygon-edge polybft whitelist-validators \
     --addresses ${address1},${address2},${address3},${address4} \
@@ -64,32 +59,37 @@ function initRootchain() {
     --jsonrpc http://127.0.0.1:8545
 
   ./polygon-edge polybft register-validator \
-    --supernet-manager $customSupernetManagerAddr \
-    --data-dir test-chain-1
+    --supernet-manager ${customSupernetManagerAddr} \
+    --data-dir test-chain-1 \
+    --jsonrpc http://127.0.0.1:8545
   
   ./polygon-edge polybft register-validator \
-    --supernet-manager $customSupernetManagerAddr \
-    --data-dir test-chain-2
+    --supernet-manager ${customSupernetManagerAddr} \
+    --data-dir test-chain-2 \
+    --jsonrpc http://127.0.0.1:8545
   
   ./polygon-edge polybft register-validator \
-    --supernet-manager $customSupernetManagerAddr \
-    --data-dir test-chain-3
+    --supernet-manager ${customSupernetManagerAddr} \
+    --data-dir test-chain-3 \
+    --jsonrpc http://127.0.0.1:8545
 
   ./polygon-edge polybft register-validator \
-    --supernet-manager $customSupernetManagerAddr \
-    --data-dir test-chain-4
+    --supernet-manager ${customSupernetManagerAddr} \
+    --data-dir test-chain-4 \
+    --jsonrpc http://127.0.0.1:8545
 
   ./polygon-edge polybft stake \
-    --stake-manager $stakeManagerAddr \
     --data-dir test-chain-1 \
     --amount 10 \
-    --chain-id $chainID \
-    --native-root-token $rootERC20
+    --chain-id ${chainID} \
+    --stake-manager ${stakeManagerAddr} \
+    --native-root-token ${rootERC20} \
+    --jsonrpc http://127.0.0.1:8545
 
   ./polygon-edge polybft supernet \
     --data-dir test-chain-1 \
-    --supernet-manager $customSupernetManagerAddr \
-    --stake-manager $stakeManagerAddr \
+    --supernet-manager ${customSupernetManagerAddr} \
+    --stake-manager ${stakeManagerAddr} \
     --finalize-genesis-set \
     --enable-staking
 }
