@@ -2,13 +2,8 @@ package polybft
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
-	"os"
-	"path"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -19,7 +14,7 @@ import (
 )
 
 func FuzzTestStakeManagerPostEpoch(f *testing.F) {
-	state := newTestStateF(f)
+	state := newTestState(f)
 
 	seeds := []struct {
 		EpochID    uint64
@@ -27,15 +22,15 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 	}{
 		{
 			EpochID:    0,
-			Validators: newTestValidatorsF(f, 6).getPublicIdentities(),
+			Validators: newTestValidators(f, 6).getPublicIdentities(),
 		},
 		{
 			EpochID:    1,
-			Validators: newTestValidatorsF(f, 42).getPublicIdentities(),
+			Validators: newTestValidators(f, 42).getPublicIdentities(),
 		},
 		{
 			EpochID:    42,
-			Validators: newTestValidatorsF(f, 6).getPublicIdentities(),
+			Validators: newTestValidators(f, 6).getPublicIdentities(),
 		},
 	}
 
@@ -79,8 +74,8 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 	var (
 		allAliases        = []string{"A", "B", "C", "D", "E", "F"}
 		initialSetAliases = []string{"A", "B", "C", "D", "E"}
-		validators        = newTestValidatorsWithAliasesF(f, allAliases)
-		state             = newTestStateF(f)
+		validators        = newTestValidatorsWithAliases(f, allAliases)
+		state             = newTestState(f)
 	)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
@@ -165,8 +160,8 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		stakes  = []uint64{10, 10, 10, 10, 10}
 	)
 
-	validators := newTestValidatorsWithAliasesF(f, aliases, stakes)
-	state := newTestStateF(f)
+	validators := newTestValidatorsWithAliases(f, aliases, stakes)
+	state := newTestState(f)
 
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
@@ -207,75 +202,4 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 
 		_, _ = stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
 	})
-}
-
-func newTestValidatorsF(f *testing.F, validatorsCount int) *testValidators {
-	f.Helper()
-
-	aliases := make([]string, validatorsCount)
-	for i := 0; i < validatorsCount; i++ {
-		aliases[i] = strconv.Itoa(i)
-	}
-
-	return newTestValidatorsWithAliasesF(f, aliases)
-}
-
-func newTestValidatorsWithAliasesF(f *testing.F, aliases []string, votingPowers ...[]uint64) *testValidators {
-	f.Helper()
-
-	validators := map[string]*testValidator{}
-
-	for i, alias := range aliases {
-		votingPower := uint64(1)
-		if len(votingPowers) == 1 {
-			votingPower = votingPowers[0][i]
-		}
-
-		validators[alias] = newTestValidatorF(f, alias, votingPower)
-	}
-
-	return &testValidators{validators: validators}
-}
-
-func newTestValidatorF(f *testing.F, alias string, votingPower uint64) *testValidator {
-	f.Helper()
-
-	return &testValidator{
-		alias:       alias,
-		votingPower: votingPower,
-		account:     generateTestAccountF(f),
-	}
-}
-
-func generateTestAccountF(f *testing.F) *wallet.Account {
-	f.Helper()
-
-	acc, err := wallet.GenerateAccount()
-	require.NoError(f, err)
-
-	return acc
-}
-
-func newTestStateF(f *testing.F) *State {
-	f.Helper()
-
-	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().UTC().Format(time.RFC3339Nano))
-	err := os.Mkdir(dir, 0775)
-
-	if err != nil {
-		f.Fatal(err)
-	}
-
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
-	if err != nil {
-		f.Fatal(err)
-	}
-
-	f.Cleanup(func() {
-		if err := os.RemoveAll(dir); err != nil {
-			f.Fatal(err)
-		}
-	})
-
-	return state
 }

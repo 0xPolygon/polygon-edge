@@ -279,19 +279,19 @@ type testValidators struct {
 	validators map[string]*testValidator
 }
 
-func newTestValidators(t *testing.T, validatorsCount int) *testValidators {
-	t.Helper()
+func newTestValidators(tb testing.TB, validatorsCount int) *testValidators {
+	tb.Helper()
 
 	aliases := make([]string, validatorsCount)
 	for i := 0; i < validatorsCount; i++ {
 		aliases[i] = strconv.Itoa(i)
 	}
 
-	return newTestValidatorsWithAliases(t, aliases)
+	return newTestValidatorsWithAliases(tb, aliases)
 }
 
-func newTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers ...[]uint64) *testValidators {
-	t.Helper()
+func newTestValidatorsWithAliases(tb testing.TB, aliases []string, votingPowers ...[]uint64) *testValidators {
+	tb.Helper()
 
 	validators := map[string]*testValidator{}
 
@@ -301,7 +301,7 @@ func newTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers .
 			votingPower = votingPowers[0][i]
 		}
 
-		validators[alias] = newTestValidator(t, alias, votingPower)
+		validators[alias] = newTestValidator(tb, alias, votingPower)
 	}
 
 	return &testValidators{validators: validators}
@@ -398,13 +398,13 @@ type testValidator struct {
 	votingPower uint64
 }
 
-func newTestValidator(t *testing.T, alias string, votingPower uint64) *testValidator {
-	t.Helper()
+func newTestValidator(tb testing.TB, alias string, votingPower uint64) *testValidator {
+	tb.Helper()
 
 	return &testValidator{
 		alias:       alias,
 		votingPower: votingPower,
-		account:     generateTestAccount(t),
+		account:     generateTestAccount(tb),
 	}
 }
 
