@@ -170,8 +170,8 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// Set up datadog profiler
-	if ddErr := m.enableDataDogProfiler(); err != nil {
-		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
+	if err := m.enableDataDogProfiler(); err != nil {
+		m.logger.Error("DataDog profiler setup failed", "err", err.Error())
 	}
 
 	// Set up the secrets manager
@@ -937,6 +937,10 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 }
 
 func (s *Server) Error() chan error {
+	// Not all servers are relayers
+	if s.stateSyncRelayer == nil {
+		return s.consensus.SyncError()
+	}
 	return common.Merge(s.consensus.SyncError(), s.stateSyncRelayer.SyncError())
 }
 

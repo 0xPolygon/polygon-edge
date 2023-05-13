@@ -164,33 +164,33 @@ func (c *consensusRuntime) close() {
 // initStateSyncManager initializes state sync manager
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
-	if c.IsBridgeEnabled() {
-		stateSenderAddr := c.config.PolyBFTConfig.Bridge.StateSenderAddr
-		stateSyncManager, err := newStateSyncManager(
-			logger.Named("state-sync-manager"),
-			c.config.State,
-			&stateSyncConfig{
-				key:                   c.config.Key,
-				stateSenderAddr:       stateSenderAddr,
-				stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
-				jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
-				dataDir:               c.config.DataDir,
-				topic:                 c.config.bridgeTopic,
-				maxCommitmentSize:     maxCommitmentSize,
-				numBlockConfirmations: c.config.numBlockConfirmations,
-			},
-		)
-
-		if err != nil {
-			return err
-		}
-
-		c.stateSyncManager = stateSyncManager
-	} else {
+	if !c.IsBridgeEnabled() {
 		c.stateSyncManager = &dummyStateSyncManager{}
+		return nil
 	}
 
-	return c.stateSyncManager.Init()
+	// Bridge enabled ss manager
+	stateSenderAddr := c.config.PolyBFTConfig.Bridge.StateSenderAddr
+	stateSyncManager, err := newStateSyncManager(
+		logger.Named("state-sync-manager"),
+		c.config.State,
+		&stateSyncConfig{
+			key:                   c.config.Key,
+			stateSenderAddr:       stateSenderAddr,
+			stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
+			jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+			dataDir:               c.config.DataDir,
+			topic:                 c.config.bridgeTopic,
+			maxCommitmentSize:     maxCommitmentSize,
+			numBlockConfirmations: c.config.numBlockConfirmations,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	c.stateSyncManager = stateSyncManager
+	return nil
 }
 
 // initCheckpointManager initializes checkpoint manager

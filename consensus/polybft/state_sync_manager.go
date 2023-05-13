@@ -35,7 +35,6 @@ type StateSyncProof struct {
 
 // StateSyncManager is an interface that defines functions for state sync workflow
 type StateSyncManager interface {
-	Init() error
 	Close()
 	Commitment() (*CommitmentMessageSigned, error)
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
@@ -49,7 +48,6 @@ var _ StateSyncManager = (*dummyStateSyncManager)(nil)
 // dummyStateSyncManager is used when bridge is not enabled
 type dummyStateSyncManager struct{}
 
-func (n *dummyStateSyncManager) Init() error                                   { return nil }
 func (n *dummyStateSyncManager) Close()                                        {}
 func (n *dummyStateSyncManager) SyncError() chan error                         { return nil }
 func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
@@ -107,20 +105,15 @@ func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 		syncErrCh: make(chan error),
 	}
 
-	return s, nil
-}
-
-// Init subscribes to bridge topics (getting votes) and start the event tracker routine
-func (s *stateSyncManager) Init() error {
 	if err := s.initTracker(); err != nil {
-		return fmt.Errorf("failed to init event tracker. Error: %w", err)
+		return nil, fmt.Errorf("failed to init event tracker. Error: %w", err)
 	}
 
 	if err := s.initTransport(); err != nil {
-		return fmt.Errorf("failed to initialize state sync transport layer. Error: %w", err)
+		return nil, fmt.Errorf("failed to initialize state sync transport layer. Error: %w", err)
 	}
 
-	return nil
+	return s, nil
 }
 
 func (s *stateSyncManager) Close() {

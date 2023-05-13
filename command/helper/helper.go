@@ -43,16 +43,16 @@ func HandleSignals(
 	closeFn func(),
 	outputter command.OutputFormatter,
 ) {
-	closeMessage := "Gracefully shutting down client...\n"
+	msg := "Gracefully shutting down client..."
 	select {
 	case sig := <-common.GetTerminationSignalCh():
-		closeMessage = fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
+		msg = fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n%s", sig, msg)
 	case <-ctx.Done():
-		closeMessage = fmt.Sprintf("\n[CONTEXT] Done: %v\n", ctx.Err())
+		msg = fmt.Sprintf("\n[CONTEXT] Done: %v\n%s", ctx.Err(), msg)
 	}
 	outputter.SetCommandResult(
 		&ClientCloseResult{
-			Message: closeMessage,
+			Message: msg,
 		},
 	)
 	outputter.WriteOutput()
