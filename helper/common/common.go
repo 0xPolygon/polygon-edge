@@ -320,6 +320,8 @@ func GetTerminationSignalCh() <-chan os.Signal {
 		os.Interrupt,
 		syscall.SIGTERM,
 		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGKILL,
 	)
 
 	return signalCh

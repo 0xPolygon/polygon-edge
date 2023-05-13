@@ -3,13 +3,10 @@ package helper
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"net/url"
-	"os"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
@@ -45,42 +42,21 @@ func HandleSignals(
 	ctx context.Context,
 	closeFn func(),
 	outputter command.OutputFormatter,
-) error {
-	var closeMessage string
+) {
+	closeMessage := "Gracefully shutting down client...\n"
 	select {
 	case sig := <-common.GetTerminationSignalCh():
 		closeMessage = fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
 	case <-ctx.Done():
 		closeMessage = fmt.Sprintf("\n[CONTEXT] Done: %v\n", ctx.Err())
 	}
-	closeMessage += "Gracefully shutting down client...\n"
-
 	outputter.SetCommandResult(
 		&ClientCloseResult{
 			Message: closeMessage,
 		},
 	)
 	outputter.WriteOutput()
-
-	// Call the Minimal server close callback
-	gracefulCh := make(chan struct{})
-
-	go func() {
-		if closeFn != nil {
-			closeFn()
-		}
-
-		close(gracefulCh)
-	}()
-
-	select {
-	case <-signalCh:
-		return errors.New("shutdown by signal channel")
-	case <-time.After(5 * time.Second):
-		return errors.New("shutdown by timeout")
-	case <-gracefulCh:
-		return nil
-	}
+	closeFn()
 }
 
 // FormatList formats a list, using a specific blank value replacement

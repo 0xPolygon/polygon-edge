@@ -319,7 +319,8 @@ func runServerLoop(
 	// Block on signals or errors
 	g, ctx := errgroup.WithContext(context.Background())
 	g.Go(func() error {
-		return helper.HandleSignals(ctx, serverInstance.Close, outputter)
+		helper.HandleSignals(ctx, serverInstance.Close, outputter)
+		return nil
 	})
 	g.Go(func() error {
 		select {
