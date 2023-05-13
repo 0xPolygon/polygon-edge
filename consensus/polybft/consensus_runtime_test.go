@@ -443,6 +443,11 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	require.NoError(t, err)
 
 	polyBftConfig := &PolyBFTConfig{
+		Bridge: &BridgeConfig{
+			StateSenderAddr:       types.Address{0x13},
+			CheckpointManagerAddr: types.Address{0x10},
+			JSONRPCEndpoint:       "testEndpoint",
+		},
 		EpochSize:  10,
 		SprintSize: 10,
 		BlockTime:  common.Duration{Duration: 2 * time.Second},
@@ -452,6 +457,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1)).Once()
+	systemStateMock.On("GetNextCommittedIndex").Return(uint64(1)).Once()
 
 	blockchainMock := &blockchainMock{}
 	blockchainMock.On("CurrentHeader").Return(&types.Header{Number: 1, ExtraData: createTestExtraForAccounts(t, 1, validators, nil)})
@@ -480,7 +486,9 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
 	assert.Equal(t, "0x0000000000000000000000000000000000000101", contracts.ValidatorSetContract.String())
-	assert.False(t, runtime.IsBridgeEnabled())
+	assert.Equal(t, "0x1300000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.StateSenderAddr.String())
+	assert.Equal(t, "0x1000000000000000000000000000000000000000", runtime.config.PolyBFTConfig.Bridge.CheckpointManagerAddr.String())
+	assert.True(t, runtime.IsBridgeEnabled())
 	systemStateMock.AssertExpectations(t)
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)
