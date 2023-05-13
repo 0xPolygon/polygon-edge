@@ -53,15 +53,14 @@ func NewRelayer(
 	stateReceiverTrackerStartBlock uint64,
 	logger hcf.Logger,
 	key ethgo.Key,
-) *StateSyncRelayer {
+) (*StateSyncRelayer, error) {
 	endpoint := sanitizeRPCEndpoint(rpcEndpoint)
 
 	// create the JSON RPC client
 	client, err := jsonrpc.NewClient(endpoint)
 	if err != nil {
 		logger.Error("Failed to create the JSON RPC client", "err", err)
-
-		return nil
+		return nil, err
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
@@ -69,7 +68,7 @@ func NewRelayer(
 		logger.Error("Failed to create the tx relayer", "err", err)
 	}
 
-	return &StateSyncRelayer{
+	r := &StateSyncRelayer{
 		dataDir:                dataDir,
 		rpcEndpoint:            endpoint,
 		stateReceiverAddr:      stateReceiverAddr,
@@ -81,9 +80,8 @@ func NewRelayer(
 		syncErrCh:              make(chan error),
 		eventTrackerStartBlock: stateReceiverTrackerStartBlock,
 	}
-}
 
-func (r *StateSyncRelayer) Start() error {
+	// Start the relayer
 	et := tracker.NewEventTracker(
 		path.Join(r.dataDir, "/relayer.db"),
 		r.rpcEndpoint,
@@ -102,12 +100,11 @@ func (r *StateSyncRelayer) Start() error {
 	}()
 
 	// Start Event Tracker and handle sync errors
-	var err error
 	err, r.syncErrCh = et.Start(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return r, nil
 }
 
 // Stop function is used to tear down all the allocated resources

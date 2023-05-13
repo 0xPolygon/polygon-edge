@@ -630,7 +630,7 @@ func (s *Server) setupRelayer() error {
 		trackerStartBlockConfig = polyBFTConfig.Bridge.EventTrackerStartBlocks
 	}
 
-	relayer := statesyncrelayer.NewRelayer(
+	s.stateSyncRelayer, err = statesyncrelayer.NewRelayer(
 		s.config.DataDir,
 		s.config.JSONRPC.JSONRPCAddr.String(),
 		ethgo.Address(contracts.StateReceiverContract),
@@ -638,9 +638,7 @@ func (s *Server) setupRelayer() error {
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account)),
 	)
-
-	// start relayer
-	if err := relayer.Start(); err != nil {
+	if err != nil {
 		return fmt.Errorf("failed to start relayer: %w", err)
 	}
 
