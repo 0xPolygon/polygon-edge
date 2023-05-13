@@ -46,20 +46,12 @@ func HandleSignals(
 	closeFn func(),
 	outputter command.OutputFormatter,
 ) error {
-	signalCh := common.GetTerminationSignalCh()
-	var sig os.Signal
-	var err error
-	select {
-	case sig = <-signalCh:
-	case <-ctx.Done():
-		err = ctx.Err()
-	}
-
 	var closeMessage string
-	if err != nil {
-		closeMessage = fmt.Sprintf("\n[ERROR] Context done: %v\n", err)
-	} else {
+	select {
+	case sig := <-common.GetTerminationSignalCh():
 		closeMessage = fmt.Sprintf("\n[SIGNAL] Caught signal: %v\n", sig)
+	case <-ctx.Done():
+		closeMessage = fmt.Sprintf("\n[CONTEXT] Done: %v\n", ctx.Err())
 	}
 	closeMessage += "Gracefully shutting down client...\n"
 
