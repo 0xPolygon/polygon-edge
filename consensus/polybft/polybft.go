@@ -2,6 +2,7 @@
 package polybft
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -354,17 +355,17 @@ func (p *Polybft) Start() error {
 	}
 
 	// start syncing
-	go func() {
+	go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
 		blockHandler := func(b *types.FullBlock) bool {
 			p.runtime.OnBlockInserted(b)
-
 			return false
 		}
-
 		if err := p.syncer.Sync(blockHandler); err != nil {
 			p.logger.Error("blocks synchronization failed", "error", err)
+			return err
 		}
-	}()
+		return nil
+	})
 
 	// start consensus runtime
 	if err := p.startRuntime(); err != nil {
