@@ -82,7 +82,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap := &testHeadersMap{}
 
 	// create genesis header
-	genesisDelta, err := createValidatorSetDelta(nil, validatorSetParent)
+	genesisDelta, err := validator.CreateValidatorSetDelta(nil, validatorSetParent)
 	require.NoError(t, err)
 
 	genesisHeader := &types.Header{Number: 0}
@@ -93,7 +93,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create headers from 1 to 9
 	for i := uint64(1); i < polyBftConfig.EpochSize; i++ {
-		delta, err := createValidatorSetDelta(validatorSetParent, validatorSetParent)
+		delta, err := validator.CreateValidatorSetDelta(validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
 
 		header := &types.Header{Number: i}
@@ -122,7 +122,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create parent header (block 10)
-	parentDelta, err := createValidatorSetDelta(validatorSetParent, validatorSetCurrent)
+	parentDelta, err := validator.CreateValidatorSetDelta(validatorSetParent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	parentHeader := &types.Header{
@@ -135,7 +135,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap.addHeader(parentHeader)
 
 	// create current header (block 11) with all appropriate fields required for validation
-	currentDelta, err := createValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
+	currentDelta, err := validator.CreateValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	currentHeader := &types.Header{

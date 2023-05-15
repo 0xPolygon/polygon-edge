@@ -278,7 +278,7 @@ func createHeaders(t *testing.T, headersMap *testHeadersMap,
 func createValidatorDeltaHeader(t *testing.T, blockNumber, epoch uint64, oldValidatorSet, newValidatorSet validator.AccountSet) *types.Header {
 	t.Helper()
 
-	delta, _ := createValidatorSetDelta(oldValidatorSet, newValidatorSet)
+	delta, _ := validator.CreateValidatorSetDelta(oldValidatorSet, newValidatorSet)
 	extra := &Extra{Validators: delta, Checkpoint: &CheckpointData{EpochNumber: epoch}}
 
 	return &types.Header{

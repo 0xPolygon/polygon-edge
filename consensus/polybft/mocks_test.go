@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
