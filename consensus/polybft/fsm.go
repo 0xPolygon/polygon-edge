@@ -650,7 +650,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	}
 	// verify that the gasUsed is <= gasLimit
 	if header.GasUsed > header.GasLimit {
-		return fmt.Errorf("invalid gasLimit: have %v, max %v", header.GasUsed, header.GasLimit)
+		return fmt.Errorf("invalid gas limit: have %v, max %v", header.GasUsed, header.GasLimit)
 	}
 	// verify time has passed
 	if header.Timestamp <= parent.Timestamp {

@@ -29,7 +29,11 @@ func TestFSM_ValidateHeader(t *testing.T) {
 
 	extra := createTestExtra(validator.AccountSet{}, validator.AccountSet{}, 0, 0, 0)
 	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
-	header := &types.Header{Number: 0, ExtraData: extra}
+	header := &types.Header{Number: 0}
+
+	// parent extra data
+	require.ErrorContains(t, validateHeaderFields(parent, header), "extra-data shorter than")
+	header.ExtraData = extra
 
 	// parent hash
 	require.ErrorContains(t, validateHeaderFields(parent, header), "incorrect header parent hash")
@@ -42,6 +46,18 @@ func TestFSM_ValidateHeader(t *testing.T) {
 	// failed timestamp
 	require.ErrorContains(t, validateHeaderFields(parent, header), "timestamp older than parent")
 	header.Timestamp = 10
+
+	// failed nonce
+	header.SetNonce(1)
+	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid nonce")
+	header.SetNonce(0)
+
+	// failed gas
+	header.GasLimit = 10
+	header.GasUsed = 11
+	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid gas limit")
+	header.GasLimit = 10
+	header.GasUsed = 10
 
 	// mix digest
 	require.ErrorContains(t, validateHeaderFields(parent, header), "mix digest is not correct")
