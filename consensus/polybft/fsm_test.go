@@ -32,7 +32,7 @@ func TestFSM_ValidateHeader(t *testing.T) {
 	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
 	header := &types.Header{Number: 0}
 
-	// parent extra data
+	// extra data
 	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "extra-data shorter than")
 	header.ExtraData = extra
 
@@ -51,6 +51,7 @@ func TestFSM_ValidateHeader(t *testing.T) {
 	// failed nonce
 	header.SetNonce(1)
 	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid nonce")
+
 	header.SetNonce(0)
 
 	// failed gas
