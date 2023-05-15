@@ -1001,7 +1001,10 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 
 	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 	go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		if err := srv.ListenAndServe(); err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
+				return nil
+			}
 			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
 			return err
 		}
