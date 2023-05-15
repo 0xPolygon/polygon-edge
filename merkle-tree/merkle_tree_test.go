@@ -90,3 +90,22 @@ func TestMerkleTree_VerifyProof_TreeWithOneNode(t *testing.T) {
 	// empty leaf
 	require.ErrorContains(t, VerifyProof(11, []byte{}, proof, tree.Hash()), "empty leaf")
 }
+
+func TestMerkleTree_WithOneLeaf_AndOneEmptyLeaf(t *testing.T) {
+	t.Parallel()
+
+	leafData := []byte{1}
+	treeData := [][]byte{leafData, {}} // with one empty leaf
+
+	tree, err := NewMerkleTree(treeData)
+	require.NoError(t, err)
+
+	proof, err := tree.GenerateProof(leafData)
+	require.NoError(t, err)
+	require.NotEmpty(t, proof)
+
+	index, err := tree.LeafIndex(leafData)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), index) // should be 0
+	require.NoError(t, VerifyProof(index, leafData, proof, tree.Hash()))
+}
