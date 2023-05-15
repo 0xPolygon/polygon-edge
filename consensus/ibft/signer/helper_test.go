@@ -73,7 +73,7 @@ func Test_wrapCommitHash(t *testing.T) {
 	assert.Equal(t, expectedOutput, output)
 }
 
-// nolint
+//nolint
 func Test_getOrCreateECDSAKey(t *testing.T) {
 	t.Parallel()
 
@@ -184,7 +184,7 @@ func Test_getOrCreateECDSAKey(t *testing.T) {
 	}
 }
 
-// nolint
+//nolint
 func Test_getOrCreateBLSKey(t *testing.T) {
 	t.Parallel()
 
