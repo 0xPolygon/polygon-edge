@@ -350,6 +350,8 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 func testGetCodeEmptyCodeHash(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 
+	// If empty code hash is passed,
+	// it is considered as a valid case and in that case we are not retrieving it from the storage.
 	snap := buildPreState(nil)
 
 	code, ok := snap.GetCode(types.EmptyCodeHash)
