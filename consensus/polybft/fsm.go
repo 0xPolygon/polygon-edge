@@ -633,7 +633,7 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header) error {
-	// header extra data must be higher or equal to ExtraVanity = 32 in order to be complient with Ethereum blocks
+	// header extra data must be higher or equal to ExtraVanity = 32 in order to be compliant with Ethereum blocks
 	if len(header.ExtraData) < ExtraVanity {
 		return fmt.Errorf("extra-data shorter than %d bytes (%d)", ExtraVanity, len(header.ExtraData))
 	}
