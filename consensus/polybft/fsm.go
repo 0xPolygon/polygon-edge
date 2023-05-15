@@ -43,7 +43,6 @@ var (
 		"is either nil or it does not match the received one")
 	errValidatorSetDeltaMismatch        = errors.New("validator set delta mismatch")
 	errValidatorsUpdateInNonEpochEnding = errors.New("trying to update validator set in a non epoch ending block")
-	zeroNonce                           = types.Nonce{}
 )
 
 type fsm struct {
@@ -646,7 +645,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 		return fmt.Errorf("invalid number")
 	}
 	// verify header nonce is zero
-	if header.Nonce != zeroNonce {
+	if header.Nonce != types.ZeroNonce {
 		return fmt.Errorf("invalid nonce")
 	}
 	// verify that the gasUsed is <= gasLimit
