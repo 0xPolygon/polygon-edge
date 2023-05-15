@@ -108,6 +108,11 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 
 		testGetCodeEmptyCodeHash(t, buildPreState)
 	})
+	t.Run("set and get code", func(t *testing.T) {
+		t.Parallel()
+
+		testSetAndGetCode(t, buildPreState)
+	})
 }
 
 func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
@@ -350,11 +355,29 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 func testGetCodeEmptyCodeHash(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 
-	// If empty code hash is passed,
-	// it is considered as a valid case and in that case we are not retrieving it from the storage.
+	// If empty code hash is passed, it is considered as a valid case,
+	// and in that case we are not retrieving it from the storage.
 	snap := buildPreState(nil)
 
 	code, ok := snap.GetCode(types.EmptyCodeHash)
-	assert.Empty(t, code)
 	assert.True(t, ok)
+	assert.Empty(t, code)
+}
+
+func testSetAndGetCode(t *testing.T, buildPreState buildPreState) {
+	t.Helper()
+
+	testCode := []byte{0x2, 0x4, 0x6, 0x8}
+	snap := buildPreState(nil)
+
+	txn := newTxn(snap)
+	txn.SetCode(addr1, testCode)
+
+	affectedObjs := txn.Commit(true)
+	snap, _ = snap.Commit(affectedObjs)
+	assert.Len(t, affectedObjs, 1)
+
+	code, ok := snap.GetCode(affectedObjs[0].CodeHash)
+	assert.True(t, ok)
+	assert.Equal(t, testCode, code)
 }
