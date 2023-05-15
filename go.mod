@@ -30,7 +30,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/umbracle/fastrlp v0.1.1-0.20230504065717-58a1b8a9929d
 	github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b
-	golang.org/x/crypto v0.8.0
+	golang.org/x/crypto v0.9.0
 	google.golang.org/grpc v1.53.0-dev
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
