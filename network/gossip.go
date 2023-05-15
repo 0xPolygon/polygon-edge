@@ -6,9 +6,7 @@ import (
 	"reflect"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/hashicorp/go-hclog"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -104,16 +102,16 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{},
 			continue
 		}
 
-		go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
+		go func() {
 			obj := t.createObj()
 			if err := proto.Unmarshal(msg.Data, obj); err != nil {
 				t.logger.Error("failed to unmarshal topic", "err", err)
-				return err
+
+				return
 			}
 
 			handler(obj, msg.GetFrom())
-			return nil
-		})
+		}()
 	}
 }
 
