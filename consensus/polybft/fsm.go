@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -293,7 +294,7 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	// validate header fields
-	if err := validateHeaderFields(f.parent, block.Header); err != nil {
+	if err := validateHeaderFields(f.parent, block.Header, f.config.BlockTimeDrift); err != nil {
 		return fmt.Errorf(
 			"failed to validate header (parent header# %d, current header#%d): %w",
 			f.parent.Number,
@@ -631,7 +632,7 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 	return errDistributeRewardsTxNotExpected
 }
 
-func validateHeaderFields(parent *types.Header, header *types.Header) error {
+func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeDrift int64) error {
 	// header extra data must be higher or equal to ExtraVanity = 32 in order to be compliant with Ethereum blocks
 	if len(header.ExtraData) < ExtraVanity {
 		return fmt.Errorf("extra-data shorter than %d bytes (%d)", ExtraVanity, len(header.ExtraData))
@@ -643,6 +644,10 @@ func validateHeaderFields(parent *types.Header, header *types.Header) error {
 	// verify parent number
 	if header.Number != parent.Number+1 {
 		return fmt.Errorf("invalid number")
+	}
+	// verify time is from the future
+	if header.Timestamp > uint64(time.Now().UTC().Unix()+blockTimeDrift) {
+		return fmt.Errorf("block from the future")
 	}
 	// verify header nonce is zero
 	if header.Nonce != types.ZeroNonce {

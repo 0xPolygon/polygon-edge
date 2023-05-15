@@ -27,52 +27,57 @@ import (
 func TestFSM_ValidateHeader(t *testing.T) {
 	t.Parallel()
 
+	blockTimeDrift := int64(1)
 	extra := createTestExtra(validator.AccountSet{}, validator.AccountSet{}, 0, 0, 0)
 	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
 	header := &types.Header{Number: 0}
 
 	// parent extra data
-	require.ErrorContains(t, validateHeaderFields(parent, header), "extra-data shorter than")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "extra-data shorter than")
 	header.ExtraData = extra
 
 	// parent hash
-	require.ErrorContains(t, validateHeaderFields(parent, header), "incorrect header parent hash")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "incorrect header parent hash")
 	header.ParentHash = parent.Hash
 
 	// sequence number
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid number")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid number")
 	header.Number = 1
 
 	// failed timestamp
-	require.ErrorContains(t, validateHeaderFields(parent, header), "timestamp older than parent")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "timestamp older than parent")
 	header.Timestamp = 10
 
 	// failed nonce
 	header.SetNonce(1)
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid nonce")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid nonce")
 	header.SetNonce(0)
 
 	// failed gas
 	header.GasLimit = 10
 	header.GasUsed = 11
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid gas limit")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid gas limit")
 	header.GasLimit = 10
 	header.GasUsed = 10
 
 	// mix digest
-	require.ErrorContains(t, validateHeaderFields(parent, header), "mix digest is not correct")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "mix digest is not correct")
 	header.MixHash = PolyBFTMixDigest
 
 	// difficulty
 	header.Difficulty = 0
-	require.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be greater than zero")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "difficulty should be greater than zero")
 
 	header.Difficulty = 1
 	header.Hash = types.BytesToHash([]byte{11, 22, 33})
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid header hash")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid header hash")
+	header.Timestamp = uint64(time.Now().UTC().Unix() + 150)
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "block from the future")
+
+	header.Timestamp = uint64(time.Now().UTC().Unix())
 
 	header.ComputeHash()
-	require.NoError(t, validateHeaderFields(parent, header))
+	require.NoError(t, validateHeaderFields(parent, header, blockTimeDrift))
 }
 
 func TestFSM_verifyCommitEpochTx(t *testing.T) {

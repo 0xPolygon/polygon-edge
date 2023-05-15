@@ -45,6 +45,8 @@ type PolyBFTConfig struct {
 
 	// RewardConfig defines rewards configuration
 	RewardConfig *RewardsConfig `json:"rewardConfig"`
+
+	BlockTimeDrift int64
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
@@ -58,6 +60,9 @@ func LoadPolyBFTConfig(chainConfigFile string) (PolyBFTConfig, int64, error) {
 	if err != nil {
 		return PolyBFTConfig{}, 0, err
 	}
+
+	// hardcoded for now
+	polybftConfig.BlockTimeDrift = int64(10)
 
 	return polybftConfig, chainCfg.Params.ChainID, err
 }
