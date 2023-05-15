@@ -60,26 +60,18 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		epoch             = uint64(1)
 		block             = uint64(10)
 		newStake          = uint64(100)
-		zeroStake         = uint64(0)
 		firstValidator    = uint64(0)
 		secondValidator   = uint64(1)
 	)
 
-	validators := newTestValidatorsWithAliases(t, allAliases)
 	state := newTestState(t)
 	t.Run("PostBlock - unstake to zero", func(t *testing.T) {
 		t.Parallel()
-		systemStateMock := new(systemStateMock)
-		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(zeroStake)), nil).Once()
 
-		blockchainMock := new(blockchainMock)
-		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-
+		validators := newTestValidatorsWithAliases(t, allAliases)
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			blockchainMock,
 			nil,
 			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
@@ -98,7 +90,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 					stakeManager.validatorSetContract,
 					validators.getValidator(initialSetAliases[firstValidator]).Address(),
 					types.ZeroAddress,
-					zeroStake,
+					1, // initial validator stake was 1
 				),
 			},
 		}
@@ -126,23 +118,14 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		require.NotNil(t, firstValidatorMeta)
 		require.Equal(t, bigZero, firstValidatorMeta.VotingPower)
 		require.False(t, firstValidatorMeta.IsActive)
-
-		systemStateMock.AssertExpectations(t)
-		blockchainMock.AssertExpectations(t)
 	})
 	t.Run("PostBlock - add stake to one validator", func(t *testing.T) {
 		t.Parallel()
-		systemStateMock := new(systemStateMock)
-		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(250), nil).Once()
 
-		blockchainMock := new(blockchainMock)
-		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-
+		validators := newTestValidatorsWithAliases(t, allAliases)
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			blockchainMock,
 			nil,
 			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
@@ -187,21 +170,14 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			}
 		}
 		require.NotNil(t, firstValidaotor)
-		require.Equal(t, big.NewInt(250), firstValidaotor.VotingPower)
+		require.Equal(t, big.NewInt(251), firstValidaotor.VotingPower) // 250 + initial 1
 		require.True(t, firstValidaotor.IsActive)
-
-		systemStateMock.AssertExpectations(t)
-		blockchainMock.AssertExpectations(t)
 	})
 
 	t.Run("PostBlock - add validator and stake", func(t *testing.T) {
 		t.Parallel()
-		systemStateMock := new(systemStateMock)
-		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(newStake)), nil).Times(len(allAliases))
 
-		blockchainMock := new(blockchainMock)
-		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
+		validators := newTestValidatorsWithAliases(t, allAliases, []uint64{1, 2, 3, 4, 5, 6})
 
 		txRelayerMock := newDummyStakeTxRelayer(t, func() *ValidatorMetadata {
 			return validators.getValidator("F").ValidatorMetadata()
@@ -214,7 +190,6 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			blockchainMock,
 			txRelayerMock,
 			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
@@ -252,12 +227,10 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, fullValidatorSet.Validators, len(allAliases))
 
-		for _, v := range fullValidatorSet.Validators {
-			require.Equal(t, newStake, v.VotingPower.Uint64())
+		validatorsCount := validators.toValidatorSet().Len()
+		for i, v := range fullValidatorSet.Validators.getSorted(validatorsCount) {
+			require.Equal(t, newStake+uint64(validatorsCount)-uint64(i)-1, v.VotingPower.Uint64())
 		}
-
-		systemStateMock.AssertExpectations(t)
-		blockchainMock.AssertExpectations(t)
 	})
 }
 
@@ -274,7 +247,6 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
-		nil,
 		nil,
 		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
@@ -420,7 +392,7 @@ func TestStakeCounter_ShouldBeDeterministic(t *testing.T) {
 		test := func() []*ValidatorMetadata {
 			stakeCounter := newValidatorStakeMap(validators.getPublicIdentities("A", "B", "C", "D", "E"))
 
-			return stakeCounter.getActiveValidators(maxValidatorSetSize)
+			return stakeCounter.getSorted(maxValidatorSetSize)
 		}
 
 		initialSlice := test()

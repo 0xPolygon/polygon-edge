@@ -229,7 +229,6 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 	c.stakeManager = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
-		c.config.blockchain,
 		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.ValidatorSetContract,

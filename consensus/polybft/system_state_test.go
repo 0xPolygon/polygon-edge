@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"math/big"
 	"testing"
 
@@ -156,72 +155,4 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 	assert.NoError(t, err)
 
 	return transition
-}
-
-func Test_buildLogsFromReceipts(t *testing.T) {
-	t.Parallel()
-
-	defaultHeader := &types.Header{
-		Number: 100,
-	}
-
-	type args struct {
-		entry  []*types.Receipt
-		header *types.Header
-	}
-
-	data := map[string]interface{}{
-		"Hash":   defaultHeader.Hash,
-		"Number": defaultHeader.Number,
-	}
-
-	dataArray, err := json.Marshal(&data)
-	require.NoError(t, err)
-
-	tests := []struct {
-		name string
-		args args
-		want []*types.Log
-	}{
-		{
-			name: "no entries provided",
-		},
-		{
-			name: "successfully created logs",
-			args: args{
-				entry: []*types.Receipt{
-					{
-						Logs: []*types.Log{
-							{
-								Address: types.BytesToAddress([]byte{0, 1}),
-								Topics:  nil,
-								Data:    dataArray,
-							},
-						},
-					},
-				},
-				header: defaultHeader,
-			},
-			want: []*types.Log{
-				{
-					Address: types.BytesToAddress([]byte{0, 1}),
-					Topics:  nil,
-					Data:    dataArray,
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.EqualValuesf(t,
-				tt.want,
-				buildLogsFromReceipts(tt.args.entry, tt.args.header),
-				"buildLogsFromReceipts(%v, %v)", tt.args.entry, tt.args.header,
-			)
-		})
-	}
 }
