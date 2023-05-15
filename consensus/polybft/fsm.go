@@ -632,7 +632,6 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 	return errDistributeRewardsTxNotExpected
 }
 
-
 func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeDrift int64) error {
 	// header extra data must be higher or equal to ExtraVanity = 32 in order to be compliant with Ethereum blocks
 	if len(header.ExtraData) < ExtraVanity {
