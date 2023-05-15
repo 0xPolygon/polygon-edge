@@ -36,8 +36,17 @@ function initRootchain() {
   echo "Initializing rootchain"
 
   ./polygon-edge rootchain server > /dev/null &
-  sleep 5
-
+  
+  set +e
+  t=1
+  while [ $t -gt 0 ]
+  do
+    nc -z 127.0.0.1 8545 </dev/null
+    t=$?
+    sleep 1
+  done
+  set -e
+  
   ./polygon-edge rootchain deploy --test
   
   rootERC20=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.nativeERC20Address')
