@@ -44,7 +44,7 @@ func (h *Header) HasReceipts() bool {
 }
 
 func (h *Header) SetNonce(i uint64) {
-	binary.BigEndian.PutUint64(h.Nonce[:], i)
+	h.Nonce.EncodeNonce(i)
 }
 
 func (h *Header) IsGenesis() bool {
@@ -52,6 +52,10 @@ func (h *Header) IsGenesis() bool {
 }
 
 type Nonce [8]byte
+
+func (n Nonce) EncodeNonce(i uint64) {
+	binary.BigEndian.PutUint64(n[:], i)
+}
 
 func (n Nonce) String() string {
 	return hex.EncodeToHex(n[:])
