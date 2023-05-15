@@ -793,21 +793,14 @@ func (t *Transition) applyCall(
 	return result
 }
 
-var emptyHash types.Hash
-
 func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
-	nonce := t.state.GetNonce(addr)
-	if nonce != 0 {
+	if t.state.GetNonce(addr) != 0 {
 		return true
 	}
 
 	codeHash := t.state.GetCodeHash(addr)
 
-	if codeHash != types.EmptyCodeHash && codeHash != emptyHash {
-		return true
-	}
-
-	return false
+	return codeHash != types.EmptyCodeHash && codeHash != types.ZeroHash
 }
 
 func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
