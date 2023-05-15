@@ -359,7 +359,7 @@ func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
 	return testData
 }
 
-func Test_MarshalBug(t *testing.T) {
+func Test_MarshalCorruptedBytesArray(t *testing.T) {
 	t.Parallel()
 
 	marshal := func(obj func(*fastrlp.Arena) *fastrlp.Value) []byte {
