@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -29,7 +30,7 @@ var (
 type StakeManager interface {
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
-	UpdateValidatorSet(epoch uint64, currentValidatorSet AccountSet) (*ValidatorSetDelta, error)
+	UpdateValidatorSet(epoch uint64, currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
 
 // dummyStakeManager is a dummy implementation of StakeManager interface
@@ -39,8 +40,8 @@ type dummyStakeManager struct{}
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
 func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
-	currentValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	return &ValidatorSetDelta{}, nil
+	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
+	return &validator.ValidatorSetDelta{}, nil
 }
 
 var _ StakeManager = (*stakeManager)(nil)
@@ -154,7 +155,8 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 
 // UpdateValidatorSet returns an updated validator set
 // based on stake change (transfer) events from ValidatorSet contract
-func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountSet) (*ValidatorSetDelta, error) {
+func (s *stakeManager) UpdateValidatorSet(
+	epoch uint64, oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	s.logger.Info("Calculating validators set update...", "epoch", epoch)
 
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
@@ -175,9 +177,9 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountS
 	}
 
 	removedBitmap := bitmap.Bitmap{}
-	updatedValidators := AccountSet{}
-	addedValidators := AccountSet{}
-	oldActiveMap := make(map[types.Address]*ValidatorMetadata)
+	updatedValidators := validator.AccountSet{}
+	addedValidators := validator.AccountSet{}
+	oldActiveMap := make(map[types.Address]*validator.ValidatorMetadata)
 
 	for i, validator := range oldValidatorSet {
 		oldActiveMap[validator.Address] = validator
@@ -208,7 +210,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch uint64, oldValidatorSet AccountS
 
 	s.logger.Info("Calculating validators set update finished.", "epoch", epoch)
 
-	delta := &ValidatorSetDelta{
+	delta := &validator.ValidatorSetDelta{
 		Added:   addedValidators,
 		Updated: updatedValidators,
 		Removed: removedBitmap,
@@ -320,10 +322,10 @@ func (vs *validatorSetState) Unmarshal(b []byte) error {
 }
 
 // validatorStakeMap holds ValidatorMetadata for each validator address
-type validatorStakeMap map[types.Address]*ValidatorMetadata
+type validatorStakeMap map[types.Address]*validator.ValidatorMetadata
 
 // newValidatorStakeMap returns a new instance of validatorStakeMap
-func newValidatorStakeMap(validatorSet AccountSet) validatorStakeMap {
+func newValidatorStakeMap(validatorSet validator.AccountSet) validatorStakeMap {
 	stakeMap := make(validatorStakeMap, len(validatorSet))
 
 	for _, v := range validatorSet {
@@ -339,7 +341,7 @@ func (sc *validatorStakeMap) addStake(address types.Address, amount *big.Int) {
 		metadata.VotingPower.Add(metadata.VotingPower, amount)
 		metadata.IsActive = metadata.VotingPower.Cmp(bigZero) > 0
 	} else {
-		(*sc)[address] = &ValidatorMetadata{
+		(*sc)[address] = &validator.ValidatorMetadata{
 			VotingPower: new(big.Int).Set(amount),
 			Address:     address,
 			IsActive:    amount.Cmp(bigZero) > 0,
@@ -355,8 +357,8 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 }
 
 // getSorted returns validators (*ValidatorMetadata) in sorted order
-func (sc validatorStakeMap) getSorted(maxValidatorSetSize int) AccountSet {
-	activeValidators := make(AccountSet, 0, len(sc))
+func (sc validatorStakeMap) getSorted(maxValidatorSetSize int) validator.AccountSet {
+	activeValidators := make(validator.AccountSet, 0, len(sc))
 
 	for _, v := range sc {
 		if v.VotingPower.Cmp(bigZero) > 0 {

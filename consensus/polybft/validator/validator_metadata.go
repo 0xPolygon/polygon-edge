@@ -1,4 +1,4 @@
-package polybft
+package validator
 
 import (
 	"bytes"

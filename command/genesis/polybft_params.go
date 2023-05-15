@@ -18,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -202,7 +203,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))
+	validatorMetadata := make([]*validator.ValidatorMetadata, len(initialValidators))
 
 	for i, validator := range initialValidators {
 		// create validator metadata instance
@@ -420,8 +421,8 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 }
 
 // generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
-func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, error) {
-	delta := &polybft.ValidatorSetDelta{
+func generateExtraDataPolyBft(validators []*validator.ValidatorMetadata) ([]byte, error) {
+	delta := &validator.ValidatorSetDelta{
 		Added:   validators,
 		Removed: bitmap.Bitmap{},
 	}
@@ -433,7 +434,7 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
 func (p *genesisParams) getValidatorAccounts(
-	premineBalances map[types.Address]*premineInfo) ([]*polybft.Validator, error) {
+	premineBalances map[types.Address]*premineInfo) ([]*validator.GenesisValidator, error) {
 	// populate validators premine info
 	stakeMap := make(map[types.Address]*premineInfo, len(p.stakes))
 
@@ -447,9 +448,9 @@ func (p *genesisParams) getValidatorAccounts(
 	}
 
 	if len(p.validators) > 0 {
-		validators := make([]*polybft.Validator, len(p.validators))
-		for i, validator := range p.validators {
-			parts := strings.Split(validator, ":")
+		validators := make([]*validator.GenesisValidator, len(p.validators))
+		for i, val := range p.validators {
+			parts := strings.Split(val, ":")
 			if len(parts) != 3 {
 				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
 					"<P2P multi address:ECDSA address:public BLS key>, but got %d part(s)",
@@ -471,7 +472,7 @@ func (p *genesisParams) getValidatorAccounts(
 			}
 
 			addr := types.StringToAddress(trimmedAddress)
-			validators[i] = &polybft.Validator{
+			validators[i] = &validator.GenesisValidator{
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,

@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -185,7 +186,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	)
 
 	currentEpochNumber := getEpochNumber(t, epochSize, epochSize)
-	validatorSet := newTestValidators(t, validatorsCount).getPublicIdentities()
+	validatorSet := validator.NewTestValidators(t, validatorsCount).GetPublicIdentities()
 	header, headerMap := createTestBlocks(t, epochSize, epochSize, validatorSet)
 	builtBlock := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header: header,
@@ -263,7 +264,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 	txPool := new(txPoolMock)
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
 
-	snapshot := NewProposerSnapshot(blockNumber, []*ValidatorMetadata{})
+	snapshot := NewProposerSnapshot(blockNumber, []*validator.ValidatorMetadata{})
 	config := &runtimeConfig{
 		PolyBFTConfig: &PolyBFTConfig{EpochSize: epochSize},
 		blockchain:    blockchainMock,
@@ -292,7 +293,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 	t.Parallel()
 
-	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
+	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
 
 	snapshot := NewProposerSnapshot(1, nil)
 	config := &runtimeConfig{
@@ -306,7 +307,7 @@ func TestConsensusRuntime_FSM_NotInValidatorSet(t *testing.T) {
 		config:             config,
 		epoch: &epochMetadata{
 			Number:     1,
-			Validators: validators.getPublicIdentities(),
+			Validators: validators.GetPublicIdentities(),
 		},
 		lastBuiltBlock: &types.Header{},
 	}
@@ -327,7 +328,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		ExtraData: extra.MarshalRLPTo(nil),
 	}
 
-	validators := newTestValidators(t, 3)
+	validators := validator.NewTestValidators(t, 3)
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
@@ -337,7 +338,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			EpochSize:  10,
 			SprintSize: 5,
 		},
-		Key:        wallet.NewKey(validators.getPrivateIdentities()[0]),
+		Key:        wallet.NewKey(validators.GetPrivateIdentities()[0]),
 		blockchain: blockchainMock,
 	}
 	runtime := &consensusRuntime{
@@ -346,7 +347,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		config:             config,
 		epoch: &epochMetadata{
 			Number:            1,
-			Validators:        validators.getPublicIdentities(),
+			Validators:        validators.GetPublicIdentities(),
 			FirstBlockInEpoch: 1,
 		},
 		lastBuiltBlock:    lastBlock,
@@ -385,8 +386,8 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		toIndex           = uint64(9)
 	)
 
-	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
-	validators := validatorAccounts.getPublicIdentities()
+	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
+	validators := validatorAccounts.GetPublicIdentities()
 
 	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
 
@@ -408,7 +409,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 			EpochSize:  epochSize,
 			SprintSize: sprintSize,
 		},
-		Key:        validatorAccounts.getValidator("A").Key(),
+		Key:        validatorAccounts.GetValidator("A").Key(),
 		blockchain: blockchainMock,
 	}
 
@@ -453,7 +454,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		BlockTime:  common.Duration{Duration: 2 * time.Second},
 	}
 
-	validators := newTestValidators(t, 3).getPublicIdentities()
+	validators := validator.NewTestValidators(t, 3).GetPublicIdentities()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1)).Once()
@@ -500,7 +501,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	const originalBlockNumber = uint64(5)
 
 	newCurrentHeader := &types.Header{Number: originalBlockNumber + 1}
-	validatorSet := newTestValidators(t, 3).getPublicIdentities()
+	validatorSet := validator.NewTestValidators(t, 3).GetPublicIdentities()
 
 	systemStateMock := new(systemStateMock)
 	systemStateMock.On("GetEpoch").Return(uint64(1), nil).Once()
@@ -550,32 +551,32 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		sprintSize      = 5
 	)
 
-	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
+	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
 	polybftConfig := &PolyBFTConfig{
 		EpochSize:  epochSize,
 		SprintSize: sprintSize,
 	}
 
-	lastBuiltBlock, headerMap := createTestBlocks(t, 19, epochSize, validators.getPublicIdentities())
+	lastBuiltBlock, headerMap := createTestBlocks(t, 19, epochSize, validators.GetPublicIdentities())
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.getPublicIdentities()).Twice()
+	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.GetPublicIdentities()).Twice()
 
 	config := &runtimeConfig{
 		PolyBFTConfig:  polybftConfig,
 		blockchain:     blockchainMock,
 		polybftBackend: polybftBackendMock,
-		Key:            validators.getValidator("A").Key(),
+		Key:            validators.GetValidator("A").Key(),
 	}
 
 	consensusRuntime := &consensusRuntime{
 		config: config,
 		epoch: &epochMetadata{
 			Number:            epoch,
-			Validators:        validators.getPublicIdentities(),
+			Validators:        validators.GetPublicIdentities(),
 			FirstBlockInEpoch: epochStartBlock,
 		},
 		lastBuiltBlock: lastBuiltBlock,
@@ -597,17 +598,17 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 	t.Parallel()
 
-	setupFn := func(t *testing.T) (*consensusRuntime, *testValidators) {
+	setupFn := func(t *testing.T) (*consensusRuntime, *validator.TestValidators) {
 		t.Helper()
 
-		validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
+		validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 		epoch := &epochMetadata{
-			Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
+			Validators: validatorAccounts.GetPublicIdentities("A", "B", "C", "D"),
 		}
 		runtime := &consensusRuntime{
 			epoch:  epoch,
 			logger: hclog.NewNullLogger(),
-			fsm:    &fsm{validators: NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
+			fsm:    &fsm{validators: validator.NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
 		}
 
 		return runtime, validatorAccounts
@@ -645,8 +646,8 @@ func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 			t.Parallel()
 
 			runtime, validatorAccounts := setupFn(t)
-			signer := validatorAccounts.getValidator(c.signerAlias)
-			sender := validatorAccounts.getValidator(c.senderAlias)
+			signer := validatorAccounts.GetValidator(c.signerAlias)
+			sender := validatorAccounts.GetValidator(c.senderAlias)
 			msg, err := signer.Key().SignIBFTMessage(&proto.Message{From: sender.Address().Bytes()})
 
 			require.NoError(t, err)
@@ -658,18 +659,18 @@ func TestConsensusRuntime_IsValidValidator_BasicCases(t *testing.T) {
 func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 	t.Parallel()
 
-	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	epoch := &epochMetadata{
-		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
+		Validators: validatorAccounts.GetPublicIdentities("A", "B", "C", "D"),
 	}
 	runtime := &consensusRuntime{
 		epoch:  epoch,
 		logger: hclog.NewNullLogger(),
-		fsm:    &fsm{validators: NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
+		fsm:    &fsm{validators: validator.NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
 	}
 
 	// provide invalid signature
-	sender := validatorAccounts.getValidator("A")
+	sender := validatorAccounts.GetValidator("A")
 	msg := &proto.Message{
 		From:      sender.Address().Bytes(),
 		Signature: []byte{1, 2, 3, 4, 5},
@@ -680,16 +681,16 @@ func TestConsensusRuntime_IsValidValidator_TamperSignature(t *testing.T) {
 func TestConsensusRuntime_TamperMessageContent(t *testing.T) {
 	t.Parallel()
 
-	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	epoch := &epochMetadata{
-		Validators: validatorAccounts.getPublicIdentities("A", "B", "C", "D"),
+		Validators: validatorAccounts.GetPublicIdentities("A", "B", "C", "D"),
 	}
 	runtime := &consensusRuntime{
 		epoch:  epoch,
 		logger: hclog.NewNullLogger(),
-		fsm:    &fsm{validators: NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
+		fsm:    &fsm{validators: validator.NewValidatorSet(epoch.Validators, hclog.NewNullLogger())},
 	}
-	sender := validatorAccounts.getValidator("A")
+	sender := validatorAccounts.GetValidator("A")
 	proposalHash := []byte{2, 4, 6, 8, 10}
 	proposalSignature, err := sender.Key().SignWithDomain(proposalHash, bls.DomainCheckpointManager)
 	require.NoError(t, err)
@@ -842,7 +843,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	const round = 5
 
-	validatorAccounts := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 
 	extra := &Extra{
 		Checkpoint: &CheckpointData{},
@@ -860,9 +861,9 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	}, true).Once()
 
 	state := newTestState(t)
-	snapshot := NewProposerSnapshot(lastBuildBlock.Number+1, validatorAccounts.getPublicIdentities())
+	snapshot := NewProposerSnapshot(lastBuildBlock.Number+1, validatorAccounts.GetPublicIdentities())
 	config := &runtimeConfig{
-		Key:           validatorAccounts.getValidator("B").Key(),
+		Key:           validatorAccounts.GetValidator("B").Key(),
 		blockchain:    blockchainMock,
 		PolyBFTConfig: &PolyBFTConfig{EpochSize: 10, SprintSize: 5},
 	}
@@ -872,7 +873,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 		lastBuiltBlock: lastBuildBlock,
 		epoch: &epochMetadata{
 			Number:     1,
-			Validators: validatorAccounts.getPublicIdentities()[:len(validatorAccounts.validators)-1],
+			Validators: validatorAccounts.GetPublicIdentities()[:len(validatorAccounts.Validators)-1],
 		},
 		logger:             hclog.NewNullLogger(),
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
@@ -887,7 +888,7 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	runtime.fsm.proposerSnapshot = snapshot
 
-	messages := make([]*proto.Message, 0, len(validatorAccounts.validators))
+	messages := make([]*proto.Message, 0, len(validatorAccounts.Validators))
 
 	// Unknown message type
 	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, -1))
@@ -909,9 +910,9 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPREPARE))
 
 	// MessageType_PREPARE
-	messages = make([]*proto.Message, 0, len(validatorAccounts.validators))
+	messages = make([]*proto.Message, 0, len(validatorAccounts.Validators))
 
-	for _, x := range validatorAccounts.validators {
+	for _, x := range validatorAccounts.Validators {
 		address := x.Address()
 
 		// proposer must not be included in prepare messages
@@ -944,9 +945,9 @@ func TestConsensusRuntime_HasQuorum(t *testing.T) {
 
 	//proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT
 	for _, msgType := range []proto.MessageType{proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT} {
-		messages = make([]*proto.Message, 0, len(validatorAccounts.validators))
+		messages = make([]*proto.Message, 0, len(validatorAccounts.Validators))
 
-		for _, x := range validatorAccounts.validators {
+		for _, x := range validatorAccounts.Validators {
 			messages = append(messages, &proto.Message{
 				From: x.Address().Bytes(),
 				Type: msgType,
@@ -1071,7 +1072,7 @@ func TestConsensusRuntime_BuildPrepareMessage(t *testing.T) {
 }
 
 func createTestBlocks(t *testing.T, numberOfBlocks, defaultEpochSize uint64,
-	validatorSet AccountSet) (*types.Header, *testHeadersMap) {
+	validatorSet validator.AccountSet) (*types.Header, *testHeadersMap) {
 	t.Helper()
 
 	headerMap := &testHeadersMap{}
@@ -1113,7 +1114,7 @@ func createTestBlocks(t *testing.T, numberOfBlocks, defaultEpochSize uint64,
 	return blockHeader, headerMap
 }
 
-func createTestBitmaps(t *testing.T, validators AccountSet, numberOfBlocks uint64) map[uint64]bitmap.Bitmap {
+func createTestBitmaps(t *testing.T, validators validator.AccountSet, numberOfBlocks uint64) map[uint64]bitmap.Bitmap {
 	t.Helper()
 
 	bitmaps := make(map[uint64]bitmap.Bitmap, numberOfBlocks)
@@ -1140,12 +1141,12 @@ func createTestBitmaps(t *testing.T, validators AccountSet, numberOfBlocks uint6
 	return bitmaps
 }
 
-func createTestExtraForAccounts(t *testing.T, epoch uint64, validators AccountSet, b bitmap.Bitmap) []byte {
+func createTestExtraForAccounts(t *testing.T, epoch uint64, validators validator.AccountSet, b bitmap.Bitmap) []byte {
 	t.Helper()
 
 	dummySignature := [64]byte{}
 	extraData := Extra{
-		Validators: &ValidatorSetDelta{
+		Validators: &validator.ValidatorSetDelta{
 			Added:   validators,
 			Removed: bitmap.Bitmap{},
 		},

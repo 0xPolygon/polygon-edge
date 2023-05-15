@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ import (
 
 func Test_setupHeaderHashFunc(t *testing.T) {
 	extra := &Extra{
-		Validators: &ValidatorSetDelta{Removed: bitmap.Bitmap{1}},
+		Validators: &validator.ValidatorSetDelta{Removed: bitmap.Bitmap{1}},
 		Parent:     createSignature(t, []*wallet.Account{generateTestAccount(t)}, types.ZeroHash, bls.DomainCheckpointManager),
 		Checkpoint: &CheckpointData{},
 		Committed:  &Signature{},

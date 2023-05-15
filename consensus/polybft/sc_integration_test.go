@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -29,8 +30,8 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	const gasLimit = 1000000000000
 
 	// create validator set and checkpoint mngr
-	currentValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
-	accSet := currentValidators.getPublicIdentities()
+	currentValidators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"}, []uint64{100, 100, 100, 100})
+	accSet := currentValidators.GetPublicIdentities()
 	cm := checkpointManager{blockchain: &blockchainMock{}}
 
 	deployerAddress := types.Address{76, 76, 1} // account that will deploy contracts
@@ -195,8 +196,8 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	bmp := bitmap.Bitmap{}
 	signatures := bls.Signatures(nil)
 
-	currentValidators.iterAcct(nil, func(v *testValidator) {
-		signatures = append(signatures, v.mustSign(checkpointHash[:], bls.DomainCheckpointManager))
+	currentValidators.IterAcct(nil, func(v *validator.TestValidator) {
+		signatures = append(signatures, v.MustSign(checkpointHash[:], bls.DomainCheckpointManager))
 		bmp.Set(i)
 		i++
 	})
@@ -263,7 +264,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	reward := uint64(math.Pow(10, 18))            // 1 token
 	walletAddress := types.StringToAddress("1234889893")
 
-	validatorSets := make([]*testValidators, len(validatorSetSize), len(validatorSetSize))
+	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
 
 	// create all validator sets which will be used in test
 	for i, size := range validatorSetSize {
@@ -275,15 +276,15 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			vps[j] = intialBalance
 		}
 
-		validatorSets[i] = newTestValidatorsWithAliases(t, aliases, vps)
+		validatorSets[i] = validator.NewTestValidatorsWithAliases(t, aliases, vps)
 	}
 
 	// iterate through the validator set and do the test for each of them
 	for _, currentValidators := range validatorSets {
-		accSet := currentValidators.getPublicIdentities()
+		accSet := currentValidators.GetPublicIdentities()
 
 		// validator data for polybft config
-		initValidators := make([]*Validator, accSet.Len())
+		initValidators := make([]*validator.GenesisValidator, accSet.Len())
 		// add contracts to genesis data
 		alloc := map[types.Address]*chain.GenesisAccount{
 			contracts.ValidatorSetContract: {
@@ -300,18 +301,18 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			},
 		}
 
-		for i, validator := range accSet {
+		for i, val := range accSet {
 			// add validator to genesis data
-			alloc[validator.Address] = &chain.GenesisAccount{
-				Balance: validator.VotingPower,
+			alloc[val.Address] = &chain.GenesisAccount{
+				Balance: val.VotingPower,
 			}
 
 			// create validator data for polybft config
-			initValidators[i] = &Validator{
-				Address: validator.Address,
-				Balance: validator.VotingPower,
-				Stake:   validator.VotingPower,
-				BlsKey:  hex.EncodeToString(validator.BlsKey.Marshal()),
+			initValidators[i] = &validator.GenesisValidator{
+				Address: val.Address,
+				Balance: val.VotingPower,
+				Stake:   val.VotingPower,
+				BlsKey:  hex.EncodeToString(val.BlsKey.Marshal()),
 			}
 		}
 
@@ -321,7 +322,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			SprintSize:          5,
 			EpochReward:         reward,
 			// use 1st account as governance address
-			Governance: currentValidators.toValidatorSet().validators.GetAddresses()[0],
+			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],
 			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
 				WalletAddress: walletAddress,

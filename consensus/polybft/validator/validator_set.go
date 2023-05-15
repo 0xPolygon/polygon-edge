@@ -1,4 +1,4 @@
-package polybft
+package validator
 
 import (
 	"math/big"
@@ -90,6 +90,10 @@ func (vs validatorSet) Includes(address types.Address) bool {
 
 func (vs validatorSet) Len() int {
 	return vs.validators.Len()
+}
+
+func (vs validatorSet) TotalVotingPower() big.Int {
+	return *vs.totalVotingPower
 }
 
 // getQuorumSize calculates quorum size as 2/3 super-majority of provided total voting power
