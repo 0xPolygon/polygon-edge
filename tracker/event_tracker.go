@@ -80,6 +80,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to start blocktracker: %w", err)
 	}
 
+	// Run tracker
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
 		tracker.WithBlockTracker(blockTracker),
