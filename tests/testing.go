@@ -150,9 +150,14 @@ func stringToInt64T(t *testing.T, str string) int64 {
 func (e *env) ToHeader(t *testing.T) *types.Header {
 	t.Helper()
 
+	baseFee := uint64(0)
+	if e.BaseFee != "" {
+		baseFee = stringToUint64T(t, e.BaseFee)
+	}
+
 	return &types.Header{
 		Miner:      stringToAddressT(t, e.Coinbase).Bytes(),
-		BaseFee:    stringToUint64T(t, e.BaseFee),
+		BaseFee:    baseFee,
 		Difficulty: stringToUint64T(t, e.Difficulty),
 		GasLimit:   stringToUint64T(t, e.GasLimit),
 		Number:     stringToUint64T(t, e.Number),
@@ -163,9 +168,14 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 	t.Helper()
 
+	baseFee := new(big.Int)
+	if e.BaseFee != "" {
+		baseFee = stringToBigIntT(t, e.BaseFee)
+	}
+
 	return runtime.TxContext{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
-		BaseFee:    stringToBigIntT(t, e.BaseFee),
+		BaseFee:    baseFee,
 		Difficulty: stringToHashT(t, e.Difficulty),
 		GasLimit:   stringToInt64T(t, e.GasLimit),
 		Number:     stringToInt64T(t, e.Number),
@@ -197,9 +207,7 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	}
 
 	var dec execUnmarshall
-	err := json.Unmarshal(input, &dec)
-
-	if err != nil {
+	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
 
@@ -207,28 +215,24 @@ func (e *exec) UnmarshalJSON(input []byte) error {
 	e.Caller = dec.Caller
 	e.Origin = dec.Origin
 
-	e.Code, err = types.ParseBytes(&dec.Code)
-	if err != nil {
+	var err error
+	if e.Code, err = types.ParseBytes(&dec.Code); err != nil {
 		return err
 	}
 
-	e.Data, err = types.ParseBytes(&dec.Data)
-	if err != nil {
+	if e.Data, err = types.ParseBytes(&dec.Data); err != nil {
 		return err
 	}
 
-	e.Value, err = types.ParseUint256orHex(&dec.Value)
-	if err != nil {
+	if e.Value, err = types.ParseUint256orHex(&dec.Value); err != nil {
 		return err
 	}
 
-	e.GasLimit, err = types.ParseUint64orHex(&dec.Gas)
-	if err != nil {
+	if e.GasLimit, err = common.ParseUint64orHex(&dec.Gas); err != nil {
 		return err
 	}
 
-	e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice)
-	if err != nil {
+	if e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice); err != nil {
 		return err
 	}
 
@@ -544,16 +548,19 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-func listFolders(fss ...embed.FS) ([]string, error) {
+//go:embed tests
+var testsFS embed.FS
+
+func listFolders(tests ...string) ([]string, error) {
 	var folders []string
 
-	for _, f := range fss {
-		if err := fs.WalkDir(f, ".", func(path string, d fs.DirEntry, err error) error {
+	for _, t := range tests {
+		if err := fs.WalkDir(testsFS, t, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
 
-			if d.IsDir() {
+			if d.IsDir() && t != "path" {
 				folders = append(folders, path)
 			}
 
@@ -561,6 +568,9 @@ func listFolders(fss ...embed.FS) ([]string, error) {
 		}); err != nil {
 			return nil, err
 		}
+
+		// Excluding root dir
+		folders = folders[1:]
 	}
 
 	return folders, nil

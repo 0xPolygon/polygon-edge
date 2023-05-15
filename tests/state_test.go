@@ -2,7 +2,6 @@ package tests
 
 import (
 	"bytes"
-	"embed"
 	"encoding/json"
 	"math/big"
 	"os"
@@ -16,13 +15,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+const (
+	stateTests       = "tests/GeneralStateTests"
+	legacyStateTests = "tests/LegacyTests/Constantinople/GeneralStateTests"
+)
+
 var (
-	//go:embed tests/GeneralStateTests/*
-	stateTestsFS embed.FS
-
-	//go:embed tests/LegacyTests/Constantinople/GeneralStateTests/*
-	legacyStateTestsFS embed.FS
-
 	ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 )
 
@@ -38,7 +36,9 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 
 	config, ok := Forks[fork]
 	if !ok {
-		t.Fatalf("config %s not found", fork)
+		t.Skipf("%s fork is not supported", fork)
+
+		return
 	}
 
 	env := c.Env.ToEnv(t)
@@ -56,7 +56,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 
 	msg, err := c.Transaction.At(p.Indexes, baseFee)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("failed to create transaction: %v", err)
 	}
 
 	s, snapshot, pastRoot := buildState(c.Pre)
@@ -134,7 +134,7 @@ func TestState(t *testing.T) {
 
 	// There are two folders in spec tests, one for the current tests for the Istanbul fork
 	// and one for the legacy tests for the other forks
-	folders, err := listFolders(stateTestsFS, legacyStateTestsFS)
+	folders, err := listFolders(stateTests, legacyStateTests)
 	if err != nil {
 		t.Fatal(err)
 	}

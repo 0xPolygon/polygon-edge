@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"embed"
 	"encoding/json"
 	"math/big"
 	"os"
@@ -20,10 +19,11 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-var (
-	//go:embed tests/GeneralStateTests/VMTests/*
-	vmTestsFS embed.FS
+const (
+	vmTests = "tests/GeneralStateTests/VMTests"
+)
 
+var (
 	mainnetChainConfig = chain.Params{
 		Forks: &chain.Forks{
 			Homestead: chain.NewFork(1150000),
@@ -143,7 +143,7 @@ func rlpHashLogs(logs []*types.Log) (res types.Hash) {
 func TestEVM(t *testing.T) {
 	t.Parallel()
 
-	folders, err := listFolders(vmTestsFS)
+	folders, err := listFolders(vmTests)
 	if err != nil {
 		t.Fatal(err)
 	}
