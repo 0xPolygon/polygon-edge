@@ -2,7 +2,10 @@ package polybft
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math/big"
+	"reflect"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -10,16 +13,30 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	go_fuzz_utils "github.com/trailofbits/go-fuzz-utils"
 )
+
+type epochIDValidatorsF struct {
+	EpochID    uint64
+	Validators []*ValidatorMetadata
+}
+
+type postBlockStructF struct {
+	EpochID     uint64
+	ValidatorID uint64
+	BlockID     uint64
+	StakeValue  uint64
+}
+
+type updateValidatorSetF struct {
+	EpochID     uint64
+	X           uint64
+	VotingPower int64
+}
 
 func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 	state := newTestState(f)
 
-	seeds := []struct {
-		EpochID    uint64
-		Validators AccountSet
-	}{
+	seeds := []epochIDValidatorsF{
 		{
 			EpochID:    0,
 			Validators: newTestValidators(f, 6).getPublicIdentities(),
@@ -35,7 +52,11 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 	}
 
 	for _, seed := range seeds {
-		data, _ := json.Marshal(seed)
+		data, err := json.Marshal(seed)
+		if err != nil {
+			return
+		}
+
 		f.Add(data)
 	}
 
@@ -46,27 +67,29 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 			maxValidatorSetSize: 10,
 		}
 
-		tp, err := go_fuzz_utils.NewTypeProvider(input)
-		if err != nil {
-			return
-		}
-		newEpochID, err := tp.GetUint64()
-		if err != nil {
-			return
-		}
-		var validators AccountSet
-		err = tp.Fill(validators)
-		if err != nil {
-			return
+		var data epochIDValidatorsF
+		if err := json.Unmarshal(input, &data); err != nil {
+			t.Skip(err)
 		}
 
-		_ = stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID: newEpochID,
+		invalidDataFormat := false
+		for _, v := range data.Validators {
+			if err := ValidateStruct(*v); err != nil {
+				invalidDataFormat = true
+			}
+		}
+		if invalidDataFormat {
+			t.Skip()
+		}
+
+		err := stakeManager.PostEpoch(&PostEpochRequest{
+			NewEpochID: data.EpochID,
 			ValidatorSet: NewValidatorSet(
-				validators,
+				data.Validators,
 				stakeManager.logger,
 			),
 		})
+		require.NoError(t, err)
 	})
 }
 
@@ -78,39 +101,54 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		state             = newTestState(f)
 	)
 
+	seeds := []postBlockStructF{
+		{
+			EpochID:     0,
+			ValidatorID: 1,
+			BlockID:     1,
+			StakeValue:  30,
+		},
+		{
+			EpochID:     5,
+			ValidatorID: 30,
+			BlockID:     4,
+			StakeValue:  60,
+		},
+		{
+			EpochID:     1,
+			ValidatorID: 42,
+			BlockID:     11,
+			StakeValue:  70,
+		},
+	}
+
+	for _, seed := range seeds {
+		data, err := json.Marshal(seed)
+		if err != nil {
+			return
+		}
+
+		f.Add(data)
+	}
+
 	f.Fuzz(func(t *testing.T, input []byte) {
 		t.Parallel()
 
-		tp, err := go_fuzz_utils.NewTypeProvider(input)
-		if err != nil {
-			return
+		var data postBlockStructF
+		if err := json.Unmarshal(input, &data); err != nil {
+			t.Skip(err)
 		}
 
-		stakeValue, err := tp.GetUint64()
-		if err != nil {
-			return
+		if err := ValidateStruct(data); err != nil {
+			t.Skip(err)
 		}
 
-		epoch, err := tp.GetUint64()
-		if err != nil {
-			return
-		}
-		validatorID, err := tp.GetUint64()
-		if err != nil {
-			return
-		}
-
-		if validatorID > uint64(len(initialSetAliases)-1) {
+		if data.ValidatorID > uint64(len(initialSetAliases)-1) {
 			t.Skip()
 		}
 
-		block, err := tp.GetUint64()
-		if err != nil {
-			return
-		}
-
 		systemStateMock := new(systemStateMock)
-		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(stakeValue)), nil).Once()
+		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(data.StakeValue)), nil).Once()
 
 		blockchainMock := new(blockchainMock)
 		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
@@ -137,20 +175,21 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 				createTestLogForTransferEvent(
 					t,
 					stakeManager.validatorSetContract,
-					validators.getValidator(initialSetAliases[validatorID]).Address(),
+					validators.getValidator(initialSetAliases[data.ValidatorID]).Address(),
 					types.ZeroAddress,
-					stakeValue,
+					data.StakeValue,
 				),
 			},
 		}
 
 		req := &PostBlockRequest{
-			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
+			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: data.BlockID}},
 				Receipts: []*types.Receipt{receipt},
 			},
-			Epoch: epoch,
+			Epoch: data.EpochID,
 		}
-		_ = stakeManager.PostBlock(req)
+		err := stakeManager.PostBlock(req)
+		require.NoError(t, err)
 	})
 }
 
@@ -173,33 +212,82 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		10,
 	)
 
+	seeds := []updateValidatorSetF{
+		{
+			EpochID:     0,
+			X:           1,
+			VotingPower: 30,
+		},
+		{
+			EpochID:     1,
+			X:           4,
+			VotingPower: 1,
+		},
+		{
+			EpochID:     2,
+			X:           3,
+			VotingPower: -2,
+		},
+	}
+
+	for _, seed := range seeds {
+		data, err := json.Marshal(seed)
+		if err != nil {
+			return
+		}
+
+		f.Add(data)
+	}
+
 	f.Fuzz(func(t *testing.T, input []byte) {
-		tp, err := go_fuzz_utils.NewTypeProvider(input)
-		if err != nil {
-			return
+		var data updateValidatorSetF
+		if err := json.Unmarshal(input, &data); err != nil {
+			t.Skip(err)
 		}
-		epoch, err := tp.GetUint64()
-		if err != nil {
-			return
+
+		if err := ValidateStruct(data); err != nil {
+			t.Skip(err)
 		}
-		x, err := tp.GetUint64()
-		if err != nil {
-			return
-		}
-		if x > uint64(len(aliases)-1) {
+
+		if data.X > uint64(len(aliases)-1) {
 			t.Skip()
 		}
-		votingPower, err := tp.GetInt64()
-		if err != nil {
-			return
-		}
 
-		_, _ = stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities(aliases[x:]...))
+		err := state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.getPublicIdentities())})
+		require.NoError(t, err)
+
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.getPublicIdentities(aliases[data.X:]...))
+		require.NoError(t, err)
 
 		fullValidatorSet := validators.getPublicIdentities().Copy()
-		validatorToUpdate := fullValidatorSet[x]
-		validatorToUpdate.VotingPower = big.NewInt(votingPower)
+		validatorToUpdate := fullValidatorSet[data.X]
+		validatorToUpdate.VotingPower = big.NewInt(data.VotingPower)
 
-		_, _ = stakeManager.UpdateValidatorSet(epoch, validators.getPublicIdentities())
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.getPublicIdentities())
+		require.NoError(t, err)
 	})
+}
+
+func ValidateStruct(s interface{}) (err error) {
+	structType := reflect.TypeOf(s)
+	if structType.Kind() != reflect.Struct {
+		return errors.New("input param should be a struct")
+	}
+
+	structVal := reflect.ValueOf(s)
+	fieldNum := structVal.NumField()
+
+	for i := 0; i < fieldNum; i++ {
+		field := structVal.Field(i)
+		fieldName := structType.Field(i).Name
+
+		isSet := field.IsValid() && !field.IsZero()
+
+		if !isSet {
+			err = fmt.Errorf("%w%s in not set; ", err, fieldName)
+		}
+	}
+
+	return err
 }
