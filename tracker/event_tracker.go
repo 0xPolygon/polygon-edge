@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -60,31 +61,24 @@ func (e *EventTracker) Start(ctx context.Context) error {
 
 	store, err := NewEventTrackerStore(e.dbPath, e.numBlockConfirmations, e.subscriber, e.logger)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create event tracker store: %w", err)
 	}
 
 	blockMaxBacklog := e.numBlockConfirmations*2 + 1
 	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
-
 	go func() {
 		<-ctx.Done()
 		blockTracker.Close()
 		store.Close()
 	}()
 
-	// Init and start block tracker concurrently, with infinite retries
-	go common.RetryForever(ctx, time.Second, func(context.Context) error {
-		if err := blockTracker.Init(); err != nil {
-			e.logger.Error("failed to init blocktracker", "error", err)
-			return err
-		}
-
-		if err := blockTracker.Start(); err != nil {
-			e.logger.Error("failed to start blocktracker", "error", err)
-			return err
-		}
-		return nil
-	})
+	// Start block tracker
+	if err := blockTracker.Init(); err != nil {
+		return fmt.Errorf("failed to init blocktracker: %w", err)
+	}
+	if err := blockTracker.Start(); err != nil {
+		return fmt.Errorf("failed to start blocktracker: %w", err)
+	}
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -99,10 +93,10 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		}),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create tracker: %w", err)
 	}
-	// Sync concurrently, with infinite retries
-	go common.RetryForever(ctx, time.Second, func(context.Context) error { //nolint: errcheck
+	// Sync concurrently, retry indefinitely
+	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
 			return err
