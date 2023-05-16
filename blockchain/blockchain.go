@@ -849,6 +849,7 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 	}
 
 	_, trace, root := txn.Commit()
+	trace.ParentStateRoot = parent.StateRoot
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())

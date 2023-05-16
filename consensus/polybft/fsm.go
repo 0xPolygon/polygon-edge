@@ -170,6 +170,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		h.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
 		h.MixHash = PolyBFTMixDigest
 	})
+	stateBlock.Trace.ParentStateRoot = parent.StateRoot
 
 	if err != nil {
 		return nil, err
