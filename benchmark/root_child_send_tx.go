@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/benchmark/common"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -26,9 +25,19 @@ var (
 	PrivateKey           = flag.String("privateKey", "", "private key that will be used to send tx")
 )
 
-// RootChildSendTx deploys single and multi contracts to the root and child chain, execute tx from the
-// test cases and measure its execution
-func RootChildSendTx(b *testing.B) {
+// The rootChildSendTx function executes test cases that measure transaction execution on both the root and child chains
+// To do this, it first calls RootChildSendTxSetUp to set up the testing environment,
+// which may include starting the cluster, deploying contracts, and building the test cases.
+// After building the test cases, rootChildSendTx returns them along with a cleanup function that should be called
+// after the test cases have been executed. The test cases are executed by the TxTestCasesExecutor.
+// The rootJSONRPC, childJSONRPC, and privateKey flags are used to configure the testing environment.
+// If all of these flags are set, then the local cluster will not be started and the provided addresses
+// will be used as the endpoints to the root and child chains.
+// If any of these flags is not set, the local cluster will be started automatically.
+// If the private key is specified, it will be used as the transaction sender.
+// Otherwise, the local cluster will generate a sender key.
+// If the cluster is not run locally, then the sender must have enough funds for sending transactions.
+func rootChildSendTx(b *testing.B) {
 	b.Helper()
 	// set up environment, get test cases and clean up fn
 	testCases, cleanUpFn := RootChildSendTxSetUp(b)
@@ -36,13 +45,13 @@ func RootChildSendTx(b *testing.B) {
 
 	// Loop over the test cases and measure the execution time of the transactions
 	for _, testInput := range testCases {
-		common.TxTestCasesExecutor(b, testInput)
+		TxTestCasesExecutor(b, testInput)
 	}
 }
 
 // RootChildSendTxSetUp sets environment for execution of sentTx test cases on both root and child chains and
 // returns test cases and clean up fn
-func RootChildSendTxSetUp(b *testing.B) ([]common.TxTestCase, func()) {
+func RootChildSendTxSetUp(b *testing.B) ([]TxTestCase, func()) {
 	b.Helper()
 	// check if test is called with the root and child node addresses and private key set.
 	// if that is the case use that json rpc addresses, otherwise run the cluster
@@ -54,7 +63,7 @@ func RootChildSendTxSetUp(b *testing.B) ([]common.TxTestCase, func()) {
 	var sender ethgo.Key
 	// if the privateKey flag is set then recover the key, otherwise recover the key
 	if privateKeyRaw != "" {
-		sender = common.GetPrivateKey(b, privateKeyRaw)
+		sender = getPrivateKey(b, privateKeyRaw)
 	} else {
 		var err error
 		sender, err = wallet.GenerateKey()
@@ -95,37 +104,37 @@ func RootChildSendTxSetUp(b *testing.B) ([]common.TxTestCase, func()) {
 	}
 
 	// deploy contracts
-	singleContChildAddr, singleContRootAddr := common.DeployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, common.SingleContByteCode)
-	multiAContChildAddr, multiAContRootAddr := common.DeployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, common.MultiContAByteCode)
-	multiBContChildAddr, multiBContRootAddr := common.DeployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, common.MultiContBByteCode)
-	multiCContChildAddr, multiCContRootAddr := common.DeployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, common.MultiContCByteCode)
+	singleContChildAddr, singleContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
+		sender, singleContByteCode)
+	multiAContChildAddr, multiAContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
+		sender, multiContAByteCode)
+	multiBContChildAddr, multiBContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
+		sender, multiContBByteCode)
+	multiCContChildAddr, multiCContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
+		sender, multiContCByteCode)
 
 	// set callee contract addresses for multi call contracts (A->B->C)
 	// set B contract address in A contract
-	common.SetContractDependencyAddress(b, childTxRelayer, multiAContChildAddr, multiBContChildAddr,
+	setContractDependencyAddress(b, childTxRelayer, multiAContChildAddr, multiBContChildAddr,
 		multiContSetAddrFunc, sender)
-	common.SetContractDependencyAddress(b, rootTxRelayer, multiAContRootAddr, multiBContRootAddr,
+	setContractDependencyAddress(b, rootTxRelayer, multiAContRootAddr, multiBContRootAddr,
 		multiContSetAddrFunc, sender)
 	// set C contract address in B contract
-	common.SetContractDependencyAddress(b, childTxRelayer, multiBContChildAddr, multiCContChildAddr,
+	setContractDependencyAddress(b, childTxRelayer, multiBContChildAddr, multiCContChildAddr,
 		multiContSetAddrFunc, sender)
-	common.SetContractDependencyAddress(b, rootTxRelayer, multiBContRootAddr, multiCContRootAddr,
+	setContractDependencyAddress(b, rootTxRelayer, multiBContRootAddr, multiCContRootAddr,
 		multiContSetAddrFunc, sender)
 
 	// create inputs for contract calls
 	singleContInputs := map[string][]byte{
-		"calc": common.GetTxInput(b, singleContCalcFunc, []interface{}{big.NewInt(50), big.NewInt(150)}),
-		"set":  common.GetTxInput(b, singleContSetFunc, []interface{}{big.NewInt(10)}),
-		"get":  common.GetTxInput(b, singleContGetFunc, nil),
+		"calc": getTxInput(b, singleContCalcFunc, []interface{}{big.NewInt(50), big.NewInt(150)}),
+		"set":  getTxInput(b, singleContSetFunc, []interface{}{big.NewInt(10)}),
+		"get":  getTxInput(b, singleContGetFunc, nil),
 	}
-	multiContInput := common.GetTxInput(b, multiContFnA, nil)
+	multiContInput := getTxInput(b, multiContFnA, nil)
 
 	// test cases
-	testCases := []common.TxTestCase{
+	testCases := []TxTestCase{
 		{
 			Name:         "[Child chain] setter 5tx",
 			Relayer:      childTxRelayer,

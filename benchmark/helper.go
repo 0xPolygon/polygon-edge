@@ -1,4 +1,4 @@
-package common
+package benchmark
 
 import (
 	"encoding/hex"
@@ -12,8 +12,8 @@ import (
 	"github.com/umbracle/ethgo/wallet"
 )
 
-// DeployContractOnRootAndChild deploys contract code on both root and child chain
-func DeployContractOnRootAndChild(
+// deployContractOnRootAndChild deploys contract code on both root and child chain
+func deployContractOnRootAndChild(
 	b *testing.B,
 	childTxRelayer txrelayer.TxRelayer,
 	rootTxRelayer txrelayer.TxRelayer,
@@ -26,16 +26,16 @@ func DeployContractOnRootAndChild(
 	require.NoError(b, err)
 
 	// deploy contract on the child chain
-	contractChildAddr := DeployContract(b, childTxRelayer, sender, byteCode)
+	contractChildAddr := deployContract(b, childTxRelayer, sender, byteCode)
 
 	// deploy contract on the root chain
-	contractRootAddr := DeployContract(b, rootTxRelayer, sender, byteCode)
+	contractRootAddr := deployContract(b, rootTxRelayer, sender, byteCode)
 
 	return contractChildAddr, contractRootAddr
 }
 
-// DeployContract deploys contract code for the given relayer
-func DeployContract(b *testing.B, txRelayer txrelayer.TxRelayer, sender ethgo.Key, byteCode []byte) ethgo.Address {
+// deployContract deploys contract code for the given relayer
+func deployContract(b *testing.B, txRelayer txrelayer.TxRelayer, sender ethgo.Key, byteCode []byte) ethgo.Address {
 	b.Helper()
 
 	txn := &ethgo.Transaction{
@@ -51,13 +51,14 @@ func DeployContract(b *testing.B, txRelayer txrelayer.TxRelayer, sender ethgo.Ke
 	return receipt.ContractAddress
 }
 
-// GetTxInput returns input for sending tx, given the abi encoded method and call parameters
-func GetTxInput(b *testing.B, method *abi.Method, args interface{}) []byte {
+// getTxInput returns input for sending tx, given the abi encoded method and call parameters
+func getTxInput(b *testing.B, method *abi.Method, args interface{}) []byte {
 	b.Helper()
 
-	var input []byte
-
-	var err error
+	var (
+		input []byte
+		err   error
+	)
 
 	if args != nil {
 		input, err = method.Encode(args)
@@ -70,12 +71,12 @@ func GetTxInput(b *testing.B, method *abi.Method, args interface{}) []byte {
 	return input
 }
 
-// SetContractDependencyAddress calls setContract function on caller contract, to set address of the callee contract
-func SetContractDependencyAddress(b *testing.B, txRelayer txrelayer.TxRelayer, callerContractAddr ethgo.Address,
+// setContractDependencyAddress calls setContract function on caller contract, to set address of the callee contract
+func setContractDependencyAddress(b *testing.B, txRelayer txrelayer.TxRelayer, callerContractAddr ethgo.Address,
 	calleeContractAddr ethgo.Address, setContractAbiMethod *abi.Method, sender ethgo.Key) {
 	b.Helper()
 
-	input := GetTxInput(b, setContractAbiMethod, []interface{}{calleeContractAddr})
+	input := getTxInput(b, setContractAbiMethod, []interface{}{calleeContractAddr})
 	receipt, err := txRelayer.SendTransaction(
 		&ethgo.Transaction{
 			To:    &callerContractAddr,
@@ -85,8 +86,8 @@ func SetContractDependencyAddress(b *testing.B, txRelayer txrelayer.TxRelayer, c
 	require.Equal(b, uint64(types.ReceiptSuccess), receipt.Status)
 }
 
-// GetPrivateKey initializes a private key from provided raw private key
-func GetPrivateKey(b *testing.B, privateKeyRaw string) ethgo.Key {
+// getPrivateKey initializes a private key from provided raw private key
+func getPrivateKey(b *testing.B, privateKeyRaw string) ethgo.Key {
 	b.Helper()
 
 	dec, err := hex.DecodeString(privateKeyRaw)

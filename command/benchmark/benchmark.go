@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/benchmark"
-	"github.com/0xPolygon/polygon-edge/benchmark/common"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/spf13/cobra"
 )
@@ -65,7 +64,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for _, testInput := range testCases {
 		sendTxResult := testing.Benchmark(func(b *testing.B) {
 			b.Helper()
-			common.TxTestCasesExecutor(b, testInput)
+			benchmark.TxTestCasesExecutor(b, testInput)
 		})
 		benchmarkResult := &benchmarkResult{
 			name:   testInput.Name,
@@ -99,11 +98,6 @@ func setFlags(cmd *cobra.Command) {
 	_ = cmd.MarkFlagRequired(rootJSONRPCFlag)
 	_ = cmd.MarkFlagRequired(childJSONRPCFlag)
 	_ = cmd.MarkFlagRequired(privateKeyFlag)
-}
-
-func (p *benchmarkParams) validateFlags() error {
-	// add addresses and key validation
-	return nil
 }
 
 func (br *benchmarkResult) GetOutput() string {
