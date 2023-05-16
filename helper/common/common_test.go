@@ -117,7 +117,7 @@ func TestRetryForever_AlwaysReturnError_ShouldNeverEnd(t *testing.T) {
 }
 
 func TestRetryForever_ReturnNilAfterFirstRun_ShouldEnd(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	RetryForever(ctx, time.Millisecond*100, func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
