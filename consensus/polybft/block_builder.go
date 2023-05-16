@@ -109,6 +109,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 	}
 
 	_, trace, root := b.state.Commit()
+	trace.ParentStateRoot = b.params.Parent.StateRoot
 	b.header.StateRoot = root
 	b.header.GasUsed = b.state.TotalGas()
 
