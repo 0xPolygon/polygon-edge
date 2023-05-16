@@ -23,12 +23,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	// minimum number of stateSyncEvents that a commitment can have
-	// (minimum number is 2 because smart contract expects that the merkle tree has at least two leaves)
-	minCommitmentSize = 2
-)
-
 type StateSyncProof struct {
 	Proof     []types.Hash
 	StateSync *contractsapi.StateSyncedEvent
