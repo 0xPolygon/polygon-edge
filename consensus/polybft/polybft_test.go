@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -31,7 +32,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	)
 
 	updateHeaderExtra := func(header *types.Header,
-		validators *ValidatorSetDelta,
+		validators *validator.ValidatorSetDelta,
 		parentSignature *Signature,
 		checkpointData *CheckpointData,
 		committedAccounts []*wallet.Account) *Signature {
@@ -61,17 +62,17 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create all validators
-	validators := newTestValidators(t, allValidatorsSize)
+	validators := validator.NewTestValidators(t, allValidatorsSize)
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{
-		InitialValidatorSet: validators.getParamValidators(),
+		InitialValidatorSet: validators.GetParamValidators(),
 		EpochSize:           fixedEpochSize,
 		SprintSize:          5,
 	}
 
-	validatorSet := validators.getPublicIdentities()
-	accounts := validators.getPrivateIdentities()
+	validatorSet := validators.GetPublicIdentities()
+	accounts := validators.GetPrivateIdentities()
 
 	// calculate validators before and after the end of the first epoch
 	validatorSetParent, validatorSetCurrent := validatorSet[:len(validatorSet)-1], validatorSet[1:]
@@ -81,7 +82,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap := &testHeadersMap{}
 
 	// create genesis header
-	genesisDelta, err := createValidatorSetDelta(nil, validatorSetParent)
+	genesisDelta, err := validator.CreateValidatorSetDelta(nil, validatorSetParent)
 	require.NoError(t, err)
 
 	genesisHeader := &types.Header{Number: 0}
@@ -92,7 +93,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create headers from 1 to 9
 	for i := uint64(1); i < polyBftConfig.EpochSize; i++ {
-		delta, err := createValidatorSetDelta(validatorSetParent, validatorSetParent)
+		delta, err := validator.CreateValidatorSetDelta(validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
 
 		header := &types.Header{Number: i}
@@ -121,7 +122,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create parent header (block 10)
-	parentDelta, err := createValidatorSetDelta(validatorSetParent, validatorSetCurrent)
+	parentDelta, err := validator.CreateValidatorSetDelta(validatorSetParent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	parentHeader := &types.Header{
@@ -134,7 +135,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap.addHeader(parentHeader)
 
 	// create current header (block 11) with all appropriate fields required for validation
-	currentDelta, err := createValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
+	currentDelta, err := validator.CreateValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	currentHeader := &types.Header{

@@ -62,6 +62,7 @@ var (
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format " +
 		"(<name:symbol:decimals count:mintable flag>)")
 	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
+	errChainIDPolyBFT         = errors.New("chain id can not be set for polybft consensus")
 )
 
 type genesisParams struct {
@@ -149,6 +150,10 @@ func (p *genesisParams) validateFlags() error {
 
 		if err := p.validateRewardWallet(); err != nil {
 			return err
+		}
+
+		if p.chainID != command.DefaultChainID {
+			return errChainIDPolyBFT
 		}
 	}
 

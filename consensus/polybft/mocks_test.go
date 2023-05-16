@@ -1,17 +1,10 @@
 package polybft
 
 import (
-	"fmt"
-	"math/big"
-	"sort"
-	"strconv"
-	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
@@ -139,14 +132,14 @@ type polybftBackendMock struct {
 }
 
 // GetValidators retrieves validator set for the given block
-func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
+func (p *polybftBackendMock) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
 	args := p.Called(blockNumber, parents)
 	if len(args) == 1 {
-		accountSet, _ := args.Get(0).(AccountSet)
+		accountSet, _ := args.Get(0).(validator.AccountSet)
 
 		return accountSet, nil
 	} else if len(args) == 2 {
-		accountSet, _ := args.Get(0).(AccountSet)
+		accountSet, _ := args.Get(0).(validator.AccountSet)
 
 		return accountSet, args.Error(1)
 	}
@@ -210,12 +203,6 @@ type systemStateMock struct {
 	mock.Mock
 }
 
-func (m *systemStateMock) GetStakeOnValidatorSet(validatorAddr types.Address) (*big.Int, error) {
-	args := m.Called()
-
-	return args.Get(0).(*big.Int), args.Error(1) //nolint:forcetypeassert
-}
-
 func (m *systemStateMock) GetNextCommittedIndex() (uint64, error) {
 	args := m.Called()
 
@@ -273,175 +260,6 @@ type transportMock struct {
 
 func (t *transportMock) Multicast(msg interface{}) {
 	_ = t.Called(msg)
-}
-
-type testValidators struct {
-	validators map[string]*testValidator
-}
-
-func newTestValidators(t *testing.T, validatorsCount int) *testValidators {
-	t.Helper()
-
-	aliases := make([]string, validatorsCount)
-	for i := 0; i < validatorsCount; i++ {
-		aliases[i] = strconv.Itoa(i)
-	}
-
-	return newTestValidatorsWithAliases(t, aliases)
-}
-
-func newTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers ...[]uint64) *testValidators {
-	t.Helper()
-
-	validators := map[string]*testValidator{}
-
-	for i, alias := range aliases {
-		votingPower := uint64(1)
-		if len(votingPowers) == 1 {
-			votingPower = votingPowers[0][i]
-		}
-
-		validators[alias] = newTestValidator(t, alias, votingPower)
-	}
-
-	return &testValidators{validators: validators}
-}
-
-func (v *testValidators) create(t *testing.T, alias string, votingPower uint64) {
-	t.Helper()
-
-	if _, ok := v.validators[alias]; !ok {
-		v.validators[alias] = newTestValidator(t, alias, votingPower)
-	}
-}
-
-func (v *testValidators) iterAcct(aliases []string, handle func(t *testValidator)) {
-	if len(aliases) == 0 {
-		// loop over the whole set
-		for k := range v.validators {
-			aliases = append(aliases, k)
-		}
-		// sort the names since they get queried randomly
-		sort.Strings(aliases)
-	}
-
-	for _, alias := range aliases {
-		handle(v.getValidator(alias))
-	}
-}
-
-func (v *testValidators) getParamValidators(aliases ...string) (res []*Validator) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.paramsValidator())
-	})
-
-	return
-}
-
-func (v *testValidators) getValidators(aliases ...string) (res []*testValidator) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t)
-	})
-
-	return
-}
-
-func (v *testValidators) getPublicIdentities(aliases ...string) (res AccountSet) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.ValidatorMetadata())
-	})
-
-	return
-}
-
-func (v *testValidators) getPrivateIdentities(aliases ...string) (res []*wallet.Account) {
-	v.iterAcct(aliases, func(t *testValidator) {
-		res = append(res, t.account)
-	})
-
-	return
-}
-
-func (v *testValidators) getValidator(alias string) *testValidator {
-	vv, ok := v.validators[alias]
-	if !ok {
-		panic(fmt.Sprintf("Validator %s does not exist", alias)) //nolint:gocritic
-	}
-
-	return vv
-}
-
-func (v *testValidators) toValidatorSet() *validatorSet {
-	return NewValidatorSet(v.getPublicIdentities(), hclog.NewNullLogger())
-}
-
-func (v *testValidators) updateVotingPowers(votingPowersMap map[string]uint64) AccountSet {
-	if len(votingPowersMap) == 0 {
-		return AccountSet{}
-	}
-
-	aliases := []string{}
-	for alias := range votingPowersMap {
-		aliases = append(aliases, alias)
-	}
-
-	v.iterAcct(aliases, func(t *testValidator) {
-		t.votingPower = votingPowersMap[t.alias]
-	})
-
-	return v.getPublicIdentities(aliases...)
-}
-
-type testValidator struct {
-	alias       string
-	account     *wallet.Account
-	votingPower uint64
-}
-
-func newTestValidator(t *testing.T, alias string, votingPower uint64) *testValidator {
-	t.Helper()
-
-	return &testValidator{
-		alias:       alias,
-		votingPower: votingPower,
-		account:     generateTestAccount(t),
-	}
-}
-
-func (v *testValidator) Address() types.Address {
-	return types.Address(v.account.Ecdsa.Address())
-}
-
-func (v *testValidator) Key() *wallet.Key {
-	return wallet.NewKey(v.account)
-}
-
-func (v *testValidator) paramsValidator() *Validator {
-	bls := v.account.Bls.PublicKey().Marshal()
-
-	return &Validator{
-		Address: v.Address(),
-		BlsKey:  hex.EncodeToString(bls),
-		Balance: big.NewInt(1000),
-		Stake:   big.NewInt(1000),
-	}
-}
-
-func (v *testValidator) ValidatorMetadata() *ValidatorMetadata {
-	return &ValidatorMetadata{
-		Address:     types.Address(v.account.Ecdsa.Address()),
-		BlsKey:      v.account.Bls.PublicKey(),
-		VotingPower: new(big.Int).SetUint64(v.votingPower),
-	}
-}
-
-func (v *testValidator) mustSign(hash, domain []byte) *bls.Signature {
-	signature, err := v.account.Bls.Sign(hash, domain)
-	if err != nil {
-		panic(fmt.Sprintf("BUG: failed to sign: %v", err)) //nolint:gocritic
-	}
-
-	return signature
 }
 
 type testHeadersMap struct {

@@ -1,13 +1,11 @@
 package polybft
 
 import (
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -17,7 +15,7 @@ const ConsensusName = "polybft"
 // PolyBFTConfig is the configuration file for the Polybft consensus protocol.
 type PolyBFTConfig struct {
 	// InitialValidatorSet are the genesis validators
-	InitialValidatorSet []*Validator `json:"initialValidatorSet"`
+	InitialValidatorSet []*validator.GenesisValidator `json:"initialValidatorSet"`
 
 	// Bridge is the rootchain bridge configuration
 	Bridge *BridgeConfig `json:"bridge"`
@@ -39,12 +37,6 @@ type PolyBFTConfig struct {
 
 	// NativeTokenConfig defines name, symbol and decimal count of the native token
 	NativeTokenConfig *TokenConfig `json:"nativeTokenConfig"`
-
-	// BridgeAllowListAdmin indicates whether bridge allow list is active
-	BridgeAllowListAdmin types.Address `json:"bridgeAllowListAdmin"`
-
-	// BridgeBlockListAdmin indicates whether bridge block list is active
-	BridgeBlockListAdmin types.Address `json:"bridgeBlockListAdmin"`
 
 	InitialTrieRoot types.Hash `json:"initialTrieRoot"`
 
@@ -105,92 +97,6 @@ type BridgeConfig struct {
 
 func (p *PolyBFTConfig) IsBridgeEnabled() bool {
 	return p.Bridge != nil
-}
-
-// Validator represents public information about validator accounts which are the part of genesis
-type Validator struct {
-	Address       types.Address
-	BlsPrivateKey *bls.PrivateKey
-	BlsKey        string
-	Balance       *big.Int
-	Stake         *big.Int
-	MultiAddr     string
-}
-
-type validatorRaw struct {
-	Address   types.Address `json:"address"`
-	BlsKey    string        `json:"blsKey"`
-	Balance   *string       `json:"balance"`
-	Stake     *string       `json:"stake"`
-	MultiAddr string        `json:"multiAddr"`
-}
-
-func (v *Validator) MarshalJSON() ([]byte, error) {
-	raw := &validatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr}
-	raw.Balance = types.EncodeBigInt(v.Balance)
-	raw.Stake = types.EncodeBigInt(v.Stake)
-
-	return json.Marshal(raw)
-}
-
-func (v *Validator) UnmarshalJSON(data []byte) error {
-	var (
-		raw validatorRaw
-		err error
-	)
-
-	if err = json.Unmarshal(data, &raw); err != nil {
-		return err
-	}
-
-	v.Address = raw.Address
-	v.BlsKey = raw.BlsKey
-	v.MultiAddr = raw.MultiAddr
-
-	v.Balance, err = types.ParseUint256orHex(raw.Balance)
-	if err != nil {
-		return err
-	}
-
-	v.Stake, err = types.ParseUint256orHex(raw.Stake)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// UnmarshalBLSPublicKey unmarshals the hex encoded BLS public key
-func (v *Validator) UnmarshalBLSPublicKey() (*bls.PublicKey, error) {
-	decoded, err := hex.DecodeString(v.BlsKey)
-	if err != nil {
-		return nil, err
-	}
-
-	return bls.UnmarshalPublicKey(decoded)
-}
-
-// ToValidatorMetadata creates ValidatorMetadata instance
-func (v *Validator) ToValidatorMetadata() (*ValidatorMetadata, error) {
-	blsKey, err := v.UnmarshalBLSPublicKey()
-	if err != nil {
-		return nil, err
-	}
-
-	metadata := &ValidatorMetadata{
-		Address:     v.Address,
-		BlsKey:      blsKey,
-		VotingPower: new(big.Int).Set(v.Stake),
-		IsActive:    true,
-	}
-
-	return metadata, nil
-}
-
-// String implements fmt.Stringer interface
-func (v *Validator) String() string {
-	return fmt.Sprintf("Address=%s; Balance=%d; P2P Multi addr=%s; BLS Key=%s;",
-		v.Address, v.Balance, v.MultiAddr, v.BlsKey)
 }
 
 // RootchainConfig contains rootchain metadata (such as JSON RPC endpoint and contract addresses)

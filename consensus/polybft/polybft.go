@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -31,7 +32,7 @@ const (
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
 type polybftBackend interface {
 	// GetValidators retrieves validator set for the given block
-	GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error)
+	GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error)
 }
 
 // Factory is the factory function to create a discovery consensus
@@ -144,10 +145,29 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		// check if there are Bridge Allow List Admins and Bridge Block List Admins
+		// and if there are, get the first address as the Admin
+		var bridgeAllowListAdmin types.Address
+		if config.Params.BridgeAllowList != nil && len(config.Params.BridgeAllowList.AdminAddresses) > 0 {
+			bridgeAllowListAdmin = config.Params.BridgeAllowList.AdminAddresses[0]
+		}
+
+		var bridgeBlockListAdmin types.Address
+		if config.Params.BridgeBlockList != nil && len(config.Params.BridgeBlockList.AdminAddresses) > 0 {
+			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
+		}
+
 		// initialize Predicate SCs
-		if polyBFTConfig.BridgeAllowListAdmin != types.ZeroAddress ||
-			polyBFTConfig.BridgeBlockListAdmin != types.ZeroAddress {
-			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig)
+		if bridgeAllowListAdmin != types.ZeroAddress || bridgeBlockListAdmin != types.ZeroAddress {
+			// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
+			owner := contracts.SystemCaller
+			if bridgeAllowListAdmin != types.ZeroAddress {
+				owner = bridgeAllowListAdmin
+			} else if bridgeBlockListAdmin != types.ZeroAddress {
+				owner = bridgeBlockListAdmin
+			}
+
+			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig.Bridge, owner)
 			if err != nil {
 				return err
 			}
@@ -157,7 +177,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			input, err = getInitChildERC721PredicateAccessListInput(polyBFTConfig)
+			input, err = getInitChildERC721PredicateAccessListInput(polyBFTConfig.Bridge, owner)
 			if err != nil {
 				return err
 			}
@@ -167,7 +187,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			input, err = getInitChildERC1155PredicateAccessListInput(polyBFTConfig)
+			input, err = getInitChildERC1155PredicateAccessListInput(polyBFTConfig.Bridge, owner)
 			if err != nil {
 				return err
 			}
@@ -542,7 +562,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*type
 		header, parent, parents, p.blockchain.GetChainID(), p, bls.DomainCheckpointManager, p.logger)
 }
 
-func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
+func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
 	return p.validatorsCache.GetSnapshot(blockNumber, parents)
 }
 

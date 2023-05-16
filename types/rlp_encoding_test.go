@@ -9,6 +9,7 @@ import (
 	"github.com/umbracle/fastrlp"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type codec interface {
@@ -356,4 +357,36 @@ func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
 	testData = vv.MarshalTo(testData)
 
 	return testData
+}
+
+func Test_MarshalCorruptedBytesArray(t *testing.T) {
+	t.Parallel()
+
+	marshal := func(obj func(*fastrlp.Arena) *fastrlp.Value) []byte {
+		ar := fastrlp.DefaultArenaPool.Get()
+		defer fastrlp.DefaultArenaPool.Put(ar)
+
+		return obj(ar).MarshalTo(nil)
+	}
+
+	emptyArray := [8]byte{}
+	corruptedSlice := make([]byte, 32)
+	corruptedSlice[29], corruptedSlice[30], corruptedSlice[31] = 5, 126, 64
+	intOfCorruption := uint64(18_446_744_073_709_551_615) // 2^64-1
+
+	marshalOne := func(ar *fastrlp.Arena) *fastrlp.Value {
+		return ar.NewBytes(corruptedSlice)
+	}
+
+	marshalTwo := func(ar *fastrlp.Arena) *fastrlp.Value {
+		return ar.NewUint(intOfCorruption)
+	}
+
+	marshal(marshalOne)
+
+	require.Equal(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
+
+	marshal(marshalTwo) // without fixing this, marshaling will cause corruption of the corrupted slice
+
+	require.Equal(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
 }

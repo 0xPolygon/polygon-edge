@@ -18,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -122,18 +123,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	// check if there are Bridge Allow List Admins and Bridge Block List Admins
-	// and if there are, get the first address as the Admin
-	var bridgeAllowListAdmin types.Address
-	if len(p.bridgeAllowListAdmin) > 0 {
-		bridgeAllowListAdmin = types.StringToAddress(p.bridgeAllowListAdmin[0])
-	}
-
-	var bridgeBlockListAdmin types.Address
-	if len(p.bridgeBlockListAdmin) > 0 {
-		bridgeBlockListAdmin = types.StringToAddress(p.bridgeBlockListAdmin[0])
-	}
-
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -141,12 +130,10 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:           initialValidators[0].Address,
-		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
-		NativeTokenConfig:    p.nativeTokenConfig,
-		BridgeAllowListAdmin: bridgeAllowListAdmin,
-		BridgeBlockListAdmin: bridgeBlockListAdmin,
-		MaxValidatorSetSize:  p.maxNumValidators,
+		Governance:          initialValidators[0].Address,
+		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:   p.nativeTokenConfig,
+		MaxValidatorSetSize: p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
@@ -216,7 +203,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	validatorMetadata := make([]*polybft.ValidatorMetadata, len(initialValidators))
+	validatorMetadata := make([]*validator.ValidatorMetadata, len(initialValidators))
 
 	for i, validator := range initialValidators {
 		// create validator metadata instance
@@ -434,8 +421,8 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 }
 
 // generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
-func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, error) {
-	delta := &polybft.ValidatorSetDelta{
+func generateExtraDataPolyBft(validators []*validator.ValidatorMetadata) ([]byte, error) {
+	delta := &validator.ValidatorSetDelta{
 		Added:   validators,
 		Removed: bitmap.Bitmap{},
 	}
@@ -447,7 +434,7 @@ func generateExtraDataPolyBft(validators []*polybft.ValidatorMetadata) ([]byte, 
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
 func (p *genesisParams) getValidatorAccounts(
-	premineBalances map[types.Address]*premineInfo) ([]*polybft.Validator, error) {
+	premineBalances map[types.Address]*premineInfo) ([]*validator.GenesisValidator, error) {
 	// populate validators premine info
 	stakeMap := make(map[types.Address]*premineInfo, len(p.stakes))
 
@@ -461,9 +448,9 @@ func (p *genesisParams) getValidatorAccounts(
 	}
 
 	if len(p.validators) > 0 {
-		validators := make([]*polybft.Validator, len(p.validators))
-		for i, validator := range p.validators {
-			parts := strings.Split(validator, ":")
+		validators := make([]*validator.GenesisValidator, len(p.validators))
+		for i, val := range p.validators {
+			parts := strings.Split(val, ":")
 			if len(parts) != 3 {
 				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
 					"<P2P multi address:ECDSA address:public BLS key>, but got %d part(s)",
@@ -485,7 +472,7 @@ func (p *genesisParams) getValidatorAccounts(
 			}
 
 			addr := types.StringToAddress(trimmedAddress)
-			validators[i] = &polybft.Validator{
+			validators[i] = &validator.GenesisValidator{
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
