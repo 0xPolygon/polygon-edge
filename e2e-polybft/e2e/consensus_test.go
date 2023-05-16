@@ -758,6 +758,9 @@ func TestE2E_Consensus_Trace(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEqual(t, blockResponse.Miner, ethgo.ZeroAddress)
 
+		parentBlock, err := ethEndpoint.GetBlockByHash(blockResponse.ParentHash, false)
+		require.NoError(t, err)
+
 		sysClient := cluster.Servers[i].Conn()
 		traceResp, err := sysClient.GetTrace(context.Background(), &proto.GetTraceRequest{Number: receipt.BlockNumber})
 		require.NoError(t, err)
@@ -765,6 +768,7 @@ func TestE2E_Consensus_Trace(t *testing.T) {
 		var trace *types.Trace
 		err = json.Unmarshal(traceResp.Trace, &trace)
 		require.NoError(t, err)
+		require.Equal(t, parentBlock.StateRoot.Bytes(), trace.ParentStateRoot.Bytes())
 
 		containsCoinbaseAddr, containsSenderAddr, containsReceiverAddr := false, false, false
 

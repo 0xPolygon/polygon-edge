@@ -107,6 +107,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	}
 
 	_, trace, root := transition.Commit()
+	trace.ParentStateRoot = parent.StateRoot
 
 	if root != block.Header.StateRoot {
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Header.StateRoot)
