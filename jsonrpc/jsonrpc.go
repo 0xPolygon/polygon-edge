@@ -1,7 +1,6 @@
 package jsonrpc
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/versioning"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
@@ -128,13 +126,11 @@ func (j *JSONRPC) setupHTTP() error {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
+	go func() {
 		if err := srv.Serve(lis); err != nil {
 			j.logger.Error("closed http connection", "err", err)
-			return err
 		}
-		return nil
-	})
+	}()
 
 	return nil
 }
