@@ -2,9 +2,6 @@
 name: Lint
 on:  # yamllint disable-line rule:truthy
   push:
-    branches-ignore:
-      - 'develop'
-      - 'release/**'
     tags-ignore:
       - 'v*'
     paths:
@@ -26,3 +23,5 @@ jobs:
 
       - name: Lint
         uses: golangci/golangci-lint-action@v3
+        with:
+          args: --timeout 10m
