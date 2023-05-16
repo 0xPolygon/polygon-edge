@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -14,12 +15,14 @@ const (
 	rootJSONRPCFlag  = "rootJSONRPC"
 	childJSONRPCFlag = "childJSONRPC"
 	privateKeyFlag   = "privateKey"
+	startClusterFlag = "startCluster"
 )
 
 type benchmarkParams struct {
 	rootJSONRPC  string
 	childJSONRPC string
 	privateKey   string
+	startCluster bool
 }
 
 type benchmarkResult struct {
@@ -36,6 +39,7 @@ func GetCommand() *cobra.Command {
 		Use:     "benchmark-test",
 		Short:   "Run benchmark tests",
 		Example: getCmdExample(),
+		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
@@ -55,6 +59,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	benchmark.RootJSONRPC = &params.rootJSONRPC
 	benchmark.ChildJSONRPC = &params.childJSONRPC
 	benchmark.PrivateKey = &params.privateKey
+	benchmark.StartCluster = &params.startCluster
 
 	// set up environment, get test cases and clean up fn
 	testCases, cleanUpFn := benchmark.RootChildSendTxSetUp(&testing.B{})
@@ -94,10 +99,15 @@ func setFlags(cmd *cobra.Command) {
 		"",
 		"private key that will be used to send tx (it is expected that this address has enough funds)",
 	)
+	cmd.Flags().BoolVar(
+		&params.startCluster,
+		startClusterFlag,
+		false,
+		"startCluster tells if the local cluster should be started",
+	)
 
-	_ = cmd.MarkFlagRequired(rootJSONRPCFlag)
-	_ = cmd.MarkFlagRequired(childJSONRPCFlag)
-	_ = cmd.MarkFlagRequired(privateKeyFlag)
+	cmd.MarkFlagsMutuallyExclusive(startClusterFlag, rootJSONRPCFlag)
+	cmd.MarkFlagsMutuallyExclusive(startClusterFlag, childJSONRPCFlag)
 }
 
 func (br *benchmarkResult) GetOutput() string {
@@ -112,4 +122,14 @@ func getCmdExample() string {
 	return fmt.Sprintf("%s %s %s %s %s", "polygon-edge", "benchmark-test",
 		"--childJSONRPC=\"http://127.0.0.1:12001\"", "--rootJSONRPC=\"http://127.0.0.1:8545\"",
 		"--privateKey=\"aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d\"")
+}
+
+func preRunCommand(_ *cobra.Command, _ []string) error {
+	if !params.startCluster {
+		if params.rootJSONRPC == "" || params.childJSONRPC == "" || params.privateKey == "" {
+			return errors.New("if startCluster is not set then rootJSONRPC, childJSONRPC and privateKey must be set")
+		}
+	}
+
+	return nil
 }

@@ -23,6 +23,7 @@ var (
 	RootJSONRPC          = flag.String("rootJSONRPC", "", "JSONRPC address of the root node")
 	ChildJSONRPC         = flag.String("childJSONRPC", "", "JSONRPC address of the child node")
 	PrivateKey           = flag.String("privateKey", "", "private key that will be used to send tx")
+	StartCluster         = flag.Bool("startCluster", true, "starts the cluster if sets to true")
 )
 
 // The rootChildSendTx function executes test cases that measure transaction execution on both the root and child chains
@@ -30,13 +31,13 @@ var (
 // which may include starting the cluster, deploying contracts, and building the test cases.
 // After building the test cases, rootChildSendTx returns them along with a cleanup function that should be called
 // after the test cases have been executed. The test cases are executed by the TxTestCasesExecutor.
-// The rootJSONRPC, childJSONRPC, and privateKey flags are used to configure the testing environment.
-// If all of these flags are set, then the local cluster will not be started and the provided addresses
+// The rootJSONRPC, childJSONRPC, privateKey and startCluster flags are used to configure the testing environment.
+// If startCluster is false, then the local cluster will not be started and the provided addresses
 // will be used as the endpoints to the root and child chains.
-// If any of these flags is not set, the local cluster will be started automatically.
+// If startCluster is set to true, the local cluster will be started automatically.
 // If the private key is specified, it will be used as the transaction sender.
 // Otherwise, the local cluster will generate a sender key.
-// If the cluster is not run locally, then the sender must have enough funds for sending transactions.
+// If startCluster is set to false, then the sender must have enough funds for sending transactions.
 func rootChildSendTx(b *testing.B) {
 	b.Helper()
 	// set up environment, get test cases and clean up fn
@@ -58,7 +59,8 @@ func RootChildSendTxSetUp(b *testing.B) ([]TxTestCase, func()) {
 	rootNodeAddr := *RootJSONRPC
 	childNodeAddr := *ChildJSONRPC
 	privateKeyRaw := *PrivateKey
-	startCluster := rootNodeAddr == "" || childNodeAddr == "" || privateKeyRaw == ""
+	startCluster := *StartCluster
+	require.True(b, startCluster || rootNodeAddr != "" && childNodeAddr != "" && privateKeyRaw != "")
 
 	var sender ethgo.Key
 	// if the privateKey flag is set then recover the key, otherwise recover the key
