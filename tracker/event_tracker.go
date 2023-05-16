@@ -86,7 +86,6 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return nil
 	})
 
-	// Run tracker
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
 		tracker.WithBlockTracker(blockTracker),
