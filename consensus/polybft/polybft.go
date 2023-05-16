@@ -354,16 +354,19 @@ func (p *Polybft) Start() error {
 		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
-	// start syncing
+	// sync concurrently, retrying indefinitely
 	go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
 		blockHandler := func(b *types.FullBlock) bool {
 			p.runtime.OnBlockInserted(b)
+
 			return false
 		}
 		if err := p.syncer.Sync(blockHandler); err != nil {
 			p.logger.Error("blocks synchronization failed", "error", err)
+
 			return err
 		}
+
 		return nil
 	})
 

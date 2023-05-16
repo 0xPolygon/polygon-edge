@@ -38,6 +38,7 @@ func RetryForever(ctx context.Context, interval time.Duration, fn func(context.C
 		if err := fn(ctx); err != nil {
 			return retry.RetryableError(err)
 		}
+
 		return nil
 	})
 }

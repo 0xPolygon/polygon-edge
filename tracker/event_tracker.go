@@ -72,7 +72,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		store.Close()
 	}()
 
-	// Init and start block tracker concurrently, with infinite retries
+	// Init and start block tracker concurrently, retrying indefinitely
 	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := blockTracker.Init(); err != nil {
 			e.logger.Error("failed to init blocktracker", "error", err)
@@ -101,8 +101,8 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Sync concurrently, with infinite retries
-	go common.RetryForever(ctx, time.Second, func(context.Context) error { //nolint: errcheck
+	// Sync concurrently, retrying indefinitely
+	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
 			return err

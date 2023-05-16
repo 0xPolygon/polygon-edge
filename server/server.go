@@ -998,6 +998,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	}
 
 	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {

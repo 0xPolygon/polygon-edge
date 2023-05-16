@@ -104,10 +104,12 @@ func Test_Duration_Marshal_UnmarshalJSON(t *testing.T) {
 func TestRetryForever_AlwaysReturnError_ShouldNeverEnd(t *testing.T) {
 	interval := time.Millisecond * 10
 	ended := false
+
 	go func() {
 		RetryForever(context.Background(), interval, func(ctx context.Context) error {
 			return errors.New("")
 		})
+
 		ended = true
 	}()
 	time.Sleep(interval * 10)
@@ -119,9 +121,11 @@ func TestRetryForever_ReturnNilAfterFirstRun_ShouldEnd(t *testing.T) {
 	RetryForever(ctx, time.Millisecond*100, func(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
+
 			return nil
 		default:
 			cancel()
+
 			return errors.New("")
 		}
 	})
