@@ -28,8 +28,6 @@ const (
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
 )
 
-var emptyCodeHashTwo = types.BytesToHash(crypto.Keccak256(nil))
-
 // GetHashByNumber returns the hash function of a block number
 type GetHashByNumber = func(i uint64) types.Hash
 
@@ -795,21 +793,14 @@ func (t *Transition) applyCall(
 	return result
 }
 
-var emptyHash types.Hash
-
 func (t *Transition) hasCodeOrNonce(addr types.Address) bool {
-	nonce := t.state.GetNonce(addr)
-	if nonce != 0 {
+	if t.state.GetNonce(addr) != 0 {
 		return true
 	}
 
 	codeHash := t.state.GetCodeHash(addr)
 
-	if codeHash != emptyCodeHashTwo && codeHash != emptyHash {
-		return true
-	}
-
-	return false
+	return codeHash != types.EmptyCodeHash && codeHash != types.ZeroHash
 }
 
 func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
