@@ -31,12 +31,15 @@ var (
 	ChildERC20                      *artifact.Artifact
 	ChildERC20Predicate             *artifact.Artifact
 	ChildERC20PredicateAccessList   *artifact.Artifact
+	RootMintableERC20Predicate      *artifact.Artifact
 	ChildERC721                     *artifact.Artifact
 	ChildERC721Predicate            *artifact.Artifact
 	ChildERC721PredicateAccessList  *artifact.Artifact
+	RootMintableERC721Predicate     *artifact.Artifact
 	ChildERC1155                    *artifact.Artifact
 	ChildERC1155Predicate           *artifact.Artifact
 	ChildERC1155PredicateAccessList *artifact.Artifact
+	RootMintableERC1155Predicate    *artifact.Artifact
 	L2StateSender                   *artifact.Artifact
 	CustomSupernetManager           *artifact.Artifact
 	StakeManager                    *artifact.Artifact
@@ -132,6 +135,11 @@ func init() {
 		log.Fatal(err)
 	}
 
+	RootMintableERC20Predicate, err = artifact.DecodeArtifact([]byte(RootMintableERC20PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ChildERC721, err = artifact.DecodeArtifact([]byte(ChildERC721Artifact))
 	if err != nil {
 		log.Fatal(err)
@@ -147,6 +155,11 @@ func init() {
 		log.Fatal(err)
 	}
 
+	RootMintableERC721Predicate, err = artifact.DecodeArtifact([]byte(RootMintableERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ChildERC1155, err = artifact.DecodeArtifact([]byte(ChildERC1155Artifact))
 	if err != nil {
 		log.Fatal(err)
@@ -158,6 +171,11 @@ func init() {
 	}
 
 	ChildERC1155PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateAccessListArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC1155Predicate, err = artifact.DecodeArtifact([]byte(RootMintableERC1155PredicateArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

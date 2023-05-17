@@ -748,13 +748,13 @@ func initializeSupernetManager(cmdOutput command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
 	deployerKey ethgo.Key) error {
 	initFn := &contractsapi.InitializeCustomSupernetManagerFn{
-		StakeManager:      rootchainConfig.StakeManagerAddress,
-		Bls:               rootchainConfig.BLSAddress,
-		StateSender:       rootchainConfig.StateSenderAddress,
-		Matic:             rootchainConfig.RootNativeERC20Address,
-		ChildValidatorSet: contracts.ValidatorSetContract,
-		ExitHelper:        rootchainConfig.ExitHelperAddress,
-		Domain:            bls.DomainValidatorSetString,
+		NewStakeManager:      rootchainConfig.StakeManagerAddress,
+		NewBls:               rootchainConfig.BLSAddress,
+		NewStateSender:       rootchainConfig.StateSenderAddress,
+		NewMatic:             rootchainConfig.RootNativeERC20Address,
+		NewChildValidatorSet: contracts.ValidatorSetContract,
+		NewExitHelper:        rootchainConfig.ExitHelperAddress,
+		NewDomain:            bls.DomainValidatorSetString,
 	}
 
 	input, err := initFn.EncodeAbi()

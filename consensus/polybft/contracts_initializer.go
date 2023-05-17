@@ -30,11 +30,11 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	}
 
 	initFn := &contractsapi.InitializeValidatorSetFn{
-		StateSender:      contracts.L2StateSenderContract,
-		StateReceiver:    contracts.StateReceiverContract,
-		RootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
-		EpochSize_:       new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		InitalValidators: initialValidators,
+		NewStateSender:      contracts.L2StateSenderContract,
+		NewStateReceiver:    contracts.StateReceiverContract,
+		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		InitalValidators:    initialValidators,
 	}
 
 	return initFn.EncodeAbi()
@@ -43,10 +43,10 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 // getInitRewardPoolInput builds input parameters for RewardPool SC initialization
 func getInitRewardPoolInput(polybftConfig PolyBFTConfig) ([]byte, error) {
 	initFn := &contractsapi.InitializeRewardPoolFn{
-		RewardToken:  polybftConfig.RewardConfig.TokenAddress,
-		RewardWallet: polybftConfig.RewardConfig.WalletAddress,
-		ValidatorSet: contracts.ValidatorSetContract,
-		BaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+		NewRewardToken:  polybftConfig.RewardConfig.TokenAddress,
+		NewRewardWallet: polybftConfig.RewardConfig.WalletAddress,
+		NewValidatorSet: contracts.ValidatorSetContract,
+		NewBaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
 	}
 
 	return initFn.EncodeAbi()
@@ -97,8 +97,8 @@ func getInitChildERC20PredicateAccessListInput(config *BridgeConfig, owner types
 		NewRootERC20Predicate:     rootERC20PredicateAddr,
 		NewChildTokenTemplate:     contracts.ChildERC20Contract,
 		NewNativeTokenRootAddress: rootERC20Addr,
-		UseAllowList:              owner != contracts.SystemCaller,
-		UseBlockList:              owner != contracts.SystemCaller,
+		NewUseAllowList:           owner != contracts.SystemCaller,
+		NewUseBlockList:           owner != contracts.SystemCaller,
 		NewOwner:                  owner,
 	}
 
@@ -137,8 +137,8 @@ func getInitChildERC721PredicateAccessListInput(config *BridgeConfig, owner type
 		NewStateReceiver:       contracts.StateReceiverContract,
 		NewRootERC721Predicate: rootERC721PredicateAccessListAddr,
 		NewChildTokenTemplate:  contracts.ChildERC721Contract,
-		UseAllowList:           owner != contracts.SystemCaller,
-		UseBlockList:           owner != contracts.SystemCaller,
+		NewUseAllowList:        owner != contracts.SystemCaller,
+		NewUseBlockList:        owner != contracts.SystemCaller,
 		NewOwner:               owner,
 	}
 
@@ -177,8 +177,8 @@ func getInitChildERC1155PredicateAccessListInput(config *BridgeConfig, owner typ
 		NewStateReceiver:        contracts.StateReceiverContract,
 		NewRootERC1155Predicate: rootERC1155PredicateAccessListAddr,
 		NewChildTokenTemplate:   contracts.ChildERC1155Contract,
-		UseAllowList:            owner != contracts.SystemCaller,
-		UseBlockList:            owner != contracts.SystemCaller,
+		NewUseAllowList:         owner != contracts.SystemCaller,
+		NewUseBlockList:         owner != contracts.SystemCaller,
 		NewOwner:                owner,
 	}
 

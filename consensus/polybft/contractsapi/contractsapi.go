@@ -366,8 +366,8 @@ type InitializeChildERC20PredicateAccessListFn struct {
 	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
 	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
 	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
-	UseAllowList              bool          `abi:"useAllowList"`
-	UseBlockList              bool          `abi:"useBlockList"`
+	NewUseAllowList           bool          `abi:"newUseAllowList"`
+	NewUseBlockList           bool          `abi:"newUseBlockList"`
 	NewOwner                  types.Address `abi:"newOwner"`
 }
 
@@ -664,8 +664,8 @@ type InitializeChildERC1155PredicateAccessListFn struct {
 	NewStateReceiver        types.Address `abi:"newStateReceiver"`
 	NewRootERC1155Predicate types.Address `abi:"newRootERC1155Predicate"`
 	NewChildTokenTemplate   types.Address `abi:"newChildTokenTemplate"`
-	UseAllowList            bool          `abi:"useAllowList"`
-	UseBlockList            bool          `abi:"useBlockList"`
+	NewUseAllowList         bool          `abi:"newUseAllowList"`
+	NewUseBlockList         bool          `abi:"newUseBlockList"`
 	NewOwner                types.Address `abi:"newOwner"`
 }
 
@@ -846,8 +846,8 @@ type InitializeChildERC721PredicateAccessListFn struct {
 	NewStateReceiver       types.Address `abi:"newStateReceiver"`
 	NewRootERC721Predicate types.Address `abi:"newRootERC721Predicate"`
 	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
-	UseAllowList           bool          `abi:"useAllowList"`
-	UseBlockList           bool          `abi:"useBlockList"`
+	NewUseAllowList        bool          `abi:"newUseAllowList"`
+	NewUseBlockList        bool          `abi:"newUseBlockList"`
 	NewOwner               types.Address `abi:"newOwner"`
 }
 
@@ -916,13 +916,13 @@ func (o *OwnerOfChildERC721Fn) DecodeAbi(buf []byte) error {
 }
 
 type InitializeCustomSupernetManagerFn struct {
-	StakeManager      types.Address `abi:"stakeManager"`
-	Bls               types.Address `abi:"bls"`
-	StateSender       types.Address `abi:"stateSender"`
-	Matic             types.Address `abi:"matic"`
-	ChildValidatorSet types.Address `abi:"childValidatorSet"`
-	ExitHelper        types.Address `abi:"exitHelper"`
-	Domain            string        `abi:"domain"`
+	NewStakeManager      types.Address `abi:"newStakeManager"`
+	NewBls               types.Address `abi:"newBls"`
+	NewStateSender       types.Address `abi:"newStateSender"`
+	NewMatic             types.Address `abi:"newMatic"`
+	NewChildValidatorSet types.Address `abi:"newChildValidatorSet"`
+	NewExitHelper        types.Address `abi:"newExitHelper"`
+	NewDomain            string        `abi:"newDomain"`
 }
 
 func (i *InitializeCustomSupernetManagerFn) Sig() []byte {
@@ -1028,7 +1028,7 @@ func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeStakeManagerFn struct {
-	MATIC_ types.Address `abi:"MATIC_"`
+	NewMatic types.Address `abi:"newMatic"`
 }
 
 func (i *InitializeStakeManagerFn) Sig() []byte {
@@ -1257,11 +1257,11 @@ func (v *ValidatorInit) DecodeAbi(buf []byte) error {
 }
 
 type InitializeValidatorSetFn struct {
-	StateSender      types.Address    `abi:"stateSender"`
-	StateReceiver    types.Address    `abi:"stateReceiver"`
-	RootChainManager types.Address    `abi:"rootChainManager"`
-	EpochSize_       *big.Int         `abi:"epochSize_"`
-	InitalValidators []*ValidatorInit `abi:"initalValidators"`
+	NewStateSender      types.Address    `abi:"newStateSender"`
+	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
+	NewRootChainManager types.Address    `abi:"newRootChainManager"`
+	NewEpochSize        *big.Int         `abi:"newEpochSize"`
+	InitalValidators    []*ValidatorInit `abi:"initalValidators"`
 }
 
 func (i *InitializeValidatorSetFn) Sig() []byte {
@@ -1341,10 +1341,10 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeRewardPoolFn struct {
-	RewardToken  types.Address `abi:"rewardToken"`
-	RewardWallet types.Address `abi:"rewardWallet"`
-	ValidatorSet types.Address `abi:"validatorSet"`
-	BaseReward   *big.Int      `abi:"baseReward"`
+	NewRewardToken  types.Address `abi:"newRewardToken"`
+	NewRewardWallet types.Address `abi:"newRewardWallet"`
+	NewValidatorSet types.Address `abi:"newValidatorSet"`
+	NewBaseReward   *big.Int      `abi:"newBaseReward"`
 }
 
 func (i *InitializeRewardPoolFn) Sig() []byte {
