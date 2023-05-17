@@ -235,6 +235,44 @@ func setFlags(cmd *cobra.Command) {
 			defaultBlockTimeDrift,
 			"configuration for block time drift value (in seconds)",
 		)
+
+		cmd.Flags().Uint64Var(
+			&params.checkpointInterval,
+			checkpointIntervalFlag,
+			defaultCheckpointInterval,
+			"number of blocks after which a new checkpoint is submitted",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.withdrawalWaitPeriod,
+			withdrawalWaitPeriodFlag,
+			defaultWithdrawalWaitPeriod,
+			"number of epochs after which withdrawal can be done from child chain",
+		)
+	}
+
+	// Governance
+	{
+		cmd.Flags().StringVar(
+			&params.voteDelay,
+			voteDelayFlag,
+			defaultVotingDelay,
+			"number of blocks after proposal is submitted before voting starts",
+		)
+
+		cmd.Flags().StringVar(
+			&params.votingPeriod,
+			votePeriodFlag,
+			defaultVotingPeriod,
+			"number of blocks that the voting period for a proposal lasts",
+		)
+
+		cmd.Flags().StringVar(
+			&params.proposalThreshold,
+			voteProposalThresholdFlag,
+			defaultVoteProposalThreshold,
+			"number of vote tokens required in order for a voter to become a proposer",
+		)
 	}
 
 	// Access Control Lists
