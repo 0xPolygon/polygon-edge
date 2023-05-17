@@ -37,12 +37,17 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize        = uint64(10)
-	defaultSprintSize       = uint64(5)
-	defaultValidatorSetSize = 100
-	defaultBlockTime        = 2 * time.Second
-	defaultEpochReward      = 1
-	defaultBlockTimeDrift   = uint64(10)
+	defaultEpochSize             = uint64(10)
+	defaultSprintSize            = uint64(5)
+	defaultValidatorSetSize      = 100
+	defaultBlockTime             = 2 * time.Second
+	defaultEpochReward           = 1
+	defaultBlockTimeDrift        = uint64(10)
+	defaultCheckpointInterval    = uint64(900)
+	defaultWithdrawalWaitPeriod  = uint64(1)
+	defaultVotingDelay           = "10"
+	defaultVotingPeriod          = "20"
+	defaultVoteProposalThreshold = "1000"
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
@@ -131,6 +136,25 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	voteDelay, err := types.ParseUint256orHex(&p.voteDelay)
+	if err != nil {
+		return err
+	}
+
+	votingPeriod, err := types.ParseUint256orHex(&p.votingPeriod)
+	if err != nil {
+		return err
+	}
+
+	if votingPeriod.Cmp(big.NewInt(0)) == 0 {
+		return errInvalidVotingPeriod
+	}
+
+	proposalThreshold, err := types.ParseUint256orHex(&p.proposalThreshold)
+	if err != nil {
+		return err
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -138,17 +162,24 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          types.ZeroAddress,
-		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
-		NativeTokenConfig:   p.nativeTokenConfig,
-		MinValidatorSetSize: p.minNumValidators,
-		MaxValidatorSetSize: p.maxNumValidators,
+		Governance:           types.ZeroAddress,
+		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:    p.nativeTokenConfig,
+		MinValidatorSetSize:  p.minNumValidators,
+		MaxValidatorSetSize:  p.maxNumValidators,
+		CheckpointInterval:   p.checkpointInterval,
+		WithdrawalWaitPeriod: p.withdrawalWaitPeriod,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
 		BlockTimeDrift: p.blockTimeDrift,
+		GovernanceConfig: &polybft.GovernanceConfig{
+			VotingDelay:       voteDelay,
+			VotingPeriod:      votingPeriod,
+			ProposalThreshold: proposalThreshold,
+		},
 	}
 
 	// Disable london hardfork if burn contract address is not provided

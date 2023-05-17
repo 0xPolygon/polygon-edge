@@ -49,11 +49,20 @@ type PolyBFTConfig struct {
 	// MaxValidatorSetSize indicates the maximum size of validator set
 	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
 
+	// CheckpointInterval indicates the number of blocks after which a new checkpoint is submitted
+	CheckpointInterval uint64 `json:"checkpointInterval,omitempty"`
+
+	// WithdrawalWaitPeriod indicates a number of epochs after which withdrawal can be done from child chain
+	WithdrawalWaitPeriod uint64 `json:"withdrawalWaitPeriod,omitempty"`
+
 	// RewardConfig defines rewards configuration
 	RewardConfig *RewardsConfig `json:"rewardConfig"`
 
 	// BlockTimeDrift defines the time slot in which a new block can be created
 	BlockTimeDrift uint64 `json:"blockTimeDrift"`
+
+	// GovernanceConfig defines on chain governance configuration
+	GovernanceConfig *GovernanceConfig `json:"governanceConfig,omitempty"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
@@ -227,4 +236,57 @@ type BurnContractInfo struct {
 	BlockNumber        uint64
 	Address            types.Address
 	DestinationAddress types.Address
+}
+
+type GovernanceConfig struct {
+	// VotingDelay indicates number of blocks after proposal is submitted before voting starts
+	VotingDelay *big.Int
+	// VotingPeriod indicates number of blocks that the voting period for a proposal lasts
+	VotingPeriod *big.Int
+	// ProposalThreshold indicates number of vote tokens required in order for a voter to become a proposer
+	ProposalThreshold *big.Int
+}
+
+func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
+	raw := &governanceConfigRaw{
+		VotingDelay:       types.EncodeBigInt(g.VotingDelay),
+		VotingPeriod:      types.EncodeBigInt(g.VotingPeriod),
+		ProposalThreshold: types.EncodeBigInt(g.ProposalThreshold),
+	}
+
+	return json.Marshal(raw)
+}
+
+func (g *GovernanceConfig) UnmarshalJSON(data []byte) error {
+	var (
+		raw governanceConfigRaw
+		err error
+	)
+
+	if err = json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	g.VotingDelay, err = types.ParseUint256orHex(raw.VotingDelay)
+	if err != nil {
+		return err
+	}
+
+	g.VotingPeriod, err = types.ParseUint256orHex(raw.VotingPeriod)
+	if err != nil {
+		return err
+	}
+
+	g.ProposalThreshold, err = types.ParseUint256orHex(raw.ProposalThreshold)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type governanceConfigRaw struct {
+	VotingDelay       *string `json:"votingDelay"`
+	VotingPeriod      *string `json:"votingPeriod"`
+	ProposalThreshold *string `json:"proposalThreshold"`
 }
