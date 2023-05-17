@@ -1001,6 +1001,9 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 		backend:    &blockchainMock{},
 		validators: validators.ToValidatorSet(),
 		logger:     hclog.NewNullLogger(),
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
 	}
 	rlpBlock := buildBlock.Block.MarshalRLP()
 
@@ -1411,6 +1414,9 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 		polybftBackend: polybftBackendMock,
 		validators:     validatorSet,
 		logger:         hclog.NewNullLogger(),
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
 	}
 
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
