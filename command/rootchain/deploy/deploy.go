@@ -263,7 +263,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	rootchainCfg, chainID, err := deployContracts(outputter, client, consensusConfig.InitialValidatorSet, cmd.Context())
+	rootchainCfg, supernetID, err := deployContracts(outputter, client,
+		chainConfig.Params.ChainID, consensusConfig.InitialValidatorSet, cmd.Context())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
@@ -284,9 +285,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	consensusConfig.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
 		rootchainCfg.StateSenderAddress: blockNum,
 	}
+	consensusConfig.SupernetID = supernetID
 
 	// write updated chain configuration
-	chainConfig.Params.ChainID = chainID
 	chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
 
 	if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
@@ -302,7 +303,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 // deployContracts deploys and initializes rootchain smart contracts
-func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
+func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
 	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
@@ -512,7 +513,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 	}
 
 	// register supernets manager on stake manager
-	chainID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
+	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -523,7 +524,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client,
 		return nil, 0, err
 	}
 
-	return rootchainConfig, chainID, nil
+	return rootchainConfig, supernetID, nil
 }
 
 // populateExistingTokenAddr checks whether given token is deployed on the provided address.
@@ -570,7 +571,7 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 	var (
 		childChainRegisteredEvent contractsapi.ChildManagerRegisteredEvent
 		found                     bool
-		chainID                   int64
+		supernetID                int64
 	)
 
 	for _, log := range receipt.Logs {
@@ -583,7 +584,7 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 			continue
 		}
 
-		chainID = childChainRegisteredEvent.ID.Int64()
+		supernetID = childChainRegisteredEvent.ID.Int64()
 		found = true
 
 		break
@@ -593,7 +594,7 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 		return 0, errors.New("could not find a log that child chain was registered on stake manager")
 	}
 
-	return chainID, nil
+	return supernetID, nil
 }
 
 // initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
