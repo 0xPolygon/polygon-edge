@@ -55,14 +55,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	// set up the testing environment
 	testing.Init()
 
-	// set testing params
-	benchmark.RootJSONRPC = &params.rootJSONRPC
-	benchmark.ChildJSONRPC = &params.childJSONRPC
-	benchmark.PrivateKey = &params.privateKey
-	benchmark.StartCluster = &params.startCluster
-
 	// set up environment, get test cases and clean up fn
-	testCases, cleanUpFn := benchmark.RootChildSendTxSetUp(&testing.B{})
+	testCases, cleanUpFn := benchmark.RootChildSendTxSetUp(
+		&testing.B{},
+		params.rootJSONRPC,
+		params.childJSONRPC,
+		params.privateKey,
+		params.startCluster,
+	)
 	defer cleanUpFn()
 
 	// Loop over the test cases and call the benchmark test

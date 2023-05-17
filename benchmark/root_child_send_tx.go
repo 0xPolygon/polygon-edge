@@ -1,7 +1,6 @@
 package benchmark
 
 import (
-	"flag"
 	"math/big"
 	"testing"
 
@@ -21,10 +20,6 @@ var (
 	singleContSetFunc    = abi.MustNewMethod("function addValue(uint256 value) public")
 	multiContSetAddrFunc = abi.MustNewMethod("function setContractAddr(address _contract) public")
 	multiContFnA         = abi.MustNewMethod("function fnA() public returns (uint256)")
-	RootJSONRPC          = flag.String("rootJSONRPC", "", "JSONRPC address of the root node")
-	ChildJSONRPC         = flag.String("childJSONRPC", "", "JSONRPC address of the child node")
-	PrivateKey           = flag.String("privateKey", "", "private key that will be used to send tx")
-	StartCluster         = flag.Bool("startCluster", true, "starts the cluster if sets to true")
 )
 
 // The rootChildSendTx function executes test cases that measure transaction execution on both the root and child chains
@@ -32,17 +27,10 @@ var (
 // which may include starting the cluster, deploying contracts, and building the test cases.
 // After building the test cases, rootChildSendTx returns them along with a cleanup function that should be called
 // after the test cases have been executed. The test cases are executed by the TxTestCasesExecutor.
-// The rootJSONRPC, childJSONRPC, privateKey and startCluster flags are used to configure the testing environment.
-// If startCluster is false, then the local cluster will not be started and the provided addresses
-// will be used as the endpoints to the root and child chains.
-// If startCluster is set to true, the local cluster will be started automatically.
-// If the private key is specified, it will be used as the transaction sender.
-// Otherwise, the local cluster will generate a sender key.
-// If startCluster is set to false, then the sender must have enough funds for sending transactions.
 func rootChildSendTx(b *testing.B) {
 	b.Helper()
 	// set up environment, get test cases and clean up fn
-	testCases, cleanUpFn := RootChildSendTxSetUp(b)
+	testCases, cleanUpFn := RootChildSendTxSetUp(b, "", "", "", true)
 	defer cleanUpFn()
 
 	// Loop over the test cases and measure the execution time of the transactions
@@ -52,21 +40,25 @@ func rootChildSendTx(b *testing.B) {
 }
 
 // RootChildSendTxSetUp sets environment for execution of sentTx test cases on both root and child chains and
-// returns test cases and clean up fn
-func RootChildSendTxSetUp(b *testing.B) ([]TxTestCase, func()) {
+// returns test cases and clean up fn.
+// The rootJSONRPC, childJSONRPC, privateKey and startCluster params are used to configure the testing environment.
+// If startCluster is false, then the local cluster will not be started and the provided addresses
+// will be used as the endpoints to the root and child chains.
+// If startCluster is set to true, the local cluster will be started automatically.
+// If the private key is specified, it will be used as the transaction sender.
+// Otherwise, the local cluster will generate a sender key.
+// If startCluster is set to false, then the sender must have enough funds for sending transactions.
+func RootChildSendTxSetUp(b *testing.B, rootNodeAddr, childNodeAddr,
+	privateKey string, startCluster bool) ([]TxTestCase, func()) {
 	b.Helper()
 	// check if test is called with the root and child node addresses and private key set.
 	// if that is the case use that json rpc addresses, otherwise run the cluster
-	rootNodeAddr := *RootJSONRPC
-	childNodeAddr := *ChildJSONRPC
-	privateKeyRaw := *PrivateKey
-	startCluster := *StartCluster
-	require.True(b, startCluster || rootNodeAddr != "" && childNodeAddr != "" && privateKeyRaw != "")
+	require.True(b, startCluster || rootNodeAddr != "" && childNodeAddr != "" && privateKey != "")
 
 	var sender ethgo.Key
 	// if the privateKey flag is set then recover the key, otherwise recover the key
-	if privateKeyRaw != "" {
-		sender = getPrivateKey(b, privateKeyRaw)
+	if privateKey != "" {
+		sender = getPrivateKey(b, privateKey)
 	} else {
 		var err error
 		sender, err = wallet.GenerateKey()
