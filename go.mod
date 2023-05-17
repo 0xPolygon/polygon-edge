@@ -31,13 +31,13 @@ require (
 	github.com/umbracle/fastrlp v0.1.1-0.20230504065717-58a1b8a9929d
 	github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b
 	golang.org/x/crypto v0.9.0
-	google.golang.org/grpc v1.53.0-dev
+	google.golang.org/grpc v1.55.0
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
 
 require (
-	cloud.google.com/go/secretmanager v1.10.0
+	cloud.google.com/go/secretmanager v1.10.1
 	github.com/armon/go-metrics v0.4.1
 	github.com/aws/aws-sdk-go v1.44.61
 	github.com/benbjohnson/clock v1.3.0 // indirect
@@ -69,7 +69,7 @@ require (
 	github.com/quasilyte/go-ruleguard v0.3.19
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	golang.org/x/sync v0.2.0
-	google.golang.org/genproto v0.0.0-20230124163310-31e0e69b6fc2
+	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1
 	gopkg.in/DataDog/dd-trace-go.v1 v1.50.1
 	pgregory.net/rapid v0.5.7
 )
@@ -81,6 +81,7 @@ require (
 	github.com/DataDog/go-libddwaf v1.1.0 // indirect
 	github.com/DataDog/go-tuf v0.3.0--fix-localmeta-fork // indirect
 	github.com/golang/mock v1.6.0 // indirect
+	github.com/google/s2a-go v0.1.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.1 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.5.1 // indirect
@@ -101,8 +102,8 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.18.0 // indirect
-	cloud.google.com/go/iam v0.10.0 // indirect
+	cloud.google.com/go/compute v1.19.0 // indirect
+	cloud.google.com/go/iam v0.13.0 // indirect
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.43.1 // indirect
@@ -141,7 +142,7 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20221203041831-ce31453925ec // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
-	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.8.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
@@ -223,7 +224,7 @@ require (
 	golang.org/x/text v0.9.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.109.0 // indirect
+	google.golang.org/api v0.118.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gotest.tools/v3 v3.0.2 // indirect
