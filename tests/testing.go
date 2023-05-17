@@ -402,7 +402,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 // forks
 
-var Forks = map[string]*chain.Forks{
+var Forks = map[string]*chain.AvailableForks{
 	"Frontier": {},
 	"Homestead": {
 		Homestead: chain.NewFork(0),

@@ -384,7 +384,7 @@ func (p *genesisParams) initGenesisConfig() error {
 		},
 		Params: &chain.Params{
 			ChainID: int64(p.chainID),
-			Forks:   enabledForks,
+			Forks:   enabledForks.ToForks(),
 			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,

@@ -42,7 +42,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 
 	var baseFee *big.Int
 
-	if config.IsLondon(0) {
+	if config.ToForks().IsLondon(0) {
 		if c.Env.BaseFee != "" {
 			baseFee = stringToBigIntT(t, c.Env.BaseFee)
 		} else {
@@ -61,7 +61,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 	forks := config.At(uint64(env.Number))
 
 	xxx := state.NewExecutor(&chain.Params{
-		Forks:   config,
+		Forks:   config.ToForks(),
 		ChainID: 1,
 		BurnContract: map[uint64]string{
 			0: types.ZeroAddress.String(),

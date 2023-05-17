@@ -97,13 +97,14 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		Number:   0,
 		GasLimit: 0,
 	}
+	forksAvail := &chain.AvailableForks{
+		EIP155:    chain.NewFork(0),
+		Homestead: chain.NewFork(0),
+	}
 	config := &chain.Chain{
 		Genesis: genesis,
 		Params: &chain.Params{
-			Forks: &chain.Forks{
-				EIP155:    chain.NewFork(0),
-				Homestead: chain.NewFork(0),
-			},
+			Forks:          forksAvail.ToForks(),
 			BlockGasTarget: defaultBlockGasTarget,
 		},
 	}
@@ -150,7 +151,7 @@ func NewMockBlockchain(
 				GasLimit: 0,
 			},
 			Params: &chain.Params{
-				Forks: chain.AllForksEnabled,
+				Forks: chain.AllForksEnabled.ToForks(),
 			},
 		}
 		mockStorage = storage.NewMockStorage()

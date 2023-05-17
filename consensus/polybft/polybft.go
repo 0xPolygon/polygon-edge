@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -357,7 +358,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		}
 
-		return nil
+		return registerForksAndHandlers(config.Params.Forks)
 	}
 }
 
@@ -677,4 +678,39 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 // Filters extra data to not contain Committed field
 func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
+}
+
+func registerForksAndHandlers(forks *chain.Forks) error {
+	//nolint:godox
+	// TODO: update to real values and read from smart contract
+	availableForks := []forkmanager.ForkName{}
+	activeForks := []*forkmanager.ForkInfo{}
+	handlers := []forkmanager.ForkHandler{}
+
+	for name, block := range *forks {
+		if !chain.IsForkAvailable(name) {
+			panic(fmt.Errorf("fork is not available: %s", name)) //nolint:gocritic
+		}
+
+		availableForks = append(availableForks, forkmanager.ForkName(name))
+
+		if block != nil {
+			info := forkmanager.NewForkInfo(forkmanager.ForkName(name), (uint64)(*block))
+			activeForks = append(activeForks, info)
+		}
+	}
+
+	return forkmanager.GetInstance().RegisterAll(availableForks, handlers, activeForks)
+}
+
+func init() {
+	// init default fork
+	availableForks := []forkmanager.ForkName{""}
+	activeForks := []*forkmanager.ForkInfo{
+		forkmanager.NewForkInfo("", 0),
+	}
+
+	if err := forkmanager.GetInstance().RegisterAll(availableForks, nil, activeForks); err != nil {
+		panic(err) //nolint:gocritic
+	}
 }
