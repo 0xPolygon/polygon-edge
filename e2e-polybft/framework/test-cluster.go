@@ -70,7 +70,7 @@ func resolveBinary() string {
 }
 
 type TestClusterConfig struct {
-	t *testing.T
+	t testing.TB
 
 	Name                 string
 	Premine              []string // address[:amount]
@@ -372,13 +372,13 @@ func NewPropertyTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOp
 	return NewTestCluster(t, validatorsCount, opts...)
 }
 
-func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *TestCluster {
-	t.Helper()
+func NewTestCluster(tb testing.TB, validatorsCount int, opts ...ClusterOption) *TestCluster {
+	tb.Helper()
 
 	var err error
 
 	config := &TestClusterConfig{
-		t:             t,
+		t:             tb,
 		WithLogs:      isTrueEnv(envLogsEnabled),
 		WithStdout:    isTrueEnv(envStdoutEnabled),
 		Binary:        resolveBinary(),
@@ -404,11 +404,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			testType = "integration"
 		}
 
-		t.Skip(fmt.Sprintf("%s tests are disabled.", testType))
+		tb.Skip(fmt.Sprintf("%s tests are disabled.", testType))
 	}
 
 	config.TmpDir, err = os.MkdirTemp("/tmp", "e2e-polybft-")
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	cluster := &TestCluster{
 		Servers:     []*TestServer{},
@@ -425,7 +425,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 	// run init accounts for validators
 	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	if cluster.Config.SecretsCallback != nil {
 		cluster.Config.SecretsCallback(addresses, cluster.Config)
@@ -436,7 +436,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// we don't call secrets callback on non-validators,
 		// since we have nothing to premine nor stake for non validators
 		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	}
 
 	genesisPath := path.Join(config.TmpDir, "genesis.json")
@@ -482,7 +482,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		validators, err := genesis.ReadValidatorsByPrefix(
 			cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		if cluster.Config.BootnodeCount > 0 {
 			bootNodesCnt := cluster.Config.BootnodeCount
@@ -562,60 +562,60 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		// run genesis command with all the arguments
 		err = cluster.cmdRun(args...)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	}
 
 	if !cluster.Config.WithoutBridge {
 		// start bridge
-		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
-		require.NoError(t, err)
+		cluster.Bridge, err = NewTestBridge(tb, cluster.Config)
+		require.NoError(tb, err)
 
 		// deploy rootchain contracts
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(genesisPath)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		// fund validators on the rootchain
 		err = cluster.Bridge.fundRootchainValidators(polybftConfig)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		// whitelist genesis validators on the rootchain
 		err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		// register genesis validators on the rootchain
 		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		// do initial staking for genesis validators on the rootchain
 		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig, chainID)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		// finalize genesis validators on the rootchain
 		err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	}
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
+		cluster.InitTestServer(tb, dir, cluster.Bridge.JSONRPCAddr(),
 			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
+		cluster.InitTestServer(tb, dir, cluster.Bridge.JSONRPCAddr(),
 			false, false /* relayer */)
 	}
 
 	return cluster
 }
 
-func (c *TestCluster) InitTestServer(t *testing.T,
+func (c *TestCluster) InitTestServer(tb testing.TB,
 	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool) {
-	t.Helper()
+	tb.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
 
@@ -623,11 +623,11 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 	if c.Config.InitialTrieDB != "" {
 		err := CopyDir(c.Config.InitialTrieDB, filepath.Join(dataDir, "trie"))
 		if err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	}
 
-	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
+	srv := NewTestServer(tb, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
 		config.DataDir = dataDir
 		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
@@ -706,10 +706,10 @@ func (c *TestCluster) WaitUntil(timeout, pollFrequency time.Duration, handler fu
 	}
 }
 
-func (c *TestCluster) WaitForReady(t *testing.T) {
-	t.Helper()
+func (c *TestCluster) WaitForReady(tb testing.TB) {
+	tb.Helper()
 
-	require.NoError(t, c.WaitForBlock(1, time.Minute))
+	require.NoError(tb, c.WaitForBlock(1, time.Minute))
 }
 
 func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
@@ -819,11 +819,11 @@ func (c *TestCluster) InitSecrets(prefix string, count int) ([]types.Address, er
 	return result, nil
 }
 
-func (c *TestCluster) ExistsCode(t *testing.T, addr ethgo.Address) bool {
-	t.Helper()
+func (c *TestCluster) ExistsCode(tb testing.TB, addr ethgo.Address) bool {
+	tb.Helper()
 
 	client, err := jsonrpc.NewClient(c.Servers[0].JSONRPCAddr())
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	code, err := client.Eth().GetCode(addr, ethgo.Latest)
 	if err != nil {
@@ -861,10 +861,10 @@ func (c *TestCluster) Call(t *testing.T, to types.Address, method *abi.Method,
 	return output
 }
 
-func (c *TestCluster) Deploy(t *testing.T, sender ethgo.Key, bytecode []byte) *TestTxn {
-	t.Helper()
+func (c *TestCluster) Deploy(tb testing.TB, sender ethgo.Key, bytecode []byte) *TestTxn {
+	tb.Helper()
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{Input: bytecode})
+	return c.SendTxn(tb, sender, &ethgo.Transaction{Input: bytecode})
 }
 
 func (c *TestCluster) Transfer(t *testing.T, sender ethgo.Key, target types.Address, value *big.Int) *TestTxn {
@@ -884,8 +884,8 @@ func (c *TestCluster) MethodTxn(t *testing.T, sender ethgo.Key, target types.Add
 }
 
 // SendTxn sends a transaction
-func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transaction) *TestTxn {
-	t.Helper()
+func (c *TestCluster) SendTxn(tb testing.TB, sender ethgo.Key, txn *ethgo.Transaction) *TestTxn {
+	tb.Helper()
 
 	// since we might use get nonce to query the latest nonce and that value is only
 	// updated if the transaction is on the pool, it is recommended to lock the whole
@@ -895,12 +895,12 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	defer c.sendTxnLock.Unlock()
 
 	client, err := jsonrpc.NewClient(c.Servers[0].JSONRPCAddr())
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	// initialize transaction values if not set
 	if txn.Nonce == 0 {
 		nonce, err := client.Eth().GetNonce(sender.Address(), ethgo.Latest)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		txn.Nonce = nonce
 	}
@@ -914,17 +914,17 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	}
 
 	chainID, err := client.Eth().ChainID()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
 	signedTxn, err := signer.SignTx(txn, sender)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	txnRaw, err := signedTxn.MarshalRLPTo(nil)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	hash, err := client.Eth().SendRawTransaction(txnRaw)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	tTxn := &TestTxn{
 		client: client.Eth(),

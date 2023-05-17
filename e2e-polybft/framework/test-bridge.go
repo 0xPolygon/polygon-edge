@@ -23,16 +23,16 @@ import (
 )
 
 type TestBridge struct {
-	t             *testing.T
+	t             testing.TB
 	clusterConfig *TestClusterConfig
 	node          *node
 }
 
-func NewTestBridge(t *testing.T, clusterConfig *TestClusterConfig) (*TestBridge, error) {
-	t.Helper()
+func NewTestBridge(tb testing.TB, clusterConfig *TestClusterConfig) (*TestBridge, error) {
+	tb.Helper()
 
 	bridge := &TestBridge{
-		t:             t,
+		t:             tb,
 		clusterConfig: clusterConfig,
 	}
 

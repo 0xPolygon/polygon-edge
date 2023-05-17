@@ -508,6 +508,16 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
+// SumbitTransaction signs given transaction by provided key and sends it to the blockchain without waiting for the receipt
+func (d *dummyTxRelayer) SumbitTransaction(txn *ethgo.Transaction, key ethgo.Key) (ethgo.Hash, error) {
+	return ethgo.ZeroHash, errors.New("SumbitTransaction is not implemented")
+}
+
+// WaitForReceipt waits for tx receipt (this is only for testing purposes)
+func (d *dummyTxRelayer) WaitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {
+	return nil, errors.New("WaitForReceipt is not implemented")
+}
+
 func (d *dummyTxRelayer) Client() *jsonrpc.Client {
 	return nil
 }
