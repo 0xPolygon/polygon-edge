@@ -790,6 +790,7 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 		distributeRewardsInput: distributeRewards,
 		polybftBackend:         polybftBackendMock,
 		newValidatorsDelta:     newValidatorDelta,
+		config:                 &PolyBFTConfig{BlockTimeDrift: 1},
 	}
 
 	err = fsm.Validate(proposal)
@@ -863,9 +864,7 @@ func TestFSM_Validate_EpochEndingBlock_UpdatingValidatorSetInNonEpochEndingBlock
 		validators:     validators.ToValidatorSet(),
 		logger:         hclog.NewNullLogger(),
 		polybftBackend: polybftBackendMock,
-		config: &PolyBFTConfig{
-			BlockTimeDrift: 1,
-		},
+		config:         &PolyBFTConfig{BlockTimeDrift: 1},
 	}
 
 	err = fsm.Validate(proposal)
@@ -933,8 +932,14 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 	for _, blockNum := range []uint64{parentBlockNumber - 1, parentBlockNumber, parentBlockNumber + 2} {
 		stateBlock := createDummyStateBlock(blockNum, parent.Hash, parent.ExtraData)
 		mBlockBuilder := newBlockBuilderMock(stateBlock)
-		fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, backend: &blockchainMock{},
-			validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger()}
+		fsm := &fsm{
+			parent:       parent,
+			blockBuilder: mBlockBuilder,
+			backend:      &blockchainMock{},
+			validators:   validators.ToValidatorSet(),
+			logger:       hclog.NewNullLogger(),
+			config:       &PolyBFTConfig{BlockTimeDrift: 1},
+		}
 
 		proposalHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 		require.NoError(t, err)
