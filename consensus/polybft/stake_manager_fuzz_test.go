@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -17,7 +18,7 @@ import (
 
 type epochIDValidatorsF struct {
 	EpochID    uint64
-	Validators []*ValidatorMetadata
+	Validators []*validator.ValidatorMetadata
 }
 
 type postBlockStructF struct {
@@ -39,15 +40,15 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 	seeds := []epochIDValidatorsF{
 		{
 			EpochID:    0,
-			Validators: newTestValidators(f, 6).getPublicIdentities(),
+			Validators: validator.NewTestValidators(f, 6).GetPublicIdentities(),
 		},
 		{
 			EpochID:    1,
-			Validators: newTestValidators(f, 42).getPublicIdentities(),
+			Validators: validator.NewTestValidators(f, 42).GetPublicIdentities(),
 		},
 		{
 			EpochID:    42,
-			Validators: newTestValidators(f, 6).getPublicIdentities(),
+			Validators: validator.NewTestValidators(f, 6).GetPublicIdentities(),
 		},
 	}
 
@@ -84,7 +85,7 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 
 		err := stakeManager.PostEpoch(&PostEpochRequest{
 			NewEpochID: data.EpochID,
-			ValidatorSet: NewValidatorSet(
+			ValidatorSet: validator.NewValidatorSet(
 				data.Validators,
 				stakeManager.logger,
 			),
@@ -97,7 +98,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 	var (
 		allAliases        = []string{"A", "B", "C", "D", "E", "F"}
 		initialSetAliases = []string{"A", "B", "C", "D", "E"}
-		validators        = newTestValidatorsWithAliases(f, allAliases)
+		validators        = validator.NewTestValidatorsWithAliases(f, allAliases)
 		state             = newTestState(f)
 	)
 
@@ -150,16 +151,11 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		systemStateMock := new(systemStateMock)
 		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(data.StakeValue)), nil).Once()
 
-		blockchainMock := new(blockchainMock)
-		blockchainMock.On("GetStateProviderForBlock", mock.Anything).Return(new(stateProviderMock)).Once()
-		blockchainMock.On("GetSystemState", mock.Anything, mock.Anything).Return(systemStateMock)
-
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
-			blockchainMock,
 			nil,
-			wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
+			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"),
 			types.StringToAddress("0x0002"),
 			5,
@@ -167,7 +163,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.getPublicIdentities(initialSetAliases...)),
+			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
 		}))
 
 		receipt := &types.Receipt{
@@ -175,7 +171,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 				createTestLogForTransferEvent(
 					t,
 					stakeManager.validatorSetContract,
-					validators.getValidator(initialSetAliases[data.ValidatorID]).Address(),
+					validators.GetValidator(initialSetAliases[data.ValidatorID]).Address(),
 					types.ZeroAddress,
 					data.StakeValue,
 				),
@@ -199,15 +195,14 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		stakes  = []uint64{10, 10, 10, 10, 10}
 	)
 
-	validators := newTestValidatorsWithAliases(f, aliases, stakes)
+	validators := validator.NewTestValidatorsWithAliases(f, aliases, stakes)
 	state := newTestState(f)
 
 	stakeManager := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
 		nil,
-		nil,
-		wallet.NewEcdsaSigner(validators.getValidator("A").Key()),
+		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		10,
 	)
@@ -254,17 +249,17 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		}
 
 		err := state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.getPublicIdentities())})
+			Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
 		require.NoError(t, err)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.getPublicIdentities(aliases[data.X:]...))
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities(aliases[data.X:]...))
 		require.NoError(t, err)
 
-		fullValidatorSet := validators.getPublicIdentities().Copy()
+		fullValidatorSet := validators.GetPublicIdentities().Copy()
 		validatorToUpdate := fullValidatorSet[data.X]
 		validatorToUpdate.VotingPower = big.NewInt(data.VotingPower)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.getPublicIdentities())
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities())
 		require.NoError(t, err)
 	})
 }

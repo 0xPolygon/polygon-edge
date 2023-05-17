@@ -3,6 +3,7 @@ package polybft
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +18,7 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 	})
 
 	t.Run("Insert validator set", func(t *testing.T) {
-		validators := newTestValidators(t, 5).getPublicIdentities()
+		validators := validator.NewTestValidators(t, 5).GetPublicIdentities()
 
 		assert.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
 			BlockNumber: 100,
@@ -33,7 +34,7 @@ func TestState_Insert_And_Get_FullValidatorSet(t *testing.T) {
 	})
 
 	t.Run("Update validator set", func(t *testing.T) {
-		validators := newTestValidators(t, 10).getPublicIdentities()
+		validators := validator.NewTestValidators(t, 10).GetPublicIdentities()
 
 		assert.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
 			BlockNumber: 40,

@@ -11,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -54,7 +55,7 @@ type epochMetadata struct {
 	FirstBlockInEpoch uint64
 
 	// Validators is the set of validators for the epoch
-	Validators AccountSet
+	Validators validator.AccountSet
 }
 
 type guardedDataDTO struct {
@@ -229,7 +230,6 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 	c.stakeManager = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
-		c.config.blockchain,
 		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.ValidatorSetContract,
@@ -360,7 +360,7 @@ func (c *consensusRuntime) FSM() error {
 	isEndOfSprint := slash || c.isFixedSizeOfSprintMet(pendingBlockNumber, epoch)
 	isEndOfEpoch := slash || c.isFixedSizeOfEpochMet(pendingBlockNumber, epoch)
 
-	valSet := NewValidatorSet(epoch.Validators, c.logger)
+	valSet := validator.NewValidatorSet(epoch.Validators, c.logger)
 
 	exitRootHash, err := c.checkpointManager.BuildEventRoot(epoch.Number)
 	if err != nil {
@@ -475,7 +475,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		SystemState:       systemState,
 		NewEpochID:        epochNumber,
 		FirstBlockOfEpoch: firstBlockInEpoch,
-		ValidatorSet:      NewValidatorSet(validatorSet, c.logger),
+		ValidatorSet:      validator.NewValidatorSet(validatorSet, c.logger),
 	}
 
 	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
@@ -505,7 +505,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 	epochID := epoch.Number
 	totalBlocks := int64(0)
 
-	getSealersForBlock := func(blockExtra *Extra, validators AccountSet) error {
+	getSealersForBlock := func(blockExtra *Extra, validators validator.AccountSet) error {
 		signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
 		if err != nil {
 			return err
@@ -1003,7 +1003,7 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 
 // getSealersForBlock checks who sealed a given block and updates the counter
 func getSealersForBlock(sealersCounter map[types.Address]uint64,
-	blockExtra *Extra, validators AccountSet) error {
+	blockExtra *Extra, validators validator.AccountSet) error {
 	signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
 	if err != nil {
 		return err

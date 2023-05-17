@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -83,7 +84,7 @@ type stateSyncManager struct {
 	// per epoch fields
 	lock               sync.RWMutex
 	pendingCommitments []*PendingCommitment
-	validatorSet       ValidatorSet
+	validatorSet       validator.ValidatorSet
 	epoch              uint64
 	nextCommittedIndex uint64
 }
@@ -205,7 +206,7 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 }
 
 // Verifies signature of the message against the public key of the signer and checks if the signer is a validator
-func (s *stateSyncManager) verifyVoteSignature(valSet ValidatorSet, signer types.Address, signature []byte,
+func (s *stateSyncManager) verifyVoteSignature(valSet validator.ValidatorSet, signer types.Address, signature []byte,
 	hash []byte) error {
 	validator := valSet.Accounts().GetValidatorMetadata(signer)
 	if validator == nil {

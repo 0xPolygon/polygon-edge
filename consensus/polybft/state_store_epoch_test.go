@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,10 +25,10 @@ func TestState_insertAndGetValidatorSnapshot(t *testing.T) {
 
 	require.NoError(t, err)
 
-	snapshot := AccountSet{
-		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
+	snapshot := validator.AccountSet{
+		&validator.ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
+		&validator.ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
+		&validator.ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
 	assert.NoError(t, state.EpochStore.insertValidatorSnapshot(&validatorSnapshot{epoch, epochEndingBlock, snapshot}))
@@ -53,10 +54,10 @@ func TestState_cleanValidatorSnapshotsFromDb(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
-	snapshot := AccountSet{
-		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
-		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
-		&ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
+	snapshot := validator.AccountSet{
+		&validator.ValidatorMetadata{Address: types.BytesToAddress([]byte{0x18}), BlsKey: keys[0].PublicKey()},
+		&validator.ValidatorMetadata{Address: types.BytesToAddress([]byte{0x23}), BlsKey: keys[1].PublicKey()},
+		&validator.ValidatorMetadata{Address: types.BytesToAddress([]byte{0x37}), BlsKey: keys[2].PublicKey()},
 	}
 
 	var epoch uint64
@@ -198,9 +199,9 @@ func TestState_getLastSnapshot(t *testing.T) {
 
 		require.NoError(t, err)
 
-		var snapshot AccountSet
+		var snapshot validator.AccountSet
 		for j := 0; j < numberOfValidators; j++ {
-			snapshot = append(snapshot, &ValidatorMetadata{Address: types.BytesToAddress(generateRandomBytes(t)), BlsKey: keys[j].PublicKey()})
+			snapshot = append(snapshot, &validator.ValidatorMetadata{Address: types.BytesToAddress(generateRandomBytes(t)), BlsKey: keys[j].PublicKey()})
 		}
 
 		require.NoError(t, state.EpochStore.insertValidatorSnapshot(&validatorSnapshot{i, i * fixedEpochSize, snapshot}))
