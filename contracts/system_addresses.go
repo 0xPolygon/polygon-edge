@@ -32,6 +32,12 @@ var (
 	ChildERC1155Contract = types.StringToAddress("0x1007")
 	// ChildERC1155PredicateContract is an address of child ERC1155 predicate contract on the child chain
 	ChildERC1155PredicateContract = types.StringToAddress("0x1008")
+	// RootMintableERC20PredicateContract is an address of mintable ERC20 predicate on the child chain
+	RootMintableERC20PredicateContract = types.StringToAddress("0x1009")
+	// RootMintableERC721PredicateContract is an address of mintable ERC721 predicate on the child chain
+	RootMintableERC721PredicateContract = types.StringToAddress("0x100a")
+	// RootMintableERC1155PredicateContract is an address of mintable ERC1155 predicate on the child chain
+	RootMintableERC1155PredicateContract = types.StringToAddress("0x100b")
 
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")

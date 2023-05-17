@@ -480,6 +480,43 @@ func (d *DepositToRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
 }
 
+type InitializeChildMintableERC20PredicateFn struct {
+	NewStateSender        types.Address `abi:"newStateSender"`
+	NewExitHelper         types.Address `abi:"newExitHelper"`
+	NewRootERC20Predicate types.Address `abi:"newRootERC20Predicate"`
+	NewChildTokenTemplate types.Address `abi:"newChildTokenTemplate"`
+}
+
+func (i *InitializeChildMintableERC20PredicateFn) Sig() []byte {
+	return ChildMintableERC20Predicate.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildMintableERC20PredicateFn) EncodeAbi() ([]byte, error) {
+	return ChildMintableERC20Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildMintableERC20PredicateFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildMintableERC20Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawToChildMintableERC20PredicateFn struct {
+	ChildToken types.Address `abi:"childToken"`
+	Receiver   types.Address `abi:"receiver"`
+	Amount     *big.Int      `abi:"amount"`
+}
+
+func (w *WithdrawToChildMintableERC20PredicateFn) Sig() []byte {
+	return ChildMintableERC20Predicate.Abi.Methods["withdrawTo"].ID()
+}
+
+func (w *WithdrawToChildMintableERC20PredicateFn) EncodeAbi() ([]byte, error) {
+	return ChildMintableERC20Predicate.Abi.Methods["withdrawTo"].Encode(w)
+}
+
+func (w *WithdrawToChildMintableERC20PredicateFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildMintableERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
+}
+
 type BalanceOfRootERC20Fn struct {
 	Account types.Address `abi:"account"`
 }
@@ -566,6 +603,44 @@ func (d *DepositBatchRootERC1155PredicateFn) EncodeAbi() ([]byte, error) {
 
 func (d *DepositBatchRootERC1155PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC1155Predicate.Abi.Methods["depositBatch"], buf, d)
+}
+
+type InitializeChildMintableERC1155PredicateFn struct {
+	NewStateSender          types.Address `abi:"newStateSender"`
+	NewExitHelper           types.Address `abi:"newExitHelper"`
+	NewRootERC1155Predicate types.Address `abi:"newRootERC1155Predicate"`
+	NewChildTokenTemplate   types.Address `abi:"newChildTokenTemplate"`
+}
+
+func (i *InitializeChildMintableERC1155PredicateFn) Sig() []byte {
+	return ChildMintableERC1155Predicate.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildMintableERC1155PredicateFn) EncodeAbi() ([]byte, error) {
+	return ChildMintableERC1155Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildMintableERC1155PredicateFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildMintableERC1155Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawBatchChildMintableERC1155PredicateFn struct {
+	ChildToken types.Address   `abi:"childToken"`
+	Receivers  []ethgo.Address `abi:"receivers"`
+	TokenIDs   []*big.Int      `abi:"tokenIds"`
+	Amounts    []*big.Int      `abi:"amounts"`
+}
+
+func (w *WithdrawBatchChildMintableERC1155PredicateFn) Sig() []byte {
+	return ChildMintableERC1155Predicate.Abi.Methods["withdrawBatch"].ID()
+}
+
+func (w *WithdrawBatchChildMintableERC1155PredicateFn) EncodeAbi() ([]byte, error) {
+	return ChildMintableERC1155Predicate.Abi.Methods["withdrawBatch"].Encode(w)
+}
+
+func (w *WithdrawBatchChildMintableERC1155PredicateFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildMintableERC1155Predicate.Abi.Methods["withdrawBatch"], buf, w)
 }
 
 type SetApprovalForAllRootERC1155Fn struct {
@@ -769,6 +844,43 @@ func (d *DepositBatchRootERC721PredicateFn) EncodeAbi() ([]byte, error) {
 
 func (d *DepositBatchRootERC721PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC721Predicate.Abi.Methods["depositBatch"], buf, d)
+}
+
+type InitializeChildMintableERC721PredicateFn struct {
+	NewStateSender         types.Address `abi:"newStateSender"`
+	NewExitHelper          types.Address `abi:"newExitHelper"`
+	NewRootERC721Predicate types.Address `abi:"newRootERC721Predicate"`
+	NewChildTokenTemplate  types.Address `abi:"newChildTokenTemplate"`
+}
+
+func (i *InitializeChildMintableERC721PredicateFn) Sig() []byte {
+	return ChildMintableERC721Predicate.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildMintableERC721PredicateFn) EncodeAbi() ([]byte, error) {
+	return ChildMintableERC721Predicate.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildMintableERC721PredicateFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildMintableERC721Predicate.Abi.Methods["initialize"], buf, i)
+}
+
+type WithdrawBatchChildMintableERC721PredicateFn struct {
+	ChildToken types.Address   `abi:"childToken"`
+	Receivers  []ethgo.Address `abi:"receivers"`
+	TokenIDs   []*big.Int      `abi:"tokenIds"`
+}
+
+func (w *WithdrawBatchChildMintableERC721PredicateFn) Sig() []byte {
+	return ChildMintableERC721Predicate.Abi.Methods["withdrawBatch"].ID()
+}
+
+func (w *WithdrawBatchChildMintableERC721PredicateFn) EncodeAbi() ([]byte, error) {
+	return ChildMintableERC721Predicate.Abi.Methods["withdrawBatch"].Encode(w)
+}
+
+func (w *WithdrawBatchChildMintableERC721PredicateFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildMintableERC721Predicate.Abi.Methods["withdrawBatch"], buf, w)
 }
 
 type SetApprovalForAllRootERC721Fn struct {

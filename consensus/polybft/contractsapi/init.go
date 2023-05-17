@@ -20,6 +20,9 @@ var (
 	RootERC20Predicate              *artifact.Artifact
 	RootERC721Predicate             *artifact.Artifact
 	RootERC1155Predicate            *artifact.Artifact
+	ChildMintableERC20Predicate     *artifact.Artifact
+	ChildMintableERC721Predicate    *artifact.Artifact
+	ChildMintableERC1155Predicate   *artifact.Artifact
 	BLS                             *artifact.Artifact
 	BLS256                          *artifact.Artifact
 	System                          *artifact.Artifact
@@ -106,6 +109,21 @@ func init() {
 	}
 
 	RootERC1155Predicate, err = artifact.DecodeArtifact([]byte(RootERC1155PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildMintableERC20Predicate, err = artifact.DecodeArtifact([]byte(ChildMintableERC20PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildMintableERC721Predicate, err = artifact.DecodeArtifact([]byte(ChildMintableERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildMintableERC1155Predicate, err = artifact.DecodeArtifact([]byte(ChildMintableERC1155PredicateArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
