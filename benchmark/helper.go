@@ -18,12 +18,8 @@ func deployContractOnRootAndChild(
 	childTxRelayer txrelayer.TxRelayer,
 	rootTxRelayer txrelayer.TxRelayer,
 	sender ethgo.Key,
-	byteCodeString string) (ethgo.Address, ethgo.Address) {
+	byteCode []byte) (ethgo.Address, ethgo.Address) {
 	b.Helper()
-
-	// bytecode from string
-	byteCode, err := hex.DecodeString(byteCodeString)
-	require.NoError(b, err)
 
 	// deploy contract on the child chain
 	contractChildAddr := deployContract(b, childTxRelayer, sender, byteCode)

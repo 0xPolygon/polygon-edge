@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -107,13 +108,13 @@ func RootChildSendTxSetUp(b *testing.B) ([]TxTestCase, func()) {
 
 	// deploy contracts
 	singleContChildAddr, singleContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, singleContByteCode)
+		sender, contractsapi.TestBenchmarkSingle.Bytecode)
 	multiAContChildAddr, multiAContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, multiContAByteCode)
+		sender, contractsapi.TestBenchmarkA.Bytecode)
 	multiBContChildAddr, multiBContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, multiContBByteCode)
+		sender, contractsapi.TestBenchmarkB.Bytecode)
 	multiCContChildAddr, multiCContRootAddr := deployContractOnRootAndChild(b, childTxRelayer, rootTxRelayer,
-		sender, multiContCByteCode)
+		sender, contractsapi.TestBenchmarkC.Bytecode)
 
 	// set callee contract addresses for multi call contracts (A->B->C)
 	// set B contract address in A contract

@@ -52,6 +52,10 @@ var (
 	RootERC20              *artifact.Artifact
 	TestSimple             *artifact.Artifact
 	TestRewardToken        *artifact.Artifact
+	TestBenchmarkA         *artifact.Artifact
+	TestBenchmarkB         *artifact.Artifact
+	TestBenchmarkC         *artifact.Artifact
+	TestBenchmarkSingle    *artifact.Artifact
 )
 
 func init() {
@@ -198,6 +202,26 @@ func init() {
 	}
 
 	TestRewardToken, err = artifact.DecodeArtifact(readTestContractContent("TestRewardToken.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestBenchmarkA, err = artifact.DecodeArtifact(readTestContractContent("TestBenchmarkA.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestBenchmarkB, err = artifact.DecodeArtifact(readTestContractContent("TestBenchmarkB.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestBenchmarkC, err = artifact.DecodeArtifact(readTestContractContent("TestBenchmarkC.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestBenchmarkSingle, err = artifact.DecodeArtifact(readTestContractContent("TestBenchmarkSingle.json"))
 	if err != nil {
 		log.Fatal(err)
 	}
