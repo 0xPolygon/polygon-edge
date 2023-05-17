@@ -863,6 +863,9 @@ func TestFSM_Validate_EpochEndingBlock_UpdatingValidatorSetInNonEpochEndingBlock
 		validators:     validators.ToValidatorSet(),
 		logger:         hclog.NewNullLogger(),
 		polybftBackend: polybftBackendMock,
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
 	}
 
 	err = fsm.Validate(proposal)
@@ -888,8 +891,15 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 	}
 	parent.ComputeHash()
 
-	fsm := &fsm{parent: parent, backend: &blockchainMock{},
-		validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger()}
+	fsm := &fsm{
+		parent:     parent,
+		backend:    &blockchainMock{},
+		validators: validators.ToValidatorSet(),
+		logger:     hclog.NewNullLogger(),
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
+	}
 
 	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, parent.ExtraData)
 
@@ -959,8 +969,14 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 			ExtraData:  parent.ExtraData,
 		}
 		stateBlock := &types.FullBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
-		fsm := &fsm{parent: parent, backend: &blockchainMock{},
-			validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger()}
+		fsm := &fsm{
+			parent:     parent,
+			backend:    &blockchainMock{},
+			validators: validators.ToValidatorSet(),
+			logger:     hclog.NewNullLogger(),
+			config: &PolyBFTConfig{
+				BlockTimeDrift: 1,
+			}}
 
 		checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
 		require.NoError(t, err)

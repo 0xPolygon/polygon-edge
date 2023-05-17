@@ -69,6 +69,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 		InitialValidatorSet: validators.GetParamValidators(),
 		EpochSize:           fixedEpochSize,
 		SprintSize:          5,
+		BlockTimeDrift:      10,
 	}
 
 	validatorSet := validators.GetPublicIdentities()
