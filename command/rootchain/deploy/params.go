@@ -20,6 +20,7 @@ type deployParams struct {
 	rootERC20TokenAddr   string
 	rootERC721TokenAddr  string
 	rootERC1155TokenAddr string
+	stakeManagerAddr     string
 	isTestMode           bool
 }
 

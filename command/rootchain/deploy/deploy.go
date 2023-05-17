@@ -209,6 +209,13 @@ func GetCommand() *cobra.Command {
 			" (otherwise provided secrets are used to resolve deployer account)",
 	)
 
+	cmd.Flags().StringVar(
+		&params.stakeManagerAddr,
+		helper.StakeManagerFlag,
+		"",
+		helper.StakeManagerFlagDesc,
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
 
 	return cmd
@@ -417,13 +424,20 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			artifact: contractsapi.ChildERC1155,
 		},
 		{
-			name:     stakeManagerName,
-			artifact: contractsapi.StakeManager,
-		},
-		{
 			name:     customSupernetManagerName,
 			artifact: contractsapi.CustomSupernetManager,
 		},
+	}
+
+	if params.stakeManagerAddr == "" {
+		// stake manager was not deployed, so we need to deploy it
+		allContracts = append(allContracts, &contractInfo{
+			name:     stakeManagerName,
+			artifact: contractsapi.StakeManager,
+		})
+	} else {
+		// stake manager was already deployed to root chain, just populate its address to rootchain config
+		rootchainConfig.StakeManagerAddress = types.StringToAddress(params.stakeManagerAddr)
 	}
 
 	allContracts = append(tokenContracts, allContracts...)
