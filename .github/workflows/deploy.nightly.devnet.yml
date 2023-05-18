@@ -64,27 +64,27 @@ jobs:
       - name: Terraform Init
         id: init
         run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
-      # - name: Terraform Validate
-      #   id: validate
-      #   run: terraform validate -no-color
-      #   continue-on-error: true
-      # - name: Terraform Plan
-      #   id: plan
-      #   run: terraform plan -out=tfplan -no-color
-      #   env:
-      #     TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-      #     TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
-      # - name: Terraform Apply
-      #   id: apply
-      #   run: terraform apply -auto-approve tfplan
-      #   env:
-      #     TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-      #     TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+        continue-on-error: true
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -out=tfplan -no-color
+        env:
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve tfplan
+        env:
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
       - name: Retrieve state file from s3
         run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Configure private keys
         run: |
-          terraform output -state state.json pk_ansible > ~/devnet_private.key
+          terraform output pk_ansible > ~/devnet_private.key
           chmod 600 ~/devnet_private.key 
           eval "$(ssh-agent)"
           ssh-add ~/devnet_private.key
@@ -224,7 +224,7 @@ jobs:
       - name: Set rpc url value
         id: url
         run: |
-          terraform output -state state.json -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
+          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
       - uses: actions/upload-artifact@v3
         with:
           name: rpc_url
