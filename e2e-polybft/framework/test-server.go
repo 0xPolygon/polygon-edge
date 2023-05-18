@@ -217,7 +217,7 @@ func (t *TestServer) RootchainFund(rootNativeERC20Addr types.Address, amount *bi
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, chainID int64, amount *big.Int) error {
+func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"stake",
@@ -225,7 +225,7 @@ func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, chainID int64, a
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--" + polybftsecrets.AccountDirFlag, t.config.DataDir,
 		"--amount", amount.String(),
-		"--chain-id", strconv.FormatInt(chainID, 10),
+		"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 		"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 	}
 
