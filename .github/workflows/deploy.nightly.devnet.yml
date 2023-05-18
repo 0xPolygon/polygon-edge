@@ -209,12 +209,12 @@ jobs:
           main
 
           EOF
-      # - name: Run Ansible
-      #   working-directory: ansible
-      #   run: |
-      #     ansible-inventory --graph
-      #     ansible-galaxy install -r requirements.yml
-      #     ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
+      - name: Run Ansible
+        working-directory: ansible
+        run: |
+          ansible-inventory --graph
+          ansible-galaxy install -r requirements.yml
+          ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
       - name: Set rpc url value
         id: url
         run: |
