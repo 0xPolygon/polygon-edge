@@ -144,13 +144,15 @@ jobs:
           {% if (enable_eip_1559) %}
                           --burn-contract 0:$BURN_CONTRACT_ADDRESS \
           {% endif %}
-                          --native-token-config {{ native_token_config }}
+                          --native-token-config MyToken:MTK:18:true
 
           {% if (enable_eip_1559) %}
               # EIP-1559
-              BYTECODE=$(cat /var/lib/bootstrap/core-contracts/artifacts/contracts/child/EIP1559Burn.sol/EIP1559Burn.json | jq -r .deployedBytecode)
-              BALANCE="0x0"
-              cat genesis.json | jq --arg code "$BYTECODE" --arg balance "$BALANCE" --arg addr "$BURN_CONTRACT_ADDRESS" '.genesis.alloc += {($addr): {"code": $code, "balance": $balance}}' | jq . > genesis.json
+              jq --argjson code $(cat /var/lib/bootstrap/core-contracts/artifacts/contracts/child/EIP1559Burn.sol/EIP1559Burn.json)  \
+                --arg balance "$BALANCE" \
+                --arg addr "$BURN_CONTRACT_ADDRESS" \
+                '.genesis.alloc += {($addr): {"code": $code.deployedBytecode, "balance": $balance}}' \
+                genesis.json | jq . > tmp.json && mv tmp.json genesis.json
           {% endif %}
 
               polycli wallet create --words 12 --language english | jq '.Addresses[0]' > rootchain-wallet.json
