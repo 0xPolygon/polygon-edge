@@ -271,9 +271,15 @@ func (t *TestBridge) cmdRun(args ...string) error {
 
 // deployRootchainContracts deploys and initializes rootchain contracts
 func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
+	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+	if err != nil {
+		return err
+	}
+
 	args := []string{
 		"rootchain",
 		"deploy",
+		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--genesis", genesisPath,
 		"--test",
 	}
@@ -300,7 +306,7 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig
 		balances[i] = polybftConfig.InitialValidatorSet[i].Balance
 	}
 
-	if err := t.FundValidators(polybftConfig.Bridge.RootNativeERC20Addr,
+	if err := t.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
 		secrets, balances); err != nil {
 		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
@@ -392,7 +398,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
 					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
 					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
-					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}
 
 				if err := t.cmdRun(args...); err != nil {
@@ -428,7 +434,7 @@ func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.P
 }
 
 // FundValidators sends tokens to a rootchain validators
-func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
+func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
 	if len(secretsPaths) != len(amounts) {
 		return errors.New("expected the same length of secrets paths and amounts")
 	}
@@ -436,7 +442,7 @@ func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []
 	args := []string{
 		"rootchain",
 		"fund",
-		"--native-root-token", tookenAddress.String(),
+		"--stake-token", tokenAddress.String(),
 		"--mint",
 	}
 
@@ -457,6 +463,22 @@ func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []
 
 	if err := t.cmdRun(args...); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (t *TestBridge) deployStakeManager(genesisPath string) error {
+	args := []string{
+		"polybft",
+		"stake-manager-deploy",
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--genesis", genesisPath,
+		"--test",
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to deploy stake manager contract: %w", err)
 	}
 
 	return nil

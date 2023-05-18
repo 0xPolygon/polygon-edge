@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	addressesFlag     = "addresses"
-	amountsFlag       = "amounts"
-	jsonRPCFlag       = "json-rpc"
-	mintRootTokenFlag = "mint"
+	addressesFlag      = "addresses"
+	amountsFlag        = "amounts"
+	jsonRPCFlag        = "json-rpc"
+	mintStakeTokenFlag = "mint"
 )
 
 var (
@@ -21,12 +21,12 @@ var (
 )
 
 type fundParams struct {
-	addresses           []string
-	amounts             []string
-	nativeRootTokenAddr string
-	deployerPrivateKey  string
-	mintRootToken       bool
-	jsonRPCAddress      string
+	addresses          []string
+	amounts            []string
+	stakeTokenAddr     string
+	deployerPrivateKey string
+	mintStakeToken     bool
+	jsonRPCAddress     string
 
 	amountValues []*big.Int
 }

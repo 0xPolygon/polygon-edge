@@ -748,7 +748,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		validatorSrv := cluster.Servers[idx]
 
 		// fund validators (send accumulated rewards amount)
-		require.NoError(t, validatorSrv.RootchainFund(polybftCfg.Bridge.RootNativeERC20Addr, validator.WithdrawableRewards))
+		require.NoError(t, validatorSrv.RootchainFund(polybftCfg.Bridge.StakeTokenAddr, validator.WithdrawableRewards))
 
 		// stake previously funded amount
 		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))

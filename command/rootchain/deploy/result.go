@@ -38,16 +38,3 @@ func (r deployContractResult) GetOutput() string {
 
 	return buffer.String()
 }
-
-type messageResult struct {
-	Message string `json:"message"`
-}
-
-func (r messageResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	buffer.WriteString(r.Message)
-	buffer.WriteString("\n")
-
-	return buffer.String()
-}
