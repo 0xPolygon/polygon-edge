@@ -4,6 +4,7 @@ package polybft
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -28,6 +29,10 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
+)
+
+var (
+	errMissingBridgeConfig = errors.New("invalid genesis configuration, missing bridge configuration")
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -120,6 +125,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		bridgeCfg := polyBFTConfig.Bridge
+		if bridgeCfg == nil {
+			return errMissingBridgeConfig
+		}
+
 		// initialize ValidatorSet SC
 		input, err := getInitValidatorSetInput(polyBFTConfig)
 		if err != nil {
@@ -153,7 +163,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			bridgeAllowListAdmin = config.Params.BridgeAllowList.AdminAddresses[0]
 		}
 
-		var bridgeBlockListAdmin types.Address
+		bridgeBlockListAdmin := types.ZeroAddress
 		if config.Params.BridgeBlockList != nil && len(config.Params.BridgeBlockList.AdminAddresses) > 0 {
 			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
 		}
@@ -198,7 +208,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 		} else {
-			input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
+			input, err = getInitERC20PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
@@ -209,7 +219,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize ChildERC721Predicate SC
-			input, err = getInitChildERC721PredicateInput(polyBFTConfig.Bridge)
+			input, err = getInitERC721PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
@@ -220,13 +230,46 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize ChildERC1155Predicate SC
-			input, err = getInitChildERC1155PredicateInput(polyBFTConfig.Bridge)
+			input, err = getInitERC1155PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
 
 			if err = initContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
 				"ChildERC1155Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC20Predicate SC
+			input, err = getInitERC20PredicateInput(bridgeCfg, true)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.SystemCaller, contracts.RootMintableERC20PredicateContract, input,
+				"RootMintableERC20Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC721Predicate SC
+			input, err = getInitERC721PredicateInput(bridgeCfg, true)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.SystemCaller, contracts.RootMintableERC721PredicateContract, input,
+				"RootMintableERC721Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC1155Predicate SC
+			input, err = getInitERC1155PredicateInput(bridgeCfg, true)
+			if err != nil {
+				return err
+			}
+
+			if err = initContract(contracts.SystemCaller, contracts.RootMintableERC1155PredicateContract, input,
+				"RootMintableERC1155Predicate", transition); err != nil {
 				return err
 			}
 		}

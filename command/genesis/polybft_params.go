@@ -360,10 +360,16 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 
 	if !params.nativeTokenConfig.IsMintable {
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
+			&contractInfo{
+				artifact: contractsapi.NativeERC20,
+				address:  contracts.NativeERC20TokenContract,
+			})
 	} else {
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
+			&contractInfo{
+				artifact: contractsapi.NativeERC20Mintable,
+				address:  contracts.NativeERC20TokenContract,
+			})
 	}
 
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
@@ -385,6 +391,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 				address:  contracts.ChildERC1155PredicateContract,
 			})
 	} else {
+		// rootchain originated tokens predicates
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20Predicate,
@@ -402,6 +409,25 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 				artifact: contractsapi.ChildERC1155Predicate,
 				address:  contracts.ChildERC1155PredicateContract,
 			})
+
+		// childchain originated tokens predicates
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC20Predicate,
+				address:  contracts.RootMintableERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC721Predicate,
+				address:  contracts.RootMintableERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC1155Predicate,
+				address:  contracts.RootMintableERC1155PredicateContract,
+			})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
@@ -415,7 +441,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 
 	if rewardTokenByteCode != nil {
 		// if reward token is provided in genesis then, add it to allocations
-		// to RewardTokenContract address and update polybftConfig
+		// to RewardTokenContract address and update Polybft config
 		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
 			Code:    rewardTokenByteCode,
