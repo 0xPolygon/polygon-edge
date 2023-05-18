@@ -138,6 +138,10 @@ jobs:
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %} --premine $(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address'):1000000000000000000000000 {% endif %}{% endfor %} \
                           --premine {{ loadtest_account }}:1000000000000000000000000000 \
                           --reward-wallet 0x0101010101010101010101010101010101010101:1000000000000000000000000000 \
+                          --premine 0xA39Fed214820cF843E2Bcd6cA1759257a530894B:1000000000000000000000000000 \
+                          --premine 0x181d9fEc79EC674DD3cB30dd9dd4188E737939FE:1000000000000000000000000000 \
+                          --premine 0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa:1000000000000000000000000000 \
+                          --block-gas-limit {{ block_gas_limit }} --block-time {{ block_time }}s \
                           --block-gas-limit {{ block_gas_limit }} --block-time {{ block_time }}s \
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address' | sed 's/^0x//'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey') {% endif %}{% endfor %} \
                           --epoch-size 10 \
@@ -254,38 +258,38 @@ jobs:
       environment: ${{ inputs.environment }}
       scenario: multiple_ERC20
 
-  # destroy_devnet:
-  #   needs: [loadtest1, loadtest2]
-  #   if: always()
-  #   name: Destroy Nightly Build
-  #   runs-on: ubuntu-latest
-  #   environment: ${{ inputs.environment }}
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v3
-  #       with:
-  #         repository: maticnetwork/terraform-polygon-supernets
-  #         ref: main
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v2
-  #       with:
-  #         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-  #         aws-region: ${{ secrets.AWS_REGION }}
-  #     - name: Install Terraform
-  #       uses: hashicorp/setup-terraform@v2.0.3
-  #       with:
-  #         terraform_version: 1.4.5
-  #     - name: Configure terraform for nightly build
-  #       run: |
-  #         sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
-  #     - name: Terraform Init
-  #       id: init
-  #       run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
-  #     - name: Retrieve state file from s3
-  #       run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
-  #     - name: Terraform Destroy
-  #       id: destroy
-  #       run: terraform destroy -auto-approve -state=state.json
-  #       env:
-  #         TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-  #         TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+  destroy_devnet:
+    needs: [loadtest1, loadtest2]
+    if: always()
+    name: Destroy Nightly Build
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          repository: maticnetwork/terraform-polygon-supernets
+          ref: main
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2.0.3
+        with:
+          terraform_version: 1.4.5
+      - name: Configure terraform for nightly build
+        run: |
+          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+      - name: Terraform Init
+        id: init
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+      - name: Terraform Destroy
+        id: destroy
+        run: terraform destroy -auto-approve -state=state.json
+        env:
+          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
