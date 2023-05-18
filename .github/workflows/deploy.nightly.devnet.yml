@@ -80,6 +80,8 @@ jobs:
         env:
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
           TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      # - name: Retrieve state file from s3
+      #   run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Configure private keys
         run: |
           terraform output pk_ansible > ~/devnet_private.key
@@ -185,12 +187,12 @@ jobs:
 
 
           EOF
-      - name: Run Ansible
-        working-directory: ansible
-        run: |
-          ansible-inventory --graph
-          ansible-galaxy install -r requirements.yml
-          ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
+      # - name: Run Ansible
+      #   working-directory: ansible
+      #   run: |
+      #     ansible-inventory --graph
+      #     ansible-galaxy install -r requirements.yml
+      #     ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
       - name: Set rpc url value
         id: url
         run: |
@@ -200,66 +202,66 @@ jobs:
           name: rpc_url
           path: rpc_url.txt
 
-  loadtest1:
-    needs: build
-    uses: ./.github/workflows/loadtest.yml
-    name: Load Test Nightly Build - multiple_EOA
-    secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-    with:
-      runner: devnet
-      environment: ${{ inputs.environment }}
-      scenario: multiple_EOA
+  # loadtest1:
+  #   needs: build
+  #   uses: ./.github/workflows/loadtest.yml
+  #   name: Load Test Nightly Build - multiple_EOA
+  #   secrets:
+  #     SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+  #     LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
+  #     DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  #     LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+  #   with:
+  #     runner: devnet
+  #     environment: ${{ inputs.environment }}
+  #     scenario: multiple_EOA
 
-  loadtest2:
-    needs: loadtest1
-    uses: ./.github/workflows/loadtest.yml
-    name: Load Test Nightly Build - multiple_ERC20
-    secrets:
-      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-      LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
-      DD_API_KEY: ${{ secrets.DD_API_KEY }}
-      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-    with:
-      runner: devnet
-      environment: ${{ inputs.environment }}
-      scenario: multiple_ERC20
+  # loadtest2:
+  #   needs: loadtest1
+  #   uses: ./.github/workflows/loadtest.yml
+  #   name: Load Test Nightly Build - multiple_ERC20
+  #   secrets:
+  #     SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+  #     LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
+  #     DD_API_KEY: ${{ secrets.DD_API_KEY }}
+  #     LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+  #   with:
+  #     runner: devnet
+  #     environment: ${{ inputs.environment }}
+  #     scenario: multiple_ERC20
 
-  destroy_devnet:
-    needs: [loadtest1, loadtest2]
-    if: always()
-    name: Destroy Nightly Build
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          repository: maticnetwork/terraform-polygon-supernets
-          ref: main
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v2.0.3
-        with:
-          terraform_version: 1.4.5
-      - name: Configure terraform for nightly build
-        run: |
-          sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
-      - name: Terraform Init
-        id: init
-        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
-      - name: Retrieve state file from s3
-        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
-      - name: Terraform Destroy
-        id: destroy
-        run: terraform destroy -auto-approve -state=state.json
-        env:
-          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+  # destroy_devnet:
+  #   needs: [loadtest1, loadtest2]
+  #   if: always()
+  #   name: Destroy Nightly Build
+  #   runs-on: ubuntu-latest
+  #   environment: ${{ inputs.environment }}
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v3
+  #       with:
+  #         repository: maticnetwork/terraform-polygon-supernets
+  #         ref: main
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v2
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+  #         aws-region: ${{ secrets.AWS_REGION }}
+  #     - name: Install Terraform
+  #       uses: hashicorp/setup-terraform@v2.0.3
+  #       with:
+  #         terraform_version: 1.4.5
+  #     - name: Configure terraform for nightly build
+  #       run: |
+  #         sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
+  #     - name: Terraform Init
+  #       id: init
+  #       run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+  #     - name: Retrieve state file from s3
+  #       run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+  #     - name: Terraform Destroy
+  #       id: destroy
+  #       run: terraform destroy -auto-approve -state=state.json
+  #       env:
+  #         TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+  #         TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
