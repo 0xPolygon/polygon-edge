@@ -64,27 +64,27 @@ jobs:
       - name: Terraform Init
         id: init
         run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
-      - name: Terraform Validate
-        id: validate
-        run: terraform validate -no-color
-        continue-on-error: true
-      - name: Terraform Plan
-        id: plan
-        run: terraform plan -out=tfplan -no-color
-        env:
-          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
-      - name: Terraform Apply
-        id: apply
-        run: terraform apply -auto-approve tfplan
-        env:
-          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
-      # - name: Retrieve state file from s3
-      #   run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+      # - name: Terraform Validate
+      #   id: validate
+      #   run: terraform validate -no-color
+      #   continue-on-error: true
+      # - name: Terraform Plan
+      #   id: plan
+      #   run: terraform plan -out=tfplan -no-color
+      #   env:
+      #     TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+      #     TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      # - name: Terraform Apply
+      #   id: apply
+      #   run: terraform apply -auto-approve tfplan
+      #   env:
+      #     TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+      #     TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+      - name: Retrieve state file from s3
+        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Configure private keys
         run: |
-          terraform output pk_ansible > ~/devnet_private.key
+          terraform output -state state.json pk_ansible > ~/devnet_private.key
           chmod 600 ~/devnet_private.key 
           eval "$(ssh-agent)"
           ssh-add ~/devnet_private.key
@@ -118,25 +118,47 @@ jobs:
               polygon-edge polybft-secrets --data-dir {{ hostvars[item].tags["Name"] }} --json --insecure > {{ hostvars[item].tags["Name"] }}.json
           {% endif %}
           {% endfor %}
+
+          {% if (enable_eip_1559) %}
+              apt update
+              curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+              apt-get install -y nodejs
+
+              pushd /opt/polygon-edge/
+              make compile-core-contracts
+              cp -r /opt/polygon-edge/core-contracts /var/lib/bootstrap/core-contracts/
+              popd
+
+              BURN_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+          {% endif %}
+
               polygon-edge genesis \
                           --consensus polybft \
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %} --bootnode /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id') {% endif %}{% endfor %} \
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %} --premine $(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address'):1000000000000000000000000 {% endif %}{% endfor %} \
                           --premine {{ loadtest_account }}:1000000000000000000000000000 \
                           --reward-wallet 0x0101010101010101010101010101010101010101:1000000000000000000000000000 \
-                          --premine 0xA39Fed214820cF843E2Bcd6cA1759257a530894B:1000000000000000000000000000 \
-                          --premine 0x181d9fEc79EC674DD3cB30dd9dd4188E737939FE:1000000000000000000000000000 \
-                          --premine 0x1AB8C3df809b85012a009c0264eb92dB04eD6EFa:1000000000000000000000000000 \
-              --block-gas-limit {{ block_gas_limit }} --block-time {{ block_time }}s \
+                          --block-gas-limit {{ block_gas_limit }} --block-time {{ block_time }}s \
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address' | sed 's/^0x//'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey') {% endif %}{% endfor %} \
-                          --chain-id  {{ chain_id }} \
-                          --epoch-size 10
+                          --epoch-size 10 \
+          {% if (enable_eip_1559) %}
+                          --burn-contract 0:$BURN_CONTRACT_ADDRESS \
+          {% endif %}
+                          --native-token-config {{ native_token_config }}
+
+          {% if (enable_eip_1559) %}
+              # EIP-1559
+              BYTECODE=$(cat /var/lib/bootstrap/core-contracts/artifacts/contracts/child/EIP1559Burn.sol/EIP1559Burn.json | jq -r .deployedBytecode)
+              BALANCE="0x0"
+              cat genesis.json | jq --arg code "$BYTECODE" --arg balance "$BALANCE" --arg addr "$BURN_CONTRACT_ADDRESS" '.genesis.alloc += {($addr): {"code": $code, "balance": $balance}}' | jq . > genesis.json
+          {% endif %}
 
               polycli wallet create --words 12 --language english | jq '.Addresses[0]' > rootchain-wallet.json
 
-              COINBASE_ADDRESS=$(cast rpc --rpc-url {{ rootchain_json_rpc }} eth_coinbase | sed 's/"//g')
-
-              cast send --rpc-url {{ rootchain_json_rpc }} --from $COINBASE_ADDRESS --value 100ether $(cat rootchain-wallet.json | jq -r '.ETHAddress')
+              # Should the deployer be funded from an unlocked L1 chain or from a prefunded account on L1
+              {% if (not fund_rootchain_coinbase) %}# {% endif %}COINBASE_ADDRESS=$(cast rpc --rpc-url {{ rootchain_json_rpc }} eth_coinbase | sed 's/"//g')
+              {% if (not fund_rootchain_coinbase) %}# {% endif %}cast send --rpc-url {{ rootchain_json_rpc }} --from $COINBASE_ADDRESS --value {{ rootchain_deployer_fund_amount }} $(cat rootchain-wallet.json | jq -r '.ETHAddress') --unlocked
+              {% if (fund_rootchain_coinbase) %}# {% endif %}cast send --rpc-url {{ rootchain_json_rpc }} --from {{ rootchain_coinbase_address }} --value {{ rootchain_deployer_fund_amount }} $(cat rootchain-wallet.json | jq -r '.ETHAddress') --private-key {{ rootchain_coinbase_private_key }}
 
               polygon-edge rootchain deploy \
                           --deployer-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
@@ -144,7 +166,8 @@ jobs:
 
           {% for item in hostvars %}
           {% if (hostvars[item].tags.Role == "validator") %}
-              cast send --rpc-url {{ rootchain_json_rpc }} --from $COINBASE_ADDRESS --value 100ether $(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address')
+              cast send --rpc-url {{ rootchain_json_rpc }} --from $(cat rootchain-wallet.json | jq -r '.ETHAddress') --private-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
+                  --value {{ rootchain_validator_fund_amount }} $(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address')
           {% endif %}
           {% endfor %}
 
@@ -165,7 +188,7 @@ jobs:
 
           {% for item in hostvars %}
           {% if (hostvars[item].tags.Role == "validator") %}
-              polygon-edge polybft stake --data-dir {{ hostvars[item].tags["Name"] }} --chain-id {{ chain_id }} \
+              polygon-edge polybft stake --data-dir {{ hostvars[item].tags["Name"] }} --chain-id $(cat genesis.json | jq -r '.params.chainID') \
                           --amount 10 \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
                           --native-root-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.nativeERC20Address') \
@@ -185,7 +208,6 @@ jobs:
 
           main
 
-
           EOF
       # - name: Run Ansible
       #   working-directory: ansible
@@ -196,39 +218,39 @@ jobs:
       - name: Set rpc url value
         id: url
         run: |
-          terraform output -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
+          terraform output -state state.json -raw aws_lb_ext_domain | grep -o -E '^ext[^:]*' > rpc_url.txt
       - uses: actions/upload-artifact@v3
         with:
           name: rpc_url
           path: rpc_url.txt
 
-  # loadtest1:
-  #   needs: build
-  #   uses: ./.github/workflows/loadtest.yml
-  #   name: Load Test Nightly Build - multiple_EOA
-  #   secrets:
-  #     SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-  #     LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
-  #     DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  #     LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-  #   with:
-  #     runner: devnet
-  #     environment: ${{ inputs.environment }}
-  #     scenario: multiple_EOA
+  loadtest1:
+    needs: build
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test Nightly Build - multiple_EOA
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+    with:
+      runner: devnet
+      environment: ${{ inputs.environment }}
+      scenario: multiple_EOA
 
-  # loadtest2:
-  #   needs: loadtest1
-  #   uses: ./.github/workflows/loadtest.yml
-  #   name: Load Test Nightly Build - multiple_ERC20
-  #   secrets:
-  #     SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
-  #     LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
-  #     DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  #     LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
-  #   with:
-  #     runner: devnet
-  #     environment: ${{ inputs.environment }}
-  #     scenario: multiple_ERC20
+  loadtest2:
+    needs: loadtest1
+    uses: ./.github/workflows/loadtest.yml
+    name: Load Test Nightly Build - multiple_ERC20
+    secrets:
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      LOADTEST_RPC_URL: "" # this is a workaround because of actions bug in passing output to another job
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+    with:
+      runner: devnet
+      environment: ${{ inputs.environment }}
+      scenario: multiple_ERC20
 
   # destroy_devnet:
   #   needs: [loadtest1, loadtest2]
