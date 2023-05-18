@@ -24,14 +24,6 @@ jobs:
     name: Build
     uses: ./.github/workflows/build.yml
 
-  test:
-    name: Test
-    uses: ./.github/workflows/test.yml
-    needs: build
-    secrets:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
   deploy_eph_devnet:
     name: Deploy Ephemeral DevNet
     needs: build
