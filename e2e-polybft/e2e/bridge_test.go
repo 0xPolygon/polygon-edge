@@ -780,7 +780,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
 	require.NoError(t, err)
 
-	targetEpoch := currentExtra.Checkpoint.EpochNumber + 1
+	targetEpoch := currentExtra.Checkpoint.EpochNumber + 2
 	require.NoError(t, waitForRootchainEpoch(targetEpoch, 2*time.Minute,
 		rootRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 

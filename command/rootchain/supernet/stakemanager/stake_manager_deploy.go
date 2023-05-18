@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
+	"golang.org/x/sync/errgroup"
 )
 
 var params stakeManagerDeployParams
@@ -127,35 +128,62 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// deploy stake manager
-	contractAddress, err := deployContract(txRelayer, deployerKey,
-		contractsapi.StakeManager, "StakeManager")
-	if err != nil {
-		return err
-	}
+	var (
+		stakeManagerAddress types.Address
+		stakeTokenAddress   = types.StringToAddress(params.stakeTokenAddress)
+		g, ctx              = errgroup.WithContext(cmd.Context())
+	)
 
-	outputter.WriteCommandResult(&rootHelper.MessageResult{
-		Message: "[STAKEMANAGER - DEPLOY] Successfully deployed StakeManager contract",
+	g.Go(func() error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			// deploy stake manager
+			contractAddress, err := deployContract(txRelayer, deployerKey,
+				contractsapi.StakeManager, "StakeManager")
+			if err != nil {
+				return err
+			}
+
+			outputter.WriteCommandResult(&rootHelper.MessageResult{
+				Message: "[STAKEMANAGER - DEPLOY] Successfully deployed StakeManager contract",
+			})
+
+			stakeManagerAddress = contractAddress
+
+			return nil
+		}
 	})
 
-	stakeManagerAddress := contractAddress
-	stakeTokenAddress := types.StringToAddress(params.stakeTokenAddress)
-
 	if params.isTestMode {
-		// this is only used for testing, we are deploying a test ERC20 token to use for staking
-		// this should not be used in production
-		// deploy stake manager
-		contractAddress, err = deployContract(txRelayer, deployerKey,
-			contractsapi.RootERC20, "MockERC20StakeToken")
-		if err != nil {
-			return err
-		}
+		g.Go(func() error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				// this is only used for testing, we are deploying a test ERC20 token to use for staking
+				// this should not be used in production
+				// deploy stake manager
+				contractAddress, err := deployContract(txRelayer, deployerKey,
+					contractsapi.RootERC20, "MockERC20StakeToken")
+				if err != nil {
+					return err
+				}
 
-		outputter.WriteCommandResult(&rootHelper.MessageResult{
-			Message: "[STAKEMANAGER - DEPLOY] Successfully deployed MockERC20StakeToken contract",
+				outputter.WriteCommandResult(&rootHelper.MessageResult{
+					Message: "[STAKEMANAGER - DEPLOY] Successfully deployed MockERC20StakeToken contract",
+				})
+
+				stakeTokenAddress = contractAddress
+
+				return nil
+			}
 		})
+	}
 
-		stakeTokenAddress = contractAddress
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
 	// initialize stake manager
@@ -211,7 +239,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 	}
 
 	cmdOutput.WriteCommandResult(&rootHelper.MessageResult{
-		Message: "StakeManager contract is initialized",
+		Message: "[STAKEMANAGER - DEPLOY] StakeManager contract is initialized",
 	})
 
 	return nil
