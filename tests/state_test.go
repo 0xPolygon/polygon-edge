@@ -15,6 +15,9 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+// Currently used test cases suite version is v10.4.
+// It does not include Merge hardfork test cases.
+
 const (
 	stateTests       = "tests/GeneralStateTests"
 	legacyStateTests = "tests/LegacyTests/Constantinople/GeneralStateTests"
