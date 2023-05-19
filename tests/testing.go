@@ -11,23 +11,24 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type info struct {
-	Comment     string `json:"comment"`
-	Solidity    string `json:"solidity"`
-	FilledWith  string `json:"filledwith"`
-	LllcVersion string `json:"lllcversion"`
-	Source      string `json:"source"`
-	SourceHash  string `json:"sourcehash"`
+type testCase struct {
+	Env         *env                                    `json:"env"`
+	Pre         map[types.Address]*chain.GenesisAccount `json:"pre"`
+	Post        map[string]postState                    `json:"post"`
+	Transaction *stTransaction                          `json:"transaction"`
 }
 
 type env struct {
@@ -183,62 +184,6 @@ func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 	}
 }
 
-type exec struct {
-	Address  types.Address
-	Caller   types.Address
-	Origin   types.Address
-	Code     []byte
-	Data     []byte
-	Value    *big.Int
-	GasLimit uint64
-	GasPrice *big.Int
-}
-
-func (e *exec) UnmarshalJSON(input []byte) error {
-	type execUnmarshall struct {
-		Address  types.Address `json:"address"`
-		Caller   types.Address `json:"caller"`
-		Origin   types.Address `json:"origin"`
-		Code     string        `json:"code"`
-		Data     string        `json:"data"`
-		Value    string        `json:"value"`
-		Gas      string        `json:"gas"`
-		GasPrice string        `json:"gasPrice"`
-	}
-
-	var dec execUnmarshall
-	if err := json.Unmarshal(input, &dec); err != nil {
-		return err
-	}
-
-	e.Address = dec.Address
-	e.Caller = dec.Caller
-	e.Origin = dec.Origin
-
-	var err error
-	if e.Code, err = types.ParseBytes(&dec.Code); err != nil {
-		return err
-	}
-
-	if e.Data, err = types.ParseBytes(&dec.Data); err != nil {
-		return err
-	}
-
-	if e.Value, err = types.ParseUint256orHex(&dec.Value); err != nil {
-		return err
-	}
-
-	if e.GasLimit, err = common.ParseUint64orHex(&dec.Gas); err != nil {
-		return err
-	}
-
-	if e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func buildState(
 	allocs map[types.Address]*chain.GenesisAccount,
 ) (state.State, state.Snapshot, types.Hash) {
@@ -361,32 +306,31 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	type txUnmarshall struct {
-		Data                 []string `json:"data"`
-		GasLimit             []string `json:"gasLimit"`
-		Value                []string `json:"value"`
-		GasPrice             string   `json:"gasPrice"`
-		MaxFeePerGas         string   `json:"maxFeePerGas"`
-		MaxPriorityFeePerGas string   `json:"maxPriorityFeePerGas"`
-		Nonce                string   `json:"nonce"`
-		SecretKey            string   `json:"secretKey"`
-		To                   string   `json:"to"`
+		Data                 []string `json:"data,omitempty"`
+		GasLimit             []string `json:"gasLimit,omitempty"`
+		Value                []string `json:"value,omitempty"`
+		GasPrice             string   `json:"gasPrice,omitempty"`
+		MaxFeePerGas         string   `json:"maxFeePerGas,omitempty"`
+		MaxPriorityFeePerGas string   `json:"maxPriorityFeePerGas,omitempty"`
+		Nonce                string   `json:"nonce,omitempty"`
+		SecretKey            string   `json:"secretKey,omitempty"`
+		To                   string   `json:"to,omitempty"`
 	}
 
 	var dec txUnmarshall
-	err := json.Unmarshal(input, &dec)
-
-	if err != nil {
-		return err
+	if err := json.Unmarshal(input, &dec); err != nil {
+		return fmt.Errorf("failed to unmarshal transaction into temporary struct: %v", err)
 	}
 
 	t.Data = dec.Data
 
 	for _, i := range dec.GasLimit {
-		if j, err := stringToUint64(i); err != nil {
-			return err
-		} else {
-			t.GasLimit = append(t.GasLimit, j)
+		j, err := stringToUint64(i)
+		if err != nil {
+			return fmt.Errorf("failed to convert string '%s' to uint64: %v", i, err)
 		}
+
+		t.GasLimit = append(t.GasLimit, j)
 	}
 
 	for _, i := range dec.Value {
@@ -405,28 +349,30 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		t.Value = append(t.Value, value)
 	}
 
-	t.GasPrice, err = stringToBigInt(dec.GasPrice)
-	if err != nil {
-		return err
+	var err error
+
+	if dec.GasPrice != "" {
+		if t.GasPrice, err = stringToBigInt(dec.GasPrice); err != nil {
+			return fmt.Errorf("failed to parse gas price: %v", err)
+		}
 	}
 
 	if dec.MaxFeePerGas != "" {
-		t.MaxFeePerGas, err = stringToBigInt(dec.MaxFeePerGas)
-		if err != nil {
-			return err
+		if t.MaxFeePerGas, err = stringToBigInt(dec.MaxFeePerGas); err != nil {
+			return fmt.Errorf("failed to parse max fee per gas: %v", err)
 		}
 	}
 
 	if dec.MaxPriorityFeePerGas != "" {
-		t.MaxPriorityFeePerGas, err = stringToBigInt(dec.MaxPriorityFeePerGas)
-		if err != nil {
-			return err
+		if t.MaxPriorityFeePerGas, err = stringToBigInt(dec.MaxPriorityFeePerGas); err != nil {
+			return fmt.Errorf("failed to parse max priority fee per gas: %v", err)
 		}
 	}
 
-	t.Nonce, err = stringToUint64(dec.Nonce)
-	if err != nil {
-		return err
+	if dec.Nonce != "" {
+		if t.Nonce, err = stringToUint64(dec.Nonce); err != nil {
+			return fmt.Errorf("failed to parse nonce: %v", err)
+		}
 	}
 
 	t.From = types.Address{}
@@ -434,7 +380,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	if len(dec.SecretKey) > 0 {
 		secretKey, err := types.ParseBytes(&dec.SecretKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse secret key: %v", err)
 		}
 
 		key, err := crypto.ParseECDSAPrivateKey(secretKey)
@@ -495,7 +441,7 @@ var Forks = map[string]*chain.Forks{
 		Petersburg:     chain.NewFork(0),
 		Istanbul:       chain.NewFork(0),
 	},
-	"London": {
+	/*"London": {
 		Homestead:      chain.NewFork(0),
 		EIP150:         chain.NewFork(0),
 		EIP155:         chain.NewFork(0),
@@ -505,7 +451,7 @@ var Forks = map[string]*chain.Forks{
 		Petersburg:     chain.NewFork(0),
 		Istanbul:       chain.NewFork(0),
 		London:         chain.NewFork(0),
-	},
+	},*/
 	"FrontierToHomesteadAt5": {
 		Homestead: chain.NewFork(5),
 	},
@@ -592,4 +538,21 @@ func listFiles(folder string) ([]string, error) {
 	})
 
 	return files, err
+}
+
+func rlpHashLogs(logs []*types.Log) (res types.Hash) {
+	r := &types.Receipt{
+		Logs: logs,
+	}
+
+	ar := &fastrlp.Arena{}
+	v := r.MarshalLogsWith(ar)
+
+	keccak.Keccak256Rlp(res[:0], v)
+
+	return
+}
+
+func vmTestBlockHash(n uint64) types.Hash {
+	return types.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
 }

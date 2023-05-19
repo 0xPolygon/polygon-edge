@@ -24,14 +24,7 @@ var (
 	ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 )
 
-type stateCase struct {
-	Env         *env                                    `json:"env"`
-	Pre         map[types.Address]*chain.GenesisAccount `json:"pre"`
-	Post        map[string]postState                    `json:"post"`
-	Transaction *stTransaction                          `json:"transaction"`
-}
-
-func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, index int, p postEntry) {
+func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, index int, p postEntry) {
 	t.Helper()
 
 	config, ok := Forks[fork]
@@ -93,6 +86,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	objs := txn.Commit(forks.EIP155)
 	_, root := snapshot.Commit(objs)
 
+	// Check block root
 	if !bytes.Equal(root, p.Root.Bytes()) {
 		t.Fatalf(
 			"root mismatch (%s %s %s %d): expected %s but found %s",
@@ -105,6 +99,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 		)
 	}
 
+	// Check transaction logs
 	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
 		t.Fatalf(
 			"logs mismatch (%s, %s %d): expected %s but found %s",
@@ -171,12 +166,12 @@ func TestState(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				var c map[string]stateCase
-				if err = json.Unmarshal(data, &c); err != nil {
-					t.Fatal(err)
+				var testCases map[string]testCase
+				if err = json.Unmarshal(data, &testCases); err != nil {
+					t.Fatalf("failed to unmarshal %s: %v", file, err)
 				}
 
-				for name, i := range c {
+				for name, i := range testCases {
 					for fork, f := range i.Post {
 						for indx, e := range f {
 							RunSpecificTest(t, file, i, name, fork, indx, e)
