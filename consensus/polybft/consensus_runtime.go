@@ -153,7 +153,6 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	if err != nil {
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
-
 	return runtime, nil
 }
 
