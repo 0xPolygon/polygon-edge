@@ -76,13 +76,16 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := blockTracker.Init(); err != nil {
 			e.logger.Error("failed to init blocktracker", "error", err)
+
 			return err
 		}
 
 		if err := blockTracker.Start(); err != nil {
 			e.logger.Error("failed to start blocktracker", "error", err)
+
 			return err
 		}
+
 		return nil
 	})
 
@@ -105,8 +108,10 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
+
 			return err
 		}
+
 		return nil
 	})
 
