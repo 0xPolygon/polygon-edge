@@ -8,7 +8,12 @@ on:  # yamllint disable-line rule:truthy
       - 'v*'
     paths:
       - '**.go'
-    pull_request:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+
   workflow_call: {}
   workflow_dispatch: {}
 
