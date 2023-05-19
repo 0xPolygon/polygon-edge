@@ -138,7 +138,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	// create the first account and extract the address
@@ -217,21 +217,21 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, secondValidator.RegisterValidator(polybftConfig.Bridge.CustomSupernetManagerAddr))
 
 	// stake manually for the first validator
-	require.NoError(t, firstValidator.Stake(polybftConfig, chainID, initialStake))
+	require.NoError(t, firstValidator.Stake(polybftConfig, initialStake))
 
 	// stake manually for the second validator
-	require.NoError(t, secondValidator.Stake(polybftConfig, chainID, initialStake))
+	require.NoError(t, secondValidator.Stake(polybftConfig, initialStake))
 
 	firstValidatorInfo, err := sidechain.GetValidatorInfo(firstValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.Stake.Cmp(initialStake) == 0)
 
 	secondValidatorInfo, err := sidechain.GetValidatorInfo(secondValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
@@ -282,14 +282,14 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	firstValidatorInfo, err = sidechain.GetValidatorInfo(firstValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, firstValidatorInfo.IsActive)
 	require.True(t, firstValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
 
 	secondValidatorInfo, err = sidechain.GetValidatorInfo(secondValidatorAddr,
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, secondValidatorInfo.IsActive)
 	require.True(t, secondValidatorInfo.WithdrawableRewards.Cmp(bigZero) > 0)
@@ -309,7 +309,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		}),
 	)
 
-	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	srv := cluster.Servers[0]
@@ -336,7 +336,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftCfg.SupernetID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.True(t, validatorInfo.IsActive)
 
@@ -382,7 +382,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// check that validator is no longer active (out of validator set)
 	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftCfg.SupernetID, rootChainRelayer, childChainRelayer)
 	require.NoError(t, err)
 	require.False(t, validatorInfo.IsActive)
 	require.True(t, validatorInfo.Stake.Cmp(big.NewInt(0)) == 0)
@@ -575,7 +575,7 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorAcc, err := sidechain.GetAccountFromDir(owner.DataDir())
@@ -583,7 +583,7 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAcc.Ecdsa.Address(),
 		polybftConfig.Bridge.CustomSupernetManagerAddr, polybftConfig.Bridge.StakeManagerAddr,
-		chainID, rootChainRelayer, childChainRelayer)
+		polybftConfig.SupernetID, rootChainRelayer, childChainRelayer)
 	t.Logf("[Validator#%v] Witdhrawable rewards=%d\n", validatorInfo.Address, validatorInfo.WithdrawableRewards)
 
 	require.NoError(t, err)

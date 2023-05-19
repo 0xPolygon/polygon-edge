@@ -574,7 +574,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err := cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
-		polybftConfig, chainID, err := polybft.LoadPolyBFTConfig(genesisPath)
+		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
 		require.NoError(t, err)
 
 		// fund validators on the rootchain
@@ -590,7 +590,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 
 		// do initial staking for genesis validators on the rootchain
-		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig, chainID)
+		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
 		require.NoError(t, err)
 
 		// finalize genesis validators on the rootchain

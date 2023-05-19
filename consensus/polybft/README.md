@@ -83,7 +83,7 @@ It has a native support for running bridge, which enables running cross-chain tr
 9. Initial staking on rootchain - each validator needs to do initial staking on rootchain (StakeManager) contract. **This command is for testing purposes only.**
 
     ```bash
-    $ polygon-edge polybft stake --data-dir ./test-chain-1 --chain-id <id_of_child_chain_from_genesis> \
+    $ polygon-edge polybft stake --data-dir ./test-chain-1 --supernet-id <supernet_id_from_genesis> \
     --amount <amount_of_tokens_to_stake> \
     --stake-manager <address_of_StakeManager_contract> --native-root-token <address_of_native_root_token>
     ```
