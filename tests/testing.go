@@ -273,8 +273,9 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
 
-	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	gasPrice := t.GasPrice
+
+	// If baseFee provided, set gasPrice to effectiveGasPrice.
 	if baseFee != nil {
 		if t.MaxFeePerGas == nil {
 			t.MaxFeePerGas = gasPrice
@@ -319,7 +320,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	var dec txUnmarshall
 	if err := json.Unmarshal(input, &dec); err != nil {
-		return fmt.Errorf("failed to unmarshal transaction into temporary struct: %v", err)
+		return fmt.Errorf("failed to unmarshal transaction into temporary struct: %w", err)
 	}
 
 	t.Data = dec.Data
@@ -327,7 +328,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	for _, i := range dec.GasLimit {
 		j, err := stringToUint64(i)
 		if err != nil {
-			return fmt.Errorf("failed to convert string '%s' to uint64: %v", i, err)
+			return fmt.Errorf("failed to convert string '%s' to uint64: %w", i, err)
 		}
 
 		t.GasLimit = append(t.GasLimit, j)
@@ -353,25 +354,25 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 
 	if dec.GasPrice != "" {
 		if t.GasPrice, err = stringToBigInt(dec.GasPrice); err != nil {
-			return fmt.Errorf("failed to parse gas price: %v", err)
+			return fmt.Errorf("failed to parse gas price: %w", err)
 		}
 	}
 
 	if dec.MaxFeePerGas != "" {
 		if t.MaxFeePerGas, err = stringToBigInt(dec.MaxFeePerGas); err != nil {
-			return fmt.Errorf("failed to parse max fee per gas: %v", err)
+			return fmt.Errorf("failed to parse max fee per gas: %w", err)
 		}
 	}
 
 	if dec.MaxPriorityFeePerGas != "" {
 		if t.MaxPriorityFeePerGas, err = stringToBigInt(dec.MaxPriorityFeePerGas); err != nil {
-			return fmt.Errorf("failed to parse max priority fee per gas: %v", err)
+			return fmt.Errorf("failed to parse max priority fee per gas: %w", err)
 		}
 	}
 
 	if dec.Nonce != "" {
 		if t.Nonce, err = stringToUint64(dec.Nonce); err != nil {
-			return fmt.Errorf("failed to parse nonce: %v", err)
+			return fmt.Errorf("failed to parse nonce: %w", err)
 		}
 	}
 
@@ -380,7 +381,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	if len(dec.SecretKey) > 0 {
 		secretKey, err := types.ParseBytes(&dec.SecretKey)
 		if err != nil {
-			return fmt.Errorf("failed to parse secret key: %v", err)
+			return fmt.Errorf("failed to parse secret key: %w", err)
 		}
 
 		key, err := crypto.ParseECDSAPrivateKey(secretKey)
