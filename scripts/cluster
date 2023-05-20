@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+function downloadInstallSubmodules() {
+  if [ -z "$(ls -A core-contracts)" ]
+  then
+    make download-submodules
+    cd core-contracts && npm install && npm run compile && cd -
+  fi
+}
+
 function initIbftConsensus() {
   echo "Running with ibft consensus"
   ./polygon-edge secrets init --insecure --data-dir test-chain- --num 4
@@ -130,12 +138,12 @@ function startServerFromBinary() {
 }
 
 function startServerFromDockerCompose() {
+  downloadInstallSubmodules
   case "$1" in
   "ibft")
     docker-compose -f ./docker/local/docker-compose.yml up -d --build
     ;;
   "polybft")
-    cd core-contracts && npm install && npm run compile && cd -
     go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
     EDGE_CONSENSUS=polybft docker-compose -f ./docker/local/docker-compose.yml up -d --build
     ;;
