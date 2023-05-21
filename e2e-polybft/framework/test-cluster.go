@@ -935,6 +935,23 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	return tTxn
 }
 
+func (c *TestCluster) PolyBFTConfig(t *testing.T, chainConfigFileName string) polybft.PolyBFTConfig {
+	t.Helper()
+
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(c.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
+	return polybftCfg
+}
+
+func (c *TestCluster) JSONRPCAddr() string {
+	return c.Servers[0].JSONRPCAddr()
+}
+
+func (c *TestCluster) JSONRPC() *jsonrpc.Client {
+	return c.Servers[0].JSONRPC()
+}
+
 type TestTxn struct {
 	client  *jsonrpc.Eth
 	hash    ethgo.Hash

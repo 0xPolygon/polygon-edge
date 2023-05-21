@@ -11,7 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
+	bridgecommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
@@ -29,6 +31,20 @@ import (
 const (
 	chainConfigFileName = "genesis.json"
 )
+
+type testCluster interface {
+	WaitForBlock(n uint64, timeout time.Duration) error
+	PolyBFTConfig(t *testing.T, chainConfigFileName string) polybft.PolyBFTConfig
+	JSONRPCAddr() string
+	JSONRPC() *jsonrpc.Client
+}
+
+type testBridge interface {
+	Deposit(tokenType bridgecommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address, receivers, amounts, tokenIDs string) error
+	Withdraw(token bridgecommon.TokenType, senderKey, receivers, amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error
+	SendExitTransaction(exitHelper types.Address, exitID uint64, rootJSONRPCAddr, childJSONRPCAddr string) error
+	JSONRPCAddr() string
+}
 
 func TestE2E_Bridge_Transfers(t *testing.T) {
 	const (
@@ -53,25 +69,42 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
 	}
 
-	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNumBlockConfirmations(numBlockConfirmations),
-		framework.WithEpochSize(epochSize))
-	defer cluster.Stop()
+	// Set up specific to test env
+	var (
+		cluster testCluster	
+		bridge testBridge
+		senderKey string
+	)
 
-	cluster.WaitForReady(t)
+	// TODO: Some logic about being local or remote cluster
+	if true {
+		c := framework.NewTestCluster(t, 5,
+			framework.WithNumBlockConfirmations(numBlockConfirmations),
+			framework.WithEpochSize(epochSize))
+		defer c.Stop()
+		c.WaitForReady(t)
+		senderAccount, err := sidechain.GetAccountFromDir(c.Servers[0].DataDir())
+		require.NoError(t, err)
+		t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
+		rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
+		require.NoError(t, err)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
-	require.NoError(t, err)
+		senderKey = hex.EncodeToString(rawKey)
+		cluster = c
+		bridge = c.Bridge
+	} else {
+		// TODO: impl remote cluster setup
+	}
 
-	validatorSrv := cluster.Servers[0]
-	childEthEndpoint := validatorSrv.JSONRPC().Eth()
+	polybftCfg := cluster.PolyBFTConfig(t, chainConfigFileName)
+	childEthEndpoint := cluster.JSONRPC().Eth()
 
 	t.Run("bridge ERC 20 tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
 		require.NoError(
 			t,
-			cluster.Bridge.Deposit(
+			bridge.Deposit(
 				common.ERC20,
 				polybftCfg.Bridge.RootNativeERC20Addr,
 				polybftCfg.Bridge.RootERC20PredicateAddr,
@@ -114,25 +147,17 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		t.Log("Deposits were successfully processed")
 
 		// WITHDRAW ERC20 TOKENS
-		rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-		require.NoError(t, err)
-
-		senderAccount, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
-		require.NoError(t, err)
-
-		t.Logf("Withdraw sender: %s\n", senderAccount.Ecdsa.Address())
-
-		rawKey, err := senderAccount.Ecdsa.MarshallPrivateKey()
+		rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(bridge.JSONRPCAddr()))
 		require.NoError(t, err)
 
 		// send withdraw transaction
-		err = cluster.Bridge.Withdraw(
+		err = bridge.Withdraw(
 			common.ERC20,
-			hex.EncodeToString(rawKey),
+			senderKey,
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 			"",
-			validatorSrv.JSONRPCAddr(),
+			cluster.JSONRPCAddr(),
 			contracts.NativeERC20TokenContract)
 		require.NoError(t, err)
 
@@ -150,14 +175,14 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 		exitHelper := polybftCfg.Bridge.ExitHelperAddr
-		rootJSONRPC := cluster.Bridge.JSONRPCAddr()
-		childJSONRPC := validatorSrv.JSONRPCAddr()
+		rootJSONRPC := bridge.JSONRPCAddr()
+		childJSONRPC := cluster.JSONRPCAddr()
 
 		for i := uint64(0); i < transfersCount; i++ {
 			exitEventID := i + 1
 
 			// send exit transaction to exit helper
-			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
+			err = bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 			require.NoError(t, err)
 
 			// make sure exit event is processed successfully
@@ -198,7 +223,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// send two transactions to the bridge so that we have a minimal commitment
 		require.NoError(
 			t,
-			cluster.Bridge.Deposit(
+			bridge.Deposit(
 				common.ERC20,
 				polybftCfg.Bridge.RootNativeERC20Addr,
 				polybftCfg.Bridge.RootERC20PredicateAddr,
@@ -212,7 +237,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		midBlockNumber := initialBlockNum + 2*sprintSize
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber, 2*time.Minute))
 
-		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.JSONRPC()))
 		require.NoError(t, err)
 
 		lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
@@ -230,7 +255,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// send some more transactions to the bridge to build another commitment in epoch
 		require.NoError(
 			t,
-			cluster.Bridge.Deposit(
+			bridge.Deposit(
 				common.ERC20,
 				polybftCfg.Bridge.RootNativeERC20Addr,
 				polybftCfg.Bridge.RootERC20PredicateAddr,
