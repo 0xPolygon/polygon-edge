@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	bridgecommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
@@ -40,8 +39,8 @@ type testCluster interface {
 }
 
 type testBridge interface {
-	Deposit(tokenType bridgecommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address, receivers, amounts, tokenIDs string) error
-	Withdraw(token bridgecommon.TokenType, senderKey, receivers, amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error
+	Deposit(tokenType common.TokenType, rootTokenAddr, rootPredicateAddr types.Address, receivers, amounts, tokenIDs string) error
+	Withdraw(token common.TokenType, senderKey, receivers, amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error
 	SendExitTransaction(exitHelper types.Address, exitID uint64, rootJSONRPCAddr, childJSONRPCAddr string) error
 	JSONRPCAddr() string
 }
@@ -345,6 +344,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	} else {
 		// TODO: impl remote cluster setup
 	}
+
 	polybftCfg := cluster.PolyBFTConfig(t, chainConfigFileName)
 
 	// DEPOSIT ERC721 TOKENS
@@ -525,6 +525,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	} else {
 		// TODO: impl remote cluster setup
 	}
+
 	polybftCfg := cluster.PolyBFTConfig(t, chainConfigFileName)
 
 	// DEPOSIT ERC1155 TOKENS
