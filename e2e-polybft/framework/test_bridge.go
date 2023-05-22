@@ -106,66 +106,9 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
 	receivers, amounts, tokenIDs string) error {
-	args := []string{}
-
-	if receivers == "" {
-		return errors.New("provide at least one receiver address value")
-	}
-
-	switch token {
-	case bridgeCommon.ERC20:
-		if amounts == "" {
-			return errors.New("provide at least one amount value")
-		}
-
-		if tokenIDs != "" {
-			return errors.New("not expected to provide token ids for ERC-20 deposits")
-		}
-
-		args = append(args,
-			"bridge",
-			"deposit-erc20",
-			"--test",
-			"--root-token", rootTokenAddr.String(),
-			"--root-predicate", rootPredicateAddr.String(),
-			"--receivers", receivers,
-			"--amounts", amounts)
-
-	case bridgeCommon.ERC721:
-		if tokenIDs == "" {
-			return errors.New("provide at least one token id value")
-		}
-
-		args = append(args,
-			"bridge",
-			"deposit-erc721",
-			"--test",
-			"--root-token", rootTokenAddr.String(),
-			"--root-predicate", rootPredicateAddr.String(),
-			"--receivers", receivers,
-			"--token-ids", tokenIDs)
-
-	case bridgeCommon.ERC1155:
-		if amounts == "" {
-			return errors.New("provide at least one amount value")
-		}
-
-		if tokenIDs == "" {
-			return errors.New("provide at least one token id value")
-		}
-
-		args = append(args,
-			"bridge",
-			"deposit-erc1155",
-			"--test",
-			"--root-token", rootTokenAddr.String(),
-			"--root-predicate", rootPredicateAddr.String(),
-			"--receivers", receivers,
-			"--amounts", amounts,
-			"--token-ids", tokenIDs)
-	}
-
-	return t.cmdRun(args...)
+	return deposit(token, rootPredicateAddr, rootPredicateAddr,
+		receivers, amounts, tokenIDs,
+		t.clusterConfig.Binary, t.clusterConfig.GetStdout("bridge"))
 }
 
 // Withdraw function is used to invoke bridge withdrawals for any kind of ERC tokens (from the child to the root chain)
@@ -173,95 +116,16 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 	senderKey, receivers,
 	amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error {
-	if senderKey == "" {
-		return errors.New("provide hex-encoded sender private key")
-	}
-
-	if receivers == "" {
-		return errors.New("provide at least one receiver address value")
-	}
-
-	if jsonRPCEndpoint == "" {
-		return errors.New("provide a JSON RPC endpoint URL")
-	}
-
-	args := []string{}
-
-	switch token {
-	case bridgeCommon.ERC20:
-		if amounts == "" {
-			return errors.New("provide at least one amount value")
-		}
-
-		if tokenIDs != "" {
-			return errors.New("not expected to provide token ids for ERC-20 withdrawals")
-		}
-
-		args = append(args,
-			"bridge",
-			"withdraw-erc20",
-			"--sender-key", senderKey,
-			"--receivers", receivers,
-			"--amounts", amounts,
-			"--json-rpc", jsonRPCEndpoint)
-
-	case bridgeCommon.ERC721:
-		if tokenIDs == "" {
-			return errors.New("provide at least one token id value")
-		}
-
-		args = append(args,
-			"bridge",
-			"withdraw-erc721",
-			"--sender-key", senderKey,
-			"--receivers", receivers,
-			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint,
-			"--child-token", childToken.String())
-
-	case bridgeCommon.ERC1155:
-		if amounts == "" {
-			return errors.New("provide at least one amount value")
-		}
-
-		if tokenIDs == "" {
-			return errors.New("provide at least one token id value")
-		}
-
-		args = append(args,
-			"bridge",
-			"withdraw-erc1155",
-			"--sender-key", senderKey,
-			"--receivers", receivers,
-			"--amounts", amounts,
-			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint,
-			"--child-token", childToken.String())
-	}
-
-	return t.cmdRun(args...)
+	return withdraw(token, senderKey, receivers, amounts, tokenIDs,
+		jsonRPCEndpoint, childToken,
+		t.clusterConfig.Binary, t.clusterConfig.GetStdout("bridge"))
 }
 
 // SendExitTransaction sends exit transaction to the root chain
 func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64,
 	rootJSONRPCAddr, childJSONRPCAddr string) error {
-	if rootJSONRPCAddr == "" {
-		return errors.New("provide a root JSON RPC endpoint URL")
-	}
-
-	if childJSONRPCAddr == "" {
-		return errors.New("provide a child JSON RPC endpoint URL")
-	}
-
-	return t.cmdRun(
-		"bridge",
-		"exit",
-		"--exit-helper", exitHelper.String(),
-		"--exit-id", strconv.FormatUint(exitID, 10),
-		"--root-json-rpc", rootJSONRPCAddr,
-		"--child-json-rpc", childJSONRPCAddr,
-		"--test",
-	)
+	return sendExitTransaction(exitHelper, exitID, rootJSONRPCAddr, childJSONRPCAddr,
+		t.clusterConfig.Binary, t.clusterConfig.GetStdout("bridge"))
 }
 
 // cmdRun executes arbitrary command from the given binary

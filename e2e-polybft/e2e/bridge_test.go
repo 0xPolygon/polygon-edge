@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net/url"
 	"path"
 	"strings"
 	"testing"
@@ -92,7 +93,12 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		cluster = c
 		bridge = c.Bridge
 	} else {
-		// TODO: impl remote cluster setup
+		childURL, err := url.Parse("TODO")
+		rootURL, err := url.Parse("TODO")
+		require.NoError(t, err)
+		cluster = framework.NewRemoteCluster(t, "TODO_ENV", childURL)
+		bridge = framework.NewRemoteBridge(t, rootURL)
+		senderKey = "TODO"
 	}
 
 	polybftCfg := cluster.PolyBFTConfig(t, chainConfigFileName)

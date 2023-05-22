@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -761,29 +760,6 @@ func (c *TestCluster) getOpenPort() int64 {
 	c.initialPort++
 
 	return c.initialPort
-}
-
-// runCommand executes command with given arguments
-func runCommand(binary string, args []string, stdout io.Writer) error {
-	var stdErr bytes.Buffer
-
-	cmd := exec.Command(binary, args...)
-	cmd.Stderr = &stdErr
-	cmd.Stdout = stdout
-
-	if err := cmd.Run(); err != nil {
-		if stdErr.Len() > 0 {
-			return fmt.Errorf("failed to execute command: %s", stdErr.String())
-		}
-
-		return fmt.Errorf("failed to execute command: %w", err)
-	}
-
-	if stdErr.Len() > 0 {
-		return fmt.Errorf("error during command execution: %s", stdErr.String())
-	}
-
-	return nil
 }
 
 // RunEdgeCommand - calls a command line edge function
