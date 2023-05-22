@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -37,7 +38,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	outputter := command.InitializeOutputter(GetCommand())
 
 	require.NotPanics(t, func() {
-		_, err = deployContracts(outputter, client, 10, []*polybft.Validator{})
+		_, _, err = deployContracts(outputter, client, 1, []*validator.GenesisValidator{}, context.Background())
 	})
 	require.NoError(t, err)
 }

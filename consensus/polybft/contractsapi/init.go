@@ -14,27 +14,36 @@ const (
 
 var (
 	// core-contracts smart contracts
-	CheckpointManager     *artifact.Artifact
-	ExitHelper            *artifact.Artifact
-	StateSender           *artifact.Artifact
-	RootERC20Predicate    *artifact.Artifact
-	RootERC721Predicate   *artifact.Artifact
-	RootERC1155Predicate  *artifact.Artifact
-	BLS                   *artifact.Artifact
-	BLS256                *artifact.Artifact
-	System                *artifact.Artifact
-	Merkle                *artifact.Artifact
-	ChildValidatorSet     *artifact.Artifact
-	NativeERC20           *artifact.Artifact
-	NativeERC20Mintable   *artifact.Artifact
-	StateReceiver         *artifact.Artifact
-	ChildERC20            *artifact.Artifact
-	ChildERC20Predicate   *artifact.Artifact
-	ChildERC721           *artifact.Artifact
-	ChildERC721Predicate  *artifact.Artifact
-	ChildERC1155          *artifact.Artifact
-	ChildERC1155Predicate *artifact.Artifact
-	L2StateSender         *artifact.Artifact
+	CheckpointManager               *artifact.Artifact
+	ExitHelper                      *artifact.Artifact
+	StateSender                     *artifact.Artifact
+	RootERC20Predicate              *artifact.Artifact
+	RootERC721Predicate             *artifact.Artifact
+	RootERC1155Predicate            *artifact.Artifact
+	BLS                             *artifact.Artifact
+	BLS256                          *artifact.Artifact
+	System                          *artifact.Artifact
+	Merkle                          *artifact.Artifact
+	ChildValidatorSet               *artifact.Artifact
+	NativeERC20                     *artifact.Artifact
+	NativeERC20Mintable             *artifact.Artifact
+	StateReceiver                   *artifact.Artifact
+	ChildERC20                      *artifact.Artifact
+	ChildERC20Predicate             *artifact.Artifact
+	ChildERC20PredicateAccessList   *artifact.Artifact
+	ChildERC721                     *artifact.Artifact
+	ChildERC721Predicate            *artifact.Artifact
+	ChildERC721PredicateAccessList  *artifact.Artifact
+	ChildERC1155                    *artifact.Artifact
+	ChildERC1155Predicate           *artifact.Artifact
+	ChildERC1155PredicateAccessList *artifact.Artifact
+	L2StateSender                   *artifact.Artifact
+	CustomSupernetManager           *artifact.Artifact
+	StakeManager                    *artifact.Artifact
+	RewardPool                      *artifact.Artifact
+	ValidatorSet                    *artifact.Artifact
+	RootERC721                      *artifact.Artifact
+	RootERC1155                     *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -42,8 +51,7 @@ var (
 	TestWriteBlockMetadata *artifact.Artifact
 	RootERC20              *artifact.Artifact
 	TestSimple             *artifact.Artifact
-	RootERC721             *artifact.Artifact
-	RootERC1155            *artifact.Artifact
+	TestRewardToken        *artifact.Artifact
 )
 
 func init() {
@@ -119,12 +127,22 @@ func init() {
 		log.Fatal(err)
 	}
 
+	ChildERC20PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC20PredicateAccessListArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	ChildERC721, err = artifact.DecodeArtifact([]byte(ChildERC721Artifact))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	ChildERC721Predicate, err = artifact.DecodeArtifact([]byte(ChildERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildERC721PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC721PredicateAccessListArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,7 +157,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	ChildValidatorSet, err = artifact.DecodeArtifact([]byte(ChildValidatorSetArtifact))
+	ChildERC1155PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateAccessListArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -175,6 +193,31 @@ func init() {
 	}
 
 	TestSimple, err = artifact.DecodeArtifact(readTestContractContent("TestSimple.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TestRewardToken, err = artifact.DecodeArtifact(readTestContractContent("TestRewardToken.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	CustomSupernetManager, err = artifact.DecodeArtifact([]byte(CustomSupernetManagerArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	StakeManager, err = artifact.DecodeArtifact([]byte(StakeManagerArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RewardPool, err = artifact.DecodeArtifact([]byte(RewardPoolArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ValidatorSet, err = artifact.DecodeArtifact([]byte(ValidatorSetArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

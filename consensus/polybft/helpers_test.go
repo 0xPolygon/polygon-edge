@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -58,39 +59,47 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash, 
 }
 
 func createTestCommitEpochInput(t *testing.T, epochID uint64,
-	validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochChildValidatorSetFn {
+	epochSize uint64) *contractsapi.CommitEpochValidatorSetFn {
 	t.Helper()
-
-	if validatorSet == nil {
-		validatorSet = newTestValidators(t, 5).getPublicIdentities()
-	}
 
 	var startBlock uint64 = 0
 	if epochID > 1 {
 		startBlock = (epochID - 1) * epochSize
 	}
 
-	uptime := &contractsapi.Uptime{
-		EpochID:     new(big.Int).SetUint64(epochID),
-		UptimeData:  []*contractsapi.UptimeData{},
-		TotalBlocks: new(big.Int).SetUint64(epochSize),
-	}
-
-	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
-		ID: uptime.EpochID,
+	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
+		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(startBlock + 1),
 			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
 			EpochRoot:  types.Hash{},
 		},
-		Uptime: uptime,
-	}
-
-	for i := range validatorSet {
-		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
 	}
 
 	return commitEpoch
+}
+
+func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
+	validatorSet validator.AccountSet, epochSize uint64) *contractsapi.DistributeRewardForRewardPoolFn {
+	t.Helper()
+
+	if validatorSet == nil {
+		validatorSet = validator.NewTestValidators(t, 5).GetPublicIdentities()
+	}
+
+	uptime := make([]*contractsapi.Uptime, len(validatorSet))
+
+	for i, v := range validatorSet {
+		uptime[i] = &contractsapi.Uptime{
+			Validator:    v.Address,
+			SignedBlocks: new(big.Int).SetUint64(epochSize),
+		}
+	}
+
+	return &contractsapi.DistributeRewardForRewardPoolFn{
+		EpochID: new(big.Int).SetUint64(epochID),
+		Uptime:  uptime,
+	}
 }
 
 func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contractsapi.StateSyncedEvent {

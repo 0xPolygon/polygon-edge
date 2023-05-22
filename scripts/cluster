@@ -15,7 +15,11 @@ function initIbftConsensus() {
 function initPolybftConsensus() {
   echo "Running with polybft consensus"
   genesis_params="--consensus polybft"
-  ./polygon-edge polybft-secrets --insecure --data-dir test-chain- --num 4
+
+  address1=$(./polygon-edge polybft-secrets --insecure --data-dir test-chain-1 | grep Public | head -n 1 | awk -F ' ' '{print $5}')
+  address2=$(./polygon-edge polybft-secrets --insecure --data-dir test-chain-2 | grep Public | head -n 1 | awk -F ' ' '{print $5}')
+  address3=$(./polygon-edge polybft-secrets --insecure --data-dir test-chain-3 | grep Public | head -n 1 | awk -F ' ' '{print $5}')
+  address4=$(./polygon-edge polybft-secrets --insecure --data-dir test-chain-4 | grep Public | head -n 1 | awk -F ' ' '{print $5}')
 }
 
 function createGenesis() {
@@ -24,7 +28,72 @@ function createGenesis() {
     --premine 0x85da99c8a7c2c95964c8efd687e95e632fc533d6:1000000000000000000000 \
     --premine 0x0000000000000000000000000000000000000000 \
     --epoch-size 10 \
-    --burn-contract 0:0x0000000000000000000000000000000000000000
+    --burn-contract 0:0x0000000000000000000000000000000000000000 \
+    --reward-wallet 0xDEADBEEF:1000000
+}
+
+function initRootchain() {
+  echo "Initializing rootchain"
+
+  ./polygon-edge rootchain server > /dev/null &
+  
+  set +e
+  t=1
+  while [ $t -gt 0 ]
+  do
+    nc -z 127.0.0.1 8545 </dev/null
+    t=$?
+    sleep 1
+  done
+  set -e
+  
+  ./polygon-edge rootchain deploy --test
+  
+  rootERC20=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.nativeERC20Address')
+  stakeManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr')
+  customSupernetManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')
+  chainID=$(cat genesis.json | jq -r '.params.chainID')
+
+  ./polygon-edge rootchain fund \
+    --native-root-token ${rootERC20} \
+    --mint \
+    --addresses ${address1},${address2},${address3},${address4} \
+    --amounts 1000000000000000000000000,1000000000000000000000000,1000000000000000000000000,1000000000000000000000000
+
+  ./polygon-edge polybft whitelist-validators \
+    --addresses ${address1},${address2},${address3},${address4} \
+    --supernet-manager ${customSupernetManagerAddr} \
+    --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
+    --jsonrpc http://127.0.0.1:8545
+
+  counter=1
+  while [ $counter -le 4 ]
+  do
+    echo "Registering validator: ${counter}"
+
+    ./polygon-edge polybft register-validator \
+    --supernet-manager ${customSupernetManagerAddr} \
+    --data-dir test-chain-${counter} \
+    --jsonrpc http://127.0.0.1:8545
+
+    ./polygon-edge polybft stake \
+    --data-dir test-chain-${counter} \
+    --amount 1000000000000000000000000 \
+    --chain-id ${chainID} \
+    --stake-manager ${stakeManagerAddr} \
+    --native-root-token ${rootERC20} \
+    --jsonrpc http://127.0.0.1:8545
+
+    ((counter++))
+  done
+
+  ./polygon-edge polybft supernet \
+    --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
+    --supernet-manager ${customSupernetManagerAddr} \
+    --stake-manager ${stakeManagerAddr} \
+    --finalize-genesis-set \
+    --enable-staking \
+    --jsonrpc http://127.0.0.1:8545
 }
 
 function startServerFromBinary() {
@@ -127,6 +196,7 @@ case "$2" in
     initPolybftConsensus
     # Create genesis file and start the server from binary
     createGenesis
+    initRootchain
     startServerFromBinary $2
     exit 0
   else

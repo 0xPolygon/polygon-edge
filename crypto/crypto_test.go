@@ -456,13 +456,6 @@ func TestRecoverPublicKey(t *testing.T) {
 		require.ErrorIs(t, err, errHashOfInvalidLength)
 	})
 
-	t.Run("Zero hash", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := RecoverPubkey(testSignature, types.ZeroHash[:])
-		require.ErrorIs(t, err, errZeroHash)
-	})
-
 	t.Run("Ok signature and hash", func(t *testing.T) {
 		t.Parallel()
 

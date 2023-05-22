@@ -11,8 +11,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
+
+var _ txrelayer.TxRelayer = (*txRelayerMock)(nil)
 
 type txRelayerMock struct {
 	mock.Mock
@@ -34,6 +37,10 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	args := t.Called(txn)
 
 	return nil, args.Error(1)
+}
+
+func (t *txRelayerMock) Client() *jsonrpc.Client {
+	return nil
 }
 
 func Test_executeStateSync(t *testing.T) {

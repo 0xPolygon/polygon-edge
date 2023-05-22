@@ -24,11 +24,18 @@ var (
 	// ZeroHash is the default zero hash
 	ZeroHash = Hash{}
 
+	// ZeroNonce is the default empty nonce
+	ZeroNonce = Nonce{}
+
 	// EmptyRootHash is the root when there are no transactions
 	EmptyRootHash = StringToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 
 	// EmptyUncleHash is the root when there are no uncles
 	EmptyUncleHash = StringToHash("0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+
+	// EmptyCodeHash is the root where there is no code.
+	// Equivalent of: `types.BytesToHash(crypto.Keccak256(nil))`
+	EmptyCodeHash = StringToHash("0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470")
 )
 
 type Hash [HashLength]byte
@@ -131,6 +138,27 @@ func StringToBytes(str string) []byte {
 	b, _ := hex.DecodeString(str)
 
 	return b
+}
+
+// IsValidAddress checks if provided string is a valid Ethereum address
+func IsValidAddress(address string) error {
+	// remove 0x prefix if it exists
+	if strings.HasPrefix(address, "0x") {
+		address = address[2:]
+	}
+
+	// decode the address
+	decodedAddress, err := hex.DecodeString(address)
+	if err != nil {
+		return fmt.Errorf("address %s contains invalid characters", address)
+	}
+
+	// check if the address has the correct length
+	if len(decodedAddress) != AddressLength {
+		return fmt.Errorf("address %s has invalid length", address)
+	}
+
+	return nil
 }
 
 // UnmarshalText parses a hash in hex syntax.

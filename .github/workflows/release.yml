@@ -12,6 +12,8 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_CONFIG: $HOME/.docker
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -28,8 +30,15 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           echo tag_name=${TAG} >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Run GoReleaser
         run: |
@@ -38,9 +47,8 @@ jobs:
           		--privileged \
           		-e CGO_ENABLED=1 \
           		-e GITHUB_TOKEN \
-          		-e DOCKER_USERNAME \
-          		-e DOCKER_PASSWORD \
           		-e SLACK_WEBHOOK \
+              -e DOCKER_CONFIG \
           		-v /var/run/docker.sock:/var/run/docker.sock \
           		-v `pwd`:/go/src/$(PACKAGE_NAME) \
           		-w /go/src/$(PACKAGE_NAME) \
@@ -51,7 +59,4 @@ jobs:
           GOLANG_CROSS_VERSION: v1.19.5
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
-          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_EDGE_GITHUB_URL }}

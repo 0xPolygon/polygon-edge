@@ -42,7 +42,7 @@ func (b *Block) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		v0 := ar.NewArray()
 		for _, tx := range b.Transactions {
 			if tx.Type != LegacyTx {
-				v0.Set(ar.NewBytes([]byte{byte(tx.Type)}))
+				v0.Set(ar.NewCopyBytes([]byte{byte(tx.Type)}))
 			}
 
 			v0.Set(tx.MarshalRLPWith(ar))
@@ -75,12 +75,12 @@ func (h *Header) MarshalRLPTo(dst []byte) []byte {
 func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
-	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
-	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.ParentHash.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.Sha3Uncles.Bytes()))
 	vv.Set(arena.NewCopyBytes(h.Miner[:]))
-	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
-	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
-	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.StateRoot.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.TxRoot.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.ReceiptsRoot.Bytes()))
 	vv.Set(arena.NewCopyBytes(h.LogsBloom[:]))
 
 	vv.Set(arena.NewUint(h.Difficulty))
@@ -90,7 +90,7 @@ func (h *Header) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewUint(h.Timestamp))
 
 	vv.Set(arena.NewCopyBytes(h.ExtraData))
-	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.MixHash.Bytes()))
 	vv.Set(arena.NewCopyBytes(h.Nonce[:]))
 
 	vv.Set(arena.NewUint(h.BaseFee))
@@ -107,7 +107,7 @@ func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 
 	for _, rr := range *r {
 		if !rr.IsLegacyTx() {
-			vv.Set(a.NewBytes([]byte{byte(rr.TransactionType)}))
+			vv.Set(a.NewCopyBytes([]byte{byte(rr.TransactionType)}))
 		}
 
 		vv.Set(rr.MarshalRLPWith(a))
@@ -135,7 +135,7 @@ func (r *Receipt) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	if r.Status != nil {
 		vv.Set(a.NewUint(uint64(*r.Status)))
 	} else {
-		vv.Set(a.NewBytes(r.Root[:]))
+		vv.Set(a.NewCopyBytes(r.Root[:]))
 	}
 
 	vv.Set(a.NewUint(r.CumulativeGasUsed))
@@ -163,15 +163,15 @@ func (r *Receipt) MarshalLogsWith(a *fastrlp.Arena) *fastrlp.Value {
 
 func (l *Log) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	v := a.NewArray()
-	v.Set(a.NewBytes(l.Address.Bytes()))
+	v.Set(a.NewCopyBytes(l.Address.Bytes()))
 
 	topics := a.NewArray()
 	for _, t := range l.Topics {
-		topics.Set(a.NewBytes(t.Bytes()))
+		topics.Set(a.NewCopyBytes(t.Bytes()))
 	}
 
 	v.Set(topics)
-	v.Set(a.NewBytes(l.Data))
+	v.Set(a.NewCopyBytes(l.Data))
 
 	return v
 }
@@ -215,7 +215,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 	// Address may be empty
 	if t.To != nil {
-		vv.Set(arena.NewBytes((*t.To).Bytes()))
+		vv.Set(arena.NewCopyBytes(t.To.Bytes()))
 	} else {
 		vv.Set(arena.NewNull())
 	}
@@ -237,7 +237,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv.Set(arena.NewBigInt(t.S))
 
 	if t.Type == StateTx {
-		vv.Set(arena.NewBytes((t.From).Bytes()))
+		vv.Set(arena.NewCopyBytes(t.From.Bytes()))
 	}
 
 	return vv

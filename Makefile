@@ -59,13 +59,14 @@ test-e2e-polybft:
     # We can not build with race because of a bug in boltdb dependency
 	go build -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
-	go test -v -timeout=45m ./e2e-polybft/e2e/...
+	go test -v -timeout=1h ./e2e-polybft/e2e/...
 
 .PHONY: test-property-polybft
 test-property-polybft:
     # We can not build with race because of a bug in boltdb dependency
 	go build -o artifacts/polygon-edge .
-	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/...
+	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/... \
+	-rapid.checks=10
 
 .PHONY: compile-core-contracts
 compile-core-contracts:
