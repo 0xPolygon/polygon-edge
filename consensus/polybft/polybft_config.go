@@ -44,6 +44,9 @@ type PolyBFTConfig struct {
 	SupernetID int64 `json:"supernetID"`
 
 	// MaxValidatorSetSize indicates the maximum size of validator set
+	MinValidatorSetSize uint64 `json:"minValidatorSetSize"`
+
+	// MaxValidatorSetSize indicates the maximum size of validator set
 	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
 
 	// RewardConfig defines rewards configuration

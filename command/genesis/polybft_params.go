@@ -133,6 +133,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Governance:          initialValidators[0].Address,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
 		NativeTokenConfig:   p.nativeTokenConfig,
+		MinValidatorSetSize: p.minNumValidators,
 		MaxValidatorSetSize: p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
