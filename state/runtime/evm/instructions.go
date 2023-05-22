@@ -914,8 +914,7 @@ func opBaseFee(c *state) {
 		return
 	}
 
-	baseFee := new(big.Int).Set(c.host.GetTxContext().BaseFee)
-	c.push1().SetUint64(baseFee.Uint64())
+	c.push(c.host.GetTxContext().BaseFee)
 }
 
 func opSelfDestruct(c *state) {
