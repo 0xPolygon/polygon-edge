@@ -19,8 +19,9 @@ import (
 // It does not include Merge hardfork test cases.
 
 const (
-	stateTests       = "tests/GeneralStateTests"
-	legacyStateTests = "tests/LegacyTests/Constantinople/GeneralStateTests"
+	stateTests         = "tests/GeneralStateTests"
+	legacyStateTests   = "tests/LegacyTests/Constantinople/GeneralStateTests"
+	testGenesisBaseFee = 0x0a
 )
 
 var (
@@ -45,9 +46,9 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 		if c.Env.BaseFee != "" {
 			baseFee = stringToBigIntT(t, c.Env.BaseFee)
 		} else {
-			// Retesteth uses `0x10` for genesis baseFee. Therefore, it defaults to
+			// Retesteth uses `10` for genesis baseFee. Therefore, it defaults to
 			// parent - 2 : 0xa as the basefee for 'this' context.
-			baseFee = big.NewInt(0x0a)
+			baseFee = big.NewInt(testGenesisBaseFee)
 		}
 	}
 
