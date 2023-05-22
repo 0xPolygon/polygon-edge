@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"testing"
@@ -93,12 +94,12 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		cluster = c
 		bridge = c.Bridge
 	} else {
-		childURL, err := url.Parse("TODO")
-		rootURL, err := url.Parse("TODO")
+		childURL, err := url.Parse(os.Getenv("E2E_CHILD_RPC_URL"))
+		rootURL, err := url.Parse(os.Getenv("E2E_ROOT_RPC_URL"))
 		require.NoError(t, err)
-		cluster = framework.NewRemoteCluster(t, "TODO_ENV", childURL)
+		cluster = framework.NewRemoteCluster(t, os.Getenv("E2E_CHAIN_CONFIG_FILENAME"), childURL)
 		bridge = framework.NewRemoteBridge(t, rootURL)
-		senderKey = "TODO"
+		senderKey = os.Getenv("E2E_SENDER_KEY")
 	}
 
 	polybftCfg := cluster.PolyBFTConfig(t, chainConfigFileName)
