@@ -375,10 +375,13 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 		return nil, err
 	}
 
-	logs := make([]*Log, 0)
+	var (
+		logIdx int
+		logs   = make([]*Log, 0)
+	)
 
 	for idx, receipt := range receipts {
-		for logIdx, log := range receipt.Logs {
+		for _, log := range receipt.Logs {
 			if query.Match(log) {
 				logs = append(logs, &Log{
 					Address:     log.Address,
@@ -391,6 +394,8 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 					LogIndex:    argUint64(logIdx),
 				})
 			}
+
+			logIdx++
 		}
 	}
 
