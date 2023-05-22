@@ -34,7 +34,7 @@ const (
 )
 
 type testCluster interface {
-	WaitForBlock(n uint64, timeout time.Duration) error
+	WaitForBlock(t *testing.T, n uint64, timeout time.Duration)
 	PolyBFTConfig(t *testing.T, chainConfigFileName string) polybft.PolyBFTConfig
 	JSONRPCAddr() string
 	JSONRPC() *jsonrpc.Client
@@ -78,7 +78,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	)
 
 	// TODO: Some logic about being local or remote cluster
-	if true {
+	if false {
 		c := framework.NewTestCluster(t, 5,
 			framework.WithNumBlockConfirmations(numBlockConfirmations),
 			framework.WithEpochSize(epochSize))
@@ -97,9 +97,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		childURL, err := url.Parse(os.Getenv("E2E_CHILD_RPC_URL"))
 		rootURL, err := url.Parse(os.Getenv("E2E_ROOT_RPC_URL"))
 		require.NoError(t, err)
-		cluster = framework.NewRemoteCluster(t, os.Getenv("E2E_CHAIN_CONFIG_FILENAME"), childURL)
-		bridge = framework.NewRemoteBridge(t, rootURL)
+		cluster = framework.NewRemoteCluster(t, os.Getenv("E2E_CHAIN_CONFIG_FILENAME"), childURL, 10*time.Second)
 		senderKey = os.Getenv("E2E_SENDER_KEY")
+		bridge = framework.NewRemoteBridge(t, rootURL, senderKey)
 	}
 
 	polybftCfg := cluster.PolyBFTConfig(t, chainConfigFileName)
@@ -120,9 +120,11 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			),
 		)
 
-		finalBlockNum := 8 * sprintSize
+		initialBlockNum, err := childEthEndpoint.BlockNumber()
+		require.NoError(t, err)
+		finalBlockNum := initialBlockNum + 8*sprintSize
 		// wait for a couple of sprints
-		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
+		cluster.WaitForBlock(t, finalBlockNum, 2*time.Minute)
 
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -224,7 +226,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// wait for next sprint block as the starting point,
 		// in order to be able to make assertions against blocks offseted by sprints
 		initialBlockNum = initialBlockNum + sprintSize - (initialBlockNum % sprintSize)
-		require.NoError(t, cluster.WaitForBlock(initialBlockNum, 1*time.Minute))
+		cluster.WaitForBlock(t, initialBlockNum, 1*time.Minute)
 
 		// send two transactions to the bridge so that we have a minimal commitment
 		require.NoError(
@@ -241,7 +243,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		// wait for a few more sprints
 		midBlockNumber := initialBlockNum + 2*sprintSize
-		require.NoError(t, cluster.WaitForBlock(midBlockNumber, 2*time.Minute))
+		cluster.WaitForBlock(t, midBlockNumber, 2*time.Minute)
 
 		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.JSONRPC()))
 		require.NoError(t, err)
@@ -273,7 +275,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		finalBlockNum := midBlockNumber + 5*sprintSize
 		// wait for a few more sprints
-		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
+		cluster.WaitForBlock(t, midBlockNumber+5*sprintSize, 3*time.Minute)
 
 		// check that we submitted the minimal commitment to smart contract
 		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
@@ -369,7 +371,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	cluster.WaitForBlock(t, 25, 2*time.Minute)
 
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -550,7 +552,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	cluster.WaitForBlock(t, 25, 2*time.Minute)
 
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
@@ -699,7 +701,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	}
 
 	// wait for a single epoch to be checkpointed
-	require.NoError(t, cluster.WaitForBlock(7, 30*time.Second))
+	cluster.WaitForBlock(t, 7, 30*time.Second)
 
 	// checking last checkpoint block before rootchain server stop
 	err = cluster.Bridge.WaitUntil(2*time.Second, 30*time.Second, func() (bool, error) {
@@ -711,7 +713,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	cluster.Bridge.Stop()
 
 	// wait for a couple of epochs so that there are pending checkpoint (epoch-ending) blocks
-	require.NoError(t, cluster.WaitForBlock(21, 2*time.Minute))
+	cluster.WaitForBlock(t, 21, 2*time.Minute)
 
 	// restart rootchain server
 	require.NoError(t, cluster.Bridge.Start())
@@ -759,7 +761,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	require.NoError(t, err)
 
 	// waiting two epochs, so that some rewards get accumulated
-	require.NoError(t, cluster.WaitForBlock(2*epochSize, 1*time.Minute))
+	cluster.WaitForBlock(t, 2*epochSize, 1*time.Minute)
 
 	queryValidators := func(handler func(idx int, validatorInfo *polybft.ValidatorInfo)) {
 		for i, validatorAddr := range votingPowerChangeValidators {
@@ -812,7 +814,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	// wait for next epoch-ending block as the starting point,
 	// in order to be able to easier track checkpoints submission
 	endOfEpochBlockNum := currentBlockNum + epochSize - (currentBlockNum % epochSize)
-	require.NoError(t, cluster.WaitForBlock(endOfEpochBlockNum, 1*time.Minute))
+	cluster.WaitForBlock(t, endOfEpochBlockNum, 1*time.Minute)
 
 	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
@@ -899,7 +901,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 		finalBlockNum := 8 * sprintSize
 		// wait for a couple of sprints
-		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
+		cluster.WaitForBlock(t, finalBlockNum, 2*time.Minute)
 
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent

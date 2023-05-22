@@ -106,9 +106,9 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
 	receivers, amounts, tokenIDs string) error {
-	return deposit(token, rootPredicateAddr, rootPredicateAddr,
+	return deposit(token, rootTokenAddr, rootPredicateAddr,
 		receivers, amounts, tokenIDs,
-		t.clusterConfig.Binary, t.clusterConfig.GetStdout("bridge"))
+		t.clusterConfig.Binary, t.clusterConfig.GetStdout("bridge"), nil, "")
 }
 
 // Withdraw function is used to invoke bridge withdrawals for any kind of ERC tokens (from the child to the root chain)

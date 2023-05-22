@@ -174,18 +174,18 @@ func TestE2E_Migration(t *testing.T) {
 	}
 
 	require.Equal(t, deployedCode, *types.EncodeBytes(contractsapi.TestWriteBlockMetadata.DeployedBytecode))
-	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
+	cluster.WaitForBlock(t, 10, 1*time.Minute)
 
 	//stop last node of validator and non-validator
 	cluster.Servers[4].Stop()
 	cluster.Servers[6].Stop()
 
-	require.NoError(t, cluster.WaitForBlock(15, time.Minute))
+	cluster.WaitForBlock(t, 15, time.Minute)
 
 	//wait sync of that nodes
 	cluster.Servers[4].Start()
 	cluster.Servers[6].Start()
-	require.NoError(t, cluster.WaitForBlock(20, time.Minute))
+	cluster.WaitForBlock(t, 20, time.Minute)
 
 	//stop all nodes
 	for i := range cluster.Servers {
@@ -198,12 +198,12 @@ func TestE2E_Migration(t *testing.T) {
 		cluster.Servers[i].Start()
 	}
 
-	require.NoError(t, cluster.WaitForBlock(25, time.Minute))
+	cluster.WaitForBlock(t, 25, time.Minute)
 
 	// add new node
 	_, err = cluster.InitSecrets("test-chain-8", 1)
 	require.NoError(t, err)
 
 	cluster.InitTestServer(t, "test-chain-8", cluster.Bridge.JSONRPCAddr(), false, false)
-	require.NoError(t, cluster.WaitForBlock(33, time.Minute))
+	cluster.WaitForBlock(t, 33, time.Minute)
 }

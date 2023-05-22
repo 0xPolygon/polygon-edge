@@ -196,7 +196,7 @@ func TestE2E_TxPool_TransactionWithHeaderInstructions(t *testing.T) {
 	)
 	defer cluster.Stop()
 
-	require.NoError(t, cluster.WaitForBlock(1, 20*time.Second))
+	cluster.WaitForBlock(t, 1, 20*time.Second)
 
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestE2E_TxPool_TransactionWithHeaderInstructions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-	require.NoError(t, cluster.WaitForBlock(10, 1*time.Minute))
+	cluster.WaitForBlock(t, 10, 1*time.Minute)
 }
 
 // TestE2E_TxPool_BroadcastTransactions sends several transactions (legacy and dynamic fees) to the cluster

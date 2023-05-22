@@ -10,25 +10,27 @@ import (
 )
 
 type RemoteBridge struct {
-	rpcURL *url.URL
-	binary string
+	rpcURL    *url.URL
+	binary    string
+	senderKey string
 }
 
-func NewRemoteBridge(t *testing.T, rpcURL *url.URL) *RemoteBridge {
+func NewRemoteBridge(t *testing.T, rpcURL *url.URL, senderKey string) *RemoteBridge {
 	t.Helper()
 
 	return &RemoteBridge{
-		rpcURL: rpcURL,
-		binary: "polygon-edge",
+		rpcURL:    rpcURL,
+		binary:    "polygon-edge",
+		senderKey: senderKey,
 	}
 }
 
 func (rb *RemoteBridge) Deposit(token common.TokenType,
 	rootTokenAddr, rootPredicateAddr types.Address,
 	receivers, amounts, tokenIDs string) error {
-	return deposit(token, rootPredicateAddr, rootPredicateAddr,
+	return deposit(token, rootTokenAddr, rootPredicateAddr,
 		receivers, amounts, tokenIDs,
-		rb.binary, os.Stdout)
+		rb.binary, os.Stdout, rb.rpcURL, rb.senderKey)
 }
 
 func (rb *RemoteBridge) Withdraw(token common.TokenType,

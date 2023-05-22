@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -49,6 +48,6 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			filepath.Base(cluster.Config.LogsDir), numNodes, epochSize, numBlocks)
 
 		// wait for single epoch to process withdrawal
-		require.NoError(t, cluster.WaitForBlock(numBlocks, blockTime*time.Duration(numBlocks)))
+		cluster.WaitForBlock(t, numBlocks, blockTime*time.Duration(numBlocks))
 	})
 }

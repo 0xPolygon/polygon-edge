@@ -15,9 +15,11 @@ type RemoteCluster struct {
 	chainConfigFilename string
 	childRPCURL         *url.URL
 	childRPCClient      *jsonrpc.Client
+	blockTime           time.Duration
 }
 
-func NewRemoteCluster(t *testing.T, chainConfigFilename string, childRPCURL *url.URL) *RemoteCluster {
+func NewRemoteCluster(t *testing.T, chainConfigFilename string,
+	childRPCURL *url.URL, blockTime time.Duration) *RemoteCluster {
 	t.Helper()
 
 	client, err := jsonrpc.NewClient(childRPCURL.String())
@@ -27,29 +29,44 @@ func NewRemoteCluster(t *testing.T, chainConfigFilename string, childRPCURL *url
 		chainConfigFilename: chainConfigFilename,
 		childRPCURL:         childRPCURL,
 		childRPCClient:      client,
+		blockTime:           blockTime,
 	}
 }
 
-func (rc *RemoteCluster) WaitForBlock(n uint64, timeout time.Duration) error {
-	timer := time.NewTimer(timeout)
+func (rc *RemoteCluster) WaitForBlock(t *testing.T, n uint64, timeout time.Duration) {
+	t.Helper()
+
+	expectedDuration := timeout
+
+	if n > 0 {
+		latestBlockNum, err := rc.childRPCClient.Eth().BlockNumber()
+		require.NoError(t, err)
+
+		expectedDuration = time.Duration(int64(n-latestBlockNum) * int64(rc.blockTime))
+	}
+
+	timer := time.NewTimer(expectedDuration)
+	t.Log("waiting", expectedDuration.String())
 
 	for {
 		// Wait and potentially timeout
 		select {
 		case <-timer.C:
-			return fmt.Errorf("wait for block timeout")
-		case <-time.After(2 * time.Second):
+			require.NoError(t, fmt.Errorf("wait for block timeout"))
+
+			return
+		case <-time.After(rc.blockTime):
 		}
 
 		// Get latest block
 		latestBlock, err := rc.JSONRPC().Eth().BlockNumber()
-		if err != nil {
-			return err
-		}
+		require.NoError(t, err)
+
+		t.Log("block:", latestBlock)
 
 		// Done
 		if latestBlock >= n {
-			return nil
+			return
 		}
 	}
 }

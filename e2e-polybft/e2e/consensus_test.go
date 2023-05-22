@@ -31,7 +31,7 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	defer cluster.Stop()
 
 	t.Run("consensus protocol", func(t *testing.T) {
-		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+		cluster.WaitForBlock(t, 2*epochSize+1, 1*time.Minute)
 	})
 
 	t.Run("sync protocol, drop single validator node", func(t *testing.T) {
@@ -44,13 +44,13 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		node.Stop()
 
 		// wait for 2 epochs to elapse, so that rest of the network progresses
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
+		cluster.WaitForBlock(t, currentBlockNum+2*epochSize, 2*time.Minute)
 
 		// start the node again
 		node.Start()
 
 		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+		cluster.WaitForBlock(t, currentBlockNum+4*epochSize, 2*time.Minute)
 	})
 
 	t.Run("sync protocol, drop single non-validator node", func(t *testing.T) {
@@ -63,13 +63,13 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 		node.Stop()
 
 		// wait for 2 epochs to elapse, so that rest of the network progresses
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+2*epochSize, 2*time.Minute))
+		cluster.WaitForBlock(t, currentBlockNum+2*epochSize, 2*time.Minute)
 
 		// start the node again
 		node.Start()
 
 		// wait 2 more epochs to elapse and make sure that stopped node managed to catch up
-		require.NoError(t, cluster.WaitForBlock(currentBlockNum+4*epochSize, 2*time.Minute))
+		cluster.WaitForBlock(t, currentBlockNum+4*epochSize, 2*time.Minute)
 	})
 }
 
@@ -100,7 +100,7 @@ func TestE2E_Consensus_BulkDrop(t *testing.T) {
 	}
 
 	// wait to proceed to the 2nd epoch
-	require.NoError(t, cluster.WaitForBlock(epochSize+1, 2*time.Minute))
+	cluster.WaitForBlock(t, epochSize+1, 2*time.Minute)
 }
 
 func TestE2E_Consensus_RegisterValidator(t *testing.T) {
@@ -237,7 +237,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.True(t, secondValidatorInfo.Stake.Cmp(initialStake) == 0)
 
 	// wait for the stake to be bridged
-	require.NoError(t, cluster.WaitForBlock(polybftConfig.EpochSize*4, time.Minute))
+	cluster.WaitForBlock(t, polybftConfig.EpochSize*4, time.Minute)
 
 	checkpointManagerAddr := ethgo.Address(polybftConfig.Bridge.CheckpointManagerAddr)
 
@@ -276,7 +276,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	require.NoError(t, err)
 
 	// wait for couple of epochs to have some rewards accumulated
-	require.NoError(t, cluster.WaitForBlock(currentBlock.Number+(polybftConfig.EpochSize*2), time.Minute))
+	cluster.WaitForBlock(t, currentBlock.Number+(polybftConfig.EpochSize*2), time.Minute)
 
 	bigZero := big.NewInt(0)
 
@@ -332,7 +332,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	validatorAddr := validatorAcc.Ecdsa.Address()
 
 	// wait for some rewards to get accumulated
-	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*3, time.Minute))
+	cluster.WaitForBlock(t, polybftCfg.EpochSize*3, time.Minute)
 
 	validatorInfo, err := sidechain.GetValidatorInfo(validatorAddr,
 		polybftCfg.Bridge.CustomSupernetManagerAddr, polybftCfg.Bridge.StakeManagerAddr,
@@ -351,7 +351,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, srv.Unstake(initialStake))
 
 	// wait for one epoch to withdraw from child
-	require.NoError(t, cluster.WaitForBlock(polybftCfg.EpochSize*4, time.Minute))
+	cluster.WaitForBlock(t, polybftCfg.EpochSize*4, time.Minute)
 
 	// withdraw from child
 	require.NoError(t, srv.WithdrawChildChain())
@@ -565,7 +565,7 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 	defer cluster.Stop()
 
 	// wait for couple of epochs to accumulate some rewards
-	require.NoError(t, cluster.WaitForBlock(epochSize*3, 3*time.Minute))
+	cluster.WaitForBlock(t, epochSize*3, 3*time.Minute)
 
 	// first validator is the owner of ChildValidator set smart contract
 	owner := cluster.Servers[0]

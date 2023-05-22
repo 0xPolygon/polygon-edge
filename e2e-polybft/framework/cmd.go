@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os/exec"
 	"strconv"
 
@@ -14,7 +15,7 @@ import (
 
 func deposit(token common.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
 	receivers, amounts, tokenIDs string,
-	binary string, stdout io.Writer) error {
+	binary string, stdout io.Writer, jsonRPC *url.URL, senderKey string) error {
 	args := []string{}
 
 	if receivers == "" {
@@ -34,7 +35,6 @@ func deposit(token common.TokenType, rootTokenAddr, rootPredicateAddr types.Addr
 		args = append(args,
 			"bridge",
 			"deposit-erc20",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
@@ -48,7 +48,6 @@ func deposit(token common.TokenType, rootTokenAddr, rootPredicateAddr types.Addr
 		args = append(args,
 			"bridge",
 			"deposit-erc721",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
@@ -66,12 +65,18 @@ func deposit(token common.TokenType, rootTokenAddr, rootPredicateAddr types.Addr
 		args = append(args,
 			"bridge",
 			"deposit-erc1155",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--token-ids", tokenIDs)
+	}
+
+	if jsonRPC != nil {
+		args = append(args, "--json-rpc", jsonRPC.String(),
+			"--sender-key", senderKey)
+	} else {
+		args = append(args, "--test")
 	}
 
 	return runCommand(binary, args, stdout)
@@ -168,7 +173,6 @@ func sendExitTransaction(exitHelper types.Address, exitID uint64,
 		"--exit-id", strconv.FormatUint(exitID, 10),
 		"--root-json-rpc", rootJSONRPCAddr,
 		"--child-json-rpc", childJSONRPCAddr,
-		"--test",
 	}
 
 	return runCommand(binary, args, stdout)

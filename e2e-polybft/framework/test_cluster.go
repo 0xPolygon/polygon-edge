@@ -708,17 +708,21 @@ func (c *TestCluster) WaitUntil(timeout, pollFrequency time.Duration, handler fu
 func (c *TestCluster) WaitForReady(t *testing.T) {
 	t.Helper()
 
-	require.NoError(t, c.WaitForBlock(1, time.Minute))
+	c.WaitForBlock(t, 1, time.Minute)
 }
 
-func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
+func (c *TestCluster) WaitForBlock(t *testing.T, n uint64, timeout time.Duration) {
+	t.Helper()
+
 	timer := time.NewTimer(timeout)
 
 	ok := false
 	for !ok {
 		select {
 		case <-timer.C:
-			return fmt.Errorf("wait for block timeout")
+			require.NoError(t, fmt.Errorf("wait for block timeout"))
+
+			return
 		case <-time.After(2 * time.Second):
 		}
 
@@ -730,8 +734,9 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 			}
 
 			num, err := i.JSONRPC().Eth().BlockNumber()
+			require.NoError(t, err)
 
-			if err != nil || num < n {
+			if num < n {
 				ok = false
 
 				break
@@ -739,7 +744,7 @@ func (c *TestCluster) WaitForBlock(n uint64, timeout time.Duration) error {
 		}
 	}
 
-	return nil
+	return
 }
 
 // WaitForGeneric waits until all running servers returns true from fn callback or timeout defined by dur occurs
