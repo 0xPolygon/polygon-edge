@@ -48,7 +48,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     $ polygon-edge rootchain server
     ```
 
-5. Deploy StakeManager - if not already deploy to rootchain. Command has a test flag used only in testing purposes which would deploy a mock ERC20 token which would be used for staking. If not used for testing, stake-token flag should be provided:
+5. Deploy StakeManager - if not already deployed to rootchain. Command has a test flag used only in testing purposes which would deploy a mock ERC20 token which would be used for staking. If not used for testing, stake-token flag should be provided:
     ``bash
     $ polygon-edge polybft stake-manager-deploy \
      --deployer-key <hex_encoded_rootchain_account_private_key> \
@@ -63,6 +63,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     ```bash
     $ polygon-edge rootchain deploy \
     --deployer-key <hex_encoded_rootchain_account_private_key> \
+    --stake-manager <address_of_stake_manager_contract> \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--test]
