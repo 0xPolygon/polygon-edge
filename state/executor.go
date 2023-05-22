@@ -816,7 +816,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	// Increment the nonce of the caller
 	t.state.IncrNonce(c.Caller)
 
-	// Check if there if there is a collision and the address already exists
+	// Check if there is a collision and the address already exists
 	if t.hasCodeOrNonce(c.Address) {
 		return &runtime.ExecutionResult{
 			GasLeft: 0,
