@@ -1,7 +1,9 @@
 package common
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"math/big"
 	"testing"
 	"time"
@@ -97,4 +99,36 @@ func Test_Duration_Marshal_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, json.Unmarshal(timerRaw, &otherTimer))
 		require.Equal(t, origTimer, otherTimer)
 	})
+}
+
+func TestRetryForever_AlwaysReturnError_ShouldNeverEnd(t *testing.T) {
+	interval := time.Millisecond * 10
+	ended := false
+
+	go func() {
+		RetryForever(context.Background(), interval, func(ctx context.Context) error {
+			return errors.New("")
+		})
+
+		ended = true
+	}()
+	time.Sleep(interval * 10)
+	require.False(t, ended)
+}
+
+func TestRetryForever_ReturnNilAfterFirstRun_ShouldEnd(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	RetryForever(ctx, time.Millisecond*100, func(ctx context.Context) error {
+		select {
+		case <-ctx.Done():
+
+			return nil
+		default:
+			cancel()
+
+			return errors.New("")
+		}
+	})
+	<-ctx.Done()
+	require.True(t, errors.Is(ctx.Err(), context.Canceled))
 }

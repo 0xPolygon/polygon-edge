@@ -2,7 +2,9 @@ package tracker
 
 import (
 	"context"
+	"time"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/blocktracker"
@@ -64,6 +66,29 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	blockMaxBacklog := e.numBlockConfirmations*2 + 1
 	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
 
+	go func() {
+		<-ctx.Done()
+		blockTracker.Close()
+		store.Close()
+	}()
+
+	// Init and start block tracker concurrently, retrying indefinitely
+	go common.RetryForever(ctx, time.Second, func(context.Context) error {
+		if err := blockTracker.Init(); err != nil {
+			e.logger.Error("failed to init blocktracker", "error", err)
+
+			return err
+		}
+
+		if err := blockTracker.Start(); err != nil {
+			e.logger.Error("failed to start blocktracker", "error", err)
+
+			return err
+		}
+
+		return nil
+	})
+
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
 		tracker.WithBlockTracker(blockTracker),
@@ -79,30 +104,16 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
-	go func() {
-		if err := blockTracker.Init(); err != nil {
-			e.logger.Error("failed to init blocktracker", "error", err)
-
-			return
-		}
-
-		if err := blockTracker.Start(); err != nil {
-			e.logger.Error("failed to start blocktracker", "error", err)
-		}
-	}()
-
-	go func() {
-		<-ctx.Done()
-		blockTracker.Close()
-		store.Close()
-	}()
-
-	go func() {
+	// Sync concurrently, retrying indefinitely
+	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := tt.Sync(ctx); err != nil {
 			e.logger.Error("failed to sync", "error", err)
+
+			return err
 		}
-	}()
+
+		return nil
+	})
 
 	return nil
 }
