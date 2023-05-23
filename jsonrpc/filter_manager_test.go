@@ -16,6 +16,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_GetLogsForQuery(t *testing.T) {
@@ -151,6 +152,82 @@ func Test_GetLogsForQuery(t *testing.T) {
 
 			assert.ErrorIs(t, logError, testCase.expectedError)
 		})
+	}
+}
+
+func Test_getLogsFromBlock(t *testing.T) {
+	t.Parallel()
+
+	numOfLogs := 4
+
+	block := &types.Block{
+		Header: &types.Header{Hash: types.StringToHash("someHash"), Number: 1},
+		Transactions: []*types.Transaction{
+			createTestTransaction(types.StringToHash("tx1")),
+			createTestTransaction(types.StringToHash("tx2")),
+			createTestTransaction(types.StringToHash("tx3")),
+		},
+	}
+
+	// setup test with block with 3 transactions and 4 logs
+	store := &mockBlockStore{receipts: map[types.Hash][]*types.Receipt{
+		block.Header.Hash: {
+			{
+				// transaction 1 logs
+				Logs: []*types.Log{
+					{
+						Topics: []types.Hash{
+							hash1,
+						},
+					},
+					{
+						Topics: []types.Hash{
+							hash2,
+						},
+					},
+				},
+			},
+			{
+				// transaction 2 logs
+				Logs: []*types.Log{
+					{
+						Topics: []types.Hash{
+							hash3,
+						},
+					},
+				},
+			},
+			{
+				// transaction 3 logs
+				Logs: []*types.Log{
+					{
+						Topics: []types.Hash{
+							hash4,
+						},
+					},
+				},
+			},
+		},
+	}}
+
+	store.appendBlocksToStore([]*types.Block{block})
+
+	f := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+
+	t.Cleanup(func() {
+		defer f.Close()
+	})
+
+	logs, err := f.getLogsFromBlock(&LogQuery{
+		fromBlock: 1,
+		toBlock:   1,
+	}, block)
+
+	require.NoError(t, err)
+	require.Len(t, logs, numOfLogs)
+
+	for i := 0; i < numOfLogs; i++ {
+		require.Equal(t, uint64(i), uint64(logs[i].LogIndex))
 	}
 }
 
