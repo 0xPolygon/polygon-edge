@@ -375,10 +375,8 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 		return nil, err
 	}
 
-	var (
-		logIdx int
-		logs   = make([]*Log, 0)
-	)
+	logIdx := uint64(0)
+	logs := make([]*Log, 0)
 
 	for idx, receipt := range receipts {
 		for _, log := range receipt.Logs {
