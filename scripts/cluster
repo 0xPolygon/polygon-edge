@@ -79,7 +79,7 @@ function initRootchain() {
     ./polygon-edge polybft stake \
     --data-dir test-chain-${counter} \
     --amount 1000000000000000000000000 \
-    --chain-id ${chainID} \
+    --supernet-id ${chainID} \
     --stake-manager ${stakeManagerAddr} \
     --native-root-token ${rootERC20} \
     --jsonrpc http://127.0.0.1:8545
