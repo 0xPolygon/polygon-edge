@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -203,11 +202,13 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		for _, addr := range params.premine {
 			premine[ethgo.HexToAddress(addr).String()[2:]] = "0xffffffffffffffffffffffffff"
 		}
+
 		input := map[string]interface{}{
 			"ValidatorAddr": validatorKey.Address().String()[2:],
 			"Period":        2,
 			"Allocs":        premine,
 		}
+
 		var tpl bytes.Buffer
 		if err = tmpl.Execute(&tpl, input); err != nil {
 			return err
@@ -231,7 +232,8 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 			if err := os.MkdirAll(parentDir, 0700); err != nil {
 				return err
 			}
-			if err := ioutil.WriteFile(localPath, content, 0644); err != nil {
+
+			if err := common.SaveFileSafe(localPath, content, 0660); err != nil {
 				return err
 			}
 		}
@@ -258,6 +260,7 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		"--keystore", "/eth1data/keystore",
 		"--mine",
 		"--miner.threads", "1",
+		//nolint:godox
 		// TODO: Unlock by index might be deprecated in future versions.
 		// As of now, we do not need a new release of geth to run the rootchain for debug.
 		// So, we can keep this for now.
@@ -400,6 +403,7 @@ func toKeystoreV3(key *wallet.Key) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	keystore, err := keystore.EncryptV3(privKey, "password")
 	if err != nil {
 		return nil, err
@@ -410,10 +414,12 @@ func toKeystoreV3(key *wallet.Key) ([]byte, error) {
 		return nil, err
 	}
 
+	//nolint:godox
 	// TODO: This fields are not populated by default by
 	// ethgo/keystore so we have to go through this loop to do it.
 	dec["address"] = key.Address().String()
 	dec["uuid"] = id
 	dec["id"] = id
+
 	return json.Marshal(dec)
 }
