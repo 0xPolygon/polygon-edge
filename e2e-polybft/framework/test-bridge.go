@@ -196,14 +196,14 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		if tokenIDs != "" {
 			return errors.New("not expected to provide token ids for ERC-20 withdrawals")
 		}
-
 		args = append(args,
 			"bridge",
 			"withdraw-erc20",
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
-			"--json-rpc", jsonRPCEndpoint)
+			"--json-rpc", jsonRPCEndpoint,
+			"--child-token", childToken.String())
 
 	case bridgeCommon.ERC721:
 		if tokenIDs == "" {

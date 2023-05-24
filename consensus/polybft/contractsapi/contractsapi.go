@@ -530,6 +530,22 @@ func (m *MintRootERC20Fn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20.Abi.Methods["mint"], buf, m)
 }
 
+type BalanceOfChildERC20Fn struct {
+	Account types.Address `abi:"account"`
+}
+
+func (b *BalanceOfChildERC20Fn) Sig() []byte {
+	return ChildERC20.Abi.Methods["balanceOf"].ID()
+}
+
+func (b *BalanceOfChildERC20Fn) EncodeAbi() ([]byte, error) {
+	return ChildERC20.Abi.Methods["balanceOf"].Encode(b)
+}
+
+func (b *BalanceOfChildERC20Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20.Abi.Methods["balanceOf"], buf, b)
+}
+
 type InitializeRootERC1155PredicateFn struct {
 	NewStateSender           types.Address `abi:"newStateSender"`
 	NewExitHelper            types.Address `abi:"newExitHelper"`
