@@ -91,19 +91,16 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	var (
-		deployerKey    ethgo.Key
-		stakeTokenAddr types.Address
-	)
+	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 
-	if params.mintStakeToken || params.deployerPrivateKey != "" {
-		deployerKey, err = helper.GetRootchainPrivateKey(params.deployerPrivateKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
+		return
+	}
 
-			return
-		}
+	var stakeTokenAddr types.Address
 
+	if params.mintStakeToken {
 		stakeTokenAddr = types.StringToAddress(params.stakeTokenAddr)
 	}
 
