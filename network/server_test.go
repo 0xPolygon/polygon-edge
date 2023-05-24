@@ -1025,13 +1025,7 @@ func TestPeerAdditionDeletion(t *testing.T) {
 	}
 
 	t.Run("peers are added correctly", func(t *testing.T) {
-		server := createServer()
-
-		//nolint:godox
-		// TODO increase this number to something astronomical
-		// when the networking package has an event system that actually works,
-		// as emitEvent can completely bug out when under load inside Server.AddPeer (to be fixed in EVM-525)
-		generateAndAddPeers(server, 10)
+		generateAndAddPeers(createServer(), 2500)
 	})
 
 	t.Run("no duplicate peers added", func(t *testing.T) {

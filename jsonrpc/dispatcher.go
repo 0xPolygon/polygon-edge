@@ -396,7 +396,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 }
 
 func (d *Dispatcher) logInternalError(method string, err error) {
-	d.logger.Error("failed to dispatch", "method", method, "err", err)
+	d.logger.Warn("failed to dispatch", "method", method, "err", err)
 }
 
 func (d *Dispatcher) registerService(serviceName string, service interface{}) error {

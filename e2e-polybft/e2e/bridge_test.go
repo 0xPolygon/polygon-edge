@@ -184,8 +184,22 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	t.Run("multiple deposit batches per epoch", func(t *testing.T) {
 		const (
-			depositsSubset = 2
+			depositsSubset = 1
 		)
+
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
+		require.NoError(t, err)
+
+		lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
+		lastCommittedIDInput, err := lastCommittedIDMethod.Encode([]interface{}{})
+		require.NoError(t, err)
+
+		// check that we submitted the minimal commitment to smart contract
+		commitmentIDRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
+		require.NoError(t, err)
+
+		initialCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
+		require.NoError(t, err)
 
 		initialBlockNum, err := childEthEndpoint.BlockNumber()
 		require.NoError(t, err)
@@ -212,20 +226,14 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		midBlockNumber := initialBlockNum + 2*sprintSize
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber, 2*time.Minute))
 
-		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
-		require.NoError(t, err)
-
-		lastCommittedIDMethod := contractsapi.StateReceiver.Abi.GetMethod("lastCommittedId")
-		encode, err := lastCommittedIDMethod.Encode([]interface{}{})
-		require.NoError(t, err)
-
 		// check that we submitted the minimal commitment to smart contract
-		commitmentIDRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
+		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress,
+			ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
 		require.NoError(t, err)
 
 		lastCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
 		require.NoError(t, err)
-		require.Equal(t, uint64(transfersCount+depositsSubset), lastCommittedID)
+		require.Equal(t, initialCommittedID+depositsSubset, lastCommittedID)
 
 		// send some more transactions to the bridge to build another commitment in epoch
 		require.NoError(
@@ -245,13 +253,13 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber+5*sprintSize, 3*time.Minute))
 
 		// check that we submitted the minimal commitment to smart contract
-		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), encode)
+		commitmentIDRaw, err = txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
 		require.NoError(t, err)
 
 		// check that the second (larger commitment) was also submitted in epoch
 		lastCommittedID, err = types.ParseUint64orHex(&commitmentIDRaw)
 		require.NoError(t, err)
-		require.Equal(t, uint64(2*transfersCount), lastCommittedID)
+		require.Equal(t, initialCommittedID+uint64(transfersCount), lastCommittedID)
 
 		// the transactions are mined and state syncs should be executed by the relayer
 		// and there should be a success events
