@@ -178,12 +178,12 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	initialBalance := ethgo.Ether(500)
 
 	// fund first new validator
-	err = cluster.Bridge.FundValidators(polybftConfig.Bridge.RootNativeERC20Addr,
+	err = cluster.Bridge.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
 		[]string{path.Join(cluster.Config.TmpDir, firstValidatorSecrets)}, []*big.Int{initialBalance})
 	require.NoError(t, err)
 
 	// fund second new validator
-	err = cluster.Bridge.FundValidators(polybftConfig.Bridge.RootNativeERC20Addr,
+	err = cluster.Bridge.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
 		[]string{path.Join(cluster.Config.TmpDir, secondValidatorSecrets)}, []*big.Int{initialBalance})
 	require.NoError(t, err)
 

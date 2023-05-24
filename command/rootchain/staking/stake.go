@@ -72,10 +72,10 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.nativeRootTokenAddr,
-		rootHelper.NativeRootTokenFlag,
+		&params.stakeTokenAddr,
+		rootHelper.StakeTokenFlag,
 		"",
-		rootHelper.NativeRootTokenFlagDesc,
+		rootHelper.StakeTokenFlagDesc,
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(polybftsecrets.AccountDirFlag, polybftsecrets.AccountConfigFlag)
@@ -108,7 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	approveTxn, err := rootHelper.CreateApproveERC20Txn(params.amountValue,
-		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.nativeRootTokenAddr))
+		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.stakeTokenAddr))
 	if err != nil {
 		return err
 	}
