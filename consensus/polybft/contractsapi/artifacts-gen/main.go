@@ -6,9 +6,15 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
+
+	"github.com/dave/jennifer/jen"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/dave/jennifer/jen"
+)
+
+const (
+	extension = ".sol"
 )
 
 func main() {
@@ -49,11 +55,15 @@ func main() {
 		},
 		{
 			"child/ChildERC20PredicateAccessList.sol",
-			"ChildERC20PredicateAccessList",
+			"ChildERC20PredicateACL",
 		},
 		{
 			"child/RootMintableERC20Predicate.sol",
 			"RootMintableERC20Predicate",
+		},
+		{
+			"child/RootMintableERC20PredicateAccessList.sol",
+			"RootMintableERC20PredicateACL",
 		},
 		{
 			"child/ChildERC721.sol",
@@ -65,11 +75,15 @@ func main() {
 		},
 		{
 			"child/ChildERC721PredicateAccessList.sol",
-			"ChildERC721PredicateAccessList",
+			"ChildERC721PredicateACL",
 		},
 		{
 			"child/RootMintableERC721Predicate.sol",
 			"RootMintableERC721Predicate",
+		},
+		{
+			"child/RootMintableERC721PredicateAccessList.sol",
+			"RootMintableERC721PredicateACL",
 		},
 		{
 			"child/ChildERC1155.sol",
@@ -81,11 +95,15 @@ func main() {
 		},
 		{
 			"child/ChildERC1155PredicateAccessList.sol",
-			"ChildERC1155PredicateAccessList",
+			"ChildERC1155PredicateACL",
 		},
 		{
 			"child/RootMintableERC1155Predicate.sol",
 			"RootMintableERC1155Predicate",
+		},
+		{
+			"child/RootMintableERC1155PredicateAccessList.sol",
+			"RootMintableERC1155PredicateACL",
 		},
 		{
 			"child/System.sol",
@@ -170,7 +188,7 @@ func main() {
 	}
 
 	for _, v := range readContracts {
-		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, v.Name)
+		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, getContractName(v.Path))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -187,4 +205,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// getContractName extracts smart contract name from provided path
+func getContractName(path string) string {
+	pathSegments := strings.Split(path, string([]rune{os.PathSeparator}))
+	nameSegment := pathSegments[len(pathSegments)-1]
+
+	return strings.Split(nameSegment, extension)[0]
 }

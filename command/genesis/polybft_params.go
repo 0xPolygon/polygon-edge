@@ -376,19 +376,19 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.ChildERC20PredicateAccessList,
+				artifact: contractsapi.ChildERC20PredicateACL,
 				address:  contracts.ChildERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.ChildERC721PredicateAccessList,
+				artifact: contractsapi.ChildERC721PredicateACL,
 				address:  contracts.ChildERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.ChildERC1155PredicateAccessList,
+				artifact: contractsapi.ChildERC1155PredicateACL,
 				address:  contracts.ChildERC1155PredicateContract,
 			})
 	} else {

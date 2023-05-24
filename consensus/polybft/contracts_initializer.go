@@ -69,7 +69,7 @@ func getInitERC20PredicateInput(config *BridgeConfig, childOriginatedTokens bool
 
 // getInitChildERC20PredicateAccessListInput builds input parameters for ChildERC20PredicateAccessList SC initialization
 func getInitChildERC20PredicateAccessListInput(config *BridgeConfig, owner types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeChildERC20PredicateAccessListFn{
+	params := &contractsapi.InitializeChildERC20PredicateACLFn{
 		NewL2StateSender:          contracts.L2StateSenderContract,
 		NewStateReceiver:          contracts.StateReceiverContract,
 		NewRootERC20Predicate:     config.RootERC20PredicateAddr,
@@ -108,7 +108,7 @@ func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens boo
 // getInitChildERC721PredicateAccessListInput builds input parameters
 // for ChildERC721PredicateAccessList SC initialization
 func getInitChildERC721PredicateAccessListInput(config *BridgeConfig, owner types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeChildERC721PredicateAccessListFn{
+	params := &contractsapi.InitializeChildERC721PredicateACLFn{
 		NewL2StateSender:       contracts.L2StateSenderContract,
 		NewStateReceiver:       contracts.StateReceiverContract,
 		NewRootERC721Predicate: config.RootERC721PredicateAddr,
@@ -146,7 +146,7 @@ func getInitERC1155PredicateInput(config *BridgeConfig, childOriginatedTokens bo
 // getInitChildERC1155PredicateAccessListInput builds input parameters
 // for ChildERC1155PredicateAccessList SC initialization
 func getInitChildERC1155PredicateAccessListInput(config *BridgeConfig, owner types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeChildERC1155PredicateAccessListFn{
+	params := &contractsapi.InitializeChildERC1155PredicateACLFn{
 		NewL2StateSender:        contracts.L2StateSenderContract,
 		NewStateReceiver:        contracts.StateReceiverContract,
 		NewRootERC1155Predicate: config.RootERC1155PredicateAddr,
