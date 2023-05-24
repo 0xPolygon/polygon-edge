@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -30,7 +29,7 @@ type postBlockStructF struct {
 
 type updateValidatorSetF struct {
 	EpochID     uint64
-	X           uint64
+	Index       uint64
 	VotingPower int64
 }
 
@@ -148,9 +147,6 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			t.Skip()
 		}
 
-		systemStateMock := new(systemStateMock)
-		systemStateMock.On("GetStakeOnValidatorSet", mock.Anything).Return(big.NewInt(int64(data.StakeValue)), nil).Once()
-
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
@@ -210,17 +206,17 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	seeds := []updateValidatorSetF{
 		{
 			EpochID:     0,
-			X:           1,
+			Index:       1,
 			VotingPower: 30,
 		},
 		{
 			EpochID:     1,
-			X:           4,
+			Index:       4,
 			VotingPower: 1,
 		},
 		{
 			EpochID:     2,
-			X:           3,
+			Index:       3,
 			VotingPower: -2,
 		},
 	}
@@ -244,7 +240,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 			t.Skip(err)
 		}
 
-		if data.X > uint64(len(aliases)-1) {
+		if data.Index > uint64(len(aliases)-1) {
 			t.Skip()
 		}
 
@@ -252,11 +248,11 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 			Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
 		require.NoError(t, err)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities(aliases[data.X:]...))
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities(aliases[data.Index:]...))
 		require.NoError(t, err)
 
 		fullValidatorSet := validators.GetPublicIdentities().Copy()
-		validatorToUpdate := fullValidatorSet[data.X]
+		validatorToUpdate := fullValidatorSet[data.Index]
 		validatorToUpdate.VotingPower = big.NewInt(data.VotingPower)
 
 		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities())
@@ -280,7 +276,7 @@ func ValidateStruct(s interface{}) (err error) {
 		isSet := field.IsValid() && !field.IsZero()
 
 		if !isSet {
-			err = fmt.Errorf("%w%s in not set; ", err, fieldName)
+			err = fmt.Errorf("%w%s is not set; ", err, fieldName)
 		}
 	}
 
