@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/sethvargo/go-retry"
 )
 
 var (
@@ -29,6 +31,17 @@ var (
 
 	errInvalidDuration = errors.New("invalid duration")
 )
+
+// RetryForever will execute a function until it completes without error
+func RetryForever(ctx context.Context, interval time.Duration, fn func(context.Context) error) {
+	_ = retry.Do(ctx, retry.NewConstant(interval), func(context.Context) error {
+		if err := fn(ctx); err != nil {
+			return retry.RetryableError(err)
+		}
+
+		return nil
+	})
+}
 
 // Min returns the strictly lower number
 func Min(a, b uint64) uint64 {

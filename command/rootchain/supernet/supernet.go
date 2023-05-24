@@ -160,7 +160,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		for _, v := range consensusConfig.InitialValidatorSet {
 			finalizedStake, err := getFinalizedStake(callerAddr, v.Address, stakeManager,
-				chainConfig.Params.ChainID, txRelayer)
+				consensusConfig.SupernetID, txRelayer)
 			if err != nil {
 				return fmt.Errorf("could not get finalized stake for validator: %v. Error: %w", v.Address, err)
 			}

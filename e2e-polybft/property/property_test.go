@@ -7,18 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
+
+	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestProperty_DifferentVotingPower(t *testing.T) {
 	t.Parallel()
 
 	const (
-		blockTime  = time.Second * 6
-		maxPremine = math.MaxUint64
+		blockTime = time.Second * 6
+		maxStake  = math.MaxUint64
 	)
 
 	rapid.Check(t, func(tt *rapid.T) {
@@ -28,18 +29,18 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			numBlocks = rapid.Uint64Range(2, 5).Draw(tt, "number of blocks the cluster should mine")
 		)
 
-		premine := make([]uint64, numNodes)
+		stakes := make([]uint64, numNodes)
 
-		// premined amount will determine validator's stake and therefore voting power
-		for i := range premine {
-			premine[i] = rapid.Uint64Range(1, maxPremine).Draw(tt, fmt.Sprintf("stake for node %d", i+1))
+		// stake amount will determine validator's stake and therefore voting power
+		for i := range stakes {
+			stakes[i] = rapid.Uint64Range(1, maxStake).Draw(tt, fmt.Sprintf("stake for node %d", i+1))
 		}
 
 		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
 				for i, a := range adresses {
-					config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premine[i]))
+					config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", a, stakes[i]))
 				}
 			}))
 		defer cluster.Stop()

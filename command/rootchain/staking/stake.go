@@ -64,11 +64,11 @@ func setFlags(cmd *cobra.Command) {
 		"amount to stake",
 	)
 
-	cmd.Flags().Uint64Var(
-		&params.chainID,
-		polybftsecrets.ChainIDFlag,
+	cmd.Flags().Int64Var(
+		&params.supernetID,
+		supernetIDFlag,
 		0,
-		polybftsecrets.ChainIDFlagDesc,
+		"ID of supernet provided by stake manager on supernet registration",
 	)
 
 	cmd.Flags().StringVar(
@@ -123,7 +123,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	stakeFn := contractsapi.StakeForStakeManagerFn{
-		ID:     new(big.Int).SetUint64(params.chainID),
+		ID:     new(big.Int).SetInt64(params.supernetID),
 		Amount: params.amountValue,
 	}
 

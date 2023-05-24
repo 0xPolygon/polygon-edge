@@ -367,8 +367,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig polybft.PolyBFTConf
 	return g.Wait()
 }
 
-func (t *TestBridge) initialStakingOfGenesisValidators(
-	polybftConfig polybft.PolyBFTConfig, chainID int64) error {
+func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
@@ -392,7 +391,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
 					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
-					"--chain-id", strconv.FormatInt(chainID, 10),
+					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
 				}
 
