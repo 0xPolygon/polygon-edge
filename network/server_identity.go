@@ -42,8 +42,6 @@ func (s *Server) AddPeer(id peer.ID, direction network.Direction) {
 
 	// Emit the event alerting listeners
 	// WARNING: THIS CALL IS POTENTIALLY BLOCKING
-	// UNDER HEAVY LOAD. IT SHOULD BE SUBSTITUTED
-	// WITH AN EVENT SYSTEM THAT ACTUALLY WORKS
 	s.emitEvent(id, peerEvent.PeerConnected)
 }
 
