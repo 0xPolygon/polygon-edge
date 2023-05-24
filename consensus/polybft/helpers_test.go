@@ -143,35 +143,35 @@ func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
 }
 
 // newTestState creates new instance of state used by tests.
-func newTestState(t *testing.T) *State {
-	t.Helper()
+func newTestState(tb testing.TB) *State {
+	tb.Helper()
 
 	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().UTC().Format(time.RFC3339Nano))
 	err := os.Mkdir(dir, 0775)
 
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if err := os.RemoveAll(dir); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	})
 
 	return state
 }
 
-func generateTestAccount(t *testing.T) *wallet.Account {
-	t.Helper()
+func generateTestAccount(tb testing.TB) *wallet.Account {
+	tb.Helper()
 
 	acc, err := wallet.GenerateAccount()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return acc
 }
