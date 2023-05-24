@@ -917,6 +917,7 @@ func (s *Server) setupGRPC() error {
 		return err
 	}
 
+	// Start server with infinite retries
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
@@ -996,11 +997,13 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	go func() {
-		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+			}
 		}
 	}()
 

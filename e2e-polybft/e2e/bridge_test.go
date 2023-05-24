@@ -60,7 +60,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
@@ -308,7 +308,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	// DEPOSIT ERC721 TOKENS
@@ -478,7 +478,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	// DEPOSIT ERC1155 TOKENS
@@ -634,7 +634,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
@@ -687,7 +687,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	defer cluster.Stop()
 
 	// load polybft config
-	polybftCfg, chainID, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
@@ -720,7 +720,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 				validatorAddr,
 				polybftCfg.Bridge.CustomSupernetManagerAddr,
 				polybftCfg.Bridge.StakeManagerAddr,
-				chainID,
+				polybftCfg.SupernetID,
 				rootRelayer,
 				childRelayer)
 			require.NoError(t, err)
@@ -743,7 +743,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 		require.NoError(t, validatorSrv.RootchainFund(polybftCfg.Bridge.RootNativeERC20Addr, validator.WithdrawableRewards))
 
 		// stake previously funded amount
-		require.NoError(t, validatorSrv.Stake(polybftCfg, chainID, validator.WithdrawableRewards))
+		require.NoError(t, validatorSrv.Stake(polybftCfg, validator.WithdrawableRewards))
 	})
 
 	queryValidators(func(idx int, validator *polybft.ValidatorInfo) {
@@ -826,7 +826,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, _, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
