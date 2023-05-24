@@ -228,7 +228,7 @@ func checkStateSyncResultLogs(
 	expectedCount int,
 ) {
 	t.Helper()
-	require.Equal(t, len(logs), expectedCount)
+	require.Equal(t, expectedCount, len(logs))
 
 	var stateSyncResultEvent contractsapi.StateSyncResultEvent
 	for _, log := range logs {

@@ -372,16 +372,18 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
-	require.Len(t, s.pendingCommitments, 0)
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(0), s.pendingCommitments[0].EndID.Uint64())
 
 	// add one more log to have a minimum commitment
 	goodLog2 := goodLog.Copy()
 	goodLog2.Topics[1] = ethgo.BytesToHash([]byte{0x1}) // state sync index 1
 	s.AddLog(goodLog2)
 
-	require.Len(t, s.pendingCommitments, 1)
-	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
-	require.Equal(t, uint64(1), s.pendingCommitments[0].EndID.Uint64())
+	require.Len(t, s.pendingCommitments, 2)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
+	require.Equal(t, uint64(1), s.pendingCommitments[1].EndID.Uint64())
 
 	// add two more logs to have larger commitments
 	goodLog3 := goodLog.Copy()
@@ -392,9 +394,9 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	goodLog4.Topics[1] = ethgo.BytesToHash([]byte{0x3}) // state sync index 3
 	s.AddLog(goodLog4)
 
-	require.Len(t, s.pendingCommitments, 3)
-	require.Equal(t, uint64(0), s.pendingCommitments[2].StartID.Uint64())
-	require.Equal(t, uint64(3), s.pendingCommitments[2].EndID.Uint64())
+	require.Len(t, s.pendingCommitments, 4)
+	require.Equal(t, uint64(0), s.pendingCommitments[3].StartID.Uint64())
+	require.Equal(t, uint64(3), s.pendingCommitments[3].EndID.Uint64())
 }
 
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
