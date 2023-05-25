@@ -27,7 +27,7 @@ import (
 func TestFSM_ValidateHeader(t *testing.T) {
 	t.Parallel()
 
-	blockTimeDrift := int64(1)
+	blockTimeDrift := uint64(1)
 	extra := createTestExtra(validator.AccountSet{}, validator.AccountSet{}, 0, 0, 0)
 	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
 	header := &types.Header{Number: 0}

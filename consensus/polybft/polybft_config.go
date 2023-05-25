@@ -49,7 +49,7 @@ type PolyBFTConfig struct {
 	// RewardConfig defines rewards configuration
 	RewardConfig *RewardsConfig `json:"rewardConfig"`
 
-	BlockTimeDrift int64
+	BlockTimeDrift uint64 `json:"blockTimeDrift"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig

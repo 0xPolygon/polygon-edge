@@ -632,7 +632,7 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 	return errDistributeRewardsTxNotExpected
 }
 
-func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeDrift int64) error {
+func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeDrift uint64) error {
 	// header extra data must be higher or equal to ExtraVanity = 32 in order to be compliant with Ethereum blocks
 	if len(header.ExtraData) < ExtraVanity {
 		return fmt.Errorf("extra-data shorter than %d bytes (%d)", ExtraVanity, len(header.ExtraData))
@@ -646,7 +646,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 		return fmt.Errorf("invalid number")
 	}
 	// verify time is from the future
-	if header.Timestamp > uint64(time.Now().UTC().Unix()+blockTimeDrift) {
+	if header.Timestamp > (uint64(time.Now().UTC().Unix()) + blockTimeDrift) {
 		return fmt.Errorf("block from the future. block time: %d, time drift %d", header.Timestamp, blockTimeDrift)
 	}
 	// verify header nonce is zero
