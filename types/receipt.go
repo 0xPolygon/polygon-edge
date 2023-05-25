@@ -98,10 +98,10 @@ func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 
 	for i := 0; i < 6; i += 2 {
 		// Find the global bit location
-		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
+		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & (BloomByteLength*8 - 1)
 
-		// Find where the bit maps in the [0..255] byte array
-		byteLocation := 256 - 1 - bit/8
+		// Find where the bit maps in the [0..BloomByteLength-1] byte array
+		byteLocation := BloomByteLength - 1 - bit/8
 		bitLocation := bit % 8
 		b[byteLocation] |= 1 << bitLocation
 	}
@@ -135,10 +135,10 @@ func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 
 	for i := 0; i < 6; i += 2 {
 		// Find the global bit location
-		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
+		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & (BloomByteLength*8 - 1)
 
-		// Find where the bit maps in the [0..255] byte array
-		byteLocation := 256 - 1 - bit/8
+		// Find where the bit maps in the [0..BloomByteLength-1] byte array
+		byteLocation := BloomByteLength - 1 - bit/8
 		bitLocation := bit % 8
 		isSet := b[byteLocation] & (1 << bitLocation)
 
