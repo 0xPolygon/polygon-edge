@@ -11,6 +11,10 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+const (
+	contractCallGasLimit = 100_000_000
+)
+
 // getInitValidatorSetInput builds input parameters for ValidatorSet SC initialization
 func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	initialValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
@@ -45,9 +49,9 @@ func getInitRewardPoolInput(polybftConfig PolyBFTConfig) ([]byte, error) {
 }
 
 // getInitERC20PredicateInput builds initialization input parameters for child chain ERC20Predicate SC
-func getInitERC20PredicateInput(config *BridgeConfig, childOriginatedTokens bool) ([]byte, error) {
+func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
-	if childOriginatedTokens {
+	if childChainMintable {
 		params = &contractsapi.InitializeRootMintableERC20PredicateFn{
 			NewL2StateSender:       contracts.L2StateSenderContract,
 			NewStateReceiver:       contracts.StateReceiverContract,
@@ -67,17 +71,31 @@ func getInitERC20PredicateInput(config *BridgeConfig, childOriginatedTokens bool
 	return params.EncodeAbi()
 }
 
-// getInitChildERC20PredicateAccessListInput builds input parameters for ChildERC20PredicateAccessList SC initialization
-func getInitChildERC20PredicateAccessListInput(config *BridgeConfig, owner types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeChildERC20PredicateACLFn{
-		NewL2StateSender:          contracts.L2StateSenderContract,
-		NewStateReceiver:          contracts.StateReceiverContract,
-		NewRootERC20Predicate:     config.RootERC20PredicateAddr,
-		NewChildTokenTemplate:     contracts.ChildERC20Contract,
-		NewNativeTokenRootAddress: config.RootNativeERC20Addr,
-		NewUseAllowList:           owner != contracts.SystemCaller,
-		NewUseBlockList:           owner != contracts.SystemCaller,
-		NewOwner:                  owner,
+// getInitERC20PredicateACLInput builds initialization input parameters for child chain ERC20PredicateAccessList SC
+func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
+	childChainMintable bool) ([]byte, error) {
+	var params contractsapi.StateTransactionInput
+	if childChainMintable {
+		params = &contractsapi.InitializeRootMintableERC20PredicateACLFn{
+			NewL2StateSender:       contracts.L2StateSenderContract,
+			NewStateReceiver:       contracts.StateReceiverContract,
+			NewChildERC20Predicate: config.ChildMintableERC20PredicateAddr,
+			NewChildTokenTemplate:  contracts.ChildERC20Contract,
+			NewUseAllowList:        owner != contracts.SystemCaller,
+			NewUseBlockList:        owner != contracts.SystemCaller,
+			NewOwner:               owner,
+		}
+	} else {
+		params = &contractsapi.InitializeChildERC20PredicateACLFn{
+			NewL2StateSender:          contracts.L2StateSenderContract,
+			NewStateReceiver:          contracts.StateReceiverContract,
+			NewRootERC20Predicate:     config.RootERC20PredicateAddr,
+			NewChildTokenTemplate:     contracts.ChildERC20Contract,
+			NewNativeTokenRootAddress: config.RootNativeERC20Addr,
+			NewUseAllowList:           owner != contracts.SystemCaller,
+			NewUseBlockList:           owner != contracts.SystemCaller,
+			NewOwner:                  owner,
+		}
 	}
 
 	return params.EncodeAbi()
@@ -105,26 +123,40 @@ func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens boo
 	return params.EncodeAbi()
 }
 
-// getInitChildERC721PredicateAccessListInput builds input parameters
-// for ChildERC721PredicateAccessList SC initialization
-func getInitChildERC721PredicateAccessListInput(config *BridgeConfig, owner types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeChildERC721PredicateACLFn{
-		NewL2StateSender:       contracts.L2StateSenderContract,
-		NewStateReceiver:       contracts.StateReceiverContract,
-		NewRootERC721Predicate: config.RootERC721PredicateAddr,
-		NewChildTokenTemplate:  contracts.ChildERC721Contract,
-		NewUseAllowList:        owner != contracts.SystemCaller,
-		NewUseBlockList:        owner != contracts.SystemCaller,
-		NewOwner:               owner,
+// getInitERC721PredicateACLInput builds initialization input parameters
+// for child chain ERC721PredicateAccessList SC
+func getInitERC721PredicateACLInput(config *BridgeConfig, owner types.Address,
+	childChainMintable bool) ([]byte, error) {
+	var params contractsapi.StateTransactionInput
+	if childChainMintable {
+		params = &contractsapi.InitializeRootMintableERC721PredicateACLFn{
+			NewL2StateSender:        contracts.L2StateSenderContract,
+			NewStateReceiver:        contracts.StateReceiverContract,
+			NewChildERC721Predicate: config.ChildMintableERC721PredicateAddr,
+			NewChildTokenTemplate:   contracts.ChildERC721Contract,
+			NewUseAllowList:         owner != contracts.SystemCaller,
+			NewUseBlockList:         owner != contracts.SystemCaller,
+			NewOwner:                owner,
+		}
+	} else {
+		params = &contractsapi.InitializeChildERC721PredicateACLFn{
+			NewL2StateSender:       contracts.L2StateSenderContract,
+			NewStateReceiver:       contracts.StateReceiverContract,
+			NewRootERC721Predicate: config.RootERC721PredicateAddr,
+			NewChildTokenTemplate:  contracts.ChildERC721Contract,
+			NewUseAllowList:        owner != contracts.SystemCaller,
+			NewUseBlockList:        owner != contracts.SystemCaller,
+			NewOwner:               owner,
+		}
 	}
 
 	return params.EncodeAbi()
 }
 
 // getInitERC1155PredicateInput builds initialization input parameters for child chain ERC1155Predicate SC
-func getInitERC1155PredicateInput(config *BridgeConfig, childOriginatedTokens bool) ([]byte, error) {
+func getInitERC1155PredicateInput(config *BridgeConfig, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
-	if childOriginatedTokens {
+	if childChainMintable {
 		params = &contractsapi.InitializeRootMintableERC1155PredicateFn{
 			NewL2StateSender:         contracts.L2StateSenderContract,
 			NewStateReceiver:         contracts.StateReceiverContract,
@@ -143,17 +175,31 @@ func getInitERC1155PredicateInput(config *BridgeConfig, childOriginatedTokens bo
 	return params.EncodeAbi()
 }
 
-// getInitChildERC1155PredicateAccessListInput builds input parameters
-// for ChildERC1155PredicateAccessList SC initialization
-func getInitChildERC1155PredicateAccessListInput(config *BridgeConfig, owner types.Address) ([]byte, error) {
-	params := &contractsapi.InitializeChildERC1155PredicateACLFn{
-		NewL2StateSender:        contracts.L2StateSenderContract,
-		NewStateReceiver:        contracts.StateReceiverContract,
-		NewRootERC1155Predicate: config.RootERC1155PredicateAddr,
-		NewChildTokenTemplate:   contracts.ChildERC1155Contract,
-		NewUseAllowList:         owner != contracts.SystemCaller,
-		NewUseBlockList:         owner != contracts.SystemCaller,
-		NewOwner:                owner,
+// getInitERC1155PredicateACLInput builds initialization input parameters
+// for child chain ERC1155PredicateAccessList SC
+func getInitERC1155PredicateACLInput(config *BridgeConfig, owner types.Address,
+	childChainMintable bool) ([]byte, error) {
+	var params contractsapi.StateTransactionInput
+	if childChainMintable {
+		params = &contractsapi.InitializeRootMintableERC1155PredicateACLFn{
+			NewL2StateSender:         contracts.L2StateSenderContract,
+			NewStateReceiver:         contracts.StateReceiverContract,
+			NewChildERC1155Predicate: config.ChildMintableERC1155PredicateAddr,
+			NewChildTokenTemplate:    contracts.ChildERC1155Contract,
+			NewUseAllowList:          owner != contracts.SystemCaller,
+			NewUseBlockList:          owner != contracts.SystemCaller,
+			NewOwner:                 owner,
+		}
+	} else {
+		params = &contractsapi.InitializeChildERC1155PredicateACLFn{
+			NewL2StateSender:        contracts.L2StateSenderContract,
+			NewStateReceiver:        contracts.StateReceiverContract,
+			NewRootERC1155Predicate: config.RootERC1155PredicateAddr,
+			NewChildTokenTemplate:   contracts.ChildERC1155Contract,
+			NewUseAllowList:         owner != contracts.SystemCaller,
+			NewUseBlockList:         owner != contracts.SystemCaller,
+			NewOwner:                owner,
+		}
 	}
 
 	return params.EncodeAbi()
@@ -171,7 +217,7 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	if err = initContract(polyBFTConfig.RewardConfig.WalletAddress,
+	if err = callContract(polyBFTConfig.RewardConfig.WalletAddress,
 		polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition); err != nil {
 		return err
 	}
@@ -182,28 +228,30 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return nil
 	}
 
-	mintFn := abi.MustNewMethod("function mint(address, uint256)")
+	mintFn := contractsapi.MintRootERC20Fn{
+		To:     polyBFTConfig.RewardConfig.WalletAddress,
+		Amount: polyBFTConfig.RewardConfig.WalletAmount,
+	}
 
-	input, err = mintFn.Encode([]interface{}{polyBFTConfig.RewardConfig.WalletAddress,
-		polyBFTConfig.RewardConfig.WalletAmount})
+	input, err = mintFn.EncodeAbi()
 	if err != nil {
 		return err
 	}
 
-	return initContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+	return callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
 }
 
-func initContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) error {
-	result := transition.Call2(from, to, input, big.NewInt(0), 100_000_000)
+// callContract calls given smart contract function, encoded in input parameter
+func callContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) error {
+	result := transition.Call2(from, to, input, big.NewInt(0), contractCallGasLimit)
 	if result.Failed() {
 		if result.Reverted() {
-			unpackedRevert, err := abi.UnpackRevertError(result.ReturnValue)
-			if err == nil {
-				fmt.Printf("%v.initialize %v\n", contractName, unpackedRevert)
+			if revertReason, err := abi.UnpackRevertError(result.ReturnValue); err == nil {
+				return fmt.Errorf("%s contract call was reverted: %s", contractName, revertReason)
 			}
 		}
 
-		return fmt.Errorf("failed to initialize %s contract. Reason: %w", contractName, result.Err)
+		return fmt.Errorf("%s contract call failed: %w", contractName, result.Err)
 	}
 
 	return nil

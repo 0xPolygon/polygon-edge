@@ -374,6 +374,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	}
 
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
+		// rootchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20PredicateACL,
@@ -390,6 +391,25 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 			&contractInfo{
 				artifact: contractsapi.ChildERC1155PredicateACL,
 				address:  contracts.ChildERC1155PredicateContract,
+			})
+
+		// childchain originated tokens predicates (with access lists)
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC20PredicateACL,
+				address:  contracts.RootMintableERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC721PredicateACL,
+				address:  contracts.RootMintableERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC1155PredicateACL,
+				address:  contracts.RootMintableERC1155PredicateContract,
 			})
 	} else {
 		// rootchain originated tokens predicates
