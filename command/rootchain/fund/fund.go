@@ -91,19 +91,16 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	var (
-		deployerKey    ethgo.Key
-		stakeTokenAddr types.Address
-	)
+	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
+
+		return
+	}
+
+	var stakeTokenAddr types.Address
 
 	if params.mintStakeToken {
-		deployerKey, err = helper.GetRootchainPrivateKey(params.deployerPrivateKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
-
-			return
-		}
-
 		stakeTokenAddr = types.StringToAddress(params.stakeTokenAddr)
 	}
 
@@ -126,7 +123,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					Value: params.amountValues[i],
 				}
 
-				receipt, err := txRelayer.SendTransactionLocal(txn)
+				var receipt *ethgo.Receipt
+
+				if params.deployerPrivateKey != "" {
+					receipt, err = txRelayer.SendTransaction(txn, deployerKey)
+				} else {
+					receipt, err = txRelayer.SendTransactionLocal(txn)
+				}
+
 				if err != nil {
 					return fmt.Errorf("failed to send fund validator '%s' transaction: %w", validatorAddr, err)
 				}
