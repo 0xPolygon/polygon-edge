@@ -2,8 +2,6 @@ package polybft
 
 import (
 	"math/big"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,9 +15,12 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T) {
+	t.Parallel()
+
 	const (
 		amount        = 1_000
 		gasPrice      = 1_000
@@ -38,9 +39,6 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	logger := hclog.NewNullLogger()
 	signer := crypto.NewSigner(forks.At(0), chainID)
 
-	tmpDir, err := os.MkdirTemp("/tmp", "bbshow")
-	require.NoError(t, err)
-
 	mchain := &chain.Chain{
 		Params: &chain.Params{
 			ChainID: chainID,
@@ -48,10 +46,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 		},
 	}
 
-	stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(tmpDir, "trie"), logger)
-	require.NoError(t, err)
-
-	mstate := itrie.NewState(stateStorage)
+	mstate := itrie.NewState(itrie.NewMemoryStorage())
 	executor := state.NewExecutor(mchain.Params, mstate, logger)
 
 	executor.GetHash = func(header *types.Header) func(i uint64) types.Hash {
@@ -66,7 +61,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 		// the third tx will fail because of insufficient balance
 		if i != 2 {
 			balanceMap[types.Address(acc.Ecdsa.Address())] = &chain.GenesisAccount{
-				Balance: big.NewInt(1_000_000_000_000),
+				Balance: ethgo.Ether(1),
 			}
 		}
 	}
