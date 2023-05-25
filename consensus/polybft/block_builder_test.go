@@ -152,4 +152,9 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 			assert.True(t, fb.Block.Header.LogsBloom.IsLogInBloom(l))
 		}
 	}
+
+	assert.False(t, fb.Block.Header.LogsBloom.IsLogInBloom(
+		&types.Log{Address: types.StringToAddress("999911117777")}))
+	assert.False(t, fb.Block.Header.LogsBloom.IsLogInBloom(
+		&types.Log{Address: types.StringToAddress("111177779999")}))
 }
