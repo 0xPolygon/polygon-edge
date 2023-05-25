@@ -647,7 +647,8 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 	}
 	// verify time is from the future
 	if header.Timestamp > (uint64(time.Now().UTC().Unix()) + blockTimeDrift) {
-		return fmt.Errorf("block from the future. block time: %d, time drift %d", header.Timestamp, blockTimeDrift)
+		return fmt.Errorf("block from the future. block timestamp: %s, configured block time drift %d seconds",
+			time.Unix(int64(header.Timestamp), 0).Format(time.RFC3339), blockTimeDrift)
 	}
 	// verify header nonce is zero
 	if header.Nonce != types.ZeroNonce {

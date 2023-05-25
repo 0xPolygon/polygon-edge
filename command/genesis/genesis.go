@@ -244,7 +244,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.blockTimeDrift,
 			blockTimeDriftFlag,
 			defaultBlockTimeDrift,
-			"configuration for block time drift value",
+			"configuration for block time drift value (in seconds)",
 		)
 	}
 
