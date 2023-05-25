@@ -114,6 +114,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 
 	_, b.header.StateRoot = b.state.Commit()
 	b.header.GasUsed = b.state.TotalGas()
+	b.header.LogsBloom = types.CreateBloom(b.Receipts())
 
 	// build the block
 	b.block = consensus.BuildBlock(consensus.BuildBlockParams{
