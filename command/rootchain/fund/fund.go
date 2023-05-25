@@ -55,17 +55,17 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringVar(
-		&params.nativeRootTokenAddr,
-		helper.NativeRootTokenFlag,
+		&params.stakeTokenAddr,
+		helper.StakeTokenFlag,
 		"",
-		helper.NativeRootTokenFlagDesc,
+		helper.StakeTokenFlag,
 	)
 
 	cmd.Flags().BoolVar(
-		&params.mintRootToken,
-		mintRootTokenFlag,
+		&params.mintStakeToken,
+		mintStakeTokenFlag,
 		false,
-		"indicates if root token deployer should mint root tokens to given validators",
+		"indicates if stake token deployer should mint root tokens to given validators",
 	)
 
 	cmd.Flags().StringVar(
@@ -91,20 +91,17 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	var (
-		deployerKey   ethgo.Key
-		rootTokenAddr types.Address
-	)
+	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+	if err != nil {
+		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 
-	if params.mintRootToken {
-		deployerKey, err = helper.GetRootchainPrivateKey(params.deployerPrivateKey)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
+		return
+	}
 
-			return
-		}
+	var stakeTokenAddr types.Address
 
-		rootTokenAddr = types.StringToAddress(params.nativeRootTokenAddr)
+	if params.mintStakeToken {
+		stakeTokenAddr = types.StringToAddress(params.stakeTokenAddr)
 	}
 
 	results := make([]command.CommandResult, len(params.addresses))
@@ -126,7 +123,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					Value: params.amountValues[i],
 				}
 
-				receipt, err := txRelayer.SendTransactionLocal(txn)
+				var receipt *ethgo.Receipt
+
+				if params.deployerPrivateKey != "" {
+					receipt, err = txRelayer.SendTransaction(txn, deployerKey)
+				} else {
+					receipt, err = txRelayer.SendTransactionLocal(txn)
+				}
+
 				if err != nil {
 					return fmt.Errorf("failed to send fund validator '%s' transaction: %w", validatorAddr, err)
 				}
@@ -135,9 +139,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("failed to fund validator '%s'", validatorAddr)
 				}
 
-				if params.mintRootToken {
+				if params.mintStakeToken {
 					// mint tokens to validator, so he is able to send them
-					mintTxn, err := helper.CreateMintTxn(validatorAddr, rootTokenAddr, params.amountValues[i])
+					mintTxn, err := helper.CreateMintTxn(validatorAddr, stakeTokenAddr, params.amountValues[i])
 					if err != nil {
 						return fmt.Errorf("failed to create mint native tokens transaction for validator '%s'. err: %w",
 							validatorAddr, err)
@@ -156,7 +160,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				results[i] = &result{
 					ValidatorAddr: validatorAddr,
 					TxHash:        types.Hash(receipt.TransactionHash),
-					IsMinted:      params.mintRootToken,
+					IsMinted:      params.mintStakeToken,
 				}
 			}
 

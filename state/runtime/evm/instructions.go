@@ -907,6 +907,16 @@ func opGasLimit(c *state) {
 	c.push1().SetInt64(c.host.GetTxContext().GasLimit)
 }
 
+func opBaseFee(c *state) {
+	if !c.config.London {
+		c.exit(errOpCodeNotFound)
+
+		return
+	}
+
+	c.push(c.host.GetTxContext().BaseFee)
+}
+
 func opSelfDestruct(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)

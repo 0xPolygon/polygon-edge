@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -33,6 +34,8 @@ const (
 	GenesisPathFlag         = "genesis"
 	GenesisPathFlagDesc     = "genesis file path, which contains chain configuration"
 	DefaultGenesisPath      = "./genesis.json"
+	StakeTokenFlag          = "stake-token"
+	StakeTokenFlagDesc      = "address of ERC20 token used for staking on rootchain"
 )
 
 var (
@@ -42,6 +45,19 @@ var (
 
 	rootchainAccountKey *wallet.Key
 )
+
+type MessageResult struct {
+	Message string `json:"message"`
+}
+
+func (r MessageResult) GetOutput() string {
+	var buffer bytes.Buffer
+
+	buffer.WriteString(r.Message)
+	buffer.WriteString("\n")
+
+	return buffer.String()
+}
 
 // GetRootchainPrivateKey initializes a private key from provided raw private key
 func GetRootchainPrivateKey(rawKey string) (ethgo.Key, error) {
@@ -198,7 +214,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 }
 
 // CreateMintTxn encodes parameters for mint function on rootchain token contract
-func CreateMintTxn(receiver, rootTokenAddr types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+func CreateMintTxn(receiver, erc20TokenAddr types.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     receiver,
 		Amount: amount,
@@ -209,7 +225,7 @@ func CreateMintTxn(receiver, rootTokenAddr types.Address, amount *big.Int) (*eth
 		return nil, fmt.Errorf("failed to encode provided parameters: %w", err)
 	}
 
-	addr := ethgo.Address(rootTokenAddr)
+	addr := ethgo.Address(erc20TokenAddr)
 
 	return &ethgo.Transaction{
 		To:    &addr,
@@ -220,7 +236,7 @@ func CreateMintTxn(receiver, rootTokenAddr types.Address, amount *big.Int) (*eth
 // CreateApproveERC20Txn sends approve transaction
 // to ERC20 token for spender so that it is able to spend given tokens
 func CreateApproveERC20Txn(amount *big.Int,
-	spender, rootERC20Token types.Address) (*ethgo.Transaction, error) {
+	spender, erc20TokenAddr types.Address) (*ethgo.Transaction, error) {
 	approveFnParams := &contractsapi.ApproveRootERC20Fn{
 		Spender: spender,
 		Amount:  amount,
@@ -231,10 +247,31 @@ func CreateApproveERC20Txn(amount *big.Int,
 		return nil, fmt.Errorf("failed to encode parameters for RootERC20.approve. error: %w", err)
 	}
 
-	addr := ethgo.Address(rootERC20Token)
+	addr := ethgo.Address(erc20TokenAddr)
 
 	return &ethgo.Transaction{
 		To:    &addr,
 		Input: input,
 	}, nil
+}
+
+// SendTransaction sends provided transaction
+func SendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []byte, contractName string,
+	deployerKey ethgo.Key) (*ethgo.Receipt, error) {
+	txn := &ethgo.Transaction{
+		To:    &addr,
+		Input: input,
+	}
+
+	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send transaction to %s contract (%s). error: %w",
+			contractName, txn.To.Address(), err)
+	}
+
+	if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
+		return nil, fmt.Errorf("transaction execution failed on %s contract", contractName)
+	}
+
+	return receipt, nil
 }

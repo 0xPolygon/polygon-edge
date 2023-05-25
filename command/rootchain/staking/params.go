@@ -12,13 +12,13 @@ import (
 var supernetIDFlag = "supernet-id"
 
 type stakeParams struct {
-	accountDir          string
-	accountConfig       string
-	stakeManagerAddr    string
-	nativeRootTokenAddr string
-	jsonRPC             string
-	supernetID          int64
-	amount              string
+	accountDir       string
+	accountConfig    string
+	stakeManagerAddr string
+	stakeTokenAddr   string
+	jsonRPC          string
+	supernetID       int64
+	amount           string
 
 	amountValue *big.Int
 }

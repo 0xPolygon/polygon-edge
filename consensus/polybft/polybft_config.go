@@ -95,6 +95,8 @@ type BridgeConfig struct {
 	RootERC1155PredicateAddr  types.Address `json:"erc1155PredicateAddress"`
 	CustomSupernetManagerAddr types.Address `json:"customSupernetManagerAddr"`
 	StakeManagerAddr          types.Address `json:"stakeManagerAddr"`
+	// only populated if stake-manager-deploy command is executed, and used for e2e tests
+	StakeTokenAddr types.Address `json:"stakeTokenAddr,omitempty"`
 
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
 	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
@@ -124,6 +126,7 @@ type RootchainConfig struct {
 	ERC1155TemplateAddress       types.Address
 	CustomSupernetManagerAddress types.Address
 	StakeManagerAddress          types.Address
+	StakeTokenAddress            types.Address
 }
 
 // ToBridgeConfig creates BridgeConfig instance

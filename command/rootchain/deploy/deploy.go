@@ -43,7 +43,6 @@ const (
 	rootERC1155Name           = "RootERC1155"
 	erc1155TemplateName       = "ERC1155Template"
 	customSupernetManagerName = "CustomSupernetManager"
-	stakeManagerName          = "StakeManager"
 )
 
 var (
@@ -97,21 +96,11 @@ var (
 		customSupernetManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.CustomSupernetManagerAddress = addr
 		},
-		stakeManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.StakeManagerAddress = addr
-		},
 	}
 
 	// initializersMap maps rootchain contract names to initializer function callbacks
 	initializersMap = map[string]func(command.OutputFormatter, txrelayer.TxRelayer,
 		*polybft.RootchainConfig, ethgo.Key) error{
-		stakeManagerName: func(fmt command.OutputFormatter,
-			relayer txrelayer.TxRelayer,
-			config *polybft.RootchainConfig,
-			key ethgo.Key) error {
-
-			return initializeStakeManager(fmt, relayer, config, key)
-		},
 		customSupernetManagerName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
@@ -209,7 +198,15 @@ func GetCommand() *cobra.Command {
 			" (otherwise provided secrets are used to resolve deployer account)",
 	)
 
+	cmd.Flags().StringVar(
+		&params.stakeManagerAddr,
+		helper.StakeManagerFlag,
+		"",
+		helper.StakeManagerFlagDesc,
+	)
+
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
+	_ = cmd.MarkFlagRequired(helper.StakeManagerFlag)
 
 	return cmd
 }
@@ -222,7 +219,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	outputter.WriteCommandResult(&messageResult{
+	outputter.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s started... Rootchain JSON RPC address %s.", contractsDeploymentTitle, params.jsonRPCAddress),
 	})
 
@@ -255,7 +252,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 			return
 		} else if code != "0x" {
-			outputter.SetCommandResult(&messageResult{
+			outputter.SetCommandResult(&helper.MessageResult{
 				Message: fmt.Sprintf("%s contracts are already deployed. Aborting.", contractsDeploymentTitle),
 			})
 
@@ -272,7 +269,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// populate bridge configuration
-	consensusConfig.Bridge = rootchainCfg.ToBridgeConfig()
+	bridgeConfig := rootchainCfg.ToBridgeConfig()
+	if consensusConfig.Bridge != nil {
+		// only true if stake-manager-deploy command was executed
+		// users can still deploy stake manager manually
+		// only used for e2e tests
+		bridgeConfig.StakeTokenAddr = consensusConfig.Bridge.StakeTokenAddr
+	}
+
+	consensusConfig.Bridge = bridgeConfig
 
 	// set event tracker start blocks for rootchain contract(s) of interest
 	blockNum, err := client.Eth().BlockNumber()
@@ -296,7 +301,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(&messageResult{
+	outputter.SetCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s finished. All contracts are successfully deployed and initialized.",
 			contractsDeploymentTitle),
 	})
@@ -331,6 +336,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	rootchainConfig := &polybft.RootchainConfig{
 		JSONRPCAddr: params.jsonRPCAddress,
+		// update stake manager address in genesis in case if stake manager was deployed manually
+		StakeManagerAddress: types.StringToAddress(params.stakeManagerAddr),
 	}
 
 	tokenContracts := []*contractInfo{}
@@ -415,10 +422,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		{
 			name:     erc1155TemplateName,
 			artifact: contractsapi.ChildERC1155,
-		},
-		{
-			name:     stakeManagerName,
-			artifact: contractsapi.StakeManager,
 		},
 		{
 			name:     customSupernetManagerName,
@@ -562,7 +565,7 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 		return 0, fmt.Errorf("failed to encode parameters for registering child chain on supernets. error: %w", err)
 	}
 
-	receipt, err := sendTransaction(txRelayer, ethgo.Address(rootchainCfg.StakeManagerAddress),
+	receipt, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainCfg.StakeManagerAddress),
 		encoded, checkpointManagerName, deployerKey)
 	if err != nil {
 		return 0, err
@@ -624,11 +627,11 @@ func initializeCheckpointManager(
 
 	addr := ethgo.Address(rootchainCfg.CheckpointManagerAddress)
 
-	if _, err = sendTransaction(txRelayer, addr, input, checkpointManagerName, deployerKey); err != nil {
+	if _, err = helper.SendTransaction(txRelayer, addr, input, checkpointManagerName, deployerKey); err != nil {
 		return err
 	}
 
-	cmdOutput.WriteCommandResult(&messageResult{
+	cmdOutput.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, checkpointManagerName),
 	})
 
@@ -646,12 +649,12 @@ func initializeExitHelper(cmdOutput command.OutputFormatter,
 		return fmt.Errorf("failed to encode parameters for ExitHelper.initialize. error: %w", err)
 	}
 
-	if _, err = sendTransaction(txRelayer, ethgo.Address(rootchainConfig.ExitHelperAddress),
+	if _, err = helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.ExitHelperAddress),
 		input, exitHelperName, deployerKey); err != nil {
 		return err
 	}
 
-	cmdOutput.WriteCommandResult(&messageResult{
+	cmdOutput.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, exitHelperName),
 	})
 
@@ -674,13 +677,13 @@ func initializeRootERC20Predicate(cmdOutput command.OutputFormatter, txRelayer t
 		return fmt.Errorf("failed to encode parameters for RootERC20Predicate.initialize. error: %w", err)
 	}
 
-	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC20PredicateAddress),
+	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC20PredicateAddress),
 		input, rootERC20PredicateName, deployerKey); err != nil {
 		return err
 	}
 
 	cmdOutput.WriteCommandResult(
-		&messageResult{
+		&helper.MessageResult{
 			Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
 		})
 
@@ -701,12 +704,12 @@ func initializeRootERC721Predicate(cmdOutput command.OutputFormatter, txRelayer 
 		return fmt.Errorf("failed to encode parameters for RootERC721Predicate.initialize. error: %w", err)
 	}
 
-	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC721PredicateAddress),
+	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC721PredicateAddress),
 		input, rootERC721PredicateName, deployerKey); err != nil {
 		return err
 	}
 
-	cmdOutput.WriteCommandResult(&messageResult{
+	cmdOutput.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC721PredicateName),
 	})
 
@@ -728,37 +731,13 @@ func initializeRootERC1155Predicate(cmdOutput command.OutputFormatter, txRelayer
 		return fmt.Errorf("failed to encode parameters for RootERC1155Predicate.initialize. error: %w", err)
 	}
 
-	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC1155PredicateAddress),
+	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC1155PredicateAddress),
 		input, rootERC1155PredicateName, deployerKey); err != nil {
 		return err
 	}
 
-	cmdOutput.WriteCommandResult(&messageResult{
+	cmdOutput.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC1155PredicateName),
-	})
-
-	return nil
-}
-
-// initializeStakeManager invokes initialize function on StakeManager contract
-func initializeStakeManager(cmdOutput command.OutputFormatter,
-	txRelayer txrelayer.TxRelayer,
-	rootchainConfig *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeStakeManagerFn{MATIC_: rootchainConfig.RootNativeERC20Address}
-
-	input, err := initFn.EncodeAbi()
-	if err != nil {
-		return err
-	}
-
-	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.StakeManagerAddress),
-		input, stakeManagerName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&messageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, stakeManagerName),
 	})
 
 	return nil
@@ -783,37 +762,16 @@ func initializeSupernetManager(cmdOutput command.OutputFormatter,
 		return err
 	}
 
-	if _, err := sendTransaction(txRelayer, ethgo.Address(rootchainConfig.CustomSupernetManagerAddress),
+	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.CustomSupernetManagerAddress),
 		input, customSupernetManagerName, deployerKey); err != nil {
 		return err
 	}
 
-	cmdOutput.WriteCommandResult(&messageResult{
+	cmdOutput.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, customSupernetManagerName),
 	})
 
 	return nil
-}
-
-// sendTransaction sends provided transaction
-func sendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []byte, contractName string,
-	deployerKey ethgo.Key) (*ethgo.Receipt, error) {
-	txn := &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}
-
-	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send transaction to %s contract (%s). error: %w",
-			contractName, txn.To.Address(), err)
-	}
-
-	if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-		return nil, fmt.Errorf("transaction execution failed on %s contract", contractName)
-	}
-
-	return receipt, nil
 }
 
 // validatorSetToABISlice converts given validators to generic map

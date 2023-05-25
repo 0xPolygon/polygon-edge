@@ -570,8 +570,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
 
+		// deploy stake manager contract
+		err := cluster.Bridge.deployStakeManager(genesisPath)
+		require.NoError(t, err)
+
 		// deploy rootchain contracts
-		err := cluster.Bridge.deployRootchainContracts(genesisPath)
+		err = cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
 		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
