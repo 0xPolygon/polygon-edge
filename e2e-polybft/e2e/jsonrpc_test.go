@@ -145,7 +145,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("eth_getStorage", func(t *testing.T) {
+	t.Run("eth_getStorageAt", func(t *testing.T) {
 		key1, err := wallet.GenerateKey()
 		require.NoError(t, err)
 
@@ -157,9 +157,26 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.NoError(t, txn.Wait())
 		require.True(t, txn.Succeed())
 
-		resp, err := client.GetStorageAt(txn.Receipt().ContractAddress, ethgo.Hash{}, ethgo.Latest)
+		target := txn.Receipt().ContractAddress
+
+		resp, err := client.GetStorageAt(target, ethgo.Hash{}, ethgo.Latest)
 		require.NoError(t, err)
 		require.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", resp.String())
+
+		setValueFn := abi.MustNewMethod("function setValue(uint256 _val) public")
+
+		newVal := big.NewInt(1)
+
+		input, err := setValueFn.Encode([]interface{}{newVal})
+		require.NoError(t, err)
+
+		txn = cluster.SendTxn(t, acct, &ethgo.Transaction{Input: input, To: &target})
+		require.NoError(t, txn.Wait())
+		require.True(t, txn.Succeed())
+
+		resp, err = client.GetStorageAt(target, ethgo.Hash{}, ethgo.Latest)
+		require.NoError(t, err)
+		require.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000001", resp.String())
 	})
 
 	t.Run("eth_getCode", func(t *testing.T) {

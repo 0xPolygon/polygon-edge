@@ -7,4 +7,8 @@ contract TestSimple {
     function getValue() public view returns (uint256) {
         return val;
     }
+
+    function setValue(uint256 _val) public {
+        val = _val;
+    }
 }
