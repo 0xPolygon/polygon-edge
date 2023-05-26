@@ -46,16 +46,23 @@ function initRootchain() {
     sleep 1
   done
   set -e
-  
-  ./polygon-edge rootchain deploy --test
-  
-  rootERC20=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.nativeERC20Address')
+
+  ./polygon-edge polybft stake-manager-deploy \
+    --jsonrpc http://127.0.0.1:8545 \
+    --test
+
   stakeManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr')
+  stakeToken=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr')
+
+  ./polygon-edge rootchain deploy \
+    --stake-manager ${stakeManagerAddr} \
+    --test 
+  
   customSupernetManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')
   supernetID=$(cat genesis.json | jq -r '.params.engine.polybft.supernetID')
 
   ./polygon-edge rootchain fund \
-    --native-root-token ${rootERC20} \
+    --stake-token ${stakeToken} \
     --mint \
     --addresses ${address1},${address2},${address3},${address4} \
     --amounts 1000000000000000000000000,1000000000000000000000000,1000000000000000000000000,1000000000000000000000000
@@ -81,7 +88,7 @@ function initRootchain() {
     --amount 1000000000000000000000000 \
     --supernet-id ${supernetID} \
     --stake-manager ${stakeManagerAddr} \
-    --native-root-token ${rootERC20} \
+    --stake-token ${stakeToken} \
     --jsonrpc http://127.0.0.1:8545
 
     ((counter++))
