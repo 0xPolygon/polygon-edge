@@ -566,7 +566,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Check if transaction can deploy smart contract
 	if tx.IsContractCreation() && p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
 		return runtime.ErrMaxCodeSizeExceeded
-
 	}
 
 	if tx.Type == types.DynamicFeeTx {

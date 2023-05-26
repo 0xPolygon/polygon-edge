@@ -1714,6 +1714,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 
 		return signedTx
 	}
+
 	t.Run("Input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
