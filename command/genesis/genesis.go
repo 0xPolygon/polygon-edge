@@ -239,6 +239,13 @@ func setFlags(cmd *cobra.Command) {
 			"",
 			"configuration of reward wallet in format <address:amount>",
 		)
+
+		cmd.Flags().Uint64Var(
+			&params.blockTimeDrift,
+			blockTimeDriftFlag,
+			defaultBlockTimeDrift,
+			"configuration for block time drift value (in seconds)",
+		)
 	}
 
 	// Access Control Lists

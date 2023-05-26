@@ -546,12 +546,12 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	return p.verifyHeaderImpl(parent, header, nil)
+	return p.verifyHeaderImpl(parent, header, p.consensusConfig.BlockTimeDrift, nil)
 }
 
-func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*types.Header) error {
+func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift uint64, parents []*types.Header) error {
 	// validate header fields
-	if err := validateHeaderFields(parent, header); err != nil {
+	if err := validateHeaderFields(parent, header, blockTimeDrift); err != nil {
 		return fmt.Errorf("failed to validate header for block %d. error = %w", header.Number, err)
 	}
 

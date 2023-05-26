@@ -104,6 +104,7 @@ type genesisParams struct {
 	sprintSize           uint64
 	blockTime            time.Duration
 	epochReward          uint64
+	blockTimeDrift       uint64
 
 	initialStateRoot string
 

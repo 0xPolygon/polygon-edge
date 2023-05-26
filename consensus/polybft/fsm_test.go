@@ -27,52 +27,58 @@ import (
 func TestFSM_ValidateHeader(t *testing.T) {
 	t.Parallel()
 
+	blockTimeDrift := uint64(1)
 	extra := createTestExtra(validator.AccountSet{}, validator.AccountSet{}, 0, 0, 0)
 	parent := &types.Header{Number: 0, Hash: types.BytesToHash([]byte{1, 2, 3})}
 	header := &types.Header{Number: 0}
 
-	// parent extra data
-	require.ErrorContains(t, validateHeaderFields(parent, header), "extra-data shorter than")
+	// extra data
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "extra-data shorter than")
 	header.ExtraData = extra
 
 	// parent hash
-	require.ErrorContains(t, validateHeaderFields(parent, header), "incorrect header parent hash")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "incorrect header parent hash")
 	header.ParentHash = parent.Hash
 
 	// sequence number
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid number")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid number")
 	header.Number = 1
 
 	// failed timestamp
-	require.ErrorContains(t, validateHeaderFields(parent, header), "timestamp older than parent")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "timestamp older than parent")
 	header.Timestamp = 10
 
 	// failed nonce
 	header.SetNonce(1)
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid nonce")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid nonce")
+
 	header.SetNonce(0)
 
 	// failed gas
 	header.GasLimit = 10
 	header.GasUsed = 11
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid gas limit")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid gas limit")
 	header.GasLimit = 10
 	header.GasUsed = 10
 
 	// mix digest
-	require.ErrorContains(t, validateHeaderFields(parent, header), "mix digest is not correct")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "mix digest is not correct")
 	header.MixHash = PolyBFTMixDigest
 
 	// difficulty
 	header.Difficulty = 0
-	require.ErrorContains(t, validateHeaderFields(parent, header), "difficulty should be greater than zero")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "difficulty should be greater than zero")
 
 	header.Difficulty = 1
 	header.Hash = types.BytesToHash([]byte{11, 22, 33})
-	require.ErrorContains(t, validateHeaderFields(parent, header), "invalid header hash")
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "invalid header hash")
+	header.Timestamp = uint64(time.Now().UTC().Unix() + 150)
+	require.ErrorContains(t, validateHeaderFields(parent, header, blockTimeDrift), "block from the future")
+
+	header.Timestamp = uint64(time.Now().UTC().Unix())
 
 	header.ComputeHash()
-	require.NoError(t, validateHeaderFields(parent, header))
+	require.NoError(t, validateHeaderFields(parent, header, blockTimeDrift))
 }
 
 func TestFSM_verifyCommitEpochTx(t *testing.T) {
@@ -784,6 +790,7 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 		distributeRewardsInput: distributeRewards,
 		polybftBackend:         polybftBackendMock,
 		newValidatorsDelta:     newValidatorDelta,
+		config:                 &PolyBFTConfig{BlockTimeDrift: 1},
 	}
 
 	err = fsm.Validate(proposal)
@@ -857,6 +864,7 @@ func TestFSM_Validate_EpochEndingBlock_UpdatingValidatorSetInNonEpochEndingBlock
 		validators:     validators.ToValidatorSet(),
 		logger:         hclog.NewNullLogger(),
 		polybftBackend: polybftBackendMock,
+		config:         &PolyBFTConfig{BlockTimeDrift: 1},
 	}
 
 	err = fsm.Validate(proposal)
@@ -882,8 +890,15 @@ func TestFSM_Validate_IncorrectHeaderParentHash(t *testing.T) {
 	}
 	parent.ComputeHash()
 
-	fsm := &fsm{parent: parent, backend: &blockchainMock{},
-		validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger()}
+	fsm := &fsm{
+		parent:     parent,
+		backend:    &blockchainMock{},
+		validators: validators.ToValidatorSet(),
+		logger:     hclog.NewNullLogger(),
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
+	}
 
 	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, parent.ExtraData)
 
@@ -917,8 +932,14 @@ func TestFSM_Validate_InvalidNumber(t *testing.T) {
 	for _, blockNum := range []uint64{parentBlockNumber - 1, parentBlockNumber, parentBlockNumber + 2} {
 		stateBlock := createDummyStateBlock(blockNum, parent.Hash, parent.ExtraData)
 		mBlockBuilder := newBlockBuilderMock(stateBlock)
-		fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, backend: &blockchainMock{},
-			validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger()}
+		fsm := &fsm{
+			parent:       parent,
+			blockBuilder: mBlockBuilder,
+			backend:      &blockchainMock{},
+			validators:   validators.ToValidatorSet(),
+			logger:       hclog.NewNullLogger(),
+			config:       &PolyBFTConfig{BlockTimeDrift: 1},
+		}
 
 		proposalHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), stateBlock.Block.Number(), stateBlock.Block.Hash())
 		require.NoError(t, err)
@@ -953,8 +974,14 @@ func TestFSM_Validate_TimestampOlder(t *testing.T) {
 			ExtraData:  parent.ExtraData,
 		}
 		stateBlock := &types.FullBlock{Block: consensus.BuildBlock(consensus.BuildBlockParams{Header: header})}
-		fsm := &fsm{parent: parent, backend: &blockchainMock{},
-			validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger()}
+		fsm := &fsm{
+			parent:     parent,
+			backend:    &blockchainMock{},
+			validators: validators.ToValidatorSet(),
+			logger:     hclog.NewNullLogger(),
+			config: &PolyBFTConfig{
+				BlockTimeDrift: 1,
+			}}
 
 		checkpointHash, err := new(CheckpointData).Hash(fsm.backend.GetChainID(), header.Number, header.Hash)
 		require.NoError(t, err)
@@ -995,6 +1022,9 @@ func TestFSM_Validate_IncorrectMixHash(t *testing.T) {
 		backend:    &blockchainMock{},
 		validators: validators.ToValidatorSet(),
 		logger:     hclog.NewNullLogger(),
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
 	}
 	rlpBlock := buildBlock.Block.MarshalRLP()
 
@@ -1405,6 +1435,9 @@ func TestFSM_Validate_FailToVerifySignatures(t *testing.T) {
 		polybftBackend: polybftBackendMock,
 		validators:     validatorSet,
 		logger:         hclog.NewNullLogger(),
+		config: &PolyBFTConfig{
+			BlockTimeDrift: 1,
+		},
 	}
 
 	finalBlock := consensus.BuildBlock(consensus.BuildBlockParams{
