@@ -92,10 +92,9 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		nil,
 		nil,
 		&Config{
-			PriceLimit:          defaultPriceLimit,
-			MaxSlots:            maxSlots,
-			MaxAccountEnqueued:  defaultMaxAccountEnqueued,
-			DeploymentWhitelist: []types.Address{},
+			PriceLimit:         defaultPriceLimit,
+			MaxSlots:           maxSlots,
+			MaxAccountEnqueued: defaultMaxAccountEnqueued,
 		},
 	)
 }
@@ -1715,42 +1714,6 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 
 		return signedTx
 	}
-
-	t.Run("contract deployment whitelist empty, anyone can deploy", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.NoError(t, pool.validateTx(signTx(tx)))
-	})
-	t.Run("Addresses inside whitelist can deploy smart contract", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-		pool.deploymentWhitelist.add(addr1)
-		pool.deploymentWhitelist.add(defaultAddr)
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.NoError(t, pool.validateTx(signTx(tx)))
-	})
-	t.Run("Addresses outside whitelist can not deploy smart contract", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-		pool.deploymentWhitelist.add(addr1)
-		pool.deploymentWhitelist.add(addr2)
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.ErrorIs(t,
-			pool.validateTx(signTx(tx)),
-			ErrSmartContractRestricted,
-		)
-	})
-
 	t.Run("Input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()

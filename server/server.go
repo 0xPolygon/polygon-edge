@@ -26,7 +26,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -330,11 +329,6 @@ func NewServer(config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 
-		deploymentWhitelist, err := configHelper.GetDeploymentWhitelist(config.Chain)
-		if err != nil {
-			return nil, err
-		}
-
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
@@ -343,10 +337,9 @@ func NewServer(config *Config) (*Server, error) {
 			m.grpcServer,
 			m.network,
 			&txpool.Config{
-				MaxSlots:            m.config.MaxSlots,
-				PriceLimit:          m.config.PriceLimit,
-				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
-				DeploymentWhitelist: deploymentWhitelist,
+				MaxSlots:           m.config.MaxSlots,
+				PriceLimit:         m.config.PriceLimit,
+				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 			},
 		)
 		if err != nil {
