@@ -149,14 +149,14 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
 	if len(p.burnContracts) == 0 {
-		enabledForks.London = nil
+		enabledForks.SetFork(chain.London, nil)
 	}
 
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Params: &chain.Params{
 			ChainID: int64(p.chainID),
-			Forks:   enabledForks.ToForks(),
+			Forks:   enabledForks,
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},

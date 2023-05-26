@@ -3,9 +3,7 @@ package chain
 import (
 	"errors"
 	"math/big"
-	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -89,90 +87,10 @@ const (
 	EIP155         = "EIP155"
 )
 
-type AvailableForks struct {
-	Homestead      *Fork
-	Byzantium      *Fork
-	Constantinople *Fork
-	Petersburg     *Fork
-	Istanbul       *Fork
-	London         *Fork
-	EIP150         *Fork
-	EIP158         *Fork
-	EIP155         *Fork
-}
-
-func (f *AvailableForks) At(block uint64) ForksInTime {
-	return ForksInTime{
-		Homestead:      active(f.Homestead, block),
-		Byzantium:      active(f.Byzantium, block),
-		Constantinople: active(f.Constantinople, block),
-		Petersburg:     active(f.Petersburg, block),
-		Istanbul:       active(f.Istanbul, block),
-		London:         active(f.London, block),
-		EIP150:         active(f.EIP150, block),
-		EIP158:         active(f.EIP158, block),
-		EIP155:         active(f.EIP155, block),
-	}
-}
-
-func (f *AvailableForks) ToForks() *Forks {
-	forks := &Forks{}
-
-	add := func(name string, fork *Fork) {
-		if fork != nil {
-			(*forks)[name] = fork
-		}
-	}
-
-	add(Homestead, f.Homestead)
-	add(Byzantium, f.Byzantium)
-	add(Constantinople, f.Constantinople)
-	add(Petersburg, f.Petersburg)
-	add(Istanbul, f.Istanbul)
-	add(London, f.London)
-	add(EIP150, f.EIP150)
-	add(EIP158, f.EIP158)
-	add(EIP155, f.EIP155)
-
-	return forks
-}
-
 // Forks specifies when each fork is activated
 type Forks map[string]*Fork
 
-func (f *Forks) IsHomestead(block uint64) bool {
-	return active((*f)[Homestead], block)
-}
-
-func (f *Forks) IsByzantium(block uint64) bool {
-	return active((*f)[Byzantium], block)
-}
-
-func (f *Forks) IsConstantinople(block uint64) bool {
-	return active((*f)[Constantinople], block)
-}
-
-func (f *Forks) IsPetersburg(block uint64) bool {
-	return active((*f)[Petersburg], block)
-}
-
-func (f *Forks) IsLondon(block uint64) bool {
-	return active((*f)[London], block)
-}
-
-func (f *Forks) IsEIP150(block uint64) bool {
-	return active((*f)[EIP150], block)
-}
-
-func (f *Forks) IsEIP158(block uint64) bool {
-	return active((*f)[EIP158], block)
-}
-
-func (f *Forks) IsEIP155(block uint64) bool {
-	return active((*f)[EIP155], block)
-}
-
-func (f *Forks) Is(name string, block uint64) bool {
+func (f *Forks) IsEnabled(name string, block uint64) bool {
 	return active((*f)[name], block)
 }
 
@@ -180,6 +98,10 @@ func (f *Forks) IsSupported(name string) bool {
 	_, exists := (*f)[name]
 
 	return exists
+}
+
+func (f *Forks) SetFork(name string, value *Fork) {
+	(*f)[name] = value
 }
 
 func (f *Forks) At(block uint64) ForksInTime {
@@ -224,7 +146,7 @@ type ForksInTime struct {
 	EIP155 bool
 }
 
-var AllForksEnabled = &AvailableForks{
+var AllForksEnabled = &Forks{
 	Homestead:      NewFork(0),
 	EIP150:         NewFork(0),
 	EIP155:         NewFork(0),
@@ -245,8 +167,7 @@ func active(ff *Fork, block uint64) bool {
 }
 
 func IsForkAvailable(name string) bool {
-	structureType := reflect.TypeOf(AvailableForks{})
-	_, found := structureType.FieldByName(strings.Title(name))
+	_, found := (*AllForksEnabled)[name]
 
 	return found
 }

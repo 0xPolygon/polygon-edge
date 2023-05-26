@@ -370,7 +370,7 @@ func (p *genesisParams) initGenesisConfig() error {
 	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
 	if len(p.burnContracts) == 0 {
-		enabledForks.London = nil
+		enabledForks.SetFork(chain.London, nil)
 	}
 
 	chainConfig := &chain.Chain{
@@ -384,7 +384,7 @@ func (p *genesisParams) initGenesisConfig() error {
 		},
 		Params: &chain.Params{
 			ChainID: int64(p.chainID),
-			Forks:   enabledForks.ToForks(),
+			Forks:   enabledForks,
 			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,

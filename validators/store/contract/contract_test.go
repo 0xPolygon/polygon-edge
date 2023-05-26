@@ -82,7 +82,7 @@ func newTestTransition(
 	st := itrie.NewState(itrie.NewMemoryStorage())
 
 	ex := state.NewExecutor(&chain.Params{
-		Forks: chain.AllForksEnabled.ToForks(),
+		Forks: chain.AllForksEnabled,
 		BurnContract: map[uint64]string{
 			0: types.ZeroAddress.String(),
 		},

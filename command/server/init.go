@@ -125,7 +125,7 @@ func (p *serverParams) initDevMode() {
 	// - disables peer discovery
 	// - enables all forks
 	p.rawConfig.Network.NoDiscover = true
-	p.genesisConfig.Params.Forks = chain.AllForksEnabled.ToForks()
+	p.genesisConfig.Params.Forks = chain.AllForksEnabled
 
 	p.initDevConsensusConfig()
 }
