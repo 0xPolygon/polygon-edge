@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 	hcf "github.com/hashicorp/go-hclog"
 )
 
@@ -104,6 +105,8 @@ type fsm struct {
 
 // BuildProposal builds a proposal for the current round (used if proposer)
 func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
+	start := time.Now().UTC()
+
 	parent := f.parent
 
 	extraParent, err := GetIbftExtra(parent.ExtraData)
@@ -199,8 +202,11 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	f.target = stateBlock
+	blockRlp := stateBlock.Block.MarshalRLP()
 
-	return stateBlock.Block.MarshalRLP(), nil
+	metrics.SetGauge([]string{consensusMetricsPrefix, "block_building_time"}, float32(time.Now().UTC().Sub(start).Seconds()))
+
+	return blockRlp, nil
 }
 
 // applyBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
