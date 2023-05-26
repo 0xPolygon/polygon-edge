@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
-	"github.com/umbracle/fastrlp"
 )
 
 var (
@@ -555,10 +554,7 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 				}
 				account := store.account
 				for index, data := range storage {
-					a := &fastrlp.Arena{}
-					value := a.NewBytes(data.Bytes())
-					newData := value.MarshalTo(nil)
-					account.Storage(index, newData)
+					account.Storage(index, data.Bytes())
 				}
 			}
 
