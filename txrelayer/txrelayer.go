@@ -107,7 +107,12 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	}
 
 	if txn.Gas == 0 {
-		txn.Gas = DefaultGasLimit
+		gasLimit, err := t.estimateGasLimit(txn)
+		if err != nil {
+			return ethgo.ZeroHash, err
+		}
+
+		txn.Gas = gasLimit
 	}
 
 	chainID, err := t.client.Eth().ChainID()
@@ -141,7 +146,13 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	}
 
 	txn.From = accounts[0]
-	txn.Gas = DefaultGasLimit
+
+	gasLimit, err := t.estimateGasLimit(txn)
+	if err != nil {
+		return nil, err
+	}
+
+	txn.Gas = gasLimit
 	txn.GasPrice = DefaultGasPrice
 
 	txnHash, err := t.client.Eth().SendTransaction(txn)
@@ -174,6 +185,19 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 		time.Sleep(t.receiptTimeout)
 		count++
 	}
+}
+
+// estimateGasLimit returns estimated gas limit for the given transaction
+func (t *TxRelayerImpl) estimateGasLimit(txn *ethgo.Transaction) (uint64, error) {
+	callMsg := &ethgo.CallMsg{
+		From:     txn.From,
+		To:       txn.To,
+		Data:     txn.Input,
+		GasPrice: txn.GasPrice,
+		Value:    txn.Value,
+	}
+
+	return t.client.Eth().EstimateGas(callMsg)
 }
 
 type TxRelayerOption func(*TxRelayerImpl)
