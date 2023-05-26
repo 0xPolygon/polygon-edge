@@ -107,6 +107,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		if err != nil {
 			return ethgo.ZeroHash, err
 		}
+		
 		txn.GasPrice = gasPrice
 	}
 
