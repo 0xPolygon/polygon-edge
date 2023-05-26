@@ -95,7 +95,7 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, res, "expected to return block, but got nil")
-	assert.Equal(t, res, 10)
+	assert.Equal(t, res, types.EncodeUint64(10))
 }
 
 func TestEth_GetTransactionByHash(t *testing.T) {
