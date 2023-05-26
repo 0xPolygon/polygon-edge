@@ -1684,13 +1684,10 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 	})
 }
 
-// TestPermissionSmartContractDeployment tests sending deployment tx with deployment whitelist
-func TestPermissionSmartContractDeployment(t *testing.T) {
+func Test_TxPool_validateTx(t *testing.T) {
 	t.Parallel()
 
 	signer := crypto.NewEIP155Signer(100, true)
-
-	poolSigner := crypto.NewEIP155Signer(100, true)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -1707,7 +1704,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 	}
 
 	signTx := func(transaction *types.Transaction) *types.Transaction {
-		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
+		signedTx, signErr := signer.SignTx(transaction, defaultKey)
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
 		}
@@ -1812,7 +1809,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		tx.GasTipCap = big.NewInt(100000)
 
 		assert.ErrorIs(t,
-			pool.addTx(local, signTx(tx)),
+			pool.validateTx(signTx(tx)),
 			ErrInvalidTxType,
 		)
 	})
