@@ -50,12 +50,6 @@ func ParseUint256orHex(val *string) (*big.Int, error) {
 	return b, nil
 }
 
-func ParseInt64orHex(val *string) (int64, error) {
-	i, err := ParseUint64orHex(val)
-
-	return int64(i), err
-}
-
 func ParseBytes(val *string) ([]byte, error) {
 	if val == nil {
 		return []byte{}, nil

@@ -177,7 +177,7 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 		return nil, nil
 	}
 
-	return len(block.Transactions), nil
+	return *types.EncodeUint64(uint64(len(block.Transactions))), nil
 }
 
 // BlockNumber returns current block number
