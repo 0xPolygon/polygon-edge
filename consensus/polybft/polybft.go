@@ -681,8 +681,6 @@ func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 }
 
 func registerForksAndHandlers(forks *chain.Forks) error {
-	//nolint:godox
-	// TODO: update to real values and read from smart contract
 	availableForks := []forkmanager.ForkName{}
 	activeForks := []*forkmanager.ForkInfo{}
 	handlers := []forkmanager.ForkHandler{}
@@ -695,22 +693,10 @@ func registerForksAndHandlers(forks *chain.Forks) error {
 		availableForks = append(availableForks, forkmanager.ForkName(name))
 
 		if block != nil {
-			info := forkmanager.NewForkInfo(forkmanager.ForkName(name), (uint64)(*block))
-			activeForks = append(activeForks, info)
+			activeForks = append(activeForks,
+				forkmanager.NewForkInfo(forkmanager.ForkName(name), (uint64)(*block)))
 		}
 	}
 
 	return forkmanager.GetInstance().RegisterAll(availableForks, handlers, activeForks)
-}
-
-func init() {
-	// init default fork
-	availableForks := []forkmanager.ForkName{""}
-	activeForks := []*forkmanager.ForkInfo{
-		forkmanager.NewForkInfo("", 0),
-	}
-
-	if err := forkmanager.GetInstance().RegisterAll(availableForks, nil, activeForks); err != nil {
-		panic(err) //nolint:gocritic
-	}
 }

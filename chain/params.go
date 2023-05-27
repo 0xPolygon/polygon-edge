@@ -159,11 +159,7 @@ var AllForksEnabled = &Forks{
 }
 
 func active(ff *Fork, block uint64) bool {
-	if ff == nil {
-		return false
-	}
-
-	return ff.Active(block)
+	return ff != nil && ff.Active(block)
 }
 
 func IsForkAvailable(name string) bool {
