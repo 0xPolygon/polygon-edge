@@ -83,12 +83,8 @@ func GetCommand() *cobra.Command {
 	return withdrawCmd
 }
 
-func preRunCommand(cmd *cobra.Command, _ []string) error {
-	if err := wp.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+func preRunCommand(_ *cobra.Command, _ []string) error {
+	return wp.Validate()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {

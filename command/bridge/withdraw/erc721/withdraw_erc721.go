@@ -82,7 +82,7 @@ func GetCommand() *cobra.Command {
 	return withdrawCmd
 }
 
-func preRun(cmd *cobra.Command, _ []string) error {
+func preRun(_ *cobra.Command, _ []string) error {
 	return wp.Validate()
 }
 

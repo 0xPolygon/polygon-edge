@@ -99,11 +99,7 @@ func GetCommand() *cobra.Command {
 }
 
 func preRunCommand(cmd *cobra.Command, _ []string) error {
-	if err := dp.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return dp.Validate()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
