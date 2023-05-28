@@ -736,64 +736,6 @@ func initContract(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelay
 	return nil
 }
 
-// initializeRootERC1155Predicate invokes initialize function on RootERC1155Predicate smart contract
-func initializeRootERC1155Predicate(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
-	rootchainConfig *polybft.RootchainConfig, deployerKey ethgo.Key) error {
-	rootERC1155PredicateParams := &contractsapi.InitializeRootERC1155PredicateFn{
-		NewStateSender:           rootchainConfig.StateSenderAddress,
-		NewExitHelper:            rootchainConfig.ExitHelperAddress,
-		NewChildERC1155Predicate: contracts.ChildERC1155PredicateContract,
-		NewChildTokenTemplate:    rootchainConfig.ERC1155TemplateAddress,
-	}
-
-	input, err := rootERC1155PredicateParams.EncodeAbi()
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for RootERC1155Predicate.initialize. error: %w", err)
-	}
-
-	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC1155PredicateAddress),
-		input, rootERC1155PredicateName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC1155PredicateName),
-	})
-
-	return nil
-}
-
-// initializeSupernetManager invokes initialize function on CustomSupernetManager contract
-func initializeSupernetManager(cmdOutput command.OutputFormatter,
-	txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeCustomSupernetManagerFn{
-		NewStakeManager:      rootchainConfig.StakeManagerAddress,
-		NewBls:               rootchainConfig.BLSAddress,
-		NewStateSender:       rootchainConfig.StateSenderAddress,
-		NewMatic:             rootchainConfig.RootNativeERC20Address,
-		NewChildValidatorSet: contracts.ValidatorSetContract,
-		NewExitHelper:        rootchainConfig.ExitHelperAddress,
-		NewDomain:            bls.DomainValidatorSetString,
-	}
-
-	input, err := initFn.EncodeAbi()
-	if err != nil {
-		return err
-	}
-
-	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.CustomSupernetManagerAddress),
-		input, customSupernetManagerName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, customSupernetManagerName),
-	})
-
-	return nil
-}
-
 // validatorSetToABISlice converts given validators to generic map
 // which is used for ABI encoding validator set being sent to the rootchain contract
 func validatorSetToABISlice(o command.OutputFormatter,
