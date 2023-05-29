@@ -371,12 +371,15 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 		}
 	}
 
+	var (
+		data []byte
+		err  error
+		ok   bool
+	)
+
 	output := fd.fv.Call(inArgs)
 	if err := getError(output[1]); err != nil {
 		d.logInternalError(req.Method, err)
-
-		var data []byte
-		var ok bool
 
 		if res := output[0].Interface(); res != nil {
 			data, ok = res.([]byte)
@@ -388,11 +391,6 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 		return data, NewInvalidRequestError(err.Error())
 	}
-
-	var (
-		data []byte
-		err  error
-	)
 
 	if res := output[0].Interface(); res != nil {
 		data, err = json.Marshal(res)
