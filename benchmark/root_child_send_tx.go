@@ -2,7 +2,9 @@ package benchmark
 
 import (
 	"math/big"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -10,34 +12,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/wallet"
 )
-
-var (
-	singleContCalcFunc   = abi.MustNewMethod("function compute(uint256 x, uint256 y) public returns (uint256)")
-	singleContGetFunc    = abi.MustNewMethod("function getValue() public returns (uint256[] memory)")
-	singleContSetFunc    = abi.MustNewMethod("function addValue(uint256 value) public")
-	multiContSetAddrFunc = abi.MustNewMethod("function setContractAddr(address _contract) public")
-	multiContFnA         = abi.MustNewMethod("function fnA() public returns (uint256)")
-)
-
-// The rootChildSendTx function executes test cases that measure transaction execution on both the root and child chains
-// To do this, it first calls RootChildSendTxSetUp to set up the testing environment,
-// which may include starting the cluster, deploying contracts, and building the test cases.
-// After building the test cases, rootChildSendTx returns them along with a cleanup function that should be called
-// after the test cases have been executed. The test cases are executed by the TxTestCasesExecutor.
-func rootChildSendTx(b *testing.B) {
-	b.Helper()
-	// set up environment, get test cases and clean up fn
-	testCases, cleanUpFn := RootChildSendTxSetUp(b, "", "", "", true)
-	defer cleanUpFn()
-
-	// Loop over the test cases and measure the execution time of the transactions
-	for _, testInput := range testCases {
-		TxTestCasesExecutor(b, testInput)
-	}
-}
 
 // RootChildSendTxSetUp sets environment for execution of sentTx test cases on both root and child chains and
 // returns test cases and clean up fn.
@@ -111,14 +87,14 @@ func RootChildSendTxSetUp(b *testing.B, rootNodeAddr, childNodeAddr,
 	// set callee contract addresses for multi call contracts (A->B->C)
 	// set B contract address in A contract
 	setContractDependencyAddress(b, childTxRelayer, multiAContChildAddr, multiBContChildAddr,
-		multiContSetAddrFunc, sender)
+		multiContSetAAddrFunc, sender)
 	setContractDependencyAddress(b, rootTxRelayer, multiAContRootAddr, multiBContRootAddr,
-		multiContSetAddrFunc, sender)
+		multiContSetAAddrFunc, sender)
 	// set C contract address in B contract
 	setContractDependencyAddress(b, childTxRelayer, multiBContChildAddr, multiCContChildAddr,
-		multiContSetAddrFunc, sender)
+		multiContSetBAddrFunc, sender)
 	setContractDependencyAddress(b, rootTxRelayer, multiBContRootAddr, multiCContRootAddr,
-		multiContSetAddrFunc, sender)
+		multiContSetBAddrFunc, sender)
 
 	// create inputs for contract calls
 	singleContInputs := map[string][]byte{
@@ -197,4 +173,78 @@ func RootChildSendTxSetUp(b *testing.B, rootNodeAddr, childNodeAddr,
 	}
 
 	return testCases, cleanUpFn
+}
+
+// TxTestCase represents a test case data to be run with txTestCasesExecutor
+type TxTestCase struct {
+	Name         string
+	Relayer      txrelayer.TxRelayer
+	ContractAddr ethgo.Address
+	Input        [][]byte
+	Sender       ethgo.Key
+	TxNumber     int
+}
+
+// TxTestCasesExecutor executes transactions from testInput and waits in separate
+// go routins for each tx receipt
+func TxTestCasesExecutor(b *testing.B, testInput TxTestCase) {
+	b.Helper()
+	b.Run(testInput.Name, func(b *testing.B) {
+		b.ReportAllocs()
+		b.ResetTimer()
+		var wg sync.WaitGroup
+
+		// submit all tx 'repeatCall' times
+		for i := 0; i < testInput.TxNumber; i++ {
+			// call contract for the all inputs
+			for j := 0; j < len(testInput.Input); j++ {
+				nonce, err := testInput.Relayer.Client().Eth().GetNonce(testInput.Sender.Address(), ethgo.Pending)
+				require.NoError(b, err)
+
+				// the tx is submitted to the blockchain without waiting for the receipt,
+				// since we want to have multiple tx in one block
+				txHash, err := testInput.Relayer.SumbitTransaction(
+					&ethgo.Transaction{
+						To:    &testInput.ContractAddr,
+						Input: testInput.Input[j],
+					}, testInput.Sender)
+				require.NoError(b, err)
+				require.NotEqual(b, ethgo.ZeroHash, txHash)
+
+				wg.Add(1)
+
+				// wait for receipt of submitted tx in a separate routine, and continue with the next tx
+				go func(hash ethgo.Hash) {
+					defer wg.Done()
+
+					receipt, err := testInput.Relayer.WaitForReceipt(hash)
+					require.NoError(b, err)
+					require.Equal(b, uint64(types.ReceiptSuccess), receipt.Status)
+				}(txHash)
+
+				// wait for tx to be added in mem pool so that we can create tx with the next nonce
+				waitForNextNonce(b, nonce, testInput.Sender.Address(), testInput.Relayer)
+			}
+		}
+
+		wg.Wait()
+	})
+}
+
+func waitForNextNonce(b *testing.B, nonce uint64, address ethgo.Address, txRelayer txrelayer.TxRelayer) {
+	b.Helper()
+
+	startTime := time.Now().UTC()
+
+	for {
+		newNonce, err := txRelayer.Client().Eth().GetNonce(address, ethgo.Pending)
+		require.NoError(b, err)
+
+		if newNonce > nonce {
+			return
+		}
+
+		elapsedTime := time.Since(startTime)
+		require.True(b, elapsedTime <= 5*time.Second, "tx not added to the mem poolin 2s")
+	}
 }

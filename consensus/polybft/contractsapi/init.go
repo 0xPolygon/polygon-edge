@@ -56,6 +56,7 @@ var (
 	TestBenchmarkB         *artifact.Artifact
 	TestBenchmarkC         *artifact.Artifact
 	TestBenchmarkSingle    *artifact.Artifact
+	SampleContract         *artifact.Artifact
 )
 
 func init() {
@@ -217,6 +218,11 @@ func init() {
 	}
 
 	TestBenchmarkC, err = artifact.DecodeArtifact(readTestContractContent("TestBenchmarkC.json"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	SampleContract, err = artifact.DecodeArtifact(readTestContractContent("SampleContract.json"))
 	if err != nil {
 		log.Fatal(err)
 	}

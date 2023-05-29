@@ -1,0 +1,138 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "SampleContract",
+  "sourceName": "contracts/test/SampleContract.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "Aborted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "ItemReceived",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "PurchaseConfirmed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "Refunded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "abort",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "buyer",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "confirmPurchase",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "confirmReceived",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "refund",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "seller",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "state",
+      "outputs": [
+        {
+          "internalType": "uint8",
+          "name": "",
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "value",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x608060405234801561001057600080fd5b50600080546001600160a01b0319168155600155600280546001600160a81b0319169055610223806100436000396000f3fe608060405234801561001057600080fd5b50600436106100785760003560e01c806308551a531461007d57806335a063b4146100ad5780633fa4f245146100b7578063590e1ae3146100ce5780637150d8ae146100e657806373fac6f0146100f9578063c19d93fb14610101578063d696069714610127575b600080fd5b600054610090906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100b561012f565b005b6100c060015481565b6040519081526020016100a4565b6100d661015a565b60405190151581526020016100a4565b600254610090906001600160a01b031681565b6100d661018b565b60025461011590600160a01b900460ff1681565b60405160ff90911681526020016100a4565b6100d66101bc565b6040517f72c874aeff0b183a56e2b79c71b46e1aed4dee5e09862134b8821ba2fddbf8bf90600090a1565b6040516000907f8616bbbbad963e4e65b1366f1d75dfb63f9e9704bbbf91fb01bec70849906cf7908290a150600190565b6040516000907fe89152acd703c9d8c7d28829d443260b411454d45394e7995815140c8cbcbcf7908290a150600190565b6040516000907fd5d55c8a68912e9a110618df8d5e2e83b8d83211c57a8ddd1203df92885dc881908290a15060019056fea264697066735822122020dbaeea5fb377656e27e4776ca67b90b97234194ed45764407db48ad4a5e8cb64736f6c63430008130033",
+  "deployedBytecode": "0x608060405234801561001057600080fd5b50600436106100785760003560e01c806308551a531461007d57806335a063b4146100ad5780633fa4f245146100b7578063590e1ae3146100ce5780637150d8ae146100e657806373fac6f0146100f9578063c19d93fb14610101578063d696069714610127575b600080fd5b600054610090906001600160a01b031681565b6040516001600160a01b0390911681526020015b60405180910390f35b6100b561012f565b005b6100c060015481565b6040519081526020016100a4565b6100d661015a565b60405190151581526020016100a4565b600254610090906001600160a01b031681565b6100d661018b565b60025461011590600160a01b900460ff1681565b60405160ff90911681526020016100a4565b6100d66101bc565b6040517f72c874aeff0b183a56e2b79c71b46e1aed4dee5e09862134b8821ba2fddbf8bf90600090a1565b6040516000907f8616bbbbad963e4e65b1366f1d75dfb63f9e9704bbbf91fb01bec70849906cf7908290a150600190565b6040516000907fe89152acd703c9d8c7d28829d443260b411454d45394e7995815140c8cbcbcf7908290a150600190565b6040516000907fd5d55c8a68912e9a110618df8d5e2e83b8d83211c57a8ddd1203df92885dc881908290a15060019056fea264697066735822122020dbaeea5fb377656e27e4776ca67b90b97234194ed45764407db48ad4a5e8cb64736f6c63430008130033",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}
