@@ -207,27 +207,3 @@ func (fm *forkManager) removeHandler(handlerName ForkHandlerName, blockNumber ui
 		handlers = handlers[:len(handlers)-1]
 	}
 }
-
-func (fm *forkManager) RegisterAll(
-	availableForks []ForkName,
-	handlers []ForkHandler,
-	activeForks []*ForkInfo,
-) error {
-	for _, x := range availableForks {
-		fm.RegisterFork(x)
-	}
-
-	for _, x := range handlers {
-		if err := fm.RegisterHandler(x.ForkName, x.HandlerName, x.Handler); err != nil {
-			return err
-		}
-	}
-
-	for _, it := range activeForks {
-		if err := fm.ActivateFork(it.Name, it.FromBlockNumber); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}

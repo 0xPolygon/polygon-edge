@@ -276,6 +276,12 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	if factory, exists := forkManagerFactory[ConsensusType(engineName)]; exists {
+		if err := factory(config.Chain.Params.Forks); err != nil {
+			return nil, err
+		}
+	}
+
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 

@@ -358,8 +358,28 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		}
 
-		return registerForksAndHandlers(config.Params.Forks)
+		return nil
 	}
+}
+
+func ForkManagerFactory(forks *chain.Forks) error {
+	fm := forkmanager.GetInstance()
+
+	for name, block := range *forks {
+		if !chain.IsForkAvailable(name) {
+			return fmt.Errorf("fork is not available: %s", name)
+		}
+
+		fm.RegisterFork(forkmanager.ForkName(name))
+
+		if block != nil {
+			if err := fm.ActivateFork(forkmanager.ForkName(name), (uint64)(*block)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
 
 // Initialize initializes the consensus (e.g. setup data)
@@ -678,25 +698,4 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 // Filters extra data to not contain Committed field
 func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
-}
-
-func registerForksAndHandlers(forks *chain.Forks) error {
-	availableForks := []forkmanager.ForkName{}
-	activeForks := []*forkmanager.ForkInfo{}
-	handlers := []forkmanager.ForkHandler{}
-
-	for name, block := range *forks {
-		if !chain.IsForkAvailable(name) {
-			panic(fmt.Errorf("fork is not available: %s", name)) //nolint:gocritic
-		}
-
-		availableForks = append(availableForks, forkmanager.ForkName(name))
-
-		if block != nil {
-			activeForks = append(activeForks,
-				forkmanager.NewForkInfo(forkmanager.ForkName(name), (uint64)(*block)))
-		}
-	}
-
-	return forkmanager.GetInstance().RegisterAll(availableForks, handlers, activeForks)
 }
