@@ -16,6 +16,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const syncerMetrics = "syncer"
+
 type Blockchain interface {
 	// SubscribeEvents subscribes new blockchain event
 	SubscribeEvents() blockchain.Subscription
