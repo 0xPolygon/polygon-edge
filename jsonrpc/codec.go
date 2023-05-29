@@ -96,9 +96,10 @@ func (e *ObjectError) Error() string {
 func (e *ObjectError) MarshalJSON() ([]byte, error) {
 	var ds string
 
-	data := e.Data.([]byte)
-	if len(data) > 0 {
-		ds = "0x" + string(data)
+	if data, ok := e.Data.([]byte); ok {
+		if len(data) > 0 {
+			ds = "0x" + string(data)
+		}
 	}
 
 	return json.Marshal(&struct {
