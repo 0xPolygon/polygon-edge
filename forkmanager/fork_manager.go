@@ -27,6 +27,8 @@ type forkManager struct {
 
 	forkMap     map[ForkName]*Fork
 	handlersMap map[ForkHandlerName][]ForkActiveHandler
+
+	currentHandlers map[ForkHandlerName]interface{}
 }
 
 func GetInstance() *forkManager {
@@ -114,21 +116,29 @@ func (fm *forkManager) DeactivateFork(forkName ForkName) error {
 	return nil
 }
 
-func (fm *forkManager) GetHandler(name ForkHandlerName, blockNumber uint64) interface{} {
+func (fm *forkManager) SetCurrentBlock(currentBlock uint64) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
-	handlers, exists := fm.handlersMap[name]
-	if !exists {
-		panic(fmt.Errorf("handlers not registered for %s", name)) //nolint:gocritic
+	fm.currentHandlers = map[ForkHandlerName]interface{}{}
+
+	for handlerName, handlers := range fm.handlersMap {
+		// binary search to find first position inside []*ForkHandler where FromBlockNumber >= blockNumber
+		pos := sort.Search(len(handlers), func(i int) bool {
+			return currentBlock < handlers[i].FromBlockNumber
+		}) - 1
+
+		if pos >= 0 {
+			fm.currentHandlers[handlerName] = handlers[pos].Handler
+		}
 	}
+}
 
-	// binary search to find first position inside []*ForkHandler where FromBlockNumber >= blockNumber
-	pos := sort.Search(len(handlers), func(i int) bool {
-		return blockNumber < handlers[i].FromBlockNumber
-	}) - 1
+func (fm *forkManager) GetHandler(name ForkHandlerName) interface{} {
+	fm.lock.Lock()
+	defer fm.lock.Unlock()
 
-	return handlers[pos].Handler
+	return fm.currentHandlers[name]
 }
 
 func (fm *forkManager) IsForkSupported(name ForkName) bool {
@@ -204,6 +214,6 @@ func (fm *forkManager) removeHandler(handlerName ForkHandlerName, blockNumber ui
 	if index != -1 {
 		copy(handlers[index:], handlers[index+1:])
 		handlers[len(handlers)-1] = ForkActiveHandler{}
-		handlers = handlers[:len(handlers)-1]
+		fm.handlersMap[handlerName] = handlers[:len(handlers)-1]
 	}
 }
