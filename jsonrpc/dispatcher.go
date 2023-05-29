@@ -382,11 +382,11 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	start := time.Now().UTC()
 	output := fd.fv.Call(inArgs) // call rpc endpoint function
 	// measure execution time of rpc endpoint function
-	metrics.SetGauge([]string{jsonRpcMetric, req.Method + "_time"}, float32(time.Now().UTC().Sub(start).Seconds()))
+	metrics.SetGauge([]string{jsonRPCMetric, req.Method + "_time"}, float32(time.Now().UTC().Sub(start).Seconds()))
 
 	if err := getError(output[1]); err != nil {
 		// measure error on the rpc endpoint function
-		metrics.IncrCounter([]string{jsonRpcMetric, req.Method + "_errors"}, 1)
+		metrics.IncrCounter([]string{jsonRPCMetric, req.Method + "_errors"}, 1)
 		d.logInternalError(req.Method, err)
 
 		if res := output[0].Interface(); res != nil {

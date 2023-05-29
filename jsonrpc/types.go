@@ -9,7 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const jsonRpcMetric = "json_rpc"
+const jsonRPCMetric = "json_rpc"
 
 // For union type of transaction and types.Hash
 type transactionOrHash interface {

@@ -110,7 +110,8 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 
 	_, root := transition.Commit()
 
-	metrics.SetGauge([]string{consensusMetricsPrefix, "block_execution_time"}, float32(time.Now().UTC().Sub(start).Seconds()))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "block_execution_time"},
+		float32(time.Now().UTC().Sub(start).Seconds()))
 
 	if root != block.Header.StateRoot {
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Header.StateRoot)
