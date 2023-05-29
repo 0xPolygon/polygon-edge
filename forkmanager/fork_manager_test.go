@@ -78,12 +78,12 @@ func TestForkManager(t *testing.T) {
 	t.Run("is fork supported", func(t *testing.T) {
 		t.Parallel()
 
-		assert.True(t, forkManager.IsForkSupported(ForkName("A")))
-		assert.True(t, forkManager.IsForkSupported(ForkName("B")))
-		assert.True(t, forkManager.IsForkSupported(ForkName("C")))
-		assert.True(t, forkManager.IsForkSupported(ForkName("D")))
+		assert.True(t, forkManager.IsForkRegistered(ForkName("A")))
+		assert.True(t, forkManager.IsForkRegistered(ForkName("B")))
+		assert.True(t, forkManager.IsForkRegistered(ForkName("C")))
+		assert.True(t, forkManager.IsForkRegistered(ForkName("D")))
 
-		assert.False(t, forkManager.IsForkSupported(ForkName("CC")))
+		assert.False(t, forkManager.IsForkRegistered(ForkName("CC")))
 	})
 
 	t.Run("get fork block", func(t *testing.T) {

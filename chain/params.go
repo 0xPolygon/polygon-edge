@@ -87,17 +87,13 @@ const (
 	EIP155         = "EIP155"
 )
 
-// Forks specifies when each fork is activated
+// Forks is map which contains all forks and their starting blocks from genesis
 type Forks map[string]*Fork
 
-func (f *Forks) IsEnabled(name string, block uint64) bool {
-	return active((*f)[name], block)
-}
+func (f *Forks) IsActive(name string, block uint64) bool {
+	ff := (*f)[name]
 
-func (f *Forks) IsSupported(name string) bool {
-	_, exists := (*f)[name]
-
-	return exists
+	return ff != nil && ff.Active(block)
 }
 
 func (f *Forks) SetFork(name string, value *Fork) {
@@ -106,15 +102,15 @@ func (f *Forks) SetFork(name string, value *Fork) {
 
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:      active((*f)[Homestead], block),
-		Byzantium:      active((*f)[Byzantium], block),
-		Constantinople: active((*f)[Constantinople], block),
-		Petersburg:     active((*f)[Petersburg], block),
-		Istanbul:       active((*f)[Istanbul], block),
-		London:         active((*f)[London], block),
-		EIP150:         active((*f)[EIP150], block),
-		EIP158:         active((*f)[EIP158], block),
-		EIP155:         active((*f)[EIP155], block),
+		Homestead:      f.IsActive(Homestead, block),
+		Byzantium:      f.IsActive(Byzantium, block),
+		Constantinople: f.IsActive(Constantinople, block),
+		Petersburg:     f.IsActive(Petersburg, block),
+		Istanbul:       f.IsActive(Istanbul, block),
+		London:         f.IsActive(London, block),
+		EIP150:         f.IsActive(EIP150, block),
+		EIP158:         f.IsActive(EIP158, block),
+		EIP155:         f.IsActive(EIP155, block),
 	}
 }
 
@@ -134,6 +130,7 @@ func (f Fork) Int() *big.Int {
 	return big.NewInt(int64(f))
 }
 
+// ForksInTime should contain all supported forks by current edge version
 type ForksInTime struct {
 	Homestead,
 	Byzantium,
@@ -146,6 +143,8 @@ type ForksInTime struct {
 	EIP155 bool
 }
 
+// AllForksEnabled should contain all supported forks by current edge version
+// All forks should be available from block 0
 var AllForksEnabled = &Forks{
 	Homestead:      NewFork(0),
 	EIP150:         NewFork(0),
@@ -158,10 +157,7 @@ var AllForksEnabled = &Forks{
 	London:         NewFork(0),
 }
 
-func active(ff *Fork, block uint64) bool {
-	return ff != nil && ff.Active(block)
-}
-
+// IsForkAvailable returns true if some fork defined by its name is supported by current edge version
 func IsForkAvailable(name string) bool {
 	_, found := (*AllForksEnabled)[name]
 

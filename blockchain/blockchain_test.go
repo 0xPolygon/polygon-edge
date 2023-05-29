@@ -1365,15 +1365,12 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
 			t.Parallel()
 
-			fork := chain.Fork(5)
-			forksAvailable := &chain.Forks{
-				chain.London: &fork,
-			}
-
 			blockchain := Blockchain{
 				config: &chain.Chain{
 					Params: &chain.Params{
-						Forks: forksAvailable,
+						Forks: &chain.Forks{
+							chain.London: chain.NewFork(5),
+						},
 					},
 					Genesis: &chain.Genesis{
 						BaseFeeEM: test.elasticityMultiplier,

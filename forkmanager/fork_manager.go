@@ -31,6 +31,7 @@ type forkManager struct {
 	currentHandlers map[ForkHandlerName]interface{}
 }
 
+// GeInstance returns fork manager singleton instance. Thread safe
 func GetInstance() *forkManager {
 	forkManagerInstanceLock.Lock()
 	defer forkManagerInstanceLock.Unlock()
@@ -45,6 +46,7 @@ func GetInstance() *forkManager {
 	return forkManagerInstance
 }
 
+// RegisterFork registers fork by its name
 func (fm *forkManager) RegisterFork(name ForkName) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -57,6 +59,7 @@ func (fm *forkManager) RegisterFork(name ForkName) {
 	}
 }
 
+// RegisterHandler registers handler by its name for specific fork
 func (fm *forkManager) RegisterHandler(forkName ForkName, handlerName ForkHandlerName, handler interface{}) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -71,6 +74,8 @@ func (fm *forkManager) RegisterHandler(forkName ForkName, handlerName ForkHandle
 	return nil
 }
 
+// ActivateFork activates fork from some block number
+// All handlers belong to this fork are also activated
 func (fm *forkManager) ActivateFork(forkName ForkName, blockNumber uint64) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -94,6 +99,8 @@ func (fm *forkManager) ActivateFork(forkName ForkName, blockNumber uint64) error
 	return nil
 }
 
+// DeactivateFork de-activates fork
+// All handlers belong to this fork are also de-activated
 func (fm *forkManager) DeactivateFork(forkName ForkName) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -116,6 +123,7 @@ func (fm *forkManager) DeactivateFork(forkName ForkName) error {
 	return nil
 }
 
+// SetCurrentBlock updates internal structures which allowes using GetHandler without specifying block
 func (fm *forkManager) SetCurrentBlock(currentBlock uint64) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -134,6 +142,7 @@ func (fm *forkManager) SetCurrentBlock(currentBlock uint64) {
 	}
 }
 
+// GetHandler retrives handler defined by its name for current block (@see SetCurrentBlock)
 func (fm *forkManager) GetHandler(name ForkHandlerName) interface{} {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -141,7 +150,8 @@ func (fm *forkManager) GetHandler(name ForkHandlerName) interface{} {
 	return fm.currentHandlers[name]
 }
 
-func (fm *forkManager) IsForkSupported(name ForkName) bool {
+// IsForkRegistered checks if fork is registered
+func (fm *forkManager) IsForkRegistered(name ForkName) bool {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -150,6 +160,7 @@ func (fm *forkManager) IsForkSupported(name ForkName) bool {
 	return exists
 }
 
+// IsForkEnabled checks if fork is registered and enabled for specific block
 func (fm *forkManager) IsForkEnabled(name ForkName, blockNumber uint64) bool {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -162,6 +173,7 @@ func (fm *forkManager) IsForkEnabled(name ForkName, blockNumber uint64) bool {
 	return fork.IsActive && fork.FromBlockNumber <= blockNumber
 }
 
+// GetForkBlock returns fork block if fork is registered and activated
 func (fm *forkManager) GetForkBlock(name ForkName) (uint64, error) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
