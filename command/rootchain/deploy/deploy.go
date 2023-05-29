@@ -442,6 +442,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	tokenContracts := []*contractInfo{}
 
+	// deploy root ERC20 token only if non-mintable native token flavor is used on a child chain
 	if !consensusCfg.NativeTokenConfig.IsMintable {
 		if params.rootERC20TokenAddr != "" {
 			// use existing root chain ERC20 token
