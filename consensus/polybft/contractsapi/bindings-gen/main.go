@@ -100,8 +100,8 @@ func main() {
 			[]string{},
 		},
 		{
-			"ChildERC20PredicateAccessList",
-			gensc.ChildERC20PredicateAccessList,
+			"ChildERC20PredicateACL",
+			gensc.ChildERC20PredicateACL,
 			false,
 			[]string{
 				"initialize",
@@ -112,6 +112,16 @@ func main() {
 		{
 			"RootMintableERC20Predicate",
 			gensc.RootMintableERC20Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositTo",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC20PredicateACL",
+			gensc.RootMintableERC20PredicateACL,
 			false,
 			[]string{
 				"initialize",
@@ -210,8 +220,8 @@ func main() {
 			[]string{},
 		},
 		{
-			"ChildERC1155PredicateAccessList",
-			gensc.ChildERC1155PredicateAccessList,
+			"ChildERC1155PredicateACL",
+			gensc.ChildERC1155PredicateACL,
 			false,
 			[]string{
 				"initialize",
@@ -222,6 +232,16 @@ func main() {
 		{
 			"RootMintableERC1155Predicate",
 			gensc.RootMintableERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC1155PredicateACL",
+			gensc.RootMintableERC1155PredicateACL,
 			false,
 			[]string{
 				"initialize",
@@ -280,8 +300,8 @@ func main() {
 			[]string{},
 		},
 		{
-			"ChildERC721PredicateAccessList",
-			gensc.ChildERC721PredicateAccessList,
+			"ChildERC721PredicateACL",
+			gensc.ChildERC721PredicateACL,
 			false,
 			[]string{
 				"initialize",
@@ -292,6 +312,16 @@ func main() {
 		{
 			"RootMintableERC721Predicate",
 			gensc.RootMintableERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC721PredicateACL",
+			gensc.RootMintableERC721PredicateACL,
 			false,
 			[]string{
 				"initialize",

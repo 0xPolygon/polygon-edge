@@ -154,7 +154,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		childJSONRPC := validatorSrv.JSONRPCAddr()
 
 		for i := uint64(0); i < transfersCount; i++ {
-			exitEventID := i + 1
+			// because first exit event is the one
+			// where native token is mapped on RootMintableERC20Predicate
+			exitEventID := i + 2
 
 			// send exit transaction to exit helper
 			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
@@ -421,15 +423,18 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 	childJSONRPC := validatorSrv.JSONRPCAddr()
 
-	for i := uint64(1); i <= txnCount; i++ {
+	for i := uint64(0); i < txnCount; i++ {
+		// because first exit event is the one
+		// where native token is mapped on RootMintableERC20Predicate
+		exitEventID := i + 2
 		// send exit transaction to exit helper
-		err = cluster.Bridge.SendExitTransaction(exitHelper, i, rootJSONRPC, childJSONRPC)
+		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
 
 		// make sure exit event is processed successfully
-		isProcessed, err := isExitEventProcessed(i, ethgo.Address(exitHelper), rootchainTxRelayer)
+		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
 		require.NoError(t, err)
-		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", i))
+		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 	}
 
 	// assert that owners of given token ids are the accounts on the root chain ERC 721 token
@@ -602,7 +607,10 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	rootJSONRPC := cluster.Bridge.JSONRPCAddr()
 	childJSONRPC := validatorSrv.JSONRPCAddr()
 
-	for exitEventID := uint64(1); exitEventID <= txnCount; exitEventID++ {
+	for i := uint64(0); i < txnCount; i++ {
+		// because first exit event is the one
+		// where native token is mapped on RootMintableERC20Predicate
+		exitEventID := i + 2
 		// send exit transaction to exit helper
 		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)
 		require.NoError(t, err)
@@ -967,7 +975,9 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		childJSONRPC := validatorSrv.JSONRPCAddr()
 
 		for i := uint64(0); i < transfersCount; i++ {
-			exitEventID := i + 1
+			// because first exit event is the one
+			// where native token is mapped on RootMintableERC20Predicate
+			exitEventID := i + 2
 
 			// send exit transaction to exit helper
 			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, rootJSONRPC, childJSONRPC)

@@ -340,14 +340,14 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init ChildValidatorSet
-		err = initContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
+		err = callContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
 		require.NoError(t, err)
 
 		initInput, err = getInitRewardPoolInput(polyBFTConfig)
 		require.NoError(t, err)
 
 		// init RewardPool
-		err = initContract(contracts.SystemCaller, contracts.RewardPoolContract, initInput, "RewardPool", transition)
+		err = callContract(contracts.SystemCaller, contracts.RewardPoolContract, initInput, "RewardPool", transition)
 		require.NoError(t, err)
 
 		// approve root token
@@ -359,7 +359,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		input, err := approveFn.EncodeAbi()
 		require.NoError(t, err)
 
-		err = initContract(polyBFTConfig.RewardConfig.WalletAddress,
+		err = callContract(polyBFTConfig.RewardConfig.WalletAddress,
 			polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
 		require.NoError(t, err)
 
