@@ -377,7 +377,11 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 
 		var data []byte
 		if res := output[0].Interface(); res != nil {
-			data = res.([]byte)
+			var ok bool
+			data, ok = res.([]byte)
+			if !ok {
+				return nil, NewInternalError(err.Error())
+			}
 		}
 
 		return data, NewInvalidRequestError(err.Error())
