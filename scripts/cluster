@@ -35,12 +35,16 @@ function createGenesis() {
 function initRootchain() {
   echo "Initializing rootchain"
 
-  ./polygon-edge rootchain server > /dev/null &
-  
+  if [ "$1" == "write-logs" ]; then
+    echo "Writing rootchain server logs to the file..."
+    ./polygon-edge rootchain server 2>&1 | tee ./rootchain-server.log &
+  else
+    ./polygon-edge rootchain server >/dev/null &
+  fi
+
   set +e
   t=1
-  while [ $t -gt 0 ]
-  do
+  while [ $t -gt 0 ]; do
     nc -z 127.0.0.1 8545 </dev/null
     t=$?
     sleep 1
@@ -56,8 +60,8 @@ function initRootchain() {
 
   ./polygon-edge rootchain deploy \
     --stake-manager ${stakeManagerAddr} \
-    --test 
-  
+    --test
+
   customSupernetManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')
   supernetID=$(cat genesis.json | jq -r '.params.engine.polybft.supernetID')
 
@@ -74,22 +78,21 @@ function initRootchain() {
     --jsonrpc http://127.0.0.1:8545
 
   counter=1
-  while [ $counter -le 4 ]
-  do
+  while [ $counter -le 4 ]; do
     echo "Registering validator: ${counter}"
 
     ./polygon-edge polybft register-validator \
-    --supernet-manager ${customSupernetManagerAddr} \
-    --data-dir test-chain-${counter} \
-    --jsonrpc http://127.0.0.1:8545
+      --supernet-manager ${customSupernetManagerAddr} \
+      --data-dir test-chain-${counter} \
+      --jsonrpc http://127.0.0.1:8545
 
     ./polygon-edge polybft stake \
-    --data-dir test-chain-${counter} \
-    --amount 1000000000000000000000000 \
-    --supernet-id ${supernetID} \
-    --stake-manager ${stakeManagerAddr} \
-    --stake-token ${stakeToken} \
-    --jsonrpc http://127.0.0.1:8545
+      --data-dir test-chain-${counter} \
+      --amount 1000000000000000000000000 \
+      --supernet-id ${supernetID} \
+      --stake-manager ${stakeManagerAddr} \
+      --stake-token ${stakeToken} \
+      --jsonrpc http://127.0.0.1:8545
 
     ((counter++))
   done
@@ -203,7 +206,7 @@ case "$2" in
     initPolybftConsensus
     # Create genesis file and start the server from binary
     createGenesis
-    initRootchain
+    initRootchain $2
     startServerFromBinary $2
     exit 0
   else
