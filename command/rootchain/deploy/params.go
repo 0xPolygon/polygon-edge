@@ -20,6 +20,7 @@ type deployParams struct {
 	genesisPath          string
 	deployerKey          string
 	jsonRPCAddress       string
+	stakeTokenAddr       string
 	rootERC20TokenAddr   string
 	rootERC721TokenAddr  string
 	rootERC1155TokenAddr string
@@ -46,6 +47,10 @@ func (ip *deployParams) validateFlags() error {
 	// when using mintable native token, child native token on root chain gets mapped automatically
 	if consensusCfg.NativeTokenConfig.IsMintable && ip.rootERC20TokenAddr != "" {
 		return errors.New("if child chain native token is mintable, root native token must not pre-exist on root chain")
+	}
+
+	if params.stakeTokenAddr == "" {
+		return errors.New("stake token address is not provided")
 	}
 
 	return nil

@@ -280,6 +280,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 		"rootchain",
 		"deploy",
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
+		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 		"--genesis", genesisPath,
 		"--test",
 	}

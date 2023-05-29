@@ -60,6 +60,7 @@ function initRootchain() {
 
   ./polygon-edge rootchain deploy \
     --stake-manager ${stakeManagerAddr} \
+    --stake-token ${stakeToken} \
     --test
 
   customSupernetManagerAddr=$(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')

@@ -125,7 +125,7 @@ var (
 				NewStakeManager:      config.StakeManagerAddress,
 				NewBls:               config.BLSAddress,
 				NewStateSender:       config.StateSenderAddress,
-				NewMatic:             config.RootNativeERC20Address,
+				NewMatic:             types.StringToAddress(params.stakeTokenAddr),
 				NewChildValidatorSet: contracts.ValidatorSetContract,
 				NewExitHelper:        config.ExitHelperAddress,
 				NewDomain:            bls.DomainValidatorSetString,
@@ -298,6 +298,13 @@ func GetCommand() *cobra.Command {
 	)
 
 	cmd.Flags().StringVar(
+		&params.stakeTokenAddr,
+		helper.StakeTokenFlag,
+		"",
+		helper.StakeTokenFlagDesc,
+	)
+
+	cmd.Flags().StringVar(
 		&params.stakeManagerAddr,
 		helper.StakeManagerFlag,
 		"",
@@ -306,6 +313,7 @@ func GetCommand() *cobra.Command {
 
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
 	_ = cmd.MarkFlagRequired(helper.StakeManagerFlag)
+	_ = cmd.MarkFlagRequired(helper.StakeTokenFlag)
 
 	return cmd
 }

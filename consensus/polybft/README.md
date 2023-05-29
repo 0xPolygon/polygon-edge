@@ -49,7 +49,8 @@ It has a native support for running bridge, which enables running cross-chain tr
     ```
 
 5. Deploy StakeManager - if not already deployed to rootchain. Command has a test flag used only in testing purposes which would deploy a mock ERC20 token which would be used for staking. If not used for testing, stake-token flag should be provided:
-    ``bash
+
+    ```bash
     $ polygon-edge polybft stake-manager-deploy \
      --deployer-key <hex_encoded_rootchain_account_private_key> \
     [--genesis ./genesis.json] \
@@ -64,6 +65,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     $ polygon-edge rootchain deploy \
     --deployer-key <hex_encoded_rootchain_account_private_key> \
     --stake-manager <address_of_stake_manager_contract> \
+    --stake-token 0xaddressOfStakeToken \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--test]
@@ -84,7 +86,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     --addresses <addresses_of_validators> --supernet-manager <address_of_SupernetManager_contract>
     ```
 
-9. Register validators on rootchain - each validator registers itself on SupernetManager. **This command is for testing purposes only.**
+9.  Register validators on rootchain - each validator registers itself on SupernetManager. **This command is for testing purposes only.**
 
     ```bash
     $ polygon-edge polybft register-validator --data-dir ./test-chain-1 \

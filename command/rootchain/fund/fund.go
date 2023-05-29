@@ -58,7 +58,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.stakeTokenAddr,
 		helper.StakeTokenFlag,
 		"",
-		helper.StakeTokenFlag,
+		helper.StakeTokenFlagDesc,
 	)
 
 	cmd.Flags().BoolVar(

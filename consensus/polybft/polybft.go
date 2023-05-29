@@ -283,6 +283,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
+			// TODO: fetch child native token address (write into RootNativeERC20Address,
+			// but rename it to NativeTokenRootchainClone)
 			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC20PredicateContract, input,
 				"RootMintableERC20Predicate", transition); err != nil {
 				return err
