@@ -226,7 +226,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 	stakeManagerAddress types.Address,
 	stakeTokenAddress types.Address,
 	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeStakeManagerFn{MATIC_: stakeTokenAddress}
+	initFn := &contractsapi.InitializeStakeManagerFn{NewMatic: stakeTokenAddress}
 
 	input, err := initFn.EncodeAbi()
 	if err != nil {

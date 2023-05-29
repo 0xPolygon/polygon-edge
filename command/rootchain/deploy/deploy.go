@@ -28,21 +28,24 @@ import (
 const (
 	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
 
-	stateSenderName           = "StateSender"
-	checkpointManagerName     = "CheckpointManager"
-	blsName                   = "BLS"
-	bn256G2Name               = "BN256G2"
-	exitHelperName            = "ExitHelper"
-	rootERC20PredicateName    = "RootERC20Predicate"
-	rootERC20Name             = "RootERC20"
-	erc20TemplateName         = "ERC20Template"
-	rootERC721PredicateName   = "RootERC721Predicate"
-	rootERC721Name            = "RootERC721"
-	erc721TemplateName        = "ERC721Template"
-	rootERC1155PredicateName  = "RootERC1155Predicate"
-	rootERC1155Name           = "RootERC1155"
-	erc1155TemplateName       = "ERC1155Template"
-	customSupernetManagerName = "CustomSupernetManager"
+	stateSenderName                   = "StateSender"
+	checkpointManagerName             = "CheckpointManager"
+	blsName                           = "BLS"
+	bn256G2Name                       = "BN256G2"
+	exitHelperName                    = "ExitHelper"
+	rootERC20PredicateName            = "RootERC20Predicate"
+	childERC20MintablePredicateName   = "ChildERC20MintablePredicate"
+	rootERC20Name                     = "RootERC20"
+	erc20TemplateName                 = "ERC20Template"
+	rootERC721PredicateName           = "RootERC721Predicate"
+	childERC721MintablePredicateName  = "ChildERC721MintablePredicate"
+	rootERC721Name                    = "RootERC721"
+	erc721TemplateName                = "ERC721Template"
+	rootERC1155PredicateName          = "RootERC1155Predicate"
+	childERC1155MintablePredicateName = "ChildERC1155MintablePredicate"
+	rootERC1155Name                   = "RootERC1155"
+	erc1155TemplateName               = "ERC1155Template"
+	customSupernetManagerName         = "CustomSupernetManager"
 )
 
 var (
@@ -69,6 +72,9 @@ var (
 		rootERC20PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC20PredicateAddress = addr
 		},
+		childERC20MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.ChildMintableERC20PredicateAddress = addr
+		},
 		rootERC20Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootNativeERC20Address = addr
 		},
@@ -78,14 +84,20 @@ var (
 		rootERC721PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC721PredicateAddress = addr
 		},
+		childERC721MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.ChildMintableERC721PredicateAddress = addr
+		},
 		rootERC721Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC721Address = addr
 		},
 		erc721TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootERC721TemplateAddress = addr
+			rootchainConfig.ERC721TemplateAddress = addr
 		},
 		rootERC1155PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155PredicateAddress = addr
+		},
+		childERC1155MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
+			rootchainConfig.ChildMintableERC1155PredicateAddress = addr
 		},
 		rootERC1155Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155Address = addr
@@ -105,36 +117,113 @@ var (
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
+			initParams := &contractsapi.InitializeCustomSupernetManagerFn{
+				NewStakeManager:      config.StakeManagerAddress,
+				NewBls:               config.BLSAddress,
+				NewStateSender:       config.StateSenderAddress,
+				NewMatic:             config.RootNativeERC20Address,
+				NewChildValidatorSet: contracts.ValidatorSetContract,
+				NewExitHelper:        config.ExitHelperAddress,
+				NewDomain:            bls.DomainValidatorSetString,
+			}
 
-			return initializeSupernetManager(fmt, relayer, config, key)
+			return initContract(fmt, relayer, initParams,
+				config.CustomSupernetManagerAddress, customSupernetManagerName, key)
 		},
 		exitHelperName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
+			inputParams := &contractsapi.InitializeExitHelperFn{
+				NewCheckpointManager: config.CheckpointManagerAddress,
+			}
 
-			return initializeExitHelper(fmt, relayer, config, key)
+			return initContract(fmt, relayer, inputParams, config.ExitHelperAddress, exitHelperName, key)
 		},
 		rootERC20PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
+			inputParams := &contractsapi.InitializeRootERC20PredicateFn{
+				NewStateSender:         config.StateSenderAddress,
+				NewExitHelper:          config.ExitHelperAddress,
+				NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
+				NewChildTokenTemplate:  config.ERC20TemplateAddress,
+				NativeTokenRootAddress: config.RootNativeERC20Address,
+			}
 
-			return initializeRootERC20Predicate(fmt, relayer, config, key)
+			return initContract(fmt, relayer, inputParams,
+				config.RootERC20PredicateAddress, rootERC20PredicateName, key)
+		},
+		childERC20MintablePredicateName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+			initParams := &contractsapi.InitializeChildMintableERC20PredicateFn{
+				NewStateSender:        config.StateSenderAddress,
+				NewExitHelper:         config.ExitHelperAddress,
+				NewRootERC20Predicate: contracts.RootMintableERC20PredicateContract,
+				NewChildTokenTemplate: config.ERC20TemplateAddress,
+			}
+
+			return initContract(fmt, relayer, initParams,
+				config.ChildMintableERC20PredicateAddress, childERC20MintablePredicateName, key)
 		},
 		rootERC721PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
+			initParams := &contractsapi.InitializeRootERC721PredicateFn{
+				NewStateSender:          config.StateSenderAddress,
+				NewExitHelper:           config.ExitHelperAddress,
+				NewChildERC721Predicate: contracts.ChildERC721PredicateContract,
+				NewChildTokenTemplate:   config.ERC721TemplateAddress,
+			}
 
-			return initializeRootERC721Predicate(fmt, relayer, config, key)
+			return initContract(fmt, relayer, initParams,
+				config.RootERC721PredicateAddress, rootERC721PredicateName, key)
+		},
+		childERC721MintablePredicateName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+			initParams := &contractsapi.InitializeChildMintableERC721PredicateFn{
+				NewStateSender:         config.StateSenderAddress,
+				NewExitHelper:          config.ExitHelperAddress,
+				NewRootERC721Predicate: contracts.RootMintableERC721PredicateContract,
+				NewChildTokenTemplate:  config.ERC721TemplateAddress,
+			}
+
+			return initContract(fmt, relayer, initParams,
+				config.ChildMintableERC721PredicateAddress, childERC721MintablePredicateName, key)
 		},
 		rootERC1155PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
+			initParams := &contractsapi.InitializeRootERC1155PredicateFn{
+				NewStateSender:           config.StateSenderAddress,
+				NewExitHelper:            config.ExitHelperAddress,
+				NewChildERC1155Predicate: contracts.ChildERC1155PredicateContract,
+				NewChildTokenTemplate:    config.ERC1155TemplateAddress,
+			}
 
-			return initializeRootERC1155Predicate(fmt, relayer, config, key)
+			return initContract(fmt, relayer, initParams,
+				config.RootERC1155PredicateAddress, rootERC1155PredicateName, key)
+		},
+		childERC1155MintablePredicateName: func(fmt command.OutputFormatter,
+			relayer txrelayer.TxRelayer,
+			config *polybft.RootchainConfig,
+			key ethgo.Key) error {
+			initParams := &contractsapi.InitializeChildMintableERC1155PredicateFn{
+				NewStateSender:          config.StateSenderAddress,
+				NewExitHelper:           config.ExitHelperAddress,
+				NewRootERC1155Predicate: contracts.RootMintableERC1155PredicateContract,
+				NewChildTokenTemplate:   config.ERC1155TemplateAddress,
+			}
+
+			return initContract(fmt, relayer, initParams,
+				config.ChildMintableERC1155PredicateAddress, childERC1155MintablePredicateName, key)
 		},
 	}
 )
@@ -404,6 +493,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			artifact: contractsapi.RootERC20Predicate,
 		},
 		{
+			name:     childERC20MintablePredicateName,
+			artifact: contractsapi.ChildMintableERC20Predicate,
+		},
+		{
 			name:     erc20TemplateName,
 			artifact: contractsapi.ChildERC20,
 		},
@@ -412,12 +505,20 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			artifact: contractsapi.RootERC721Predicate,
 		},
 		{
+			name:     childERC721MintablePredicateName,
+			artifact: contractsapi.ChildMintableERC721Predicate,
+		},
+		{
 			name:     erc721TemplateName,
 			artifact: contractsapi.ChildERC721,
 		},
 		{
 			name:     rootERC1155PredicateName,
 			artifact: contractsapi.RootERC1155Predicate,
+		},
+		{
+			name:     childERC1155MintablePredicateName,
+			artifact: contractsapi.ChildMintableERC1155Predicate,
 		},
 		{
 			name:     erc1155TemplateName,
@@ -521,9 +622,21 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return nil, 0, err
 	}
 
-	// init CheckpointManager
-	if err := initializeCheckpointManager(outputter, txRelayer, chainID,
-		initialValidators, rootchainConfig, deployerKey); err != nil {
+	// initialize CheckpointManager
+	validatorSet, err := validatorSetToABISlice(outputter, initialValidators)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to convert validators to map: %w", err)
+	}
+
+	initParams := &contractsapi.InitializeCheckpointManagerFn{
+		ChainID_:        big.NewInt(chainID),
+		NewBls:          rootchainConfig.BLSAddress,
+		NewBn256G2:      rootchainConfig.BN256G2Address,
+		NewValidatorSet: validatorSet,
+	}
+
+	if err := initContract(outputter, txRelayer, initParams,
+		rootchainConfig.CheckpointManagerAddress, checkpointManagerName, deployerKey); err != nil {
 		return nil, 0, err
 	}
 
@@ -600,176 +713,25 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 	return supernetID, nil
 }
 
-// initializeCheckpointManager invokes initialize function on "CheckpointManager" smart contract
-func initializeCheckpointManager(
-	cmdOutput command.OutputFormatter,
-	txRelayer txrelayer.TxRelayer,
-	chainID int64,
-	validators []*validator.GenesisValidator,
-	rootchainCfg *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
-	validatorSet, err := validatorSetToABISlice(cmdOutput, validators)
+// initContract initializes arbitrary contract with given parameters deployed on a given address
+func initContract(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
+	initInputFn contractsapi.StateTransactionInput, contractAddr types.Address,
+	contractName string, deployerKey ethgo.Key) error {
+	input, err := initInputFn.EncodeAbi()
 	if err != nil {
-		return fmt.Errorf("failed to convert validators to map: %w", err)
+		return fmt.Errorf("failed to encode initialization params for %s.initialize. error: %w",
+			contractName, err)
 	}
 
-	initialize := contractsapi.InitializeCheckpointManagerFn{
-		ChainID_:        big.NewInt(chainID),
-		NewBls:          rootchainCfg.BLSAddress,
-		NewBn256G2:      rootchainCfg.BN256G2Address,
-		NewValidatorSet: validatorSet,
-	}
-
-	input, err := initialize.EncodeAbi()
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for CheckpointManager.initialize. error: %w", err)
-	}
-
-	addr := ethgo.Address(rootchainCfg.CheckpointManagerAddress)
-
-	if _, err = helper.SendTransaction(txRelayer, addr, input, checkpointManagerName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, checkpointManagerName),
-	})
-
-	return nil
-}
-
-// initializeExitHelper invokes initialize function on "ExitHelper" smart contract
-func initializeExitHelper(cmdOutput command.OutputFormatter,
-	txRelayer txrelayer.TxRelayer,
-	rootchainConfig *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
-	input, err := contractsapi.ExitHelper.Abi.GetMethod("initialize").
-		Encode([]interface{}{rootchainConfig.CheckpointManagerAddress})
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for ExitHelper.initialize. error: %w", err)
-	}
-
-	if _, err = helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.ExitHelperAddress),
-		input, exitHelperName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, exitHelperName),
-	})
-
-	return nil
-}
-
-// initializeRootERC20Predicate invokes initialize function on "RootERC20Predicate" smart contract
-func initializeRootERC20Predicate(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
-	rootchainConfig *polybft.RootchainConfig, deployerKey ethgo.Key) error {
-	rootERC20PredicateParams := &contractsapi.InitializeRootERC20PredicateFn{
-		NewStateSender:         rootchainConfig.StateSenderAddress,
-		NewExitHelper:          rootchainConfig.ExitHelperAddress,
-		NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
-		NewChildTokenTemplate:  rootchainConfig.ERC20TemplateAddress,
-		NativeTokenRootAddress: rootchainConfig.RootNativeERC20Address,
-	}
-
-	input, err := rootERC20PredicateParams.EncodeAbi()
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for RootERC20Predicate.initialize. error: %w", err)
-	}
-
-	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC20PredicateAddress),
-		input, rootERC20PredicateName, deployerKey); err != nil {
+	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(contractAddr),
+		input, contractName, deployerKey); err != nil {
 		return err
 	}
 
 	cmdOutput.WriteCommandResult(
 		&helper.MessageResult{
-			Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC20PredicateName),
+			Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, contractName),
 		})
-
-	return nil
-}
-
-func initializeRootERC721Predicate(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
-	rootchainConfig *polybft.RootchainConfig, deployerKey ethgo.Key) error {
-	rootERC721PredicateParams := contractsapi.InitializeRootERC721PredicateFn{
-		NewStateSender:          rootchainConfig.StateSenderAddress,
-		NewExitHelper:           rootchainConfig.ExitHelperAddress,
-		NewChildERC721Predicate: contracts.ChildERC721PredicateContract,
-		NewChildTokenTemplate:   rootchainConfig.RootERC721TemplateAddress,
-	}
-
-	input, err := rootERC721PredicateParams.EncodeAbi()
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for RootERC721Predicate.initialize. error: %w", err)
-	}
-
-	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC721PredicateAddress),
-		input, rootERC721PredicateName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC721PredicateName),
-	})
-
-	return nil
-}
-
-// initializeRootERC1155Predicate invokes initialize function on RootERC1155Predicate smart contract
-func initializeRootERC1155Predicate(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelayer,
-	rootchainConfig *polybft.RootchainConfig, deployerKey ethgo.Key) error {
-	rootERC1155PredicateParams := &contractsapi.InitializeRootERC1155PredicateFn{
-		NewStateSender:           rootchainConfig.StateSenderAddress,
-		NewExitHelper:            rootchainConfig.ExitHelperAddress,
-		NewChildERC1155Predicate: contracts.ChildERC1155PredicateContract,
-		NewChildTokenTemplate:    rootchainConfig.ERC1155TemplateAddress,
-	}
-
-	input, err := rootERC1155PredicateParams.EncodeAbi()
-	if err != nil {
-		return fmt.Errorf("failed to encode parameters for RootERC1155Predicate.initialize. error: %w", err)
-	}
-
-	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.RootERC1155PredicateAddress),
-		input, rootERC1155PredicateName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, rootERC1155PredicateName),
-	})
-
-	return nil
-}
-
-// initializeSupernetManager invokes initialize function on CustomSupernetManager contract
-func initializeSupernetManager(cmdOutput command.OutputFormatter,
-	txRelayer txrelayer.TxRelayer, rootchainConfig *polybft.RootchainConfig,
-	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeCustomSupernetManagerFn{
-		StakeManager:      rootchainConfig.StakeManagerAddress,
-		Bls:               rootchainConfig.BLSAddress,
-		StateSender:       rootchainConfig.StateSenderAddress,
-		Matic:             rootchainConfig.RootNativeERC20Address,
-		ChildValidatorSet: contracts.ValidatorSetContract,
-		ExitHelper:        rootchainConfig.ExitHelperAddress,
-		Domain:            bls.DomainValidatorSetString,
-	}
-
-	input, err := initFn.EncodeAbi()
-	if err != nil {
-		return err
-	}
-
-	if _, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainConfig.CustomSupernetManagerAddress),
-		input, customSupernetManagerName, deployerKey); err != nil {
-		return err
-	}
-
-	cmdOutput.WriteCommandResult(&helper.MessageResult{
-		Message: fmt.Sprintf("%s %s contract is initialized", contractsDeploymentTitle, customSupernetManagerName),
-	})
 
 	return nil
 }

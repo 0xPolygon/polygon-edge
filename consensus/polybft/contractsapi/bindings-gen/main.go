@@ -110,6 +110,16 @@ func main() {
 			[]string{},
 		},
 		{
+			"RootMintableERC20Predicate",
+			gensc.RootMintableERC20Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositTo",
+			},
+			[]string{},
+		},
+		{
 			"NativeERC20",
 			gensc.NativeERC20,
 			false,
@@ -138,6 +148,16 @@ func main() {
 			[]string{},
 		},
 		{
+			"ChildMintableERC20Predicate",
+			gensc.ChildMintableERC20Predicate,
+			false,
+			[]string{
+				"initialize",
+				"withdrawTo",
+			},
+			[]string{},
+		},
+		{
 			"RootERC20",
 			gensc.RootERC20,
 			false,
@@ -155,6 +175,16 @@ func main() {
 			[]string{
 				"initialize",
 				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildMintableERC1155Predicate",
+			gensc.ChildMintableERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+				"withdrawBatch",
 			},
 			[]string{},
 		},
@@ -190,6 +220,16 @@ func main() {
 			[]string{},
 		},
 		{
+			"RootMintableERC1155Predicate",
+			gensc.RootMintableERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
 			"ChildERC1155",
 			gensc.ChildERC1155,
 			false,
@@ -206,6 +246,16 @@ func main() {
 			[]string{
 				"initialize",
 				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildMintableERC721Predicate",
+			gensc.ChildMintableERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+				"withdrawBatch",
 			},
 			[]string{},
 		},
@@ -236,6 +286,16 @@ func main() {
 			[]string{
 				"initialize",
 				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC721Predicate",
+			gensc.RootMintableERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositBatch",
 			},
 			[]string{},
 		},

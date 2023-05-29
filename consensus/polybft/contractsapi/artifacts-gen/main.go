@@ -52,6 +52,10 @@ func main() {
 			"ChildERC20PredicateAccessList",
 		},
 		{
+			"child/RootMintableERC20Predicate.sol",
+			"RootMintableERC20Predicate",
+		},
+		{
 			"child/ChildERC721.sol",
 			"ChildERC721",
 		},
@@ -64,6 +68,10 @@ func main() {
 			"ChildERC721PredicateAccessList",
 		},
 		{
+			"child/RootMintableERC721Predicate.sol",
+			"RootMintableERC721Predicate",
+		},
+		{
 			"child/ChildERC1155.sol",
 			"ChildERC1155",
 		},
@@ -74,6 +82,10 @@ func main() {
 		{
 			"child/ChildERC1155PredicateAccessList.sol",
 			"ChildERC1155PredicateAccessList",
+		},
+		{
+			"child/RootMintableERC1155Predicate.sol",
+			"RootMintableERC1155Predicate",
 		},
 		{
 			"child/System.sol",
@@ -112,6 +124,10 @@ func main() {
 			"RootERC20Predicate",
 		},
 		{
+			"root/ChildMintableERC20Predicate.sol",
+			"ChildMintableERC20Predicate",
+		},
+		{
 			"mocks/MockERC721.sol",
 			"MockERC721",
 		},
@@ -120,12 +136,20 @@ func main() {
 			"RootERC721Predicate",
 		},
 		{
+			"root/ChildMintableERC721Predicate.sol",
+			"ChildMintableERC721Predicate",
+		},
+		{
 			"mocks/MockERC1155.sol",
 			"MockERC1155",
 		},
 		{
 			"root/RootERC1155Predicate.sol",
 			"RootERC1155Predicate",
+		},
+		{
+			"root/ChildMintableERC1155Predicate.sol",
+			"ChildMintableERC1155Predicate",
 		},
 		{
 			"root/staking/CustomSupernetManager.sol",
