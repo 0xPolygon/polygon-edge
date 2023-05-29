@@ -106,6 +106,8 @@ type fsm struct {
 // BuildProposal builds a proposal for the current round (used if proposer)
 func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	start := time.Now().UTC()
+	defer metrics.SetGauge([]string{consensusMetricsPrefix, "block_building_time"},
+		float32(time.Now().UTC().Sub(start).Seconds()))
 
 	parent := f.parent
 
@@ -202,11 +204,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	}
 
 	f.target = stateBlock
-	blockRlp := stateBlock.Block.MarshalRLP()
 
-	metrics.SetGauge([]string{consensusMetricsPrefix, "block_building_time"}, float32(time.Now().UTC().Sub(start).Seconds()))
-
-	return blockRlp, nil
+	return stateBlock.Block.MarshalRLP(), nil
 }
 
 // applyBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
