@@ -18,7 +18,6 @@ type Params struct {
 	Forks          *Forks                 `json:"forks"`
 	ChainID        int64                  `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
-	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
 	// Access control configuration
@@ -73,11 +72,6 @@ func (p *Params) GetEngine() string {
 	}
 
 	return ""
-}
-
-// Whitelists specifies supported whitelists
-type Whitelists struct {
-	Deployment []types.Address `json:"deployment,omitempty"`
 }
 
 // Forks specifies when each fork is activated

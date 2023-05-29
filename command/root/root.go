@@ -23,7 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
-	"github.com/0xPolygon/polygon-edge/command/whitelist"
 )
 
 type RootCommand struct {
@@ -57,7 +56,6 @@ func (rc *RootCommand) registerSubCommands() {
 		backup.GetCommand(),
 		genesis.GetCommand(),
 		server.GetCommand(),
-		whitelist.GetCommand(),
 		license.GetCommand(),
 		polybftsecrets.GetCommand(),
 		polybft.GetCommand(),
