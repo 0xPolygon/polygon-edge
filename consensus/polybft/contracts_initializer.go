@@ -217,7 +217,7 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	if err = callContract(polyBFTConfig.RewardConfig.WalletAddress,
+	if _, err = callContract(polyBFTConfig.RewardConfig.WalletAddress,
 		polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition); err != nil {
 		return err
 	}
@@ -238,21 +238,23 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	return callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+	_, err = callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+
+	return err
 }
 
 // callContract calls given smart contract function, encoded in input parameter
-func callContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) error {
+func callContract(from, to types.Address, input []byte, contractName string, transition *state.Transition) ([]byte, error) {
 	result := transition.Call2(from, to, input, big.NewInt(0), contractCallGasLimit)
 	if result.Failed() {
 		if result.Reverted() {
 			if revertReason, err := abi.UnpackRevertError(result.ReturnValue); err == nil {
-				return fmt.Errorf("%s contract call was reverted: %s", contractName, revertReason)
+				return nil, fmt.Errorf("%s contract call was reverted: %s", contractName, revertReason)
 			}
 		}
 
-		return fmt.Errorf("%s contract call failed: %w", contractName, result.Err)
+		return nil, fmt.Errorf("%s contract call failed: %w", contractName, result.Err)
 	}
 
-	return nil
+	return result.ReturnValue, nil
 }
