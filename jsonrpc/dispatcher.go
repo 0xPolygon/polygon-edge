@@ -328,7 +328,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			errorResponse := NewRPCResponse(req.ID, "2.0", nil, err)
+			errorResponse := NewRPCResponse(req.ID, "2.0", response, err)
 			responses = append(responses, errorResponse)
 
 			continue
@@ -375,7 +375,12 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 	if err := getError(output[1]); err != nil {
 		d.logInternalError(req.Method, err)
 
-		return nil, NewInvalidRequestError(err.Error())
+		var data []byte
+		if res := output[0].Interface(); res != nil {
+			data = res.([]byte)
+		}
+
+		return data, NewInvalidRequestError(err.Error())
 	}
 
 	var (
