@@ -77,3 +77,7 @@ compile-core-contracts:
 generate-smart-contract-bindings:
 	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
 	go run ./consensus/polybft/contractsapi/bindings-gen/main.go
+
+.PHONY: run-docker
+run-docker:
+	./scripts/cluster polybft --docker
