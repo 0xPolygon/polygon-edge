@@ -2,8 +2,8 @@ package benchmark
 
 import (
 	"encoding/hex"
+	"math"
 	"math/big"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -127,7 +127,7 @@ func transitionCallContract(b *testing.B, transition *state.Transition, contract
 	sender types.Address, input []byte) *runtime.ExecutionResult {
 	b.Helper()
 
-	result := transition.Call2(sender, contractAddress, input, big.NewInt(0), 1e9)
+	result := transition.Call2(sender, contractAddress, input, big.NewInt(0), math.MaxUint64)
 	require.NoError(b, result.Err)
 
 	return result
@@ -139,8 +139,7 @@ func newTestTransition(b *testing.B, alloc map[types.Address]*chain.GenesisAccou
 	var st *itrie.State
 
 	if disk {
-		testDir := createTestTempDirectory(b)
-		stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(testDir, "trie"), hclog.NewNullLogger())
+		stateStorage, err := itrie.NewLevelDBStorage(filepath.Join(b.TempDir(), "trie"), hclog.NewNullLogger())
 		require.NoError(b, err)
 
 		st = itrie.NewState(stateStorage)
@@ -172,21 +171,4 @@ func newTestTransition(b *testing.B, alloc map[types.Address]*chain.GenesisAccou
 	require.NoError(b, err)
 
 	return transition
-}
-
-func createTestTempDirectory(b *testing.B) string {
-	b.Helper()
-
-	path, err := os.MkdirTemp("", "temp")
-	if err != nil {
-		b.Logf("failed to create temp directory, err=%+v", err)
-
-		b.FailNow()
-	}
-
-	b.Cleanup(func() {
-		os.RemoveAll(path)
-	})
-
-	return path
 }

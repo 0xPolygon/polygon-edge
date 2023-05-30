@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -91,10 +92,9 @@ func sampleContractTest(b *testing.B, disk bool) {
 		senderAddr: {Balance: ethgo.Ether(100)}, // give some ethers to sender
 	}
 	transition := newTestTransition(b, alloc, disk)
-	code := contractsapi.SampleContract.Bytecode
-	cpurchase := getTxInput(b, contractsapi.SampleContract.Abi.Methods["confirmPurchase"], nil)
-	creceived := getTxInput(b, contractsapi.SampleContract.Abi.Methods["confirmReceived"], nil)
-	refund := getTxInput(b, contractsapi.SampleContract.Abi.Methods["refund"], nil)
+	code := contractsapi.BigDataContract.Bytecode
+	newData := strings.Repeat("A", 100000)
+	input := getTxInput(b, contractsapi.BigDataContract.Abi.Methods["writeData"], []interface{}{[]byte(newData)})
 
 	// deploy contracts
 	contractAddr := transitionDeployContract(b, transition, code, senderAddr)
@@ -103,10 +103,10 @@ func sampleContractTest(b *testing.B, disk bool) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		for j := 0; j < 400; j++ {
-			transitionCallContract(b, transition, contractAddr, senderAddr, cpurchase)
-			transitionCallContract(b, transition, contractAddr, senderAddr, creceived)
-			transitionCallContract(b, transition, contractAddr, senderAddr, refund)
+		for j := 0; j < 100; j++ {
+			transitionCallContract(b, transition, contractAddr, senderAddr, input)
 		}
 	}
+	b.StopTimer()
+	transition.Commit()
 }
