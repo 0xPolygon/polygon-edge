@@ -594,6 +594,27 @@ func (w *WithdrawToChildMintableERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildMintableERC20Predicate.Abi.Methods["withdrawTo"], buf, w)
 }
 
+type MintableTokenMappedEvent struct {
+	RootToken  types.Address `abi:"rootToken"`
+	ChildToken types.Address `abi:"childToken"`
+}
+
+func (*MintableTokenMappedEvent) Sig() ethgo.Hash {
+	return ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].ID()
+}
+
+func (*MintableTokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].Inputs.Encode(inputs)
+}
+
+func (m *MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"], log, m)
+}
+
 type BalanceOfRootERC20Fn struct {
 	Account types.Address `abi:"account"`
 }

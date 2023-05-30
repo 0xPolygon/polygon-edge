@@ -165,7 +165,9 @@ func main() {
 				"initialize",
 				"withdrawTo",
 			},
-			[]string{},
+			[]string{
+				"MintableTokenMapped",
+			},
 		},
 		{
 			"RootERC20",

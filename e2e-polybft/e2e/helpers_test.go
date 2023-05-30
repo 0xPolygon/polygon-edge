@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
 
@@ -23,8 +24,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/require"
-	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
 type e2eStateProvider struct {
@@ -132,52 +131,6 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifa
 		To:    &contractAddress,
 		Input: input,
 	}, key)
-}
-
-func sendExitTransaction(
-	sidechainKey *ethgow.Key,
-	rootchainKey ethgo.Key,
-	proof types.Proof,
-	checkpointBlock uint64,
-	stateSenderData []byte,
-	l1ExitTestAddr,
-	exitHelperAddr ethgo.Address,
-	l1TxRelayer txrelayer.TxRelayer,
-	exitEventID uint64) (bool, error) {
-	var exitEventAPI contractsapi.L2StateSyncedEvent
-
-	proofExitEventEncoded, err := exitEventAPI.Encode(&polybft.ExitEvent{
-		ID:       exitEventID,
-		Sender:   sidechainKey.Address(),
-		Receiver: l1ExitTestAddr,
-		Data:     stateSenderData,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
-	if !ok {
-		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
-	}
-
-	receipt, err := ABITransaction(l1TxRelayer, rootchainKey, contractsapi.ExitHelper, exitHelperAddr,
-		"exit",
-		big.NewInt(int64(checkpointBlock)),
-		uint64(leafIndex),
-		proofExitEventEncoded,
-		proof.Data,
-	)
-
-	if err != nil {
-		return false, err
-	}
-
-	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return false, errors.New("transaction execution failed")
-	}
-
-	return isExitEventProcessed(exitEventID, exitHelperAddr, l1TxRelayer)
 }
 
 func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
@@ -301,4 +254,20 @@ func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Add
 	}
 
 	require.Equal(t, role.Uint64(), num.Uint64())
+}
+
+// erc20BalanceOf returns balance of given account on ERC20 token
+func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address, relayer txrelayer.TxRelayer) *big.Int {
+	t.Helper()
+
+	balanceOfFn := &contractsapi.BalanceOfRootERC20Fn{Account: account}
+	balanceOfInput, err := balanceOfFn.EncodeAbi()
+	require.NoError(t, err)
+
+	balanceRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(tokenAddr), balanceOfInput)
+	require.NoError(t, err)
+	balance, err := types.ParseUint256orHex(&balanceRaw)
+	require.NoError(t, err)
+
+	return balance
 }

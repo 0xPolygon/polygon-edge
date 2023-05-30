@@ -373,7 +373,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	exitEventID := uint64(2)
 
 	// send exit transaction to exit helper
-	err = cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, exitEventID, srv.BridgeJSONRPCAddr(), srv.JSONRPCAddr())
+	err = cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, exitEventID, srv.JSONRPCAddr())
 	require.NoError(t, err)
 
 	// make sure exit event is processed successfully

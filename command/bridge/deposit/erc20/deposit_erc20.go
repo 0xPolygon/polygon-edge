@@ -33,7 +33,7 @@ var (
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc20",
-		Short:   "Deposits ERC 20 tokens from the root chain to the child chain",
+		Short:   "Deposits ERC 20 tokens from the origin to the destination chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
@@ -42,14 +42,14 @@ func GetCommand() *cobra.Command {
 		&dp.SenderKey,
 		common.SenderKeyFlag,
 		"",
-		"hex encoded private key of the account which sends rootchain deposit transactions",
+		"hex encoded private key of the account which sends deposit transactions",
 	)
 
 	depositCmd.Flags().StringSliceVar(
 		&dp.Receivers,
 		common.ReceiversFlag,
 		nil,
-		"receiving accounts addresses on child chain",
+		"receiving accounts addresses",
 	)
 
 	depositCmd.Flags().StringSliceVar(
@@ -77,14 +77,14 @@ func GetCommand() *cobra.Command {
 		&dp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		txrelayer.DefaultRPCAddress,
-		"the JSON RPC root chain endpoint",
+		"the JSON RPC endpoint",
 	)
 
 	depositCmd.Flags().BoolVar(
 		&dp.testMode,
 		helper.TestModeFlag,
 		false,
-		"test indicates whether depositor is hardcoded test account "+
+		"test indicates whether depositor is hardcoded rootchain test account "+
 			"(in that case tokens are minted to it, so it is able to make deposits)",
 	)
 
@@ -161,7 +161,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	// approve root erc20 predicate
+	// approve erc20 predicate
 	approveTxn, err := helper.CreateApproveERC20Txn(aggregateAmount,
 		types.StringToAddress(dp.PredicateAddr),
 		types.StringToAddress(dp.TokenAddr))
@@ -216,7 +216,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if err = g.Wait(); err != nil {
-		outputter.SetError(fmt.Errorf("sending deposit transactions to the rootchain failed: %w", err))
+		outputter.SetError(fmt.Errorf("sending deposit transactions failed: %w", err))
 
 		return
 	}

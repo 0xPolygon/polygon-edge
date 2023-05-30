@@ -105,11 +105,15 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 // Deposit function invokes bridge deposit of ERC tokens (from the root to the child chain)
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
-	receivers, amounts, tokenIDs string) error {
+	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr string) error {
 	args := []string{}
 
 	if receivers == "" {
 		return errors.New("provide at least one receiver address value")
+	}
+
+	if jsonRPCAddr == "" {
+		return errors.New("provide a JSON RPC endpoint URL")
 	}
 
 	switch token {
@@ -125,11 +129,17 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		args = append(args,
 			"bridge",
 			"deposit-erc20",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
-			"--amounts", amounts)
+			"--amounts", amounts,
+			"--json-rpc", jsonRPCAddr)
+
+		if senderKey != "" {
+			args = append(args, "--sender-key", senderKey)
+		} else {
+			args = append(args, "--test")
+		}
 
 	case bridgeCommon.ERC721:
 		if tokenIDs == "" {
@@ -139,11 +149,17 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		args = append(args,
 			"bridge",
 			"deposit-erc721",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
-			"--token-ids", tokenIDs)
+			"--token-ids", tokenIDs,
+			"--json-rpc", jsonRPCAddr)
+
+		if senderKey != "" {
+			args = append(args, "--sender-key", senderKey)
+		} else {
+			args = append(args, "--test")
+		}
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {
@@ -157,12 +173,18 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		args = append(args,
 			"bridge",
 			"deposit-erc1155",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
 			"--amounts", amounts,
-			"--token-ids", tokenIDs)
+			"--token-ids", tokenIDs,
+			"--json-rpc", jsonRPCAddr)
+
+		if senderKey != "" {
+			args = append(args, "--sender-key", senderKey)
+		} else {
+			args = append(args, "--test")
+		}
 	}
 
 	return t.cmdRun(args...)
@@ -172,7 +194,7 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 	senderKey, receivers,
-	amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error {
+	amounts, tokenIDs, jsonRPCAddr string, childToken types.Address) error {
 	if senderKey == "" {
 		return errors.New("provide hex-encoded sender private key")
 	}
@@ -181,7 +203,7 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		return errors.New("provide at least one receiver address value")
 	}
 
-	if jsonRPCEndpoint == "" {
+	if jsonRPCAddr == "" {
 		return errors.New("provide a JSON RPC endpoint URL")
 	}
 
@@ -200,10 +222,11 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		args = append(args,
 			"bridge",
 			"withdraw-erc20",
+			"--child-token", childToken.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
-			"--json-rpc", jsonRPCEndpoint)
+			"--json-rpc", jsonRPCAddr)
 
 	case bridgeCommon.ERC721:
 		if tokenIDs == "" {
@@ -216,7 +239,7 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint,
+			"--json-rpc", jsonRPCAddr,
 			"--child-token", childToken.String())
 
 	case bridgeCommon.ERC1155:
@@ -235,7 +258,7 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint,
+			"--json-rpc", jsonRPCAddr,
 			"--child-token", childToken.String())
 	}
 
@@ -243,14 +266,9 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 }
 
 // SendExitTransaction sends exit transaction to the root chain
-func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64,
-	rootJSONRPCAddr, childJSONRPCAddr string) error {
-	if rootJSONRPCAddr == "" {
-		return errors.New("provide a root JSON RPC endpoint URL")
-	}
-
+func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64, childJSONRPCAddr string) error {
 	if childJSONRPCAddr == "" {
-		return errors.New("provide a child JSON RPC endpoint URL")
+		return errors.New("provide a child chain JSON RPC endpoint URL")
 	}
 
 	return t.cmdRun(
@@ -258,7 +276,7 @@ func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64
 		"exit",
 		"--exit-helper", exitHelper.String(),
 		"--exit-id", strconv.FormatUint(exitID, 10),
-		"--root-json-rpc", rootJSONRPCAddr,
+		"--root-json-rpc", t.JSONRPCAddr(),
 		"--child-json-rpc", childJSONRPCAddr,
 		"--test",
 	)

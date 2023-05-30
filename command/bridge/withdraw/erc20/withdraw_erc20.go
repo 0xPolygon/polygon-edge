@@ -30,7 +30,7 @@ var (
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc20",
-		Short:   "Withdraws ERC 20 tokens from the child chain to the root chain",
+		Short:   "Withdraws ERC 20 tokens from the destination to the origin chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
@@ -46,7 +46,7 @@ func GetCommand() *cobra.Command {
 		&wp.Receivers,
 		common.ReceiversFlag,
 		nil,
-		"receiving accounts addresses on the root chain",
+		"receiving accounts addresses",
 	)
 
 	withdrawCmd.Flags().StringSliceVar(
@@ -60,21 +60,21 @@ func GetCommand() *cobra.Command {
 		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC20PredicateContract.String(),
-		"ERC20 child chain predicate address",
+		"child ERC 20 predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.NativeERC20TokenContract.String(),
-		"ERC20 child chain token address",
+		"child ERC 20 token address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
-		"the JSON RPC child chain endpoint",
+		"the JSON RPC endpoint",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -107,7 +107,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(wp.JSONRPCAddr))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("could not create child chain tx relayer: %w", err))
+		outputter.SetError(fmt.Errorf("could not create destination chain tx relayer: %w", err))
 
 		return
 	}
@@ -169,7 +169,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		})
 }
 
-// createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
+// createWithdrawTxn encodes parameters for withdraw function on destination predicate contract
 func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transaction, error) {
 	withdrawToFn := &contractsapi.WithdrawToChildERC20PredicateFn{
 		ChildToken: types.StringToAddress(wp.TokenAddr),
