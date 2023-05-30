@@ -1,7 +1,19 @@
 version: '3.9'
 
 services:
-  ## INITIALIZE GENESIS AND SECRETS
+  ## RUN ROOTCHAIN
+  rootchain:
+    image: ghcr.io/0xpolygon/go-ethereum-console:latest
+    container_name: polygon-edge-rootchain
+    command: [ "--dev", "--dev.period", "2", "--datadir", "/eth1data", "--ipcpath", "/eth1data/geth.ipc", "--http", "--http.addr", "0.0.0.0", "--http.api", "eth,net,web3,debug", "--ws", "--ws.addr", "0.0.0.0" ]
+    ports:
+      - '8545:8545'
+    volumes:
+      - eth1data:/eth1data
+    networks:
+      - polygon-edge-docker
+
+  ## INITIALIZE GENESIS AND SECRETS, ETC.
   init:
     build:
       context: ../../
@@ -9,6 +21,9 @@ services:
     image: local/polygon-edge
     container_name: polygon-edge-bootstrapper
     command: [ "init", "${EDGE_CONSENSUS:-polybft}" ]
+    depends_on:
+      rootchain:
+        condition: service_started
     volumes:
       - data:/data
     networks:
@@ -22,6 +37,8 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '10000:9632'
       - '10002:8545'
@@ -39,6 +56,8 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '20000:9632'
       - '20002:8545'
@@ -56,6 +75,8 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '30000:9632'
       - '30002:8545'
@@ -73,6 +94,8 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '40000:9632'
       - '40002:8545'
@@ -90,4 +113,5 @@ networks:
 
 volumes:
   data:
+  eth1data:
   genesis:
