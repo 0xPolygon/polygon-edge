@@ -2,6 +2,7 @@ package chain
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 
@@ -157,9 +158,14 @@ var AllForksEnabled = &Forks{
 	London:         NewFork(0),
 }
 
-// IsForkAvailable returns true if some fork defined by its name is supported by current edge version
-func IsForkAvailable(name string) bool {
-	_, found := (*AllForksEnabled)[name]
+// CheckMissingFork checks if there is a fork received as a genesis parameter that is not supported
+// by the current edge version.
+func CheckMissingFork(forks *Forks) error {
+	for name := range *forks {
+		if _, found := (*AllForksEnabled)[name]; !found {
+			return fmt.Errorf("fork is not available: %s", name)
+		}
+	}
 
-	return found
+	return nil
 }

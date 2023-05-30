@@ -363,19 +363,27 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 }
 
 func ForkManagerFactory(forks *chain.Forks) error {
+	if err := chain.CheckMissingFork(forks); err != nil {
+		return err
+	}
+
 	fm := forkmanager.GetInstance()
 
+	// Register forks
+	for name := range *forks {
+		fm.RegisterFork(forkmanager.ForkName(name))
+	}
+
+	// Register handlers here
+
+	// Activate forks
 	for name, block := range *forks {
-		if !chain.IsForkAvailable(name) {
-			return fmt.Errorf("fork is not available: %s", name)
+		if block == nil {
+			continue
 		}
 
-		fm.RegisterFork(forkmanager.ForkName(name))
-
-		if block != nil {
-			if err := fm.ActivateFork(forkmanager.ForkName(name), (uint64)(*block)); err != nil {
-				return err
-			}
+		if err := fm.ActivateFork(forkmanager.ForkName(name), (uint64)(*block)); err != nil {
+			return err
 		}
 	}
 
