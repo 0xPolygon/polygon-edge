@@ -208,10 +208,6 @@ func (s *syncer) Sync(callback func(*types.FullBlock) bool) error {
 	return nil
 }
 
-func (s *syncer) syncerMetricsRun() {
-
-}
-
 // bulkSyncWithPeer syncs block with a given peer
 func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.FullBlock) bool) (uint64, bool, error) {
 	localLatest := s.blockchain.Header().Number
