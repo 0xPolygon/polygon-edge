@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"path"
 	"reflect"
 	"testing"
 
@@ -14,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -553,11 +555,11 @@ func TestBlockchainWriteBody(t *testing.T) {
 	newChain := func(
 		t *testing.T,
 		txFromByTxHash map[types.Hash]types.Address,
+		path string,
 	) *Blockchain {
 		t.Helper()
 
-		storage, err := memory.NewMemoryStorage(nil)
-		assert.NoError(t, err)
+		storage, _ := newStorageP(t, path)
 
 		chain := &Blockchain{
 			db: storage,
@@ -590,12 +592,15 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 
-		chain := newChain(t, txFromByTxHash)
+		chain := newChain(t, txFromByTxHash, "t1")
+		defer chain.db.Close()
+		batch := chain.db.NewBatch()
 
 		assert.NoError(
 			t,
-			chain.writeBody(block),
+			chain.writeBody(batch, block),
 		)
+		assert.NoError(t, batch.Write())
 	})
 
 	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
@@ -618,13 +623,16 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 		txFromByTxHash := map[types.Hash]types.Address{}
 
-		chain := newChain(t, txFromByTxHash)
+		chain := newChain(t, txFromByTxHash, "t2")
+		defer chain.db.Close()
+		batch := chain.db.NewBatch()
 
 		assert.ErrorIs(
 			t,
 			errRecoveryAddressFailed,
-			chain.writeBody(block),
+			chain.writeBody(batch, block),
 		)
+		assert.NoError(t, batch.Write())
 	})
 
 	t.Run("should recover from address and store to storage", func(t *testing.T) {
@@ -649,9 +657,12 @@ func TestBlockchainWriteBody(t *testing.T) {
 			tx.Hash: addr,
 		}
 
-		chain := newChain(t, txFromByTxHash)
+		chain := newChain(t, txFromByTxHash, "t3")
+		defer chain.db.Close()
+		batch := chain.db.NewBatch()
 
-		assert.NoError(t, chain.writeBody(block))
+		assert.NoError(t, chain.writeBody(batch, block))
+		assert.NoError(t, batch.Write())
 
 		readBody, ok := chain.readBody(block.Hash())
 		assert.True(t, ok)
@@ -854,8 +865,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 }
 
 func TestBlockchainReadBody(t *testing.T) {
-	storage, err := memory.NewMemoryStorage(nil)
-	assert.NoError(t, err)
+	storage, _ := newStorageP(t, "TestBlockchainReadBody")
 
 	txFromByTxHash := make(map[types.Hash]types.Address)
 	addr := types.StringToAddress("1")
@@ -867,6 +877,8 @@ func TestBlockchainReadBody(t *testing.T) {
 			txFromByTxHash: txFromByTxHash,
 		},
 	}
+
+	batch := b.db.NewBatch()
 
 	tx := &types.Transaction{
 		Value: big.NewInt(10),
@@ -886,9 +898,11 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	txFromByTxHash[tx.Hash] = types.ZeroAddress
 
-	if err := b.writeBody(block); err != nil {
+	if err := b.writeBody(batch, block); err != nil {
 		t.Fatal(err)
 	}
+
+	assert.NoError(t, batch.Write())
 
 	txFromByTxHash[tx.Hash] = addr
 
@@ -1390,4 +1404,37 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 			assert.Equal(t, test.expectedBaseFee, got, fmt.Sprintf("expected %d, got %d", test.expectedBaseFee, got))
 		})
 	}
+}
+
+func newStorageP(t *testing.T, testPath string) (storage.Storage, func()) {
+	t.Helper()
+
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	p := path.Join(dir, "/tmp/storage/", testPath)
+
+	err = os.MkdirAll(p, 0755)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s, err := leveldb.NewLevelDBStorage(p, hclog.NewNullLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	closeFn := func() {
+		if err := s.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := os.RemoveAll(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return s, closeFn
 }

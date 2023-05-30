@@ -55,6 +55,7 @@ type KV interface {
 	Close() error
 	Set(p []byte, v []byte) error
 	Get(p []byte) ([]byte, bool, error)
+	NewBatch() *Batch
 }
 
 // KeyValueStorage is a generic storage for kv databases
@@ -349,4 +350,8 @@ func (s *KeyValueStorage) get(p []byte, k []byte) ([]byte, bool) {
 // Close closes the connection with the db
 func (s *KeyValueStorage) Close() error {
 	return s.db.Close()
+}
+
+func (s *KeyValueStorage) NewBatch() *Batch {
+	return s.db.NewBatch()
 }

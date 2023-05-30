@@ -63,3 +63,7 @@ func (l *levelDBKV) Get(p []byte) ([]byte, bool, error) {
 func (l *levelDBKV) Close() error {
 	return l.db.Close()
 }
+
+func (l *levelDBKV) NewBatch() *storage.Batch {
+	return storage.NewBatch(l.db)
+}
