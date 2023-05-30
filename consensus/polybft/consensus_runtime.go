@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -270,8 +269,6 @@ func (c *consensusRuntime) IsBridgeEnabled() bool {
 func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
-	forkmanager.GetInstance().SetCurrentBlock(fullBlock.Block.Number() + 1)
 
 	if c.lastBuiltBlock != nil && c.lastBuiltBlock.Number >= fullBlock.Block.Number() {
 		c.logger.Debug("on block inserted already handled",

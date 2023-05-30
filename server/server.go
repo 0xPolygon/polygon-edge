@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -370,9 +369,6 @@ func NewServer(config *Config) (*Server, error) {
 	if err := m.blockchain.ComputeGenesis(); err != nil {
 		return nil, err
 	}
-
-	// update fork manager state
-	forkmanager.GetInstance().SetCurrentBlock(m.blockchain.Header().Number + 1)
 
 	// initialize data in consensus layer
 	if err := m.consensus.Initialize(); err != nil {

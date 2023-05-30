@@ -27,8 +27,6 @@ type forkManager struct {
 
 	forkMap     map[ForkName]*Fork
 	handlersMap map[ForkHandlerName][]ForkActiveHandler
-
-	currentHandlers map[ForkHandlerName]interface{}
 }
 
 // GeInstance returns fork manager singleton instance. Thread safe
@@ -123,31 +121,24 @@ func (fm *forkManager) DeactivateFork(forkName ForkName) error {
 	return nil
 }
 
-// SetCurrentBlock updates internal structures which allowes using GetHandler without specifying block
-func (fm *forkManager) SetCurrentBlock(currentBlock uint64) {
+func (fm *forkManager) GetHandler(name ForkHandlerName, blockNumber uint64) interface{} {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
-	fm.currentHandlers = map[ForkHandlerName]interface{}{}
-
-	for handlerName, handlers := range fm.handlersMap {
-		// binary search to find first position inside []*ForkHandler where FromBlockNumber >= blockNumber
-		pos := sort.Search(len(handlers), func(i int) bool {
-			return currentBlock < handlers[i].FromBlockNumber
-		}) - 1
-
-		if pos >= 0 {
-			fm.currentHandlers[handlerName] = handlers[pos].Handler
-		}
+	handlers, exists := fm.handlersMap[name]
+	if !exists {
+		return nil
 	}
-}
 
-// GetHandler retrives handler defined by its name for current block (@see SetCurrentBlock)
-func (fm *forkManager) GetHandler(name ForkHandlerName) interface{} {
-	fm.lock.Lock()
-	defer fm.lock.Unlock()
+	// binary search to find first position where handler.FromBlockNumber < blockNumber
+	pos := sort.Search(len(handlers), func(i int) bool {
+		return blockNumber < handlers[i].FromBlockNumber
+	}) - 1
+	if pos < 0 {
+		return nil
+	}
 
-	return fm.currentHandlers[name]
+	return handlers[pos].Handler
 }
 
 // IsForkRegistered checks if fork is registered

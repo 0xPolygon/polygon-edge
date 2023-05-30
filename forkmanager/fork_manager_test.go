@@ -21,7 +21,7 @@ func TestForkManager(t *testing.T) {
 	assert.NoError(t, forkManager.RegisterHandler(ForkName("A"), "B", func() string { return "BAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkName("B"), "B", func() string { return "BBH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkName("D"), "B", func() string { return "BDH" }))
-	assert.NoError(t, forkManager.RegisterHandler(ForkName("B"), "C", func() string { return "CBH" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkName("C"), "C", func() string { return "CCH" }))
 
 	assert.NoError(t, forkManager.ActivateFork(ForkName("A"), 0))
 	assert.NoError(t, forkManager.ActivateFork(ForkName("B"), 100))
@@ -118,33 +118,30 @@ func TestForkManager(t *testing.T) {
 	t.Run("get handler", func(t *testing.T) {
 		t.Parallel()
 
-		for i := 0; i < 4; i++ {
-			forkManager.SetCurrentBlock(uint64(i))
-
-			assert.Equal(t, "AAH", forkManager.GetHandler("A").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "BAH", forkManager.GetHandler("B").(func() string)()) //nolint:forcetypeassert
-			assert.Nil(t, forkManager.GetHandler("C"))
-
-			forkManager.SetCurrentBlock(uint64(100 + i))
-
-			assert.Equal(t, "AAH", forkManager.GetHandler("A").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "BBH", forkManager.GetHandler("B").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "CBH", forkManager.GetHandler("C").(func() string)()) //nolint:forcetypeassert
-
-			forkManager.SetCurrentBlock(uint64(200 + i))
-
-			assert.Equal(t, "ACH", forkManager.GetHandler("A").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "BBH", forkManager.GetHandler("B").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "CBH", forkManager.GetHandler("C").(func() string)()) //nolint:forcetypeassert
-
-			forkManager.SetCurrentBlock(uint64(300 + i))
-
-			assert.Equal(t, "ACH", forkManager.GetHandler("A").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "BDH", forkManager.GetHandler("B").(func() string)()) //nolint:forcetypeassert
-			assert.Equal(t, "CBH", forkManager.GetHandler("C").(func() string)()) //nolint:forcetypeassert
+		execute := func(name ForkHandlerName, block uint64) string {
+			//nolint:forcetypeassert
+			return forkManager.GetHandler(name, block).(func() string)()
 		}
 
-		assert.Nil(t, forkManager.GetHandler("D"))
+		for i := uint64(0); i < uint64(4); i++ {
+			assert.Equal(t, "AAH", execute("A", i))
+			assert.Equal(t, "BAH", execute("B", i))
+			assert.Nil(t, forkManager.GetHandler("C", i))
+
+			assert.Equal(t, "AAH", execute("A", 100+i))
+			assert.Equal(t, "BBH", execute("B", 100+i))
+			assert.Nil(t, forkManager.GetHandler("C", 100+i))
+
+			assert.Equal(t, "ACH", execute("A", 200+i))
+			assert.Equal(t, "BBH", execute("B", 200+i))
+			assert.Equal(t, "CCH", execute("C", 200+i))
+
+			assert.Equal(t, "ACH", execute("A", 300+i))
+			assert.Equal(t, "BDH", execute("B", 300+i))
+			assert.Equal(t, "CCH", execute("C", 300+i))
+		}
+
+		assert.Nil(t, forkManager.GetHandler("D", 0))
 	})
 }
 
