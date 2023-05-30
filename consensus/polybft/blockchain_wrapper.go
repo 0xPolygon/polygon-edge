@@ -122,8 +122,6 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		Receipts: transition.Receipts(),
 	})
 
-	updateBlockSpaceUsedMetric(builtBlock.Header.GasUsed)
-
 	return &types.FullBlock{
 		Block:    builtBlock,
 		Receipts: transition.Receipts(),
