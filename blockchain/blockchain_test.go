@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
-	"path"
 	"reflect"
 	"testing"
 
@@ -16,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
-	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -559,10 +557,11 @@ func TestBlockchainWriteBody(t *testing.T) {
 	) *Blockchain {
 		t.Helper()
 
-		storage, _ := newStorageP(t, path)
+		dbStorage, err := memory.NewMemoryStorage(nil)
+		assert.NoError(t, err)
 
 		chain := &Blockchain{
-			db: storage,
+			db: dbStorage,
 			txSigner: &mockSigner{
 				txFromByTxHash: txFromByTxHash,
 			},
@@ -595,10 +594,11 @@ func TestBlockchainWriteBody(t *testing.T) {
 		chain := newChain(t, txFromByTxHash, "t1")
 		defer chain.db.Close()
 		batch := chain.db.NewBatch()
+		batchHelper := storage.NewBatchHelper(batch)
 
 		assert.NoError(
 			t,
-			chain.writeBody(batch, block),
+			chain.writeBody(batchHelper, block),
 		)
 		assert.NoError(t, batch.Write())
 	})
@@ -626,11 +626,12 @@ func TestBlockchainWriteBody(t *testing.T) {
 		chain := newChain(t, txFromByTxHash, "t2")
 		defer chain.db.Close()
 		batch := chain.db.NewBatch()
+		batchHelper := storage.NewBatchHelper(batch)
 
 		assert.ErrorIs(
 			t,
 			errRecoveryAddressFailed,
-			chain.writeBody(batch, block),
+			chain.writeBody(batchHelper, block),
 		)
 		assert.NoError(t, batch.Write())
 	})
@@ -660,8 +661,9 @@ func TestBlockchainWriteBody(t *testing.T) {
 		chain := newChain(t, txFromByTxHash, "t3")
 		defer chain.db.Close()
 		batch := chain.db.NewBatch()
+		batchHelper := storage.NewBatchHelper(batch)
 
-		assert.NoError(t, chain.writeBody(batch, block))
+		assert.NoError(t, chain.writeBody(batchHelper, block))
 		assert.NoError(t, batch.Write())
 
 		readBody, ok := chain.readBody(block.Hash())
@@ -865,20 +867,22 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 }
 
 func TestBlockchainReadBody(t *testing.T) {
-	storage, _ := newStorageP(t, "TestBlockchainReadBody")
+	dbStorage, err := memory.NewMemoryStorage(nil)
+	assert.NoError(t, err)
 
 	txFromByTxHash := make(map[types.Hash]types.Address)
 	addr := types.StringToAddress("1")
 
 	b := &Blockchain{
 		logger: hclog.NewNullLogger(),
-		db:     storage,
+		db:     dbStorage,
 		txSigner: &mockSigner{
 			txFromByTxHash: txFromByTxHash,
 		},
 	}
 
 	batch := b.db.NewBatch()
+	batchHelper := storage.NewBatchHelper(batch)
 
 	tx := &types.Transaction{
 		Value: big.NewInt(10),
@@ -898,7 +902,7 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	txFromByTxHash[tx.Hash] = types.ZeroAddress
 
-	if err := b.writeBody(batch, block); err != nil {
+	if err := b.writeBody(batchHelper, block); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1404,37 +1408,4 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 			assert.Equal(t, test.expectedBaseFee, got, fmt.Sprintf("expected %d, got %d", test.expectedBaseFee, got))
 		})
 	}
-}
-
-func newStorageP(t *testing.T, testPath string) (storage.Storage, func()) {
-	t.Helper()
-
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	p := path.Join(dir, "/tmp/storage/", testPath)
-
-	err = os.MkdirAll(p, 0755)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	s, err := leveldb.NewLevelDBStorage(p, hclog.NewNullLogger())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	closeFn := func() {
-		if err := s.Close(); err != nil {
-			t.Fatal(err)
-		}
-
-		if err := os.RemoveAll(p); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	return s, closeFn
 }

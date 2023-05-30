@@ -441,16 +441,14 @@ func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 }
 
 // writeCanonicalHeader writes the new header
-func (b *Blockchain) writeCanonicalHeader(batch *storage.Batch, event *Event, h *types.Header) error {
+func (b *Blockchain) writeCanonicalHeader(batch *storage.BatchHelper, event *Event, h *types.Header) error {
 	parentTD, ok := b.readTotalDifficulty(h.ParentHash)
 	if !ok {
 		return fmt.Errorf("parent difficulty not found")
 	}
 
 	newTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
-	if err := batch.WriteCanonicalHeader(h, newTD); err != nil {
-		return err
-	}
+	batch.WriteCanonicalHeader(h, newTD)
 
 	event.Type = EventHead
 	event.AddNewHeader(h)
@@ -611,8 +609,6 @@ func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
 
 // WriteHeadersWithBodies writes a batch of headers
 func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
-	batch := b.db.NewBatch()
-
 	// Check the size
 	if len(headers) == 0 {
 		return fmt.Errorf("passed in headers array is empty")
@@ -636,19 +632,23 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 		}
 	}
 
-	// Write the actual headers
+	// Write the actual headers in seperate batches for now
 	for _, h := range headers {
 		event := &Event{}
-		if err := b.writeHeaderImpl(batch, event, h); err != nil {
+
+		batch := b.db.NewBatch()
+		batchHelper := storage.NewBatchHelper(batch)
+
+		if err := b.writeHeaderImpl(batchHelper, event, h); err != nil {
+			return err
+		}
+
+		if err := batch.Write(); err != nil {
 			return err
 		}
 
 		// Notify the event stream
 		b.dispatchEvent(event)
-	}
-
-	if err := batch.Write(); err != nil {
-		return err
 	}
 
 	return nil
@@ -868,6 +868,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 
 	block := fblock.Block
 	batch := b.db.NewBatch()
+	batchHelper := storage.NewBatchHelper(batch)
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
@@ -877,22 +878,20 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 
 	header := block.Header
 
-	if err := b.writeBody(batch, block); err != nil {
+	if err := b.writeBody(batchHelper, block); err != nil {
 		return err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
-	if err := b.writeHeaderImpl(batch, evnt, header); err != nil {
+	if err := b.writeHeaderImpl(batchHelper, evnt, header); err != nil {
 		return err
 	}
 
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	if err := batch.WriteReceipts(block.Hash(), fblock.Receipts); err != nil {
-		return err
-	}
+	batchHelper.WriteReceipts(block.Hash(), fblock.Receipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -930,6 +929,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 // It doesn't do any kind of verification, only commits the block to the DB
 func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	batch := b.db.NewBatch()
+	batchHelper := storage.NewBatchHelper(batch)
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
@@ -939,13 +939,13 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	header := block.Header
 
-	if err := b.writeBody(batch, block); err != nil {
+	if err := b.writeBody(batchHelper, block); err != nil {
 		return err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
-	if err := b.writeHeaderImpl(batch, evnt, header); err != nil {
+	if err := b.writeHeaderImpl(batchHelper, evnt, header); err != nil {
 		return err
 	}
 
@@ -1054,7 +1054,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
-func (b *Blockchain) writeBody(batch *storage.Batch, block *types.Block) error {
+func (b *Blockchain) writeBody(batch *storage.BatchHelper, block *types.Block) error {
 	// Recover 'from' field in tx before saving
 	// Because the block passed from the consensus layer doesn't have from field in tx,
 	// due to missing encoding in RLP
@@ -1063,15 +1063,11 @@ func (b *Blockchain) writeBody(batch *storage.Batch, block *types.Block) error {
 	}
 
 	// Write the full body (txns + receipts)
-	if err := batch.WriteBody(block.Header.Hash, block.Body()); err != nil {
-		return err
-	}
+	batch.WriteBody(block.Header.Hash, block.Body())
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		if err := batch.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
-			return err
-		}
+		batch.WriteTxLookup(txn.Hash, block.Hash())
 	}
 
 	return nil
@@ -1205,7 +1201,7 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 }
 
 // writeHeaderImpl writes a block and the data, assumes the genesis is already set
-func (b *Blockchain) writeHeaderImpl(batch *storage.Batch, evnt *Event, header *types.Header) error {
+func (b *Blockchain) writeHeaderImpl(batch *storage.BatchHelper, evnt *Event, header *types.Header) error {
 	currentHeader := b.Header()
 
 	// Write the data
@@ -1214,9 +1210,7 @@ func (b *Blockchain) writeHeaderImpl(batch *storage.Batch, evnt *Event, header *
 		return b.writeCanonicalHeader(batch, evnt, header)
 	}
 
-	if err := batch.WriteHeader(header); err != nil {
-		return err
-	}
+	batch.WriteHeader(header)
 
 	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
 	if !ok {
@@ -1234,15 +1228,13 @@ func (b *Blockchain) writeHeaderImpl(batch *storage.Batch, evnt *Event, header *
 	}
 
 	// Write the difficulty
-	if err := batch.WriteTotalDifficulty(
+	batch.WriteTotalDifficulty(
 		header.Hash,
 		big.NewInt(0).Add(
 			parentTD,
 			big.NewInt(0).SetUint64(header.Difficulty),
 		),
-	); err != nil {
-		return err
-	}
+	)
 
 	// Update the headers cache
 	b.headersCache.Add(header.Hash, header)

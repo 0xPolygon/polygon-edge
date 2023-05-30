@@ -37,6 +37,6 @@ func (m *memoryKV) Close() error {
 	return nil
 }
 
-func (m *memoryKV) NewBatch() *storage.Batch {
-	return nil
+func (m *memoryKV) NewBatch() storage.Batch {
+	return NewBatchMemory(m.db)
 }

@@ -734,6 +734,6 @@ func (m *MockStorage) HookClose(fn closeDelegate) {
 	m.closeFn = fn
 }
 
-func (m *MockStorage) NewBatch() *Batch {
+func (m *MockStorage) NewBatch() Batch {
 	return nil
 }

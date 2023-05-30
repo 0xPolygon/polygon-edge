@@ -64,6 +64,6 @@ func (l *levelDBKV) Close() error {
 	return l.db.Close()
 }
 
-func (l *levelDBKV) NewBatch() *storage.Batch {
-	return storage.NewBatch(l.db)
+func (l *levelDBKV) NewBatch() storage.Batch {
+	return NewBatchLevelDB(l.db)
 }

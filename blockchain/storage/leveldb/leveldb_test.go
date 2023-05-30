@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/require"
 )
 
 func newStorage(t *testing.T) (storage.Storage, func()) {
@@ -150,31 +151,21 @@ func generateBlock(t *testing.T, num uint64) *types.FullBlock {
 func newStorageP(t *testing.T) (storage.Storage, func(), string) {
 	t.Helper()
 
-	p, err := filepath.Abs("/media/nikola/DATA/tmp/storage")
+	p, err := os.MkdirTemp("", "leveldbtest")
+	require.NoError(t, err)
 
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	err = os.MkdirAll(p, 0755)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, os.MkdirAll(p, 0755))
 
 	s, err := NewLevelDBStorage(p, hclog.NewNullLogger())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	closeFn := func() {
+		require.NoError(t, s.Close())
 		if err := s.Close(); err != nil {
 			t.Fatal(err)
 		}
 
-		if err := os.RemoveAll(p); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, os.RemoveAll(p))
 	}
 
 	return s, closeFn, p
@@ -254,32 +245,18 @@ insertloop:
 			break insertloop
 		case b := <-blockchain:
 			batch := s.NewBatch()
+			batchHelper := storage.NewBatchHelper(batch)
 
-			if err := batch.WriteBody(b.Block.Hash(), b.Block.Body()); err != nil {
-				t.Log(err)
-			}
+			batchHelper.WriteBody(b.Block.Hash(), b.Block.Body())
 
 			for _, tx := range b.Block.Transactions {
-				if err := batch.WriteTxLookup(tx.Hash, b.Block.Hash()); err != nil {
-					t.Log(err)
-				}
+				batchHelper.WriteTxLookup(tx.Hash, b.Block.Hash())
 			}
 
-			if err := s.WriteHeader(b.Block.Header); err != nil {
-				t.Log(err)
-			}
-
-			if err := s.WriteHeadNumber(uint64(i)); err != nil {
-				t.Log(err)
-			}
-
-			if err := s.WriteHeadHash(b.Block.Header.Hash); err != nil {
-				t.Log(err)
-			}
-
-			if err := batch.WriteReceipts(b.Block.Hash(), b.Receipts); err != nil {
-				t.Log(err)
-			}
+			batchHelper.WriteHeader(b.Block.Header)
+			batchHelper.WriteHeadNumber(uint64(i))
+			batchHelper.WriteHeadHash(b.Block.Header.Hash)
+			batchHelper.WriteReceipts(b.Block.Hash(), b.Receipts)
 
 			if err := batch.Write(); err != nil {
 				fmt.Println(err)
