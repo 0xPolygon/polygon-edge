@@ -377,12 +377,12 @@ func ForkManagerFactory(forks *chain.Forks) error {
 	// Register handlers here
 
 	// Activate forks
-	for name, block := range *forks {
-		if block == nil {
+	for name, blockNumber := range *forks {
+		if blockNumber == nil {
 			continue
 		}
 
-		if err := fm.ActivateFork(forkmanager.ForkName(name), (uint64)(*block)); err != nil {
+		if err := fm.ActivateFork(forkmanager.ForkName(name), (uint64)(*blockNumber)); err != nil {
 			return err
 		}
 	}

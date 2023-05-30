@@ -121,6 +121,7 @@ func (fm *forkManager) DeactivateFork(forkName ForkName) error {
 	return nil
 }
 
+// GetHandler retrieves handler for handler name and for a block number
 func (fm *forkManager) GetHandler(name ForkHandlerName, blockNumber uint64) interface{} {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -130,7 +131,7 @@ func (fm *forkManager) GetHandler(name ForkHandlerName, blockNumber uint64) inte
 		return nil
 	}
 
-	// binary search to find first position where handler.FromBlockNumber < blockNumber
+	// binary search to find the latest handler defined for a specific block
 	pos := sort.Search(len(handlers), func(i int) bool {
 		return blockNumber < handlers[i].FromBlockNumber
 	}) - 1
@@ -171,7 +172,7 @@ func (fm *forkManager) GetForkBlock(name ForkName) (uint64, error) {
 
 	fork, exists := fm.forkMap[name]
 	if !exists {
-		return 0, fmt.Errorf("fork does not exists: %s", name)
+		return 0, fmt.Errorf("fork does not exist: %s", name)
 	}
 
 	if !fork.IsActive {
