@@ -596,13 +596,13 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 
 		if tx.GasFeeCap.BitLen() > 256 {
-			metrics.IncrCounter([]string{txPoolMetrics, "fee_cap_to_high_dynamic_tx"}, 1)
+			metrics.IncrCounter([]string{txPoolMetrics, "fee_cap_too_high_dynamic_tx"}, 1)
 
 			return ErrFeeCapVeryHigh
 		}
 
 		if tx.GasTipCap.BitLen() > 256 {
-			metrics.IncrCounter([]string{txPoolMetrics, "tip_to_high_dynamic_tx"}, 1)
+			metrics.IncrCounter([]string{txPoolMetrics, "tip_too_high_dynamic_tx"}, 1)
 
 			return ErrTipVeryHigh
 		}

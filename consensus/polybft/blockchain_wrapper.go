@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"time"
 
-	metrics "github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -110,8 +109,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 
 	_, root := transition.Commit()
 
-	metrics.SetGauge([]string{consensusMetricsPrefix, "block_execution_time"},
-		float32(time.Now().UTC().Sub(start).Seconds()))
+	updateBlockExecutionMetric(start)
 
 	if root != block.Header.StateRoot {
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Header.StateRoot)
@@ -124,7 +122,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		Receipts: transition.Receipts(),
 	})
 
-	metrics.SetGauge([]string{consensusMetricsPrefix, "block_space_used"}, float32(builtBlock.Header.GasUsed))
+	updateBlockSpaceUsedMetric(builtBlock.Header.GasUsed)
 
 	return &types.FullBlock{
 		Block:    builtBlock,

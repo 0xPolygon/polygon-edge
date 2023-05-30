@@ -46,3 +46,14 @@ func updateEpochMetrics(epoch epochMetadata) {
 	// update number of validators metrics
 	metrics.SetGauge([]string{consensusMetricsPrefix, "validators"}, float32(epoch.Validators.Len()))
 }
+
+// updateBlockExecutionMetric updates the block execution metric
+func updateBlockExecutionMetric(start time.Time) {
+	metrics.SetGauge([]string{consensusMetricsPrefix, "block_execution_time"},
+		float32(time.Now().UTC().Sub(start).Seconds()))
+}
+
+// updateBlockSpaceUsedMetric updates the block space used metric
+func updateBlockSpaceUsedMetric(gasUsed uint64) {
+	metrics.SetGauge([]string{consensusMetricsPrefix, "block_space_used"}, float32(gasUsed))
+}
