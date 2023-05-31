@@ -2,6 +2,10 @@ package common
 
 import (
 	"errors"
+	"math/big"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/umbracle/ethgo"
 )
 
 type TokenType int
@@ -13,16 +17,16 @@ const (
 )
 
 const (
-	SenderKeyFlag = "sender-key"
-	ReceiversFlag = "receivers"
-	AmountsFlag   = "amounts"
-	TokenIDsFlag  = "token-ids"
-
-	RootTokenFlag      = "root-token"
-	RootPredicateFlag  = "root-predicate"
-	ChildPredicateFlag = "child-predicate"
-	ChildTokenFlag     = "child-token"
-	JSONRPCFlag        = "json-rpc"
+	SenderKeyFlag          = "sender-key"
+	ReceiversFlag          = "receivers"
+	AmountsFlag            = "amounts"
+	TokenIDsFlag           = "token-ids"
+	RootTokenFlag          = "root-token"
+	RootPredicateFlag      = "root-predicate"
+	ChildPredicateFlag     = "child-predicate"
+	ChildTokenFlag         = "child-token"
+	JSONRPCFlag            = "json-rpc"
+	ChildChainMintableFlag = "child-chain-mintable"
 )
 
 var (
@@ -31,11 +35,12 @@ var (
 )
 
 type BridgeParams struct {
-	SenderKey     string
-	Receivers     []string
-	TokenAddr     string
-	PredicateAddr string
-	JSONRPCAddr   string
+	SenderKey          string
+	Receivers          []string
+	TokenAddr          string
+	PredicateAddr      string
+	JSONRPCAddr        string
+	ChildChainMintable bool
 }
 
 type ERC20BridgeParams struct {
@@ -92,4 +97,23 @@ func (bp *ERC1155BridgeParams) Validate() error {
 	}
 
 	return nil
+}
+
+// ExtractExitEventID tries to extract exit event id from provided receipt
+func ExtractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
+	var exitEvent contractsapi.L2StateSyncedEvent
+	for _, log := range receipt.Logs {
+		doesMatch, err := exitEvent.ParseLog(log)
+		if err != nil {
+			return nil, err
+		}
+
+		if !doesMatch {
+			continue
+		}
+
+		return exitEvent.ID, nil
+	}
+
+	return nil, errors.New("failed to find exit event log")
 }

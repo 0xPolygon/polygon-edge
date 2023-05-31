@@ -3,7 +3,6 @@ package withdraw
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -73,6 +72,13 @@ func GetCommand() *cobra.Command {
 		common.JSONRPCFlag,
 		"http://127.0.0.1:9545",
 		"the JSON RPC child chain endpoint",
+	)
+
+	withdrawCmd.Flags().BoolVar(
+		&wp.ChildChainMintable,
+		common.ChildChainMintableFlag,
+		false,
+		"flag indicating whether tokens originate from child chain",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.SenderKeyFlag)
@@ -150,24 +156,26 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	exitEventIDRaw, err := extractExitEventID(receipt)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
-
-		return
+	blockNumber := strconv.FormatUint(receipt.BlockNumber, 10)
+	res := &withdrawResult{
+		Sender:      senderAccount.Address().String(),
+		Receivers:   wp.Receivers,
+		TokenIDs:    wp.TokenIDs,
+		BlockNumber: blockNumber,
 	}
 
-	exitEventID := strconv.FormatUint(exitEventIDRaw.Uint64(), 10)
-	blockNumber := strconv.FormatUint(receipt.BlockNumber, 10)
+	if !wp.ChildChainMintable {
+		exitEventIDRaw, err := common.ExtractExitEventID(receipt)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
-	outputter.SetCommandResult(
-		&withdrawERC721Result{
-			Sender:      senderAccount.Address().String(),
-			Receivers:   wp.Receivers,
-			TokenIDs:    wp.TokenIDs,
-			ExitEventID: exitEventID,
-			BlockNumber: blockNumber,
-		})
+			return
+		}
+
+		res.ExitEventID = strconv.FormatUint(exitEventIDRaw.Uint64(), 10)
+	}
+
+	outputter.SetCommandResult(res)
 }
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
@@ -191,41 +199,26 @@ func createWithdrawTxn(receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.T
 	}, nil
 }
 
-// extractExitEventID tries to extract exit event id from provided receipt
-func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
-	var exitEvent contractsapi.L2StateSyncedEvent
-	for _, log := range receipt.Logs {
-		doesMatch, err := exitEvent.ParseLog(log)
-		if err != nil {
-			return nil, err
-		}
-
-		if !doesMatch {
-			continue
-		}
-
-		return exitEvent.ID, nil
-	}
-
-	return nil, errors.New("failed to find exit event log")
-}
-
-type withdrawERC721Result struct {
+type withdrawResult struct {
 	Sender      string   `json:"sender"`
 	Receivers   []string `json:"receivers"`
 	TokenIDs    []string `json:"tokenIDs"`
-	ExitEventID string   `json:"exitEventIDs"`
+	ExitEventID string   `json:"exitEventId"`
 	BlockNumber string   `json:"blockNumbers"`
 }
 
-func (r *withdrawERC721Result) GetOutput() string {
+func (r *withdrawResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 5)
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("TokenIDs|%s", strings.Join(r.TokenIDs, ", ")))
-	vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", r.ExitEventID))
+	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
+
+	if wp.ChildChainMintable {
+		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
+	}
+
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", r.BlockNumber))
 
 	buffer.WriteString("\n[WITHDRAW ERC 721]\n")

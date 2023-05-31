@@ -193,8 +193,8 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 // Withdraw function is used to invoke bridge withdrawals for any kind of ERC tokens (from the child to the root chain)
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
-	senderKey, receivers,
-	amounts, tokenIDs, jsonRPCAddr string, childToken types.Address) error {
+	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr string,
+	childPredicate, childToken types.Address, childChainMintable bool) error {
 	if senderKey == "" {
 		return errors.New("provide hex-encoded sender private key")
 	}
@@ -223,10 +223,15 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"bridge",
 			"withdraw-erc20",
 			"--child-token", childToken.String(),
+			"--child-predicate", childPredicate.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 	case bridgeCommon.ERC721:
 		if tokenIDs == "" {
@@ -236,11 +241,16 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		args = append(args,
 			"bridge",
 			"withdraw-erc721",
+			"--child-token", childToken.String(),
+			"--child-predicate", childPredicate.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCAddr,
-			"--child-token", childToken.String())
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {
@@ -254,12 +264,17 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		args = append(args,
 			"bridge",
 			"withdraw-erc1155",
+			"--child-token", childToken.String(),
+			"--child-predicate", childPredicate.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCAddr,
-			"--child-token", childToken.String())
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 	}
 
 	return t.cmdRun(args...)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -29,7 +30,7 @@ var (
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc721",
-		Short:   "Deposits ERC721 tokens from the root chain to the child chain",
+		Short:   "Deposits ERC721 tokens from the origin to the destination chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
@@ -38,14 +39,14 @@ func GetCommand() *cobra.Command {
 		&dp.SenderKey,
 		common.SenderKeyFlag,
 		"",
-		"hex encoded private key of the account which sends rootchain deposit transactions",
+		"hex encoded private key of the account which sends deposit transactions",
 	)
 
 	depositCmd.Flags().StringSliceVar(
 		&dp.Receivers,
 		common.ReceiversFlag,
 		nil,
-		"receiving accounts addresses on child chain",
+		"receiving accounts addresses",
 	)
 
 	depositCmd.Flags().StringSliceVar(
@@ -73,7 +74,7 @@ func GetCommand() *cobra.Command {
 		&dp.JSONRPCAddr,
 		common.JSONRPCFlag,
 		txrelayer.DefaultRPCAddress,
-		"the JSON RPC root chain endpoint",
+		"the JSON RPC endpoint",
 	)
 
 	depositCmd.Flags().BoolVar(
@@ -82,6 +83,13 @@ func GetCommand() *cobra.Command {
 		false,
 		"test indicates whether depositor is hardcoded test account "+
 			"(in that case tokens are minted to it, so it is able to make deposits)",
+	)
+
+	depositCmd.Flags().BoolVar(
+		&dp.ChildChainMintable,
+		common.ChildChainMintableFlag,
+		false,
+		"flag indicating whether tokens originate from child chain",
 	)
 
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -111,7 +119,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to initialize rootchain tx relayer: %w", err))
+		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 
 		return
 	}
@@ -201,12 +209,24 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(
-		&depositERC721Result{
-			Sender:    depositorAddr.String(),
-			Receivers: dp.Receivers,
-			TokenIDs:  dp.TokenIDs,
-		})
+	res := &depositResult{
+		Sender:    depositorAddr.String(),
+		Receivers: dp.Receivers,
+		TokenIDs:  dp.TokenIDs,
+	}
+
+	if dp.ChildChainMintable {
+		exitEventID, err := common.ExtractExitEventID(receipt)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
+
+			return
+		}
+
+		res.ExitEventID = strconv.FormatUint(exitEventID.Uint64(), 10)
+	}
+
+	outputter.SetCommandResult(res)
 }
 
 // createDepositTxn encodes parameters for deposit fnction on rootchain predicate contract
@@ -272,19 +292,24 @@ func createApproveERC721PredicateTxn(rootERC721Predicate, rootERC721Token types.
 	}, nil
 }
 
-type depositERC721Result struct {
-	Sender    string   `json:"sender"`
-	Receivers []string `json:"receivers"`
-	TokenIDs  []string `json:"tokenIDs"`
+type depositResult struct {
+	Sender      string   `json:"sender"`
+	Receivers   []string `json:"receivers"`
+	TokenIDs    []string `json:"tokenIDs"`
+	ExitEventID string   `json:"exitEventId"`
 }
 
-func (r *depositERC721Result) GetOutput() string {
+func (r *depositResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("TokenIDs|%s", strings.Join(r.TokenIDs, ", ")))
+	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
+
+	if dp.ChildChainMintable {
+		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
+	}
 
 	buffer.WriteString("\n[DEPOSIT ERC 721]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))

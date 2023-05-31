@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -88,6 +89,13 @@ func GetCommand() *cobra.Command {
 			"(in that case tokens are minted to it, so it is able to make deposits)",
 	)
 
+	depositCmd.Flags().BoolVar(
+		&dp.ChildChainMintable,
+		common.ChildChainMintableFlag,
+		false,
+		"flag indicating whether tokens originate from child chain",
+	)
+
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = depositCmd.MarkFlagRequired(common.AmountsFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
@@ -115,7 +123,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to initialize rootchain tx relayer: %w", err))
+		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 
 		return
 	}
@@ -185,10 +193,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	g, ctx := errgroup.WithContext(cmd.Context())
+	exitEventIDs := make([]string, len(dp.Receivers))
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
 		amount := amounts[i]
+		i := i
 
 		g.Go(func() error {
 			select {
@@ -210,6 +220,15 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
+				if dp.ChildChainMintable {
+					exitEventID, err := common.ExtractExitEventID(receipt)
+					if err != nil {
+						return fmt.Errorf("failed to extract exit event: %w", err)
+					}
+
+					exitEventIDs[i] = strconv.FormatUint(exitEventID.Uint64(), 10)
+				}
+
 				return nil
 			}
 		})
@@ -221,10 +240,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(&depositERC20Result{
-		Sender:    depositorAddr.String(),
-		Receivers: dp.Receivers,
-		Amounts:   dp.Amounts,
+	outputter.SetCommandResult(&depositResult{
+		Sender:       depositorAddr.String(),
+		Receivers:    dp.Receivers,
+		ExitEventIDs: exitEventIDs,
+		Amounts:      dp.Amounts,
 	})
 }
 
@@ -250,19 +270,24 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 	}, nil
 }
 
-type depositERC20Result struct {
-	Sender    string   `json:"sender"`
-	Receivers []string `json:"receivers"`
-	Amounts   []string `json:"amounts"`
+type depositResult struct {
+	Sender       string   `json:"sender"`
+	Receivers    []string `json:"receivers"`
+	Amounts      []string `json:"amounts"`
+	ExitEventIDs []string `json:"exitEventIds"`
 }
 
-func (r *depositERC20Result) GetOutput() string {
+func (r *depositResult) GetOutput() string {
 	var buffer bytes.Buffer
 
 	vals := make([]string, 0, 3)
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
+
+	if dp.ChildChainMintable {
+		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
+	}
 
 	buffer.WriteString("\n[DEPOSIT ERC 20]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))

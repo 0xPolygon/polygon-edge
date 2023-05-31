@@ -3,7 +3,6 @@ package erc20
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -77,6 +76,13 @@ func GetCommand() *cobra.Command {
 		"the JSON RPC endpoint",
 	)
 
+	withdrawCmd.Flags().BoolVar(
+		&wp.ChildChainMintable,
+		common.ChildChainMintableFlag,
+		false,
+		"flag indicating whether tokens originate from child chain",
+	)
+
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = withdrawCmd.MarkFlagRequired(common.AmountsFlag)
 
@@ -148,14 +154,17 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		exitEventID, err := extractExitEventID(receipt)
-		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
+		if !wp.ChildChainMintable {
+			exitEventID, err := common.ExtractExitEventID(receipt)
+			if err != nil {
+				outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
-			return
+				return
+			}
+
+			exitEventIDs[i] = strconv.FormatUint(exitEventID.Uint64(), 10)
 		}
 
-		exitEventIDs[i] = strconv.FormatUint(exitEventID.Uint64(), 10)
 		blockNumbers[i] = strconv.FormatUint(receipt.BlockNumber, 10)
 	}
 
@@ -190,25 +199,6 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 	}, nil
 }
 
-// extractExitEventID tries to extract exit event id from provided receipt
-func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
-	var exitEvent contractsapi.L2StateSyncedEvent
-	for _, log := range receipt.Logs {
-		doesMatch, err := exitEvent.ParseLog(log)
-		if err != nil {
-			return nil, err
-		}
-
-		if !doesMatch {
-			continue
-		}
-
-		return exitEvent.ID, nil
-	}
-
-	return nil, errors.New("failed to find exit event log")
-}
-
 type withdrawResult struct {
 	Sender       string   `json:"sender"`
 	Receivers    []string `json:"receivers"`
@@ -224,7 +214,11 @@ func (r *withdrawResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-	vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
+
+	if !wp.ChildChainMintable {
+		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
+	}
+
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))
 
 	buffer.WriteString("\n[WITHDRAW ERC 20]\n")
