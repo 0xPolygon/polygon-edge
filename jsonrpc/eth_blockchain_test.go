@@ -358,7 +358,7 @@ func TestEth_Call(t *testing.T) {
 		res, err := eth.Call(contractCall, BlockNumberOrHash{}, nil)
 		assert.Error(t, err)
 		assert.NotNil(t, res)
-		bres := res.([]byte)
+		bres := res.([]byte) // nolint:forcetypeassert
 		assert.Equal(t, []byte(hex.EncodeToString(returnValue)), bres)
 	})
 }
