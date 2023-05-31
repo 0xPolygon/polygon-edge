@@ -6,6 +6,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 )
 
+const InitialFork = "initialfork"
+
 // HandlerDesc gives description for the handler
 // eq: "extra", "proposer_calculator", etc
 type HandlerDesc string
@@ -37,6 +39,9 @@ func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error
 
 	fm := GetInstance()
 
+	// register initial fork
+	fm.RegisterFork(InitialFork)
+
 	// Register forks
 	for name := range *forks {
 		// check if fork is not supported by current edge version
@@ -49,6 +54,11 @@ func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error
 
 	// Register handlers and additional forks here
 	if err := factory(forks); err != nil {
+		return err
+	}
+
+	// Activate initial fork
+	if err := fm.ActivateFork(InitialFork, uint64(0)); err != nil {
 		return err
 	}
 
