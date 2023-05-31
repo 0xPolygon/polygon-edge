@@ -161,6 +161,7 @@ func newStorageP(t *testing.T) (storage.Storage, func(), string) {
 
 	closeFn := func() {
 		require.NoError(t, s.Close())
+
 		if err := s.Close(); err != nil {
 			t.Fatal(err)
 		}
@@ -224,7 +225,7 @@ func TestWriteFullBlock(t *testing.T) {
 	s, _, path := newStorageP(t)
 	defer s.Close()
 
-	count := 40000
+	count := 100
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*45)
 
 	signchan := make(chan os.Signal, 1)

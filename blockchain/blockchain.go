@@ -632,7 +632,7 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 		}
 	}
 
-	// Write the actual headers in seperate batches for now
+	// Write the actual headers in separate batches for now
 	for _, h := range headers {
 		event := &Event{}
 
