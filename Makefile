@@ -81,3 +81,11 @@ generate-smart-contract-bindings:
 .PHONY: run-docker
 run-docker:
 	./scripts/cluster polybft --docker
+
+.PHONY: stop-docker
+stop-docker:
+	./scripts/cluster polybft --docker stop
+
+.PHONY: destroy-docker
+destroy-docker:
+	./scripts/cluster polybft --docker destroy

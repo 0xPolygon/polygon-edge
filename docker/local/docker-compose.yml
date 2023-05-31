@@ -21,6 +21,8 @@ services:
     image: local/polygon-edge
     container_name: polygon-edge-bootstrapper
     command: [ "init", "${EDGE_CONSENSUS:-polybft}" ]
+    environment:
+      ROOTCHAIN_IP: 10.5.0.1
     depends_on:
       rootchain:
         condition: service_started
@@ -110,6 +112,10 @@ networks:
   polygon-edge-docker:
     driver: bridge
     name: polygon-edge-docker
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1
 
 volumes:
   data:
