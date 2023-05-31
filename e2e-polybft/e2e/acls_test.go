@@ -297,9 +297,9 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 		// Step 6. 'adminAddr' sends a transaction to disable himself.
 		input, _ := addresslist.SetNoneFunc.Encode([]interface{}{adminAddr})
 
-		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
-		require.NoError(t, adminSetTxn.Wait())
-		expectRole(t, cluster, contracts.AllowListTransactionsAddr, targetAddr, addresslist.EnabledRole)
+		noneSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, noneSetTxn.Wait())
+		expectRole(t, cluster, contracts.AllowListTransactionsAddr, adminAddr, addresslist.AdminRole)
 	}
 }
 

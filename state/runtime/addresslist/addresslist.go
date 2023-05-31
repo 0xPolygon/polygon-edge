@@ -12,10 +12,10 @@ import (
 
 // list of function methods for the address list functionality
 var (
-	SetAdminFunc            = abi.MustNewMethod("function setAdmin(address)")
-	SetEnabledSignatureFunc = abi.MustNewMethod("function setEnabled(address)")
-	SetNoneFunc             = abi.MustNewMethod("function setNone(address)")
-	ReadAddressListFunc     = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
+	SetAdminFunc        = abi.MustNewMethod("function setAdmin(address)")
+	SetEnabledFunc      = abi.MustNewMethod("function setEnabled(address)")
+	SetNoneFunc         = abi.MustNewMethod("function setNone(address)")
+	ReadAddressListFunc = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
 )
 
 // list of gas costs for the operations
@@ -102,7 +102,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	var updateRole Role
 	if bytes.Equal(sig, SetAdminFunc.ID()) {
 		updateRole = AdminRole
-	} else if bytes.Equal(sig, SetEnabledSignatureFunc.ID()) {
+	} else if bytes.Equal(sig, SetEnabledFunc.ID()) {
 		updateRole = EnabledRole
 	} else if bytes.Equal(sig, SetNoneFunc.ID()) {
 		updateRole = NoRole
