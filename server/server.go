@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -276,10 +277,8 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if factory, exists := forkManagerFactory[ConsensusType(engineName)]; exists {
-		if err := factory(config.Chain.Params.Forks); err != nil {
-			return nil, err
-		}
+	if err := forkManagerInit(engineName, config.Chain.Params.Forks); err != nil {
+		return nil, err
 	}
 
 	// compute the genesis root state
@@ -409,6 +408,42 @@ func NewServer(config *Config) (*Server, error) {
 	m.txpool.Start()
 
 	return m, nil
+}
+
+func forkManagerInit(engineName string, forks *chain.Forks) error {
+	if err := chain.CheckMissingFork(forks); err != nil {
+		return err
+	}
+
+	factory, exists := forkManagerFactory[ConsensusType(engineName)]
+	if !exists {
+		return nil
+	}
+
+	fm := forkmanager.GetInstance()
+
+	// Register forks
+	for name := range *forks {
+		fm.RegisterFork(name)
+	}
+
+	// Register handlers here
+	if err := factory(forks); err != nil {
+		return err
+	}
+
+	// Activate forks
+	for name, blockNumber := range *forks {
+		if blockNumber == nil {
+			continue
+		}
+
+		if err := fm.ActivateFork(name, (uint64)(*blockNumber)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func unaryInterceptor(

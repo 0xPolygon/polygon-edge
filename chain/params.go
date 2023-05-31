@@ -91,16 +91,19 @@ const (
 // Forks is map which contains all forks and their starting blocks from genesis
 type Forks map[string]*Fork
 
+// IsActive returns true if fork defined by name exists and defined for the block
 func (f *Forks) IsActive(name string, block uint64) bool {
 	ff := (*f)[name]
 
 	return ff != nil && ff.Active(block)
 }
 
+// SetFork adds/updates fork defined by name
 func (f *Forks) SetFork(name string, value *Fork) {
 	(*f)[name] = value
 }
 
+// At returns ForksInTime instance that shows which supported forks are enabled for the block
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
 		Homestead:      f.IsActive(Homestead, block),
@@ -145,7 +148,6 @@ type ForksInTime struct {
 }
 
 // AllForksEnabled should contain all supported forks by current edge version
-// All forks should be available from block 0
 var AllForksEnabled = &Forks{
 	Homestead:      NewFork(0),
 	EIP150:         NewFork(0),

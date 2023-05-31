@@ -7,16 +7,16 @@ import (
 )
 
 const (
-	HandlerA = ForkHandlerName("HA")
-	HandlerB = ForkHandlerName("HB")
-	HandlerC = ForkHandlerName("HC")
-	HandlerD = ForkHandlerName("HD")
+	HandlerA = HandlerDesc("HA")
+	HandlerB = HandlerDesc("HB")
+	HandlerC = HandlerDesc("HC")
+	HandlerD = HandlerDesc("HD")
 
-	ForkA = ForkName("A")
-	ForkB = ForkName("B")
-	ForkC = ForkName("C")
-	ForkD = ForkName("D")
-	ForkE = ForkName("E")
+	ForkA = "A"
+	ForkB = "B"
+	ForkC = "C"
+	ForkD = "D"
+	ForkE = "E"
 )
 
 func TestForkManager(t *testing.T) {
@@ -131,7 +131,7 @@ func TestForkManager(t *testing.T) {
 	t.Run("get handler", func(t *testing.T) {
 		t.Parallel()
 
-		execute := func(name ForkHandlerName, block uint64) string {
+		execute := func(name HandlerDesc, block uint64) string {
 			//nolint:forcetypeassert
 			return forkManager.GetHandler(name, block).(func() string)()
 		}
@@ -162,8 +162,8 @@ func TestForkManager_Deactivate(t *testing.T) {
 	t.Parallel()
 
 	forkManager := &forkManager{
-		forkMap:     map[ForkName]*Fork{},
-		handlersMap: map[ForkHandlerName][]ForkActiveHandler{},
+		forkMap:     map[string]*Fork{},
+		handlersMap: map[HandlerDesc][]Handler{},
 	}
 
 	forkManager.RegisterFork(ForkA)

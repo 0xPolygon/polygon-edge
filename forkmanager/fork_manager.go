@@ -25,8 +25,8 @@ var (
 type forkManager struct {
 	lock sync.Mutex
 
-	forkMap     map[ForkName]*Fork
-	handlersMap map[ForkHandlerName][]ForkActiveHandler
+	forkMap     map[string]*Fork
+	handlersMap map[HandlerDesc][]Handler
 }
 
 // GeInstance returns fork manager singleton instance. Thread safe
@@ -36,8 +36,8 @@ func GetInstance() *forkManager {
 
 	if forkManagerInstance == nil {
 		forkManagerInstance = &forkManager{
-			forkMap:     map[ForkName]*Fork{},
-			handlersMap: map[ForkHandlerName][]ForkActiveHandler{},
+			forkMap:     map[string]*Fork{},
+			handlersMap: map[HandlerDesc][]Handler{},
 		}
 	}
 
@@ -45,7 +45,7 @@ func GetInstance() *forkManager {
 }
 
 // RegisterFork registers fork by its name
-func (fm *forkManager) RegisterFork(name ForkName) {
+func (fm *forkManager) RegisterFork(name string) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -53,12 +53,12 @@ func (fm *forkManager) RegisterFork(name ForkName) {
 		Name:            name,
 		FromBlockNumber: 0,
 		IsActive:        false,
-		Handlers:        map[ForkHandlerName]interface{}{},
+		Handlers:        map[HandlerDesc]interface{}{},
 	}
 }
 
 // RegisterHandler registers handler by its name for specific fork
-func (fm *forkManager) RegisterHandler(forkName ForkName, handlerName ForkHandlerName, handler interface{}) error {
+func (fm *forkManager) RegisterHandler(forkName string, handlerName HandlerDesc, handler interface{}) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -74,7 +74,7 @@ func (fm *forkManager) RegisterHandler(forkName ForkName, handlerName ForkHandle
 
 // ActivateFork activates fork from some block number
 // All handlers belong to this fork are also activated
-func (fm *forkManager) ActivateFork(forkName ForkName, blockNumber uint64) error {
+func (fm *forkManager) ActivateFork(forkName string, blockNumber uint64) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -99,7 +99,7 @@ func (fm *forkManager) ActivateFork(forkName ForkName, blockNumber uint64) error
 
 // DeactivateFork de-activates fork
 // All handlers belong to this fork are also de-activated
-func (fm *forkManager) DeactivateFork(forkName ForkName) error {
+func (fm *forkManager) DeactivateFork(forkName string) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -122,7 +122,7 @@ func (fm *forkManager) DeactivateFork(forkName ForkName) error {
 }
 
 // GetHandler retrieves handler for handler name and for a block number
-func (fm *forkManager) GetHandler(name ForkHandlerName, blockNumber uint64) interface{} {
+func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interface{} {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -143,7 +143,7 @@ func (fm *forkManager) GetHandler(name ForkHandlerName, blockNumber uint64) inte
 }
 
 // IsForkRegistered checks if fork is registered
-func (fm *forkManager) IsForkRegistered(name ForkName) bool {
+func (fm *forkManager) IsForkRegistered(name string) bool {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -153,7 +153,7 @@ func (fm *forkManager) IsForkRegistered(name ForkName) bool {
 }
 
 // IsForkEnabled checks if fork is registered and enabled for specific block
-func (fm *forkManager) IsForkEnabled(name ForkName, blockNumber uint64) bool {
+func (fm *forkManager) IsForkEnabled(name string, blockNumber uint64) bool {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -166,7 +166,7 @@ func (fm *forkManager) IsForkEnabled(name ForkName, blockNumber uint64) bool {
 }
 
 // GetForkBlock returns fork block if fork is registered and activated
-func (fm *forkManager) GetForkBlock(name ForkName) (uint64, error) {
+func (fm *forkManager) GetForkBlock(name string) (uint64, error) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -182,9 +182,9 @@ func (fm *forkManager) GetForkBlock(name ForkName) (uint64, error) {
 	return fork.FromBlockNumber, nil
 }
 
-func (fm *forkManager) addHandler(handlerName ForkHandlerName, blockNumber uint64, handler interface{}) {
+func (fm *forkManager) addHandler(handlerName HandlerDesc, blockNumber uint64, handler interface{}) {
 	if handlers, exists := fm.handlersMap[handlerName]; !exists {
-		fm.handlersMap[handlerName] = []ForkActiveHandler{
+		fm.handlersMap[handlerName] = []Handler{
 			{
 				FromBlockNumber: blockNumber,
 				Handler:         handler,
@@ -195,9 +195,9 @@ func (fm *forkManager) addHandler(handlerName ForkHandlerName, blockNumber uint6
 		index := sort.Search(len(handlers), func(i int) bool {
 			return handlers[i].FromBlockNumber >= blockNumber
 		})
-		handlers = append(handlers, ForkActiveHandler{})
+		handlers = append(handlers, Handler{})
 		copy(handlers[index+1:], handlers[index:])
-		handlers[index] = ForkActiveHandler{
+		handlers[index] = Handler{
 			FromBlockNumber: blockNumber,
 			Handler:         handler,
 		}
@@ -205,7 +205,7 @@ func (fm *forkManager) addHandler(handlerName ForkHandlerName, blockNumber uint6
 	}
 }
 
-func (fm *forkManager) removeHandler(handlerName ForkHandlerName, blockNumber uint64) {
+func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64) {
 	handlers, exists := fm.handlersMap[handlerName]
 	if !exists {
 		return
@@ -217,7 +217,7 @@ func (fm *forkManager) removeHandler(handlerName ForkHandlerName, blockNumber ui
 
 	if index != -1 {
 		copy(handlers[index:], handlers[index+1:])
-		handlers[len(handlers)-1] = ForkActiveHandler{}
+		handlers[len(handlers)-1] = Handler{}
 		fm.handlersMap[handlerName] = handlers[:len(handlers)-1]
 	}
 }

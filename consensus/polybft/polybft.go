@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -363,30 +362,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 }
 
 func ForkManagerFactory(forks *chain.Forks) error {
-	if err := chain.CheckMissingFork(forks); err != nil {
-		return err
-	}
-
-	fm := forkmanager.GetInstance()
-
-	// Register forks
-	for name := range *forks {
-		fm.RegisterFork(forkmanager.ForkName(name))
-	}
-
-	// Register handlers here
-
-	// Activate forks
-	for name, blockNumber := range *forks {
-		if blockNumber == nil {
-			continue
-		}
-
-		if err := fm.ActivateFork(forkmanager.ForkName(name), (uint64)(*blockNumber)); err != nil {
-			return err
-		}
-	}
-
+	// place fork manager handler registration here
 	return nil
 }
 

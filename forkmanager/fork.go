@@ -1,17 +1,25 @@
 package forkmanager
 
-type ForkHandlerName string
+// HandlerDesc gives description for the handler
+// eq: "extra", "proposer_calculator", etc
+type HandlerDesc string
 
-type ForkName string
-
+// Fork structure defines one fork
 type Fork struct {
-	Name            ForkName
+	// name of the fork
+	Name string
+	// after the fork is activated, `FromBlockNumber` shows from which block is enabled
 	FromBlockNumber uint64
-	IsActive        bool
-	Handlers        map[ForkHandlerName]interface{}
+	// this value is false if fork is registered but not activated
+	IsActive bool
+	// map of all handlers registered for this fork
+	Handlers map[HandlerDesc]interface{}
 }
 
-type ForkActiveHandler struct {
+// Handler defines one custom handler
+type Handler struct {
+	// Handler should be active from block `FromBlockNumber``
 	FromBlockNumber uint64
-	Handler         interface{}
+	// instance of some structure, function etc
+	Handler interface{}
 }
