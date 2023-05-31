@@ -1,5 +1,11 @@
 package forkmanager
 
+import (
+	"fmt"
+
+	"github.com/0xPolygon/polygon-edge/chain"
+)
+
 // HandlerDesc gives description for the handler
 // eq: "extra", "proposer_calculator", etc
 type HandlerDesc string
@@ -22,4 +28,40 @@ type Handler struct {
 	FromBlockNumber uint64
 	// instance of some structure, function etc
 	Handler interface{}
+}
+
+func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error {
+	if factory == nil {
+		return nil
+	}
+
+	fm := GetInstance()
+
+	// Register forks
+	for name := range *forks {
+		// check if fork is not supported by current edge version
+		if _, found := (*chain.AllForksEnabled)[name]; !found {
+			return fmt.Errorf("fork is not available: %s", name)
+		}
+
+		fm.RegisterFork(name)
+	}
+
+	// Register handlers and additional forks here
+	if err := factory(forks); err != nil {
+		return err
+	}
+
+	// Activate forks
+	for name, blockNumber := range *forks {
+		if blockNumber == nil {
+			continue
+		}
+
+		if err := fm.ActivateFork(name, (uint64)(*blockNumber)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

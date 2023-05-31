@@ -2,7 +2,6 @@ package chain
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 	"sort"
 
@@ -158,16 +157,4 @@ var AllForksEnabled = &Forks{
 	Petersburg:     NewFork(0),
 	Istanbul:       NewFork(0),
 	London:         NewFork(0),
-}
-
-// CheckMissingFork checks if there is a fork received as a genesis parameter that is not supported
-// by the current edge version.
-func CheckMissingFork(forks *Forks) error {
-	for name := range *forks {
-		if _, found := (*AllForksEnabled)[name]; !found {
-			return fmt.Errorf("fork is not available: %s", name)
-		}
-	}
-
-	return nil
 }

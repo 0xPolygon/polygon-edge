@@ -277,7 +277,9 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := forkManagerInit(engineName, config.Chain.Params.Forks); err != nil {
+	if err := forkmanager.ForkManagerInit(
+		forkManagerFactory[ConsensusType(engineName)],
+		config.Chain.Params.Forks); err != nil {
 		return nil, err
 	}
 
@@ -408,42 +410,6 @@ func NewServer(config *Config) (*Server, error) {
 	m.txpool.Start()
 
 	return m, nil
-}
-
-func forkManagerInit(engineName string, forks *chain.Forks) error {
-	if err := chain.CheckMissingFork(forks); err != nil {
-		return err
-	}
-
-	factory, exists := forkManagerFactory[ConsensusType(engineName)]
-	if !exists {
-		return nil
-	}
-
-	fm := forkmanager.GetInstance()
-
-	// Register forks
-	for name := range *forks {
-		fm.RegisterFork(name)
-	}
-
-	// Register handlers here
-	if err := factory(forks); err != nil {
-		return err
-	}
-
-	// Activate forks
-	for name, blockNumber := range *forks {
-		if blockNumber == nil {
-			continue
-		}
-
-		if err := fm.ActivateFork(name, (uint64)(*blockNumber)); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func unaryInterceptor(
