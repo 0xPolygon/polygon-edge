@@ -143,7 +143,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			contractAddress, err := deployContract(txRelayer, deployerKey,
 				contractsapi.StakeManager, "StakeManager")
 			if err != nil {
-				return fmt.Errorf("faield to deploy stake manager: %w", err)
+				return err
 			}
 
 			outputter.WriteCommandResult(&rootHelper.MessageResult{
@@ -168,7 +168,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 				contractAddress, err := deployContract(txRelayer, deployerKey,
 					contractsapi.RootERC20, "MockERC20StakeToken")
 				if err != nil {
-					return fmt.Errorf("faield to deploy mock ERC20 stake token: %w", err)
+					return err
 				}
 
 				outputter.WriteCommandResult(&rootHelper.MessageResult{

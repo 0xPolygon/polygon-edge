@@ -21,13 +21,13 @@ case "$1" in
               if [ -f "$GENESIS_PATH" ]; then
                   echo "Secrets have already been generated."
               else
-                  echo "Generating iBFT secrets..."
+                  echo "Generating IBFT secrets..."
                   secrets=$("$POLYGON_EDGE_BIN" secrets init --insecure --num 4 --data-dir /data/data- --json)
                   echo "Secrets have been successfully generated"
 
                   rm -f /data/genesis.json
 
-                  echo "Generating iBFT Genesis file..."
+                  echo "Generating IBFT Genesis file..."
                   "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
                     --dir /data/genesis.json \
                     --consensus ibft \
