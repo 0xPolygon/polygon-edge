@@ -287,10 +287,10 @@ func NewServer(config *Config) (*Server, error) {
 	// Use the london signer with eip-155 as a fallback one
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
-		chain.AllForksEnabled.At(0).Homestead,
+		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		crypto.NewEIP155Signer(
 			uint64(m.config.Chain.Params.ChainID),
-			chain.AllForksEnabled.At(0).Homestead,
+			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		),
 	)
 
