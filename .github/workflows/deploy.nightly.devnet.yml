@@ -106,10 +106,6 @@ jobs:
           #!/bin/bash -x
 
           main() {
-              if [[ -d "/var/lib/bootstrap" ]]; then
-                  echo "It appears this network has already been boot strapped"
-                  exit
-              fi
               mkdir /var/lib/bootstrap
               pushd /var/lib/bootstrap
 
