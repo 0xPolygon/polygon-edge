@@ -106,10 +106,6 @@ jobs:
           #!/bin/bash -x
 
           main() {
-              if [[ -d "/var/lib/bootstrap" ]]; then
-                  echo "It appears this network has already been boot strapped"
-                  exit
-              fi
               mkdir /var/lib/bootstrap
               pushd /var/lib/bootstrap
 
@@ -140,8 +136,13 @@ jobs:
               {% if (not fund_rootchain_coinbase) %}# {% endif %}cast send --rpc-url {{ rootchain_json_rpc }} --from $COINBASE_ADDRESS --value {{ rootchain_deployer_fund_amount }} $(cat rootchain-wallet.json | jq -r '.ETHAddress') --unlocked
               {% if (fund_rootchain_coinbase) %}# {% endif %}cast send --rpc-url {{ rootchain_json_rpc }} --from {{ rootchain_coinbase_address }} --value {{ rootchain_deployer_fund_amount }} $(cat rootchain-wallet.json | jq -r '.ETHAddress') --private-key {{ rootchain_coinbase_private_key }}
 
+              polygon-edge polybft stake-manager-deploy \
+                  --jsonrpc {{ rootchain_json_rpc }} \
+                  --private-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey')
+
               polygon-edge rootchain deploy \
                           --deployer-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
+                          --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
                           --json-rpc {{ rootchain_json_rpc }}
 
           {% for item in hostvars %}
@@ -155,32 +156,30 @@ jobs:
                           --private-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
                           --addresses $(cat validator-*.json | jq -r ".[].address" | tr "\n" ",") \
                           --supernet-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr') \
-                          --json-rpc {{ rootchain_json_rpc }}
-
+                          --jsonrpc {{ rootchain_json_rpc }}
 
           {% for item in hostvars %}
           {% if (hostvars[item].tags.Role == "validator") %}
               polygon-edge polybft register-validator --data-dir {{ hostvars[item].tags["Name"] }} \
                           --supernet-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr') \
-                          --json-rpc {{ rootchain_json_rpc }}
-          {% endif %}
-          {% endfor %}
+                          --jsonrpc {{ rootchain_json_rpc }}
 
-          {% for item in hostvars %}
-          {% if (hostvars[item].tags.Role == "validator") %}
-              polygon-edge polybft stake --data-dir {{ hostvars[item].tags["Name"] }} --chain-id $(cat genesis.json | jq -r '.params.chainID') \
+              polygon-edge polybft stake --data-dir {{ hostvars[item].tags["Name"] }} \
                           --amount 10 \
+                          --supernet-id $(cat genesis.json | jq -r '.params.engine.polybft.supernetID') \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
+                          --stake-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr') \
                           --native-root-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.nativeERC20Address') \
-                          --json-rpc {{ rootchain_json_rpc }}
+                          --jsonrpc {{ rootchain_json_rpc }}
           {% endif %}
           {% endfor %}
 
               polygon-edge polybft supernet --private-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
                           --supernet-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr') \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
-                          --finalize-genesis --enable-staking \
-                          --json-rpc {{ rootchain_json_rpc }}
+                          --finalize-genesis-set \
+                          --enable-staking \
+                          --jsonrpc {{ rootchain_json_rpc }}
 
               tar czf {{ base_dn }}.tar.gz *.json *.private
               popd
