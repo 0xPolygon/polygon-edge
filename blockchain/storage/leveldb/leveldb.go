@@ -6,6 +6,12 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+)
+
+const (
+	DefaultCache   = int(256)
+	DefaultHandles = int(256)
 )
 
 // Factory creates a leveldb storage
@@ -25,7 +31,13 @@ func Factory(config map[string]interface{}, logger hclog.Logger) (storage.Storag
 
 // NewLevelDBStorage creates the new storage reference with leveldb
 func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error) {
-	db, err := leveldb.OpenFile(path, nil)
+	options := opt.Options{}
+	// Set default options
+	options.OpenFilesCacheCapacity = DefaultHandles
+	options.BlockCacheCapacity = DefaultCache / 2 * opt.MiB
+	options.WriteBuffer = DefaultCache / 4 * opt.MiB // Two of these are used internally
+
+	db, err := leveldb.OpenFile(path, &options)
 	if err != nil {
 		return nil, err
 	}
