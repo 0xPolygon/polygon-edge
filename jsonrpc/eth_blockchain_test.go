@@ -188,30 +188,58 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 		eth := newTestEthEndpoint(store)
 		block := newTestBlock(1, hash4)
 		store.add(block)
-		txn := newTestTransaction(uint64(0), addr0)
-		block.Transactions = append(block.Transactions, txn)
-		rec := &types.Receipt{
+		txn0 := newTestTransaction(uint64(0), addr0)
+		txn1 := newTestTransaction(uint64(1), addr1)
+		block.Transactions = []*types.Transaction{txn0, txn1}
+		receipt1 := &types.Receipt{
 			Logs: []*types.Log{
 				{
+					// log 0
+					Topics: []types.Hash{
+						hash1,
+					},
+				},
+				{
+					// log 1
+					Topics: []types.Hash{
+						hash2,
+					},
+				},
+				{
+					// log 2
+					Topics: []types.Hash{
+						hash3,
+					},
+				},
+			},
+		}
+		receipt1.SetStatus(types.ReceiptSuccess)
+		receipt2 := &types.Receipt{
+			Logs: []*types.Log{
+				{
+					// log 3
 					Topics: []types.Hash{
 						hash4,
 					},
 				},
 			},
 		}
-		rec.SetStatus(types.ReceiptSuccess)
-		store.receipts[hash4] = []*types.Receipt{rec}
+		receipt2.SetStatus(types.ReceiptSuccess)
+		store.receipts[hash4] = []*types.Receipt{receipt1, receipt2}
 
-		res, err := eth.GetTransactionReceipt(txn.Hash)
+		res, err := eth.GetTransactionReceipt(txn1.Hash)
 
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
 		//nolint:forcetypeassert
 		response := res.(*receipt)
-		assert.Equal(t, txn.Hash, response.TxHash)
+		assert.Equal(t, txn1.Hash, response.TxHash)
 		assert.Equal(t, block.Hash(), response.BlockHash)
 		assert.NotNil(t, response.Logs)
+		assert.Len(t, response.Logs, 1)
+		assert.Equal(t, uint64(3), uint64(response.Logs[0].LogIndex))
+		assert.Equal(t, uint64(1), uint64(response.Logs[0].TxIndex))
 	})
 }
 
