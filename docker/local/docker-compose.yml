@@ -5,7 +5,18 @@ services:
   rootchain:
     image: ghcr.io/0xpolygon/go-ethereum-console:latest
     container_name: polygon-edge-rootchain
-    command: [ "--dev", "--dev.period", "2", "--datadir", "/eth1data", "--ipcpath", "/eth1data/geth.ipc", "--http", "--http.addr", "0.0.0.0", "--http.api", "eth,net,web3,debug", "--ws", "--ws.addr", "0.0.0.0" ]
+    command: [
+      "--dev",
+      "--dev.period", "2",
+      "--datadir", "/eth1data",
+      "--ipcpath", "/eth1data/geth.ipc",
+      "--http",
+      "--http.addr", "0.0.0.0",
+      "--http.vhosts", "*",
+      "--http.api", "eth,net,web3,debug",
+      "--ws",
+      "--ws.addr", "0.0.0.0"
+    ]
     ports:
       - '8545:8545'
     volumes:
@@ -21,8 +32,6 @@ services:
     image: local/polygon-edge
     container_name: polygon-edge-bootstrapper
     command: [ "init", "${EDGE_CONSENSUS:-polybft}" ]
-    environment:
-      ROOTCHAIN_IP: 10.5.0.1
     depends_on:
       rootchain:
         condition: service_started
@@ -35,7 +44,16 @@ services:
   node-1:
     image: local/polygon-edge
     container_name: polygon-edge-validator-1
-    command: ["server", "--data-dir", "/data/data-1", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir", "/data/data-1",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -54,7 +72,17 @@ services:
   node-2:
     image: local/polygon-edge
     container_name: polygon-edge-validator-2
-    command: ["server", "--data-dir", "/data/data-2", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir",
+      "/data/data-2",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -73,7 +101,16 @@ services:
   node-3:
     image: local/polygon-edge
     container_name: polygon-edge-validator-3
-    command: ["server", "--data-dir", "/data/data-3", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir", "/data/data-3",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -92,7 +129,16 @@ services:
   node-4:
     image: local/polygon-edge
     container_name: polygon-edge-validator-4
-    command: ["server", "--data-dir", "/data/data-4", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir",  "/data/data-4",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
@@ -112,10 +158,6 @@ networks:
   polygon-edge-docker:
     driver: bridge
     name: polygon-edge-docker
-    ipam:
-      config:
-        - subnet: 10.5.0.0/16
-          gateway: 10.5.0.1
 
 volumes:
   data:

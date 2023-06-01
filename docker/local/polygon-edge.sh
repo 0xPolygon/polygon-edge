@@ -43,12 +43,6 @@ case "$1" in
               secrets=$("$POLYGON_EDGE_BIN" polybft-secrets init --insecure --num 4 --data-dir /data/data- --json)
               echo "Secrets have been successfully generated"
 
-              if [ -z "$ROOTCHAIN_IP" ]
-              then
-                    echo "\$ROOTCHAIN_IP evar must be provided with rootchain's IP address"
-                    exit 1
-              fi
-
               rm -f /data/genesis.json
 
               echo "Generating PolyBFT genesis file..."
@@ -65,7 +59,7 @@ case "$1" in
 
               echo "Deploying stake manager..."
               "$POLYGON_EDGE_BIN" polybft stake-manager-deploy \
-                --jsonrpc http://$ROOTCHAIN_IP:8545 \
+                --jsonrpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
                 --test
 
@@ -74,7 +68,7 @@ case "$1" in
 
               "$POLYGON_EDGE_BIN" rootchain deploy \
                 --stake-manager ${stakeManagerAddr} \
-                --json-rpc http://$ROOTCHAIN_IP:8545 \
+                --json-rpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
                 --test
 
@@ -82,7 +76,7 @@ case "$1" in
               supernetID=$(cat /data/genesis.json | jq -r '.params.engine.polybft.supernetID')
 
               "$POLYGON_EDGE_BIN" rootchain fund \
-                --json-rpc http://$ROOTCHAIN_IP:8545 \
+                --json-rpc http://rootchain:8545 \
                 --stake-token ${stakeToken} \
                 --mint \
                 --addresses "$(echo "$secrets" | jq -r '.[0] | .address'),$(echo "$secrets" | jq -r '.[1] | .address'),$(echo "$secrets" | jq -r '.[2] | .address'),$(echo "$secrets" | jq -r '.[3] | .address')" \
@@ -92,7 +86,7 @@ case "$1" in
                 --addresses "$(echo "$secrets" | jq -r '.[0] | .address'),$(echo "$secrets" | jq -r '.[1] | .address'),$(echo "$secrets" | jq -r '.[2] | .address'),$(echo "$secrets" | jq -r '.[3] | .address')" \
                 --supernet-manager ${customSupernetManagerAddr} \
                 --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
-                --jsonrpc http://$ROOTCHAIN_IP:8545
+                --jsonrpc http://rootchain:8545
 
               counter=1
               while [ $counter -le 4 ]; do
@@ -101,7 +95,7 @@ case "$1" in
                 "$POLYGON_EDGE_BIN" polybft register-validator \
                   --supernet-manager ${customSupernetManagerAddr} \
                   --data-dir /data/data-${counter} \
-                  --jsonrpc http://$ROOTCHAIN_IP:8545
+                  --jsonrpc http://rootchain:8545
 
                 "$POLYGON_EDGE_BIN" polybft stake \
                   --data-dir /data/data-${counter} \
@@ -109,7 +103,7 @@ case "$1" in
                   --supernet-id ${supernetID} \
                   --stake-manager ${stakeManagerAddr} \
                   --stake-token ${stakeToken} \
-                  --jsonrpc http://$ROOTCHAIN_IP:8545
+                  --jsonrpc http://rootchain:8545
 
                 counter=$((counter + 1))
               done
@@ -121,7 +115,7 @@ case "$1" in
                 --finalize-genesis-set \
                 --enable-staking \
                 --genesis /data/genesis.json \
-                --jsonrpc http://$ROOTCHAIN_IP:8545
+                --jsonrpc http://rootchain:8545
               ;;
       esac
       ;;
