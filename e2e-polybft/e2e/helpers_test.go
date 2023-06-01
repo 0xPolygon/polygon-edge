@@ -223,6 +223,18 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 	}
 }
 
+func aclSetEnabledRole(t *testing.T, cluster *framework.TestCluster, precompile, account types.Address, aclAdminKey ethgo.Key) {
+	t.Helper()
+
+	input, err := addresslist.SetEnabledFunc.Encode([]interface{}{account})
+	require.NoError(t, err)
+
+	enableSetTxn := cluster.MethodTxn(t, aclAdminKey, precompile, input)
+	require.NoError(t, enableSetTxn.Wait())
+
+	expectRole(t, cluster, precompile, account, addresslist.EnabledRole)
+}
+
 func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Address, addr types.Address, role addresslist.Role) {
 	t.Helper()
 	out := cluster.Call(t, contract, addresslist.ReadAddressListFunc, addr)

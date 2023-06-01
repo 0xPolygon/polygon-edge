@@ -21,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -80,7 +79,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				strings.Join(amounts[:], ","),
 				"",
 				cluster.Bridge.JSONRPCAddr(),
-			),
+				false),
 		)
 
 		finalBlockNum := 8 * sprintSize
@@ -209,7 +208,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				strings.Join(amounts[:depositsSubset], ","),
 				"",
 				cluster.Bridge.JSONRPCAddr(),
-			),
+				false),
 		)
 
 		// wait for a few more sprints
@@ -237,7 +236,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				strings.Join(amounts[depositsSubset:], ","),
 				"",
 				cluster.Bridge.JSONRPCAddr(),
-			),
+				false),
 		)
 
 		finalBlockNum := midBlockNumber + 5*sprintSize
@@ -324,7 +323,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 			"",
 			strings.Join(tokenIDs[:], ","),
 			cluster.Bridge.JSONRPCAddr(),
-		),
+			false),
 	)
 
 	// wait for a few more sprints
@@ -491,7 +490,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 			strings.Join(amounts[:], ","),
 			strings.Join(tokenIDs[:], ","),
 			cluster.Bridge.JSONRPCAddr(),
-		),
+			false),
 	)
 
 	// wait for a few more sprints
@@ -636,6 +635,9 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	funds := make([]*big.Int, transfersCount)
 	singleToken := ethgo.Ether(1)
 
+	aclAdmin, err := ethgow.GenerateKey()
+	aclAdminAddr := types.Address(aclAdmin.Address())
+
 	for i := uint64(0); i < transfersCount; i++ {
 		key, err := ethgow.GenerateKey()
 		require.NoError(t, err)
@@ -651,12 +653,15 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		t.Logf("Depositor#%d=%s\n", i+1, depositors[i])
 	}
 
+	// TODO: @Stefan-Ethernal Uncomment ACLs when ready
 	// setup cluster
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
 		framework.WithNativeTokenConfig("Mintable Edge Coin:MEC:18:true"),
-		framework.WithPremine(depositors...))
+		// framework.WithBridgeAllowListAdmin(aclAdminAddr),
+		// framework.WithBridgeBlockListAdmin(aclAdminAddr),
+		framework.WithPremine(append(depositors, aclAdminAddr)...))
 	defer cluster.Stop()
 
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
@@ -674,8 +679,29 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("bridge native (ERC-20) tokens", func(t *testing.T) {
-		// deposit native token
+		// TODO: @Stefan-Ethernal Uncomment, ACLs
+		// try sending a single native token deposit transaction
+		// it should not be succesful,
+		// because depositors are not allow listed for bridge transactions
+		// err = cluster.Bridge.Deposit(
+		// 	common.ERC20,
+		// 	contracts.NativeERC20TokenContract,
+		// 	contracts.RootMintableERC20PredicateContract,
+		// 	depositorKeys[0],
+		// 	depositors[0].String(),
+		// 	amounts[0],
+		// 	"",
+		// 	validatorSrv.JSONRPCAddr(),
+		// 	true)
+		// require.Error(t, err)
+
+		// allow list each depositor and make sure deposit is successfully executed
 		for i, key := range depositorKeys {
+			// TODO: @Stefan-Ethernal Uncomment, ACLs
+			// allow list each depositor
+			// aclSetEnabledRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], aclAdmin)
+
+			// make sure deposit is successfully executed
 			err = cluster.Bridge.Deposit(
 				common.ERC20,
 				contracts.NativeERC20TokenContract,
@@ -684,7 +710,8 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 				depositors[i].String(),
 				amounts[i],
 				"",
-				validatorSrv.JSONRPCAddr())
+				validatorSrv.JSONRPCAddr(),
+				true)
 			require.NoError(t, err)
 		}
 
@@ -770,6 +797,12 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 			t.Log("Balance before", balancesBefore[i], "Balance after", balance)
 			require.Equal(t, balance, balancesBefore[i].Add(balancesBefore[i], big.NewInt(amount)))
 		}
+	})
+
+	t.Run("bridge ERC-721 tokens", func(t *testing.T) {
+		erc721DeployTxn := cluster.Deploy(t, aclAdmin, []byte(contractsapi.MockERC721Artifact))
+		require.NoError(t, erc721DeployTxn.Wait())
+		// rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
 	})
 }
 
@@ -994,7 +1027,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 					strings.Join(amounts[:], ","),
 					"",
 					cluster.Bridge.JSONRPCAddr(),
-				),
+					false),
 			)
 		}
 
@@ -1043,7 +1076,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		require.NoError(t, err)
 
 		// send withdraw transaction.
-		// It should fail because sender is not white-listed.
+		// It should fail because sender is not allow-listed.
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(rawKey),
@@ -1056,12 +1089,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			false)
 		require.Error(t, err)
 
-		{
-			input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{senderAccount.Ecdsa.Address()})
-			enableSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListBridgeAddr, input)
-			require.NoError(t, enableSetTxn.Wait())
-			expectRole(t, cluster, contracts.AllowListBridgeAddr, types.Address(senderAccount.Ecdsa.Address()), addresslist.EnabledRole)
-		}
+		// add account to bridge allow list
+		aclSetEnabledRole(t, cluster, contracts.AllowListBridgeAddr, senderAccount.Address(), admin)
 
 		// try to withdraw again
 		err = cluster.Bridge.Withdraw(
@@ -1076,12 +1105,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			false)
 		require.NoError(t, err)
 
-		{
-			input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{senderAccount.Ecdsa.Address()})
-			disableSetTxn := cluster.MethodTxn(t, admin, contracts.BlockListBridgeAddr, input)
-			require.NoError(t, disableSetTxn.Wait())
-			expectRole(t, cluster, contracts.BlockListBridgeAddr, types.Address(senderAccount.Ecdsa.Address()), addresslist.EnabledRole)
-		}
+		// add account to bridge block list
+		aclSetEnabledRole(t, cluster, contracts.BlockListBridgeAddr, senderAccount.Address(), admin)
 
 		// it should fail now because in block list
 		err = cluster.Bridge.Withdraw(

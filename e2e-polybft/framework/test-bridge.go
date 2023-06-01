@@ -105,7 +105,7 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 // Deposit function invokes bridge deposit of ERC tokens (from the root to the child chain)
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
-	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr string) error {
+	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr string, childChainMintable bool) error {
 	args := []string{}
 
 	if receivers == "" {
@@ -135,6 +135,10 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--amounts", amounts,
 			"--json-rpc", jsonRPCAddr)
 
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
+
 		if senderKey != "" {
 			args = append(args, "--sender-key", senderKey)
 		} else {
@@ -154,6 +158,10 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--receivers", receivers,
 			"--token-ids", tokenIDs,
 			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 		if senderKey != "" {
 			args = append(args, "--sender-key", senderKey)
@@ -179,6 +187,10 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--amounts", amounts,
 			"--token-ids", tokenIDs,
 			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 		if senderKey != "" {
 			args = append(args, "--sender-key", senderKey)
