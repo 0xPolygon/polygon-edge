@@ -678,6 +678,9 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
+	childchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
+	require.NoError(t, err)
+
 	t.Run("bridge native (ERC-20) tokens", func(t *testing.T) {
 		// TODO: @Stefan-Ethernal Uncomment, ACLs
 		// try sending a single native token deposit transaction
@@ -790,8 +793,6 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(blockNum+3*sprintSize, 2*time.Minute))
 
 		// check that balances on the child chain are correct
-		childchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
-		require.NoError(t, err)
 		for i, receiver := range depositors {
 			balance := erc20BalanceOf(t, receiver, contracts.NativeERC20TokenContract, childchainTxRelayer)
 			t.Log("Balance before", balancesBefore[i], "Balance after", balance)
@@ -799,11 +800,37 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		}
 	})
 
-	t.Run("bridge ERC-721 tokens", func(t *testing.T) {
-		erc721DeployTxn := cluster.Deploy(t, aclAdmin, []byte(contractsapi.MockERC721Artifact))
-		require.NoError(t, erc721DeployTxn.Wait())
-		// rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
-	})
+	// t.Run("bridge ERC-721 tokens", func(t *testing.T) {
+	// 	rootchainInitialBlock, err := rootchainTxRelayer.Client().Eth().BlockNumber()
+	// 	require.NoError(t, err)
+
+	// 	exitEventsCounterFn := contractsapi.CheckpointManager.Abi.Methods["counter"]
+	// 	input, err := exitEventsCounterFn.Encode([]interface{}{})
+	// 	require.NoError(t, err)
+	// 	initialExitEventIDRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
+	// 	require.NoError(t, err)
+	// 	initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
+	// 	require.NoError(t, err)
+
+	// 	erc721DeployTxn := cluster.Deploy(t, aclAdmin, []byte(contractsapi.MockERC721Artifact))
+	// 	require.NoError(t, erc721DeployTxn.Wait())
+	// 	rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
+
+	// 	for i, depositorKey := range depositorKeys {
+	// 		err = cluster.Bridge.Deposit(
+	// 			common.ERC721,
+	// 			types.Address(rootERC721Token),
+	// 			contracts.RootMintableERC721PredicateContract,
+	// 			depositorKey,
+	// 			depositors[i].String(),
+	// 			"",
+	// 			fmt.Sprintf("%d", i+1),
+	// 			validatorSrv.JSONRPCAddr(),
+	// 			true)
+	// 		require.NoError(t, err)
+	// 	}
+
+	// })
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
