@@ -140,16 +140,12 @@ function startServerFromBinary() {
 }
 
 function startServerFromDockerCompose() {
-  case "$1" in
-  "ibft")
-    docker-compose -f ./docker/local/docker-compose.yml up -d --build
-    ;;
-  "polybft")
-    cd core-contracts && npm install && npm run compile && cd -
-    go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
-    EDGE_CONSENSUS=polybft docker-compose -f ./docker/local/docker-compose.yml up -d --build
-    ;;
-  esac
+  if [ "$1" != "polybft" ]
+  then
+    export EDGE_CONSENSUS="$1"
+  fi
+
+  docker-compose -f ./docker/local/docker-compose.yml up -d --build
 }
 
 function destroyDockerEnvironment() {
