@@ -38,6 +38,7 @@ func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error
 	}
 
 	fm := GetInstance()
+	fm.Clear()
 
 	// register initial fork
 	fm.RegisterFork(InitialFork)

@@ -35,13 +35,19 @@ func GetInstance() *forkManager {
 	defer forkManagerInstanceLock.Unlock()
 
 	if forkManagerInstance == nil {
-		forkManagerInstance = &forkManager{
-			forkMap:     map[string]*Fork{},
-			handlersMap: map[HandlerDesc][]Handler{},
-		}
+		forkManagerInstance = &forkManager{}
+		forkManagerInstance.Clear()
 	}
 
 	return forkManagerInstance
+}
+
+func (fm *forkManager) Clear() {
+	fm.lock.Lock()
+	defer fm.lock.Unlock()
+
+	fm.forkMap = map[string]*Fork{}
+	fm.handlersMap = map[HandlerDesc][]Handler{}
 }
 
 // RegisterFork registers fork by its name
