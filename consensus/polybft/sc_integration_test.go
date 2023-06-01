@@ -61,7 +61,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		return result.ReturnValue
 	}
 
-	// deploy MockERC20 as root chain ERC 20 token
+	// deploy MockERC20 as root chain ERC-20 token
 	rootERC20Addr := deployAndInitContract(t, transition, contractsapi.RootERC20, deployerAddress, nil)
 
 	// deploy CheckpointManager

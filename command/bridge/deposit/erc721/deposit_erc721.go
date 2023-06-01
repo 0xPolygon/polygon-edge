@@ -35,19 +35,7 @@ func GetCommand() *cobra.Command {
 		Run:     runCommand,
 	}
 
-	depositCmd.Flags().StringVar(
-		&dp.SenderKey,
-		common.SenderKeyFlag,
-		"",
-		"hex encoded private key of the account which sends deposit transactions",
-	)
-
-	depositCmd.Flags().StringSliceVar(
-		&dp.Receivers,
-		common.ReceiversFlag,
-		nil,
-		"receiving accounts addresses",
-	)
+	dp.RegisterCommonFlags(depositCmd)
 
 	depositCmd.Flags().StringSliceVar(
 		&dp.TokenIDs,
@@ -60,21 +48,14 @@ func GetCommand() *cobra.Command {
 		&dp.TokenAddr,
 		common.RootTokenFlag,
 		"",
-		"root ERC 721 token address",
+		"root ERC-721 token address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.PredicateAddr,
 		common.RootPredicateFlag,
 		"",
-		"root ERC 721 token predicate address",
-	)
-
-	depositCmd.Flags().StringVar(
-		&dp.JSONRPCAddr,
-		common.JSONRPCFlag,
-		txrelayer.DefaultRPCAddress,
-		"the JSON RPC endpoint",
+		"root ERC-721 token predicate address",
 	)
 
 	depositCmd.Flags().BoolVar(
@@ -83,13 +64,6 @@ func GetCommand() *cobra.Command {
 		false,
 		"test indicates whether depositor is hardcoded test account "+
 			"(in that case tokens are minted to it, so it is able to make deposits)",
-	)
-
-	depositCmd.Flags().BoolVar(
-		&dp.ChildChainMintable,
-		common.ChildChainMintableFlag,
-		false,
-		"flag indicating whether tokens originate from child chain",
 	)
 
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -311,7 +285,7 @@ func (r *depositResult) GetOutput() string {
 		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
 	}
 
-	buffer.WriteString("\n[DEPOSIT ERC 721]\n")
+	buffer.WriteString("\n[DEPOSIT ERC-721]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 

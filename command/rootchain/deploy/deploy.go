@@ -279,14 +279,14 @@ func GetCommand() *cobra.Command {
 		&params.rootERC721TokenAddr,
 		erc721AddrFlag,
 		"",
-		"existing root chain ERC 721 token address",
+		"existing root chain ERC-721 token address",
 	)
 
 	cmd.Flags().StringVar(
 		&params.rootERC1155TokenAddr,
 		erc1155AddrFlag,
 		"",
-		"existing root chain ERC 1155 token address",
+		"existing root chain ERC-1155 token address",
 	)
 
 	cmd.Flags().BoolVar(

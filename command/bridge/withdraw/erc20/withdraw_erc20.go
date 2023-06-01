@@ -29,24 +29,12 @@ var (
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc20",
-		Short:   "Withdraws ERC 20 tokens from the destination to the origin chain",
+		Short:   "Withdraws ERC-20 tokens from the destination to the origin chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
-	withdrawCmd.Flags().StringVar(
-		&wp.SenderKey,
-		common.SenderKeyFlag,
-		"",
-		"withdraw transaction sender hex-encoded private key",
-	)
-
-	withdrawCmd.Flags().StringSliceVar(
-		&wp.Receivers,
-		common.ReceiversFlag,
-		nil,
-		"receiving accounts addresses",
-	)
+	wp.RegisterCommonFlags(withdrawCmd)
 
 	withdrawCmd.Flags().StringSliceVar(
 		&wp.Amounts,
@@ -59,28 +47,14 @@ func GetCommand() *cobra.Command {
 		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC20PredicateContract.String(),
-		"child ERC 20 predicate address",
+		"child ERC-20 predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.NativeERC20TokenContract.String(),
-		"child ERC 20 token address",
-	)
-
-	withdrawCmd.Flags().StringVar(
-		&wp.JSONRPCAddr,
-		common.JSONRPCFlag,
-		"http://127.0.0.1:9545",
-		"the JSON RPC endpoint",
-	)
-
-	withdrawCmd.Flags().BoolVar(
-		&wp.ChildChainMintable,
-		common.ChildChainMintableFlag,
-		false,
-		"flag indicating whether tokens originate from child chain",
+		"child ERC-20 token address",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -221,7 +195,7 @@ func (r *withdrawResult) GetOutput() string {
 
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))
 
-	buffer.WriteString("\n[WITHDRAW ERC 20]\n")
+	buffer.WriteString("\n[WITHDRAW ERC-20]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 

@@ -29,24 +29,12 @@ var (
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc1155",
-		Short:   "Withdraws ERC 1155 tokens from the child chain to the root chain",
+		Short:   "Withdraws ERC-1155 tokens from the destination to the origin chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
-	withdrawCmd.Flags().StringVar(
-		&wp.SenderKey,
-		common.SenderKeyFlag,
-		"",
-		"withdraw transaction sender hex-encoded private key",
-	)
-
-	withdrawCmd.Flags().StringSliceVar(
-		&wp.Receivers,
-		common.ReceiversFlag,
-		nil,
-		"receiving accounts addresses on the root chain",
-	)
+	wp.RegisterCommonFlags(withdrawCmd)
 
 	withdrawCmd.Flags().StringSliceVar(
 		&wp.Amounts,
@@ -66,28 +54,14 @@ func GetCommand() *cobra.Command {
 		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC1155PredicateContract.String(),
-		"ERC 1155 child chain predicate address",
+		"ERC-1155 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.ChildERC1155Contract.String(),
-		"ERC 1155 child chain token address",
-	)
-
-	withdrawCmd.Flags().StringVar(
-		&wp.JSONRPCAddr,
-		common.JSONRPCFlag,
-		"http://127.0.0.1:9545",
-		"the JSON RPC child chain endpoint",
-	)
-
-	withdrawCmd.Flags().BoolVar(
-		&wp.ChildChainMintable,
-		common.ChildChainMintableFlag,
-		false,
-		"flag indicating whether tokens originate from child chain",
+		"ERC-1155 child chain token address",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)

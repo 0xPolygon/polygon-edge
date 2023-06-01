@@ -4,8 +4,11 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
 )
 
 type TokenType int
@@ -41,6 +44,37 @@ type BridgeParams struct {
 	PredicateAddr      string
 	JSONRPCAddr        string
 	ChildChainMintable bool
+}
+
+// RegisterCommonFlags registers common bridge flags to a given command
+func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&p.SenderKey,
+		SenderKeyFlag,
+		"",
+		"hex encoded private key of the account which sends bridge transactions",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&p.Receivers,
+		ReceiversFlag,
+		nil,
+		"receiving accounts addresses",
+	)
+
+	cmd.Flags().StringVar(
+		&p.JSONRPCAddr,
+		JSONRPCFlag,
+		txrelayer.DefaultRPCAddress,
+		"the JSON RPC endpoint",
+	)
+
+	cmd.Flags().BoolVar(
+		&p.ChildChainMintable,
+		ChildChainMintableFlag,
+		false,
+		"flag indicating whether tokens originate from child chain",
+	)
 }
 
 type ERC20BridgeParams struct {
