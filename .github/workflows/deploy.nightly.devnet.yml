@@ -143,6 +143,7 @@ jobs:
               polygon-edge rootchain deploy \
                           --deployer-key $(cat rootchain-wallet.json | jq -r '.HexPrivateKey') \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
+                          --stake-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr') \
                           --json-rpc {{ rootchain_json_rpc }}
 
           {% for item in hostvars %}

@@ -32,6 +32,8 @@ This command deploys and initializes rootchain contracts. Transactions are being
 $ polygon-edge rootchain deploy \
     --genesis <chain_config_file> \
     --deployer-key <hex_encoded_rootchain_deployer_private_key> \
+    --stake-manager <stake_manager_address> \
+    --stake-token <stake_token_address> \
     --json-rpc <json_rpc_endpoint> 
 ```
 
