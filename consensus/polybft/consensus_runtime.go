@@ -766,61 +766,19 @@ func (c *consensusRuntime) ID() []byte {
 	return c.config.Key.Address().Bytes()
 }
 
-// HasQuorum returns true if quorum is reached for the given blockNumber
-func (c *consensusRuntime) HasQuorum(
-	height uint64,
-	messages []*proto.Message,
-	msgType proto.MessageType) bool {
+// GetVotingPowers returns map of validators addresses and their voting powers for the specified height.
+func (c *consensusRuntime) GetVotingPowers(height uint64) (map[string]*big.Int, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	// extract the addresses of all the signers of the messages
-	ppIncluded := false
-	signers := make(map[types.Address]struct{}, len(messages))
 
-	for _, message := range messages {
-		if message.Type == proto.MessageType_PREPREPARE {
-			ppIncluded = true
-		}
-
-		signers[types.BytesToAddress(message.From)] = struct{}{}
+	if c.fsm == nil {
+		return nil, errors.New("getting voting power failed - backend is not initialized")
+	} else if c.fsm.Height() != height {
+		return nil, fmt.Errorf("getting voting power failed - backend is not initialized for height %d, fsm height %d",
+			height, c.fsm.Height())
 	}
 
-	// check quorum
-	switch msgType {
-	case proto.MessageType_PREPREPARE:
-		return len(messages) >= 1
-	case proto.MessageType_PREPARE:
-		if ppIncluded {
-			return c.fsm.validators.HasQuorum(signers)
-		}
-
-		if len(messages) == 0 {
-			return false
-		}
-
-		propAddress, err := c.fsm.proposerSnapshot.GetLatestProposer(messages[0].View.Round, height)
-		if err != nil {
-			// This can happen if e.g. node runs sequence on lower height and proposer calculator updated
-			// to a newer count as a consequence of inserting block from syncer
-			c.logger.Debug("HasQuorum has been called but proposer could not be retrieved", "error", err)
-
-			return false
-		}
-
-		if _, ok := signers[propAddress]; ok {
-			c.logger.Warn("HasQuorum failed - proposer is among signers but it is not expected to be")
-
-			return false
-		}
-
-		signers[propAddress] = struct{}{} // add proposer manually
-
-		return c.fsm.validators.HasQuorum(signers)
-	case proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT:
-		return c.fsm.validators.HasQuorum(signers)
-	default:
-		return false
-	}
+	return c.fsm.validators.GetVotingPowers(), nil
 }
 
 // BuildPrePrepareMessage builds a PREPREPARE message based on the passed in proposal
