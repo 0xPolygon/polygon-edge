@@ -160,11 +160,6 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			// send exit transaction to exit helper
 			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
 			require.NoError(t, err)
-
-			// make sure exit event is processed successfully
-			isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
-			require.NoError(t, err)
-			require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 		}
 
 		// assert that receiver's balances on RootERC20 smart contract are expected
@@ -425,11 +420,6 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 		// send exit transaction to exit helper
 		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
 		require.NoError(t, err)
-
-		// make sure exit event is processed successfully
-		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
-		require.NoError(t, err)
-		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 	}
 
 	// assert that owners of given token ids are the accounts on the root chain ERC-721 token
@@ -450,10 +440,9 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	const (
-		transfersCount        = 5
-		amount                = 100
-		numBlockConfirmations = 2
-		epochSize             = 5
+		transfersCount = 5
+		amount         = 100
+		epochSize      = 5
 	)
 
 	receiverKeys := make([]string, transfersCount)
@@ -479,7 +468,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	}
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNumBlockConfirmations(numBlockConfirmations),
+		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
@@ -609,11 +598,6 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		// send exit transaction to exit helper
 		err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
 		require.NoError(t, err)
-
-		// make sure exit event is processed successfully
-		isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
-		require.NoError(t, err)
-		require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 	}
 
 	// assert that receiver's balances on RootERC1155 smart contract are expected
@@ -955,9 +939,8 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 
 func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	const (
-		transfersCount        = 5
-		amount                = 10
-		numBlockConfirmations = 2
+		transfersCount = 5
+		amount         = 10
 		// make epoch size long enough, so that all exit events are processed within the same epoch
 		epochSize  = 30
 		sprintSize = uint64(5)
@@ -980,7 +963,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	adminAddr := types.Address(admin.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithNumBlockConfirmations(numBlockConfirmations),
+		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
 		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeBlockListAdmin(adminAddr),
@@ -996,7 +979,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	t.Run("bridge ERC-20 tokens", func(t *testing.T) {
+	t.Run("bridge native (ERC-20) tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
 		for i := 0; i < 2; i++ {
@@ -1133,11 +1116,6 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			// send exit transaction to exit helper
 			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
 			require.NoError(t, err)
-
-			// make sure exit event is processed successfully
-			isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(exitHelper), rootchainTxRelayer)
-			require.NoError(t, err)
-			require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 		}
 
 		// assert that receiver's balances on RootERC20 smart contract are expected

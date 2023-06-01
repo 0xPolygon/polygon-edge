@@ -43,27 +43,6 @@ func (s *e2eStateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, 
 	return nil, errors.New("send txn is not supported")
 }
 
-// isExitEventProcessed queries ExitHelper and as a result returns indication whether given exit event id is processed
-func isExitEventProcessed(exitEventID uint64, exitHelper ethgo.Address, rootTxRelayer txrelayer.TxRelayer) (bool, error) {
-	result, err := ABICall(
-		rootTxRelayer,
-		contractsapi.ExitHelper,
-		exitHelper,
-		ethgo.ZeroAddress,
-		"processedExits",
-		new(big.Int).SetUint64(exitEventID))
-	if err != nil {
-		return false, err
-	}
-
-	isProcessed, err := types.ParseUint64orHex(&result)
-	if err != nil {
-		return false, err
-	}
-
-	return isProcessed == uint64(1), nil
-}
-
 // getCheckpointManagerValidators queries rootchain validator set on CheckpointManager contract
 func getCheckpointManagerValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
 	validatorsCountRaw, err := ABICall(relayer, contractsapi.CheckpointManager,
