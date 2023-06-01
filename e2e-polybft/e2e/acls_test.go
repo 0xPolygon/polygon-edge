@@ -299,6 +299,7 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 
 		noneSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, noneSetTxn.Wait())
+		require.True(t, noneSetTxn.Failed())
 		expectRole(t, cluster, contracts.AllowListTransactionsAddr, adminAddr, addresslist.AdminRole)
 	}
 }
