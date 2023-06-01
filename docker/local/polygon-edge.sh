@@ -74,16 +74,17 @@ case "$1" in
 
               customSupernetManagerAddr=$(cat /data/genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')
               supernetID=$(cat /data/genesis.json | jq -r '.params.engine.polybft.supernetID')
+              addresses="$(echo "$secrets" | jq -r '.[0] | .address'),$(echo "$secrets" | jq -r '.[1] | .address'),$(echo "$secrets" | jq -r '.[2] | .address'),$(echo "$secrets" | jq -r '.[3] | .address')"
 
               "$POLYGON_EDGE_BIN" rootchain fund \
                 --json-rpc http://rootchain:8545 \
                 --stake-token ${stakeToken} \
                 --mint \
-                --addresses "$(echo "$secrets" | jq -r '.[0] | .address'),$(echo "$secrets" | jq -r '.[1] | .address'),$(echo "$secrets" | jq -r '.[2] | .address'),$(echo "$secrets" | jq -r '.[3] | .address')" \
+                --addresses ${addresses} \
                 --amounts 1000000000000000000000000,1000000000000000000000000,1000000000000000000000000,1000000000000000000000000
 
               "$POLYGON_EDGE_BIN" polybft whitelist-validators \
-                --addresses "$(echo "$secrets" | jq -r '.[0] | .address'),$(echo "$secrets" | jq -r '.[1] | .address'),$(echo "$secrets" | jq -r '.[2] | .address'),$(echo "$secrets" | jq -r '.[3] | .address')" \
+                --addresses ${addresses} \
                 --supernet-manager ${customSupernetManagerAddr} \
                 --private-key aa75e9a7d427efc732f8e4f1a5b7646adcc61fd5bae40f80d13c8419c9f43d6d \
                 --jsonrpc http://rootchain:8545
