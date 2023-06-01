@@ -370,7 +370,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	require.NoError(t, waitForRootchainEpoch(currentEpoch, time.Minute,
 		rootChainRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
-	exitEventID := uint64(2)
+	exitEventID := uint64(1)
 
 	// send exit transaction to exit helper
 	err = cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, exitEventID, srv.JSONRPCAddr())
@@ -379,7 +379,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	// make sure exit event is processed successfully
 	isProcessed, err := isExitEventProcessed(exitEventID, ethgo.Address(polybftCfg.Bridge.ExitHelperAddr), rootChainRelayer)
 	require.NoError(t, err)
-	require.True(t, isProcessed, "exit event with was not processed")
+	require.True(t, isProcessed, fmt.Sprintf("exit event with ID %d was not processed", exitEventID))
 
 	// check that validator is no longer active (out of validator set)
 	validatorInfo, err = sidechain.GetValidatorInfo(validatorAddr,
