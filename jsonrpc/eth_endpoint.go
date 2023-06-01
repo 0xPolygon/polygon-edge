@@ -327,8 +327,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 
 		// accumulate receipt logs indexes from block transactions
 		// that are before the desired transaction
-		receipt := receipts[i]
-		logIndex += len(receipt.Logs)
+		logIndex += len(receipts[i].Logs)
 	}
 
 	if txIndex == -1 {
