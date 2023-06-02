@@ -449,7 +449,7 @@ func newDummyStakeTxRelayer(t *testing.T, callback func() *validator.ValidatorMe
 	}
 }
 
-func (d dummyStakeTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
+func (d *dummyStakeTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	args := d.Called(from, to, input)
 
 	if d.callback != nil {
