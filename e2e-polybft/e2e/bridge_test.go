@@ -674,7 +674,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 				amounts[i],
 				"",
 				validatorSrv.JSONRPCAddr(),
-				adminHexKey,
+				"",
 				true)
 			require.NoError(t, err)
 		}
@@ -763,7 +763,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
 		require.NoError(t, err)
 
-		erc721DeployTxn := cluster.Deploy(t, admin, []byte(contractsapi.MockERC721Artifact))
+		erc721DeployTxn := cluster.Deploy(t, admin, contractsapi.RootERC721.Bytecode)
 		require.NoError(t, erc721DeployTxn.Wait())
 		rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
 

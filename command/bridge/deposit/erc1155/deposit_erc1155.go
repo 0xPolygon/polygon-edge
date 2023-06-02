@@ -81,8 +81,6 @@ func GetCommand() *cobra.Command {
 	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootPredicateFlag)
 
-	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
-
 	return depositCmd
 }
 
