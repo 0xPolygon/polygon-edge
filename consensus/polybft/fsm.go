@@ -111,8 +111,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	//nolint:godox
-	// TODO: we will need to revisit once slashing is implemented (to be fixed in EVM-519)
 	extra := &Extra{Parent: extraParent.Committed}
 	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
 	nextValidators := f.validators.Accounts()

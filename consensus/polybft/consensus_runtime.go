@@ -287,8 +287,8 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	var (
 		epoch = c.epoch
 		err   error
-		//nolint:godox
-		// TODO - this will need to take inconsideration if slashing occurred (to be fixed in EVM-519)
+		// calculation of epoch and sprint end does not consider slashing currently
+
 		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
@@ -352,13 +352,10 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("cannot create block builder for fsm: %w", err)
 	}
 
-	//nolint:godox
-	// TODO - recognize slashing occurred (to be fixed in EVM-519)
-	slash := false
-
 	pendingBlockNumber := parent.Number + 1
-	isEndOfSprint := slash || c.isFixedSizeOfSprintMet(pendingBlockNumber, epoch)
-	isEndOfEpoch := slash || c.isFixedSizeOfEpochMet(pendingBlockNumber, epoch)
+	// calculation of epoch and sprint end does not consider slashing currently
+	isEndOfSprint := c.isFixedSizeOfSprintMet(pendingBlockNumber, epoch)
+	isEndOfEpoch := c.isFixedSizeOfEpochMet(pendingBlockNumber, epoch)
 
 	valSet := validator.NewValidatorSet(epoch.Validators, c.logger)
 
