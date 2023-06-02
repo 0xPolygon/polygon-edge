@@ -165,7 +165,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	genesisBlock, err := owner.JSONRPC().Eth().GetBlockByNumber(0, false)
 	require.NoError(t, err)
 
-	_, err = polybft.GetIbftExtra(genesisBlock.ExtraData)
+	_, err = polybft.GetIbftExtra(genesisBlock.ExtraData, genesisBlock.Number)
 	require.NoError(t, err)
 
 	// owner whitelists both new validators
@@ -359,7 +359,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	currentBlock, err := srv.JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)

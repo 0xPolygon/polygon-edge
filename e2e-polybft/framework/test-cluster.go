@@ -18,9 +18,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -58,6 +60,11 @@ var (
 
 func init() {
 	startTime = time.Now().UTC().UnixMilli()
+
+	// register forks
+	if err := forkmanager.ForkManagerInit(polybft.ForkManagerFactory, chain.AllForksEnabled); err != nil {
+		panic(err) //nolint:gocritic
+	}
 }
 
 func resolveBinary() string {

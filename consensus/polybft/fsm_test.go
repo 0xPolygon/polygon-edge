@@ -341,11 +341,11 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	}
 
 	proposal, err := fsm.BuildProposal(0)
-	assert.NoError(t, err)
-	assert.NotNil(t, proposal)
+	require.NoError(t, err)
+	require.NotNil(t, proposal)
 
-	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
-	assert.NoError(t, err)
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData, parentBlockNumber+1)
+	require.NoError(t, err)
 	assert.Len(t, blockExtra.Validators.Added, 2)
 	assert.False(t, blockExtra.Validators.IsEmpty())
 
@@ -391,11 +391,11 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 		exitEventRootHash: types.ZeroHash, logger: hclog.NewNullLogger()}
 
 	proposal, err := fsm.BuildProposal(0)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
-	assert.NoError(t, err)
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData, stateBlock.Block.Number())
+	require.NoError(t, err)
 	assert.True(t, blockExtra.Validators.IsEmpty())
 
 	blockBuilderMock.AssertExpectations(t)

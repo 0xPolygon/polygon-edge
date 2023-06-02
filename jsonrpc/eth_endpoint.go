@@ -70,7 +70,7 @@ type ethBlockchainStore interface {
 
 type ethFilter interface {
 	// FilterExtra filters extra data from header extra that is not included in block hash
-	FilterExtra(extra []byte) ([]byte, error)
+	FilterExtra(*types.Header) ([]byte, error)
 }
 
 // ethStore provides access to the methods needed by eth endpoint
@@ -154,7 +154,7 @@ func (e *Eth) filterExtra(block *types.Block) error {
 	// and not a copy, so changing it, actually changes it in storage as well
 	headerCopy := block.Header.Copy()
 
-	filteredExtra, err := e.store.FilterExtra(headerCopy.ExtraData)
+	filteredExtra, err := e.store.FilterExtra(headerCopy)
 	if err != nil {
 		return err
 	}

@@ -325,7 +325,7 @@ func (t *TestServer) HasValidatorSealed(firstBlock, lastBlock uint64, validators
 			return false, err
 		}
 
-		extra, err := polybft.GetIbftExtra(block.ExtraData)
+		extra, err := polybft.GetIbftExtra(block.ExtraData, block.Number)
 		if err != nil {
 			return false, err
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -362,8 +363,18 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 }
 
 func ForkManagerFactory(forks *chain.Forks) error {
-	// place fork manager handler registration here
-	return nil
+	fm := forkmanager.GetInstance()
+
+	// Register handlers here
+	if err := fm.RegisterHandler(forkmanager.InitialFork, extraHandler, &ExtraHandlerBase{}); err != nil {
+		return err
+	}
+
+	if err := fm.RegisterHandler(chain.MyFirstFork, extraHandler, &ExtraHandlerMyFirstFork{}); err != nil {
+		return err
+	}
+
+	return fm.RegisterHandler(chain.MySecondFork, extraHandler, &ExtraHandlerMySecondFork{})
 }
 
 // Initialize initializes the consensus (e.g. setup data)
@@ -641,9 +652,13 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 	}
 
 	// decode the extra data
-	extra, err := GetIbftExtra(header.ExtraData)
+	extra, err := GetIbftExtra(header.ExtraData, header.Number)
 	if err != nil {
 		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", header.Number, err)
+	}
+
+	if err := extra.ValidateAdditional(header); err != nil {
+		return err
 	}
 
 	// validate extra data
@@ -680,6 +695,6 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 
 // GetBridgeProvider is an implementation of Consensus interface
 // Filters extra data to not contain Committed field
-func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
-	return GetIbftExtraClean(extra)
+func (p *Polybft) FilterExtra(header *types.Header) ([]byte, error) {
+	return GetIbftExtraClean(header.ExtraData, header.Number)
 }
