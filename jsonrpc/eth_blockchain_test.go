@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -361,6 +362,33 @@ func TestEth_Call(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 	})
+
+	t.Run("returns error and result as data of a reverted transaction execution", func(t *testing.T) {
+		t.Parallel()
+
+		returnValue := []byte("Reverted()")
+
+		store := newMockBlockStore()
+		store.add(newTestBlock(100, hash1))
+		store.ethCallError = runtime.ErrExecutionReverted
+		store.returnValue = returnValue
+		eth := newTestEthEndpoint(store)
+		contractCall := &txnArgs{
+			From:     &addr0,
+			To:       &addr1,
+			Gas:      argUintPtr(100000),
+			GasPrice: argBytesPtr([]byte{0x64}),
+			Value:    argBytesPtr([]byte{0x64}),
+			Data:     nil,
+			Nonce:    argUintPtr(0),
+		}
+
+		res, err := eth.Call(contractCall, BlockNumberOrHash{}, nil)
+		assert.Error(t, err)
+		assert.NotNil(t, res)
+		bres := res.([]byte) //nolint:forcetypeassert
+		assert.Equal(t, []byte(hex.EncodeToString(returnValue)), bres)
+	})
 }
 
 type testStore interface {
@@ -376,6 +404,7 @@ type mockBlockStore struct {
 	isSyncing       bool
 	averageGasPrice int64
 	ethCallError    error
+	returnValue     []byte
 }
 
 func newMockBlockStore() *mockBlockStore {
@@ -546,7 +575,10 @@ func (m *mockBlockStore) GetAvgGasPrice() *big.Int {
 }
 
 func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction, overrides types.StateOverride) (*runtime.ExecutionResult, error) {
-	return &runtime.ExecutionResult{Err: m.ethCallError}, nil
+	return &runtime.ExecutionResult{
+		Err:         m.ethCallError,
+		ReturnValue: m.returnValue,
+	}, nil
 }
 
 func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {

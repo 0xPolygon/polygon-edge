@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -475,7 +476,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 
 	// Check if an EVM revert happened
 	if result.Reverted() {
-		return nil, constructErrorFromRevert(result)
+		return []byte(hex.EncodeToString(result.ReturnValue)), constructErrorFromRevert(result)
 	}
 
 	if result.Failed() {
