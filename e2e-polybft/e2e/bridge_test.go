@@ -67,7 +67,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	t.Run("bridge ERC-20 tokens", func(t *testing.T) {
+	t.Run("bridge ERC 20 tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
 		require.NoError(
@@ -388,7 +388,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// assert that owners of given token ids are the accounts on the root chain ERC-721 token
+	// assert that owners of given token ids are the accounts on the root chain ERC 721 token
 	for i, receiver := range receiversAddrs {
 		owner := erc721OwnerOf(t, big.NewInt(int64(i)), polybftCfg.Bridge.RootERC721Addr, rootchainTxRelayer)
 		require.Equal(t, receiver, owner)
@@ -741,7 +741,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		}
 	})
 
-	t.Run("bridge ERC-721 tokens", func(t *testing.T) {
+	t.Run("bridge ERC 721 tokens", func(t *testing.T) {
 		rootchainInitialBlock, err := rootchainTxRelayer.Client().Eth().BlockNumber()
 		require.NoError(t, err)
 
@@ -1083,7 +1083,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	t.Run("bridge native (ERC-20) tokens", func(t *testing.T) {
+	t.Run("bridge native (ERC 20) tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
 		for i := 0; i < 2; i++ {

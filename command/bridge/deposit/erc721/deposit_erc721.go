@@ -48,14 +48,14 @@ func GetCommand() *cobra.Command {
 		&dp.TokenAddr,
 		common.RootTokenFlag,
 		"",
-		"root ERC-721 token address",
+		"root ERC 721 token address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.PredicateAddr,
 		common.RootPredicateFlag,
 		"",
-		"root ERC-721 token predicate address",
+		"root ERC 721 token predicate address",
 	)
 
 	depositCmd.Flags().StringVar(
@@ -285,11 +285,11 @@ func (r *depositResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	if dp.ChildChainMintable {
+	if r.ExitEventID != "" {
 		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
 	}
 
-	buffer.WriteString("\n[DEPOSIT ERC-721]\n")
+	buffer.WriteString("\n[DEPOSIT ERC 721]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 

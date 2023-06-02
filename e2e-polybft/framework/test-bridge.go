@@ -124,7 +124,7 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		}
 
 		if tokenIDs != "" {
-			return errors.New("not expected to provide token ids for ERC-20 deposits")
+			return errors.New("not expected to provide token ids for ERC 20 deposits")
 		}
 
 		args = append(args,
@@ -217,7 +217,7 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		}
 
 		if tokenIDs != "" {
-			return errors.New("not expected to provide token ids for ERC-20 withdrawals")
+			return errors.New("not expected to provide token ids for ERC 20 withdrawals")
 		}
 
 		args = append(args,

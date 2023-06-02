@@ -29,7 +29,7 @@ var (
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc1155",
-		Short:   "Withdraws ERC-1155 tokens from the destination to the origin chain",
+		Short:   "Withdraws ERC 1155 tokens from the destination to the origin chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
@@ -54,14 +54,14 @@ func GetCommand() *cobra.Command {
 		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC1155PredicateContract.String(),
-		"ERC-1155 child chain predicate address",
+		"ERC 1155 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.ChildERC1155Contract.String(),
-		"ERC-1155 child chain token address",
+		"ERC 1155 child chain token address",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -212,7 +212,7 @@ func (r *withdrawResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	if !wp.ChildChainMintable {
+	if r.ExitEventID != "" {
 		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
 	}
 

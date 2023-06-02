@@ -279,7 +279,7 @@ func getFilteredLogs(eventSig ethgo.Hash, startBlock, endBlock uint64,
 	return ethEndpoint.GetLogs(filter)
 }
 
-// erc20BalanceOf returns balance of given account on ERC-20 token
+// erc20BalanceOf returns balance of given account on ERC 20 token
 func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address, relayer txrelayer.TxRelayer) *big.Int {
 	t.Helper()
 
@@ -295,7 +295,7 @@ func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address
 	return balance
 }
 
-// erc721OwnerOf returns owner of given ERC-721 token
+// erc721OwnerOf returns owner of given ERC 721 token
 func erc721OwnerOf(t *testing.T, tokenID *big.Int, tokenAddr types.Address, relayer txrelayer.TxRelayer) types.Address {
 	t.Helper()
 

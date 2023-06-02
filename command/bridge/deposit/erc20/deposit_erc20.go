@@ -34,7 +34,7 @@ var (
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc20",
-		Short:   "Deposits ERC-20 tokens from the origin to the destination chain",
+		Short:   "Deposits ERC 20 tokens from the origin to the destination chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
@@ -52,14 +52,14 @@ func GetCommand() *cobra.Command {
 		&dp.TokenAddr,
 		common.RootTokenFlag,
 		"",
-		"root ERC-20 token address",
+		"root ERC 20 token address",
 	)
 
 	depositCmd.Flags().StringVar(
 		&dp.PredicateAddr,
 		common.RootPredicateFlag,
 		"",
-		"root ERC-20 token predicate address",
+		"root ERC 20 token predicate address",
 	)
 
 	depositCmd.Flags().StringVar(
@@ -263,11 +263,11 @@ func (r *depositResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 
-	if dp.ChildChainMintable {
+	if len(r.ExitEventIDs) > 0 {
 		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
 	}
 
-	buffer.WriteString("\n[DEPOSIT ERC-20]\n")
+	buffer.WriteString("\n[DEPOSIT ERC 20]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 

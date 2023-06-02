@@ -1,6 +1,6 @@
 ## Deposit
 
-Bridge ERC-20 tokens from rootchain to childchain via deposit.
+Bridge ERC 20 tokens from rootchain to childchain via deposit.
 
 ```mermaid
 sequenceDiagram
@@ -24,7 +24,7 @@ sequenceDiagram
 
 ## Withdraw
 
-Bridge ERC-20 tokens from childchain to rootchain via withdrawal.
+Bridge ERC 20 tokens from childchain to rootchain via withdrawal.
 
 ```mermaid
 sequenceDiagram
@@ -42,7 +42,7 @@ sequenceDiagram
 ```
 ## Exit
 
-Finalize withdrawal of ERC-20 tokens from childchain to rootchain.
+Finalize withdrawal of ERC 20 tokens from childchain to rootchain.
 
 ```mermaid
 sequenceDiagram

@@ -27,7 +27,7 @@ var (
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc721",
-		Short:   "Withdraws ERC-721 tokens from the destination to the origin chain",
+		Short:   "Withdraws ERC 721 tokens from the destination to the origin chain",
 		PreRunE: preRun,
 		Run:     run,
 	}
@@ -45,14 +45,14 @@ func GetCommand() *cobra.Command {
 		&wp.PredicateAddr,
 		common.ChildPredicateFlag,
 		contracts.ChildERC721PredicateContract.String(),
-		"ERC-721 child chain predicate address",
+		"ERC 721 child chain predicate address",
 	)
 
 	withdrawCmd.Flags().StringVar(
 		&wp.TokenAddr,
 		common.ChildTokenFlag,
 		contracts.ChildERC721Contract.String(),
-		"ERC-721 child chain token address",
+		"ERC 721 child chain token address",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.SenderKeyFlag)
@@ -189,13 +189,13 @@ func (r *withdrawResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	if wp.ChildChainMintable {
+	if r.ExitEventID != "" {
 		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
 	}
 
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", r.BlockNumber))
 
-	buffer.WriteString("\n[WITHDRAW ERC-721]\n")
+	buffer.WriteString("\n[WITHDRAW ERC 721]\n")
 	buffer.WriteString(cmdHelper.FormatKV(vals))
 	buffer.WriteString("\n")
 
