@@ -22,6 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -586,12 +587,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	admin, err := ethgow.GenerateKey()
 	require.NoError(t, err)
 
-	aclAdminAddr := types.Address(admin.Address())
-
-	adminRawKey, err := admin.MarshallPrivateKey()
-	require.NoError(t, err)
-
-	adminHexKey := hex.EncodeToString(adminRawKey)
+	adminAddr := types.Address(admin.Address())
 
 	for i := uint64(0); i < transfersCount; i++ {
 		key, err := ethgow.GenerateKey()
@@ -608,16 +604,14 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		t.Logf("Depositor#%d=%s\n", i+1, depositors[i])
 	}
 
-	//nolint:godox
-	// TODO: @Stefan-Ethernal Uncomment ACLs when ready
 	// setup cluster
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
 		framework.WithNativeTokenConfig("Mintable Edge Coin:MEC:18:true"),
-		// framework.WithBridgeAllowListAdmin(aclAdminAddr),
-		// framework.WithBridgeBlockListAdmin(aclAdminAddr),
-		framework.WithPremine(append(depositors, aclAdminAddr)...)) //nolint:makezero
+		framework.WithBridgeAllowListAdmin(adminAddr),
+		framework.WithBridgeBlockListAdmin(adminAddr),
+		framework.WithPremine(append(depositors, adminAddr)...)) //nolint:makezero
 	defer cluster.Stop()
 
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
@@ -639,30 +633,26 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 
 	var mintableTokenMapped contractsapi.MintableTokenMappedEvent
 
-	t.Run("bridge native (ERC-20) tokens", func(t *testing.T) {
-		//nolint:godox
-		// TODO: @Stefan-Ethernal Uncomment, ACLs
+	t.Run("bridge native tokens", func(t *testing.T) {
 		// try sending a single native token deposit transaction
-		// it should not be successful,
-		// because depositors are not allow listed for bridge transactions
-		// err = cluster.Bridge.Deposit(
-		// 	common.ERC20,
-		// 	contracts.NativeERC20TokenContract,
-		// 	contracts.RootMintableERC20PredicateContract,
-		// 	depositorKeys[0],
-		// 	depositors[0].String(),
-		// 	amounts[0],
-		// 	"",
-		// 	validatorSrv.JSONRPCAddr(),
-		// 	true)
-		// require.Error(t, err)
+		// it should fail, because depositors are not allow listed for bridge transactions
+		err = cluster.Bridge.Deposit(
+			common.ERC20,
+			contracts.NativeERC20TokenContract,
+			contracts.RootMintableERC20PredicateContract,
+			depositorKeys[0],
+			depositors[0].String(),
+			amounts[0],
+			"",
+			validatorSrv.JSONRPCAddr(),
+			"",
+			true)
+		require.Error(t, err)
 
 		// allow list each depositor and make sure deposit is successfully executed
 		for i, key := range depositorKeys {
-			//nolint:godox
-			// TODO: @Stefan-Ethernal Uncomment, ACLs
-			// allow list each depositor
-			// aclSetEnabledRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], aclAdmin)
+			// add all depositors to bridge allow list
+			setAccessListRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], addresslist.EnabledRole, admin)
 
 			// make sure deposit is successfully executed
 			err = cluster.Bridge.Deposit(
@@ -765,10 +755,45 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 
 		erc721DeployTxn := cluster.Deploy(t, admin, contractsapi.RootERC721.Bytecode)
 		require.NoError(t, erc721DeployTxn.Wait())
-		rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
+		require.True(t, erc721DeployTxn.Succeed())
+		rootERC721Token := erc721DeployTxn.Receipt().ContractAddress
 
-		// deposit
+		for _, depositor := range depositors {
+			// mint all the depositors in advance
+			mintFn := &contractsapi.MintRootERC721Fn{To: depositor}
+			mintInput, err := mintFn.EncodeAbi()
+			require.NoError(t, err)
+
+			mintTxn := cluster.MethodTxn(t, admin, types.Address(rootERC721Token), mintInput)
+			require.NoError(t, mintTxn.Wait())
+			require.True(t, mintTxn.Succeed())
+
+			// add all depositors to bride block list
+			setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, depositor, addresslist.EnabledRole, admin)
+		}
+
+		// deposit should fail because depositors are in bridge block list
+		err = cluster.Bridge.Deposit(
+			common.ERC721,
+			types.Address(rootERC721Token),
+			contracts.RootMintableERC721PredicateContract,
+			depositorKeys[0],
+			depositors[0].String(),
+			"",
+			fmt.Sprintf("%d", 0),
+			validatorSrv.JSONRPCAddr(),
+			"",
+			true)
+		require.Error(t, err)
+
 		for i, depositorKey := range depositorKeys {
+			// add all depositors to the bridge allow list
+			setAccessListRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], addresslist.EnabledRole, admin)
+
+			// remove all depositors from the bridge block list
+			setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, depositors[i], addresslist.NoRole, admin)
+
+			// deposit (without minting, as it was already done beforehand)
 			err = cluster.Bridge.Deposit(
 				common.ERC721,
 				types.Address(rootERC721Token),
@@ -778,7 +803,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 				"",
 				fmt.Sprintf("%d", i),
 				validatorSrv.JSONRPCAddr(),
-				adminHexKey,
+				"",
 				true)
 			require.NoError(t, err)
 		}
@@ -1127,7 +1152,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		require.Error(t, err)
 
 		// add account to bridge allow list
-		aclSetEnabledRole(t, cluster, contracts.AllowListBridgeAddr, senderAccount.Address(), admin)
+		setAccessListRole(t, cluster, contracts.AllowListBridgeAddr, senderAccount.Address(), addresslist.EnabledRole, admin)
 
 		// try to withdraw again
 		err = cluster.Bridge.Withdraw(
@@ -1143,7 +1168,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		require.NoError(t, err)
 
 		// add account to bridge block list
-		aclSetEnabledRole(t, cluster, contracts.BlockListBridgeAddr, senderAccount.Address(), admin)
+		setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, senderAccount.Address(), addresslist.EnabledRole, admin)
 
 		// it should fail now because in block list
 		err = cluster.Bridge.Withdraw(

@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/contract"
 	"github.com/umbracle/ethgo/jsonrpc"
 
@@ -224,18 +225,35 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 	}
 }
 
-// aclSetEnabledRole sets enabled role to appropriate access list precompile
-func aclSetEnabledRole(t *testing.T, cluster *framework.TestCluster,
-	precompile, account types.Address, aclAdminKey ethgo.Key) {
+// setAccessListRole sets access list role to appropriate access list precompile
+func setAccessListRole(t *testing.T, cluster *framework.TestCluster, precompile, account types.Address,
+	role addresslist.Role, aclAdmin ethgo.Key) {
 	t.Helper()
 
-	input, err := addresslist.SetEnabledFunc.Encode([]interface{}{account})
+	var updateRoleFn *abi.Method
+
+	switch role {
+	case addresslist.AdminRole:
+		updateRoleFn = addresslist.SetAdminFunc
+
+		break
+	case addresslist.EnabledRole:
+		updateRoleFn = addresslist.SetEnabledFunc
+
+		break
+	case addresslist.NoRole:
+		updateRoleFn = addresslist.SetNoneFunc
+
+		break
+	}
+
+	input, err := updateRoleFn.Encode([]interface{}{account})
 	require.NoError(t, err)
 
-	enableSetTxn := cluster.MethodTxn(t, aclAdminKey, precompile, input)
+	enableSetTxn := cluster.MethodTxn(t, aclAdmin, precompile, input)
 	require.NoError(t, enableSetTxn.Wait())
 
-	expectRole(t, cluster, precompile, account, addresslist.EnabledRole)
+	expectRole(t, cluster, precompile, account, role)
 }
 
 func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Address, addr types.Address, role addresslist.Role) {
