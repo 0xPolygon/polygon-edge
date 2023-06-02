@@ -139,7 +139,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 		require.NoError(t, err)
 
 		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
@@ -411,7 +411,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC721(t *testing.T) {
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
@@ -594,7 +594,7 @@ func TestE2E_Bridge_DepositAndWithdrawERC1155(t *testing.T) {
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	currentEpoch := currentExtra.Checkpoint.EpochNumber
@@ -785,7 +785,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	targetEpoch := currentExtra.Checkpoint.EpochNumber + 2
@@ -960,7 +960,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 		require.NoError(t, err)
 
 		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)

@@ -142,7 +142,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			return fmt.Errorf("block %d was not found", initialBlockNumber)
 		}
 
-		parentExtra, err = GetIbftExtra(parentHeader.ExtraData)
+		parentExtra, err = GetIbftExtra(parentHeader.ExtraData, parentHeader.Number)
 		if err != nil {
 			return err
 		}
@@ -155,7 +155,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			return fmt.Errorf("block %d was not found", blockNumber)
 		}
 
-		currentExtra, err = GetIbftExtra(currentHeader.ExtraData)
+		currentExtra, err = GetIbftExtra(currentHeader.ExtraData, currentHeader.Number)
 		if err != nil {
 			return err
 		}
@@ -182,7 +182,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 	// (in case there were pending checkpoint blocks)
 	if currentExtra == nil {
 		// we need to send checkpoint for the latest block
-		currentExtra, err = GetIbftExtra(latestHeader.ExtraData)
+		currentExtra, err = GetIbftExtra(latestHeader.ExtraData, latestHeader.Number)
 		if err != nil {
 			return err
 		}

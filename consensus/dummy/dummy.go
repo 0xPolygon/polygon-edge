@@ -79,8 +79,8 @@ func (d *Dummy) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
 }
 
-func (d *Dummy) FilterExtra(extra []byte) ([]byte, error) {
-	return extra, nil
+func (d *Dummy) FilterExtra(header *types.Header) ([]byte, error) {
+	return header.ExtraData, nil
 }
 
 func (d *Dummy) run() {
