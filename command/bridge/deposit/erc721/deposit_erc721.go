@@ -20,7 +20,7 @@ import (
 
 type depositERC721Params struct {
 	*common.ERC721BridgeParams
-	testMode bool
+	minterKey string
 }
 
 var (
@@ -58,20 +58,17 @@ func GetCommand() *cobra.Command {
 		"root ERC-721 token predicate address",
 	)
 
-	depositCmd.Flags().BoolVar(
-		&dp.testMode,
-		helper.TestModeFlag,
-		false,
-		"test indicates whether depositor is hardcoded test account "+
-			"(in that case tokens are minted to it, so it is able to make deposits)",
+	depositCmd.Flags().StringVar(
+		&dp.minterKey,
+		common.MinterKeyFlag,
+		"",
+		common.MinterKeyFlagDesc,
 	)
 
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
 	_ = depositCmd.MarkFlagRequired(common.TokenIDsFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootPredicateFlag)
-
-	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
 
 	return depositCmd
 }
@@ -84,7 +81,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	depositorKey, err := helper.GetRootchainPrivateKey(dp.SenderKey)
+	depositorKey, err := helper.DecodePrivateKey(dp.SenderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize depositor private key: %w", err))
 	}
@@ -115,7 +112,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		tokenIDs[i] = tokenID
 	}
 
-	if dp.testMode {
+	if dp.minterKey != "" {
+		minterKey, err := helper.DecodePrivateKey(dp.minterKey)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("invalid minter key provided: %w", err))
+
+			return
+		}
+
 		for i := 0; i < len(tokenIDs); i++ {
 			mintTxn, err := createMintTxn(types.Address(depositorAddr), types.Address(depositorAddr))
 			if err != nil {
@@ -124,7 +128,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				return
 			}
 
-			receipt, err := txRelayer.SendTransaction(mintTxn, depositorKey)
+			receipt, err := txRelayer.SendTransaction(mintTxn, minterKey)
 			if err != nil {
 				outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
 

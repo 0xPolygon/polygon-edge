@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/contract"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -223,7 +224,9 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 	}
 }
 
-func aclSetEnabledRole(t *testing.T, cluster *framework.TestCluster, precompile, account types.Address, aclAdminKey ethgo.Key) {
+// aclSetEnabledRole sets enabled role to appropriate access list precompile
+func aclSetEnabledRole(t *testing.T, cluster *framework.TestCluster,
+	precompile, account types.Address, aclAdminKey ethgo.Key) {
 	t.Helper()
 
 	input, err := addresslist.SetEnabledFunc.Encode([]interface{}{account})
@@ -245,6 +248,17 @@ func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Add
 	}
 
 	require.Equal(t, role.Uint64(), num.Uint64())
+}
+
+// getFilteredLogs retrieves Ethereum logs, described by event signature within the block range
+func getFilteredLogs(eventSig ethgo.Hash, startBlock, endBlock uint64,
+	ethEndpoint *jsonrpc.Eth) ([]*ethgo.Log, error) {
+	filter := &ethgo.LogFilter{Topics: [][]*ethgo.Hash{{&eventSig}}}
+
+	filter.SetFromUint64(startBlock)
+	filter.SetToUint64(endBlock)
+
+	return ethEndpoint.GetLogs(filter)
 }
 
 // erc20BalanceOf returns balance of given account on ERC20 token

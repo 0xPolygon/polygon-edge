@@ -30,6 +30,10 @@ const (
 	ChildTokenFlag         = "child-token"
 	JSONRPCFlag            = "json-rpc"
 	ChildChainMintableFlag = "child-chain-mintable"
+
+	MinterKeyFlag     = "minter-key"
+	MinterKeyFlagDesc = "minter key is the account which is able to mint tokens to sender account " +
+		"(if provided tokens are minted prior to depositing)"
 )
 
 var (

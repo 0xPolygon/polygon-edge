@@ -30,7 +30,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	client, err := jsonrpc.NewClient(server.HTTPAddr())
 	require.NoError(t, err)
 
-	testKey, err := helper.GetRootchainPrivateKey("")
+	testKey, err := helper.DecodePrivateKey("")
 	require.NoError(t, err)
 
 	receipt, err := server.Fund(testKey.Address())

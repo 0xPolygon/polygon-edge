@@ -415,7 +415,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
-	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerKey)
+	deployerKey, err := helper.DecodePrivateKey(params.deployerKey)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to initialize deployer key: %w", err)
 	}

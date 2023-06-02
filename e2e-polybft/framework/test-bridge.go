@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -19,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"golang.org/x/sync/errgroup"
 )
 
 type TestBridge struct {
@@ -105,7 +106,7 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 // Deposit function invokes bridge deposit of ERC tokens (from the root to the child chain)
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
-	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr string, childChainMintable bool) error {
+	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr, minterKey string, childChainMintable bool) error {
 	args := []string{}
 
 	if receivers == "" {
@@ -133,16 +134,12 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
 			"--amounts", amounts,
+			"--sender-key", senderKey,
+			"--minter-key", minterKey,
 			"--json-rpc", jsonRPCAddr)
 
 		if childChainMintable {
 			args = append(args, "--child-chain-mintable")
-		}
-
-		if senderKey != "" {
-			args = append(args, "--sender-key", senderKey)
-		} else {
-			args = append(args, "--test")
 		}
 
 	case bridgeCommon.ERC721:
@@ -157,16 +154,12 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
 			"--token-ids", tokenIDs,
+			"--sender-key", senderKey,
+			"--minter-key", minterKey,
 			"--json-rpc", jsonRPCAddr)
 
 		if childChainMintable {
 			args = append(args, "--child-chain-mintable")
-		}
-
-		if senderKey != "" {
-			args = append(args, "--sender-key", senderKey)
-		} else {
-			args = append(args, "--test")
 		}
 
 	case bridgeCommon.ERC1155:
@@ -186,16 +179,12 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--token-ids", tokenIDs,
+			"--sender-key", senderKey,
+			"--minter-key", minterKey,
 			"--json-rpc", jsonRPCAddr)
 
 		if childChainMintable {
 			args = append(args, "--child-chain-mintable")
-		}
-
-		if senderKey != "" {
-			args = append(args, "--sender-key", senderKey)
-		} else {
-			args = append(args, "--test")
 		}
 	}
 

@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -74,11 +75,12 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				common.ERC20,
 				polybftCfg.Bridge.RootNativeERC20Addr,
 				polybftCfg.Bridge.RootERC20PredicateAddr,
-				"",
+				rootHelper.TestAccountPrivKey,
 				strings.Join(receivers[:], ","),
 				strings.Join(amounts[:], ","),
 				"",
 				cluster.Bridge.JSONRPCAddr(),
+				rootHelper.TestAccountPrivKey,
 				false),
 		)
 
@@ -89,17 +91,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
 
-		id := stateSyncedResult.Sig()
-		filter := &ethgo.LogFilter{
-			Topics: [][]*ethgo.Hash{
-				{&id},
-			},
-		}
-
-		filter.SetFromUint64(0)
-		filter.SetToUint64(finalBlockNum)
-
-		logs, err := childEthEndpoint.GetLogs(filter)
+		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
 		require.NoError(t, err)
 
 		// assert that all deposits are executed successfully
@@ -203,11 +195,12 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				common.ERC20,
 				polybftCfg.Bridge.RootNativeERC20Addr,
 				polybftCfg.Bridge.RootERC20PredicateAddr,
-				"",
+				rootHelper.TestAccountPrivKey,
 				strings.Join(receivers[:depositsSubset], ","),
 				strings.Join(amounts[:depositsSubset], ","),
 				"",
 				cluster.Bridge.JSONRPCAddr(),
+				rootHelper.TestAccountPrivKey,
 				false),
 		)
 
@@ -231,11 +224,12 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				common.ERC20,
 				polybftCfg.Bridge.RootNativeERC20Addr,
 				polybftCfg.Bridge.RootERC20PredicateAddr,
-				"",
+				rootHelper.TestAccountPrivKey,
 				strings.Join(receivers[depositsSubset:], ","),
 				strings.Join(amounts[depositsSubset:], ","),
 				"",
 				cluster.Bridge.JSONRPCAddr(),
+				rootHelper.TestAccountPrivKey,
 				false),
 		)
 
@@ -256,17 +250,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
 
-		id := stateSyncedResult.Sig()
-		filter := &ethgo.LogFilter{
-			Topics: [][]*ethgo.Hash{
-				{&id},
-			},
-		}
-
-		filter.SetFromUint64(initialBlockNum)
-		filter.SetToUint64(finalBlockNum)
-
-		logs, err := childEthEndpoint.GetLogs(filter)
+		logs, err := getFilteredLogs(stateSyncedResult.Sig(), initialBlockNum, finalBlockNum, childEthEndpoint)
 		require.NoError(t, err)
 
 		// assert that all state syncs are executed successfully
@@ -318,37 +302,28 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 			common.ERC721,
 			polybftCfg.Bridge.RootERC721Addr,
 			polybftCfg.Bridge.RootERC721PredicateAddr,
-			"",
+			rootHelper.TestAccountPrivKey,
 			strings.Join(receivers[:], ","),
 			"",
 			strings.Join(tokenIDs[:], ","),
 			cluster.Bridge.JSONRPCAddr(),
+			rootHelper.TestAccountPrivKey,
 			false),
 	)
 
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
-	// the transactions are processed and there should be a success events
-	var stateSyncedResult contractsapi.StateSyncResultEvent
-
-	id := stateSyncedResult.Sig()
-	filter := &ethgo.LogFilter{
-		Topics: [][]*ethgo.Hash{
-			{&id},
-		},
-	}
-
-	filter.SetFromUint64(0)
-	filter.SetToUint64(100)
-
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
+	// the transactions are processed and there should be a success events
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 100, childEthEndpoint)
 	require.NoError(t, err)
 
-	logs, err := childEthEndpoint.GetLogs(filter)
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
 	require.NoError(t, err)
 
 	// assert that all deposits are executed successfully.
@@ -485,37 +460,28 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 			common.ERC1155,
 			polybftCfg.Bridge.RootERC1155Addr,
 			polybftCfg.Bridge.RootERC1155PredicateAddr,
-			"",
+			rootHelper.TestAccountPrivKey,
 			strings.Join(receivers[:], ","),
 			strings.Join(amounts[:], ","),
 			strings.Join(tokenIDs[:], ","),
 			cluster.Bridge.JSONRPCAddr(),
+			rootHelper.TestAccountPrivKey,
 			false),
 	)
 
 	// wait for a few more sprints
 	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
 
-	// the transactions are processed and there should be a success events
-	var stateSyncedResult contractsapi.StateSyncResultEvent
-
-	id := stateSyncedResult.Sig()
-	filter := &ethgo.LogFilter{
-		Topics: [][]*ethgo.Hash{
-			{&id},
-		},
-	}
-
-	filter.SetFromUint64(0)
-	filter.SetToUint64(100)
-
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
+	// the transactions are processed and there should be a success events
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 100, childEthEndpoint)
 	require.NoError(t, err)
 
-	logs, err := childEthEndpoint.GetLogs(filter)
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
 	require.NoError(t, err)
 
 	// assert that all deposits are executed successfully.
@@ -635,8 +601,15 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	funds := make([]*big.Int, transfersCount)
 	singleToken := ethgo.Ether(1)
 
-	aclAdmin, err := ethgow.GenerateKey()
-	aclAdminAddr := types.Address(aclAdmin.Address())
+	admin, err := ethgow.GenerateKey()
+	require.NoError(t, err)
+
+	aclAdminAddr := types.Address(admin.Address())
+
+	adminRawKey, err := admin.MarshallPrivateKey()
+	require.NoError(t, err)
+
+	adminHexKey := hex.EncodeToString(adminRawKey)
 
 	for i := uint64(0); i < transfersCount; i++ {
 		key, err := ethgow.GenerateKey()
@@ -653,6 +626,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		t.Logf("Depositor#%d=%s\n", i+1, depositors[i])
 	}
 
+	//nolint:godox
 	// TODO: @Stefan-Ethernal Uncomment ACLs when ready
 	// setup cluster
 	cluster := framework.NewTestCluster(t, 5,
@@ -661,7 +635,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		framework.WithNativeTokenConfig("Mintable Edge Coin:MEC:18:true"),
 		// framework.WithBridgeAllowListAdmin(aclAdminAddr),
 		// framework.WithBridgeBlockListAdmin(aclAdminAddr),
-		framework.WithPremine(append(depositors, aclAdminAddr)...))
+		framework.WithPremine(append(depositors, aclAdminAddr)...)) //nolint:makezero
 	defer cluster.Stop()
 
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
@@ -681,10 +655,13 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	childchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
 	require.NoError(t, err)
 
+	var mintableTokenMapped contractsapi.MintableTokenMappedEvent
+
 	t.Run("bridge native (ERC-20) tokens", func(t *testing.T) {
+		//nolint:godox
 		// TODO: @Stefan-Ethernal Uncomment, ACLs
 		// try sending a single native token deposit transaction
-		// it should not be succesful,
+		// it should not be successful,
 		// because depositors are not allow listed for bridge transactions
 		// err = cluster.Bridge.Deposit(
 		// 	common.ERC20,
@@ -700,6 +677,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 
 		// allow list each depositor and make sure deposit is successfully executed
 		for i, key := range depositorKeys {
+			//nolint:godox
 			// TODO: @Stefan-Ethernal Uncomment, ACLs
 			// allow list each depositor
 			// aclSetEnabledRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], aclAdmin)
@@ -714,6 +692,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 				amounts[i],
 				"",
 				validatorSrv.JSONRPCAddr(),
+				adminHexKey,
 				true)
 			require.NoError(t, err)
 		}
@@ -729,6 +708,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 			waitForRootchainEpoch(extra.Checkpoint.EpochNumber, 2*time.Minute, rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 		// first exit event is mapping child token on a rootchain
+		// remaining ones are deposits
 		for exitEventID := uint64(1); exitEventID <= transfersCount+1; exitEventID++ {
 			require.NoError(t,
 				cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, exitEventID, validatorSrv.JSONRPCAddr()))
@@ -738,18 +718,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve child mintable token address
-		var mintableTokenMapped contractsapi.MintableTokenMappedEvent
-
-		id := mintableTokenMapped.Sig()
-		startBlock := ethgo.BlockNumber(0)
-		endBlock := ethgo.BlockNumber(rootchainLatestBlock)
-		filter := &ethgo.LogFilter{
-			Topics: [][]*ethgo.Hash{{&id}},
-			From:   &startBlock,
-			To:     &endBlock,
-		}
-
-		logs, err := rootchainTxRelayer.Client().Eth().GetLogs(filter)
+		logs, err := getFilteredLogs(mintableTokenMapped.Sig(), 0, rootchainLatestBlock, rootchainTxRelayer.Client().Eth())
 		require.NoError(t, err)
 		require.Len(t, logs, 1)
 
@@ -800,37 +769,70 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		}
 	})
 
-	// t.Run("bridge ERC-721 tokens", func(t *testing.T) {
-	// 	rootchainInitialBlock, err := rootchainTxRelayer.Client().Eth().BlockNumber()
-	// 	require.NoError(t, err)
+	t.Run("bridge ERC-721 tokens", func(t *testing.T) {
+		rootchainInitialBlock, err := rootchainTxRelayer.Client().Eth().BlockNumber()
+		require.NoError(t, err)
 
-	// 	exitEventsCounterFn := contractsapi.CheckpointManager.Abi.Methods["counter"]
-	// 	input, err := exitEventsCounterFn.Encode([]interface{}{})
-	// 	require.NoError(t, err)
-	// 	initialExitEventIDRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
-	// 	require.NoError(t, err)
-	// 	initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
-	// 	require.NoError(t, err)
+		exitEventsCounterFn := contractsapi.L2StateSender.Abi.Methods["counter"]
+		input, err := exitEventsCounterFn.Encode([]interface{}{})
+		require.NoError(t, err)
+		initialExitEventIDRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
+		require.NoError(t, err)
+		initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
+		require.NoError(t, err)
 
-	// 	erc721DeployTxn := cluster.Deploy(t, aclAdmin, []byte(contractsapi.MockERC721Artifact))
-	// 	require.NoError(t, erc721DeployTxn.Wait())
-	// 	rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
+		erc721DeployTxn := cluster.Deploy(t, admin, []byte(contractsapi.MockERC721Artifact))
+		require.NoError(t, erc721DeployTxn.Wait())
+		rootERC721Token := erc721DeployTxn.Receipt().ContractAddress.Address()
 
-	// 	for i, depositorKey := range depositorKeys {
-	// 		err = cluster.Bridge.Deposit(
-	// 			common.ERC721,
-	// 			types.Address(rootERC721Token),
-	// 			contracts.RootMintableERC721PredicateContract,
-	// 			depositorKey,
-	// 			depositors[i].String(),
-	// 			"",
-	// 			fmt.Sprintf("%d", i+1),
-	// 			validatorSrv.JSONRPCAddr(),
-	// 			true)
-	// 		require.NoError(t, err)
-	// 	}
+		// deposit
+		for i, depositorKey := range depositorKeys {
+			err = cluster.Bridge.Deposit(
+				common.ERC721,
+				types.Address(rootERC721Token),
+				contracts.RootMintableERC721PredicateContract,
+				depositorKey,
+				depositors[i].String(),
+				"",
+				fmt.Sprintf("%d", i),
+				validatorSrv.JSONRPCAddr(),
+				adminHexKey,
+				true)
+			require.NoError(t, err)
+		}
 
-	// })
+		childchainBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
+		require.NoError(t, err)
+
+		blockExtra, err := polybft.GetIbftExtra(childchainBlock.ExtraData)
+		require.NoError(t, err)
+
+		// wait for checkpoint to be submitted
+		err = waitForRootchainEpoch(blockExtra.Checkpoint.EpochNumber, 2*time.Minute, rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr)
+		require.NoError(t, err)
+
+		// first exit event is mapping child token on a rootchain
+		// remaining ones are the deposits
+		initialExitEventID++
+		for i := initialExitEventID; i <= initialExitEventID+transfersCount; i++ {
+			require.NoError(t,
+				cluster.Bridge.SendExitTransaction(polybftCfg.Bridge.ExitHelperAddr, i, validatorSrv.JSONRPCAddr()))
+		}
+
+		latestRootchainBlock, err := rootchainTxRelayer.Client().Eth().BlockNumber()
+		require.NoError(t, err)
+
+		logs, err := getFilteredLogs(mintableTokenMapped.Sig(), rootchainInitialBlock, latestRootchainBlock,
+			rootchainTxRelayer.Client().Eth())
+		require.NoError(t, err)
+		require.Len(t, logs, 1)
+
+		ok, err := mintableTokenMapped.ParseLog(logs[0])
+		require.NoError(t, err)
+		require.True(t, ok)
+
+		// &contractsapi.OwnerOfChildERC721Fn{TokenID: }
+	})
 }
 
 func TestE2E_CheckpointSubmission(t *testing.T) {
@@ -1049,11 +1051,12 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 					common.ERC20,
 					polybftCfg.Bridge.RootNativeERC20Addr,
 					polybftCfg.Bridge.RootERC20PredicateAddr,
-					"",
+					rootHelper.TestAccountPrivKey,
 					strings.Join(receivers[:], ","),
 					strings.Join(amounts[:], ","),
 					"",
 					cluster.Bridge.JSONRPCAddr(),
+					rootHelper.TestAccountPrivKey,
 					false),
 			)
 		}
@@ -1065,17 +1068,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		// the transactions are processed and there should be a success events
 		var stateSyncedResult contractsapi.StateSyncResultEvent
 
-		id := stateSyncedResult.Sig()
-		filter := &ethgo.LogFilter{
-			Topics: [][]*ethgo.Hash{
-				{&id},
-			},
-		}
-
-		filter.SetFromUint64(0)
-		filter.SetToUint64(finalBlockNum)
-
-		logs, err := childEthEndpoint.GetLogs(filter)
+		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
 		require.NoError(t, err)
 
 		// assert that all deposits are executed successfully
