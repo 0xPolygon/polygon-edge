@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -223,7 +224,12 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 	}
 
 	if err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge")); err != nil {
-		return fmt.Errorf("failed to fund account %s on the rootchain: %w", t.address, err)
+		acctAddrs := make([]string, len(accounts))
+		for i, acc := range accounts {
+			acctAddrs[i] = acc.String()
+		}
+
+		return fmt.Errorf("failed to fund accounts (%s) on the rootchain: %w", strings.Join(acctAddrs, ","), err)
 	}
 
 	return nil
