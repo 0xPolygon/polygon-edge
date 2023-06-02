@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -315,35 +316,40 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		return nil, nil
 	}
 	// find the transaction in the body
-	indx := -1
+	txIndex := -1
+	logIndex := 0
 
 	for i, txn := range block.Transactions {
 		if txn.Hash == hash {
-			indx = i
+			txIndex = i
 
 			break
 		}
+
+		// accumulate receipt logs indexes from block transactions
+		// that are before the desired transaction
+		logIndex += len(receipts[i].Logs)
 	}
 
-	if indx == -1 {
+	if txIndex == -1 {
 		// txn not found
 		return nil, nil
 	}
 
-	txn := block.Transactions[indx]
-	raw := receipts[indx]
+	txn := block.Transactions[txIndex]
+	raw := receipts[txIndex]
 
 	logs := make([]*Log, len(raw.Logs))
-	for indx, elem := range raw.Logs {
-		logs[indx] = &Log{
+	for i, elem := range raw.Logs {
+		logs[i] = &Log{
 			Address:     elem.Address,
 			Topics:      elem.Topics,
 			Data:        argBytes(elem.Data),
 			BlockHash:   block.Hash(),
 			BlockNumber: argUint64(block.Number()),
 			TxHash:      txn.Hash,
-			TxIndex:     argUint64(indx),
-			LogIndex:    argUint64(indx),
+			TxIndex:     argUint64(txIndex),
+			LogIndex:    argUint64(logIndex + i),
 			Removed:     false,
 		}
 	}
@@ -354,7 +360,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		LogsBloom:         raw.LogsBloom,
 		Status:            argUint64(*raw.Status),
 		TxHash:            txn.Hash,
-		TxIndex:           argUint64(indx),
+		TxIndex:           argUint64(txIndex),
 		BlockHash:         block.Hash(),
 		BlockNumber:       argUint64(block.Number()),
 		GasUsed:           argUint64(raw.GasUsed),
@@ -470,7 +476,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 
 	// Check if an EVM revert happened
 	if result.Reverted() {
-		return nil, constructErrorFromRevert(result)
+		return []byte(hex.EncodeToString(result.ReturnValue)), constructErrorFromRevert(result)
 	}
 
 	if result.Failed() {

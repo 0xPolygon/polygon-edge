@@ -19,8 +19,11 @@ type ValidatorSet interface {
 	// Accounts returns the list of the ValidatorMetadata
 	Accounts() AccountSet
 
-	// checks if submitted signers have reached quorum
+	// HasQuorum checks if submitted signers have reached quorum
 	HasQuorum(signers map[types.Address]struct{}) bool
+
+	// GetVotingPowers retrieves map: string(address) -> vp
+	GetVotingPowers() map[string]*big.Int
 }
 
 type validatorSet struct {
@@ -78,6 +81,16 @@ func (vs validatorSet) HasQuorum(signers map[types.Address]struct{}) bool {
 		"hasQuorum", hasQuorum)
 
 	return hasQuorum
+}
+
+func (vs validatorSet) GetVotingPowers() map[string]*big.Int {
+	result := make(map[string]*big.Int, vs.Len())
+
+	for address, vp := range vs.votingPowerMap {
+		result[types.AddressToString(address)] = vp
+	}
+
+	return result
 }
 
 func (vs validatorSet) Accounts() AccountSet {
