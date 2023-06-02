@@ -115,7 +115,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"depositTo",
 			},
 			[]string{},
 		},
@@ -125,7 +124,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"depositTo",
 			},
 			[]string{},
 		},
@@ -163,7 +161,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"withdrawTo",
 			},
 			[]string{
 				"MintableTokenMapped",
@@ -196,7 +193,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"withdrawBatch",
 			},
 			[]string{},
 		},
@@ -237,7 +233,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"depositBatch",
 			},
 			[]string{},
 		},
@@ -247,7 +242,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"depositBatch",
 			},
 			[]string{},
 		},
@@ -277,7 +271,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"withdrawBatch",
 			},
 			[]string{},
 		},
@@ -317,7 +310,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"depositBatch",
 			},
 			[]string{},
 		},
@@ -327,7 +319,6 @@ func main() {
 			false,
 			[]string{
 				"initialize",
-				"depositBatch",
 			},
 			[]string{},
 		},

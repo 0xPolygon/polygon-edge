@@ -389,7 +389,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 	// assert that owners of given token ids are the accounts on the root chain ERC-721 token
 	for i, receiver := range receiversAddrs {
-		owner := erc721OwnerOf(t, big.NewInt(int64(i)), polybftCfg.Bridge.RootERC721Addr, txRelayer)
+		owner := erc721OwnerOf(t, big.NewInt(int64(i)), polybftCfg.Bridge.RootERC721Addr, rootchainTxRelayer)
 		require.Equal(t, receiver, owner)
 	}
 }
@@ -710,7 +710,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 
 		t.Log("Child token address", mintableTokenMapped.ChildToken)
 
-		// check that balances on rootchain have increased by depositted amounts
+		// check that balances on rootchain have increased by deposited amounts
 		for _, depositor := range depositors {
 			balance := erc20BalanceOf(t, depositor, mintableTokenMapped.ChildToken, rootchainTxRelayer)
 			require.Equal(t, big.NewInt(amount), balance)
@@ -818,7 +818,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		// check owner on the rootchain
 		for i := uint64(0); i < transfersCount; i++ {
 			owner := erc721OwnerOf(t, new(big.Int).SetUint64(i), childERC721, rootchainTxRelayer)
-			t.Log("Owner", owner)
+			t.Log("ChildERC721 owner", owner)
 			require.Equal(t, depositors[i], owner)
 		}
 
@@ -846,7 +846,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		// check owners on the child chain
 		for i, receiver := range depositors {
 			owner := erc721OwnerOf(t, big.NewInt(int64(i)), types.Address(rootERC721Token), childchainTxRelayer)
-			t.Log("Owner", owner)
+			t.Log("RootERC721 owner", owner)
 			require.Equal(t, receiver, owner)
 		}
 	})
