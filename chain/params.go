@@ -74,70 +74,46 @@ func (p *Params) GetEngine() string {
 	return ""
 }
 
-// Forks specifies when each fork is activated
-type Forks struct {
-	Homestead      *Fork `json:"homestead,omitempty"`
-	Byzantium      *Fork `json:"byzantium,omitempty"`
-	Constantinople *Fork `json:"constantinople,omitempty"`
-	Petersburg     *Fork `json:"petersburg,omitempty"`
-	Istanbul       *Fork `json:"istanbul,omitempty"`
-	London         *Fork `json:"london,omitempty"`
-	EIP150         *Fork `json:"EIP150,omitempty"`
-	EIP158         *Fork `json:"EIP158,omitempty"`
-	EIP155         *Fork `json:"EIP155,omitempty"`
+// predefined forks
+const (
+	Homestead      = "homestead"
+	Byzantium      = "byzantium"
+	Constantinople = "constantinople"
+	Petersburg     = "petersburg"
+	Istanbul       = "istanbul"
+	London         = "london"
+	EIP150         = "EIP150"
+	EIP158         = "EIP158"
+	EIP155         = "EIP155"
+)
+
+// Forks is map which contains all forks and their starting blocks from genesis
+type Forks map[string]*Fork
+
+// IsActive returns true if fork defined by name exists and defined for the block
+func (f *Forks) IsActive(name string, block uint64) bool {
+	ff := (*f)[name]
+
+	return ff != nil && ff.Active(block)
 }
 
-func (f *Forks) active(ff *Fork, block uint64) bool {
-	if ff == nil {
-		return false
-	}
-
-	return ff.Active(block)
+// SetFork adds/updates fork defined by name
+func (f *Forks) SetFork(name string, value *Fork) {
+	(*f)[name] = value
 }
 
-func (f *Forks) IsHomestead(block uint64) bool {
-	return f.active(f.Homestead, block)
-}
-
-func (f *Forks) IsByzantium(block uint64) bool {
-	return f.active(f.Byzantium, block)
-}
-
-func (f *Forks) IsConstantinople(block uint64) bool {
-	return f.active(f.Constantinople, block)
-}
-
-func (f *Forks) IsPetersburg(block uint64) bool {
-	return f.active(f.Petersburg, block)
-}
-
-func (f *Forks) IsLondon(block uint64) bool {
-	return f.active(f.London, block)
-}
-
-func (f *Forks) IsEIP150(block uint64) bool {
-	return f.active(f.EIP150, block)
-}
-
-func (f *Forks) IsEIP158(block uint64) bool {
-	return f.active(f.EIP158, block)
-}
-
-func (f *Forks) IsEIP155(block uint64) bool {
-	return f.active(f.EIP155, block)
-}
-
+// At returns ForksInTime instance that shows which supported forks are enabled for the block
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:      f.active(f.Homestead, block),
-		Byzantium:      f.active(f.Byzantium, block),
-		Constantinople: f.active(f.Constantinople, block),
-		Petersburg:     f.active(f.Petersburg, block),
-		Istanbul:       f.active(f.Istanbul, block),
-		London:         f.active(f.London, block),
-		EIP150:         f.active(f.EIP150, block),
-		EIP158:         f.active(f.EIP158, block),
-		EIP155:         f.active(f.EIP155, block),
+		Homestead:      f.IsActive(Homestead, block),
+		Byzantium:      f.IsActive(Byzantium, block),
+		Constantinople: f.IsActive(Constantinople, block),
+		Petersburg:     f.IsActive(Petersburg, block),
+		Istanbul:       f.IsActive(Istanbul, block),
+		London:         f.IsActive(London, block),
+		EIP150:         f.IsActive(EIP150, block),
+		EIP158:         f.IsActive(EIP158, block),
+		EIP155:         f.IsActive(EIP155, block),
 	}
 }
 
@@ -157,6 +133,7 @@ func (f Fork) Int() *big.Int {
 	return big.NewInt(int64(f))
 }
 
+// ForksInTime should contain all supported forks by current edge version
 type ForksInTime struct {
 	Homestead,
 	Byzantium,
@@ -169,6 +146,7 @@ type ForksInTime struct {
 	EIP155 bool
 }
 
+// AllForksEnabled should contain all supported forks by current edge version
 var AllForksEnabled = &Forks{
 	Homestead:      NewFork(0),
 	EIP150:         NewFork(0),

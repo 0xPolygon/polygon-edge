@@ -19,6 +19,8 @@ type GenesisFactoryHook func(config *chain.Chain, engineName string) func(*state
 
 type ConsensusType string
 
+type ForkManagerFactory func(forks *chain.Forks) error
+
 const (
 	DevConsensus     ConsensusType = "dev"
 	IBFTConsensus    ConsensusType = "ibft"
@@ -44,6 +46,10 @@ var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManag
 
 var genesisCreationFactory = map[ConsensusType]GenesisFactoryHook{
 	PolyBFTConsensus: consensusPolyBFT.GenesisPostHookFactory,
+}
+
+var forkManagerFactory = map[ConsensusType]ForkManagerFactory{
+	PolyBFTConsensus: consensusPolyBFT.ForkManagerFactory,
 }
 
 func ConsensusSupported(value string) bool {

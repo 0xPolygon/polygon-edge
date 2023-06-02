@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -276,16 +277,22 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	if err := forkmanager.ForkManagerInit(
+		forkManagerFactory[ConsensusType(engineName)],
+		config.Chain.Params.Forks); err != nil {
+		return nil, err
+	}
+
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// Use the london signer with eip-155 as a fallback one
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
-		chain.AllForksEnabled.At(0).Homestead,
+		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		crypto.NewEIP155Signer(
 			uint64(m.config.Chain.Params.ChainID),
-			chain.AllForksEnabled.At(0).Homestead,
+			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		),
 	)
 

@@ -361,6 +361,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 	}
 }
 
+func ForkManagerFactory(forks *chain.Forks) error {
+	// place fork manager handler registration here
+	return nil
+}
+
 // Initialize initializes the consensus (e.g. setup data)
 func (p *Polybft) Initialize() error {
 	p.logger.Info("initializing polybft...")
