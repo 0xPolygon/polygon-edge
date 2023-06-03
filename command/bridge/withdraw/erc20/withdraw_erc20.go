@@ -92,7 +92,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	exitEventIDs := make([]string, len(wp.Receivers))
+	exitEventIDs := make([]*big.Int, 0, len(wp.Receivers))
 	blockNumbers := make([]string, len(wp.Receivers))
 
 	for i := range wp.Receivers {
@@ -136,7 +136,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				return
 			}
 
-			exitEventIDs[i] = strconv.FormatUint(exitEventID.Uint64(), 10)
+			exitEventIDs = append(exitEventIDs, exitEventID)
 		}
 
 		blockNumbers[i] = strconv.FormatUint(receipt.BlockNumber, 10)
@@ -174,11 +174,11 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 }
 
 type withdrawResult struct {
-	Sender       string   `json:"sender"`
-	Receivers    []string `json:"receivers"`
-	Amounts      []string `json:"amounts"`
-	ExitEventIDs []string `json:"exitEventIDs"`
-	BlockNumbers []string `json:"blockNumbers"`
+	Sender       string     `json:"sender"`
+	Receivers    []string   `json:"receivers"`
+	Amounts      []string   `json:"amounts"`
+	ExitEventIDs []*big.Int `json:"exitEventIDs"`
+	BlockNumbers []string   `json:"blockNumbers"`
 }
 
 func (r *withdrawResult) GetOutput() string {
@@ -189,8 +189,18 @@ func (r *withdrawResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 
-	if !wp.ChildChainMintable {
-		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
+	if len(r.ExitEventIDs) > 0 {
+		var buf bytes.Buffer
+
+		for i, id := range r.ExitEventIDs {
+			buf.WriteString(id.String())
+
+			if i != len(r.ExitEventIDs)-1 {
+				buf.WriteString(",")
+			}
+		}
+
+		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", buf.String()))
 	}
 
 	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))

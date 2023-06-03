@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -221,14 +220,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if dp.ChildChainMintable {
-		exitEventID, err := common.ExtractExitEventID(receipt)
+		res.ExitEventID, err = common.ExtractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
-
-		res.ExitEventID = strconv.FormatUint(exitEventID.Uint64(), 10)
 	}
 
 	outputter.SetCommandResult(res)
@@ -307,7 +304,7 @@ type depositResult struct {
 	Receivers   []string `json:"receivers"`
 	Amounts     []string `json:"amounts"`
 	TokenIDs    []string `json:"tokenIds"`
-	ExitEventID string   `json:"exitEventId"`
+	ExitEventID *big.Int `json:"exitEventId"`
 }
 
 func (r *depositResult) GetOutput() string {
@@ -319,8 +316,8 @@ func (r *depositResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	if r.ExitEventID != "" {
-		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
+	if r.ExitEventID != nil {
+		vals = append(vals, fmt.Sprintf("Exit Event ID|%d", r.ExitEventID))
 	}
 
 	buffer.WriteString("\n[DEPOSIT ERC1155]\n")

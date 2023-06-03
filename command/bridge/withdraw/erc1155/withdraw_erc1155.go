@@ -159,14 +159,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if !wp.ChildChainMintable {
-		exitEventID, err := common.ExtractExitEventID(receipt)
+		res.ExitEventID, err = common.ExtractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
-
-		res.ExitEventID = strconv.FormatUint(exitEventID.Uint64(), 10)
 	}
 
 	outputter.SetCommandResult(res)
@@ -199,7 +197,7 @@ type withdrawResult struct {
 	Receivers   []string `json:"receivers"`
 	Amounts     []string `json:"amounts"`
 	TokenIDs    []string `json:"TokenIDs"`
-	ExitEventID string   `json:"exitEventID"`
+	ExitEventID *big.Int `json:"exitEventID"`
 	BlockNumber string   `json:"blockNumber"`
 }
 
@@ -212,8 +210,8 @@ func (r *withdrawResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	if r.ExitEventID != "" {
-		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
+	if r.ExitEventID != nil {
+		vals = append(vals, fmt.Sprintf("Exit Event ID|%d", r.ExitEventID))
 	}
 
 	vals = append(vals, fmt.Sprintf("Inclusion Block Number|%s", r.BlockNumber))

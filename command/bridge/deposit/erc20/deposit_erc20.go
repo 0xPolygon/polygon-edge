@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -171,12 +170,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	g, ctx := errgroup.WithContext(cmd.Context())
-	exitEventIDs := make([]string, len(dp.Receivers))
+	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
 		amount := amounts[i]
-		i := i
 
 		g.Go(func() error {
 			select {
@@ -204,7 +202,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
 
-					exitEventIDs[i] = strconv.FormatUint(exitEventID.Uint64(), 10)
+					exitEventIDs = append(exitEventIDs, exitEventID)
 				}
 
 				return nil
@@ -249,10 +247,10 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 }
 
 type depositResult struct {
-	Sender       string   `json:"sender"`
-	Receivers    []string `json:"receivers"`
-	Amounts      []string `json:"amounts"`
-	ExitEventIDs []string `json:"exitEventIds"`
+	Sender       string     `json:"sender"`
+	Receivers    []string   `json:"receivers"`
+	Amounts      []string   `json:"amounts"`
+	ExitEventIDs []*big.Int `json:"exitEventIds"`
 }
 
 func (r *depositResult) GetOutput() string {
@@ -264,7 +262,17 @@ func (r *depositResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
 
 	if len(r.ExitEventIDs) > 0 {
-		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", strings.Join(r.ExitEventIDs, ", ")))
+		var buf bytes.Buffer
+
+		for i, id := range r.ExitEventIDs {
+			buf.WriteString(id.String())
+
+			if i != len(r.ExitEventIDs)-1 {
+				buf.WriteString(",")
+			}
+		}
+
+		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", buf.String()))
 	}
 
 	buffer.WriteString("\n[DEPOSIT ERC 20]\n")

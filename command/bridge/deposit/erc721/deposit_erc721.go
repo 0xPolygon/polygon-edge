@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -194,14 +193,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	if dp.ChildChainMintable {
-		exitEventID, err := common.ExtractExitEventID(receipt)
+		res.ExitEventID, err = common.ExtractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
-
-		res.ExitEventID = strconv.FormatUint(exitEventID.Uint64(), 10)
 	}
 
 	outputter.SetCommandResult(res)
@@ -274,7 +271,7 @@ type depositResult struct {
 	Sender      string   `json:"sender"`
 	Receivers   []string `json:"receivers"`
 	TokenIDs    []string `json:"tokenIDs"`
-	ExitEventID string   `json:"exitEventId"`
+	ExitEventID *big.Int `json:"exitEventId"`
 }
 
 func (r *depositResult) GetOutput() string {
@@ -285,8 +282,8 @@ func (r *depositResult) GetOutput() string {
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
 
-	if r.ExitEventID != "" {
-		vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
+	if r.ExitEventID != nil {
+		vals = append(vals, fmt.Sprintf("Exit Event ID|%d", r.ExitEventID))
 	}
 
 	buffer.WriteString("\n[DEPOSIT ERC 721]\n")
