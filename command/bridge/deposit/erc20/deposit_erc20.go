@@ -170,7 +170,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	g, ctx := errgroup.WithContext(cmd.Context())
+	exitEventIDsCh := make(chan *big.Int)
 	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
+
+	go func() {
+		for exitEventID := range exitEventIDsCh {
+			exitEventIDs = append(exitEventIDs, exitEventID)
+		}
+	}()
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
@@ -202,7 +209,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
 
-					exitEventIDs = append(exitEventIDs, exitEventID)
+					exitEventIDsCh <- exitEventID
 				}
 
 				return nil
@@ -215,6 +222,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		return
 	}
+
+	close(exitEventIDsCh)
 
 	outputter.SetCommandResult(&depositResult{
 		Sender:       depositorAddr.String(),
