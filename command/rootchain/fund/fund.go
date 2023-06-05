@@ -58,7 +58,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.stakeTokenAddr,
 		helper.StakeTokenFlag,
 		"",
-		helper.StakeTokenFlag,
+		helper.StakeTokenFlagDesc,
 	)
 
 	cmd.Flags().BoolVar(
@@ -91,7 +91,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerPrivateKey)
+	deployerKey, err := helper.DecodePrivateKey(params.deployerPrivateKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize deployer private key: %w", err))
 

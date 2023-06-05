@@ -49,7 +49,11 @@ const (
 )
 
 var (
+	// params are the parameters of CLI command
 	params deployParams
+
+	// consensusCfg contains consensus protocol configuration parameters
+	consensusCfg polybft.PolyBFTConfig
 
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
@@ -121,7 +125,7 @@ var (
 				NewStakeManager:      config.StakeManagerAddress,
 				NewBls:               config.BLSAddress,
 				NewStateSender:       config.StateSenderAddress,
-				NewMatic:             config.RootNativeERC20Address,
+				NewMatic:             types.StringToAddress(params.stakeTokenAddr),
 				NewChildValidatorSet: contracts.ValidatorSetContract,
 				NewExitHelper:        config.ExitHelperAddress,
 				NewDomain:            bls.DomainValidatorSetString,
@@ -144,12 +148,18 @@ var (
 			relayer txrelayer.TxRelayer,
 			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
+			// map root native token on rootchain only if it is non-mintable on a childchain
+			nativeTokenRootAddr := types.ZeroAddress
+			if !consensusCfg.NativeTokenConfig.IsMintable {
+				nativeTokenRootAddr = config.RootNativeERC20Address
+			}
+
 			inputParams := &contractsapi.InitializeRootERC20PredicateFn{
 				NewStateSender:         config.StateSenderAddress,
 				NewExitHelper:          config.ExitHelperAddress,
 				NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
 				NewChildTokenTemplate:  config.ERC20TemplateAddress,
-				NativeTokenRootAddress: config.RootNativeERC20Address,
+				NativeTokenRootAddress: nativeTokenRootAddr,
 			}
 
 			return initContract(fmt, relayer, inputParams,
@@ -262,7 +272,7 @@ func GetCommand() *cobra.Command {
 		&params.rootERC20TokenAddr,
 		erc20AddrFlag,
 		"",
-		"existing root chain ERC 20 token address",
+		"existing root chain root native token address",
 	)
 
 	cmd.Flags().StringVar(
@@ -288,6 +298,13 @@ func GetCommand() *cobra.Command {
 	)
 
 	cmd.Flags().StringVar(
+		&params.stakeTokenAddr,
+		helper.StakeTokenFlag,
+		"",
+		helper.StakeTokenFlagDesc,
+	)
+
+	cmd.Flags().StringVar(
 		&params.stakeManagerAddr,
 		helper.StakeManagerFlag,
 		"",
@@ -296,6 +313,7 @@ func GetCommand() *cobra.Command {
 
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
 	_ = cmd.MarkFlagRequired(helper.StakeManagerFlag)
+	_ = cmd.MarkFlagRequired(helper.StakeTokenFlag)
 
 	return cmd
 }
@@ -319,13 +337,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to retrieve consensus configuration: %w", err))
-
-		return
-	}
-
 	client, err := jsonrpc.NewClient(params.jsonRPCAddress)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize JSON RPC client for provided IP address: %s: %w",
@@ -334,8 +345,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	if consensusConfig.Bridge != nil {
-		code, err := client.Eth().GetCode(ethgo.Address(consensusConfig.Bridge.StateSenderAddr), ethgo.Latest)
+	if consensusCfg.Bridge != nil {
+		code, err := client.Eth().GetCode(ethgo.Address(consensusCfg.Bridge.StateSenderAddr), ethgo.Latest)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to check if rootchain contracts are deployed: %w", err))
 
@@ -350,7 +361,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	rootchainCfg, supernetID, err := deployContracts(outputter, client,
-		chainConfig.Params.ChainID, consensusConfig.InitialValidatorSet, cmd.Context())
+		chainConfig.Params.ChainID, consensusCfg.InitialValidatorSet, cmd.Context())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
 
@@ -359,14 +370,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	// populate bridge configuration
 	bridgeConfig := rootchainCfg.ToBridgeConfig()
-	if consensusConfig.Bridge != nil {
+	if consensusCfg.Bridge != nil {
 		// only true if stake-manager-deploy command was executed
 		// users can still deploy stake manager manually
 		// only used for e2e tests
-		bridgeConfig.StakeTokenAddr = consensusConfig.Bridge.StakeTokenAddr
+		bridgeConfig.StakeTokenAddr = consensusCfg.Bridge.StakeTokenAddr
 	}
 
-	consensusConfig.Bridge = bridgeConfig
+	consensusCfg.Bridge = bridgeConfig
 
 	// set event tracker start blocks for rootchain contract(s) of interest
 	blockNum, err := client.Eth().BlockNumber()
@@ -376,13 +387,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	consensusConfig.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
+	consensusCfg.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
 		rootchainCfg.StateSenderAddress: blockNum,
 	}
-	consensusConfig.SupernetID = supernetID
+	consensusCfg.SupernetID = supernetID
 
-	// write updated chain configuration
-	chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
+	// write updated consensus configuration
+	chainConfig.Params.Engine[polybft.ConsensusName] = consensusCfg
 
 	if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save chain configuration bridge data: %w", err))
@@ -404,7 +415,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
-	deployerKey, err := helper.GetRootchainPrivateKey(params.deployerKey)
+	deployerKey, err := helper.DecodePrivateKey(params.deployerKey)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to initialize deployer key: %w", err)
 	}
@@ -431,16 +442,19 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	tokenContracts := []*contractInfo{}
 
-	if params.rootERC20TokenAddr != "" {
-		// use existing root chain ERC20 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-			return nil, 0, err
+	// deploy root ERC20 token only if non-mintable native token flavor is used on a child chain
+	if !consensusCfg.NativeTokenConfig.IsMintable {
+		if params.rootERC20TokenAddr != "" {
+			// use existing root chain ERC20 token
+			if err := populateExistingTokenAddr(client.Eth(),
+				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
+				return nil, 0, err
+			}
+		} else {
+			// deploy MockERC20 as a root chain root native token
+			tokenContracts = append(tokenContracts,
+				&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
 		}
-	} else {
-		// deploy MockERC20 as a default root chain ERC20 token
-		tokenContracts = append(tokenContracts,
-			&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
 	}
 
 	if params.rootERC721TokenAddr != "" {

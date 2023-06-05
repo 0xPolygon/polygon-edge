@@ -59,8 +59,8 @@ func (r MessageResult) GetOutput() string {
 	return buffer.String()
 }
 
-// GetRootchainPrivateKey initializes a private key from provided raw private key
-func GetRootchainPrivateKey(rawKey string) (ethgo.Key, error) {
+// DecodePrivateKey decodes a private key from provided raw private key
+func DecodePrivateKey(rawKey string) (ethgo.Key, error) {
 	privateKeyRaw := TestAccountPrivKey
 	if rawKey != "" {
 		privateKeyRaw = rawKey
@@ -128,7 +128,7 @@ func ReadRootchainIP() (string, error) {
 // if not, it will return the key from the secrets manager
 func GetECDSAKey(privateKey, accountDir, accountConfig string) (ethgo.Key, error) {
 	if privateKey != "" {
-		key, err := GetRootchainPrivateKey(privateKey)
+		key, err := DecodePrivateKey(privateKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to initialize private key: %w", err)
 		}

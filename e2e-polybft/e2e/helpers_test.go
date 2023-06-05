@@ -11,8 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/contract"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -23,8 +26,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/require"
-	ethgow "github.com/umbracle/ethgo/wallet"
 )
 
 type e2eStateProvider struct {
@@ -42,27 +43,6 @@ func (s *e2eStateProvider) Call(contractAddr ethgo.Address, input []byte, opts *
 
 func (s *e2eStateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, error) {
 	return nil, errors.New("send txn is not supported")
-}
-
-// isExitEventProcessed queries ExitHelper and as a result returns indication whether given exit event id is processed
-func isExitEventProcessed(exitEventID uint64, exitHelper ethgo.Address, rootTxRelayer txrelayer.TxRelayer) (bool, error) {
-	result, err := ABICall(
-		rootTxRelayer,
-		contractsapi.ExitHelper,
-		exitHelper,
-		ethgo.ZeroAddress,
-		"processedExits",
-		new(big.Int).SetUint64(exitEventID))
-	if err != nil {
-		return false, err
-	}
-
-	isProcessed, err := types.ParseUint64orHex(&result)
-	if err != nil {
-		return false, err
-	}
-
-	return isProcessed == uint64(1), nil
 }
 
 // getCheckpointManagerValidators queries rootchain validator set on CheckpointManager contract
@@ -132,52 +112,6 @@ func ABITransaction(relayer txrelayer.TxRelayer, key ethgo.Key, artifact *artifa
 		To:    &contractAddress,
 		Input: input,
 	}, key)
-}
-
-func sendExitTransaction(
-	sidechainKey *ethgow.Key,
-	rootchainKey ethgo.Key,
-	proof types.Proof,
-	checkpointBlock uint64,
-	stateSenderData []byte,
-	l1ExitTestAddr,
-	exitHelperAddr ethgo.Address,
-	l1TxRelayer txrelayer.TxRelayer,
-	exitEventID uint64) (bool, error) {
-	var exitEventAPI contractsapi.L2StateSyncedEvent
-
-	proofExitEventEncoded, err := exitEventAPI.Encode(&polybft.ExitEvent{
-		ID:       exitEventID,
-		Sender:   sidechainKey.Address(),
-		Receiver: l1ExitTestAddr,
-		Data:     stateSenderData,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
-	if !ok {
-		return false, fmt.Errorf("could not get leaf index from exit event proof. Leaf from proof: %v", proof.Metadata["LeafIndex"])
-	}
-
-	receipt, err := ABITransaction(l1TxRelayer, rootchainKey, contractsapi.ExitHelper, exitHelperAddr,
-		"exit",
-		big.NewInt(int64(checkpointBlock)),
-		uint64(leafIndex),
-		proofExitEventEncoded,
-		proof.Data,
-	)
-
-	if err != nil {
-		return false, err
-	}
-
-	if receipt.Status != uint64(types.ReceiptSuccess) {
-		return false, errors.New("transaction execution failed")
-	}
-
-	return isExitEventProcessed(exitEventID, exitHelperAddr, l1TxRelayer)
 }
 
 func getExitProof(rpcAddress string, exitID uint64) (types.Proof, error) {
@@ -291,6 +225,37 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 	}
 }
 
+// setAccessListRole sets access list role to appropriate access list precompile
+func setAccessListRole(t *testing.T, cluster *framework.TestCluster, precompile, account types.Address,
+	role addresslist.Role, aclAdmin ethgo.Key) {
+	t.Helper()
+
+	var updateRoleFn *abi.Method
+
+	switch role {
+	case addresslist.AdminRole:
+		updateRoleFn = addresslist.SetAdminFunc
+
+		break
+	case addresslist.EnabledRole:
+		updateRoleFn = addresslist.SetEnabledFunc
+
+		break
+	case addresslist.NoRole:
+		updateRoleFn = addresslist.SetNoneFunc
+
+		break
+	}
+
+	input, err := updateRoleFn.Encode([]interface{}{account})
+	require.NoError(t, err)
+
+	enableSetTxn := cluster.MethodTxn(t, aclAdmin, precompile, input)
+	require.NoError(t, enableSetTxn.Wait())
+
+	expectRole(t, cluster, precompile, account, role)
+}
+
 func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Address, addr types.Address, role addresslist.Role) {
 	t.Helper()
 	out := cluster.Call(t, contract, addresslist.ReadAddressListFunc, addr)
@@ -301,4 +266,45 @@ func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Add
 	}
 
 	require.Equal(t, role.Uint64(), num.Uint64())
+}
+
+// getFilteredLogs retrieves Ethereum logs, described by event signature within the block range
+func getFilteredLogs(eventSig ethgo.Hash, startBlock, endBlock uint64,
+	ethEndpoint *jsonrpc.Eth) ([]*ethgo.Log, error) {
+	filter := &ethgo.LogFilter{Topics: [][]*ethgo.Hash{{&eventSig}}}
+
+	filter.SetFromUint64(startBlock)
+	filter.SetToUint64(endBlock)
+
+	return ethEndpoint.GetLogs(filter)
+}
+
+// erc20BalanceOf returns balance of given account on ERC 20 token
+func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address, relayer txrelayer.TxRelayer) *big.Int {
+	t.Helper()
+
+	balanceOfFn := &contractsapi.BalanceOfRootERC20Fn{Account: account}
+	balanceOfInput, err := balanceOfFn.EncodeAbi()
+	require.NoError(t, err)
+
+	balanceRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(tokenAddr), balanceOfInput)
+	require.NoError(t, err)
+	balance, err := types.ParseUint256orHex(&balanceRaw)
+	require.NoError(t, err)
+
+	return balance
+}
+
+// erc721OwnerOf returns owner of given ERC 721 token
+func erc721OwnerOf(t *testing.T, tokenID *big.Int, tokenAddr types.Address, relayer txrelayer.TxRelayer) types.Address {
+	t.Helper()
+
+	ownerOfFn := &contractsapi.OwnerOfChildERC721Fn{TokenID: tokenID}
+	ownerOfInput, err := ownerOfFn.EncodeAbi()
+	require.NoError(t, err)
+
+	ownerRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(tokenAddr), ownerOfInput)
+	require.NoError(t, err)
+
+	return types.StringToAddress(ownerRaw)
 }

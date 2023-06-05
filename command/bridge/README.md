@@ -13,10 +13,11 @@ $ polygon-edge bridge deposit-erc20 \
     --amounts <amounts> \
     --root-token <root_erc20_token_address> \
     --root-predicate <root_erc20_predicate_address> \
-    --json-rpc <root_chain_json_rpc_endpoint>
+    --json-rpc <json_rpc_endpoint>
+    [--minter-key <hex_encoded_minter_account_private_key>]
 ```
 
-**Note:** for using test account provided by Geth dev instance, use `--test` flag. In that case `--sender-key` flag can be omitted and test account is used as a depositor.
+**Note:** in case `minter-key` is provided, tokens are going to be minted to sender account. Note that provided minter private key must belong to the account which has minter role.
 
 ## Withdraw ERC20
 
@@ -27,9 +28,9 @@ $ polygon-edge bridge withdraw-erc20 \
     --sender-key <hex_encoded_txn_sender_private_key> \
     --receivers <receivers_addresses> \
     --amounts <amounts> \
-    --child-predicate <rchild_erc20_predicate_address> \
+    --child-predicate <child_erc20_predicate_address> \
     [--child-token <child_erc20_token_address>] \
-    --json-rpc <child_chain_json_rpc_endpoint>
+    --json-rpc <json_rpc_endpoint>
 ```
 
 ## Exit
