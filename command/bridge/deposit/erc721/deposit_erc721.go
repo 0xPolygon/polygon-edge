@@ -1,14 +1,12 @@
 package deposit
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -186,19 +184,23 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	res := &depositResult{
-		Sender:    depositorAddr.String(),
-		Receivers: dp.Receivers,
-		TokenIDs:  dp.TokenIDs,
+	res := &common.BridgeTxResult{
+		Sender:       depositorAddr.String(),
+		Receivers:    dp.Receivers,
+		TokenIDs:     dp.TokenIDs,
+		BlockNumbers: []uint64{receipt.BlockNumber},
+		Title:        "DEPOSIT ERC 721",
 	}
 
 	if dp.ChildChainMintable {
-		res.ExitEventID, err = common.ExtractExitEventID(receipt)
+		exitEventID, err := common.ExtractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
+
+		res.ExitEventIDs = []*big.Int{exitEventID}
 	}
 
 	outputter.SetCommandResult(res)
@@ -265,30 +267,4 @@ func createApproveERC721PredicateTxn(rootERC721Predicate, rootERC721Token types.
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-type depositResult struct {
-	Sender      string   `json:"sender"`
-	Receivers   []string `json:"receivers"`
-	TokenIDs    []string `json:"tokenIDs"`
-	ExitEventID *big.Int `json:"exitEventId"`
-}
-
-func (r *depositResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 3)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
-
-	if r.ExitEventID != nil {
-		vals = append(vals, fmt.Sprintf("Exit Event ID|%d", r.ExitEventID))
-	}
-
-	buffer.WriteString("\n[DEPOSIT ERC 721]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

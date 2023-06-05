@@ -1,7 +1,6 @@
 package erc1155
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"strings"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -212,20 +210,24 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	res := &depositResult{
-		Sender:    depositorAddr.String(),
-		Receivers: dp.Receivers,
-		Amounts:   dp.Amounts,
-		TokenIDs:  dp.TokenIDs,
+	res := &common.BridgeTxResult{
+		Sender:       depositorAddr.String(),
+		Receivers:    dp.Receivers,
+		Amounts:      dp.Amounts,
+		TokenIDs:     dp.TokenIDs,
+		BlockNumbers: []uint64{receipt.BlockNumber},
+		Title:        "DEPOSIT ERC 1155",
 	}
 
 	if dp.ChildChainMintable {
-		res.ExitEventID, err = common.ExtractExitEventID(receipt)
+		exitEventID, err := common.ExtractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
+
+		res.ExitEventIDs = []*big.Int{exitEventID}
 	}
 
 	outputter.SetCommandResult(res)
@@ -297,32 +299,4 @@ func createApproveERC1155PredicateTxn(rootERC1155Predicate,
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-type depositResult struct {
-	Sender      string   `json:"sender"`
-	Receivers   []string `json:"receivers"`
-	Amounts     []string `json:"amounts"`
-	TokenIDs    []string `json:"tokenIds"`
-	ExitEventID *big.Int `json:"exitEventId"`
-}
-
-func (r *depositResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 4)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
-
-	if r.ExitEventID != nil {
-		vals = append(vals, fmt.Sprintf("Exit Event ID|%d", r.ExitEventID))
-	}
-
-	buffer.WriteString("\n[DEPOSIT ERC1155]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

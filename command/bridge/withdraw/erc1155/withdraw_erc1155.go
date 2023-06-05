@@ -1,11 +1,9 @@
 package erc1155
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -150,21 +147,24 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	res := &withdrawResult{
-		Sender:      senderAccount.Address().String(),
-		Receivers:   wp.Receivers,
-		Amounts:     wp.Amounts,
-		TokenIDs:    wp.TokenIDs,
-		BlockNumber: strconv.FormatUint(receipt.BlockNumber, 10),
+	res := &common.BridgeTxResult{
+		Sender:       senderAccount.Address().String(),
+		Receivers:    wp.Receivers,
+		Amounts:      wp.Amounts,
+		TokenIDs:     wp.TokenIDs,
+		BlockNumbers: []uint64{receipt.BlockNumber},
+		Title:        "WITHDRAW ERC 1155",
 	}
 
 	if !wp.ChildChainMintable {
-		res.ExitEventID, err = common.ExtractExitEventID(receipt)
+		exitEventID, err := common.ExtractExitEventID(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
 			return
 		}
+
+		res.ExitEventIDs = []*big.Int{exitEventID}
 	}
 
 	outputter.SetCommandResult(res)
@@ -190,35 +190,4 @@ func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) 
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-type withdrawResult struct {
-	Sender      string   `json:"sender"`
-	Receivers   []string `json:"receivers"`
-	Amounts     []string `json:"amounts"`
-	TokenIDs    []string `json:"TokenIDs"`
-	ExitEventID *big.Int `json:"exitEventID"`
-	BlockNumber string   `json:"blockNumber"`
-}
-
-func (r *withdrawResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 6)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
-
-	if r.ExitEventID != nil {
-		vals = append(vals, fmt.Sprintf("Exit Event ID|%d", r.ExitEventID))
-	}
-
-	vals = append(vals, fmt.Sprintf("Inclusion Block Number|%s", r.BlockNumber))
-
-	buffer.WriteString("\n[WITHDRAW ERC1155]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }
