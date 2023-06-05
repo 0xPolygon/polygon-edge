@@ -168,6 +168,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	g, ctx := errgroup.WithContext(cmd.Context())
 	exitEventIDsCh := make(chan *big.Int, len(dp.Receivers))
+	blockNumbersCh := make(chan uint64, len(dp.Receivers))
 	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
 	blockNumbers := make([]uint64, 0, len(dp.Receivers))
 
@@ -195,7 +196,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
-				blockNumbers = append(blockNumbers, receipt.BlockNumber)
+				blockNumbersCh <- receipt.BlockNumber
 
 				if dp.ChildChainMintable {
 					exitEventID, err := common.ExtractExitEventID(receipt)
@@ -218,9 +219,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	close(exitEventIDsCh)
+	close(blockNumbersCh)
 
 	for exitEventID := range exitEventIDsCh {
 		exitEventIDs = append(exitEventIDs, exitEventID)
+	}
+
+	for blockNum := range blockNumbersCh {
+		blockNumbers = append(blockNumbers, blockNum)
 	}
 
 	outputter.SetCommandResult(
