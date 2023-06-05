@@ -168,7 +168,7 @@ type BridgeTxResult struct {
 	TokenIDs     []string   `json:"tokenIds"`
 	BlockNumbers []uint64   `json:"blockNumbers"`
 
-	Title string
+	Title string `json:"title"`
 }
 
 func (r *BridgeTxResult) GetOutput() string {
