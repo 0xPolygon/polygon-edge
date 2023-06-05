@@ -1,10 +1,8 @@
 package erc20
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -12,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -171,7 +168,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	g, ctx := errgroup.WithContext(cmd.Context())
 	exitEventIDsCh := make(chan *big.Int, len(dp.Receivers))
+	blockNumbersCh := make(chan uint64, len(dp.Receivers))
 	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
+	blockNumbers := make([]uint64, 0, len(dp.Receivers))
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
@@ -197,6 +196,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
+				blockNumbersCh <- receipt.BlockNumber
+
 				if dp.ChildChainMintable {
 					exitEventID, err := common.ExtractExitEventID(receipt)
 					if err != nil {
@@ -218,17 +219,25 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	close(exitEventIDsCh)
+	close(blockNumbersCh)
 
 	for exitEventID := range exitEventIDsCh {
 		exitEventIDs = append(exitEventIDs, exitEventID)
 	}
 
-	outputter.SetCommandResult(&depositResult{
-		Sender:       depositorAddr.String(),
-		Receivers:    dp.Receivers,
-		ExitEventIDs: exitEventIDs,
-		Amounts:      dp.Amounts,
-	})
+	for blockNum := range blockNumbersCh {
+		blockNumbers = append(blockNumbers, blockNum)
+	}
+
+	outputter.SetCommandResult(
+		&common.BridgeTxResult{
+			Sender:       depositorAddr.String(),
+			Receivers:    dp.Receivers,
+			Amounts:      dp.Amounts,
+			ExitEventIDs: exitEventIDs,
+			BlockNumbers: blockNumbers,
+			Title:        "DEPOSIT ERC 20",
+		})
 }
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
@@ -251,40 +260,4 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-type depositResult struct {
-	Sender       string     `json:"sender"`
-	Receivers    []string   `json:"receivers"`
-	Amounts      []string   `json:"amounts"`
-	ExitEventIDs []*big.Int `json:"exitEventIds"`
-}
-
-func (r *depositResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 3)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-
-	if len(r.ExitEventIDs) > 0 {
-		var buf bytes.Buffer
-
-		for i, id := range r.ExitEventIDs {
-			buf.WriteString(id.String())
-
-			if i != len(r.ExitEventIDs)-1 {
-				buf.WriteString(",")
-			}
-		}
-
-		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", buf.String()))
-	}
-
-	buffer.WriteString("\n[DEPOSIT ERC 20]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

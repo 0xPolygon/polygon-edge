@@ -1,12 +1,9 @@
 package erc20
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math/big"
-	"strconv"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -14,7 +11,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -93,7 +89,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	exitEventIDs := make([]*big.Int, 0, len(wp.Receivers))
-	blockNumbers := make([]string, len(wp.Receivers))
+	blockNumbers := make([]uint64, len(wp.Receivers))
 
 	for i := range wp.Receivers {
 		receiver := wp.Receivers[i]
@@ -139,16 +135,17 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			exitEventIDs = append(exitEventIDs, exitEventID)
 		}
 
-		blockNumbers[i] = strconv.FormatUint(receipt.BlockNumber, 10)
+		blockNumbers[i] = receipt.BlockNumber
 	}
 
 	outputter.SetCommandResult(
-		&withdrawResult{
+		&common.BridgeTxResult{
 			Sender:       senderAccount.Address().String(),
 			Receivers:    wp.Receivers,
 			Amounts:      wp.Amounts,
 			ExitEventIDs: exitEventIDs,
 			BlockNumbers: blockNumbers,
+			Title:        "WITHDRAW ERC 20",
 		})
 }
 
@@ -171,43 +168,4 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-type withdrawResult struct {
-	Sender       string     `json:"sender"`
-	Receivers    []string   `json:"receivers"`
-	Amounts      []string   `json:"amounts"`
-	ExitEventIDs []*big.Int `json:"exitEventIDs"`
-	BlockNumbers []string   `json:"blockNumbers"`
-}
-
-func (r *withdrawResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 5)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-
-	if len(r.ExitEventIDs) > 0 {
-		var buf bytes.Buffer
-
-		for i, id := range r.ExitEventIDs {
-			buf.WriteString(id.String())
-
-			if i != len(r.ExitEventIDs)-1 {
-				buf.WriteString(",")
-			}
-		}
-
-		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", buf.String()))
-	}
-
-	vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", strings.Join(r.BlockNumbers, ", ")))
-
-	buffer.WriteString("\n[WITHDRAW ERC 20]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

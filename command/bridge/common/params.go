@@ -1,12 +1,16 @@
 package common
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
 
+	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 )
@@ -154,4 +158,65 @@ func ExtractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	}
 
 	return nil, errors.New("failed to find exit event log")
+}
+
+type BridgeTxResult struct {
+	Sender       string     `json:"sender"`
+	Receivers    []string   `json:"receivers"`
+	ExitEventIDs []*big.Int `json:"exitEventIDs"`
+	Amounts      []string   `json:"amounts"`
+	TokenIDs     []string   `json:"tokenIds"`
+	BlockNumbers []uint64   `json:"blockNumbers"`
+
+	Title string `json:"title"`
+}
+
+func (r *BridgeTxResult) GetOutput() string {
+	var buffer bytes.Buffer
+
+	vals := make([]string, 0, 5)
+	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
+	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
+
+	if len(r.Amounts) > 0 {
+		vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
+	}
+
+	if len(r.TokenIDs) > 0 {
+		vals = append(vals, fmt.Sprintf("Token Ids|%s", strings.Join(r.TokenIDs, ", ")))
+	}
+
+	if len(r.ExitEventIDs) > 0 {
+		var buf bytes.Buffer
+
+		for i, id := range r.ExitEventIDs {
+			buf.WriteString(id.String())
+
+			if i != len(r.ExitEventIDs)-1 {
+				buf.WriteString(", ")
+			}
+		}
+
+		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", buf.String()))
+	}
+
+	if len(r.BlockNumbers) > 0 {
+		var buf bytes.Buffer
+
+		for i, blockNum := range r.BlockNumbers {
+			buf.WriteString(fmt.Sprintf("%d", blockNum))
+
+			if i != len(r.BlockNumbers)-1 {
+				buf.WriteString(", ")
+			}
+		}
+
+		vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", buf.String()))
+	}
+
+	_, _ = buffer.WriteString(fmt.Sprintf("\n[%s]\n", r.Title))
+	_, _ = buffer.WriteString(cmdHelper.FormatKV(vals))
+	_, _ = buffer.WriteString("\n")
+
+	return buffer.String()
 }
