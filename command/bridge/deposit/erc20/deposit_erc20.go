@@ -170,14 +170,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	g, ctx := errgroup.WithContext(cmd.Context())
-	exitEventIDsCh := make(chan *big.Int)
+	exitEventIDsCh := make(chan *big.Int, len(dp.Receivers))
 	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
-
-	go func() {
-		for exitEventID := range exitEventIDsCh {
-			exitEventIDs = append(exitEventIDs, exitEventID)
-		}
-	}()
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
@@ -224,6 +218,10 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	close(exitEventIDsCh)
+
+	for exitEventID := range exitEventIDsCh {
+		exitEventIDs = append(exitEventIDs, exitEventID)
+	}
 
 	outputter.SetCommandResult(&depositResult{
 		Sender:       depositorAddr.String(),
