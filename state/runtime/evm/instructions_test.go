@@ -359,6 +359,57 @@ func TestCreate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "should set zero address if contract call throws any error for CREATE2",
+			op:   CREATE2,
+			contract: &runtime.Contract{
+				Static:  false,
+				Address: addr1,
+			},
+			config: &chain.ForksInTime{
+				Homestead:      true,
+				Constantinople: true,
+			},
+			initState: &state{
+				gas: 1000,
+				sp:  4,
+				stack: []*big.Int{
+					big.NewInt(0x01), // salt
+					big.NewInt(0x01), // length
+					big.NewInt(0x00), // offset
+					big.NewInt(0x00), // value
+				},
+				memory: []byte{
+					byte(REVERT),
+				},
+				stop: false,
+				err:  nil,
+			},
+			// during creation of code with length 1 for CREATE2 op code, 985 gas units are spent by buildCreateContract()
+			resultState: &state{
+				gas: 15,
+				sp:  1,
+				stack: []*big.Int{
+					big.NewInt(0x01).SetInt64(0x00),
+					big.NewInt(0x01),
+					big.NewInt(0x00),
+					big.NewInt(0x00),
+				},
+				memory: []byte{
+					byte(REVERT),
+				},
+				stop: false,
+				err:  nil,
+			},
+			mockHost: &mockHostForInstructions{
+				nonce: 0,
+				callxResult: &runtime.ExecutionResult{
+					// if it is ErrCodeStoreOutOfGas then we set GasLeft to 0
+					GasLeft: 0,
+					Err:     runtime.ErrCodeStoreOutOfGas,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
