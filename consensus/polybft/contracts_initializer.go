@@ -30,7 +30,7 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 		NewStateReceiver:    contracts.StateReceiverContract,
 		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		InitalValidators:    initialValidators,
+		InitialValidators:   initialValidators,
 	}
 
 	return initFn.EncodeAbi()
