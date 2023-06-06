@@ -910,7 +910,10 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	}
 
 	if txn.GasPrice == 0 {
-		txn.GasPrice = txrelayer.DefaultGasPrice
+		gasPrice, err := client.Eth().GasPrice()
+		require.NoError(t, err)
+
+		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
