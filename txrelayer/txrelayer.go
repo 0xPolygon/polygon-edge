@@ -103,7 +103,12 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	txn.Nonce = nonce
 
 	if txn.GasPrice == 0 {
-		txn.GasPrice = DefaultGasPrice
+		gasPrice, err := t.Client().Eth().GasPrice()
+		if err != nil {
+			return ethgo.ZeroHash, err
+		}
+
+		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
