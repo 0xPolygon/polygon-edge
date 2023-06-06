@@ -59,7 +59,7 @@ test-e2e-polybft:
     # We can not build with race because of a bug in boltdb dependency
 	go build -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
-	go test -v -timeout=1h ./e2e-polybft/e2e/...
+	go test -v -timeout=1h10m ./e2e-polybft/e2e/...
 
 .PHONY: test-property-polybft
 test-property-polybft:
@@ -77,3 +77,15 @@ compile-core-contracts:
 generate-smart-contract-bindings:
 	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
 	go run ./consensus/polybft/contractsapi/bindings-gen/main.go
+
+.PHONY: run-docker
+run-docker:
+	./scripts/cluster polybft --docker
+
+.PHONY: stop-docker
+stop-docker:
+	./scripts/cluster polybft --docker stop
+
+.PHONY: destroy-docker
+destroy-docker:
+	./scripts/cluster polybft --docker destroy

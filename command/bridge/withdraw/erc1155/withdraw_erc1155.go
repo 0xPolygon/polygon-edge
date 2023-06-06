@@ -1,12 +1,9 @@
 package erc1155
 
 import (
-	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -15,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -30,24 +26,12 @@ var (
 func GetCommand() *cobra.Command {
 	withdrawCmd := &cobra.Command{
 		Use:     "withdraw-erc1155",
-		Short:   "Withdraws ERC 1155 tokens from the child chain to the root chain",
+		Short:   "Withdraws ERC 1155 tokens from the destination to the origin chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
-	withdrawCmd.Flags().StringVar(
-		&wp.SenderKey,
-		common.SenderKeyFlag,
-		"",
-		"withdraw transaction sender hex-encoded private key",
-	)
-
-	withdrawCmd.Flags().StringSliceVar(
-		&wp.Receivers,
-		common.ReceiversFlag,
-		nil,
-		"receiving accounts addresses on the root chain",
-	)
+	wp.RegisterCommonFlags(withdrawCmd)
 
 	withdrawCmd.Flags().StringSliceVar(
 		&wp.Amounts,
@@ -75,13 +59,6 @@ func GetCommand() *cobra.Command {
 		common.ChildTokenFlag,
 		contracts.ChildERC1155Contract.String(),
 		"ERC 1155 child chain token address",
-	)
-
-	withdrawCmd.Flags().StringVar(
-		&wp.JSONRPCAddr,
-		common.JSONRPCFlag,
-		"http://127.0.0.1:9545",
-		"the JSON RPC child chain endpoint",
 	)
 
 	_ = withdrawCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -170,22 +147,27 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	exitEventID, err := extractExitEventID(receipt)
-	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
-
-		return
+	res := &common.BridgeTxResult{
+		Sender:       senderAccount.Address().String(),
+		Receivers:    wp.Receivers,
+		Amounts:      wp.Amounts,
+		TokenIDs:     wp.TokenIDs,
+		BlockNumbers: []uint64{receipt.BlockNumber},
+		Title:        "WITHDRAW ERC 1155",
 	}
 
-	outputter.SetCommandResult(
-		&withdrawResult{
-			Sender:      senderAccount.Address().String(),
-			Receivers:   wp.Receivers,
-			Amounts:     wp.Amounts,
-			TokenIDs:    wp.TokenIDs,
-			ExitEventID: strconv.FormatUint(exitEventID.Uint64(), 10),
-			BlockNumber: strconv.FormatUint(receipt.BlockNumber, 10),
-		})
+	if !wp.ChildChainMintable {
+		exitEventID, err := common.ExtractExitEventID(receipt)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
+
+			return
+		}
+
+		res.ExitEventIDs = []*big.Int{exitEventID}
+	}
+
+	outputter.SetCommandResult(res)
 }
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
@@ -208,50 +190,4 @@ func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) 
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-// extractExitEventID tries to extract exit event id from provided receipt
-func extractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
-	var exitEvent contractsapi.L2StateSyncedEvent
-	for _, log := range receipt.Logs {
-		doesMatch, err := exitEvent.ParseLog(log)
-		if err != nil {
-			return nil, err
-		}
-
-		if !doesMatch {
-			continue
-		}
-
-		return exitEvent.ID, nil
-	}
-
-	return nil, errors.New("failed to find exit event log")
-}
-
-type withdrawResult struct {
-	Sender      string   `json:"sender"`
-	Receivers   []string `json:"receivers"`
-	Amounts     []string `json:"amounts"`
-	TokenIDs    []string `json:"TokenIDs"`
-	ExitEventID string   `json:"exitEventID"`
-	BlockNumber string   `json:"blockNumber"`
-}
-
-func (r *withdrawResult) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 6)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-	vals = append(vals, fmt.Sprintf("Token IDs|%s", strings.Join(r.TokenIDs, ", ")))
-	vals = append(vals, fmt.Sprintf("Exit Event ID|%s", r.ExitEventID))
-	vals = append(vals, fmt.Sprintf("Inclusion Block Number|%s", r.BlockNumber))
-
-	buffer.WriteString("\n[WITHDRAW ERC1155]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

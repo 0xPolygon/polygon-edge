@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 // the test initializes polybft and chain mock (map of headers) after which a new header is verified
@@ -270,4 +272,76 @@ func Test_Factory(t *testing.T) {
 	assert.Equal(t, txPool, polybft.txPool)
 	assert.Equal(t, epochSize, polybft.consensusConfig.EpochSize)
 	assert.Equal(t, params, polybft.config)
+}
+
+func Test_GenesisPostHookFactory(t *testing.T) {
+	t.Parallel()
+
+	const (
+		epochSize     = 15
+		maxValidators = 150
+	)
+
+	validators := validator.NewTestValidators(t, 6)
+	bridgeCfg := createTestBridgeConfig()
+	cases := []struct {
+		name            string
+		config          *PolyBFTConfig
+		bridgeAllowList *chain.AddressListConfig
+		expectedErr     error
+	}{
+		{
+			name: "non-mintable native token; access lists disabled",
+			config: &PolyBFTConfig{
+				InitialValidatorSet: validators.GetParamValidators(),
+				Bridge:              bridgeCfg,
+				EpochSize:           epochSize,
+				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
+				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
+				MaxValidatorSetSize: maxValidators,
+			},
+		},
+		{
+			name: "mintable native token; access lists enabled",
+			config: &PolyBFTConfig{
+				InitialValidatorSet: validators.GetParamValidators(),
+				Bridge:              bridgeCfg,
+				EpochSize:           epochSize,
+				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
+				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
+				MaxValidatorSetSize: maxValidators,
+			},
+			bridgeAllowList: &chain.AddressListConfig{
+				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},
+				EnabledAddresses: []types.Address{validators.Validators["1"].Address()},
+			},
+		},
+		{
+			name:        "missing bridge configuration",
+			config:      &PolyBFTConfig{},
+			expectedErr: errMissingBridgeConfig,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			params := &chain.Params{
+				Engine:          map[string]interface{}{ConsensusName: tc.config},
+				BridgeAllowList: tc.bridgeAllowList,
+			}
+			chainConfig := &chain.Chain{Params: params}
+			initHandler := GenesisPostHookFactory(chainConfig, ConsensusName)
+			require.NotNil(t, initHandler)
+
+			transition := newTestTransition(t, nil)
+			if tc.expectedErr == nil {
+				require.NoError(t, initHandler(transition))
+			} else {
+				require.ErrorIs(t, initHandler(transition), tc.expectedErr)
+			}
+		})
+	}
 }

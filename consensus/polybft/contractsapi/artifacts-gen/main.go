@@ -6,9 +6,15 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
+
+	"github.com/dave/jennifer/jen"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/dave/jennifer/jen"
+)
+
+const (
+	extension = ".sol"
 )
 
 func main() {
@@ -49,7 +55,15 @@ func main() {
 		},
 		{
 			"child/ChildERC20PredicateAccessList.sol",
-			"ChildERC20PredicateAccessList",
+			"ChildERC20PredicateACL",
+		},
+		{
+			"child/RootMintableERC20Predicate.sol",
+			"RootMintableERC20Predicate",
+		},
+		{
+			"child/RootMintableERC20PredicateAccessList.sol",
+			"RootMintableERC20PredicateACL",
 		},
 		{
 			"child/ChildERC721.sol",
@@ -61,7 +75,15 @@ func main() {
 		},
 		{
 			"child/ChildERC721PredicateAccessList.sol",
-			"ChildERC721PredicateAccessList",
+			"ChildERC721PredicateACL",
+		},
+		{
+			"child/RootMintableERC721Predicate.sol",
+			"RootMintableERC721Predicate",
+		},
+		{
+			"child/RootMintableERC721PredicateAccessList.sol",
+			"RootMintableERC721PredicateACL",
 		},
 		{
 			"child/ChildERC1155.sol",
@@ -73,7 +95,15 @@ func main() {
 		},
 		{
 			"child/ChildERC1155PredicateAccessList.sol",
-			"ChildERC1155PredicateAccessList",
+			"ChildERC1155PredicateACL",
+		},
+		{
+			"child/RootMintableERC1155Predicate.sol",
+			"RootMintableERC1155Predicate",
+		},
+		{
+			"child/RootMintableERC1155PredicateAccessList.sol",
+			"RootMintableERC1155PredicateACL",
 		},
 		{
 			"child/System.sol",
@@ -112,6 +142,10 @@ func main() {
 			"RootERC20Predicate",
 		},
 		{
+			"root/ChildMintableERC20Predicate.sol",
+			"ChildMintableERC20Predicate",
+		},
+		{
 			"mocks/MockERC721.sol",
 			"MockERC721",
 		},
@@ -120,12 +154,20 @@ func main() {
 			"RootERC721Predicate",
 		},
 		{
+			"root/ChildMintableERC721Predicate.sol",
+			"ChildMintableERC721Predicate",
+		},
+		{
 			"mocks/MockERC1155.sol",
 			"MockERC1155",
 		},
 		{
 			"root/RootERC1155Predicate.sol",
 			"RootERC1155Predicate",
+		},
+		{
+			"root/ChildMintableERC1155Predicate.sol",
+			"ChildMintableERC1155Predicate",
 		},
 		{
 			"root/staking/CustomSupernetManager.sol",
@@ -146,7 +188,7 @@ func main() {
 	}
 
 	for _, v := range readContracts {
-		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, v.Name)
+		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, getContractName(v.Path))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -163,4 +205,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// getContractName extracts smart contract name from provided path
+func getContractName(path string) string {
+	pathSegments := strings.Split(path, string([]rune{os.PathSeparator}))
+	nameSegment := pathSegments[len(pathSegments)-1]
+
+	return strings.Split(nameSegment, extension)[0]
 }

@@ -104,13 +104,13 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	)
 
 	if params.isTestMode {
-		deployerKey, err = rootHelper.GetRootchainPrivateKey("")
+		deployerKey, err = rootHelper.DecodePrivateKey("")
 	} else {
 		deployerKey, err = rootHelper.GetECDSAKey(params.privateKey, params.accountDir, params.accountConfig)
 	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("faield to get deployer key: %w", err)
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC))
@@ -124,7 +124,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return err
+			return fmt.Errorf("faield to send local transaction: %w", err)
 		}
 	}
 
@@ -213,7 +213,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	// write updated chain configuration
 	chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
 
-	if err := helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
+	if err = helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 		return fmt.Errorf("failed to save chain configuration bridge data: %w", err)
 	}
 
@@ -226,7 +226,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 	stakeManagerAddress types.Address,
 	stakeTokenAddress types.Address,
 	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeStakeManagerFn{MATIC_: stakeTokenAddress}
+	initFn := &contractsapi.InitializeStakeManagerFn{NewMatic: stakeTokenAddress}
 
 	input, err := initFn.EncodeAbi()
 	if err != nil {

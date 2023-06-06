@@ -1,8 +1,11 @@
 package deploy
 
 import (
+	"errors"
 	"fmt"
 	"os"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 )
 
 const (
@@ -17,6 +20,7 @@ type deployParams struct {
 	genesisPath          string
 	deployerKey          string
 	jsonRPCAddress       string
+	stakeTokenAddr       string
 	rootERC20TokenAddr   string
 	rootERC721TokenAddr  string
 	rootERC1155TokenAddr string
@@ -25,8 +29,28 @@ type deployParams struct {
 }
 
 func (ip *deployParams) validateFlags() error {
-	if _, err := os.Stat(ip.genesisPath); err != nil {
+	var err error
+
+	if _, err = os.Stat(ip.genesisPath); err != nil {
 		return fmt.Errorf("provided genesis path '%s' is invalid. Error: %w ", ip.genesisPath, err)
+	}
+
+	consensusCfg, err = polybft.LoadPolyBFTConfig(ip.genesisPath)
+	if err != nil {
+		return err
+	}
+
+	if consensusCfg.NativeTokenConfig == nil {
+		return errors.New("native token configuration is undefined")
+	}
+
+	// when using mintable native token, child native token on root chain gets mapped automatically
+	if consensusCfg.NativeTokenConfig.IsMintable && ip.rootERC20TokenAddr != "" {
+		return errors.New("if child chain native token is mintable, root native token must not pre-exist on root chain")
+	}
+
+	if params.stakeTokenAddr == "" {
+		return errors.New("stake token address is not provided")
 	}
 
 	return nil

@@ -487,7 +487,7 @@ func newDummyTxRelayer(t *testing.T) *dummyTxRelayer {
 	return &dummyTxRelayer{test: t}
 }
 
-func (d dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
+func (d *dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	args := d.Called(from, to, input)
 
 	return args.String(0), args.Error(1)

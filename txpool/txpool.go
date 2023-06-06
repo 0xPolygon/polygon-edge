@@ -55,7 +55,6 @@ var (
 	ErrOversizedData           = errors.New("oversized data")
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
-	ErrSmartContractRestricted = errors.New("smart contract deployment restricted")
 	ErrInvalidTxType           = errors.New("invalid tx type")
 	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
 	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
@@ -94,10 +93,9 @@ type signer interface {
 }
 
 type Config struct {
-	PriceLimit          uint64
-	MaxSlots            uint64
-	MaxAccountEnqueued  uint64
-	DeploymentWhitelist []types.Address
+	PriceLimit         uint64
+	MaxSlots           uint64
+	MaxAccountEnqueued uint64
 }
 
 /* All requests are passed to the main loop
@@ -182,50 +180,12 @@ type TxPool struct {
 	// Event manager for txpool events
 	eventManager *eventManager
 
-	// deploymentWhitelist map
-	deploymentWhitelist deploymentWhitelist
-
 	// indicates which txpool operator commands should be implemented
 	proto.UnimplementedTxnPoolOperatorServer
 
 	// pending is the list of pending and ready transactions. This variable
 	// is accessed with atomics
 	pending int64
-}
-
-// deploymentWhitelist map which contains all addresses which can deploy contracts
-// if empty anyone can
-type deploymentWhitelist struct {
-	// Contract deployment whitelist
-	addresses map[string]bool
-}
-
-// add an address to deploymentWhitelist map
-func (w *deploymentWhitelist) add(addr types.Address) {
-	w.addresses[addr.String()] = true
-}
-
-// allowed checks if address can deploy smart contract
-func (w *deploymentWhitelist) allowed(addr types.Address) bool {
-	if len(w.addresses) == 0 {
-		return true
-	}
-
-	_, ok := w.addresses[addr.String()]
-
-	return ok
-}
-
-func newDeploymentWhitelist(deploymentWhitelistRaw []types.Address) deploymentWhitelist {
-	deploymentWhitelist := deploymentWhitelist{
-		addresses: map[string]bool{},
-	}
-
-	for _, addr := range deploymentWhitelistRaw {
-		deploymentWhitelist.add(addr)
-	}
-
-	return deploymentWhitelist
 }
 
 // NewTxPool returns a new pool for processing incoming transactions.
@@ -270,9 +230,6 @@ func NewTxPool(
 
 		pool.topic = topic
 	}
-
-	// initialize deployment whitelist
-	pool.deploymentWhitelist = newDeploymentWhitelist(config.DeploymentWhitelist)
 
 	if grpcServer != nil {
 		proto.RegisterTxnPoolOperatorServer(grpcServer, pool)
@@ -607,14 +564,8 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() {
-		if !p.deploymentWhitelist.allowed(tx.From) {
-			return ErrSmartContractRestricted
-		}
-
-		if p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
-			return runtime.ErrMaxCodeSizeExceeded
-		}
+	if tx.IsContractCreation() && p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
+		return runtime.ErrMaxCodeSizeExceeded
 	}
 
 	if tx.Type == types.DynamicFeeTx {

@@ -1,10 +1,12 @@
 package framework
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -199,18 +201,35 @@ func (t *TestServer) Stop() {
 
 // RootchainFund funds given validator account on the rootchain
 func (t *TestServer) RootchainFund(stakeToken types.Address, amount *big.Int) error {
+	return t.RootchainFundFor([]types.Address{t.address}, []*big.Int{amount}, stakeToken)
+}
+
+// RootchainFundFor funds given account on the rootchain
+func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.Int, stakeToken types.Address) error {
+	if len(accounts) != len(amounts) {
+		return errors.New("same size for accounts and amounts must be provided to the rootchain funding")
+	}
+
 	args := []string{
 		"rootchain",
 		"fund",
-		"--addresses", t.address.String(),
-		"--amounts", amount.String(),
 		"--json-rpc", t.BridgeJSONRPCAddr(),
 		"--stake-token", stakeToken.String(),
 		"--mint",
 	}
 
+	for i := 0; i < len(accounts); i++ {
+		args = append(args, "--addresses", accounts[i].String())
+		args = append(args, "--amounts", amounts[i].String())
+	}
+
 	if err := runCommand(t.clusterConfig.Binary, args, t.clusterConfig.GetStdout("bridge")); err != nil {
-		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
+		acctAddrs := make([]string, len(accounts))
+		for i, acc := range accounts {
+			acctAddrs[i] = acc.String()
+		}
+
+		return fmt.Errorf("failed to fund accounts (%s) on the rootchain: %w", strings.Join(acctAddrs, ","), err)
 	}
 
 	return nil
