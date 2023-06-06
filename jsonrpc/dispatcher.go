@@ -231,11 +231,45 @@ func (d *Dispatcher) RemoveFilterByWs(conn wsConn) {
 }
 
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
+	// first try to unmarshal to batch request
+	// if there is an error try to unmarshal to single request
+	var batchReq BatchRequest
+	if err := json.Unmarshal(reqBody, &batchReq); err == nil {
+		const (
+			openSquareBracket  = 91 // [
+			closeSquareBracket = 93 // ]
+			comma              = 44 // ,
+		)
+
+		responses := make([][]byte, len(batchReq))
+
+		for i, req := range batchReq {
+			responses[i], err = d.handleWs(req, conn)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		var buf bytes.Buffer
+
+		// batch output should look like:
+		// [ { "requestId": "1", "status": 200 }, { "requestId": "2", "status": 200 } ]
+		buf.WriteByte(openSquareBracket)                // [
+		buf.Write(bytes.Join(responses, []byte{comma})) // join responses with the comma separator
+		buf.WriteByte(closeSquareBracket)               // ]
+
+		return buf.Bytes(), nil
+	}
+
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
+	return d.handleWs(req, conn)
+}
+
+func (d *Dispatcher) handleWs(req Request, conn wsConn) ([]byte, error) {
 	// if the request method is eth_subscribe we need to create a
 	// new filter with ws connection
 	if req.Method == "eth_subscribe" {
