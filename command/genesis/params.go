@@ -99,7 +99,6 @@ type genesisParams struct {
 	// PolyBFT
 	validatorsPath       string
 	validatorsPrefixPath string
-	stakes               []string
 	validators           []string
 	sprintSize           uint64
 	blockTime            time.Duration

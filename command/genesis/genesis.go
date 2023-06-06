@@ -177,16 +177,6 @@ func setFlags(cmd *cobra.Command) {
 			"validators defined by user (format: <P2P multi address>:<ECDSA address>:<public BLS key>)",
 		)
 
-		cmd.Flags().StringArrayVar(
-			&params.stakes,
-			stakeFlag,
-			[]string{},
-			fmt.Sprintf(
-				"validators staked amount (format: <address>[:<amount>]). Default stake amount: %d",
-				command.DefaultStake,
-			),
-		)
-
 		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPathFlag)
 		cmd.MarkFlagsMutuallyExclusive(validatorsFlag, validatorsPrefixFlag)
 

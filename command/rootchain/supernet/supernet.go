@@ -173,7 +173,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			v.Stake = finalizedStake
 		}
 
-		if err := helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
+		if err = helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 			return fmt.Errorf("failed to save chain configuration bridge data: %w", err)
 		}
 	}

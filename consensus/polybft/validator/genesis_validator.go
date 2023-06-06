@@ -24,16 +24,16 @@ type genesisValidatorRaw struct {
 	Address   types.Address `json:"address"`
 	BlsKey    string        `json:"blsKey"`
 	Balance   *string       `json:"balance"`
-	Stake     *string       `json:"stake"`
 	MultiAddr string        `json:"multiAddr"`
 }
 
 func (v *GenesisValidator) MarshalJSON() ([]byte, error) {
-	raw := &genesisValidatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr}
-	raw.Balance = types.EncodeBigInt(v.Balance)
-	raw.Stake = types.EncodeBigInt(v.Stake)
-
-	return json.Marshal(raw)
+	return json.Marshal(&genesisValidatorRaw{
+		Address:   v.Address,
+		BlsKey:    v.BlsKey,
+		Balance:   types.EncodeBigInt(v.Balance),
+		MultiAddr: v.MultiAddr,
+	})
 }
 
 func (v *GenesisValidator) UnmarshalJSON(data []byte) error {
@@ -51,11 +51,6 @@ func (v *GenesisValidator) UnmarshalJSON(data []byte) error {
 	v.MultiAddr = raw.MultiAddr
 
 	v.Balance, err = types.ParseUint256orHex(raw.Balance)
-	if err != nil {
-		return err
-	}
-
-	v.Stake, err = types.ParseUint256orHex(raw.Stake)
 	if err != nil {
 		return err
 	}
