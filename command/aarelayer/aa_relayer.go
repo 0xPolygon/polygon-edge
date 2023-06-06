@@ -53,14 +53,12 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	config := service.DefaultConfig()
-
 	jsonRPC := helper.GetJSONRPCAddress(cmd)
 	if !strings.HasPrefix(jsonRPC, "http://") {
 		jsonRPC = "http://" + jsonRPC
 	}
 
-	txSender, err := service.NewAATxSender(jsonRPC)
+	aaRPCClient, err := service.NewAARPCClient(jsonRPC)
 	if err != nil {
 		return err
 	}
@@ -85,31 +83,35 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	pool := service.NewAAPool()
 	pool.Init(pending)
 
+	currentNonce, err := state.GetNonce()
+	if err != nil {
+		return err
+	}
+
 	var opts []service.AAVerificationOption
 	if params.eip3074Hash {
 		opts = append(opts, service.WithMagicHashFn(crypto.Make3074Hash))
 	}
 
+	config := service.DefaultConfig()
 	verification := service.NewAAVerification(
 		config,
 		invokerAddress,
 		params.chainID,
 		opts...)
 	restService := service.NewAARelayerRestServer(pool, state, verification, logger)
-
-	relayerService, err := service.NewAARelayerService(
-		txSender,
+	relayerService := service.NewAARelayerService(
+		aaRPCClient,
 		pool,
 		state,
 		account.Ecdsa,
 		invokerAddress,
+		params.chainID,
+		currentNonce,
 		logger,
 		service.WithPullTime(config.PullTime),
 		service.WithReceiptDelay(config.ReceiptRetryDelay),
 		service.WithNumRetries(config.ReceiptNumRetries))
-	if err != nil {
-		return err
-	}
 
 	ctx, cancel := context.WithCancel(cmd.Context())
 	stopCh := common.GetTerminationSignalCh()

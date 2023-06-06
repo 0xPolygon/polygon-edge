@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/google/uuid"
 	bolt "go.etcd.io/bbolt"
 )
@@ -19,19 +20,28 @@ type AATxState interface {
 	GetAllPending() ([]*AAStateTransaction, error)
 	// Get all queued transactions
 	GetAllQueued() ([]*AAStateTransaction, error)
+	// Get all sent transactions
+	GetAllSent() ([]*AAStateTransaction, error)
 	// Update modifies the metadata for the AA transaction
 	Update(stateTx *AAStateTransaction) error
+	// GetNonce get latest saved nonce
+	GetNonce() (uint64, error)
+	// UpdateNonce updates latest nonce
+	UpdateNonce(nonce uint64) error
 }
 
 var (
 	pendingBucket  = []byte("pending")
 	queuedBucket   = []byte("queued")
+	sentBucket     = []byte("sent")
 	finishedBucket = []byte("finished")
+	nonceBucket    = []byte("nonce")
 
-	allBuckets        = [][]byte{pendingBucket, queuedBucket, finishedBucket}
+	allBuckets        = [][]byte{pendingBucket, queuedBucket, sentBucket, finishedBucket}
 	statusToBucketMap = map[string][]byte{
 		StatusPending:   pendingBucket,
 		StatusQueued:    queuedBucket,
+		StatusSent:      sentBucket,
 		StatusCompleted: finishedBucket,
 		StatusFailed:    finishedBucket,
 	}
@@ -102,6 +112,10 @@ func (s *aaTxState) GetAllQueued() ([]*AAStateTransaction, error) {
 	return s.getAllFromBucket(queuedBucket)
 }
 
+func (s *aaTxState) GetAllSent() ([]*AAStateTransaction, error) {
+	return s.getAllFromBucket(sentBucket)
+}
+
 func (s *aaTxState) Update(stateTx *AAStateTransaction) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		idb := []byte(stateTx.ID)
@@ -139,6 +153,29 @@ func (s *aaTxState) Update(stateTx *AAStateTransaction) error {
 	})
 }
 
+func (s *aaTxState) GetNonce() (nonce uint64, err error) {
+	if err = s.db.View(func(tx *bolt.Tx) error {
+		bytes := tx.Bucket(nonceBucket).Get([]byte{0})
+		if bytes == nil {
+			nonce = 0
+		} else {
+			nonce = common.EncodeBytesToUint64(bytes)
+		}
+
+		return nil
+	}); err != nil {
+		return 0, err
+	}
+
+	return nonce, nil
+}
+
+func (s *aaTxState) UpdateNonce(nonce uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(nonceBucket).Put([]byte{0}, common.EncodeUint64ToBytes(nonce))
+	})
+}
+
 func (s *aaTxState) init(dbFilePath string) (err error) {
 	if s.db, err = bolt.Open(dbFilePath, 0666, nil); err != nil {
 		return err
@@ -149,6 +186,10 @@ func (s *aaTxState) init(dbFilePath string) (err error) {
 			if _, err := tx.CreateBucketIfNotExists(bucket); err != nil {
 				return err
 			}
+		}
+
+		if _, err := tx.CreateBucketIfNotExists(nonceBucket); err != nil {
+			return err
 		}
 
 		return nil

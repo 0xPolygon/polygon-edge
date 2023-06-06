@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync/atomic"
 	"time"
@@ -11,17 +12,24 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/wallet"
 )
 
-const receiptSuccess = 1
+const (
+	receiptSuccess  = 1
+	defaultGasLimit = 5242880 // 0x500000
+)
+
+var nonceTooLowErrStr = "nonce too low"
 
 // AARelayerService pulls transaction from pool one at the time and sends it to relayer
 type AARelayerService struct {
 	pool         AAPool
 	state        AATxState
-	txSender     AATxSender
+	rpcClient    AARPCClient
 	key          ethgo.Key
 	invokerAddr  types.Address
+	chainID      int64
 	currentNonce uint64
 	pullTime     time.Duration // pull from txpool every `pullTime` second/millisecond
 	receiptDelay time.Duration
@@ -30,24 +38,23 @@ type AARelayerService struct {
 }
 
 func NewAARelayerService(
-	txSender AATxSender,
+	rpcClient AARPCClient,
 	pool AAPool,
 	state AATxState,
 	key ethgo.Key,
-	invokerAddr types.Address, logger hclog.Logger,
-	opts ...TxRelayerOption) (*AARelayerService, error) {
-	nonce, err := txSender.GetNonce(key.Address())
-	if err != nil {
-		return nil, err
-	}
-
+	invokerAddr types.Address,
+	chainID int64,
+	currentNonce uint64,
+	logger hclog.Logger,
+	opts ...TxRelayerOption) *AARelayerService {
 	service := &AARelayerService{
-		txSender:     txSender,
+		rpcClient:    rpcClient,
 		pool:         pool,
 		state:        state,
 		key:          key,
 		invokerAddr:  invokerAddr,
-		currentNonce: nonce,
+		chainID:      chainID,
+		currentNonce: currentNonce,
 		pullTime:     time.Millisecond * 5000,
 		receiptDelay: time.Millisecond * 500,
 		numRetries:   100,
@@ -58,7 +65,7 @@ func NewAARelayerService(
 		opt(service)
 	}
 
-	return service, nil
+	return service
 }
 
 func (rs *AARelayerService) Start(ctx context.Context) {
@@ -71,103 +78,80 @@ func (rs *AARelayerService) Start(ctx context.Context) {
 			return
 		case <-ticker.C:
 			stateTx := rs.getFirstValidTx()
-
-			if stateTx != nil { // there is something to process
-				go func() {
-					if err := rs.executeJob(ctx, stateTx); err != nil {
-						rs.logger.Error(
-							"transaction execution has been failed",
-							"id", stateTx.ID,
-							"from", stateTx.Tx.Transaction.From,
-							"nonce", stateTx.Tx.Transaction.Nonce,
-							"err", err)
-					}
-				}()
+			if stateTx == nil { // nothing to process
+				continue
 			}
+
+			if err := rs.addToQueue(stateTx); err != nil {
+				rs.pool.Push(stateTx) // if adding to queue fails, tx should return to the pending pool
+				rs.logger.Error(
+					"error while adding transaction to the queue",
+					"id", stateTx.ID,
+					"from", stateTx.Tx.Transaction.From,
+					"err", err)
+
+				continue
+			}
+
+			go func() {
+				if err := rs.executeJob(ctx, stateTx); err != nil {
+					rs.logger.Error(
+						"transaction execution has been failed",
+						"id", stateTx.ID,
+						"from", stateTx.Tx.Transaction.From,
+						"nonce", stateTx.Nonce,
+						"err", err)
+				}
+			}()
 		}
 	}
 }
 
 func (rs *AARelayerService) executeJob(ctx context.Context, stateTx *AAStateTransaction) error {
-	var netErr net.Error
-
-	rs.logger.Info("transaction execution has been started",
-		"id", stateTx.ID,
-		"from", stateTx.Tx.Transaction.From,
-		"nonce", stateTx.Tx.Transaction.Nonce)
-
-	tx, err := rs.makeEthgoTransaction(stateTx)
-	if err != nil {
-		// this should not happened
-		rs.pool.Push(stateTx)
-
+	if err := rs.sendTransaction(stateTx); err != nil {
 		return err
 	}
 
-	hash, err := rs.txSender.SendTransaction(tx, rs.key)
-	// if its network error return tx back to the pool
-	if errors.As(err, &netErr) {
-		rs.pool.Push(stateTx)
-
-		return err
-	} else if err != nil {
-		errstr := err.Error()
-		stateTx.Error = &errstr
-
-		if errUpdate := rs.state.Update(stateTx); errUpdate != nil {
-			errstr = errUpdate.Error()
-
-			return fmt.Errorf("err = %w, update error = %s", err, errstr)
-		}
-
-		return err
-	}
-
-	atomic.AddUint64(&rs.currentNonce, 1) // increment global nonce for this relayer
-
-	stateTx.Status = StatusQueued
-	stateTx.Hash = hash
-
-	if err := rs.state.Update(stateTx); err != nil {
-		rs.logger.Error("error while updating tx state to queued", "id", stateTx.ID, "err", err)
-	}
-
-	rs.logger.Info("transaction has been sent to the invoker", "id", stateTx.ID)
-
-	receipt, err := rs.txSender.WaitForReceipt(ctx, hash, rs.receiptDelay, rs.numRetries)
-	if err != nil {
-		errstr := err.Error()
-		stateTx.Error = &errstr
-		stateTx.Status = StatusFailed
-
-		rs.logger.Warn("transaction receipt error",
-			"id", stateTx.ID,
-			"from", stateTx.Tx.Transaction.From,
-			"nonce", stateTx.Tx.Transaction.Nonce,
-			"err", errstr)
-	} else {
-		rs.populateStateTx(stateTx, receipt)
-	}
-
-	if err := rs.state.Update(stateTx); err != nil {
-		return fmt.Errorf("error while updating tx state to %s, err = %w", stateTx.Status, err)
-	}
-
-	return nil
+	return rs.waitForReceipt(ctx, stateTx)
 }
 
-func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) (*ethgo.Transaction, error) {
-	input, err := stateTx.Tx.ToAbi()
+func (rs *AARelayerService) makeEthgoTransaction(stateTx *AAStateTransaction) ([]byte, ethgo.Hash, error) {
+	gasPrice, err := rs.rpcClient.GetGasPrice()
 	if err != nil {
-		return nil, err
+		return nil, ethgo.ZeroHash, err
 	}
 
-	return &ethgo.Transaction{
-		From:  rs.key.Address(),
-		To:    (*ethgo.Address)(&rs.invokerAddr),
-		Input: input,
-		Nonce: atomic.LoadUint64(&rs.currentNonce),
-	}, nil
+	input, err := stateTx.Tx.ToAbi()
+	if err != nil {
+		return nil, ethgo.ZeroHash, err
+	}
+
+	tx := &ethgo.Transaction{
+		From:     rs.key.Address(),
+		To:       (*ethgo.Address)(&rs.invokerAddr),
+		Input:    input,
+		Nonce:    stateTx.Nonce,
+		Gas:      defaultGasLimit,
+		ChainID:  big.NewInt(rs.chainID),
+		GasPrice: gasPrice,
+	}
+
+	signer := wallet.NewEIP155Signer(tx.ChainID.Uint64())
+	if _, err := signer.SignTx(tx, rs.key); err != nil {
+		return nil, ethgo.ZeroHash, err
+	}
+
+	hash, err := tx.GetHash()
+	if err != nil {
+		return nil, ethgo.ZeroHash, err
+	}
+
+	raw, err := tx.MarshalRLPTo(nil)
+	if err != nil {
+		return nil, ethgo.ZeroHash, err
+	}
+
+	return raw, hash, nil
 }
 
 // getFirstValidTx takes from the pool first arrived transaction which nonce is good
@@ -185,7 +169,7 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 
 		address := poppedTx.Tx.Transaction.From
 
-		nonce, err := rs.txSender.GetAANonce(ethgo.Address(rs.invokerAddr), ethgo.Address(address))
+		nonce, err := rs.rpcClient.GetAANonce(ethgo.Address(rs.invokerAddr), ethgo.Address(address))
 		if err != nil {
 			rs.logger.Warn("transaction retrieving nonce failed",
 				"tx", poppedTx.ID, "from", address, "err", err)
@@ -210,11 +194,10 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 			pushBackList = append(pushBackList, poppedTx)
 		} else {
 			// ...otherwise if it is lower update status to failed and never process it again
-			errorStr := "nonce too low"
-			poppedTx.Error = &errorStr
+			poppedTx.Error = &nonceTooLowErrStr
 			poppedTx.Status = StatusFailed
 
-			if err := rs.state.Update(stateTx); err != nil {
+			if err := rs.state.Update(poppedTx); err != nil {
 				rs.logger.Debug("fail to update transaction status, nonce too low",
 					"tx", poppedTx.ID, "from", address, "nonce", poppedTx.Tx.Transaction.Nonce, "err", err)
 			} else {
@@ -230,6 +213,82 @@ func (rs *AARelayerService) getFirstValidTx() *AAStateTransaction {
 	}
 
 	return stateTx
+}
+
+func (rs *AARelayerService) addToQueue(stateTx *AAStateTransaction) error {
+	stateTx.Nonce = atomic.LoadUint64(&rs.currentNonce) // setup nonce for this transaction
+
+	txRaw, hash, err := rs.makeEthgoTransaction(stateTx)
+	if err != nil {
+		return fmt.Errorf("failed to create transaction: %w", err)
+	}
+
+	// transaction is now in the queued state
+	stateTx.Status = StatusQueued
+	stateTx.Hash = hash
+	stateTx.Raw = txRaw
+
+	if err := rs.state.Update(stateTx); err != nil {
+		return fmt.Errorf("failed to update transaction state to queued: %w", err)
+	}
+
+	newNonce := atomic.AddUint64(&rs.currentNonce, 1) // increment current aa relayer nonce
+
+	if err := rs.state.UpdateNonce(newNonce); err != nil {
+		return fmt.Errorf("failed to update transaction state to queued: %w", err)
+	}
+
+	return nil
+}
+
+func (rs *AARelayerService) sendTransaction(stateTx *AAStateTransaction) error {
+	var netErr net.Error
+
+	_, err := rs.rpcClient.SendTransaction(stateTx.Raw)
+	if errors.As(err, &netErr) {
+		return fmt.Errorf("failed to send transaction: %w", err)
+	} else if err != nil {
+		errstr := err.Error()
+		stateTx.Error = &errstr
+		stateTx.Status = StatusFailed // change status on all non network related errors?
+
+		if errUpdate := rs.state.Update(stateTx); errUpdate != nil {
+			return fmt.Errorf("failed to send transaction: %w, update error: %s", err, errUpdate.Error())
+		}
+
+		return err
+	}
+
+	rs.logger.Info("transaction has been sent to the invoker", "id", stateTx.ID)
+
+	// transaction is now in the sent state
+	stateTx.Status = StatusSent
+	if err := rs.state.Update(stateTx); err != nil {
+		// if fails, just log error. We should figure out how to update to status sent if state update fails
+		rs.logger.Warn("failed to update transaction state to sent", "id", stateTx.ID, "err", err)
+	}
+
+	return nil
+}
+
+func (rs *AARelayerService) waitForReceipt(ctx context.Context, stateTx *AAStateTransaction) error {
+	receipt, err := rs.rpcClient.WaitForReceipt(ctx, stateTx.Hash, rs.receiptDelay, rs.numRetries)
+	if err != nil {
+		errstr := err.Error()
+		stateTx.Error = &errstr
+		stateTx.Status = StatusFailed
+
+		rs.logger.Warn("transaction receipt error",
+			"id", stateTx.ID, "hash", stateTx.Hash, "err", err)
+	} else {
+		rs.populateStateTx(stateTx, receipt)
+	}
+
+	if err := rs.state.Update(stateTx); err != nil {
+		return fmt.Errorf("failed to update transaction state to %s, err = %w", stateTx.Status, err)
+	}
+
+	return nil
 }
 
 func (rs *AARelayerService) populateStateTx(stateTx *AAStateTransaction, receipt *ethgo.Receipt) {

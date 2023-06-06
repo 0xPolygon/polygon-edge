@@ -148,4 +148,22 @@ func Test_AAState_UpdateGetQueuedGetPending(t *testing.T) {
 	assert.Len(t, txsPending, 0)
 	assert.NoError(t, err2)
 	assert.Len(t, txsQueued, 4)
+
+	for i := range txsQueued[:2] {
+		txsQueued[i].Status = StatusSent
+
+		require.NoError(t, state.Update(txsQueued[i]))
+	}
+
+	// retrieve again
+	txsQueued, err1 = state.GetAllQueued()
+	txsPending, err2 = state.GetAllPending()
+	txSent, err3 := state.GetAllSent()
+
+	assert.NoError(t, err1)
+	assert.Len(t, txsPending, 0)
+	assert.NoError(t, err2)
+	assert.Len(t, txsQueued, 2)
+	assert.NoError(t, err3)
+	assert.Len(t, txSent, 2)
 }
