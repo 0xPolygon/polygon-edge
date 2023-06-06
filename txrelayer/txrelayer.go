@@ -95,6 +95,8 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	txn.From = key.Address()
+
 	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
 	if err != nil {
 		return ethgo.ZeroHash, err
