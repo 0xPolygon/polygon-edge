@@ -311,7 +311,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			initValidators[i] = &validator.GenesisValidator{
 				Address: val.Address,
 				Balance: val.VotingPower,
-				Stake:   val.VotingPower,
 				BlsKey:  hex.EncodeToString(val.BlsKey.Marshal()),
 			}
 		}

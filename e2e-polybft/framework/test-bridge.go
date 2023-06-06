@@ -431,7 +431,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
+					"--amount", polybftConfig.InitialValidatorSet[i].Balance.String(),
 					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}

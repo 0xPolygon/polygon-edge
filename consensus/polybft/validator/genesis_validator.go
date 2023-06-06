@@ -78,7 +78,7 @@ func (v *GenesisValidator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 	metadata := &ValidatorMetadata{
 		Address:     v.Address,
 		BlsKey:      blsKey,
-		VotingPower: new(big.Int).Set(v.Stake),
+		VotingPower: new(big.Int).Set(v.Balance),
 		IsActive:    true,
 	}
 

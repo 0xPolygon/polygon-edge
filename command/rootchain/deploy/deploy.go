@@ -773,7 +773,7 @@ func validatorSetToABISlice(o command.OutputFormatter,
 		accSet[i] = &validator.ValidatorMetadata{
 			Address:     val.Address,
 			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(val.Stake),
+			VotingPower: new(big.Int).Set(val.Balance),
 		}
 	}
 
