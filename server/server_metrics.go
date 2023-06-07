@@ -16,7 +16,7 @@ func (s *Server) setupTelemetry() error {
 	metrics.DefaultInmemSignal(inm)
 
 	promSink, err := prometheus.NewPrometheusSinkFrom(prometheus.PrometheusOpts{
-		Name:       "edge_prometeus_sink",
+		Name:       "edge_prometheus_sink",
 		Expiration: 0,
 	})
 	if err != nil {
