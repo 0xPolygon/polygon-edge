@@ -496,8 +496,6 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 		const validatorsCount = 7
 		vals := validator.NewTestValidators(t, validatorsCount)
 
-		polyBftConfig := PolyBFTConfig{InitialValidatorSet: vals.GetParamValidators()}
-
 		delta := &validator.ValidatorSetDelta{
 			Added:   make(validator.AccountSet, validatorsCount),
 			Removed: bitmap.Bitmap{},
@@ -516,9 +514,6 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 		extra := Extra{Validators: delta}
 
 		genesis := &chain.Genesis{
-			Config: &chain.Params{Engine: map[string]interface{}{
-				ConsensusName: polyBftConfig,
-			}},
 			ExtraData: extra.MarshalRLPTo(nil),
 		}
 
@@ -531,13 +526,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 	t.Run("Invalid Extra data", func(t *testing.T) {
 		t.Parallel()
 
-		validators := validator.NewTestValidators(t, 5)
-		polyBftConfig := PolyBFTConfig{InitialValidatorSet: validators.GetParamValidators()}
-
 		genesis := &chain.Genesis{
-			Config: &chain.Params{Engine: map[string]interface{}{
-				ConsensusName: polyBftConfig,
-			}},
 			ExtraData: append(make([]byte, ExtraVanity), []byte{0x2, 0x3}...),
 		}
 

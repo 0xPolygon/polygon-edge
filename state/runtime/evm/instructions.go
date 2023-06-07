@@ -1101,7 +1101,9 @@ func opCreate(op OpCode) instruction {
 		v := c.push1()
 		if op == CREATE && c.config.Homestead && errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
 			v.Set(zero)
-		} else if result.Failed() && !errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
+		} else if op == CREATE && result.Failed() && !errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
+			v.Set(zero)
+		} else if op == CREATE2 && result.Failed() {
 			v.Set(zero)
 		} else {
 			v.SetBytes(contract.Address.Bytes())

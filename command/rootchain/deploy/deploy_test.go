@@ -12,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -30,7 +31,7 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	client, err := jsonrpc.NewClient(server.HTTPAddr())
 	require.NoError(t, err)
 
-	testKey, err := helper.GetRootchainPrivateKey("")
+	testKey, err := helper.DecodePrivateKey("")
 	require.NoError(t, err)
 
 	receipt, err := server.Fund(testKey.Address())
@@ -48,6 +49,15 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 
 	outputter := command.InitializeOutputter(GetCommand())
 	params.stakeManagerAddr = receipt.ContractAddress.String()
+	params.stakeTokenAddr = types.StringToAddress("0x123456789").String()
+	consensusCfg = polybft.PolyBFTConfig{
+		NativeTokenConfig: &polybft.TokenConfig{
+			Name:       "Test",
+			Symbol:     "TST",
+			Decimals:   18,
+			IsMintable: false,
+		},
+	}
 
 	require.NotPanics(t, func() {
 		_, _, err = deployContracts(outputter, client, 1, []*validator.GenesisValidator{}, context.Background())

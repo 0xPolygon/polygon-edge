@@ -34,6 +34,7 @@ func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) e
 	metrics.SetGauge([]string{consensusMetricsPrefix, "rounds"}, float32(extra.Checkpoint.BlockRound))
 	metrics.SetGauge([]string{consensusMetricsPrefix, "chain_head"}, float32(currentBlock.Number()))
 	metrics.IncrCounter([]string{consensusMetricsPrefix, "block_counter"}, float32(1))
+	metrics.SetGauge([]string{consensusMetricsPrefix, "block_space_used"}, float32(currentBlock.Header.GasUsed))
 
 	return nil
 }
@@ -45,4 +46,10 @@ func updateEpochMetrics(epoch epochMetadata) {
 	metrics.SetGauge([]string{consensusMetricsPrefix, "epoch_number"}, float32(epoch.Number))
 	// update number of validators metrics
 	metrics.SetGauge([]string{consensusMetricsPrefix, "validators"}, float32(epoch.Validators.Len()))
+}
+
+// updateBlockExecutionMetric updates the block execution metric
+func updateBlockExecutionMetric(start time.Time) {
+	metrics.SetGauge([]string{consensusMetricsPrefix, "block_execution_time"},
+		float32(time.Now().UTC().Sub(start).Seconds()))
 }

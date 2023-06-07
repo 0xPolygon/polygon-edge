@@ -104,7 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	)
 
 	if params.isTestMode {
-		deployerKey, err = rootHelper.GetRootchainPrivateKey("")
+		deployerKey, err = rootHelper.DecodePrivateKey("")
 	} else {
 		deployerKey, err = rootHelper.GetECDSAKey(params.privateKey, params.accountDir, params.accountConfig)
 	}

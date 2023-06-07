@@ -42,7 +42,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 
 	var baseFee *big.Int
 
-	if config.IsLondon(0) {
+	if config.IsActive(chain.London, 0) {
 		if c.Env.BaseFee != "" {
 			baseFee = stringToBigIntT(t, c.Env.BaseFee)
 		} else {

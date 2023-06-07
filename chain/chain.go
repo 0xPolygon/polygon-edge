@@ -41,8 +41,6 @@ type Chain struct {
 
 // Genesis specifies the header fields, state of a genesis block
 type Genesis struct {
-	Config *Params `json:"config"`
-
 	Nonce      [8]byte                           `json:"nonce"`
 	Timestamp  uint64                            `json:"timestamp"`
 	ExtraData  []byte                            `json:"extraData,omitempty"`

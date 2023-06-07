@@ -95,10 +95,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	txn := &ethgo.Transaction{
-		From:     validatorAddr,
-		Input:    encoded,
-		To:       &rewardPoolAddr,
-		GasPrice: sidechainHelper.DefaultGasPrice,
+		From:  validatorAddr,
+		Input: encoded,
+		To:    &rewardPoolAddr,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)

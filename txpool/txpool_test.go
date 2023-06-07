@@ -31,11 +31,11 @@ const (
 )
 
 var (
-	forks = &chain.Forks{
-		Homestead: chain.NewFork(0),
-		Istanbul:  chain.NewFork(0),
-		London:    chain.NewFork(0),
-	}
+	forks = (&chain.Forks{
+		chain.Homestead: chain.NewFork(0),
+		chain.Istanbul:  chain.NewFork(0),
+		chain.London:    chain.NewFork(0),
+	})
 )
 
 // addresses used in tests

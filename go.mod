@@ -72,7 +72,7 @@ require (
 	golang.org/x/sync v0.2.0
 	google.golang.org/genproto v0.0.0-20230530153820-e85fd2cbaebc
 	gopkg.in/DataDog/dd-trace-go.v1 v1.51.0
-	pgregory.net/rapid v0.6.1
+	pgregory.net/rapid v0.6.2
 )
 
 require (

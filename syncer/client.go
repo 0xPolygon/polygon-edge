@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -380,6 +381,7 @@ func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.
 			}
 
 			if err != nil {
+				metrics.IncrCounter([]string{syncerMetrics, "bad_message"}, 1)
 				errorCh <- err
 
 				break
@@ -387,10 +389,13 @@ func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.
 
 			block, err := fromProto(protoBlock)
 			if err != nil {
+				metrics.IncrCounter([]string{syncerMetrics, "bad_block"}, 1)
 				errorCh <- err
 
 				break
 			}
+
+			metrics.SetGauge([]string{syncerMetrics, "ingress_bytes"}, float32(len(protoBlock.Block)))
 
 			blockCh <- block
 		}

@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 	hcf "github.com/hashicorp/go-hclog"
 )
 
@@ -104,6 +105,10 @@ type fsm struct {
 
 // BuildProposal builds a proposal for the current round (used if proposer)
 func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
+	start := time.Now().UTC()
+	defer metrics.SetGauge([]string{consensusMetricsPrefix, "block_building_time"},
+		float32(time.Now().UTC().Sub(start).Seconds()))
+
 	parent := f.parent
 
 	extraParent, err := GetIbftExtra(parent.ExtraData)
@@ -111,8 +116,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	//nolint:godox
-	// TODO: we will need to revisit once slashing is implemented (to be fixed in EVM-519)
 	extra := &Extra{Parent: extraParent.Committed}
 	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
 	nextValidators := f.validators.Accounts()

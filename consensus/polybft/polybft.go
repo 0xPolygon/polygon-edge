@@ -311,17 +311,12 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		}
 
-		rootNativeERC20Token := types.ZeroAddress
-		if polyBFTConfig.Bridge != nil {
-			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
-		}
-
 		if polyBFTConfig.NativeTokenConfig.IsMintable {
 			// initialize NativeERC20Mintable SC
 			params := &contractsapi.InitializeNativeERC20MintableFn{
 				Predicate_: contracts.ChildERC20PredicateContract,
 				Owner_:     polyBFTConfig.Governance,
-				RootToken_: rootNativeERC20Token,
+				RootToken_: polyBFTConfig.Bridge.RootNativeERC20Addr,
 				Name_:      polyBFTConfig.NativeTokenConfig.Name,
 				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
 				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
@@ -342,7 +337,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				Name_:      polyBFTConfig.NativeTokenConfig.Name,
 				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
 				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
-				RootToken_: rootNativeERC20Token,
+				RootToken_: polyBFTConfig.Bridge.RootNativeERC20Addr,
 				Predicate_: contracts.ChildERC20PredicateContract,
 			}
 
@@ -359,6 +354,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		return nil
 	}
+}
+
+func ForkManagerFactory(forks *chain.Forks) error {
+	// place fork manager handler registration here
+	return nil
 }
 
 // Initialize initializes the consensus (e.g. setup data)

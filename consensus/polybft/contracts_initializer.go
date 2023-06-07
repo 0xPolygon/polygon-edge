@@ -30,7 +30,7 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 		NewStateReceiver:    contracts.StateReceiverContract,
 		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
-		InitalValidators:    initialValidators,
+		InitialValidators:   initialValidators,
 	}
 
 	return initFn.EncodeAbi()
@@ -238,7 +238,8 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	return callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+	return callContract(contracts.SystemCaller, polyBFTConfig.RewardConfig.TokenAddress, input,
+		"RewardToken", transition)
 }
 
 // callContract calls given smart contract function, encoded in input parameter

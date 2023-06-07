@@ -15,6 +15,8 @@ type Request struct {
 	Params json.RawMessage `json:"params,omitempty"`
 }
 
+type BatchRequest []Request
+
 // Response is a jsonrpc response interface
 type Response interface {
 	GetID() interface{}
