@@ -38,6 +38,7 @@ type Storage interface {
 	ReadTxLookup(hash types.Hash) (types.Hash, bool)
 
 	NewBatch() Batch
+	WriteBatch() error
 
 	Close() error
 }

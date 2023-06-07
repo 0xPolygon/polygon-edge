@@ -636,14 +636,13 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	for _, h := range headers {
 		event := &Event{}
 
-		batch := b.db.NewBatch()
-		batchHelper := storage.NewBatchHelper(batch)
+		batchHelper := storage.NewBatchHelper(b.db)
 
 		if err := b.writeHeaderImpl(batchHelper, event, h); err != nil {
 			return err
 		}
 
-		if err := batch.Write(); err != nil {
+		if err := batchHelper.WriteBatch(); err != nil {
 			return err
 		}
 
@@ -867,8 +866,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	defer b.writeLock.Unlock()
 
 	block := fblock.Block
-	batch := b.db.NewBatch()
-	batchHelper := storage.NewBatchHelper(batch)
+	batchHelper := storage.NewBatchHelper(b.db)
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
@@ -916,7 +914,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 		logArgs = append(logArgs, "generation_time_in_seconds", diff)
 	}
 
-	if err := batch.Write(); err != nil {
+	if err := batchHelper.WriteBatch(); err != nil {
 		return err
 	}
 
@@ -928,8 +926,10 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 // WriteBlock writes a single block to the local blockchain.
 // It doesn't do any kind of verification, only commits the block to the DB
 func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
-	batch := b.db.NewBatch()
-	batchHelper := storage.NewBatchHelper(batch)
+	b.writeLock.Lock()
+	defer b.writeLock.Unlock()
+
+	batchHelper := storage.NewBatchHelper(b.db)
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
@@ -985,10 +985,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 		logArgs = append(logArgs, "generation_time_in_seconds", diff)
 	}
 
-	b.writeLock.Lock()
-	defer b.writeLock.Unlock()
-
-	if err := batch.Write(); err != nil {
+	if err := batchHelper.WriteBatch(); err != nil {
 		return err
 	}
 

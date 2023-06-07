@@ -18,7 +18,9 @@ type BatchHelper struct {
 	batch Batch
 }
 
-func NewBatchHelper(batch Batch) *BatchHelper {
+func NewBatchHelper(storage Storage) *BatchHelper {
+	batch := storage.NewBatch()
+
 	return &BatchHelper{batch: batch}
 }
 
@@ -85,14 +87,6 @@ func (b *BatchHelper) putWithPrefix(p, k, data []byte) {
 	b.batch.Put(fullKey, data)
 }
 
-// func (b *BatchHelper) Delete(key []byte) error {
-// 	return b.Delete(key)
-// }
-
-// func (b *BatchHelper) Write() error {
-// 	return b.batch.Write()
-// }
-
-// func (b *BatchHelper) Put(k []byte, data []byte) error {
-// 	return b.batch.Put(k, data)
-// }
+func (b *BatchHelper) WriteBatch() error {
+	return b.batch.Write()
+}

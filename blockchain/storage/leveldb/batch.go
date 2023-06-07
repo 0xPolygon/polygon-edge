@@ -5,9 +5,8 @@ import (
 )
 
 type batchLevelDB struct {
-	db   *leveldb.DB
-	b    *leveldb.Batch
-	Size int
+	db *leveldb.DB
+	b  *leveldb.Batch
 }
 
 func NewBatchLevelDB(db *leveldb.DB) *batchLevelDB {
@@ -19,7 +18,6 @@ func NewBatchLevelDB(db *leveldb.DB) *batchLevelDB {
 
 func (b *batchLevelDB) Delete(key []byte) {
 	b.b.Delete(key)
-	b.Size += len(key)
 }
 
 func (b *batchLevelDB) Write() error {
@@ -28,5 +26,4 @@ func (b *batchLevelDB) Write() error {
 
 func (b *batchLevelDB) Put(k []byte, data []byte) {
 	b.b.Put(k, data)
-	b.Size += len(k) + len(data)
 }

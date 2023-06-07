@@ -593,14 +593,13 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 		chain := newChain(t, txFromByTxHash, "t1")
 		defer chain.db.Close()
-		batch := chain.db.NewBatch()
-		batchHelper := storage.NewBatchHelper(batch)
+		batchHelper := storage.NewBatchHelper(chain.db)
 
 		assert.NoError(
 			t,
 			chain.writeBody(batchHelper, block),
 		)
-		assert.NoError(t, batch.Write())
+		assert.NoError(t, batchHelper.WriteBatch())
 	})
 
 	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
@@ -625,15 +624,14 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 		chain := newChain(t, txFromByTxHash, "t2")
 		defer chain.db.Close()
-		batch := chain.db.NewBatch()
-		batchHelper := storage.NewBatchHelper(batch)
+		batchHelper := storage.NewBatchHelper(chain.db)
 
 		assert.ErrorIs(
 			t,
 			errRecoveryAddressFailed,
 			chain.writeBody(batchHelper, block),
 		)
-		assert.NoError(t, batch.Write())
+		assert.NoError(t, batchHelper.WriteBatch())
 	})
 
 	t.Run("should recover from address and store to storage", func(t *testing.T) {
@@ -660,11 +658,10 @@ func TestBlockchainWriteBody(t *testing.T) {
 
 		chain := newChain(t, txFromByTxHash, "t3")
 		defer chain.db.Close()
-		batch := chain.db.NewBatch()
-		batchHelper := storage.NewBatchHelper(batch)
+		batchHelper := storage.NewBatchHelper(chain.db)
 
 		assert.NoError(t, chain.writeBody(batchHelper, block))
-		assert.NoError(t, batch.Write())
+		assert.NoError(t, batchHelper.WriteBatch())
 
 		readBody, ok := chain.readBody(block.Hash())
 		assert.True(t, ok)
@@ -881,8 +878,7 @@ func TestBlockchainReadBody(t *testing.T) {
 		},
 	}
 
-	batch := b.db.NewBatch()
-	batchHelper := storage.NewBatchHelper(batch)
+	batchHelper := storage.NewBatchHelper(b.db)
 
 	tx := &types.Transaction{
 		Value: big.NewInt(10),
@@ -906,7 +902,7 @@ func TestBlockchainReadBody(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.NoError(t, batch.Write())
+	assert.NoError(t, batchHelper.WriteBatch())
 
 	txFromByTxHash[tx.Hash] = addr
 

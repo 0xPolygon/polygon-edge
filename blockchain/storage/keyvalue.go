@@ -355,3 +355,7 @@ func (s *KeyValueStorage) Close() error {
 func (s *KeyValueStorage) NewBatch() Batch {
 	return s.db.NewBatch()
 }
+
+func (s *KeyValueStorage) WriteBatch() error {
+	return s.db.NewBatch().Write()
+}

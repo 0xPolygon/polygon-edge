@@ -220,8 +220,6 @@ func DirSize(path string) (int64, error) {
 }
 
 func TestWriteFullBlock(t *testing.T) {
-	t.Helper()
-
 	s, _, path := newStorageP(t)
 	defer s.Close()
 
@@ -245,8 +243,7 @@ insertloop:
 		case <-ctx.Done():
 			break insertloop
 		case b := <-blockchain:
-			batch := s.NewBatch()
-			batchHelper := storage.NewBatchHelper(batch)
+			batchHelper := storage.NewBatchHelper(s)
 
 			batchHelper.WriteBody(b.Block.Hash(), b.Block.Body())
 
@@ -259,9 +256,8 @@ insertloop:
 			batchHelper.WriteHeadHash(b.Block.Header.Hash)
 			batchHelper.WriteReceipts(b.Block.Hash(), b.Receipts)
 
-			if err := batch.Write(); err != nil {
-				fmt.Println(err)
-				t.FailNow()
+			if err := batchHelper.WriteBatch(); err != nil {
+				require.NoError(t, err)
 			}
 
 			fmt.Println("writing block", i)

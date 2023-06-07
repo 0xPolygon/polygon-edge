@@ -29,15 +29,20 @@ func Factory(config map[string]interface{}, logger hclog.Logger) (storage.Storag
 	return NewLevelDBStorage(pathStr, logger)
 }
 
-// NewLevelDBStorage creates the new storage reference with leveldb
+// NewLevelDBStorage creates the new storage reference with leveldb default options
 func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error) {
-	options := opt.Options{}
+	options := &opt.Options{}
 	// Set default options
 	options.OpenFilesCacheCapacity = DefaultHandles
 	options.BlockCacheCapacity = DefaultCache / 2 * opt.MiB
 	options.WriteBuffer = DefaultCache / 4 * opt.MiB // Two of these are used internally
 
-	db, err := leveldb.OpenFile(path, &options)
+	return NewLevelDBStorageWithOpt(path, logger, options)
+}
+
+// NewLevelDBStorageWithOpt creates the new storage reference with leveldb with custom options
+func NewLevelDBStorageWithOpt(path string, logger hclog.Logger, opts *opt.Options) (storage.Storage, error) {
+	db, err := leveldb.OpenFile(path, opts)
 	if err != nil {
 		return nil, err
 	}
