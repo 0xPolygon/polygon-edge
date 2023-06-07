@@ -141,8 +141,12 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
-		if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
-			return err
+		if !isNativeRewardToken(polyBFTConfig) {
+			// if reward token is a native erc20 token, we don't need to mint an amount of tokens
+			// for given wallet address to it since this is done in premine
+			if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
+				return err
+			}
 		}
 
 		// initialize RewardPool SC
@@ -354,6 +358,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		return nil
 	}
+}
+
+// isNativeRewardToken returns true in case a native token is used as a reward token as well
+func isNativeRewardToken(cfg PolyBFTConfig) bool {
+	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
 }
 
 func ForkManagerFactory(forks *chain.Forks) error {

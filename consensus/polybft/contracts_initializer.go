@@ -222,12 +222,6 @@ func mintRewardTokensToWalletAddress(polyBFTConfig *PolyBFTConfig, transition *s
 		return err
 	}
 
-	if polyBFTConfig.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract {
-		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
-		// for given wallet address to it since this is done in premine
-		return nil
-	}
-
 	mintFn := contractsapi.MintRootERC20Fn{
 		To:     polyBFTConfig.RewardConfig.WalletAddress,
 		Amount: polyBFTConfig.RewardConfig.WalletAmount,
