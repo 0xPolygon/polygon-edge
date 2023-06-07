@@ -245,7 +245,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 
 	reqBody = bytes.TrimLeft(reqBody, " \t\r\n")
 
-	// if body begins with [ than consider this request as batch request
+	// if body begins with [ consider it as a batch request
 	if len(reqBody) > 0 && reqBody[0] == openSquareBracket {
 		var batchReq BatchRequest
 
