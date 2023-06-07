@@ -251,7 +251,8 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 
 		err := json.Unmarshal(reqBody, &batchReq)
 		if err != nil {
-			return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
+			return NewRPCResponse(nil, "2.0", nil,
+				NewInvalidRequestError("Invalid json batch request")).Bytes()
 		}
 
 		// if not disabled, avoid handling long batch requests
@@ -267,7 +268,7 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		responses := make([][]byte, len(batchReq))
 
 		for i, req := range batchReq {
-			responses[i], err = d.handleWs(req, conn).Bytes()
+			responses[i], err = d.handleSingleWs(req, conn).Bytes()
 			if err != nil {
 				return nil, err
 			}
@@ -289,10 +290,10 @@ func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
 		return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
-	return d.handleWs(req, conn).Bytes()
+	return d.handleSingleWs(req, conn).Bytes()
 }
 
-func (d *Dispatcher) handleWs(req Request, conn wsConn) Response {
+func (d *Dispatcher) handleSingleWs(req Request, conn wsConn) Response {
 	id, err := formatID(req.ID)
 	if err != nil {
 		return NewRPCResponse(nil, "2.0", nil, err)
