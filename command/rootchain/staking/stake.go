@@ -102,11 +102,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	gasPrice, err := txRelayer.Client().Eth().GasPrice()
-	if err != nil {
-		return err
-	}
-
 	approveTxn, err := rootHelper.CreateApproveERC20Txn(params.amountValue,
 		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.stakeTokenAddr))
 	if err != nil {
@@ -134,10 +129,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	stakeManagerAddr := ethgo.Address(types.StringToAddress(params.stakeManagerAddr))
 	txn := &ethgo.Transaction{
-		From:     validatorAccount.Ecdsa.Address(),
-		Input:    encoded,
-		To:       &stakeManagerAddr,
-		GasPrice: gasPrice,
+		From:  validatorAccount.Ecdsa.Address(),
+		Input: encoded,
+		To:    &stakeManagerAddr,
 	}
 
 	receipt, err = txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)

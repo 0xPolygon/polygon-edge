@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	DefaultGasPrice   = 1879048192 // 0x70000000
+	defaultGasPrice   = 1879048192 // 0x70000000
 	DefaultGasLimit   = 5242880    // 0x500000
 	DefaultRPCAddress = "http://127.0.0.1:8545"
 	numRetries        = 1000
@@ -103,7 +103,12 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	txn.Nonce = nonce
 
 	if txn.GasPrice == 0 {
-		txn.GasPrice = DefaultGasPrice
+		gasPrice, err := t.Client().Eth().GasPrice()
+		if err != nil {
+			return ethgo.ZeroHash, err
+		}
+
+		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
@@ -142,7 +147,7 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 
 	txn.From = accounts[0]
 	txn.Gas = DefaultGasLimit
-	txn.GasPrice = DefaultGasPrice
+	txn.GasPrice = defaultGasPrice
 
 	txnHash, err := t.client.Eth().SendTransaction(txn)
 	if err != nil {

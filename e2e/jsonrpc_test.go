@@ -81,7 +81,6 @@ func TestJsonRPC(t *testing.T) {
 		amountToSend := new(big.Int).Sub(newBalance, big.NewInt(int64(txPrice)))
 		txn, err = srv.Txn(key1).Transfer(fund.Address(), amountToSend).
 			GasLimit(estimatedGas).
-			GasPrice(gasPrice).
 			Send()
 		require.NoError(t, err)
 		txn.NoFail(t)
