@@ -21,7 +21,7 @@ func getInitValidatorSetInput(polyBFTConfig PolyBFTConfig) ([]byte, error) {
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
 		initialValidators[i] = &contractsapi.ValidatorInit{
 			Addr:  validator.Address,
-			Stake: validator.Stake,
+			Stake: validator.Balance,
 		}
 	}
 

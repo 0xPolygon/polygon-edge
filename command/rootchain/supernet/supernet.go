@@ -170,7 +170,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 				return fmt.Errorf("could not get finalized stake for validator: %v. Error: %w", v.Address, err)
 			}
 
-			v.Stake = finalizedStake
+			v.Balance = finalizedStake
 		}
 
 		if err = helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
