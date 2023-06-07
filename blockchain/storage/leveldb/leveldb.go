@@ -31,11 +31,12 @@ func Factory(config map[string]interface{}, logger hclog.Logger) (storage.Storag
 
 // NewLevelDBStorage creates the new storage reference with leveldb default options
 func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error) {
-	options := &opt.Options{}
 	// Set default options
-	options.OpenFilesCacheCapacity = DefaultHandles
-	options.BlockCacheCapacity = DefaultCache / 2 * opt.MiB
-	options.WriteBuffer = DefaultCache / 4 * opt.MiB // Two of these are used internally
+	options := &opt.Options{
+		OpenFilesCacheCapacity: DefaultHandles,
+		BlockCacheCapacity:     DefaultCache / 2 * opt.MiB,
+		WriteBuffer:            DefaultCache / 4 * opt.MiB, // Two of these are used internally
+	}
 
 	return NewLevelDBStorageWithOpt(path, logger, options)
 }
