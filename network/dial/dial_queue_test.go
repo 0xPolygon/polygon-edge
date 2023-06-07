@@ -10,21 +10,31 @@ import (
 
 func TestDialQueue(t *testing.T) {
 	q := NewDialQueue()
+	infos := [3]*peer.AddrInfo{}
 
-	info0 := &peer.AddrInfo{
-		ID: peer.ID("a"),
+	for i, x := range []string{"a", "b", "c"} {
+		infos[i] = &peer.AddrInfo{
+			ID: peer.ID(x),
+		}
+
+		if i != 1 {
+			q.AddTask(infos[i], 8)
+		} else {
+			q.AddTask(infos[i], 1)
+		}
+
+		assert.Equal(t, i+1, q.heap.Len())
 	}
-	q.AddTask(info0, 1)
-	assert.Equal(t, 1, q.heap.Len())
 
-	info1 := &peer.AddrInfo{
-		ID: peer.ID("b"),
-	}
-	q.AddTask(info1, 1)
-	assert.Equal(t, 2, q.heap.Len())
+	q.AddTask(infos[0], 8) // existing task, same priority
+	assert.Equal(t, 3, q.heap.Len())
 
-	assert.Equal(t, q.popTaskImpl().addrInfo.ID, peer.ID("a"))
-	assert.Equal(t, q.popTaskImpl().addrInfo.ID, peer.ID("b"))
+	q.AddTask(infos[2], 1) // existing task, more priority
+	assert.Equal(t, 3, q.heap.Len())
+
+	assert.Equal(t, peer.ID("b"), q.popTaskImpl().addrInfo.ID)
+	assert.Equal(t, peer.ID("c"), q.popTaskImpl().addrInfo.ID)
+	assert.Equal(t, peer.ID("a"), q.popTaskImpl().addrInfo.ID)
 	assert.Equal(t, 0, q.heap.Len())
 
 	assert.Nil(t, q.popTaskImpl())
@@ -43,7 +53,7 @@ func TestDialQueue(t *testing.T) {
 	case <-time.After(1 * time.Second):
 	}
 
-	q.AddTask(info0, 1)
+	q.AddTask(infos[0], 1)
 
 	select {
 	case <-done:
