@@ -495,11 +495,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		// provide validators' stakes
-		for _, validatorStake := range cluster.Config.StakeAmounts {
-			args = append(args, "--stake", validatorStake)
-		}
-
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
 			args = append(args, "--contract-deployer-allow-list-admin",
 				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
