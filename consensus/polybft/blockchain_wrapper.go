@@ -87,6 +87,7 @@ func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
 func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block,
 	callback func(*state.Transition) error) (*types.FullBlock, error) {
 	header := block.Header.Copy()
+	start := time.Now().UTC()
 
 	transition, err := p.executor.BeginTxn(parent.StateRoot, header, types.BytesToAddress(header.Miner))
 	if err != nil {
@@ -107,6 +108,8 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	}
 
 	_, root := transition.Commit()
+
+	updateBlockExecutionMetric(start)
 
 	if root != block.Header.StateRoot {
 		return nil, fmt.Errorf("incorrect state root: (%s, %s)", root, block.Header.StateRoot)
