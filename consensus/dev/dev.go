@@ -236,6 +236,10 @@ func (d *Dev) PreCommitState(_header *types.Header, _txn *state.Transition) erro
 	return nil
 }
 
+func (d *Dev) PostCommitState(_ *types.Block) error {
+	return nil
+}
+
 func (d *Dev) GetSyncProgression() *progress.Progression {
 	return nil
 }

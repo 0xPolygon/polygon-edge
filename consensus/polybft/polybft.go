@@ -661,6 +661,11 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 	return nil
 }
 
+func (p *Polybft) PostCommitState(block *types.Block) error {
+	// TODO:
+	return nil
+}
+
 // GetBridgeProvider is an implementation of Consensus interface
 // Returns an instance of BridgeDataProvider
 func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {

@@ -92,6 +92,7 @@ type Verifier interface {
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
 	PreCommitState(header *types.Header, txn *state.Transition) error
+	PostCommitState(block *types.Block) error
 }
 
 type Executor interface {
@@ -689,12 +690,7 @@ func (b *Blockchain) verifyBlock(block *types.Block) ([]*types.Receipt, error) {
 	}
 
 	// Make sure the block body data is valid
-	receipts, err := b.verifyBlockBody(block)
-	if err != nil {
-		return nil, err
-	}
-
-	return receipts, nil
+	return b.verifyBlockBody(block)
 }
 
 // verifyBlockParent makes sure that the child block is in line
@@ -841,6 +837,10 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 	}
 
 	_, root := txn.Commit()
+
+	if err := b.consensus.PostCommitState(block); err != nil {
+		return nil, err
+	}
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())

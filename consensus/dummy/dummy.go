@@ -65,6 +65,10 @@ func (d *Dummy) PreCommitState(_header *types.Header, _txn *state.Transition) er
 	return nil
 }
 
+func (d *Dummy) PostCommitState(_ *types.Block) error {
+	return nil
+}
+
 func (d *Dummy) GetSyncProgression() *progress.Progression {
 	return nil
 }

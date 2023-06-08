@@ -419,7 +419,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			continue
 		}
 
-		decodedStateTx, err := decodeStateTransaction(tx.Input) // used to be Data
+		decodedStateTx, err := decodeStateTransaction(tx.Input)
 		if err != nil {
 			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
 		}

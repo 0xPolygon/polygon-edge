@@ -278,6 +278,10 @@ func (m *MockVerifier) PreCommitState(header *types.Header, txn *state.Transitio
 	return nil
 }
 
+func (m *MockVerifier) PostCommitState(_ *types.Block) error {
+	return nil
+}
+
 func (m *MockVerifier) HookPreCommitState(fn preStateCommitDelegate) {
 	m.preStateCommitFn = fn
 }

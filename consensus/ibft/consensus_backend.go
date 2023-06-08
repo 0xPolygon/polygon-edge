@@ -230,6 +230,10 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		Receipts: transition.Receipts(),
 	})
 
+	if err := i.PostCommitState(block); err != nil {
+		return nil, err
+	}
+
 	// write the seal of the block after all the fields are completed
 	header, err = i.currentSigner.WriteProposerSeal(header)
 	if err != nil {

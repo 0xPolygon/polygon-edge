@@ -31,6 +31,9 @@ type Consensus interface {
 	// PreCommitState a hook to be called before finalizing state transition on inserting block
 	PreCommitState(header *types.Header, txn *state.Transition) error
 
+	// PostCommitState is a hook to be called after finalizing state transition
+	PostCommitState(block *types.Block) error
+
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
 

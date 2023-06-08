@@ -496,6 +496,10 @@ func (i *backendIBFT) PreCommitState(header *types.Header, txn *state.Transition
 	return hooks.PreCommitState(header, txn)
 }
 
+func (d *backendIBFT) PostCommitState(_ *types.Block) error {
+	return nil
+}
+
 // GetEpoch returns the current epoch
 func (i *backendIBFT) GetEpoch(number uint64) uint64 {
 	if number%i.epochSize == 0 {
