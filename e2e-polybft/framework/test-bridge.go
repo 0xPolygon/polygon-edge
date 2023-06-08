@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -338,7 +339,7 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig
 
 	for i, secret := range validatorSecrets {
 		secrets[i] = path.Join(t.clusterConfig.TmpDir, secret)
-		balances[i] = polybftConfig.InitialValidatorSet[i].Balance
+		balances[i] = command.DefaultPremineBalance
 	}
 
 	if err := t.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
@@ -416,9 +417,8 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 
 	g, ctx := errgroup.WithContext(context.Background())
 
-	for i, secret := range validatorSecrets {
+	for _, secret := range validatorSecrets {
 		secret := secret
-		i := i
 
 		g.Go(func() error {
 			select {
@@ -431,7 +431,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
+					"--amount", command.DefaultStake.String(),
 					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}

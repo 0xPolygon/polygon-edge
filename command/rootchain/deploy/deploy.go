@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -636,24 +635,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return nil, 0, err
 	}
 
-	// initialize CheckpointManager
-	validatorSet, err := validatorSetToABISlice(outputter, initialValidators)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to convert validators to map: %w", err)
-	}
-
-	initParams := &contractsapi.InitializeCheckpointManagerFn{
-		ChainID_:        big.NewInt(chainID),
-		NewBls:          rootchainConfig.BLSAddress,
-		NewBn256G2:      rootchainConfig.BN256G2Address,
-		NewValidatorSet: validatorSet,
-	}
-
-	if err := initContract(outputter, txRelayer, initParams,
-		rootchainConfig.CheckpointManagerAddress, checkpointManagerName, deployerKey); err != nil {
-		return nil, 0, err
-	}
-
 	return rootchainConfig, supernetID, nil
 }
 
@@ -748,43 +729,4 @@ func initContract(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelay
 		})
 
 	return nil
-}
-
-// validatorSetToABISlice converts given validators to generic map
-// which is used for ABI encoding validator set being sent to the rootchain contract
-func validatorSetToABISlice(o command.OutputFormatter,
-	validators []*validator.GenesisValidator) ([]*contractsapi.Validator, error) {
-	accSet := make(validator.AccountSet, len(validators))
-
-	if _, err := o.Write([]byte(fmt.Sprintf("%s [VALIDATORS]\n", contractsDeploymentTitle))); err != nil {
-		return nil, err
-	}
-
-	for i, val := range validators {
-		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", val))); err != nil {
-			return nil, err
-		}
-
-		blsKey, err := val.UnmarshalBLSPublicKey()
-		if err != nil {
-			return nil, err
-		}
-
-		accSet[i] = &validator.ValidatorMetadata{
-			Address:     val.Address,
-			BlsKey:      blsKey,
-			VotingPower: new(big.Int).Set(val.Stake),
-		}
-	}
-
-	hash, err := accSet.Hash()
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := o.Write([]byte(fmt.Sprintf("%s Validators hash: %s\n", contractsDeploymentTitle, hash))); err != nil {
-		return nil, err
-	}
-
-	return accSet.ToAPIBinding(), nil
 }
