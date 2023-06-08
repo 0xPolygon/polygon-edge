@@ -66,6 +66,8 @@ const (
 
 var (
 	errNoGenesisValidators = errors.New("genesis validators aren't provided")
+	errNoPremineAllowed    = errors.New("native token is not mintable, so no premine is allowed " +
+		"except for zero address and reward wallet if native token is used as reward token")
 )
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
@@ -89,6 +91,16 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+	}
+
+	if !p.nativeTokenConfig.IsMintable {
+		// validate premine map, no premine is allowed if token is not mintable,
+		// except for the reward wallet (if native token is used as reward token) and zero address
+		for a := range premineBalances {
+			if a != types.ZeroAddress && (p.rewardTokenCode != "" || a != walletPremineInfo.address) {
+				return errNoPremineAllowed
+			}
+		}
 	}
 
 	var (
