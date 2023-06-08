@@ -202,12 +202,14 @@ func generateBlocks(t *testing.T, count int, ch chan *types.FullBlock, ctx conte
 	}
 }
 
-func DirSize(path string) (int64, error) {
+func dirSize(t *testing.T, path string) int64 {
+	t.Helper()
+
 	var size int64
 
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			t.Fail()
 		}
 		if !info.IsDir() {
 			size += info.Size()
@@ -215,8 +217,11 @@ func DirSize(path string) (int64, error) {
 
 		return err
 	})
+	if err != nil {
+		t.Log(err)
+	}
 
-	return size, err
+	return size
 }
 
 func TestWriteFullBlock(t *testing.T) {
@@ -262,7 +267,7 @@ insertloop:
 
 			fmt.Println("writing block", i)
 
-			size, _ := DirSize(path)
+			size := dirSize(t, path)
 			fmt.Println("\tldb file count:", countLdbFilesInPath(path))
 			fmt.Println("\tdir size", size/1_000_000, "MBs")
 		}
