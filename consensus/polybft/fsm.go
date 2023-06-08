@@ -488,7 +488,9 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 }
 
 // verifyCommitmentTx validates bridge commitment transaction
-func verifyCommitmentTx(txHash types.Hash, commitment *CommitmentMessageSigned, validators validator.ValidatorSet) error {
+func verifyCommitmentTx(txHash types.Hash,
+	commitment *CommitmentMessageSigned,
+	validators validator.ValidatorSet) error {
 	signers, err := validators.Accounts().GetFilteredValidators(commitment.AggSignature.Bitmap)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve signers for state tx (%s): %w", txHash, err)

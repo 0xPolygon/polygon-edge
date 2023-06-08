@@ -496,7 +496,7 @@ func (i *backendIBFT) PreCommitState(header *types.Header, txn *state.Transition
 	return hooks.PreCommitState(header, txn)
 }
 
-func (d *backendIBFT) PostCommitState(_ *types.Block) error {
+func (i *backendIBFT) PostCommitState(_ *types.Block) error {
 	return nil
 }
 

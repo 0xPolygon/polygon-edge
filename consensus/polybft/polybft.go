@@ -663,6 +663,7 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 
 func (p *Polybft) PostCommitState(block *types.Block) error {
 	commitmentTxExists := false
+
 	validators, err := p.GetValidators(block.Number()-1, nil)
 	if err != nil {
 		return err
@@ -692,6 +693,7 @@ func (p *Polybft) PostCommitState(block *types.Block) error {
 			}
 		}
 	}
+
 	return nil
 }
 
