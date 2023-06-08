@@ -53,10 +53,15 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 
 		testWriteEmptyState(t, buildPreState)
 	})
-	t.Run("update state with empty", func(t *testing.T) {
+	t.Run("update state with empty - delete empty objects", func(t *testing.T) {
 		t.Parallel()
 
-		testUpdateStateWithEmpty(t, buildPreState)
+		testUpdateStateWithEmpty(t, buildPreState, true)
+	})
+	t.Run("update state with empty - do not delete empty objects", func(t *testing.T) {
+		t.Parallel()
+
+		testUpdateStateWithEmpty(t, buildPreState, false)
 	})
 	t.Run("suicide account in pre-state", func(t *testing.T) {
 		t.Parallel()
@@ -189,7 +194,7 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 	assert.False(t, txn.Exist(addr1))
 }
 
-func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
+func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState, deleteEmptyObjects bool) {
 	t.Helper()
 
 	// If the state (in prestate) is updated to empty it should be removed
@@ -198,13 +203,27 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	txn := newTxn(snap)
 	txn.SetState(addr1, hash1, hash0)
 
-	//nolint:godox
-	// TODO, test with false (should not be deleted) (to be fixed in EVM-528)
-	// TODO, test with balance on the account and nonce (to be fixed in EVM-528)
-	snap, _ = snap.Commit(txn.Commit(true))
+	snap, _ = snap.Commit(txn.Commit(deleteEmptyObjects))
 
 	txn = newTxn(snap)
-	assert.False(t, txn.Exist(addr1))
+	assert.Equal(t, !deleteEmptyObjects, txn.Exist(addr1))
+
+	// if balance is set, no matter what is passed to deleteEmptyObjects,
+	// addr1 should exist in state objects of txn
+	txn.SetBalance(addr1, big.NewInt(100))
+	snap, _ = snap.Commit(txn.Commit(deleteEmptyObjects))
+
+	txn = newTxn(snap)
+	assert.Equal(t, true, txn.Exist(addr1))
+
+	// if nonce is set, no matter what is passed to deleteEmptyObjects,
+	// addr1 should exist in state objects of txn
+	txn.SetBalance(addr1, big.NewInt(0))
+	txn.SetNonce(addr1, 1)
+	snap, _ = snap.Commit(txn.Commit(deleteEmptyObjects))
+
+	txn = newTxn(snap)
+	assert.Equal(t, true, txn.Exist(addr1))
 }
 
 func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {

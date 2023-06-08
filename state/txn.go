@@ -492,9 +492,6 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 	})
 }
 
-//nolint:godox
-// TODO, check panics with this ones (to be fixed in EVM-528)
-
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
 
