@@ -1362,8 +1362,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	txns = append(txns,
 		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 
-	err = f.VerifyStateTransactions(txns)
-	require.ErrorContains(t, err, "invalid signature for tx")
+	require.ErrorContains(t, f.VerifyStateTransactions(txns), "invalid signature for state tx")
 }
 
 func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {

@@ -662,7 +662,36 @@ func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
 }
 
 func (p *Polybft) PostCommitState(block *types.Block) error {
-	// TODO:
+	commitmentTxExists := false
+	validators, err := p.GetValidators(block.Number()-1, nil)
+	if err != nil {
+		return err
+	}
+
+	// validate commitment state transactions
+	for _, tx := range block.Transactions {
+		if tx.Type != types.StateTx {
+			continue
+		}
+
+		decodedStateTx, err := decodeStateTransaction(tx.Input)
+		if err != nil {
+			return fmt.Errorf("unknown state transaction: tx=%v, error: %w", tx.Hash, err)
+		}
+
+		switch stateTxData := decodedStateTx.(type) {
+		case *CommitmentMessageSigned:
+			if commitmentTxExists {
+				return fmt.Errorf("only one commitment state tx is allowed per block: %v", tx.Hash)
+			}
+
+			commitmentTxExists = true
+
+			if err := verifyCommitmentTx(tx.Hash, stateTxData, validator.NewValidatorSet(validators, p.logger)); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
