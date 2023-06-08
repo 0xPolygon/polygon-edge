@@ -57,7 +57,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.configPath,
 		configFlag,
 		"",
-		"the path to the CLI config. Supports .json and .hcl",
+		"the path to the CLI config. Supports .json, .hcl, .yaml, .yml",
 	)
 
 	cmd.Flags().StringVar(
@@ -186,7 +186,7 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().StringArrayVar(
-		&params.corsAllowedOrigins,
+		&params.rawConfig.CorsAllowedOrigins,
 		corsOriginFlag,
 		defaultConfig.Headers.AccessControlAllowOrigins,
 		"the CORS header indicating whether any JSON-RPC response can be shared with the specified origin",
