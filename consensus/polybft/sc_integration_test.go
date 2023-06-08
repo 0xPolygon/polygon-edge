@@ -335,37 +335,21 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		transition := newTestTransition(t, alloc)
 
-		// get data for ChildValidatorSet initialization
-		initInput, err := getInitValidatorSetInput(polyBFTConfig)
-		require.NoError(t, err)
-
-		// init ChildValidatorSet
-		err = callContract(contracts.SystemCaller, contracts.ValidatorSetContract, initInput, "ChildValidatorSet", transition)
-		require.NoError(t, err)
-
-		initInput, err = getInitRewardPoolInput(polyBFTConfig)
+		// init ValidatorSet
+		err := initValidatorSet(polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// init RewardPool
-		err = callContract(contracts.SystemCaller, contracts.RewardPoolContract, initInput, "RewardPool", transition)
+		err = initRewardPool(polyBFTConfig, transition)
 		require.NoError(t, err)
 
-		// approve root token
-		approveFn := &contractsapi.ApproveRootERC20Fn{
-			Spender: contracts.RewardPoolContract,
-			Amount:  polyBFTConfig.RewardConfig.WalletAmount,
-		}
-
-		input, err := approveFn.EncodeAbi()
-		require.NoError(t, err)
-
-		err = callContract(polyBFTConfig.RewardConfig.WalletAddress,
-			polyBFTConfig.RewardConfig.TokenAddress, input, "RewardToken", transition)
+		// approve reward pool as reward token spender
+		err = approveRewardPoolAsSpender(polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch
 		commitEpoch := createTestCommitEpochInput(t, 1, polyBFTConfig.EpochSize)
-		input, err = commitEpoch.EncodeAbi()
+		input, err := commitEpoch.EncodeAbi()
 		require.NoError(t, err)
 
 		// call commit epoch

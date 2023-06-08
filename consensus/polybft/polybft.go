@@ -131,32 +131,22 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize ValidatorSet SC
-		input, err := getInitValidatorSetInput(polyBFTConfig)
-		if err != nil {
+		if err = initValidatorSet(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
-		if err = callContract(contracts.SystemCaller,
-			contracts.ValidatorSetContract, input, "ValidatorSet", transition); err != nil {
+		// approve reward pool
+		if err = approveRewardPoolAsSpender(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
-		if !isNativeRewardToken(polyBFTConfig) {
-			// if reward token is a native erc20 token, we don't need to mint an amount of tokens
-			// for given wallet address to it since this is done in premine
-			if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
-				return err
-			}
+		// mint reward tokens to reward wallet
+		if err = mintRewardTokensToWallet(polyBFTConfig, transition); err != nil {
+			return err
 		}
 
 		// initialize RewardPool SC
-		input, err = getInitRewardPoolInput(polyBFTConfig)
-		if err != nil {
-			return err
-		}
-
-		if err = callContract(contracts.SystemCaller,
-			contracts.RewardPoolContract, input, "RewardPool", transition); err != nil {
+		if err = initRewardPool(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
@@ -183,7 +173,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize ChildERC20PredicateAccessList SC
-			input, err = getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, false)
+			input, err := getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
@@ -249,7 +239,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		} else {
 			// initialize ChildERC20Predicate SC
-			input, err = getInitERC20PredicateInput(bridgeCfg, false)
+			input, err := getInitERC20PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
@@ -358,11 +348,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		return nil
 	}
-}
-
-// isNativeRewardToken returns true in case a native token is used as a reward token as well
-func isNativeRewardToken(cfg PolyBFTConfig) bool {
-	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
 }
 
 func ForkManagerFactory(forks *chain.Forks) error {
