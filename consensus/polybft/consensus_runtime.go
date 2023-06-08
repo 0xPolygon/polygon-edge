@@ -167,7 +167,7 @@ func (c *consensusRuntime) close() {
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		stateSenderAddr := c.config.PolyBFTConfig.Bridge.StateSenderAddr
-		stateSyncManager, err := newStateSyncManager(
+		stateSyncManager := newStateSyncManager(
 			logger.Named("state-sync-manager"),
 			c.config.State,
 			&stateSyncConfig{
@@ -181,10 +181,6 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				numBlockConfirmations: c.config.numBlockConfirmations,
 			},
 		)
-
-		if err != nil {
-			return err
-		}
 
 		c.stateSyncManager = stateSyncManager
 	} else {
