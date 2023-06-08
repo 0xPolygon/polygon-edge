@@ -117,11 +117,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("enlist validator failed: %w", err)
 	}
 
-	gasPrice, err := txRelayer.Client().Eth().GasPrice()
-	if err != nil {
-		return err
-	}
-
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 
 	if params.finalizeGenesisSet {
@@ -131,10 +126,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 
 		txn := &ethgo.Transaction{
-			From:     ownerKey.Address(),
-			Input:    encoded,
-			To:       &supernetAddr,
-			GasPrice: gasPrice,
+			From:  ownerKey.Address(),
+			Input: encoded,
+			To:    &supernetAddr,
 		}
 
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
@@ -185,10 +179,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 
 		txn := &ethgo.Transaction{
-			From:     ownerKey.Address(),
-			Input:    encoded,
-			To:       &supernetAddr,
-			GasPrice: gasPrice,
+			From:  ownerKey.Address(),
+			Input: encoded,
+			To:    &supernetAddr,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, ownerKey)

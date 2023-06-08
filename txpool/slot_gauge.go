@@ -4,6 +4,7 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 )
 
 const (
@@ -23,12 +24,14 @@ func (g *slotGauge) read() uint64 {
 
 // increase increases the height of the gauge by the specified slots amount.
 func (g *slotGauge) increase(slots uint64) {
-	atomic.AddUint64(&g.height, slots)
+	newHeight := atomic.AddUint64(&g.height, slots)
+	metrics.SetGauge([]string{txPoolMetrics, "slots_used"}, float32(newHeight))
 }
 
 // decrease decreases the height of the gauge by the specified slots amount.
 func (g *slotGauge) decrease(slots uint64) {
-	atomic.AddUint64(&g.height, ^(slots - 1))
+	newHeight := atomic.AddUint64(&g.height, ^(slots - 1))
+	metrics.SetGauge([]string{txPoolMetrics, "slots_used"}, float32(newHeight))
 }
 
 // highPressure checks if the gauge level

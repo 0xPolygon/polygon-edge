@@ -85,10 +85,9 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		toAddr := key1.Address()
 		msg := &ethgo.CallMsg{
-			From:     acct.Address(),
-			To:       &toAddr,
-			Value:    newBalance,
-			GasPrice: gasPrice,
+			From:  acct.Address(),
+			To:    &toAddr,
+			Value: newBalance,
 		}
 
 		estimatedGas, err := client.EstimateGas(msg)
@@ -99,10 +98,9 @@ func TestE2E_JsonRPC(t *testing.T) {
 		amountToSend := new(big.Int).Sub(newBalance, big.NewInt(int64(txPrice)))
 		targetAddr := acct.Address()
 		txn = cluster.SendTxn(t, key1, &ethgo.Transaction{
-			To:       &targetAddr,
-			Value:    amountToSend,
-			GasPrice: gasPrice,
-			Gas:      estimatedGas,
+			To:    &targetAddr,
+			Value: amountToSend,
+			Gas:   estimatedGas,
 		})
 		require.NoError(t, txn.Wait())
 		require.True(t, txn.Succeed())

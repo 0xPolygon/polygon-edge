@@ -94,11 +94,6 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("whitelist validator failed. Could not create tx relayer: %w", err)
 	}
 
-	gasPrice, err := txRelayer.Client().Eth().GasPrice()
-	if err != nil {
-		return err
-	}
-
 	whitelistFn := &contractsapi.WhitelistValidatorsCustomSupernetManagerFn{
 		Validators_: stringSliceToAddressSlice(params.newValidatorAddresses),
 	}
@@ -110,10 +105,9 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
 	txn := &ethgo.Transaction{
-		From:     ecdsaKey.Address(),
-		Input:    encoded,
-		To:       &supernetAddr,
-		GasPrice: gasPrice,
+		From:  ecdsaKey.Address(),
+		Input: encoded,
+		To:    &supernetAddr,
 	}
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)

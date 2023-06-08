@@ -626,12 +626,6 @@ func (t *Txn) GasLimit(gas uint64) *Txn {
 	return t
 }
 
-func (t *Txn) GasPrice(price uint64) *Txn {
-	t.raw.GasPrice = price
-
-	return t
-}
-
 func (t *Txn) Nonce(nonce uint64) *Txn {
 	t.raw.Nonce = nonce
 
@@ -645,7 +639,12 @@ func (t *Txn) sendImpl() error {
 	}
 
 	if t.raw.GasPrice == 0 {
-		t.raw.GasPrice = 1048576
+		gasPrice, err := t.client.GasPrice()
+		if err != nil {
+			return fmt.Errorf("failed to get gas price: %w", err)
+		}
+
+		t.raw.GasPrice = gasPrice
 	}
 
 	if t.raw.Nonce == 0 {
