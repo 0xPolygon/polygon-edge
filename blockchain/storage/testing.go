@@ -737,7 +737,3 @@ func (m *MockStorage) HookClose(fn closeDelegate) {
 func (m *MockStorage) NewBatch() Batch {
 	return nil
 }
-
-func (m *MockStorage) WriteBatch() error {
-	return nil
-}

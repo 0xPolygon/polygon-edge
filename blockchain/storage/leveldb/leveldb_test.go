@@ -245,16 +245,16 @@ insertloop:
 		case b := <-blockchain:
 			batchHelper := storage.NewBatchHelper(s)
 
-			batchHelper.WriteBody(b.Block.Hash(), b.Block.Body())
+			batchHelper.PutBody(b.Block.Hash(), b.Block.Body())
 
 			for _, tx := range b.Block.Transactions {
-				batchHelper.WriteTxLookup(tx.Hash, b.Block.Hash())
+				batchHelper.PutTxLookup(tx.Hash, b.Block.Hash())
 			}
 
-			batchHelper.WriteHeader(b.Block.Header)
-			batchHelper.WriteHeadNumber(uint64(i))
-			batchHelper.WriteHeadHash(b.Block.Header.Hash)
-			batchHelper.WriteReceipts(b.Block.Hash(), b.Receipts)
+			batchHelper.PutHeader(b.Block.Header)
+			batchHelper.PutHeadNumber(uint64(i))
+			batchHelper.PutHeadHash(b.Block.Header.Hash)
+			batchHelper.PutReceipts(b.Block.Hash(), b.Receipts)
 
 			if err := batchHelper.WriteBatch(); err != nil {
 				require.NoError(t, err)

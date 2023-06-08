@@ -24,48 +24,48 @@ func NewBatchHelper(storage Storage) *BatchHelper {
 	return &BatchHelper{batch: batch}
 }
 
-func (b *BatchHelper) WriteHeader(h *types.Header) {
+func (b *BatchHelper) PutHeader(h *types.Header) {
 	b.putRlp(HEADER, h.Hash.Bytes(), h)
 }
 
-func (b *BatchHelper) WriteBody(hash types.Hash, body *types.Body) {
+func (b *BatchHelper) PutBody(hash types.Hash, body *types.Body) {
 	b.putRlp(BODY, hash.Bytes(), body)
 }
 
-func (b *BatchHelper) WriteHeadHash(h types.Hash) {
+func (b *BatchHelper) PutHeadHash(h types.Hash) {
 	b.putWithPrefix(HEAD, HASH, h.Bytes())
 }
 
-func (b *BatchHelper) WriteTxLookup(hash types.Hash, blockHash types.Hash) {
+func (b *BatchHelper) PutTxLookup(hash types.Hash, blockHash types.Hash) {
 	ar := &fastrlp.Arena{}
 	vr := ar.NewBytes(blockHash.Bytes()).MarshalTo(nil)
 
 	b.putWithPrefix(TX_LOOKUP_PREFIX, hash.Bytes(), vr)
 }
 
-func (b *BatchHelper) WriteHeadNumber(n uint64) {
+func (b *BatchHelper) PutHeadNumber(n uint64) {
 	b.putWithPrefix(HEAD, NUMBER, common.EncodeUint64ToBytes(n))
 }
 
-func (b *BatchHelper) WriteReceipts(hash types.Hash, receipts []*types.Receipt) {
+func (b *BatchHelper) PutReceipts(hash types.Hash, receipts []*types.Receipt) {
 	rr := types.Receipts(receipts)
 
 	b.putRlp(RECEIPTS, hash.Bytes(), &rr)
 }
 
-func (b *BatchHelper) WriteCanonicalHeader(h *types.Header, diff *big.Int) {
-	b.WriteHeader(h)
-	b.WriteHeadHash(h.Hash)
-	b.WriteHeadNumber(h.Number)
-	b.WriteCanonicalHash(h.Number, h.Hash)
-	b.WriteTotalDifficulty(h.Hash, diff)
+func (b *BatchHelper) PutCanonicalHeader(h *types.Header, diff *big.Int) {
+	b.PutHeader(h)
+	b.PutHeadHash(h.Hash)
+	b.PutHeadNumber(h.Number)
+	b.PutCanonicalHash(h.Number, h.Hash)
+	b.PutTotalDifficulty(h.Hash, diff)
 }
 
-func (b *BatchHelper) WriteCanonicalHash(n uint64, hash types.Hash) {
+func (b *BatchHelper) PutCanonicalHash(n uint64, hash types.Hash) {
 	b.putWithPrefix(CANONICAL, common.EncodeUint64ToBytes(n), hash.Bytes())
 }
 
-func (b *BatchHelper) WriteTotalDifficulty(hash types.Hash, diff *big.Int) {
+func (b *BatchHelper) PutTotalDifficulty(hash types.Hash, diff *big.Int) {
 	b.putWithPrefix(DIFFICULTY, hash.Bytes(), diff.Bytes())
 }
 

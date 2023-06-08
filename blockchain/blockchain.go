@@ -448,7 +448,7 @@ func (b *Blockchain) writeCanonicalHeader(batch *storage.BatchHelper, event *Eve
 	}
 
 	newTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
-	batch.WriteCanonicalHeader(h, newTD)
+	batch.PutCanonicalHeader(h, newTD)
 
 	event.Type = EventHead
 	event.AddNewHeader(h)
@@ -866,7 +866,6 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	defer b.writeLock.Unlock()
 
 	block := fblock.Block
-	batchHelper := storage.NewBatchHelper(b.db)
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
@@ -875,6 +874,8 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	}
 
 	header := block.Header
+
+	batchHelper := storage.NewBatchHelper(b.db)
 
 	if err := b.writeBody(batchHelper, block); err != nil {
 		return err
@@ -889,7 +890,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchHelper.WriteReceipts(block.Hash(), fblock.Receipts)
+	batchHelper.PutReceipts(block.Hash(), fblock.Receipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -929,8 +930,6 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	b.writeLock.Lock()
 	defer b.writeLock.Unlock()
 
-	batchHelper := storage.NewBatchHelper(b.db)
-
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
 
@@ -938,6 +937,8 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	}
 
 	header := block.Header
+
+	batchHelper := storage.NewBatchHelper(b.db)
 
 	if err := b.writeBody(batchHelper, block); err != nil {
 		return err
@@ -1060,11 +1061,11 @@ func (b *Blockchain) writeBody(batch *storage.BatchHelper, block *types.Block) e
 	}
 
 	// Write the full body (txns + receipts)
-	batch.WriteBody(block.Header.Hash, block.Body())
+	batch.PutBody(block.Header.Hash, block.Body())
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		batch.WriteTxLookup(txn.Hash, block.Hash())
+		batch.PutTxLookup(txn.Hash, block.Hash())
 	}
 
 	return nil
@@ -1207,7 +1208,7 @@ func (b *Blockchain) writeHeaderImpl(batch *storage.BatchHelper, evnt *Event, he
 		return b.writeCanonicalHeader(batch, evnt, header)
 	}
 
-	batch.WriteHeader(header)
+	batch.PutHeader(header)
 
 	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
 	if !ok {
@@ -1225,7 +1226,7 @@ func (b *Blockchain) writeHeaderImpl(batch *storage.BatchHelper, evnt *Event, he
 	}
 
 	// Write the difficulty
-	batch.WriteTotalDifficulty(
+	batch.PutTotalDifficulty(
 		header.Hash,
 		big.NewInt(0).Add(
 			parentTD,
