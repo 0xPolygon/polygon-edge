@@ -134,6 +134,10 @@ jobs:
                           --epoch-size 10 \
                           --native-token-config MyToken:MTK:18:true
 
+              polycli wallet create --words 12 --language english | jq '.Addresses[0]' > rootchain-wallet.json
+              COINBASE_ADDRESS=$(cast rpc --rpc-url {{ rootchain_json_rpc }} eth_coinbase | sed 's/"//g')
+              cast send --rpc-url {{ rootchain_json_rpc }} --from $COINBASE_ADDRESS --value {{ rootchain_deployer_fund_amount }} $(cat rootchain-wallet.json | jq -r '.ETHAddress') --unlocked
+
               polygon-edge polybft stake-manager-deploy \
                   --jsonrpc {{ rootchain_json_rpc }} \
                   --test
