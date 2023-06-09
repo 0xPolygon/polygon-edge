@@ -453,7 +453,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	}
 
 	validatorsAddrs := make([]types.Address, validatorCount)
-	initValidatorsBalance := ethgo.Gwei(1)
+	initValidatorsBalance := ethgo.Ether(1)
 	initMinterBalance := ethgo.Ether(100000)
 
 	minter, err := wallet.GenerateKey()
