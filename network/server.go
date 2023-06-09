@@ -354,34 +354,18 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 // Essentially, the networking server monitors for any open connection slots
 // and attempts to fill them as soon as they open up
 func (s *Server) runDial() {
-	// The notification channel needs to be buffered to avoid
-	// having events go missing, as they're crucial to the functioning
-	// of the runDial mechanism
-	notifyCh := make(chan struct{}, 1)
-
+	slots := NewSlots(s.connectionCounts.maxOutboundConnectionCount)
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// cancel context first
-	defer close(notifyCh)
 	defer cancel()
 
 	if err := s.Subscribe(ctx, func(event *peerEvent.PeerEvent) {
-		// Only concerned about the listed event types
-		// PeerConnected, PeerDialCompleted will not change HasFreeOutboundConn from false to true
+		// Return back slot on PeerFailedToConnect or PeerDisconnected
 		switch event.Type {
 		case
 			peerEvent.PeerFailedToConnect,
-			peerEvent.PeerDisconnected,
-			peerEvent.PeerAddedToDialQueue:
-		default:
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case notifyCh <- struct{}{}:
-		default:
+			peerEvent.PeerDisconnected:
+			_ = slots.ReturnSlot()
 		}
 	}); err != nil {
 		s.logger.Error(
@@ -400,35 +384,35 @@ func (s *Server) runDial() {
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
 		// maxDials requests concurrently (to be fixed in EVM-543)
-		for s.connectionCounts.HasFreeOutboundConn() {
-			tt := s.dialQueue.PopTask()
-			if tt == nil {
-				// The dial queue is closed,
-				// no further dial tasks are incoming
-				return
-			}
-
-			peerInfo := tt.GetAddrInfo()
-
-			s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
-
-			if !s.IsConnected(peerInfo.ID) {
-				// the connection process is async because it involves connection (here) +
-				// the handshake done in the identity service.
-				if err := s.host.Connect(ctx, *peerInfo); err != nil {
-					s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
-
-					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
-				}
-			}
+		tt := s.dialQueue.PopTask()
+		if tt == nil {
+			// The dial queue is closed,
+			// no further dial tasks are incoming
+			return
 		}
 
-		// wait until there is a change in the state of a peer that
-		// might involve a new dial slot available
-		select {
-		case <-notifyCh:
-		case <-s.closeCh:
+		peerInfo := tt.GetAddrInfo()
+
+		if s.IsConnected(peerInfo.ID) {
+			continue
+		}
+
+		s.logger.Debug("Waiting for a dialing slot", "addr", peerInfo, "local", s.host.ID())
+
+		if _, closed := slots.TakeSlot(ctx); closed {
 			return
+		}
+
+		s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
+
+		// the connection process is async because it involves connection (here) +
+		// the handshake done in the identity service.
+		if err := s.host.Connect(ctx, *peerInfo); err != nil {
+			slots.ReturnSlot()
+
+			s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
+
+			s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
 		}
 	}
 }
