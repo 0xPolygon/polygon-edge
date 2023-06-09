@@ -54,10 +54,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
-          steps:
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
       - name: Install Terraform
         uses: hashicorp/setup-terraform@v2.0.3
         with:
@@ -205,6 +201,9 @@ jobs:
           }
 
           main
+
+          sudo apt update
+          sudo apt install nodejs npm
 
           EOF
       - name: Run Ansible
