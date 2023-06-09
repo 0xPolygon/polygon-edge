@@ -65,7 +65,45 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
+	senderAccount, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
+	require.NoError(t, err)
+
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
+
+	// bridge some tokens for first validator to child chain
+	tokensToDeposit := ethgo.Ether(10)
+
+	require.NoError(
+		t, cluster.Bridge.Deposit(
+			common.ERC20,
+			polybftCfg.Bridge.RootNativeERC20Addr,
+			polybftCfg.Bridge.RootERC20PredicateAddr,
+			rootHelper.TestAccountPrivKey,
+			senderAccount.Address().String(),
+			tokensToDeposit.String(),
+			"",
+			cluster.Bridge.JSONRPCAddr(),
+			rootHelper.TestAccountPrivKey,
+			false),
+	)
+
+	// wait for a couple of sprints
+	finalBlockNum := 5 * sprintSize
+	require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
+
+	// the transaction is processed and there should be a success event
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
+	require.NoError(t, err)
+
+	// assert that all deposits are executed successfully
+	checkStateSyncResultLogs(t, logs, 1)
+
+	// check validator balance got increased by deposited amount
+	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
+	require.NoError(t, err)
+	require.Equal(t, tokensToDeposit, balance)
 
 	t.Run("bridge ERC 20 tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
@@ -85,7 +123,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				false),
 		)
 
-		finalBlockNum := 8 * sprintSize
+		finalBlockNum := 10 * sprintSize
 		// wait for a couple of sprints
 		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
 
@@ -96,7 +134,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(t, err)
 
 		// assert that all deposits are executed successfully
-		checkStateSyncResultLogs(t, logs, transfersCount)
+		checkStateSyncResultLogs(t, logs, transfersCount+1) // because of the first deposit for the first validator
 
 		// check receivers balances got increased by deposited amount
 		for _, receiver := range receivers {
@@ -287,6 +325,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize),
+		framework.WithNativeTokenConfig(nativeTokenMintableTestCfg),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
 
@@ -427,6 +466,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
+		framework.WithNativeTokenConfig(nativeTokenMintableTestCfg),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
 
@@ -1042,26 +1082,18 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 }
 
 func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
-	const (
+	var (
 		transfersCount = 5
-		amount         = 10
+		depositAmount  = ethgo.Ether(5)
+		withdrawAmount = ethgo.Ether(1)
 		// make epoch size long enough, so that all exit events are processed within the same epoch
 		epochSize  = 30
 		sprintSize = uint64(5)
 	)
 
 	receivers := make([]string, transfersCount)
-	amounts := make([]string, transfersCount)
-
-	for i := 0; i < transfersCount; i++ {
-		key, err := ethgow.GenerateKey()
-		require.NoError(t, err)
-
-		receivers[i] = types.Address(key.Address()).String()
-		amounts[i] = fmt.Sprintf("%d", amount)
-
-		t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
-	}
+	depositAmounts := make([]string, transfersCount)
+	withdrawAmounts := make([]string, transfersCount)
 
 	admin, _ := ethgow.GenerateKey()
 	adminAddr := types.Address(admin.Address())
@@ -1071,7 +1103,15 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		framework.WithEpochSize(epochSize),
 		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeBlockListAdmin(adminAddr),
-		framework.WithPremine(adminAddr),
+		framework.WithSecretsCallback(func(a []types.Address, tcc *framework.TestClusterConfig) {
+			for i := 0; i < len(a); i++ {
+				receivers[i] = a[i].String()
+				depositAmounts[i] = fmt.Sprintf("%d", depositAmount)
+				withdrawAmounts[i] = fmt.Sprintf("%d", withdrawAmount)
+
+				t.Logf("Receiver#%d=%s\n", i+1, receivers[i])
+			}
+		}),
 	)
 	defer cluster.Stop()
 
@@ -1083,44 +1123,82 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
 
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	// fund admin on rootchain
+	require.NoError(t, cluster.Servers[0].RootchainFundFor([]types.Address{adminAddr}, []*big.Int{ethgo.Ether(10)},
+		polybftCfg.Bridge.StakeTokenAddr))
+
+	adminBalanceOnChild := ethgo.Ether(5)
+
+	// bridge some tokens for admin to child chain
+	require.NoError(
+		t, cluster.Bridge.Deposit(
+			common.ERC20,
+			polybftCfg.Bridge.RootNativeERC20Addr,
+			polybftCfg.Bridge.RootERC20PredicateAddr,
+			rootHelper.TestAccountPrivKey,
+			adminAddr.String(),
+			adminBalanceOnChild.String(),
+			"",
+			cluster.Bridge.JSONRPCAddr(),
+			rootHelper.TestAccountPrivKey,
+			false),
+	)
+
+	// wait for a couple of sprints
+	finalBlockNum := 5 * sprintSize
+	require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
+
+	// the transaction is processed and there should be a success events
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
+	require.NoError(t, err)
+
+	// assert that all deposits are executed successfully
+	checkStateSyncResultLogs(t, logs, 1)
+
+	// check admin balance got increased by deposited amount
+	balance, err := childEthEndpoint.GetBalance(ethgo.Address(adminAddr), ethgo.Latest)
+	require.NoError(t, err)
+	require.Equal(t, adminBalanceOnChild, balance)
+
 	t.Run("bridge native (ERC 20) tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
-		for i := 0; i < 2; i++ {
-			require.NoError(
-				t,
-				cluster.Bridge.Deposit(
-					common.ERC20,
-					polybftCfg.Bridge.RootNativeERC20Addr,
-					polybftCfg.Bridge.RootERC20PredicateAddr,
-					rootHelper.TestAccountPrivKey,
-					strings.Join(receivers[:], ","),
-					strings.Join(amounts[:], ","),
-					"",
-					cluster.Bridge.JSONRPCAddr(),
-					rootHelper.TestAccountPrivKey,
-					false),
-			)
-		}
+		require.NoError(
+			t,
+			cluster.Bridge.Deposit(
+				common.ERC20,
+				polybftCfg.Bridge.RootNativeERC20Addr,
+				polybftCfg.Bridge.RootERC20PredicateAddr,
+				rootHelper.TestAccountPrivKey,
+				strings.Join(receivers[:], ","),
+				strings.Join(depositAmounts[:], ","),
+				"",
+				cluster.Bridge.JSONRPCAddr(),
+				rootHelper.TestAccountPrivKey,
+				false),
+		)
 
-		finalBlockNum := 8 * sprintSize
+		finalBlockNum := 10 * sprintSize
 		// wait for a couple of sprints
 		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
 
 		// the transactions are processed and there should be a success events
-		var stateSyncedResult contractsapi.StateSyncResultEvent
-
 		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
 		require.NoError(t, err)
 
+		// because of the admin deposit on child chain at the beginning
+		totalTransfers := transfersCount + 1
+
 		// assert that all deposits are executed successfully
-		checkStateSyncResultLogs(t, logs, transfersCount)
+		checkStateSyncResultLogs(t, logs, totalTransfers)
 
 		// check receivers balances got increased by deposited amount
 		for _, receiver := range receivers {
 			balance, err := childEthEndpoint.GetBalance(ethgo.Address(types.StringToAddress(receiver)), ethgo.Latest)
 			require.NoError(t, err)
-			require.Equal(t, big.NewInt(amount), balance)
+			require.Equal(t, depositAmount, balance)
 		}
 
 		t.Log("Deposits were successfully processed")
@@ -1143,7 +1221,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			common.ERC20,
 			hex.EncodeToString(rawKey),
 			strings.Join(receivers[:], ","),
-			strings.Join(amounts[:], ","),
+			strings.Join(withdrawAmounts[:], ","),
 			"",
 			validatorSrv.JSONRPCAddr(),
 			contracts.ChildERC20PredicateContract,
@@ -1159,7 +1237,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			common.ERC20,
 			hex.EncodeToString(rawKey),
 			strings.Join(receivers[:], ","),
-			strings.Join(amounts[:], ","),
+			strings.Join(withdrawAmounts[:], ","),
 			"",
 			validatorSrv.JSONRPCAddr(),
 			contracts.ChildERC20PredicateContract,
@@ -1175,7 +1253,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			common.ERC20,
 			hex.EncodeToString(rawKey),
 			strings.Join(receivers[:], ","),
-			strings.Join(amounts[:], ","),
+			strings.Join(withdrawAmounts[:], ","),
 			"",
 			validatorSrv.JSONRPCAddr(),
 			contracts.ChildERC20PredicateContract,
@@ -1199,7 +1277,13 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		exitHelper := polybftCfg.Bridge.ExitHelperAddr
 		childJSONRPC := validatorSrv.JSONRPCAddr()
 
-		for exitEventID := uint64(1); exitEventID <= transfersCount; exitEventID++ {
+		oldBalances := map[types.Address]*big.Int{}
+		for _, receiver := range receivers {
+			balance := erc20BalanceOf(t, types.StringToAddress(receiver), polybftCfg.Bridge.RootNativeERC20Addr, rootchainTxRelayer)
+			oldBalances[types.StringToAddress(receiver)] = balance
+		}
+
+		for exitEventID := uint64(1); exitEventID <= uint64(transfersCount); exitEventID++ {
 			// send exit transaction to exit helper
 			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
 			require.NoError(t, err)
@@ -1208,7 +1292,8 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		// assert that receiver's balances on RootERC20 smart contract are expected
 		for _, receiver := range receivers {
 			balance := erc20BalanceOf(t, types.StringToAddress(receiver), polybftCfg.Bridge.RootNativeERC20Addr, rootchainTxRelayer)
-			require.Equal(t, big.NewInt(amount), balance)
+			require.Equal(t, oldBalances[types.StringToAddress(receiver)].Add(
+				oldBalances[types.StringToAddress(receiver)], withdrawAmount), balance)
 		}
 	})
 }

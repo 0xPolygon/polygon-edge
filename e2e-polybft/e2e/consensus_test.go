@@ -121,6 +121,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	cluster := framework.NewTestCluster(t, validatorSetSize,
 		framework.WithEpochSize(epochSize),
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
+		framework.WithNativeTokenConfig(nativeTokenMintableTestCfg),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%s", a, premineBalance))
@@ -302,10 +303,11 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
 		framework.WithEpochSize(5),
+		framework.WithNativeTokenConfig(nativeTokenMintableTestCfg),
 		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
 			for _, a := range addresses {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premineAmount))
-				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", a, premineAmount))
+				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(premineAmount))
 			}
 		}),
 	)
@@ -468,7 +470,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), initMinterBalance))
 			for i, addr := range addrs {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initValidatorsBalance))
-				config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", addr, initValidatorsBalance))
+				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(initValidatorsBalance))
 				validatorsAddrs[i] = addr
 			}
 		}))

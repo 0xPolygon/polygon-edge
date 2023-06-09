@@ -417,8 +417,9 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 
 	g, ctx := errgroup.WithContext(context.Background())
 
-	for _, secret := range validatorSecrets {
+	for i, secret := range validatorSecrets {
 		secret := secret
+		i := i
 
 		g.Go(func() error {
 			select {
@@ -431,7 +432,7 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", command.DefaultStake.String(),
+					"--amount", t.getStakeAmount(i).String(),
 					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
 					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}
@@ -446,6 +447,15 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 	}
 
 	return g.Wait()
+}
+
+func (t *TestBridge) getStakeAmount(validatorIndex int) *big.Int {
+	l := len(t.clusterConfig.StakeAmounts)
+	if l == 0 || l <= validatorIndex {
+		return command.DefaultStake
+	}
+
+	return t.clusterConfig.StakeAmounts[validatorIndex]
 }
 
 func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.PolyBFTConfig) error {
