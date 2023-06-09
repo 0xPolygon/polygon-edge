@@ -656,12 +656,7 @@ func (p *Polybft) GetBlockCreator(h *types.Header) (types.Address, error) {
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
-	// Not required
-	return nil
-}
-
-func (p *Polybft) PostCommitState(block *types.Block) error {
+func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error {
 	commitmentTxExists := false
 
 	validators, err := p.GetValidators(block.Number()-1, nil)

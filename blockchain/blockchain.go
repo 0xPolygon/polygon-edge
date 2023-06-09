@@ -91,8 +91,7 @@ type Verifier interface {
 	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
-	PreCommitState(header *types.Header, txn *state.Transition) error
-	PostCommitState(block *types.Block) error
+	PreCommitState(block *types.Block, txn *state.Transition) error
 }
 
 type Executor interface {
@@ -832,15 +831,11 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	if err := b.consensus.PreCommitState(header, txn); err != nil {
+	if err := b.consensus.PreCommitState(block, txn); err != nil {
 		return nil, err
 	}
 
 	_, root := txn.Commit()
-
-	if err := b.consensus.PostCommitState(block); err != nil {
-		return nil, err
-	}
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())

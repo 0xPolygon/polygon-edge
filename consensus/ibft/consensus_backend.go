@@ -215,14 +215,6 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		transition,
 	)
 
-	if err := i.PreCommitState(header, transition); err != nil {
-		return nil, err
-	}
-
-	_, root := transition.Commit()
-	header.StateRoot = root
-	header.GasUsed = transition.TotalGas()
-
 	// build the block
 	block := consensus.BuildBlock(consensus.BuildBlockParams{
 		Header:   header,
@@ -230,9 +222,13 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		Receipts: transition.Receipts(),
 	})
 
-	if err := i.PostCommitState(block); err != nil {
+	if err := i.PreCommitState(block, transition); err != nil {
 		return nil, err
 	}
+
+	_, root := transition.Commit()
+	header.StateRoot = root
+	header.GasUsed = transition.TotalGas()
 
 	// write the seal of the block after all the fields are completed
 	header, err = i.currentSigner.WriteProposerSeal(header)
