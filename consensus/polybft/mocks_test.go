@@ -125,6 +125,12 @@ func (m *blockchainMock) GetChainID() uint64 {
 	return 0
 }
 
+func (m *blockchainMock) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	args := m.Called(hash)
+
+	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
+}
+
 var _ polybftBackend = (*polybftBackendMock)(nil)
 
 type polybftBackendMock struct {

@@ -76,12 +76,14 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			nil,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			nil,
 			5,
 		)
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 1,
 		}))
 
 		receipt := &types.Receipt{
@@ -130,12 +132,14 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			nil,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			nil,
 			5,
 		)
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 1,
 		}))
 
 		receipt := &types.Receipt{
@@ -194,12 +198,14 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			txRelayerMock,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			nil,
 			5,
 		)
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 1,
 		}))
 
 		receipts := make([]*types.Receipt, len(allAliases))
@@ -233,6 +239,71 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			require.Equal(t, newStake+uint64(validatorsCount)-uint64(i)-1, v.VotingPower.Uint64())
 		}
 	})
+
+	t.Run("PostBlock - add stake to one validator + missing block", func(t *testing.T) {
+		t.Parallel()
+
+		receipt := &types.Receipt{}
+		header1, header2 := &types.Header{Hash: types.Hash{3, 2}}, &types.Header{Hash: types.Hash{6, 4}}
+
+		bcMock := new(blockchainMock)
+		bcMock.On("GetHeaderByNumber", block-2).Return(header1, true).Once()
+		bcMock.On("GetHeaderByNumber", block-1).Return(header2, true).Once()
+		bcMock.On("GetReceiptsByHash", header1.Hash).Return([]*types.Receipt{receipt}, error(nil)).Once()
+		bcMock.On("GetReceiptsByHash", header2.Hash).Return([]*types.Receipt{}, error(nil)).Once()
+
+		validators := validator.NewTestValidatorsWithAliases(t, allAliases)
+		stakeManager := newStakeManager(
+			hclog.NewNullLogger(),
+			state,
+			nil,
+			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
+			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			bcMock,
+			5,
+		)
+
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 3,
+		}))
+
+		receipt.Logs = []*types.Log{
+			createTestLogForTransferEvent(
+				t,
+				stakeManager.validatorSetContract,
+				types.ZeroAddress,
+				validators.GetValidator(initialSetAliases[secondValidator]).Address(),
+				250,
+			),
+		}
+		receipt.SetStatus(types.ReceiptSuccess)
+
+		req := &PostBlockRequest{
+			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
+				Receipts: []*types.Receipt{receipt},
+			},
+			Epoch: epoch,
+		}
+
+		require.NoError(t, stakeManager.PostBlock(req))
+
+		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
+		require.NoError(t, err)
+		var firstValidaotor *validator.ValidatorMetadata
+		firstValidaotor = nil
+		for _, validator := range fullValidatorSet.Validators {
+			if validator.Address.String() == validators.GetValidator(initialSetAliases[secondValidator]).Address().String() {
+				firstValidaotor = validator
+			}
+		}
+		require.NotNil(t, firstValidaotor)
+		require.Equal(t, big.NewInt(501), firstValidaotor.VotingPower) // 250 + 250 + initial 1
+		require.True(t, firstValidaotor.IsActive)
+
+		bcMock.AssertExpectations(t)
+	})
 }
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
@@ -251,6 +322,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		nil,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+		nil,
 		10,
 	)
 
