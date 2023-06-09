@@ -509,7 +509,7 @@ func (p *genesisParams) getValidatorAccounts(
 		for i, val := range p.validators {
 			parts := strings.Split(val, ":")
 			if len(parts) != 3 {
-				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
+				return nil, fmt.Errorf("expected 3 parts provided in the following format "+
 					"<P2P multi address:ECDSA address:public BLS key>, but got %d part(s)",
 					len(parts))
 			}

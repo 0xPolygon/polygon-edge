@@ -20,8 +20,6 @@ func GetCommand() *cobra.Command {
 		Run:     runCommand,
 	}
 
-	helper.RegisterGRPCAddressFlag(genesisCmd)
-
 	setFlags(genesisCmd)
 	setLegacyFlags(genesisCmd)
 
