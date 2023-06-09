@@ -436,7 +436,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			commitmentTxExists = true
 
-			if err = verifyCommitmentTx(tx.Hash, stateTxData, f.validators); err != nil {
+			if err = verifyBridgeCommitmentTx(tx.Hash, stateTxData, f.validators); err != nil {
 				return err
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
@@ -482,37 +482,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			// but it should be
 			return errDistributeRewardsTxDoesNotExist
 		}
-	}
-
-	return nil
-}
-
-// verifyCommitmentTx validates bridge commitment transaction
-func verifyCommitmentTx(txHash types.Hash,
-	commitment *CommitmentMessageSigned,
-	validators validator.ValidatorSet) error {
-	signers, err := validators.Accounts().GetFilteredValidators(commitment.AggSignature.Bitmap)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve signers for state tx (%s): %w", txHash, err)
-	}
-
-	if !validators.HasQuorum(signers.GetAddressesAsSet()) {
-		return fmt.Errorf("quorum size not reached for state tx (%s)", txHash)
-	}
-
-	commitmentHash, err := commitment.Hash()
-	if err != nil {
-		return err
-	}
-
-	signature, err := bls.UnmarshalSignature(commitment.AggSignature.AggregatedSignature)
-	if err != nil {
-		return fmt.Errorf("error for state tx (%s) while unmarshaling signature: %w", txHash, err)
-	}
-
-	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), bls.DomainStateReceiver)
-	if !verified {
-		return fmt.Errorf("invalid signature for state tx (%s)", txHash)
 	}
 
 	return nil
@@ -644,6 +613,37 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 	}
 
 	return errDistributeRewardsTxNotExpected
+}
+
+// verifyBridgeCommitmentTx validates bridge commitment transaction
+func verifyBridgeCommitmentTx(txHash types.Hash,
+	commitment *CommitmentMessageSigned,
+	validators validator.ValidatorSet) error {
+	signers, err := validators.Accounts().GetFilteredValidators(commitment.AggSignature.Bitmap)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve signers for state tx (%s): %w", txHash, err)
+	}
+
+	if !validators.HasQuorum(signers.GetAddressesAsSet()) {
+		return fmt.Errorf("quorum size not reached for state tx (%s)", txHash)
+	}
+
+	commitmentHash, err := commitment.Hash()
+	if err != nil {
+		return err
+	}
+
+	signature, err := bls.UnmarshalSignature(commitment.AggSignature.AggregatedSignature)
+	if err != nil {
+		return fmt.Errorf("error for state tx (%s) while unmarshaling signature: %w", txHash, err)
+	}
+
+	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), bls.DomainStateReceiver)
+	if !verified {
+		return fmt.Errorf("invalid signature for state tx (%s)", txHash)
+	}
+
+	return nil
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeDrift uint64) error {
