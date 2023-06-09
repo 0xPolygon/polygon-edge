@@ -163,10 +163,11 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 
 // TokenConfig is the configuration of native token used by edge network
 type TokenConfig struct {
-	Name       string `json:"name"`
-	Symbol     string `json:"symbol"`
-	Decimals   uint8  `json:"decimals"`
-	IsMintable bool   `json:"isMintable"`
+	Name       string        `json:"name"`
+	Symbol     string        `json:"symbol"`
+	Decimals   uint8         `json:"decimals"`
+	IsMintable bool          `json:"isMintable"`
+	Owner      types.Address `json:"owner"`
 }
 
 type RewardsConfig struct {
