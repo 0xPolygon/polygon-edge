@@ -114,8 +114,7 @@ func hashit(k []byte) []byte {
 }
 
 var (
-	accountArenaPool fastrlp.ArenaPool
-	stateArenaPool   fastrlp.ArenaPool
+	stateArenaPool fastrlp.ArenaPool
 )
 
 // Hash returns the root hash of the trie. It does not write to the
