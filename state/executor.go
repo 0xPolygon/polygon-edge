@@ -426,11 +426,9 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	result, err := t.apply(msg)
 	if err != nil {
-		if err = t.state.RevertToSnapshot(s); err != nil {
-			return nil, err
+		if revertErr := t.state.RevertToSnapshot(s); revertErr != nil {
+			return nil, revertErr
 		}
-
-		return nil, err
 	}
 
 	if t.PostHook != nil {
