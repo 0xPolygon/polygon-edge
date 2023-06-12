@@ -1,9 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -19,11 +23,20 @@ import (
 	dockerclient "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/go-connections/nat"
+	"github.com/hashicorp/go-uuid"
 	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/keystore"
+	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+)
+
+var (
+	//go:embed genesis.json.tmpl
+	genesisTmpl string
 )
 
 const (
@@ -67,6 +80,13 @@ func setFlags(cmd *cobra.Command) {
 		noConsole,
 		false,
 		"use the official geth image instead of the console fork",
+	)
+
+	cmd.Flags().StringArrayVar(
+		&params.premine,
+		premineFlag,
+		[]string{},
+		"premine accounts at genesis",
 	)
 }
 
@@ -143,6 +163,17 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		image = gethImage
 	}
 
+	genesisFilePath := filepath.Join(params.dataDir, "genesis.json")
+
+	var started bool
+	if _, err := os.Stat(genesisFilePath); err == nil {
+		started = true
+	} else if errors.Is(err, os.ErrNotExist) {
+		started = false
+	} else {
+		return err
+	}
+
 	// try to pull the image
 	reader, err := dockerClient.ImagePull(ctx, image, dockertypes.ImagePullOptions{})
 	if err != nil {
@@ -154,27 +185,94 @@ func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeC
 		return fmt.Errorf("cannot copy: %w", err)
 	}
 
-	// create the client
-	args := []string{"--dev"}
+	if !started {
+		// generate a random validator
+		validatorKey, err := wallet.GenerateKey()
+		if err != nil {
+			return err
+		}
 
-	// add period of 2 seconds
-	args = append(args, "--dev.period", "2")
+		// generate the genesis.json file
+		tmpl, err := template.New("name").Parse(genesisTmpl)
+		if err != nil {
+			return err
+		}
 
-	// add data dir
-	args = append(args, "--datadir", "/eth1data")
+		premine := map[string]string{}
+		for _, addr := range params.premine {
+			premine[ethgo.HexToAddress(addr).String()[2:]] = "0xffffffffffffffffffffffffff"
+		}
 
-	// add ipcpath
-	args = append(args, "--ipcpath", "/eth1data/geth.ipc")
+		input := map[string]interface{}{
+			"ValidatorAddr": validatorKey.Address().String()[2:],
+			"Period":        2,
+			"Allocs":        premine,
+		}
 
-	// enable rpc
-	args = append(args, "--http", "--http.addr", "0.0.0.0", "--http.api", "eth,net,web3,debug")
+		var tpl bytes.Buffer
+		if err = tmpl.Execute(&tpl, input); err != nil {
+			return err
+		}
 
-	// enable ws
-	args = append(args, "--ws", "--ws.addr", "0.0.0.0")
+		keystore, err := toKeystoreV3(validatorKey)
+		if err != nil {
+			return err
+		}
+
+		// write all the data
+		filesToWrite := map[string][]byte{
+			"genesis.json":          tpl.Bytes(),
+			"keystore/account.json": keystore,
+			"password.txt":          []byte("password"),
+		}
+		for path, content := range filesToWrite {
+			localPath := filepath.Join(params.dataDir, path)
+
+			parentDir := filepath.Dir(localPath)
+			if err := os.MkdirAll(parentDir, 0700); err != nil {
+				return err
+			}
+
+			if err := common.SaveFileSafe(localPath, content, 0660); err != nil {
+				return err
+			}
+		}
+	}
+
+	// We run two commands inside the same bash sh session of the docker container.
+	// The first script initializes the data folder for Geth with a custom genesis file
+	// which runs a Clique consensus protocol with premine accounts.
+	// The second script, runs the Geth server with the initialized chain. Unlike in dev mode,
+	// it needs to manually activate the mining module.
+	args := []string{
+		// init with a custom genesis
+		"geth",
+		"--datadir", "/eth1data",
+		"init", "/eth1data/genesis.json",
+		"&&",
+		// start the execution node
+		"geth",
+		"--datadir", "/eth1data",
+		"--networkid", "1337",
+		"--ipcpath", "/eth1data/geth.ipc",
+		"--http", "--http.addr", "0.0.0.0", "--http.api", "eth,net,web3,debug",
+		"--ws", "--ws.addr", "0.0.0.0",
+		"--keystore", "/eth1data/keystore",
+		"--mine",
+		"--miner.threads", "1",
+		//nolint:godox
+		// TODO: Unlock by index might be deprecated in future versions.
+		// As of now, we do not need a new release of geth to run the rootchain for debug.
+		// So, we can keep this for now.
+		"--unlock", "0",
+		"--allow-insecure-unlock",
+		"--password", "/eth1data/password.txt",
+	}
 
 	config := &container.Config{
-		Image: image,
-		Cmd:   args,
+		Image:      image,
+		Cmd:        []string{strings.Join(args, " ")},
+		Entrypoint: []string{"/bin/sh", "-c"},
 		Labels: map[string]string{
 			"edge-type": "rootchain",
 		},
@@ -295,4 +393,33 @@ func handleSignals(ctx context.Context, closeCh <-chan struct{}) error {
 	}
 
 	return nil
+}
+
+func toKeystoreV3(key *wallet.Key) ([]byte, error) {
+	id, _ := uuid.GenerateUUID()
+
+	// keystore does not include "address" and "id" field
+	privKey, err := key.MarshallPrivateKey()
+	if err != nil {
+		return nil, err
+	}
+
+	keystore, err := keystore.EncryptV3(privKey, "password")
+	if err != nil {
+		return nil, err
+	}
+
+	var dec map[string]interface{}
+	if err := json.Unmarshal(keystore, &dec); err != nil {
+		return nil, err
+	}
+
+	//nolint:godox
+	// TODO: This fields are not populated by default by
+	// ethgo/keystore so we have to go through this loop to do it.
+	dec["address"] = key.Address().String()
+	dec["uuid"] = id
+	dec["id"] = id
+
+	return json.Marshal(dec)
 }
