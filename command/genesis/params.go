@@ -522,7 +522,10 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 	}
 
 	// owner address
-	owner := types.StringToAddress(strings.TrimSpace(params[4]))
+	owner := types.ZeroAddress
+	if isMintable {
+		owner = types.StringToAddress(strings.TrimSpace(params[4]))
+	}
 
 	p.nativeTokenConfig = &polybft.TokenConfig{
 		Name:       name,
