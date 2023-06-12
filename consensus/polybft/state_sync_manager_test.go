@@ -16,7 +16,6 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
@@ -409,11 +408,9 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	stateSenderArtifact, err := artifact.DecodeArtifact([]byte(contractsapi.StateSenderArtifact))
-	require.NoError(t, err)
-
+	// Deploy contract
 	contractReceipt, err := server.SendTxn(&ethgo.Transaction{
-		Input: stateSenderArtifact.Bytecode,
+		Input: contractsapi.StateSender.Bytecode,
 	})
 	require.NoError(t, err)
 
