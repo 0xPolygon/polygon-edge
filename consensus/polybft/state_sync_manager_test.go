@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -407,32 +409,31 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	//nolint:godox
-	// TODO: Deploy local artifacts (to be fixed in EVM-542)
-	cc := &testutil.Contract{}
-	cc.AddCallback(func() string {
-		return `
-			event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data);
-			uint256 indx;
-
-			function emitEvent() public payable {
-				emit StateSynced(indx, msg.sender, msg.sender, bytes(""));
-				indx++;
-			}
-			`
-	})
-
-	_, addr, err := server.DeployContract(cc)
+	stateSenderArtifact, err := artifact.DecodeArtifact([]byte(contractsapi.StateSenderArtifact))
 	require.NoError(t, err)
+
+	contractReceipt, err := server.SendTxn(&ethgo.Transaction{
+		Input: stateSenderArtifact.Bytecode,
+	})
+	require.NoError(t, err)
+
+	// Create contract function call payload
+	encodedSyncStateData, err := (&contractsapi.SyncStateStateSenderFn{
+		Receiver: types.BytesToAddress(server.Account(0).Bytes()),
+		Data:     []byte{},
+	}).EncodeAbi()
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
-		receipt, err := server.TxnTo(addr, "emitEvent")
+		receipt, err := server.SendTxn(&ethgo.Transaction{
+			To:    &contractReceipt.ContractAddress,
+			Input: encodedSyncStateData,
+		})
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	s.config.stateSenderAddr = types.Address(addr)
+	s.config.stateSenderAddr = types.Address(contractReceipt.ContractAddress)
 	s.config.jsonrpcAddr = server.HTTPAddr()
 
 	require.NoError(t, s.initTracker())
