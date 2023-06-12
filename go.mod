@@ -58,7 +58,7 @@ require (
 )
 
 require (
-	github.com/0xPolygon/go-ibft v0.4.1-0.20230418151118-337b82c3c3c4
+	github.com/0xPolygon/go-ibft v0.4.1-0.20230612114712-fa4235351cbc
 	github.com/docker/docker v20.10.18+incompatible
 	github.com/docker/go-connections v0.4.0
 	go.etcd.io/bbolt v1.3.7
