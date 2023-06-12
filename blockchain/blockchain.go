@@ -840,7 +840,10 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	_, root := txn.Commit()
+	_, root, err := txn.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
+	}
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())

@@ -112,7 +112,11 @@ func (e *Executor) WriteGenesis(
 		}
 	}
 
-	objs := txn.Commit(false)
+	objs, err := txn.Commit(false)
+	if err != nil {
+		return types.Hash{}, err
+	}
+
 	_, root := snap.Commit(objs)
 
 	return types.BytesToHash(root), nil
@@ -363,7 +367,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	}
 
 	// The suicided accounts are set as deleted for the next iteration
-	t.state.CleanDeleteObjects(true)
+	if err := t.state.CleanDeleteObjects(true); err != nil {
+		return fmt.Errorf("failed to clean deleted objects: %w", err)
+	}
 
 	if result.Failed() {
 		receipt.SetStatus(types.ReceiptFailed)
@@ -385,11 +391,15 @@ func (t *Transition) Write(txn *types.Transaction) error {
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash) {
-	objs := t.state.Commit(t.config.EIP155)
+func (t *Transition) Commit() (Snapshot, types.Hash, error) {
+	objs, err := t.state.Commit(t.config.EIP155)
+	if err != nil {
+		return nil, types.ZeroHash, err
+	}
+
 	s2, root := t.snap.Commit(objs)
 
-	return s2, types.BytesToHash(root)
+	return s2, types.BytesToHash(root), nil
 }
 
 func (t *Transition) subGasPool(amount uint64) error {
@@ -416,7 +426,9 @@ func (t *Transition) Apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	result, err := t.apply(msg)
 	if err != nil {
-		t.state.RevertToSnapshot(s)
+		if revertErr := t.state.RevertToSnapshot(s); revertErr != nil {
+			return nil, revertErr
+		}
 	}
 
 	if t.PostHook != nil {
@@ -785,7 +797,12 @@ func (t *Transition) applyCall(
 
 	result = t.run(c, host)
 	if result.Failed() {
-		t.state.RevertToSnapshot(snapshot)
+		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+			return &runtime.ExecutionResult{
+				GasLeft: c.Gas,
+				Err:     err,
+			}
+		}
 	}
 
 	t.captureCallEnd(c, result)
@@ -873,14 +890,22 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	result = t.run(c, host)
 	if result.Failed() {
-		t.state.RevertToSnapshot(snapshot)
+		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+			return &runtime.ExecutionResult{
+				Err: err,
+			}
+		}
 
 		return result
 	}
 
 	if t.config.EIP158 && len(result.ReturnValue) > SpuriousDragonMaxCodeSize {
 		// Contract size exceeds 'SpuriousDragon' size limit
-		t.state.RevertToSnapshot(snapshot)
+		if err := t.state.RevertToSnapshot(snapshot); err != nil {
+			return &runtime.ExecutionResult{
+				Err: err,
+			}
+		}
 
 		return &runtime.ExecutionResult{
 			GasLeft: 0,
@@ -896,7 +921,11 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 		// Out of gas creating the contract
 		if t.config.Homestead {
-			t.state.RevertToSnapshot(snapshot)
+			if err := t.state.RevertToSnapshot(snapshot); err != nil {
+				return &runtime.ExecutionResult{
+					Err: err,
+				}
+			}
 
 			result.GasLeft = 0
 		}

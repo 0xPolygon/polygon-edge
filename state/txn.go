@@ -1,6 +1,8 @@
 package state
 
 import (
+	"errors"
+	"fmt"
 	"math/big"
 
 	iradix "github.com/hashicorp/go-immutable-radix"
@@ -68,13 +70,15 @@ func (txn *Txn) Snapshot() int {
 }
 
 // RevertToSnapshot reverts to a given snapshot
-func (txn *Txn) RevertToSnapshot(id int) {
-	if id > len(txn.snapshots) {
-		panic("") //nolint:gocritic
+func (txn *Txn) RevertToSnapshot(id int) error {
+	if id > len(txn.snapshots)-1 {
+		return fmt.Errorf("snapshot id %d out of the range", id)
 	}
 
 	tree := txn.snapshots[id]
 	txn.txn = tree.Txn()
+
+	return nil
 }
 
 // GetAccount returns an account
@@ -492,9 +496,6 @@ func (txn *Txn) TouchAccount(addr types.Address) {
 	})
 }
 
-//nolint:godox
-// TODO, check panics with this ones (to be fixed in EVM-528)
-
 func (txn *Txn) Exist(addr types.Address) bool {
 	_, exists := txn.getStateObject(addr)
 
@@ -537,7 +538,7 @@ func (txn *Txn) CreateAccount(addr types.Address) {
 	txn.txn.Insert(addr.Bytes(), obj)
 }
 
-func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
+func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) error {
 	remove := [][]byte{}
 
 	txn.txn.Root().Walk(func(k []byte, v interface{}) bool {
@@ -555,13 +556,12 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 	for _, k := range remove {
 		v, ok := txn.txn.Get(k)
 		if !ok {
-			panic("it should not happen") //nolint:gocritic
+			return fmt.Errorf("failed to retrieve value for %s key", string(k))
 		}
 
 		obj, ok := v.(*StateObject)
-
 		if !ok {
-			panic("it should not happen") //nolint:gocritic
+			return errors.New("found object is not of StateObject type")
 		}
 
 		obj2 := obj.Copy()
@@ -571,10 +571,14 @@ func (txn *Txn) CleanDeleteObjects(deleteEmptyObjects bool) {
 
 	// delete refunds
 	txn.txn.Delete(refundIndex)
+
+	return nil
 }
 
-func (txn *Txn) Commit(deleteEmptyObjects bool) []*Object {
-	txn.CleanDeleteObjects(deleteEmptyObjects)
+func (txn *Txn) Commit(deleteEmptyObjects bool) ([]*Object, error) {
+	if err := txn.CleanDeleteObjects(deleteEmptyObjects); err != nil {
+		return nil, err
+	}
 
 	x := txn.txn.Commit()
 
@@ -620,5 +624,5 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) []*Object {
 		return false
 	})
 
-	return objs
+	return objs, nil
 }

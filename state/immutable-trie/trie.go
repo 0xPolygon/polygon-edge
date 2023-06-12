@@ -113,12 +113,9 @@ func hashit(k []byte) []byte {
 	return h.Sum(nil)
 }
 
-var accountArenaPool fastrlp.ArenaPool
-
-// TODO, Remove once we do update in fastrlp (to be fixed in EVM-528)
-//
-//nolint:godox
-var stateArenaPool fastrlp.ArenaPool
+var (
+	stateArenaPool fastrlp.ArenaPool
+)
 
 // Hash returns the root hash of the trie. It does not write to the
 // database and can be used even if the trie doesn't have one.
