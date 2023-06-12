@@ -226,8 +226,8 @@ func (s *Server) setupDiscovery() error {
 	)
 
 	// Register a network event handler
-	if subscribeErr := s.Subscribe(context.Background(), discoveryService.HandleNetworkEvent); subscribeErr != nil {
-		return fmt.Errorf("unable to subscribe to network events, %w", subscribeErr)
+	if err := s.Subscribe(context.Background(), discoveryService.HandleNetworkEvent); err != nil {
+		return fmt.Errorf("unable to subscribe to network events, %w", err)
 	}
 
 	// Register the actual discovery service as a valid protocol
