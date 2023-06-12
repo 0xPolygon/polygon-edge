@@ -202,9 +202,6 @@ jobs:
 
           main
 
-          sudo apt update
-          sudo apt install nodejs npm
-
           EOF
       - name: Run Ansible
         working-directory: ansible
