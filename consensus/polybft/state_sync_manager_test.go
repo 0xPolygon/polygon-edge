@@ -441,7 +441,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 9)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }
