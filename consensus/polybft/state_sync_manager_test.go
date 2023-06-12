@@ -7,13 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -21,6 +14,13 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/testutil"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateSyncManager {
@@ -422,6 +422,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 		Receiver: types.BytesToAddress(server.Account(0).Bytes()),
 		Data:     []byte{},
 	}).EncodeAbi()
+	require.NoError(t, err)
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
