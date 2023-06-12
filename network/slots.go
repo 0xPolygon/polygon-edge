@@ -2,71 +2,38 @@ package network
 
 import (
 	"context"
-	"sync"
 )
 
 // Slots is synchronization structure
-// A routine can invoke the TakeSlot method, which will block until at least one slot becomes available
-// The ReturnSlot method can be called by other routines to increase the count of available slots by one
-type Slots struct {
-	ch        chan struct{}
-	maximal   int64
-	available int64
+// A routine can invoke the Take method, which will block until at least one slot becomes available
+// The Release method can be called by other routines to increase the number of available slots by one
+type Slots chan struct{}
 
-	lock sync.Mutex
-}
-
-// NewSlots creates *Slots object with maximal slots available
-func NewSlots(maximal int64) *Slots {
-	ch := make(chan struct{}, maximal)
+// NewSlots creates Slots object with maximal slots available
+func NewSlots(maximal int64) Slots {
+	slots := make(Slots, maximal)
 	// add slots
 	for i := int64(0); i < maximal; i++ {
-		ch <- struct{}{}
+		slots <- struct{}{}
 	}
 
-	return &Slots{
-		ch:        ch,
-		maximal:   maximal,
-		available: maximal,
-		lock:      sync.Mutex{},
-	}
+	return slots
 }
 
-// TakeSlot takes slot if available or blocks until slot is available or context is done
-func (s *Slots) TakeSlot(ctx context.Context) (int64, bool) {
+// Take takes slot if available or blocks until slot is available or context is done
+func (s Slots) Take(ctx context.Context) bool {
 	select {
 	case <-ctx.Done():
-		return -1, true
-	case <-s.ch:
-		s.lock.Lock()
-		defer s.lock.Unlock()
-
-		s.available--
-
-		return s.available, false
+		return true
+	case <-s:
+		return false
 	}
 }
 
-// ReturnSlot returns back one slot. There is guarantee that available slots must be <= than maximal slots
-func (s *Slots) ReturnSlot() int64 {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	// prevent to return more slots than maximal
-	if s.available == s.maximal {
-		return s.available
+// Release returns back one slot. If all slots are already released, nothing will happen
+func (s Slots) Release() {
+	select {
+	case s <- struct{}{}:
+	default: // No slot available to release, do nothing
 	}
-
-	s.ch <- struct{}{}
-	s.available++
-
-	return s.available
-}
-
-// GetAvailableCount returns currently available slots count
-func (s *Slots) GetAvailableCount() int64 {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	return s.available
 }

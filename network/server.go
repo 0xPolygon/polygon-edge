@@ -365,7 +365,8 @@ func (s *Server) runDial() {
 		case
 			peerEvent.PeerFailedToConnect,
 			peerEvent.PeerDisconnected:
-			_ = slots.ReturnSlot()
+			slots.Release()
+			s.logger.Debug("slot released", "event", event.Type)
 		}
 	}); err != nil {
 		s.logger.Error(
@@ -399,7 +400,7 @@ func (s *Server) runDial() {
 
 		s.logger.Debug("Waiting for a dialing slot", "addr", peerInfo, "local", s.host.ID())
 
-		if _, closed := slots.TakeSlot(ctx); closed {
+		if closed := slots.Take(ctx); closed {
 			return
 		}
 
@@ -408,8 +409,6 @@ func (s *Server) runDial() {
 		// the connection process is async because it involves connection (here) +
 		// the handshake done in the identity service.
 		if err := s.host.Connect(ctx, *peerInfo); err != nil {
-			slots.ReturnSlot()
-
 			s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
 
 			s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
