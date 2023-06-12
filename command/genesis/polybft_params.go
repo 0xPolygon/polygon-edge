@@ -138,7 +138,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          initialValidators[0].Address,
+		Governance:          types.ZeroAddress,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
 		NativeTokenConfig:   p.nativeTokenConfig,
 		MinValidatorSetSize: p.minNumValidators,
