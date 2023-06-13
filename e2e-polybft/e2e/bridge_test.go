@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -304,7 +303,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 		epochSize      = 5
 	)
 
-	minter, err := wallet.GenerateKey()
+	minter, err := ethgow.GenerateKey()
 	require.NoError(t, err)
 
 	receiverKeys := make([]string, transfersCount)
@@ -446,7 +445,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		epochSize      = 5
 	)
 
-	minter, err := wallet.GenerateKey()
+	minter, err := ethgow.GenerateKey()
 	require.NoError(t, err)
 
 	receiverKeys := make([]string, transfersCount)
