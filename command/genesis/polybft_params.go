@@ -505,7 +505,7 @@ func (p *genesisParams) getValidatorAccounts(
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
-				Balance:   big.NewInt(0),
+				Balance:   getPremineAmount(addr, premineBalances, big.NewInt(0)),
 				Stake:     big.NewInt(0),
 			}
 		}
@@ -524,7 +524,7 @@ func (p *genesisParams) getValidatorAccounts(
 	}
 
 	for _, v := range validators {
-		v.Balance = big.NewInt(0)
+		v.Balance = getPremineAmount(v.Address, premineBalances, big.NewInt(0))
 		v.Stake = big.NewInt(0)
 	}
 
