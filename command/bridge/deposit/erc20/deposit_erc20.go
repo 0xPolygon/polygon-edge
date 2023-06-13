@@ -238,7 +238,10 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var childToken *types.Address
 
 	for x := range bridgeTxCh {
-		exitEventIDs = append(exitEventIDs, x.exitEventID)
+		if x.exitEventID != nil {
+			exitEventIDs = append(exitEventIDs, x.exitEventID)
+		}
+
 		blockNumbers = append(blockNumbers, x.blockNumber)
 
 		if x.childTokenAddr != nil {
