@@ -20,8 +20,6 @@ func GetCommand() *cobra.Command {
 		Run:     runCommand,
 	}
 
-	helper.RegisterGRPCAddressFlag(genesisCmd)
-
 	setFlags(genesisCmd)
 	setLegacyFlags(genesisCmd)
 
@@ -223,7 +221,8 @@ func setFlags(cmd *cobra.Command) {
 			&params.nativeTokenConfigRaw,
 			nativeTokenConfigFlag,
 			"",
-			"configuration of native token in format <name:symbol:decimals count:mintable flag>",
+			"native token configuration, provided in the following format: "+
+				"<name:symbol:decimals count:mintable flag:[mintable token owner address]>",
 		)
 
 		cmd.Flags().StringVar(

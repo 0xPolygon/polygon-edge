@@ -7,11 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -19,6 +14,12 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/testutil"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateSyncManager {
@@ -407,39 +408,37 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	//nolint:godox
-	// TODO: Deploy local artifacts (to be fixed in EVM-542)
-	cc := &testutil.Contract{}
-	cc.AddCallback(func() string {
-		return `
-			event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data);
-			uint256 indx;
-
-			function emitEvent() public payable {
-				emit StateSynced(indx, msg.sender, msg.sender, bytes(""));
-				indx++;
-			}
-			`
+	// Deploy contract
+	contractReceipt, err := server.SendTxn(&ethgo.Transaction{
+		Input: contractsapi.StateSender.Bytecode,
 	})
+	require.NoError(t, err)
 
-	_, addr, err := server.DeployContract(cc)
+	// Create contract function call payload
+	encodedSyncStateData, err := (&contractsapi.SyncStateStateSenderFn{
+		Receiver: types.BytesToAddress(server.Account(0).Bytes()),
+		Data:     []byte{},
+	}).EncodeAbi()
 	require.NoError(t, err)
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
-		receipt, err := server.TxnTo(addr, "emitEvent")
+		receipt, err := server.SendTxn(&ethgo.Transaction{
+			To:    &contractReceipt.ContractAddress,
+			Input: encodedSyncStateData,
+		})
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	s.config.stateSenderAddr = types.Address(addr)
+	s.config.stateSenderAddr = types.Address(contractReceipt.ContractAddress)
 	s.config.jsonrpcAddr = server.HTTPAddr()
 
 	require.NoError(t, s.initTracker())
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 9)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }

@@ -186,7 +186,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	txns := d.writeTransactions(baseFee, gasLimit, transition)
 
 	// Commit the changes
-	_, root := transition.Commit()
+	_, root, err := transition.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit the state changes: %w", err)
+	}
 
 	// Update the header
 	header.StateRoot = root

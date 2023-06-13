@@ -219,7 +219,11 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	_, root := transition.Commit()
+	_, root, err := transition.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
+	}
+
 	header.StateRoot = root
 	header.GasUsed = transition.TotalGas()
 
