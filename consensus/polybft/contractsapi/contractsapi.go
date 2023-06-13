@@ -521,6 +521,27 @@ func (d *DepositToRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
 }
 
+type TokenMappedEvent struct {
+	RootToken  types.Address `abi:"rootToken"`
+	ChildToken types.Address `abi:"childToken"`
+}
+
+func (*TokenMappedEvent) Sig() ethgo.Hash {
+	return RootERC20Predicate.Abi.Events["TokenMapped"].ID()
+}
+
+func (*TokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return RootERC20Predicate.Abi.Events["TokenMapped"].Inputs.Encode(inputs)
+}
+
+func (t *TokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !RootERC20Predicate.Abi.Events["TokenMapped"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(RootERC20Predicate.Abi.Events["TokenMapped"], log, t)
+}
+
 type InitializeChildMintableERC20PredicateFn struct {
 	NewStateSender        types.Address `abi:"newStateSender"`
 	NewExitHelper         types.Address `abi:"newExitHelper"`
@@ -839,6 +860,27 @@ func (i *InitializeRootMintableERC1155PredicateACLFn) EncodeAbi() ([]byte, error
 
 func (i *InitializeRootMintableERC1155PredicateACLFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootMintableERC1155PredicateACL.Abi.Methods["initialize"], buf, i)
+}
+
+type L2MintableTokenMappedEvent struct {
+	RootToken  types.Address `abi:"rootToken"`
+	ChildToken types.Address `abi:"childToken"`
+}
+
+func (*L2MintableTokenMappedEvent) Sig() ethgo.Hash {
+	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].ID()
+}
+
+func (*L2MintableTokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Inputs.Encode(inputs)
+}
+
+func (l *L2MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"], log, l)
 }
 
 type InitializeChildERC1155Fn struct {

@@ -153,7 +153,9 @@ func main() {
 				"initialize",
 				"depositTo",
 			},
-			[]string{},
+			[]string{
+				"TokenMapped",
+			},
 		},
 		{
 			"ChildMintableERC20Predicate",
@@ -243,7 +245,9 @@ func main() {
 			[]string{
 				"initialize",
 			},
-			[]string{},
+			[]string{
+				"L2MintableTokenMapped",
+			},
 		},
 		{
 			"ChildERC1155",

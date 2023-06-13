@@ -167,8 +167,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	type bridgeTxData struct {
-		exitEventId *big.Int
-		blockNumber uint64
+		exitEventID    *big.Int
+		blockNumber    uint64
+		childTokenAddr *types.Address
 	}
 
 	g, ctx := errgroup.WithContext(cmd.Context())
@@ -200,18 +201,25 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
-				var exitEventId *big.Int
+				var exitEventID *big.Int
 
 				if dp.ChildChainMintable {
-					if exitEventId, err = common.ExtractExitEventID(receipt); err != nil {
+					if exitEventID, err = common.ExtractExitEventID(receipt); err != nil {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
 				}
 
+				// populate child token address if a token is mapped alongside with deposit
+				childToken, err := common.ExtractChildTokenAddr(receipt, dp.ChildChainMintable)
+				if err != nil {
+					return fmt.Errorf("failed to extract child token address: %w", err)
+				}
+
 				// send aggregated data to channel if everything went ok
 				bridgeTxCh <- bridgeTxData{
-					blockNumber: receipt.BlockNumber,
-					exitEventId: exitEventId,
+					blockNumber:    receipt.BlockNumber,
+					exitEventID:    exitEventID,
+					childTokenAddr: childToken,
 				}
 
 				return nil
@@ -227,19 +235,26 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	close(bridgeTxCh)
 
+	var childToken *types.Address
+
 	for x := range bridgeTxCh {
-		exitEventIDs = append(exitEventIDs, x.exitEventId)
+		exitEventIDs = append(exitEventIDs, x.exitEventID)
 		blockNumbers = append(blockNumbers, x.blockNumber)
+
+		if x.childTokenAddr != nil {
+			childToken = x.childTokenAddr
+		}
 	}
 
 	outputter.SetCommandResult(
 		&common.BridgeTxResult{
-			Sender:       depositorAddr.String(),
-			Receivers:    dp.Receivers,
-			Amounts:      dp.Amounts,
-			ExitEventIDs: exitEventIDs,
-			BlockNumbers: blockNumbers,
-			Title:        "DEPOSIT ERC 20",
+			Sender:         depositorAddr.String(),
+			Receivers:      dp.Receivers,
+			Amounts:        dp.Amounts,
+			ExitEventIDs:   exitEventIDs,
+			ChildTokenAddr: childToken,
+			BlockNumbers:   blockNumbers,
+			Title:          "DEPOSIT ERC 20",
 		})
 }
 

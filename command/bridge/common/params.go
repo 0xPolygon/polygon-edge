@@ -13,6 +13,7 @@ import (
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type TokenType int
@@ -160,13 +161,50 @@ func ExtractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 	return nil, errors.New("failed to find exit event log")
 }
 
+// ExtractChildTokenAddr extracts predicted deterministic child token address
+func ExtractChildTokenAddr(receipt *ethgo.Receipt, childChainMintable bool) (*types.Address, error) {
+	var (
+		l1TokenMapped contractsapi.TokenMappedEvent
+		l2TokenMapped contractsapi.L2MintableTokenMappedEvent
+	)
+
+	for _, log := range receipt.Logs {
+		if childChainMintable {
+			doesMatch, err := l2TokenMapped.ParseLog(log)
+			if err != nil {
+				return nil, err
+			}
+
+			if !doesMatch {
+				continue
+			}
+
+			return &l2TokenMapped.ChildToken, nil
+		} else {
+			doesMatch, err := l1TokenMapped.ParseLog(log)
+			if err != nil {
+				return nil, err
+			}
+
+			if !doesMatch {
+				continue
+			}
+
+			return &l1TokenMapped.ChildToken, nil
+		}
+	}
+
+	return nil, nil
+}
+
 type BridgeTxResult struct {
-	Sender       string     `json:"sender"`
-	Receivers    []string   `json:"receivers"`
-	ExitEventIDs []*big.Int `json:"exitEventIDs"`
-	Amounts      []string   `json:"amounts"`
-	TokenIDs     []string   `json:"tokenIds"`
-	BlockNumbers []uint64   `json:"blockNumbers"`
+	Sender         string         `json:"sender"`
+	Receivers      []string       `json:"receivers"`
+	ExitEventIDs   []*big.Int     `json:"exitEventIDs"`
+	Amounts        []string       `json:"amounts"`
+	TokenIDs       []string       `json:"tokenIds"`
+	BlockNumbers   []uint64       `json:"blockNumbers"`
+	ChildTokenAddr *types.Address `json:"childTokenAddr"`
 
 	Title string `json:"title"`
 }
@@ -174,7 +212,7 @@ type BridgeTxResult struct {
 func (r *BridgeTxResult) GetOutput() string {
 	var buffer bytes.Buffer
 
-	vals := make([]string, 0, 5)
+	vals := make([]string, 0, 7)
 	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
 	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
 
@@ -212,6 +250,10 @@ func (r *BridgeTxResult) GetOutput() string {
 		}
 
 		vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", buf.String()))
+	}
+
+	if r.ChildTokenAddr != nil {
+		vals = append(vals, fmt.Sprintf("Child Token Address|%s", (*r.ChildTokenAddr).String()))
 	}
 
 	_, _ = buffer.WriteString(fmt.Sprintf("\n[%s]\n", r.Title))
