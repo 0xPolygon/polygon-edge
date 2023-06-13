@@ -1181,7 +1181,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 			contracts.ChildERC20PredicateContract,
 			contracts.NativeERC20TokenContract,
 			false)
-		require.ErrorContains(t, err, "failed to execute withdrawal")
+		require.ErrorContains(t, err, "failed to send withdraw transaction")
 
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)

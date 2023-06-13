@@ -3,6 +3,7 @@ package txrelayer
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -202,6 +203,7 @@ func (t *TxRelayerImpl) estimateGasLimit(txn *ethgo.Transaction) (uint64, error)
 		Data:     txn.Input,
 		GasPrice: txn.GasPrice,
 		Value:    txn.Value,
+		Gas:      big.NewInt(int64(txn.Gas)),
 	}
 
 	return t.client.Eth().EstimateGas(callMsg)
