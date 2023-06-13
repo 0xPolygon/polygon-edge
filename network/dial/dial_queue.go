@@ -9,6 +9,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+const updateChBufferSize = 20
+
 // DialQueue is a queue that holds dials tasks for potential peers, implemented as a min-heap
 type DialQueue struct {
 	sync.Mutex
@@ -25,7 +27,7 @@ func NewDialQueue() *DialQueue {
 	return &DialQueue{
 		heap:     dialQueueImpl{},
 		tasks:    map[peer.ID]*DialTask{},
-		updateCh: make(chan struct{}, 10),
+		updateCh: make(chan struct{}, updateChBufferSize),
 		closeCh:  make(chan struct{}),
 	}
 }
@@ -56,9 +58,7 @@ func (d *DialQueue) popTaskImpl() *DialTask {
 
 	if len(d.heap) != 0 {
 		// pop the first value and remove it from the heap
-		tt := heap.Pop(&d.heap)
-
-		task, ok := tt.(*DialTask)
+		task, ok := heap.Pop(&d.heap).(*DialTask)
 		if !ok {
 			return nil
 		}
@@ -78,11 +78,7 @@ func (d *DialQueue) DeleteTask(peer peer.ID) {
 
 	item, ok := d.tasks[peer]
 	if ok {
-		// negative index for popped element
-		if item.index >= 0 {
-			heap.Remove(&d.heap, item.index)
-		}
-
+		heap.Remove(&d.heap, item.index)
 		delete(d.tasks, peer)
 	}
 }
