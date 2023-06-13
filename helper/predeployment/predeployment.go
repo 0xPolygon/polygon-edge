@@ -185,24 +185,29 @@ func GenerateGenesisAccountFromFile(
 		return nil, fmt.Errorf("unable to create contract ABI, %w", err)
 	}
 
-	// Constructor arguments are passed in as an array of values.
-	// Structs are treated as sub-arrays with their corresponding values laid out
-	// in ABI encoding
-	parsedArguments, err := ParseArguments(constructorArgs)
-	if err != nil {
-		return nil, err
-	}
+	finalBytecode := artifact.Bytecode
+	constructorInfo := contractABI.Constructor
 
-	// Encode the constructor params
-	constructor, err := abi.Encode(
-		parsedArguments,
-		contractABI.Constructor.Inputs,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("unable to encode constructor arguments, %w", err)
-	}
+	if constructorInfo != nil {
+		// Constructor arguments are passed in as an array of values.
+		// Structs are treated as sub-arrays with their corresponding values laid out
+		// in ABI encoding
+		parsedArguments, err := ParseArguments(constructorArgs)
+		if err != nil {
+			return nil, err
+		}
 
-	finalBytecode := append(artifact.Bytecode, constructor...)
+		// Encode the constructor params
+		constructor, err := abi.Encode(
+			parsedArguments,
+			contractABI.Constructor.Inputs,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("unable to encode constructor arguments, %w", err)
+		}
+
+		finalBytecode = append(artifact.Bytecode, constructor...)
+	}
 
 	return getPredeployAccount(predeployAddress, finalBytecode, artifact.DeployedBytecode)
 }
