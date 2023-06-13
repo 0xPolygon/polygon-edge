@@ -166,9 +166,13 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	type bridgeTxData struct {
+		exitEventId *big.Int
+		blockNumber uint64
+	}
+
 	g, ctx := errgroup.WithContext(cmd.Context())
-	exitEventIDsCh := make(chan *big.Int, len(dp.Receivers))
-	blockNumbersCh := make(chan uint64, len(dp.Receivers))
+	bridgeTxCh := make(chan bridgeTxData, len(dp.Receivers))
 	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
 	blockNumbers := make([]uint64, 0, len(dp.Receivers))
 
@@ -196,15 +200,18 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
-				blockNumbersCh <- receipt.BlockNumber
+				var exitEventId *big.Int
 
 				if dp.ChildChainMintable {
-					exitEventID, err := common.ExtractExitEventID(receipt)
-					if err != nil {
+					if exitEventId, err = common.ExtractExitEventID(receipt); err != nil {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
+				}
 
-					exitEventIDsCh <- exitEventID
+				// send aggregated data to channel if everything went ok
+				bridgeTxCh <- bridgeTxData{
+					blockNumber: receipt.BlockNumber,
+					exitEventId: exitEventId,
 				}
 
 				return nil
@@ -218,15 +225,11 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	close(exitEventIDsCh)
-	close(blockNumbersCh)
+	close(bridgeTxCh)
 
-	for exitEventID := range exitEventIDsCh {
-		exitEventIDs = append(exitEventIDs, exitEventID)
-	}
-
-	for blockNum := range blockNumbersCh {
-		blockNumbers = append(blockNumbers, blockNum)
+	for x := range bridgeTxCh {
+		exitEventIDs = append(exitEventIDs, x.exitEventId)
+		blockNumbers = append(blockNumbers, x.blockNumber)
 	}
 
 	outputter.SetCommandResult(
