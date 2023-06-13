@@ -28,7 +28,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-const nativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true"
+const nativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s"
 
 type e2eStateProvider struct {
 	txRelayer txrelayer.TxRelayer

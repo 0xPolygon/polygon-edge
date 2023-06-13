@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/wallet"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -303,6 +304,9 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 		epochSize      = 5
 	)
 
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
 	receiverKeys := make([]string, transfersCount)
 	receivers := make([]string, transfersCount)
 	receiversAddrs := make([]types.Address, transfersCount)
@@ -325,7 +329,8 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize),
-		framework.WithNativeTokenConfig(nativeTokenMintableTestCfg),
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, minter.Address())),
+		framework.WithPremine(types.Address(minter.Address())),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
 
@@ -441,6 +446,9 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		epochSize      = 5
 	)
 
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
 	receiverKeys := make([]string, transfersCount)
 	receivers := make([]string, transfersCount)
 	receiversAddrs := make([]types.Address, transfersCount)
@@ -466,7 +474,8 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
-		framework.WithNativeTokenConfig(nativeTokenMintableTestCfg),
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, minter.Address())),
+		framework.WithPremine(types.Address(minter.Address())),
 		framework.WithPremine(receiversAddrs...))
 	defer cluster.Stop()
 
