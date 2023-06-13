@@ -75,7 +75,7 @@ type TestClusterConfig struct {
 	Name                 string
 	Premine              []string // address[:amount]
 	PremineValidators    []string // address[:amount]
-	StakeAmounts         []string // address[:amount]
+	StakeAmounts         []*big.Int
 	WithoutBridge        bool
 	BootnodeCount        int
 	NonValidatorCount    int
@@ -385,7 +385,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochSize:     10,
 		EpochReward:   1,
 		BlockGasLimit: 1e7, // 10M
-		StakeAmounts:  []string{},
+		StakeAmounts:  []*big.Int{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -493,11 +493,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for i := 0; i < bootNodesCnt; i++ {
 				args = append(args, "--bootnode", validators[i].MultiAddr)
 			}
-		}
-
-		// provide validators' stakes
-		for _, validatorStake := range cluster.Config.StakeAmounts {
-			args = append(args, "--stake", validatorStake)
 		}
 
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {

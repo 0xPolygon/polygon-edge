@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"math/big"
 	"sync"
 	"testing"
@@ -23,7 +24,10 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	sender, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(sender.Address())))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender.Address())),
+		framework.WithPremine(types.Address(sender.Address())),
+	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -99,7 +103,10 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	require.NoError(t, err)
 
 	// first account should have some matics premined
-	cluster := framework.NewTestCluster(t, 5, framework.WithPremine(types.Address(premine.Address())))
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, premine.Address())),
+		framework.WithPremine(types.Address(premine.Address())),
+	)
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -192,6 +199,7 @@ func TestE2E_TxPool_TransactionWithHeaderInstructions(t *testing.T) {
 	require.NoError(t, err)
 
 	cluster := framework.NewTestCluster(t, 4,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sidechainKey.Address())),
 		framework.WithPremine(types.Address(sidechainKey.Address())),
 	)
 	defer cluster.Stop()
@@ -237,6 +245,7 @@ func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 
 	// First account should have some matics premined
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender.Address())),
 		framework.WithPremine(types.Address(sender.Address())),
 	)
 	defer cluster.Stop()

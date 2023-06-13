@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -27,7 +26,6 @@ import (
 )
 
 const (
-	stakeFlag            = "stake"
 	validatorsFlag       = "validators"
 	validatorsPathFlag   = "validators-path"
 	validatorsPrefixFlag = "validators-prefix"
@@ -68,6 +66,8 @@ const (
 
 var (
 	errNoGenesisValidators = errors.New("genesis validators aren't provided")
+	errNoPremineAllowed    = errors.New("native token is not mintable, so no premine is allowed " +
+		"except for zero address and reward wallet if native token is used as reward token")
 )
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
@@ -91,6 +91,16 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+	}
+
+	if !p.nativeTokenConfig.IsMintable {
+		// validate premine map, no premine is allowed if token is not mintable,
+		// except for the reward wallet (if native token is used as reward token) and zero address
+		for a := range premineBalances {
+			if a != types.ZeroAddress && (p.rewardTokenCode != "" || a != walletPremineInfo.address) {
+				return errNoPremineAllowed
+			}
+		}
 	}
 
 	var (
@@ -169,24 +179,10 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	totalStake := big.NewInt(0)
-
-	for _, validator := range initialValidators {
-		// increment total stake
-		totalStake.Add(totalStake, validator.Stake)
-	}
-
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake, rewardTokenByteCode, polyBftConfig)
+	allocs, err := p.deployContracts(rewardTokenByteCode, polyBftConfig)
 	if err != nil {
 		return err
-	}
-
-	// premine initial validators
-	for _, v := range initialValidators {
-		allocs[v.Address] = &chain.GenesisAccount{
-			Balance: v.Balance,
-		}
 	}
 
 	// premine other accounts
@@ -231,7 +227,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	genesisExtraData, err := generateExtraDataPolyBft(validatorMetadata)
+	genesisExtraData, err := GenerateExtraDataPolyBft(validatorMetadata)
 	if err != nil {
 		return err
 	}
@@ -310,8 +306,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts(totalStake *big.Int,
-	rewardTokenByteCode []byte,
+func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
 	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
 		artifact *artifact.Artifact
@@ -477,33 +472,10 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	return allocations, nil
 }
 
-// generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
-func generateExtraDataPolyBft(validators []*validator.ValidatorMetadata) ([]byte, error) {
-	delta := &validator.ValidatorSetDelta{
-		Added:   validators,
-		Removed: bitmap.Bitmap{},
-	}
-
-	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
-
-	return extra.MarshalRLPTo(nil), nil
-}
-
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
 func (p *genesisParams) getValidatorAccounts(
 	premineBalances map[types.Address]*premineInfo) ([]*validator.GenesisValidator, error) {
 	// populate validators premine info
-	stakeMap := make(map[types.Address]*premineInfo, len(p.stakes))
-
-	for _, stake := range p.stakes {
-		stakeInfo, err := parsePremineInfo(stake)
-		if err != nil {
-			return nil, fmt.Errorf("invalid stake amount provided '%s' : %w", stake, err)
-		}
-
-		stakeMap[stakeInfo.address] = stakeInfo
-	}
-
 	if len(p.validators) > 0 {
 		validators := make([]*validator.GenesisValidator, len(p.validators))
 		for i, val := range p.validators {
@@ -533,8 +505,8 @@ func (p *genesisParams) getValidatorAccounts(
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
-				Balance:   getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
-				Stake:     getPremineAmount(addr, stakeMap, command.DefaultStake),
+				Balance:   big.NewInt(0),
+				Stake:     big.NewInt(0),
 			}
 		}
 
@@ -552,8 +524,8 @@ func (p *genesisParams) getValidatorAccounts(
 	}
 
 	for _, v := range validators {
-		v.Balance = getPremineAmount(v.Address, premineBalances, command.DefaultPremineBalance)
-		v.Stake = getPremineAmount(v.Address, stakeMap, command.DefaultStake)
+		v.Balance = big.NewInt(0)
+		v.Stake = big.NewInt(0)
 	}
 
 	return validators, nil
