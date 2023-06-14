@@ -33,7 +33,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateS
 
 	topic := &mockTopic{}
 
-	s, err := newStateSyncManager(hclog.NewNullLogger(), state,
+	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
 			jsonrpcAddr:       "",
@@ -42,8 +42,6 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateS
 			key:               key.Key(),
 			maxCommitmentSize: maxCommitmentSize,
 		})
-
-	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)

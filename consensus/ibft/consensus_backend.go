@@ -215,7 +215,9 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		transition,
 	)
 
-	if err := i.PreCommitState(header, transition); err != nil {
+	// provide dummy block instance to the PreCommitState
+	// (for the IBFT consensus, it is correct to have just a header, as only it is used)
+	if err := i.PreCommitState(&types.Block{Header: header}, transition); err != nil {
 		return nil, err
 	}
 

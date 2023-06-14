@@ -79,11 +79,7 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
-	if err := p.blockchain.WriteFullBlock(block, consensusSource); err != nil {
-		return err
-	}
-
-	return nil
+	return p.blockchain.WriteFullBlock(block, consensusSource)
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
