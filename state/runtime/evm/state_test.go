@@ -70,7 +70,7 @@ func TestStackOverflow(t *testing.T) {
 	s.host = &mockHost{}
 
 	_, err = s.Run()
-	assert.Equal(t, &runtime.ErrStackOverflow{StackLen: stackSize + 1, Limit: stackSize}, err)
+	assert.Equal(t, &runtime.StackOverflowError{StackLen: stackSize + 1, Limit: stackSize}, err)
 }
 
 func TestStackUnderflow(t *testing.T) {
@@ -102,7 +102,7 @@ func TestStackUnderflow(t *testing.T) {
 
 	_, err = s.Run()
 	// need at least one operation on the stack
-	assert.Equal(t, &runtime.ErrStackUnderflow{StackLen: 0, Required: 1}, err)
+	assert.Equal(t, &runtime.StackUnderflowError{StackLen: 0, Required: 1}, err)
 }
 
 func TestOpcodeNotFound(t *testing.T) {

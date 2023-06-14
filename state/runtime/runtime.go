@@ -143,25 +143,25 @@ var (
 	ErrNotAuth                  = errors.New("not in allow list")
 )
 
-// ErrStackUnderflow wraps an evm error when the items on the stack less
+// StackUnderflowError wraps an evm error when the items on the stack less
 // than the minimal requirement.
-type ErrStackUnderflow struct {
+type StackUnderflowError struct {
 	StackLen int
 	Required int
 }
 
-func (e *ErrStackUnderflow) Error() string {
+func (e *StackUnderflowError) Error() string {
 	return fmt.Sprintf("stack underflow (%d <=> %d)", e.StackLen, e.Required)
 }
 
-// ErrStackOverflow wraps an evm error when the items on the stack exceeds
+// StackOverflowError wraps an evm error when the items on the stack exceeds
 // the maximum allowance.
-type ErrStackOverflow struct {
+type StackOverflowError struct {
 	StackLen int
 	Limit    int
 }
 
-func (e *ErrStackOverflow) Error() string {
+func (e *StackOverflowError) Error() string {
 	return fmt.Sprintf("stack limit reached %d (%d)", e.StackLen, e.Limit)
 }
 

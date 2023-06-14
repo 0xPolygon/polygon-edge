@@ -243,7 +243,7 @@ func (c *state) Run() ([]byte, error) {
 
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
-			c.exit(&runtime.ErrStackUnderflow{StackLen: c.sp, Required: inst.stack})
+			c.exit(&runtime.StackUnderflowError{StackLen: c.sp, Required: inst.stack})
 			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
 
 			break
@@ -264,7 +264,8 @@ func (c *state) Run() ([]byte, error) {
 
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
-			c.exit(&runtime.ErrStackOverflow{StackLen: c.sp, Limit: stackSize})
+			c.exit(&runtime.StackOverflowError{StackLen: c.sp, Limit: stackSize})
+
 			break
 		}
 
