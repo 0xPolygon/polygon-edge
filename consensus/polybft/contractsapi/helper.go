@@ -2,7 +2,6 @@ package contractsapi
 
 import (
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -12,16 +11,6 @@ type StateTransactionInput interface {
 	EncodeAbi() ([]byte, error)
 	// DecodeAbi contains logic for decoding given ABI data
 	DecodeAbi(b []byte) error
-}
-
-// Event is an abstraction for Ethereum events
-type Event interface {
-	// Sig returns hash signature of given event
-	Sig() ethgo.Hash
-	// Encode encodes given inputs into the ABI
-	Encode(inputs interface{}) ([]byte, error)
-	// ParseLog parses provided log and populates Event's instance fields
-	ParseLog(log *ethgo.Log) (bool, error)
 }
 
 var (
