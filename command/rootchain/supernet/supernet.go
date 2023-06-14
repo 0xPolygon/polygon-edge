@@ -7,11 +7,13 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -157,7 +159,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		stakeManager := types.StringToAddress(params.stakeManagerAddress)
 		callerAddr := types.Address(ownerKey.Address())
 
-		for _, v := range consensusConfig.InitialValidatorSet {
+		validatorMetadata := make([]*validator.ValidatorMetadata, len(consensusConfig.InitialValidatorSet))
+
+		// update Stake field of validators in genesis file
+		// based on their finalized stake on rootchain
+		for i, v := range consensusConfig.InitialValidatorSet {
 			finalizedStake, err := getFinalizedStake(callerAddr, v.Address, stakeManager,
 				consensusConfig.SupernetID, txRelayer)
 			if err != nil {
@@ -165,10 +171,34 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			}
 
 			v.Stake = finalizedStake
+
+			metadata, err := v.ToValidatorMetadata()
+			if err != nil {
+				return err
+			}
+
+			validatorMetadata[i] = metadata
 		}
 
+		// update the voting power in genesis block extra
+		// based on finalized stake on rootchain
+		genesisExtraData, err := genesis.GenerateExtraDataPolyBft(validatorMetadata)
+		if err != nil {
+			return err
+		}
+
+		chainConfig.Genesis.ExtraData = genesisExtraData
+		chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
+
+		// save updated stake and genesis extra to genesis file on disk
 		if err := helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 			return fmt.Errorf("failed to save chain configuration bridge data: %w", err)
+		}
+
+		// initialize CheckpointManager contract since it needs to have a valid VotingPowers of validators
+		if err := initializeCheckpointManager(outputter, txRelayer,
+			consensusConfig, chainConfig.Params.ChainID, ownerKey); err != nil {
+			return fmt.Errorf("could not initialize CheckpointManager with finalized genesis validator set: %w", err)
 		}
 	}
 
@@ -223,4 +253,80 @@ func getFinalizedStake(owner, validator, stakeManager types.Address, chainID int
 	}
 
 	return types.ParseUint256orHex(&response)
+}
+
+// validatorSetToABISlice converts given validators to generic map
+// which is used for ABI encoding validator set being sent to the rootchain contract
+func validatorSetToABISlice(o command.OutputFormatter,
+	validators []*validator.GenesisValidator) ([]*contractsapi.Validator, error) {
+	accSet := make(validator.AccountSet, len(validators))
+
+	if _, err := o.Write([]byte("[VALIDATORS - CHECKPOINT MANAGER] \n")); err != nil {
+		return nil, err
+	}
+
+	for i, val := range validators {
+		if _, err := o.Write([]byte(fmt.Sprintf("%v\n", val))); err != nil {
+			return nil, err
+		}
+
+		blsKey, err := val.UnmarshalBLSPublicKey()
+		if err != nil {
+			return nil, err
+		}
+
+		accSet[i] = &validator.ValidatorMetadata{
+			Address:     val.Address,
+			BlsKey:      blsKey,
+			VotingPower: new(big.Int).Set(val.Stake),
+		}
+	}
+
+	hash, err := accSet.Hash()
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := o.Write([]byte(
+		fmt.Sprintf("[VALIDATORS - CHECKPOINT MANAGER] Validators hash: %s\n", hash))); err != nil {
+		return nil, err
+	}
+
+	return accSet.ToAPIBinding(), nil
+}
+
+// initializeCheckpointManager initializes CheckpointManager contract on rootchain
+// based on finalized stake (voting power) of genesis validators on root
+func initializeCheckpointManager(outputter command.OutputFormatter,
+	txRelayer txrelayer.TxRelayer,
+	consensusConfig polybft.PolyBFTConfig, chainID int64,
+	deployerKey ethgo.Key) error {
+	validatorSet, err := validatorSetToABISlice(outputter, consensusConfig.InitialValidatorSet)
+	if err != nil {
+		return fmt.Errorf("failed to convert validators to map: %w", err)
+	}
+
+	initParams := &contractsapi.InitializeCheckpointManagerFn{
+		ChainID_:        big.NewInt(chainID),
+		NewBls:          consensusConfig.Bridge.BLSAddress,
+		NewBn256G2:      consensusConfig.Bridge.BN256G2Address,
+		NewValidatorSet: validatorSet,
+	}
+
+	input, err := initParams.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("failed to encode initialization params for CheckpointManager.initialize. error: %w", err)
+	}
+
+	if _, err := rootHelper.SendTransaction(txRelayer, ethgo.Address(consensusConfig.Bridge.CheckpointManagerAddr),
+		input, "CheckpointManager", deployerKey); err != nil {
+		return err
+	}
+
+	outputter.WriteCommandResult(
+		&rootHelper.MessageResult{
+			Message: fmt.Sprintf("CheckpointManager contract is initialized"),
+		})
+
+	return nil
 }

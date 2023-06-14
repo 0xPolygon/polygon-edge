@@ -92,6 +92,6 @@ func (v *GenesisValidator) ToValidatorMetadata() (*ValidatorMetadata, error) {
 
 // String implements fmt.Stringer interface
 func (v *GenesisValidator) String() string {
-	return fmt.Sprintf("Address=%s; Balance=%d; P2P Multi addr=%s; BLS Key=%s;",
-		v.Address, v.Balance, v.MultiAddr, v.BlsKey)
+	return fmt.Sprintf("Address=%s; Balance=%d; Stake=%d; P2P Multi addr=%s; BLS Key=%s;",
+		v.Address, v.Balance, v.Stake, v.MultiAddr, v.BlsKey)
 }
