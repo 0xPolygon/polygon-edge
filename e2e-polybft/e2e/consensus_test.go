@@ -13,16 +13,18 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/wallet"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
+
+var uint256ABIType = abi.MustNewType("tuple(uint256)")
 
 func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	const epochSize = 4
@@ -30,6 +32,19 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithEpochSize(epochSize), framework.WithNonValidators(2))
 	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	// initialize tx relayer
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	require.NoError(t, err)
+
+	// because we are using native token as reward wallet, and it has default premine balance
+	initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
+
+	// check if initial total supply of native ERC20 token is the same as expected
+	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
+	require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
 
 	t.Run("consensus protocol", func(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
@@ -449,29 +464,15 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		decimals    = uint8(5)
 	)
 
-	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
-
-	queryNativeERC20Metadata := func(funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
-		valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable, nativeTokenAddr, ethgo.ZeroAddress, funcName)
-		require.NoError(t, err)
-
-		valueRaw, err := hex.DecodeHex(valueHex)
-		require.NoError(t, err)
-
-		var decodedResult map[string]interface{}
-
-		err = abiType.DecodeStruct(valueRaw, &decodedResult)
-		require.NoError(t, err)
-
-		return decodedResult["0"]
-	}
-
 	validatorsAddrs := make([]types.Address, validatorCount)
 	initValidatorsBalance := ethgo.Ether(1)
 	initMinterBalance := ethgo.Ether(100000)
 
 	minter, err := wallet.GenerateKey()
 	require.NoError(t, err)
+
+	// because we are using native token as reward wallet, and it has default premine balance
+	initialTotalSupply := new(big.Int).Set(command.DefaultPremineBalance)
 
 	cluster := framework.NewTestCluster(t,
 		validatorCount,
@@ -480,10 +481,13 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		framework.WithEpochSize(epochSize),
 		framework.WithSecretsCallback(func(addrs []types.Address, config *framework.TestClusterConfig) {
 			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), initMinterBalance))
+			initialTotalSupply.Add(initialTotalSupply, initMinterBalance)
+
 			for i, addr := range addrs {
 				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", addr, initValidatorsBalance))
 				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(initValidatorsBalance))
 				validatorsAddrs[i] = addr
+				initialTotalSupply.Add(initialTotalSupply, initValidatorsBalance)
 			}
 		}))
 	defer cluster.Stop()
@@ -500,13 +504,17 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	stringABIType := abi.MustNewType("tuple(string)")
 	uint8ABIType := abi.MustNewType("tuple(uint8)")
 
-	name := queryNativeERC20Metadata("name", stringABIType, relayer)
+	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
+	require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
+
+	// check if initial total supply of native ERC20 token is the same as expected
+	name := queryNativeERC20Metadata(t, "name", stringABIType, relayer)
 	require.Equal(t, tokenName, name)
 
-	symbol := queryNativeERC20Metadata("symbol", stringABIType, relayer)
+	symbol := queryNativeERC20Metadata(t, "symbol", stringABIType, relayer)
 	require.Equal(t, tokenSymbol, symbol)
 
-	decimalsCount := queryNativeERC20Metadata("decimals", uint8ABIType, relayer)
+	decimalsCount := queryNativeERC20Metadata(t, "decimals", uint8ABIType, relayer)
 	require.Equal(t, decimals, decimalsCount)
 
 	// send mint transactions
@@ -514,6 +522,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 	require.True(t, exists)
 
 	mintAmount := ethgo.Ether(10)
+	nativeTokenAddr := ethgo.Address(contracts.NativeERC20TokenContract)
 
 	// make sure minter account can mint tokens
 	for _, addr := range validatorsAddrs {
@@ -569,6 +578,20 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 		framework.WithTestRewardToken(),
 	)
 	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	// initialize tx relayer
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(cluster.Servers[0].JSONRPC()))
+	require.NoError(t, err)
+
+	// because we are not using native token as reward wallet, and have no premine
+	// initial token supply should be 0
+	initialTotalSupply := big.NewInt(0)
+
+	// check if initial total supply of native ERC20 token is the same as expected
+	totalSupply := queryNativeERC20Metadata(t, "totalSupply", uint256ABIType, relayer)
+	require.True(t, initialTotalSupply.Cmp(totalSupply.(*big.Int)) == 0) //nolint:forcetypeassert
 
 	// wait for couple of epochs to accumulate some rewards
 	require.NoError(t, cluster.WaitForBlock(epochSize*3, 3*time.Minute))

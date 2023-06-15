@@ -332,7 +332,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				Engine:          map[string]interface{}{ConsensusName: tc.config},
 				BridgeAllowList: tc.bridgeAllowList,
 			}
-			chainConfig := &chain.Chain{Params: params}
+			chainConfig := &chain.Chain{Params: params, Genesis: &chain.Genesis{Alloc: make(map[types.Address]*chain.GenesisAccount)}}
 			initHandler := GenesisPostHookFactory(chainConfig, ConsensusName)
 			require.NotNil(t, initHandler)
 

@@ -20,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -309,4 +310,24 @@ func erc721OwnerOf(t *testing.T, tokenID *big.Int, tokenAddr types.Address, rela
 	require.NoError(t, err)
 
 	return types.StringToAddress(ownerRaw)
+}
+
+// queryNativeERC20Metadata returns some meta data user requires from native erc20 token
+func queryNativeERC20Metadata(t *testing.T, funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
+	t.Helper()
+
+	valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable,
+		ethgo.Address(contracts.NativeERC20TokenContract),
+		ethgo.ZeroAddress, funcName)
+	require.NoError(t, err)
+
+	valueRaw, err := hex.DecodeHex(valueHex)
+	require.NoError(t, err)
+
+	var decodedResult map[string]interface{}
+
+	err = abiType.DecodeStruct(valueRaw, &decodedResult)
+	require.NoError(t, err)
+
+	return decodedResult["0"]
 }
