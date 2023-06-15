@@ -20,7 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -618,23 +617,4 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, validatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
-}
-
-func queryNativeERC20Metadata(t *testing.T, funcName string, abiType *abi.Type, relayer txrelayer.TxRelayer) interface{} {
-	t.Helper()
-
-	valueHex, err := ABICall(relayer, contractsapi.NativeERC20Mintable,
-		ethgo.Address(contracts.NativeERC20TokenContract),
-		ethgo.ZeroAddress, funcName)
-	require.NoError(t, err)
-
-	valueRaw, err := hex.DecodeHex(valueHex)
-	require.NoError(t, err)
-
-	var decodedResult map[string]interface{}
-
-	err = abiType.DecodeStruct(valueRaw, &decodedResult)
-	require.NoError(t, err)
-
-	return decodedResult["0"]
 }

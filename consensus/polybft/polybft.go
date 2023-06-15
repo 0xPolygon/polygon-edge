@@ -128,6 +128,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		// calculate initial total supply of native erc20 token
 		// we skip zero address, since its a special case address
+		// that is used for minting and burning native token
 		initialTotalSupply := big.NewInt(0)
 
 		for addr, alloc := range config.Genesis.Alloc {
