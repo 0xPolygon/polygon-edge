@@ -1,5 +1,44 @@
 #!/usr/bin/env bash
 
+function installJq() {
+  echo "jq is not installed.  Attempting to install it..."
+
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS installation
+    if ! command -v brew >/dev/null 2>&1; then
+      echo "Homebrew is required to install jq. Aborting."
+      exit 1
+    fi
+    
+    brew install jq
+    
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "Failed to install jq. Aborting."
+      exit 1
+    fi
+  else
+    # Linux installation
+    if ! command -v apt-get >/dev/null 2>&1; then
+      echo "apt-get package manager is required to install jq. Aborting."
+      exit 1
+    fi
+    
+    sudo apt-get update
+    sudo apt-get install -y jq
+    
+    if ! command -v jq >/dev/null 2>&1; then
+      echo "Failed to install jq, install jq manually for the specific distribution. Aborting...."
+      exit 1
+    fi
+  fi
+  echo "jq has been installed successfully."
+}
+
+# Check if jq is installed
+if ! command -v jq >/dev/null 2>&1; then
+  installJq
+fi
+
 function initIbftConsensus() {
   echo "Running with ibft consensus"
   ./polygon-edge secrets init --insecure --data-dir test-chain- --num 4
