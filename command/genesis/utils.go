@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/command"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -227,4 +229,16 @@ func getSecrets(directory string) (*wallet.Account, string, error) {
 	}
 
 	return account, nodeID, err
+}
+
+// GenerateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
+func GenerateExtraDataPolyBft(validators []*validator.ValidatorMetadata) ([]byte, error) {
+	delta := &validator.ValidatorSetDelta{
+		Added:   validators,
+		Removed: bitmap.Bitmap{},
+	}
+
+	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
+
+	return extra.MarshalRLPTo(nil), nil
 }

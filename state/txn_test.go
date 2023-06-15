@@ -67,6 +67,6 @@ func TestSnapshotUpdateData(t *testing.T) {
 	txn.SetState(addr1, hash1, hash2)
 	assert.Equal(t, hash2, txn.GetState(addr1, hash1))
 
-	txn.RevertToSnapshot(ss)
+	assert.NoError(t, txn.RevertToSnapshot(ss))
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 }

@@ -1,7 +1,19 @@
 package common
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
+	"math/big"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
+
+	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 type TokenType int
@@ -13,16 +25,20 @@ const (
 )
 
 const (
-	SenderKeyFlag = "sender-key"
-	ReceiversFlag = "receivers"
-	AmountsFlag   = "amounts"
-	TokenIDsFlag  = "token-ids"
+	SenderKeyFlag          = "sender-key"
+	ReceiversFlag          = "receivers"
+	AmountsFlag            = "amounts"
+	TokenIDsFlag           = "token-ids"
+	RootTokenFlag          = "root-token"
+	RootPredicateFlag      = "root-predicate"
+	ChildPredicateFlag     = "child-predicate"
+	ChildTokenFlag         = "child-token"
+	JSONRPCFlag            = "json-rpc"
+	ChildChainMintableFlag = "child-chain-mintable"
 
-	RootTokenFlag      = "root-token"
-	RootPredicateFlag  = "root-predicate"
-	ChildPredicateFlag = "child-predicate"
-	ChildTokenFlag     = "child-token"
-	JSONRPCFlag        = "json-rpc"
+	MinterKeyFlag     = "minter-key"
+	MinterKeyFlagDesc = "minter key is the account which is able to mint tokens to sender account " +
+		"(if provided tokens are minted prior to depositing)"
 )
 
 var (
@@ -31,11 +47,43 @@ var (
 )
 
 type BridgeParams struct {
-	SenderKey     string
-	Receivers     []string
-	TokenAddr     string
-	PredicateAddr string
-	JSONRPCAddr   string
+	SenderKey          string
+	Receivers          []string
+	TokenAddr          string
+	PredicateAddr      string
+	JSONRPCAddr        string
+	ChildChainMintable bool
+}
+
+// RegisterCommonFlags registers common bridge flags to a given command
+func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
+	cmd.Flags().StringVar(
+		&p.SenderKey,
+		SenderKeyFlag,
+		"",
+		"hex encoded private key of the account which sends bridge transactions",
+	)
+
+	cmd.Flags().StringSliceVar(
+		&p.Receivers,
+		ReceiversFlag,
+		nil,
+		"receiving accounts addresses",
+	)
+
+	cmd.Flags().StringVar(
+		&p.JSONRPCAddr,
+		JSONRPCFlag,
+		txrelayer.DefaultRPCAddress,
+		"the JSON RPC endpoint",
+	)
+
+	cmd.Flags().BoolVar(
+		&p.ChildChainMintable,
+		ChildChainMintableFlag,
+		false,
+		"flag indicating whether tokens originate from child chain",
+	)
 }
 
 type ERC20BridgeParams struct {
@@ -92,4 +140,125 @@ func (bp *ERC1155BridgeParams) Validate() error {
 	}
 
 	return nil
+}
+
+// ExtractExitEventID tries to extract exit event id from provided receipt
+func ExtractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
+	var exitEvent contractsapi.L2StateSyncedEvent
+	for _, log := range receipt.Logs {
+		doesMatch, err := exitEvent.ParseLog(log)
+		if err != nil {
+			return nil, err
+		}
+
+		if !doesMatch {
+			continue
+		}
+
+		return exitEvent.ID, nil
+	}
+
+	return nil, errors.New("failed to find exit event log")
+}
+
+// ExtractChildTokenAddr extracts predicted deterministic child token address
+func ExtractChildTokenAddr(receipt *ethgo.Receipt, childChainMintable bool) (*types.Address, error) {
+	var (
+		l1TokenMapped contractsapi.TokenMappedEvent
+		l2TokenMapped contractsapi.L2MintableTokenMappedEvent
+	)
+
+	for _, log := range receipt.Logs {
+		if childChainMintable {
+			doesMatch, err := l2TokenMapped.ParseLog(log)
+			if err != nil {
+				return nil, err
+			}
+
+			if !doesMatch {
+				continue
+			}
+
+			return &l2TokenMapped.ChildToken, nil
+		} else {
+			doesMatch, err := l1TokenMapped.ParseLog(log)
+			if err != nil {
+				return nil, err
+			}
+
+			if !doesMatch {
+				continue
+			}
+
+			return &l1TokenMapped.ChildToken, nil
+		}
+	}
+
+	return nil, nil
+}
+
+type BridgeTxResult struct {
+	Sender         string         `json:"sender"`
+	Receivers      []string       `json:"receivers"`
+	ExitEventIDs   []*big.Int     `json:"exitEventIDs"`
+	Amounts        []string       `json:"amounts"`
+	TokenIDs       []string       `json:"tokenIds"`
+	BlockNumbers   []uint64       `json:"blockNumbers"`
+	ChildTokenAddr *types.Address `json:"childTokenAddr"`
+
+	Title string `json:"title"`
+}
+
+func (r *BridgeTxResult) GetOutput() string {
+	var buffer bytes.Buffer
+
+	vals := make([]string, 0, 7)
+	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
+	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
+
+	if len(r.Amounts) > 0 {
+		vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
+	}
+
+	if len(r.TokenIDs) > 0 {
+		vals = append(vals, fmt.Sprintf("Token Ids|%s", strings.Join(r.TokenIDs, ", ")))
+	}
+
+	if len(r.ExitEventIDs) > 0 {
+		var buf bytes.Buffer
+
+		for i, id := range r.ExitEventIDs {
+			buf.WriteString(id.String())
+
+			if i != len(r.ExitEventIDs)-1 {
+				buf.WriteString(", ")
+			}
+		}
+
+		vals = append(vals, fmt.Sprintf("Exit Event IDs|%s", buf.String()))
+	}
+
+	if len(r.BlockNumbers) > 0 {
+		var buf bytes.Buffer
+
+		for i, blockNum := range r.BlockNumbers {
+			buf.WriteString(fmt.Sprintf("%d", blockNum))
+
+			if i != len(r.BlockNumbers)-1 {
+				buf.WriteString(", ")
+			}
+		}
+
+		vals = append(vals, fmt.Sprintf("Inclusion Block Numbers|%s", buf.String()))
+	}
+
+	if r.ChildTokenAddr != nil {
+		vals = append(vals, fmt.Sprintf("Child Token Address|%s", (*r.ChildTokenAddr).String()))
+	}
+
+	_, _ = buffer.WriteString(fmt.Sprintf("\n[%s]\n", r.Title))
+	_, _ = buffer.WriteString(cmdHelper.FormatKV(vals))
+	_, _ = buffer.WriteString("\n")
+
+	return buffer.String()
 }

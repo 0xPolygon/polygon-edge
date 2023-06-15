@@ -15,7 +15,10 @@ func (s *Server) setupTelemetry() error {
 	inm := metrics.NewInmemSink(10*time.Second, time.Minute)
 	metrics.DefaultInmemSignal(inm)
 
-	promSink, err := prometheus.NewPrometheusSink()
+	promSink, err := prometheus.NewPrometheusSinkFrom(prometheus.PrometheusOpts{
+		Name:       "edge_prometheus_sink",
+		Expiration: 0,
+	})
 	if err != nil {
 		return err
 	}

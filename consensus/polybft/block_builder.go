@@ -1,6 +1,7 @@
 package polybft
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -112,8 +113,14 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 		handler(b.header)
 	}
 
-	_, b.header.StateRoot = b.state.Commit()
+	_, stateRoot, err := b.state.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
+	}
+
+	b.header.StateRoot = stateRoot
 	b.header.GasUsed = b.state.TotalGas()
+	b.header.LogsBloom = types.CreateBloom(b.Receipts())
 
 	// build the block
 	b.block = consensus.BuildBlock(consensus.BuildBlockParams{

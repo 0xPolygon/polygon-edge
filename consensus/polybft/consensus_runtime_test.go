@@ -838,126 +838,35 @@ func TestConsensusRuntime_ID(t *testing.T) {
 	require.NotEqual(t, runtime.ID(), key2.Address().Bytes())
 }
 
-func TestConsensusRuntime_HasQuorum(t *testing.T) {
+func TestConsensusRuntime_GetVotingPowers(t *testing.T) {
 	t.Parallel()
 
-	const round = 5
+	const height = 100
 
-	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
+	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C"}, []uint64{1, 3, 2})
+	runtime := &consensusRuntime{}
 
-	extra := &Extra{
-		Checkpoint: &CheckpointData{},
+	_, err := runtime.GetVotingPowers(height)
+	require.Error(t, err)
+
+	runtime.fsm = &fsm{
+		validators: validatorAccounts.ToValidatorSet(),
+		parent:     &types.Header{Number: height},
 	}
 
-	lastBuildBlock := &types.Header{
-		Number:    1,
-		ExtraData: extra.MarshalRLPTo(nil),
-	}
+	_, err = runtime.GetVotingPowers(height)
+	require.Error(t, err)
 
-	blockchainMock := new(blockchainMock)
-	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(&types.Header{
-		Number: 0,
-	}, true).Once()
+	runtime.fsm.parent.Number = height - 1
 
-	state := newTestState(t)
-	snapshot := NewProposerSnapshot(lastBuildBlock.Number+1, validatorAccounts.GetPublicIdentities())
-	config := &runtimeConfig{
-		Key:           validatorAccounts.GetValidator("B").Key(),
-		blockchain:    blockchainMock,
-		PolyBFTConfig: &PolyBFTConfig{EpochSize: 10, SprintSize: 5},
-	}
-	runtime := &consensusRuntime{
-		state:          state,
-		config:         config,
-		lastBuiltBlock: lastBuildBlock,
-		epoch: &epochMetadata{
-			Number:     1,
-			Validators: validatorAccounts.GetPublicIdentities()[:len(validatorAccounts.Validators)-1],
-		},
-		logger:             hclog.NewNullLogger(),
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		stateSyncManager:   &dummyStateSyncManager{},
-		checkpointManager:  &dummyCheckpointManager{},
-	}
-
-	require.NoError(t, runtime.FSM())
-
-	proposer, err := snapshot.CalcProposer(round, lastBuildBlock.Number+1)
+	val, err := runtime.GetVotingPowers(height)
 	require.NoError(t, err)
 
-	runtime.fsm.proposerSnapshot = snapshot
+	addresses := validatorAccounts.GetPublicIdentities([]string{"A", "B", "C"}...).GetAddresses()
 
-	messages := make([]*proto.Message, 0, len(validatorAccounts.Validators))
-
-	// Unknown message type
-	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, -1))
-
-	// invalid block number
-	for _, msgType := range []proto.MessageType{proto.MessageType_PREPREPARE, proto.MessageType_PREPARE,
-		proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT} {
-		assert.False(t, runtime.HasQuorum(lastBuildBlock.Number, nil, msgType))
-	}
-
-	// MessageType_PREPREPARE - only one message is enough
-	messages = append(messages, &proto.Message{
-		From: proposer.Bytes(),
-		Type: proto.MessageType_PREPREPARE,
-		View: &proto.View{Height: 1, Round: round},
-	})
-
-	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, nil, proto.MessageType_PREPREPARE))
-	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPREPARE))
-
-	// MessageType_PREPARE
-	messages = make([]*proto.Message, 0, len(validatorAccounts.Validators))
-
-	for _, x := range validatorAccounts.Validators {
-		address := x.Address()
-
-		// proposer must not be included in prepare messages
-		if address != proposer {
-			messages = append(messages, &proto.Message{
-				From: address[:],
-				Type: proto.MessageType_PREPARE,
-				View: &proto.View{Height: lastBuildBlock.Number + 1, Round: round},
-			})
-		}
-	}
-
-	// enough quorum
-	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
-
-	// not enough quorum
-	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages[:1], proto.MessageType_PREPARE))
-
-	// include proposer which is not allowed
-	messages = append(messages, &proto.Message{
-		From: proposer[:],
-		Type: proto.MessageType_PREPARE,
-		View: &proto.View{Height: lastBuildBlock.Number + 1, Round: round},
-	})
-	assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
-
-	// last message is MessageType_PREPREPARE - this should be allowed
-	messages[len(messages)-1].Type = proto.MessageType_PREPREPARE
-	assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, proto.MessageType_PREPARE))
-
-	//proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT
-	for _, msgType := range []proto.MessageType{proto.MessageType_ROUND_CHANGE, proto.MessageType_COMMIT} {
-		messages = make([]*proto.Message, 0, len(validatorAccounts.Validators))
-
-		for _, x := range validatorAccounts.Validators {
-			messages = append(messages, &proto.Message{
-				From: x.Address().Bytes(),
-				Type: msgType,
-				View: &proto.View{Height: lastBuildBlock.Number + 1, Round: round},
-			})
-		}
-
-		assert.True(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages, msgType))
-		assert.False(t, runtime.HasQuorum(lastBuildBlock.Number+1, messages[:1], msgType))
-	}
+	assert.Equal(t, uint64(1), val[types.AddressToString(addresses[0])].Uint64())
+	assert.Equal(t, uint64(3), val[types.AddressToString(addresses[1])].Uint64())
+	assert.Equal(t, uint64(2), val[types.AddressToString(addresses[2])].Uint64())
 }
 
 func TestConsensusRuntime_BuildRoundChangeMessage(t *testing.T) {

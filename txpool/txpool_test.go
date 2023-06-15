@@ -31,11 +31,11 @@ const (
 )
 
 var (
-	forks = &chain.Forks{
-		Homestead: chain.NewFork(0),
-		Istanbul:  chain.NewFork(0),
-		London:    chain.NewFork(0),
-	}
+	forks = (&chain.Forks{
+		chain.Homestead: chain.NewFork(0),
+		chain.Istanbul:  chain.NewFork(0),
+		chain.London:    chain.NewFork(0),
+	})
 )
 
 // addresses used in tests
@@ -92,10 +92,9 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		nil,
 		nil,
 		&Config{
-			PriceLimit:          defaultPriceLimit,
-			MaxSlots:            maxSlots,
-			MaxAccountEnqueued:  defaultMaxAccountEnqueued,
-			DeploymentWhitelist: []types.Address{},
+			PriceLimit:         defaultPriceLimit,
+			MaxSlots:           maxSlots,
+			MaxAccountEnqueued: defaultMaxAccountEnqueued,
 		},
 	)
 }
@@ -1685,14 +1684,10 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 	})
 }
 
-// TestPermissionSmartContractDeployment tests sending deployment tx with deployment whitelist
-func TestPermissionSmartContractDeployment(t *testing.T) {
+func Test_TxPool_validateTx(t *testing.T) {
 	t.Parallel()
 
 	signer := crypto.NewEIP155Signer(100, true)
-
-	poolSigner := crypto.NewEIP155Signer(100, true)
-
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
@@ -1708,7 +1703,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 	}
 
 	signTx := func(transaction *types.Transaction) *types.Transaction {
-		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
+		signedTx, signErr := signer.SignTx(transaction, defaultKey)
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
 		}
@@ -1716,42 +1711,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		return signedTx
 	}
 
-	t.Run("contract deployment whitelist empty, anyone can deploy", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.NoError(t, pool.validateTx(signTx(tx)))
-	})
-	t.Run("Addresses inside whitelist can deploy smart contract", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-		pool.deploymentWhitelist.add(addr1)
-		pool.deploymentWhitelist.add(defaultAddr)
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.NoError(t, pool.validateTx(signTx(tx)))
-	})
-	t.Run("Addresses outside whitelist can not deploy smart contract", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-		pool.deploymentWhitelist.add(addr1)
-		pool.deploymentWhitelist.add(addr2)
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.ErrorIs(t,
-			pool.validateTx(signTx(tx)),
-			ErrSmartContractRestricted,
-		)
-	})
-
-	t.Run("Input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
+	t.Run("tx input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.EIP158 = true
@@ -1770,7 +1730,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		)
 	})
 
-	t.Run("Input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
+	t.Run("tx input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.EIP158 = true
@@ -1803,7 +1763,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		assert.NoError(t, pool.validateTx(signTx(tx)))
 	})
 
-	t.Run("gas fee cap less than base fee", func(t *testing.T) {
+	t.Run("eip-1559 tx (gas fee cap less than base fee)", func(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
@@ -1820,7 +1780,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		)
 	})
 
-	t.Run("gas fee cap less than tip cap", func(t *testing.T) {
+	t.Run("eip-1559 tx (gas fee cap less than tip cap)", func(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
@@ -1837,7 +1797,68 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		)
 	})
 
-	t.Run("dynamic fee tx placed without eip-1559 fork enabled", func(t *testing.T) {
+	t.Run("eip-1559 tx (gas fee cap and/or gas tip cap undefined)", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		// undefined gas tip cap
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(10000)
+
+		signedTx := signTx(tx)
+		signedTx.GasTipCap = nil
+
+		assert.ErrorIs(t,
+			pool.validateTx(signedTx),
+			ErrUnderpriced,
+		)
+
+		// undefined gas fee cap
+		tx = newTx(defaultAddr, 1, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasTipCap = big.NewInt(1000)
+		signedTx = signTx(tx)
+		signedTx.GasFeeCap = nil
+
+		assert.ErrorIs(t,
+			pool.validateTx(signedTx),
+			ErrUnderpriced,
+		)
+	})
+
+	t.Run("eip-1559 tx (gas fee cap and gas tip cap very high)", func(t *testing.T) {
+		t.Parallel()
+
+		bitLength := 512
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		// very high gas fee cap
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrFeeCapVeryHigh,
+		)
+
+		// very high gas tip cap
+		tx = newTx(defaultAddr, 1, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasTipCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrTipVeryHigh,
+		)
+	})
+
+	t.Run("eip-1559 tx placed without eip-1559 fork enabled", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.London = false
@@ -1848,7 +1869,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		tx.GasTipCap = big.NewInt(100000)
 
 		assert.ErrorIs(t,
-			pool.addTx(local, signTx(tx)),
+			pool.validateTx(signTx(tx)),
 			ErrInvalidTxType,
 		)
 	})

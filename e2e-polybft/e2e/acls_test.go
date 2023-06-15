@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -43,6 +44,7 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 	otherAddr := types.Address{0x1}
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr),
 		framework.WithContractDeployerAllowListAdmin(adminAddr),
 		framework.WithContractDeployerAllowListEnabled(otherAddr),
@@ -92,7 +94,7 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 
 	{
 		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{targetAddr})
 
 		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListContractsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
@@ -110,7 +112,7 @@ func TestE2E_AllowList_ContractDeployment(t *testing.T) {
 	{
 		// Step 6. 'targetAddr' cannot enable other accounts since it is not an admin
 		// (The transaction fails)
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{types.ZeroAddress})
 
 		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListContractsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
@@ -141,6 +143,7 @@ func TestE2E_BlockList_ContractDeployment(t *testing.T) {
 	otherAddr := types.Address{0x1}
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr),
 		framework.WithContractDeployerBlockListAdmin(adminAddr),
 		framework.WithContractDeployerBlockListEnabled(otherAddr),
@@ -184,7 +187,7 @@ func TestE2E_BlockList_ContractDeployment(t *testing.T) {
 
 	{
 		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{targetAddr})
 
 		adminSetTxn := cluster.MethodTxn(t, admin, contracts.BlockListContractsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
@@ -202,7 +205,7 @@ func TestE2E_BlockList_ContractDeployment(t *testing.T) {
 	{
 		// Step 6. 'targetAddr' cannot enable other accounts since it is not an admin
 		// (The transaction fails)
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{types.ZeroAddress})
 
 		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.BlockListContractsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
@@ -224,6 +227,7 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithTransactionsAllowListAdmin(adminAddr),
 		framework.WithTransactionsAllowListEnabled(otherAddr),
@@ -268,7 +272,7 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 
 	{
 		// Step 3. 'adminAddr' sends a transaction to enable 'targetAddr'.
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{targetAddr})
 
 		adminSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
@@ -285,12 +289,22 @@ func TestE2E_AllowList_Transactions(t *testing.T) {
 	{
 		// Step 5. 'targetAddr' cannot enable other accounts since it is not an admin
 		// (The transaction fails)
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{types.ZeroAddress})
 
 		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
 		require.True(t, adminSetFailTxn.Failed())
 		expectRole(t, cluster, contracts.AllowListTransactionsAddr, types.ZeroAddress, addresslist.NoRole)
+	}
+
+	{
+		// Step 6. 'adminAddr' sends a transaction to disable himself.
+		input, _ := addresslist.SetNoneFunc.Encode([]interface{}{adminAddr})
+
+		noneSetTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, noneSetTxn.Wait())
+		require.True(t, noneSetTxn.Failed())
+		expectRole(t, cluster, contracts.AllowListTransactionsAddr, adminAddr, addresslist.AdminRole)
 	}
 }
 
@@ -307,6 +321,7 @@ func TestE2E_BlockList_Transactions(t *testing.T) {
 	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithTransactionsBlockListAdmin(adminAddr),
 		framework.WithTransactionsBlockListEnabled(otherAddr),
@@ -339,7 +354,7 @@ func TestE2E_BlockList_Transactions(t *testing.T) {
 	{
 		// Step 3. 'targetAddr' cannot enable other accounts since it is not an admin
 		// (The transaction fails)
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{types.ZeroAddress})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{types.ZeroAddress})
 
 		adminSetFailTxn := cluster.MethodTxn(t, target, contracts.BlockListTransactionsAddr, input)
 		require.NoError(t, adminSetFailTxn.Wait())
@@ -349,7 +364,7 @@ func TestE2E_BlockList_Transactions(t *testing.T) {
 
 	{
 		// Step 4. 'adminAddr' sends a transaction to enable 'targetAddr'.
-		input, _ := addresslist.SetEnabledSignatureFunc.Encode([]interface{}{targetAddr})
+		input, _ := addresslist.SetEnabledFunc.Encode([]interface{}{targetAddr})
 
 		adminSetTxn := cluster.MethodTxn(t, admin, contracts.BlockListTransactionsAddr, input)
 		require.NoError(t, adminSetTxn.Wait())
@@ -377,6 +392,7 @@ func TestE2E_AddressLists_Bridge(t *testing.T) {
 	otherAddr := types.Address(other.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, targetAddr, otherAddr),
 		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeAllowListEnabled(otherAddr),

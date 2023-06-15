@@ -138,7 +138,7 @@ func TestAddressList_WriteOp_Full(t *testing.T) {
 		role   Role
 	}{
 		{SetAdminFunc, AdminRole},
-		{SetEnabledSignatureFunc, EnabledRole},
+		{SetEnabledFunc, EnabledRole},
 		{SetNoneFunc, NoRole},
 	}
 

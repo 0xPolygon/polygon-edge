@@ -91,7 +91,7 @@ type Verifier interface {
 	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
-	PreCommitState(header *types.Header, txn *state.Transition) error
+	PreCommitState(block *types.Block, txn *state.Transition) error
 }
 
 type Executor interface {
@@ -689,12 +689,7 @@ func (b *Blockchain) verifyBlock(block *types.Block) ([]*types.Receipt, error) {
 	}
 
 	// Make sure the block body data is valid
-	receipts, err := b.verifyBlockBody(block)
-	if err != nil {
-		return nil, err
-	}
-
-	return receipts, nil
+	return b.verifyBlockBody(block)
 }
 
 // verifyBlockParent makes sure that the child block is in line
@@ -836,11 +831,14 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	if err := b.consensus.PreCommitState(header, txn); err != nil {
+	if err := b.consensus.PreCommitState(block, txn); err != nil {
 		return nil, err
 	}
 
-	_, root := txn.Commit()
+	_, root, err := txn.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
+	}
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())
@@ -1413,7 +1411,7 @@ func (b *Blockchain) Close() error {
 
 // CalculateBaseFee calculates the basefee of the header.
 func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
-	if !b.config.Params.Forks.IsLondon(parent.Number) {
+	if !b.config.Params.Forks.IsActive(chain.London, parent.Number) {
 		return chain.GenesisBaseFee
 	}
 

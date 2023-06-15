@@ -15,6 +15,8 @@ type Request struct {
 	Params json.RawMessage `json:"params,omitempty"`
 }
 
+type BatchRequest []Request
+
 // Response is a jsonrpc response interface
 type Response interface {
 	GetID() interface{}
@@ -91,6 +93,25 @@ func (e *ObjectError) Error() string {
 	}
 
 	return string(data)
+}
+
+func (e *ObjectError) MarshalJSON() ([]byte, error) {
+	var ds string
+
+	data, ok := e.Data.([]byte)
+	if ok && len(data) > 0 {
+		ds = "0x" + string(data)
+	}
+
+	return json.Marshal(&struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    string `json:"data,omitempty"`
+	}{
+		Code:    e.Code,
+		Message: e.Message,
+		Data:    ds,
+	})
 }
 
 const (
@@ -190,8 +211,8 @@ func (b *BlockNumber) UnmarshalJSON(buffer []byte) error {
 }
 
 // NewRPCErrorResponse is used to create a custom error response
-func NewRPCErrorResponse(id interface{}, errCode int, err string, jsonrpcver string) Response {
-	errObject := &ObjectError{errCode, err, nil}
+func NewRPCErrorResponse(id interface{}, errCode int, err string, data []byte, jsonrpcver string) Response {
+	errObject := &ObjectError{errCode, err, data}
 
 	response := &ErrorResponse{
 		JSONRPC: jsonrpcver,
@@ -209,7 +230,7 @@ func NewRPCResponse(id interface{}, jsonrpcver string, reply []byte, err Error) 
 	case nil:
 		response = &SuccessResponse{JSONRPC: jsonrpcver, ID: id, Result: reply}
 	default:
-		response = NewRPCErrorResponse(id, err.ErrorCode(), err.Error(), jsonrpcver)
+		response = NewRPCErrorResponse(id, err.ErrorCode(), err.Error(), reply, jsonrpcver)
 	}
 
 	return response

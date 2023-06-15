@@ -3,6 +3,7 @@ package property
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"path/filepath"
 	"testing"
 	"time"
@@ -29,18 +30,20 @@ func TestProperty_DifferentVotingPower(t *testing.T) {
 			numBlocks = rapid.Uint64Range(2, 5).Draw(tt, "number of blocks the cluster should mine")
 		)
 
-		stakes := make([]uint64, numNodes)
+		stakes := make([]*big.Int, numNodes)
 
 		// stake amount will determine validator's stake and therefore voting power
 		for i := range stakes {
-			stakes[i] = rapid.Uint64Range(1, maxStake).Draw(tt, fmt.Sprintf("stake for node %d", i+1))
+			stakes[i] = new(big.Int).
+				SetUint64(rapid.Uint64Range(1, maxStake).
+					Draw(tt, fmt.Sprintf("stake for node %d", i+1)))
 		}
 
 		cluster := framework.NewPropertyTestCluster(t, int(numNodes),
 			framework.WithEpochSize(epochSize),
 			framework.WithSecretsCallback(func(adresses []types.Address, config *framework.TestClusterConfig) {
-				for i, a := range adresses {
-					config.StakeAmounts = append(config.StakeAmounts, fmt.Sprintf("%s:%d", a, stakes[i]))
+				for i := range adresses {
+					config.StakeAmounts = append(config.StakeAmounts, stakes[i])
 				}
 			}))
 		defer cluster.Stop()

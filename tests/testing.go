@@ -1,35 +1,38 @@
 package tests
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// TESTS is the default location of the tests folder
-const TESTS = "./tests"
-
-type info struct {
-	Comment     string `json:"comment"`
-	FilledWith  string `json:"filledwith"`
-	LllcVersion string `json:"lllcversion"`
-	Source      string `json:"source"`
-	SourceHash  string `json:"sourcehash"`
+type testCase struct {
+	Env         *env                                    `json:"env"`
+	Pre         map[types.Address]*chain.GenesisAccount `json:"pre"`
+	Post        map[string]postState                    `json:"post"`
+	Transaction *stTransaction                          `json:"transaction"`
 }
 
 type env struct {
+	BaseFee    string `json:"currentBaseFee"`
 	Coinbase   string `json:"currentCoinbase"`
 	Difficulty string `json:"currentDifficulty"`
 	GasLimit   string `json:"currentGasLimit"`
@@ -79,6 +82,17 @@ func stringToBigInt(str string) (*big.Int, error) {
 	}
 
 	return n, nil
+}
+
+func stringToBigIntT(t *testing.T, str string) *big.Int {
+	t.Helper()
+
+	number, err := stringToBigInt(str)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return number
 }
 
 func stringToAddressT(t *testing.T, str string) types.Address {
@@ -137,10 +151,14 @@ func stringToInt64T(t *testing.T, str string) int64 {
 func (e *env) ToHeader(t *testing.T) *types.Header {
 	t.Helper()
 
-	miner := stringToAddressT(t, e.Coinbase)
+	baseFee := uint64(0)
+	if e.BaseFee != "" {
+		baseFee = stringToUint64T(t, e.BaseFee)
+	}
 
 	return &types.Header{
-		Miner:      miner[:],
+		Miner:      stringToAddressT(t, e.Coinbase).Bytes(),
+		BaseFee:    baseFee,
 		Difficulty: stringToUint64T(t, e.Difficulty),
 		GasLimit:   stringToUint64T(t, e.GasLimit),
 		Number:     stringToUint64T(t, e.Number),
@@ -151,8 +169,14 @@ func (e *env) ToHeader(t *testing.T) *types.Header {
 func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 	t.Helper()
 
+	baseFee := new(big.Int)
+	if e.BaseFee != "" {
+		baseFee = stringToBigIntT(t, e.BaseFee)
+	}
+
 	return runtime.TxContext{
 		Coinbase:   stringToAddressT(t, e.Coinbase),
+		BaseFee:    baseFee,
 		Difficulty: stringToHashT(t, e.Difficulty),
 		GasLimit:   stringToInt64T(t, e.GasLimit),
 		Number:     stringToInt64T(t, e.Number),
@@ -160,71 +184,9 @@ func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 	}
 }
 
-type exec struct {
-	Address  types.Address
-	Caller   types.Address
-	Origin   types.Address
-	Code     []byte
-	Data     []byte
-	Value    *big.Int
-	GasLimit uint64
-	GasPrice *big.Int
-}
-
-func (e *exec) UnmarshalJSON(input []byte) error {
-	type execUnmarshall struct {
-		Address  types.Address `json:"address"`
-		Caller   types.Address `json:"caller"`
-		Origin   types.Address `json:"origin"`
-		Code     string        `json:"code"`
-		Data     string        `json:"data"`
-		Value    string        `json:"value"`
-		Gas      string        `json:"gas"`
-		GasPrice string        `json:"gasPrice"`
-	}
-
-	var dec execUnmarshall
-	err := json.Unmarshal(input, &dec)
-
-	if err != nil {
-		return err
-	}
-
-	e.Address = dec.Address
-	e.Caller = dec.Caller
-	e.Origin = dec.Origin
-
-	e.Code, err = types.ParseBytes(&dec.Code)
-	if err != nil {
-		return err
-	}
-
-	e.Data, err = types.ParseBytes(&dec.Data)
-	if err != nil {
-		return err
-	}
-
-	e.Value, err = types.ParseUint256orHex(&dec.Value)
-	if err != nil {
-		return err
-	}
-
-	e.GasLimit, err = types.ParseUint64orHex(&dec.Gas)
-	if err != nil {
-		return err
-	}
-
-	e.GasPrice, err = types.ParseUint256orHex(&dec.GasPrice)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func buildState(
 	allocs map[types.Address]*chain.GenesisAccount,
-) (state.State, state.Snapshot, types.Hash) {
+) (state.State, state.Snapshot, types.Hash, error) {
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
@@ -244,10 +206,14 @@ func buildState(
 		}
 	}
 
-	objs := txn.Commit(false)
+	objs, err := txn.Commit(false)
+	if err != nil {
+		return nil, nil, types.ZeroHash, err
+	}
+
 	snap, root := snap.Commit(objs)
 
-	return s, snap, types.BytesToHash(root)
+	return s, snap, types.BytesToHash(root), nil
 }
 
 type indexes struct {
@@ -260,6 +226,7 @@ type postEntry struct {
 	Root    types.Hash
 	Logs    types.Hash
 	Indexes indexes
+	TxBytes []byte
 }
 
 type postState []postEntry
@@ -269,6 +236,7 @@ func (p *postEntry) UnmarshalJSON(input []byte) error {
 		Root    string  `json:"hash"`
 		Logs    string  `json:"logs"`
 		Indexes indexes `json:"indexes"`
+		TxBytes string  `json:"txbytes"`
 	}
 
 	var dec stateUnmarshall
@@ -279,21 +247,24 @@ func (p *postEntry) UnmarshalJSON(input []byte) error {
 	p.Root = types.StringToHash(dec.Root)
 	p.Logs = types.StringToHash(dec.Logs)
 	p.Indexes = dec.Indexes
+	p.TxBytes = types.StringToBytes(dec.TxBytes)
 
 	return nil
 }
 
 type stTransaction struct {
-	Data     []string       `json:"data"`
-	GasLimit []uint64       `json:"gasLimit"`
-	Value    []*big.Int     `json:"value"`
-	GasPrice *big.Int       `json:"gasPrice"`
-	Nonce    uint64         `json:"nonce"`
-	From     types.Address  `json:"secretKey"`
-	To       *types.Address `json:"to"`
+	Data                 []string       `json:"data"`
+	GasLimit             []uint64       `json:"gasLimit"`
+	Value                []*big.Int     `json:"value"`
+	GasPrice             *big.Int       `json:"gasPrice"`
+	MaxFeePerGas         *big.Int       `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int       `json:"maxPriorityFeePerGas"`
+	Nonce                uint64         `json:"nonce"`
+	From                 types.Address  `json:"secretKey"`
+	To                   *types.Address `json:"to"`
 }
 
-func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
+func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, error) {
 	if i.Data > len(t.Data) {
 		return nil, fmt.Errorf("data index %d out of bounds (%d)", i.Data, len(t.Data))
 	}
@@ -306,46 +277,65 @@ func (t *stTransaction) At(i indexes) (*types.Transaction, error) {
 		return nil, fmt.Errorf("value index %d out of bounds (%d)", i.Value, len(t.Value))
 	}
 
-	msg := &types.Transaction{
-		To:       t.To,
-		Nonce:    t.Nonce,
-		Value:    new(big.Int).Set(t.Value[i.Value]),
-		Gas:      t.GasLimit[i.Gas],
-		GasPrice: new(big.Int).Set(t.GasPrice),
-		Input:    hex.MustDecodeHex(t.Data[i.Data]),
+	gasPrice := t.GasPrice
+
+	// If baseFee provided, set gasPrice to effectiveGasPrice.
+	if baseFee != nil {
+		if t.MaxFeePerGas == nil {
+			t.MaxFeePerGas = gasPrice
+		}
+
+		if t.MaxFeePerGas == nil {
+			t.MaxFeePerGas = new(big.Int)
+		}
+
+		if t.MaxPriorityFeePerGas == nil {
+			t.MaxPriorityFeePerGas = t.MaxFeePerGas
+		}
+
+		gasPrice = common.BigMin(new(big.Int).Add(t.MaxPriorityFeePerGas, baseFee), t.MaxFeePerGas)
 	}
 
-	msg.From = t.From
-
-	return msg, nil
+	return &types.Transaction{
+		From:      t.From,
+		To:        t.To,
+		Nonce:     t.Nonce,
+		Value:     new(big.Int).Set(t.Value[i.Value]),
+		Gas:       t.GasLimit[i.Gas],
+		GasPrice:  new(big.Int).Set(gasPrice),
+		GasFeeCap: t.MaxFeePerGas,
+		GasTipCap: t.MaxPriorityFeePerGas,
+		Input:     hex.MustDecodeHex(t.Data[i.Data]),
+	}, nil
 }
 
 func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	type txUnmarshall struct {
-		Data      []string `json:"data"`
-		GasLimit  []string `json:"gasLimit"`
-		Value     []string `json:"value"`
-		GasPrice  string   `json:"gasPrice"`
-		Nonce     string   `json:"nonce"`
-		SecretKey string   `json:"secretKey"`
-		To        string   `json:"to"`
+		Data                 []string `json:"data,omitempty"`
+		GasLimit             []string `json:"gasLimit,omitempty"`
+		Value                []string `json:"value,omitempty"`
+		GasPrice             string   `json:"gasPrice,omitempty"`
+		MaxFeePerGas         string   `json:"maxFeePerGas,omitempty"`
+		MaxPriorityFeePerGas string   `json:"maxPriorityFeePerGas,omitempty"`
+		Nonce                string   `json:"nonce,omitempty"`
+		SecretKey            string   `json:"secretKey,omitempty"`
+		To                   string   `json:"to,omitempty"`
 	}
 
 	var dec txUnmarshall
-	err := json.Unmarshal(input, &dec)
-
-	if err != nil {
-		return err
+	if err := json.Unmarshal(input, &dec); err != nil {
+		return fmt.Errorf("failed to unmarshal transaction into temporary struct: %w", err)
 	}
 
 	t.Data = dec.Data
 
 	for _, i := range dec.GasLimit {
-		if j, err := stringToUint64(i); err != nil {
-			return err
-		} else {
-			t.GasLimit = append(t.GasLimit, j)
+		j, err := stringToUint64(i)
+		if err != nil {
+			return fmt.Errorf("failed to convert string '%s' to uint64: %w", i, err)
 		}
+
+		t.GasLimit = append(t.GasLimit, j)
 	}
 
 	for _, i := range dec.Value {
@@ -364,14 +354,30 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		t.Value = append(t.Value, value)
 	}
 
-	t.GasPrice, err = stringToBigInt(dec.GasPrice)
-	if err != nil {
-		return err
+	var err error
+
+	if dec.GasPrice != "" {
+		if t.GasPrice, err = stringToBigInt(dec.GasPrice); err != nil {
+			return fmt.Errorf("failed to parse gas price: %w", err)
+		}
 	}
 
-	t.Nonce, err = stringToUint64(dec.Nonce)
-	if err != nil {
-		return err
+	if dec.MaxFeePerGas != "" {
+		if t.MaxFeePerGas, err = stringToBigInt(dec.MaxFeePerGas); err != nil {
+			return fmt.Errorf("failed to parse max fee per gas: %w", err)
+		}
+	}
+
+	if dec.MaxPriorityFeePerGas != "" {
+		if t.MaxPriorityFeePerGas, err = stringToBigInt(dec.MaxPriorityFeePerGas); err != nil {
+			return fmt.Errorf("failed to parse max priority fee per gas: %w", err)
+		}
+	}
+
+	if dec.Nonce != "" {
+		if t.Nonce, err = stringToUint64(dec.Nonce); err != nil {
+			return fmt.Errorf("failed to parse nonce: %w", err)
+		}
 	}
 
 	t.From = types.Address{}
@@ -379,7 +385,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	if len(dec.SecretKey) > 0 {
 		secretKey, err := types.ParseBytes(&dec.SecretKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to parse secret key: %w", err)
 		}
 
 		key, err := crypto.ParseECDSAPrivateKey(secretKey)
@@ -403,83 +409,72 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 var Forks = map[string]*chain.Forks{
 	"Frontier": {},
 	"Homestead": {
-		Homestead: chain.NewFork(0),
+		chain.Homestead: chain.NewFork(0),
 	},
 	"EIP150": {
-		Homestead: chain.NewFork(0),
-		EIP150:    chain.NewFork(0),
+		chain.Homestead: chain.NewFork(0),
+		chain.EIP150:    chain.NewFork(0),
 	},
 	"EIP158": {
-		Homestead: chain.NewFork(0),
-		EIP150:    chain.NewFork(0),
-		EIP155:    chain.NewFork(0),
-		EIP158:    chain.NewFork(0),
+		chain.Homestead: chain.NewFork(0),
+		chain.EIP150:    chain.NewFork(0),
+		chain.EIP155:    chain.NewFork(0),
+		chain.EIP158:    chain.NewFork(0),
 	},
 	"Byzantium": {
-		Homestead: chain.NewFork(0),
-		EIP150:    chain.NewFork(0),
-		EIP155:    chain.NewFork(0),
-		EIP158:    chain.NewFork(0),
-		Byzantium: chain.NewFork(0),
+		chain.Homestead: chain.NewFork(0),
+		chain.EIP150:    chain.NewFork(0),
+		chain.EIP155:    chain.NewFork(0),
+		chain.EIP158:    chain.NewFork(0),
+		chain.Byzantium: chain.NewFork(0),
 	},
 	"Constantinople": {
-		Homestead:      chain.NewFork(0),
-		EIP150:         chain.NewFork(0),
-		EIP155:         chain.NewFork(0),
-		EIP158:         chain.NewFork(0),
-		Byzantium:      chain.NewFork(0),
-		Constantinople: chain.NewFork(0),
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
 	},
-	"Istanbul": {
-		Homestead:      chain.NewFork(0),
-		EIP150:         chain.NewFork(0),
-		EIP155:         chain.NewFork(0),
-		EIP158:         chain.NewFork(0),
-		Byzantium:      chain.NewFork(0),
-		Constantinople: chain.NewFork(0),
-		Petersburg:     chain.NewFork(0),
-		Istanbul:       chain.NewFork(0),
-	},
-	"London": {
-		Homestead:      chain.NewFork(0),
-		EIP150:         chain.NewFork(0),
-		EIP155:         chain.NewFork(0),
-		EIP158:         chain.NewFork(0),
-		Byzantium:      chain.NewFork(0),
-		Constantinople: chain.NewFork(0),
-		Petersburg:     chain.NewFork(0),
-		Istanbul:       chain.NewFork(0),
-		London:         chain.NewFork(0),
+	"Istchain.anbul": {
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
+		chain.Istanbul:       chain.NewFork(0),
 	},
 	"FrontierToHomesteadAt5": {
-		Homestead: chain.NewFork(5),
+		chain.Homestead: chain.NewFork(5),
 	},
 	"HomesteadToEIP150At5": {
-		Homestead: chain.NewFork(0),
-		EIP150:    chain.NewFork(5),
+		chain.Homestead: chain.NewFork(0),
+		chain.EIP150:    chain.NewFork(5),
 	},
 	"HomesteadToDaoAt5": {
-		Homestead: chain.NewFork(0),
+		chain.Homestead: chain.NewFork(0),
 	},
 	"EIP158ToByzantiumAt5": {
-		Homestead: chain.NewFork(0),
-		EIP150:    chain.NewFork(0),
-		EIP155:    chain.NewFork(0),
-		EIP158:    chain.NewFork(0),
-		Byzantium: chain.NewFork(5),
+		chain.Homestead: chain.NewFork(0),
+		chain.EIP150:    chain.NewFork(0),
+		chain.EIP155:    chain.NewFork(0),
+		chain.EIP158:    chain.NewFork(0),
+		chain.Byzantium: chain.NewFork(5),
 	},
 	"ByzantiumToConstantinopleAt5": {
-		Byzantium:      chain.NewFork(0),
-		Constantinople: chain.NewFork(5),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(5),
 	},
 	"ConstantinopleFix": {
-		Homestead:      chain.NewFork(0),
-		EIP150:         chain.NewFork(0),
-		EIP155:         chain.NewFork(0),
-		EIP158:         chain.NewFork(0),
-		Byzantium:      chain.NewFork(0),
-		Constantinople: chain.NewFork(0),
-		Petersburg:     chain.NewFork(0),
+		chain.Homestead:      chain.NewFork(0),
+		chain.EIP150:         chain.NewFork(0),
+		chain.EIP155:         chain.NewFork(0),
+		chain.EIP158:         chain.NewFork(0),
+		chain.Byzantium:      chain.NewFork(0),
+		chain.Constantinople: chain.NewFork(0),
+		chain.Petersburg:     chain.NewFork(0),
 	},
 }
 
@@ -493,37 +488,42 @@ func contains(l []string, name string) bool {
 	return false
 }
 
-func listFolders(paths ...string) ([]string, error) {
-	folders := []string{}
+//go:embed tests
+var testsFS embed.FS
 
-	for _, p := range paths {
-		path := filepath.Join(TESTS, p)
+func listFolders(tests ...string) ([]string, error) {
+	var folders []string
 
-		files, err := os.ReadDir(path)
-		if err != nil {
+	for _, t := range tests {
+		if err := fs.WalkDir(testsFS, t, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if d.IsDir() && t != "path" {
+				folders = append(folders, path)
+			}
+
+			return nil
+		}); err != nil {
 			return nil, err
 		}
 
-		for _, i := range files {
-			if i.IsDir() {
-				folders = append(folders, filepath.Join(path, i.Name()))
-			}
-		}
+		// Excluding root dir
+		folders = folders[1:]
 	}
 
 	return folders, nil
 }
 
 func listFiles(folder string) ([]string, error) {
-	if !strings.HasPrefix(folder, filepath.Base(TESTS)) {
-		folder = filepath.Join(TESTS, folder)
-	}
+	var files []string
 
-	files := []string{}
 	err := filepath.Walk(folder, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+
 		if !info.IsDir() {
 			files = append(files, path)
 		}
@@ -532,4 +532,21 @@ func listFiles(folder string) ([]string, error) {
 	})
 
 	return files, err
+}
+
+func rlpHashLogs(logs []*types.Log) (res types.Hash) {
+	r := &types.Receipt{
+		Logs: logs,
+	}
+
+	ar := &fastrlp.Arena{}
+	v := r.MarshalLogsWith(ar)
+
+	keccak.Keccak256Rlp(res[:0], v)
+
+	return
+}
+
+func vmTestBlockHash(n uint64) types.Hash {
+	return types.BytesToHash(crypto.Keccak256([]byte(big.NewInt(int64(n)).String())))
 }

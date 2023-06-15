@@ -12,10 +12,10 @@ import (
 
 // list of function methods for the address list functionality
 var (
-	SetAdminFunc            = abi.MustNewMethod("function setAdmin(address)")
-	SetEnabledSignatureFunc = abi.MustNewMethod("function setEnabled(address)")
-	SetNoneFunc             = abi.MustNewMethod("function setNone(address)")
-	ReadAddressListFunc     = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
+	SetAdminFunc        = abi.MustNewMethod("function setAdmin(address)")
+	SetEnabledFunc      = abi.MustNewMethod("function setEnabled(address)")
+	SetNoneFunc         = abi.MustNewMethod("function setNone(address)")
+	ReadAddressListFunc = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
 )
 
 // list of gas costs for the operations
@@ -55,6 +55,7 @@ var (
 	errInputTooShort       = fmt.Errorf("wrong input size, expected 32")
 	errFunctionNotFound    = fmt.Errorf("function not found")
 	errWriteProtection     = fmt.Errorf("write protection")
+	errAdminSelfRemove     = fmt.Errorf("cannot remove admin role from caller")
 )
 
 func (a *AddressList) runInputCall(caller types.Address, input []byte,
@@ -102,7 +103,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	var updateRole Role
 	if bytes.Equal(sig, SetAdminFunc.ID()) {
 		updateRole = AdminRole
-	} else if bytes.Equal(sig, SetEnabledSignatureFunc.ID()) {
+	} else if bytes.Equal(sig, SetEnabledFunc.ID()) {
 		updateRole = EnabledRole
 	} else if bytes.Equal(sig, SetNoneFunc.ID()) {
 		updateRole = NoRole
@@ -123,6 +124,11 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	addrRole := a.GetRole(caller)
 	if addrRole != AdminRole {
 		return nil, gasUsed, runtime.ErrNotAuth
+	}
+
+	// An admin can not remove himself from the list
+	if addrRole == AdminRole && caller == inputAddr {
+		return nil, gasUsed, errAdminSelfRemove
 	}
 
 	a.SetRole(inputAddr, updateRole)

@@ -7,11 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -19,6 +14,12 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/testutil"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateSyncManager {
@@ -32,7 +33,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateS
 
 	topic := &mockTopic{}
 
-	s, err := newStateSyncManager(hclog.NewNullLogger(), state,
+	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
 			jsonrpcAddr:       "",
@@ -41,8 +42,6 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateS
 			key:               key.Key(),
 			maxCommitmentSize: maxCommitmentSize,
 		})
-
-	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
@@ -372,16 +371,18 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
-	require.Len(t, s.pendingCommitments, 0)
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(0), s.pendingCommitments[0].EndID.Uint64())
 
 	// add one more log to have a minimum commitment
 	goodLog2 := goodLog.Copy()
 	goodLog2.Topics[1] = ethgo.BytesToHash([]byte{0x1}) // state sync index 1
 	s.AddLog(goodLog2)
 
-	require.Len(t, s.pendingCommitments, 1)
-	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
-	require.Equal(t, uint64(1), s.pendingCommitments[0].EndID.Uint64())
+	require.Len(t, s.pendingCommitments, 2)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
+	require.Equal(t, uint64(1), s.pendingCommitments[1].EndID.Uint64())
 
 	// add two more logs to have larger commitments
 	goodLog3 := goodLog.Copy()
@@ -392,9 +393,9 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	goodLog4.Topics[1] = ethgo.BytesToHash([]byte{0x3}) // state sync index 3
 	s.AddLog(goodLog4)
 
-	require.Len(t, s.pendingCommitments, 3)
-	require.Equal(t, uint64(0), s.pendingCommitments[2].StartID.Uint64())
-	require.Equal(t, uint64(3), s.pendingCommitments[2].EndID.Uint64())
+	require.Len(t, s.pendingCommitments, 4)
+	require.Equal(t, uint64(0), s.pendingCommitments[3].StartID.Uint64())
+	require.Equal(t, uint64(3), s.pendingCommitments[3].EndID.Uint64())
 }
 
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
@@ -405,39 +406,37 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	server := testutil.DeployTestServer(t, nil)
 
-	//nolint:godox
-	// TODO: Deploy local artifacts (to be fixed in EVM-542)
-	cc := &testutil.Contract{}
-	cc.AddCallback(func() string {
-		return `
-			event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data);
-			uint256 indx;
-
-			function emitEvent() public payable {
-				emit StateSynced(indx, msg.sender, msg.sender, bytes(""));
-				indx++;
-			}
-			`
+	// Deploy contract
+	contractReceipt, err := server.SendTxn(&ethgo.Transaction{
+		Input: contractsapi.StateSender.Bytecode,
 	})
+	require.NoError(t, err)
 
-	_, addr, err := server.DeployContract(cc)
+	// Create contract function call payload
+	encodedSyncStateData, err := (&contractsapi.SyncStateStateSenderFn{
+		Receiver: types.BytesToAddress(server.Account(0).Bytes()),
+		Data:     []byte{},
+	}).EncodeAbi()
 	require.NoError(t, err)
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
-		receipt, err := server.TxnTo(addr, "emitEvent")
+		receipt, err := server.SendTxn(&ethgo.Transaction{
+			To:    &contractReceipt.ContractAddress,
+			Input: encodedSyncStateData,
+		})
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	s.config.stateSenderAddr = types.Address(addr)
+	s.config.stateSenderAddr = types.Address(contractReceipt.ContractAddress)
 	s.config.jsonrpcAddr = server.HTTPAddr()
 
 	require.NoError(t, s.initTracker())
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 9)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }

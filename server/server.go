@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -26,7 +27,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -277,16 +277,22 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	if err := forkmanager.ForkManagerInit(
+		forkManagerFactory[ConsensusType(engineName)],
+		config.Chain.Params.Forks); err != nil {
+		return nil, err
+	}
+
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// Use the london signer with eip-155 as a fallback one
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
-		chain.AllForksEnabled.At(0).Homestead,
+		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		crypto.NewEIP155Signer(
 			uint64(m.config.Chain.Params.ChainID),
-			chain.AllForksEnabled.At(0).Homestead,
+			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		),
 	)
 
@@ -330,11 +336,6 @@ func NewServer(config *Config) (*Server, error) {
 			Blockchain: m.blockchain,
 		}
 
-		deploymentWhitelist, err := configHelper.GetDeploymentWhitelist(config.Chain)
-		if err != nil {
-			return nil, err
-		}
-
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
@@ -343,10 +344,9 @@ func NewServer(config *Config) (*Server, error) {
 			m.grpcServer,
 			m.network,
 			&txpool.Config{
-				MaxSlots:            m.config.MaxSlots,
-				PriceLimit:          m.config.PriceLimit,
-				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
-				DeploymentWhitelist: deploymentWhitelist,
+				MaxSlots:           m.config.MaxSlots,
+				PriceLimit:         m.config.PriceLimit,
+				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 			},
 		)
 		if err != nil {
@@ -917,6 +917,7 @@ func (s *Server) setupGRPC() error {
 		return err
 	}
 
+	// Start server with infinite retries
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
@@ -996,11 +997,13 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	go func() {
-		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+			}
 		}
 	}()
 

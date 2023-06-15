@@ -143,35 +143,56 @@ func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
 }
 
 // newTestState creates new instance of state used by tests.
-func newTestState(t *testing.T) *State {
-	t.Helper()
+func newTestState(tb testing.TB) *State {
+	tb.Helper()
 
 	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().UTC().Format(time.RFC3339Nano))
 	err := os.Mkdir(dir, 0775)
 
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
 	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
-		t.Fatal(err)
+		tb.Fatal(err)
 	}
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if err := os.RemoveAll(dir); err != nil {
-			t.Fatal(err)
+			tb.Fatal(err)
 		}
 	})
 
 	return state
 }
 
-func generateTestAccount(t *testing.T) *wallet.Account {
-	t.Helper()
+func generateTestAccount(tb testing.TB) *wallet.Account {
+	tb.Helper()
 
 	acc, err := wallet.GenerateAccount()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return acc
+}
+
+// createTestBridgeConfig creates test bridge configuration with hard-coded addresses
+func createTestBridgeConfig() *BridgeConfig {
+	return &BridgeConfig{
+		StateSenderAddr:                   types.StringToAddress("1"),
+		CheckpointManagerAddr:             types.StringToAddress("2"),
+		ExitHelperAddr:                    types.StringToAddress("3"),
+		RootERC20PredicateAddr:            types.StringToAddress("4"),
+		ChildMintableERC20PredicateAddr:   types.StringToAddress("5"),
+		RootNativeERC20Addr:               types.StringToAddress("6"),
+		RootERC721Addr:                    types.StringToAddress("7"),
+		RootERC721PredicateAddr:           types.StringToAddress("8"),
+		ChildMintableERC721PredicateAddr:  types.StringToAddress("9"),
+		RootERC1155Addr:                   types.StringToAddress("10"),
+		RootERC1155PredicateAddr:          types.StringToAddress("11"),
+		ChildMintableERC1155PredicateAddr: types.StringToAddress("12"),
+		CustomSupernetManagerAddr:         types.StringToAddress("13"),
+		StakeManagerAddr:                  types.StringToAddress("14"),
+		JSONRPCEndpoint:                   "http://localhost:8545",
+	}
 }

@@ -81,8 +81,6 @@ type serverParams struct {
 	devInterval    uint64
 	isDevMode      bool
 
-	corsAllowedOrigins []string
-
 	ibftBaseTimeoutLegacy uint64
 
 	genesisConfig *chain.Chain
@@ -151,7 +149,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		Chain: p.genesisConfig,
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
-			AccessControlAllowOrigin: p.corsAllowedOrigins,
+			AccessControlAllowOrigin: p.rawConfig.CorsAllowedOrigins,
 			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
 			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
 		},

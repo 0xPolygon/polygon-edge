@@ -60,20 +60,18 @@ func TestE2E_Migration(t *testing.T) {
 	//send transaction to user2
 	sendAmount := ethgo.Gwei(10000)
 	receipt, err := relayer.SendTransaction(&ethgo.Transaction{
-		From:     userAddr,
-		To:       &userAddr2,
-		GasPrice: 1048576,
-		Gas:      1000000,
-		Value:    sendAmount,
+		From:  userAddr,
+		To:    &userAddr2,
+		Gas:   1000000,
+		Value: sendAmount,
 	}, userKey)
 	assert.NoError(t, err)
 	assert.NotNil(t, receipt)
 
 	receipt, err = relayer.SendTransaction(&ethgo.Transaction{
-		From:     userAddr,
-		GasPrice: 1048576,
-		Gas:      1000000,
-		Input:    contractsapi.TestWriteBlockMetadata.Bytecode,
+		From:  userAddr,
+		Gas:   1000000,
+		Input: contractsapi.TestWriteBlockMetadata.Bytecode,
 	}, userKey)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)

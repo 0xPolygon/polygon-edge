@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
+	"github.com/0xPolygon/polygon-edge/command"
 	bridgeCommon "github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -19,7 +22,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"golang.org/x/sync/errgroup"
 )
 
 type TestBridge struct {
@@ -105,11 +107,15 @@ func (t *TestBridge) WaitUntil(pollFrequency, timeout time.Duration, handler fun
 // Deposit function invokes bridge deposit of ERC tokens (from the root to the child chain)
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPredicateAddr types.Address,
-	receivers, amounts, tokenIDs string) error {
+	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr, minterKey string, childChainMintable bool) error {
 	args := []string{}
 
 	if receivers == "" {
 		return errors.New("provide at least one receiver address value")
+	}
+
+	if jsonRPCAddr == "" {
+		return errors.New("provide a JSON RPC endpoint URL")
 	}
 
 	switch token {
@@ -119,17 +125,23 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		}
 
 		if tokenIDs != "" {
-			return errors.New("not expected to provide token ids for ERC-20 deposits")
+			return errors.New("not expected to provide token ids for ERC 20 deposits")
 		}
 
 		args = append(args,
 			"bridge",
 			"deposit-erc20",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
-			"--amounts", amounts)
+			"--amounts", amounts,
+			"--sender-key", senderKey,
+			"--minter-key", minterKey,
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 	case bridgeCommon.ERC721:
 		if tokenIDs == "" {
@@ -139,11 +151,17 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		args = append(args,
 			"bridge",
 			"deposit-erc721",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
-			"--token-ids", tokenIDs)
+			"--token-ids", tokenIDs,
+			"--sender-key", senderKey,
+			"--minter-key", minterKey,
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {
@@ -157,12 +175,18 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 		args = append(args,
 			"bridge",
 			"deposit-erc1155",
-			"--test",
 			"--root-token", rootTokenAddr.String(),
 			"--root-predicate", rootPredicateAddr.String(),
 			"--receivers", receivers,
 			"--amounts", amounts,
-			"--token-ids", tokenIDs)
+			"--token-ids", tokenIDs,
+			"--sender-key", senderKey,
+			"--minter-key", minterKey,
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 	}
 
 	return t.cmdRun(args...)
@@ -171,8 +195,8 @@ func (t *TestBridge) Deposit(token bridgeCommon.TokenType, rootTokenAddr, rootPr
 // Withdraw function is used to invoke bridge withdrawals for any kind of ERC tokens (from the child to the root chain)
 // with given receivers, amounts and/or token ids
 func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
-	senderKey, receivers,
-	amounts, tokenIDs, jsonRPCEndpoint string, childToken types.Address) error {
+	senderKey, receivers, amounts, tokenIDs, jsonRPCAddr string,
+	childPredicate, childToken types.Address, childChainMintable bool) error {
 	if senderKey == "" {
 		return errors.New("provide hex-encoded sender private key")
 	}
@@ -181,7 +205,7 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		return errors.New("provide at least one receiver address value")
 	}
 
-	if jsonRPCEndpoint == "" {
+	if jsonRPCAddr == "" {
 		return errors.New("provide a JSON RPC endpoint URL")
 	}
 
@@ -194,16 +218,22 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		}
 
 		if tokenIDs != "" {
-			return errors.New("not expected to provide token ids for ERC-20 withdrawals")
+			return errors.New("not expected to provide token ids for ERC 20 withdrawals")
 		}
 
 		args = append(args,
 			"bridge",
 			"withdraw-erc20",
+			"--child-predicate", childPredicate.String(),
+			"--child-token", childToken.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
-			"--json-rpc", jsonRPCEndpoint)
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 	case bridgeCommon.ERC721:
 		if tokenIDs == "" {
@@ -213,11 +243,16 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		args = append(args,
 			"bridge",
 			"withdraw-erc721",
+			"--child-predicate", childPredicate.String(),
+			"--child-token", childToken.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint,
-			"--child-token", childToken.String())
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 
 	case bridgeCommon.ERC1155:
 		if amounts == "" {
@@ -231,26 +266,26 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 		args = append(args,
 			"bridge",
 			"withdraw-erc1155",
+			"--child-predicate", childPredicate.String(),
+			"--child-token", childToken.String(),
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
 			"--token-ids", tokenIDs,
-			"--json-rpc", jsonRPCEndpoint,
-			"--child-token", childToken.String())
+			"--json-rpc", jsonRPCAddr)
+
+		if childChainMintable {
+			args = append(args, "--child-chain-mintable")
+		}
 	}
 
 	return t.cmdRun(args...)
 }
 
 // SendExitTransaction sends exit transaction to the root chain
-func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64,
-	rootJSONRPCAddr, childJSONRPCAddr string) error {
-	if rootJSONRPCAddr == "" {
-		return errors.New("provide a root JSON RPC endpoint URL")
-	}
-
+func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64, childJSONRPCAddr string) error {
 	if childJSONRPCAddr == "" {
-		return errors.New("provide a child JSON RPC endpoint URL")
+		return errors.New("provide a child chain JSON RPC endpoint URL")
 	}
 
 	return t.cmdRun(
@@ -258,7 +293,7 @@ func (t *TestBridge) SendExitTransaction(exitHelper types.Address, exitID uint64
 		"exit",
 		"--exit-helper", exitHelper.String(),
 		"--exit-id", strconv.FormatUint(exitID, 10),
-		"--root-json-rpc", rootJSONRPCAddr,
+		"--root-json-rpc", t.JSONRPCAddr(),
 		"--child-json-rpc", childJSONRPCAddr,
 		"--test",
 	)
@@ -271,9 +306,16 @@ func (t *TestBridge) cmdRun(args ...string) error {
 
 // deployRootchainContracts deploys and initializes rootchain contracts
 func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
+	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+	if err != nil {
+		return err
+	}
+
 	args := []string{
 		"rootchain",
 		"deploy",
+		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
+		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 		"--genesis", genesisPath,
 		"--test",
 	}
@@ -297,10 +339,10 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig
 
 	for i, secret := range validatorSecrets {
 		secrets[i] = path.Join(t.clusterConfig.TmpDir, secret)
-		balances[i] = polybftConfig.InitialValidatorSet[i].Balance
+		balances[i] = command.DefaultPremineBalance
 	}
 
-	if err := t.FundValidators(polybftConfig.Bridge.RootNativeERC20Addr,
+	if err := t.FundValidators(polybftConfig.Bridge.StakeTokenAddr,
 		secrets, balances); err != nil {
 		return fmt.Errorf("failed to fund validators on the rootchain: %w", err)
 	}
@@ -390,9 +432,9 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 					"--jsonrpc", t.JSONRPCAddr(),
 					"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 					"--" + polybftsecrets.AccountDirFlag, path.Join(t.clusterConfig.TmpDir, secret),
-					"--amount", polybftConfig.InitialValidatorSet[i].Stake.String(),
+					"--amount", t.getStakeAmount(i).String(),
 					"--supernet-id", strconv.FormatInt(polybftConfig.SupernetID, 10),
-					"--native-root-token", polybftConfig.Bridge.RootNativeERC20Addr.String(),
+					"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
 				}
 
 				if err := t.cmdRun(args...); err != nil {
@@ -405,6 +447,15 @@ func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.Pol
 	}
 
 	return g.Wait()
+}
+
+func (t *TestBridge) getStakeAmount(validatorIndex int) *big.Int {
+	l := len(t.clusterConfig.StakeAmounts)
+	if l == 0 || l <= validatorIndex {
+		return command.DefaultStake
+	}
+
+	return t.clusterConfig.StakeAmounts[validatorIndex]
 }
 
 func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.PolyBFTConfig) error {
@@ -428,7 +479,7 @@ func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.P
 }
 
 // FundValidators sends tokens to a rootchain validators
-func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
+func (t *TestBridge) FundValidators(tokenAddress types.Address, secretsPaths []string, amounts []*big.Int) error {
 	if len(secretsPaths) != len(amounts) {
 		return errors.New("expected the same length of secrets paths and amounts")
 	}
@@ -436,7 +487,7 @@ func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []
 	args := []string{
 		"rootchain",
 		"fund",
-		"--native-root-token", tookenAddress.String(),
+		"--stake-token", tokenAddress.String(),
 		"--mint",
 	}
 
@@ -457,6 +508,22 @@ func (t *TestBridge) FundValidators(tookenAddress types.Address, secretsPaths []
 
 	if err := t.cmdRun(args...); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func (t *TestBridge) deployStakeManager(genesisPath string) error {
+	args := []string{
+		"polybft",
+		"stake-manager-deploy",
+		"--jsonrpc", t.JSONRPCAddr(),
+		"--genesis", genesisPath,
+		"--test",
+	}
+
+	if err := t.cmdRun(args...); err != nil {
+		return fmt.Errorf("failed to deploy stake manager contract: %w", err)
 	}
 
 	return nil

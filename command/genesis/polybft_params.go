@@ -15,18 +15,17 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 const (
-	stakeFlag            = "stake"
 	validatorsFlag       = "validators"
 	validatorsPathFlag   = "validators-path"
 	validatorsPrefixFlag = "validators-prefix"
@@ -37,11 +36,14 @@ const (
 	blockTimeFlag  = "block-time"
 	trieRootFlag   = "trieroot"
 
+	blockTimeDriftFlag = "block-time-drift"
+
 	defaultEpochSize        = uint64(10)
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
 	defaultEpochReward      = 1
+	defaultBlockTimeDrift   = uint64(10)
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
@@ -64,10 +66,16 @@ const (
 
 var (
 	errNoGenesisValidators = errors.New("genesis validators aren't provided")
+	errNoPremineAllowed    = errors.New("native token is not mintable, so no premine is allowed " +
+		"except for zero address and reward wallet if native token is used as reward token")
 )
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
+	if err := forkmanager.ForkManagerInit(polybft.ForkManagerFactory, chain.AllForksEnabled); err != nil {
+		return err
+	}
+
 	// populate premine balance map
 	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
 
@@ -83,6 +91,16 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return fmt.Errorf("invalid reward wallet configuration provided '%s' : %w", p.rewardWallet, err)
+	}
+
+	if !p.nativeTokenConfig.IsMintable {
+		// validate premine map, no premine is allowed if token is not mintable,
+		// except for the reward wallet (if native token is used as reward token) and zero address
+		for a := range premineBalances {
+			if a != types.ZeroAddress && (p.rewardTokenCode != "" || a != walletPremineInfo.address) {
+				return errNoPremineAllowed
+			}
+		}
 	}
 
 	var (
@@ -130,21 +148,23 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:          initialValidators[0].Address,
+		Governance:          types.ZeroAddress,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
 		NativeTokenConfig:   p.nativeTokenConfig,
+		MinValidatorSetSize: p.minNumValidators,
 		MaxValidatorSetSize: p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
+		BlockTimeDrift: p.blockTimeDrift,
 	}
 
 	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
 	if len(p.burnContracts) == 0 {
-		enabledForks.London = nil
+		enabledForks.SetFork(chain.London, nil)
 	}
 
 	chainConfig := &chain.Chain{
@@ -159,24 +179,10 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	totalStake := big.NewInt(0)
-
-	for _, validator := range initialValidators {
-		// increment total stake
-		totalStake.Add(totalStake, validator.Stake)
-	}
-
 	// deploy genesis contracts
-	allocs, err := p.deployContracts(totalStake, rewardTokenByteCode, polyBftConfig)
+	allocs, err := p.deployContracts(rewardTokenByteCode, polyBftConfig)
 	if err != nil {
 		return err
-	}
-
-	// premine initial validators
-	for _, v := range initialValidators {
-		allocs[v.Address] = &chain.GenesisAccount{
-			Balance: v.Balance,
-		}
 	}
 
 	// premine other accounts
@@ -221,7 +227,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	genesisExtraData, err := generateExtraDataPolyBft(validatorMetadata)
+	genesisExtraData, err := GenerateExtraDataPolyBft(validatorMetadata)
 	if err != nil {
 		return err
 	}
@@ -300,8 +306,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
-func (p *genesisParams) deployContracts(totalStake *big.Int,
-	rewardTokenByteCode []byte,
+func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
 	polybftConfig *polybft.PolyBFTConfig) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
 		artifact *artifact.Artifact
@@ -356,31 +361,58 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 
 	if !params.nativeTokenConfig.IsMintable {
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.NativeERC20, address: contracts.NativeERC20TokenContract})
+			&contractInfo{
+				artifact: contractsapi.NativeERC20,
+				address:  contracts.NativeERC20TokenContract,
+			})
 	} else {
 		genesisContracts = append(genesisContracts,
-			&contractInfo{artifact: contractsapi.NativeERC20Mintable, address: contracts.NativeERC20TokenContract})
+			&contractInfo{
+				artifact: contractsapi.NativeERC20Mintable,
+				address:  contracts.NativeERC20TokenContract,
+			})
 	}
 
 	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
+		// rootchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.ChildERC20PredicateAccessList,
+				artifact: contractsapi.ChildERC20PredicateACL,
 				address:  contracts.ChildERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.ChildERC721PredicateAccessList,
+				artifact: contractsapi.ChildERC721PredicateACL,
 				address:  contracts.ChildERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
-				artifact: contractsapi.ChildERC1155PredicateAccessList,
+				artifact: contractsapi.ChildERC1155PredicateACL,
 				address:  contracts.ChildERC1155PredicateContract,
 			})
+
+		// childchain originated tokens predicates (with access lists)
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC20PredicateACL,
+				address:  contracts.RootMintableERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC721PredicateACL,
+				address:  contracts.RootMintableERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC1155PredicateACL,
+				address:  contracts.RootMintableERC1155PredicateContract,
+			})
 	} else {
+		// rootchain originated tokens predicates
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20Predicate,
@@ -398,6 +430,25 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 				artifact: contractsapi.ChildERC1155Predicate,
 				address:  contracts.ChildERC1155PredicateContract,
 			})
+
+		// childchain originated tokens predicates
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC20Predicate,
+				address:  contracts.RootMintableERC20PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC721Predicate,
+				address:  contracts.RootMintableERC721PredicateContract,
+			})
+
+		genesisContracts = append(genesisContracts,
+			&contractInfo{
+				artifact: contractsapi.RootMintableERC1155Predicate,
+				address:  contracts.RootMintableERC1155PredicateContract,
+			})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
@@ -411,7 +462,7 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 
 	if rewardTokenByteCode != nil {
 		// if reward token is provided in genesis then, add it to allocations
-		// to RewardTokenContract address and update polybftConfig
+		// to RewardTokenContract address and update Polybft config
 		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
 			Code:    rewardTokenByteCode,
@@ -421,39 +472,16 @@ func (p *genesisParams) deployContracts(totalStake *big.Int,
 	return allocations, nil
 }
 
-// generateExtraDataPolyBft populates Extra with specific fields required for polybft consensus protocol
-func generateExtraDataPolyBft(validators []*validator.ValidatorMetadata) ([]byte, error) {
-	delta := &validator.ValidatorSetDelta{
-		Added:   validators,
-		Removed: bitmap.Bitmap{},
-	}
-
-	extra := polybft.Extra{Validators: delta, Checkpoint: &polybft.CheckpointData{}}
-
-	return extra.MarshalRLPTo(nil), nil
-}
-
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
 func (p *genesisParams) getValidatorAccounts(
 	premineBalances map[types.Address]*premineInfo) ([]*validator.GenesisValidator, error) {
 	// populate validators premine info
-	stakeMap := make(map[types.Address]*premineInfo, len(p.stakes))
-
-	for _, stake := range p.stakes {
-		stakeInfo, err := parsePremineInfo(stake)
-		if err != nil {
-			return nil, fmt.Errorf("invalid stake amount provided '%s' : %w", stake, err)
-		}
-
-		stakeMap[stakeInfo.address] = stakeInfo
-	}
-
 	if len(p.validators) > 0 {
 		validators := make([]*validator.GenesisValidator, len(p.validators))
 		for i, val := range p.validators {
 			parts := strings.Split(val, ":")
 			if len(parts) != 3 {
-				return nil, fmt.Errorf("expected 4 parts provided in the following format "+
+				return nil, fmt.Errorf("expected 3 parts provided in the following format "+
 					"<P2P multi address:ECDSA address:public BLS key>, but got %d part(s)",
 					len(parts))
 			}
@@ -477,8 +505,8 @@ func (p *genesisParams) getValidatorAccounts(
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
-				Balance:   getPremineAmount(addr, premineBalances, command.DefaultPremineBalance),
-				Stake:     getPremineAmount(addr, stakeMap, command.DefaultStake),
+				Balance:   getPremineAmount(addr, premineBalances, big.NewInt(0)),
+				Stake:     big.NewInt(0),
 			}
 		}
 
@@ -496,8 +524,8 @@ func (p *genesisParams) getValidatorAccounts(
 	}
 
 	for _, v := range validators {
-		v.Balance = getPremineAmount(v.Address, premineBalances, command.DefaultPremineBalance)
-		v.Stake = getPremineAmount(v.Address, stakeMap, command.DefaultStake)
+		v.Balance = getPremineAmount(v.Address, premineBalances, big.NewInt(0))
+		v.Stake = big.NewInt(0)
 	}
 
 	return validators, nil

@@ -48,17 +48,30 @@ It has a native support for running bridge, which enables running cross-chain tr
     $ polygon-edge rootchain server
     ```
 
-5. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates genesis configuration with rootchain contract addresses and rootchain default sender address.
+5. Deploy StakeManager - if not already deployed to rootchain. Command has a test flag used only in testing purposes which would deploy a mock ERC20 token which would be used for staking. If not used for testing, stake-token flag should be provided:
+
+    ```bash
+    $ polygon-edge polybft stake-manager-deploy \
+     --deployer-key <hex_encoded_rootchain_account_private_key> \
+    [--genesis ./genesis.json] \
+    [--json-rpc http://127.0.0.1:8545] \
+    [--stake-token 0xaddressOfStakeToken] \
+    [--test]
+    ```
+
+6. Deploy and initialize rootchain contracts - this command deploys rootchain smart contracts and initializes them. It also updates genesis configuration with rootchain contract addresses and rootchain default sender address.
 
     ```bash
     $ polygon-edge rootchain deploy \
     --deployer-key <hex_encoded_rootchain_account_private_key> \
+    --stake-manager <address_of_stake_manager_contract> \
+    --stake-token 0xaddressOfStakeToken \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--test]
     ```
 
-6. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**
+7. Fund validators on rootchain - in order for validators to be able to send transactions to Ethereum, they need to be funded in order to be able to cover gas cost. **This command is for testing purposes only.**
 
     ```bash
     $ polygon-edge rootchain fund \
@@ -66,29 +79,29 @@ It has a native support for running bridge, which enables running cross-chain tr
         --amounts 200000000000000000000
     ```
 
-7. Whitelist validators on rootchain - in order for validators to be able to be registered on the SupernetManager contract on rootchain. Note that only deployer of SupernetManager contract (the one who run the deploy command) can whitelist validators on rootchain. He can use either its hex encoded private key, or data-dir flag if he has secerets initialized:
+8. Whitelist validators on rootchain - in order for validators to be able to be registered on the SupernetManager contract on rootchain. Note that only deployer of SupernetManager contract (the one who run the deploy command) can whitelist validators on rootchain. He can use either its hex encoded private key, or data-dir flag if he has secerets initialized:
 
     ```bash
     $ polygon-edge polybft whitelist-validators --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
     --addresses <addresses_of_validators> --supernet-manager <address_of_SupernetManager_contract>
     ```
 
-8. Register validators on rootchain - each validator registers itself on SupernetManager. **This command is for testing purposes only.**
+9.  Register validators on rootchain - each validator registers itself on SupernetManager. **This command is for testing purposes only.**
 
     ```bash
     $ polygon-edge polybft register-validator --data-dir ./test-chain-1 \
     --supernet-manager <address_of_SupernetManager_contract>
     ```
 
-9. Initial staking on rootchain - each validator needs to do initial staking on rootchain (StakeManager) contract. **This command is for testing purposes only.**
+10. Initial staking on rootchain - each validator needs to do initial staking on rootchain (StakeManager) contract. **This command is for testing purposes only.**
 
     ```bash
     $ polygon-edge polybft stake --data-dir ./test-chain-1 --supernet-id <supernet_id_from_genesis> \
     --amount <amount_of_tokens_to_stake> \
-    --stake-manager <address_of_StakeManager_contract> --native-root-token <address_of_native_root_token>
+    --stake-manager <address_of_StakeManager_contract> --stake-token <address_of_erc20_token_used_for_staking>
     ```
 
-10. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts.
+11. Finalize genesis validator set on rootchain (SupernetManager) contract. This is done after all validators from genesis do initial staking on rootchain, and it's a final step that is required before starting the child chain. This needs to be done by the deployer of SupernetManager contract (the user that run the deploy command). He can use either its hex encoded private key, or data-dir flag if he has secerets initialized. If enable-staking flag is provided, validators will be able to continue staking on rootchain. If not, genesis validators will not be able update its stake or unstake, nor will newly registered validators after genesis will be able to stake tokens on the rootchain. Enabling of staking can be done through this command, or later after the child chain starts.
 
     ```bash
     $ polygon-edge polybft supernet --private-key <hex_encoded_rootchain_account_private_key_of_supernetManager_deployer> \
@@ -98,7 +111,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     --finalize-genesis --enable-staking
     ```
 
-11. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
+12. Run (child chain) cluster, consisting of 4 Edge clients in this particular example
 
     ```bash
     $ polygon-edge server --data-dir ./test-chain-1 --chain genesis.json --grpc-address :5001 --libp2p :30301 --jsonrpc :9545 \

@@ -107,7 +107,7 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	senderKey, err := helper.GetRootchainPrivateKey(ep.senderKey)
+	senderKey, err := helper.DecodePrivateKey(ep.senderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create wallet from private key: %w", err))
 

@@ -20,6 +20,9 @@ var (
 	RootERC20Predicate              *artifact.Artifact
 	RootERC721Predicate             *artifact.Artifact
 	RootERC1155Predicate            *artifact.Artifact
+	ChildMintableERC20Predicate     *artifact.Artifact
+	ChildMintableERC721Predicate    *artifact.Artifact
+	ChildMintableERC1155Predicate   *artifact.Artifact
 	BLS                             *artifact.Artifact
 	BLS256                          *artifact.Artifact
 	System                          *artifact.Artifact
@@ -30,13 +33,19 @@ var (
 	StateReceiver                   *artifact.Artifact
 	ChildERC20                      *artifact.Artifact
 	ChildERC20Predicate             *artifact.Artifact
-	ChildERC20PredicateAccessList   *artifact.Artifact
+	ChildERC20PredicateACL          *artifact.Artifact
+	RootMintableERC20Predicate      *artifact.Artifact
+	RootMintableERC20PredicateACL   *artifact.Artifact
 	ChildERC721                     *artifact.Artifact
 	ChildERC721Predicate            *artifact.Artifact
-	ChildERC721PredicateAccessList  *artifact.Artifact
+	ChildERC721PredicateACL         *artifact.Artifact
+	RootMintableERC721Predicate     *artifact.Artifact
+	RootMintableERC721PredicateACL  *artifact.Artifact
 	ChildERC1155                    *artifact.Artifact
 	ChildERC1155Predicate           *artifact.Artifact
-	ChildERC1155PredicateAccessList *artifact.Artifact
+	ChildERC1155PredicateACL        *artifact.Artifact
+	RootMintableERC1155Predicate    *artifact.Artifact
+	RootMintableERC1155PredicateACL *artifact.Artifact
 	L2StateSender                   *artifact.Artifact
 	CustomSupernetManager           *artifact.Artifact
 	StakeManager                    *artifact.Artifact
@@ -107,6 +116,21 @@ func init() {
 		log.Fatal(err)
 	}
 
+	ChildMintableERC20Predicate, err = artifact.DecodeArtifact([]byte(ChildMintableERC20PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildMintableERC721Predicate, err = artifact.DecodeArtifact([]byte(ChildMintableERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ChildMintableERC1155Predicate, err = artifact.DecodeArtifact([]byte(ChildMintableERC1155PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	StateReceiver, err = artifact.DecodeArtifact([]byte(StateReceiverArtifact))
 	if err != nil {
 		log.Fatal(err)
@@ -127,7 +151,17 @@ func init() {
 		log.Fatal(err)
 	}
 
-	ChildERC20PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC20PredicateAccessListArtifact))
+	ChildERC20PredicateACL, err = artifact.DecodeArtifact([]byte(ChildERC20PredicateACLArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC20Predicate, err = artifact.DecodeArtifact([]byte(RootMintableERC20PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC20PredicateACL, err = artifact.DecodeArtifact([]byte(RootMintableERC20PredicateACLArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -142,7 +176,17 @@ func init() {
 		log.Fatal(err)
 	}
 
-	ChildERC721PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC721PredicateAccessListArtifact))
+	ChildERC721PredicateACL, err = artifact.DecodeArtifact([]byte(ChildERC721PredicateACLArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC721Predicate, err = artifact.DecodeArtifact([]byte(RootMintableERC721PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC721PredicateACL, err = artifact.DecodeArtifact([]byte(RootMintableERC721PredicateACLArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -157,7 +201,17 @@ func init() {
 		log.Fatal(err)
 	}
 
-	ChildERC1155PredicateAccessList, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateAccessListArtifact))
+	ChildERC1155PredicateACL, err = artifact.DecodeArtifact([]byte(ChildERC1155PredicateACLArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC1155Predicate, err = artifact.DecodeArtifact([]byte(RootMintableERC1155PredicateArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	RootMintableERC1155PredicateACL, err = artifact.DecodeArtifact([]byte(RootMintableERC1155PredicateACLArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

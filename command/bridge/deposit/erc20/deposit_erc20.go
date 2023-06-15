@@ -1,10 +1,8 @@
 package erc20
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -12,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -21,7 +18,7 @@ import (
 
 type depositERC20Params struct {
 	*common.ERC20BridgeParams
-	testMode bool
+	minterKey string
 }
 
 var (
@@ -33,24 +30,12 @@ var (
 func GetCommand() *cobra.Command {
 	depositCmd := &cobra.Command{
 		Use:     "deposit-erc20",
-		Short:   "Deposits ERC 20 tokens from the root chain to the child chain",
+		Short:   "Deposits ERC 20 tokens from the origin to the destination chain",
 		PreRunE: preRunCommand,
 		Run:     runCommand,
 	}
 
-	depositCmd.Flags().StringVar(
-		&dp.SenderKey,
-		common.SenderKeyFlag,
-		"",
-		"hex encoded private key of the account which sends rootchain deposit transactions",
-	)
-
-	depositCmd.Flags().StringSliceVar(
-		&dp.Receivers,
-		common.ReceiversFlag,
-		nil,
-		"receiving accounts addresses on child chain",
-	)
+	dp.RegisterCommonFlags(depositCmd)
 
 	depositCmd.Flags().StringSliceVar(
 		&dp.Amounts,
@@ -74,18 +59,10 @@ func GetCommand() *cobra.Command {
 	)
 
 	depositCmd.Flags().StringVar(
-		&dp.JSONRPCAddr,
-		common.JSONRPCFlag,
-		txrelayer.DefaultRPCAddress,
-		"the JSON RPC root chain endpoint",
-	)
-
-	depositCmd.Flags().BoolVar(
-		&dp.testMode,
-		helper.TestModeFlag,
-		false,
-		"test indicates whether depositor is hardcoded test account "+
-			"(in that case tokens are minted to it, so it is able to make deposits)",
+		&dp.minterKey,
+		common.MinterKeyFlag,
+		"",
+		common.MinterKeyFlagDesc,
 	)
 
 	_ = depositCmd.MarkFlagRequired(common.ReceiversFlag)
@@ -93,24 +70,18 @@ func GetCommand() *cobra.Command {
 	_ = depositCmd.MarkFlagRequired(common.RootTokenFlag)
 	_ = depositCmd.MarkFlagRequired(common.RootPredicateFlag)
 
-	depositCmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, common.SenderKeyFlag)
-
 	return depositCmd
 }
 
 func preRunCommand(cmd *cobra.Command, _ []string) error {
-	if err := dp.Validate(); err != nil {
-		return err
-	}
-
-	return nil
+	return dp.Validate()
 }
 
 func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	depositorKey, err := helper.GetRootchainPrivateKey(dp.SenderKey)
+	depositorKey, err := helper.DecodePrivateKey(dp.SenderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to initialize depositor private key: %w", err))
 	}
@@ -119,7 +90,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(dp.JSONRPCAddr))
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to initialize rootchain tx relayer: %w", err))
+		outputter.SetError(fmt.Errorf("failed to initialize tx relayer: %w", err))
 
 		return
 	}
@@ -141,7 +112,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		aggregateAmount.Add(aggregateAmount, amount)
 	}
 
-	if dp.testMode {
+	if dp.minterKey != "" {
+		minterKey, err := helper.DecodePrivateKey(dp.minterKey)
+		if err != nil {
+			outputter.SetError(fmt.Errorf("invalid minter key provided: %w", err))
+
+			return
+		}
+
 		// mint tokens to depositor, so he is able to send them
 		mintTxn, err := helper.CreateMintTxn(types.Address(depositorAddr),
 			types.StringToAddress(dp.TokenAddr), aggregateAmount)
@@ -151,7 +129,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		receipt, err := txRelayer.SendTransaction(mintTxn, depositorKey)
+		receipt, err := txRelayer.SendTransaction(mintTxn, minterKey)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
 
@@ -165,7 +143,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	// approve root erc20 predicate
+	// approve erc20 predicate
 	approveTxn, err := helper.CreateApproveERC20Txn(aggregateAmount,
 		types.StringToAddress(dp.PredicateAddr),
 		types.StringToAddress(dp.TokenAddr))
@@ -188,7 +166,16 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	type bridgeTxData struct {
+		exitEventID    *big.Int
+		blockNumber    uint64
+		childTokenAddr *types.Address
+	}
+
 	g, ctx := errgroup.WithContext(cmd.Context())
+	bridgeTxCh := make(chan bridgeTxData, len(dp.Receivers))
+	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
+	blockNumbers := make([]uint64, 0, len(dp.Receivers))
 
 	for i := range dp.Receivers {
 		receiver := dp.Receivers[i]
@@ -214,22 +201,64 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
+				var exitEventID *big.Int
+
+				if dp.ChildChainMintable {
+					if exitEventID, err = common.ExtractExitEventID(receipt); err != nil {
+						return fmt.Errorf("failed to extract exit event: %w", err)
+					}
+				}
+
+				// populate child token address if a token is mapped alongside with deposit
+				childToken, err := common.ExtractChildTokenAddr(receipt, dp.ChildChainMintable)
+				if err != nil {
+					return fmt.Errorf("failed to extract child token address: %w", err)
+				}
+
+				// send aggregated data to channel if everything went ok
+				bridgeTxCh <- bridgeTxData{
+					blockNumber:    receipt.BlockNumber,
+					exitEventID:    exitEventID,
+					childTokenAddr: childToken,
+				}
+
 				return nil
 			}
 		})
 	}
 
 	if err = g.Wait(); err != nil {
-		outputter.SetError(fmt.Errorf("sending deposit transactions to the rootchain failed: %w", err))
+		outputter.SetError(fmt.Errorf("sending deposit transactions failed: %w", err))
 
 		return
 	}
 
-	outputter.SetCommandResult(&depositERC20Result{
-		Sender:    depositorAddr.String(),
-		Receivers: dp.Receivers,
-		Amounts:   dp.Amounts,
-	})
+	close(bridgeTxCh)
+
+	var childToken *types.Address
+
+	for x := range bridgeTxCh {
+		if x.exitEventID != nil {
+			exitEventIDs = append(exitEventIDs, x.exitEventID)
+		}
+
+		blockNumbers = append(blockNumbers, x.blockNumber)
+
+		if x.childTokenAddr != nil {
+			childToken = x.childTokenAddr
+		}
+	}
+
+	outputter.SetCommandResult(
+		&common.BridgeTxResult{
+			Sender:         depositorAddr.String(),
+			Receivers:      dp.Receivers,
+			Amounts:        dp.Amounts,
+			ExitEventIDs:   exitEventIDs,
+			ChildTokenAddr: childToken,
+			BlockNumbers:   blockNumbers,
+			Title:          "DEPOSIT ERC 20",
+		})
 }
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
@@ -252,25 +281,4 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 		To:    &addr,
 		Input: input,
 	}, nil
-}
-
-type depositERC20Result struct {
-	Sender    string   `json:"sender"`
-	Receivers []string `json:"receivers"`
-	Amounts   []string `json:"amounts"`
-}
-
-func (r *depositERC20Result) GetOutput() string {
-	var buffer bytes.Buffer
-
-	vals := make([]string, 0, 3)
-	vals = append(vals, fmt.Sprintf("Sender|%s", r.Sender))
-	vals = append(vals, fmt.Sprintf("Receivers|%s", strings.Join(r.Receivers, ", ")))
-	vals = append(vals, fmt.Sprintf("Amounts|%s", strings.Join(r.Amounts, ", ")))
-
-	buffer.WriteString("\n[DEPOSIT ERC 20]\n")
-	buffer.WriteString(cmdHelper.FormatKV(vals))
-	buffer.WriteString("\n")
-
-	return buffer.String()
 }

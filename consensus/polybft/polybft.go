@@ -2,7 +2,9 @@
 package polybft
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -27,6 +29,10 @@ const (
 	minSyncPeers = 2
 	pbftProto    = "/pbft/0.2"
 	bridgeProto  = "/bridge/0.2"
+)
+
+var (
+	errMissingBridgeConfig = errors.New("invalid genesis configuration, missing bridge configuration")
 )
 
 // polybftBackend is an interface defining polybft methods needed by fsm and sync tracker
@@ -119,29 +125,28 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		bridgeCfg := polyBFTConfig.Bridge
+		if bridgeCfg == nil {
+			return errMissingBridgeConfig
+		}
+
 		// initialize ValidatorSet SC
-		input, err := getInitValidatorSetInput(polyBFTConfig)
-		if err != nil {
+		if err = initValidatorSet(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
-		if err = initContract(contracts.SystemCaller,
-			contracts.ValidatorSetContract, input, "ValidatorSet", transition); err != nil {
+		// approve reward pool
+		if err = approveRewardPoolAsSpender(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
-		if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
+		// mint reward tokens to reward wallet
+		if err = mintRewardTokensToWallet(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
 		// initialize RewardPool SC
-		input, err = getInitRewardPoolInput(polyBFTConfig)
-		if err != nil {
-			return err
-		}
-
-		if err = initContract(contracts.SystemCaller,
-			contracts.RewardPoolContract, input, "RewardPool", transition); err != nil {
+		if err = initRewardPool(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
@@ -152,7 +157,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			bridgeAllowListAdmin = config.Params.BridgeAllowList.AdminAddresses[0]
 		}
 
-		var bridgeBlockListAdmin types.Address
+		bridgeBlockListAdmin := types.ZeroAddress
 		if config.Params.BridgeBlockList != nil && len(config.Params.BridgeBlockList.AdminAddresses) > 0 {
 			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
 		}
@@ -167,80 +172,145 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				owner = bridgeBlockListAdmin
 			}
 
-			input, err = getInitChildERC20PredicateAccessListInput(polyBFTConfig.Bridge, owner)
+			// initialize ChildERC20PredicateAccessList SC
+			input, err := getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller, contracts.ChildERC20PredicateContract, input,
+			if err = callContract(contracts.SystemCaller, contracts.ChildERC20PredicateContract, input,
 				"ChildERC20PredicateAccessList", transition); err != nil {
 				return err
 			}
 
-			input, err = getInitChildERC721PredicateAccessListInput(polyBFTConfig.Bridge, owner)
+			// initialize ChildERC721PredicateAccessList SC
+			input, err = getInitERC721PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller, contracts.ChildERC721PredicateContract, input,
+			if err = callContract(contracts.SystemCaller, contracts.ChildERC721PredicateContract, input,
 				"ChildERC721PredicateAccessList", transition); err != nil {
 				return err
 			}
 
-			input, err = getInitChildERC1155PredicateAccessListInput(polyBFTConfig.Bridge, owner)
+			// initialize ChildERC1155PredicateAccessList SC
+			input, err = getInitERC1155PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
+			if err = callContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
 				"ChildERC1155PredicateAccessList", transition); err != nil {
 				return err
 			}
-		} else {
-			input, err = getInitChildERC20PredicateInput(polyBFTConfig.Bridge)
+
+			// initialize RootMintableERC20PredicateAccessList SC
+			input, err = getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, true)
 			if err != nil {
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller, contracts.ChildERC20PredicateContract, input,
+			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC20PredicateContract, input,
+				"RootMintableERC20PredicateAccessList", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC721PredicateAccessList SC
+			input, err = getInitERC721PredicateACLInput(polyBFTConfig.Bridge, owner, true)
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC721PredicateContract, input,
+				"RootMintableERC721PredicateAccessList", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC1155PredicateAccessList SC
+			input, err = getInitERC1155PredicateACLInput(polyBFTConfig.Bridge, owner, true)
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC1155PredicateContract, input,
+				"RootMintableERC1155PredicateAccessList", transition); err != nil {
+				return err
+			}
+		} else {
+			// initialize ChildERC20Predicate SC
+			input, err := getInitERC20PredicateInput(bridgeCfg, false)
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller, contracts.ChildERC20PredicateContract, input,
 				"ChildERC20Predicate", transition); err != nil {
 				return err
 			}
 
 			// initialize ChildERC721Predicate SC
-			input, err = getInitChildERC721PredicateInput(polyBFTConfig.Bridge)
+			input, err = getInitERC721PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller, contracts.ChildERC721PredicateContract, input,
+			if err = callContract(contracts.SystemCaller, contracts.ChildERC721PredicateContract, input,
 				"ChildERC721Predicate", transition); err != nil {
 				return err
 			}
 
 			// initialize ChildERC1155Predicate SC
-			input, err = getInitChildERC1155PredicateInput(polyBFTConfig.Bridge)
+			input, err = getInitERC1155PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
+			if err = callContract(contracts.SystemCaller, contracts.ChildERC1155PredicateContract, input,
 				"ChildERC1155Predicate", transition); err != nil {
 				return err
 			}
-		}
 
-		rootNativeERC20Token := types.ZeroAddress
-		if polyBFTConfig.Bridge != nil {
-			rootNativeERC20Token = polyBFTConfig.Bridge.RootNativeERC20Addr
+			// initialize RootMintableERC20Predicate SC
+			input, err = getInitERC20PredicateInput(bridgeCfg, true)
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC20PredicateContract, input,
+				"RootMintableERC20Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC721Predicate SC
+			input, err = getInitERC721PredicateInput(bridgeCfg, true)
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC721PredicateContract, input,
+				"RootMintableERC721Predicate", transition); err != nil {
+				return err
+			}
+
+			// initialize RootMintableERC1155Predicate SC
+			input, err = getInitERC1155PredicateInput(bridgeCfg, true)
+			if err != nil {
+				return err
+			}
+
+			if err = callContract(contracts.SystemCaller, contracts.RootMintableERC1155PredicateContract, input,
+				"RootMintableERC1155Predicate", transition); err != nil {
+				return err
+			}
 		}
 
 		if polyBFTConfig.NativeTokenConfig.IsMintable {
 			// initialize NativeERC20Mintable SC
 			params := &contractsapi.InitializeNativeERC20MintableFn{
 				Predicate_: contracts.ChildERC20PredicateContract,
-				Owner_:     polyBFTConfig.Governance,
-				RootToken_: rootNativeERC20Token,
+				Owner_:     polyBFTConfig.NativeTokenConfig.Owner,
+				RootToken_: polyBFTConfig.Bridge.RootNativeERC20Addr,
 				Name_:      polyBFTConfig.NativeTokenConfig.Name,
 				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
 				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
@@ -251,7 +321,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller,
+			if err = callContract(contracts.SystemCaller,
 				contracts.NativeERC20TokenContract, input, "NativeERC20Mintable", transition); err != nil {
 				return err
 			}
@@ -261,7 +331,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				Name_:      polyBFTConfig.NativeTokenConfig.Name,
 				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
 				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
-				RootToken_: rootNativeERC20Token,
+				RootToken_: polyBFTConfig.Bridge.RootNativeERC20Addr,
 				Predicate_: contracts.ChildERC20PredicateContract,
 			}
 
@@ -270,7 +340,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				return err
 			}
 
-			if err = initContract(contracts.SystemCaller,
+			if err = callContract(contracts.SystemCaller,
 				contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
 				return err
 			}
@@ -278,6 +348,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		return nil
 	}
+}
+
+func ForkManagerFactory(forks *chain.Forks) error {
+	// place fork manager handler registration here
+	return nil
 }
 
 // Initialize initializes the consensus (e.g. setup data)
@@ -353,18 +428,21 @@ func (p *Polybft) Start() error {
 		return fmt.Errorf("failed to start syncer. Error: %w", err)
 	}
 
-	// start syncing
-	go func() {
+	// sync concurrently, retrying indefinitely
+	go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
 		blockHandler := func(b *types.FullBlock) bool {
 			p.runtime.OnBlockInserted(b)
 
 			return false
 		}
-
 		if err := p.syncer.Sync(blockHandler); err != nil {
 			p.logger.Error("blocks synchronization failed", "error", err)
+
+			return err
 		}
-	}()
+
+		return nil
+	})
 
 	// start consensus runtime
 	if err := p.startRuntime(); err != nil {
@@ -542,12 +620,12 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	return p.verifyHeaderImpl(parent, header, nil)
+	return p.verifyHeaderImpl(parent, header, p.consensusConfig.BlockTimeDrift, nil)
 }
 
-func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, parents []*types.Header) error {
+func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift uint64, parents []*types.Header) error {
 	// validate header fields
-	if err := validateHeaderFields(parent, header); err != nil {
+	if err := validateHeaderFields(parent, header, blockTimeDrift); err != nil {
 		return fmt.Errorf("failed to validate header for block %d. error = %w", header.Number, err)
 	}
 
@@ -578,8 +656,41 @@ func (p *Polybft) GetBlockCreator(h *types.Header) (types.Address, error) {
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
-	// Not required
+func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error {
+	commitmentTxExists := false
+
+	validators, err := p.GetValidators(block.Number()-1, nil)
+	if err != nil {
+		return err
+	}
+
+	// validate commitment state transactions
+	for _, tx := range block.Transactions {
+		if tx.Type != types.StateTx {
+			continue
+		}
+
+		decodedStateTx, err := decodeStateTransaction(tx.Input)
+		if err != nil {
+			return fmt.Errorf("unknown state transaction: tx=%v, error: %w", tx.Hash, err)
+		}
+
+		if signedCommitment, ok := decodedStateTx.(*CommitmentMessageSigned); ok {
+			if commitmentTxExists {
+				return fmt.Errorf("only one commitment state tx is allowed per block: %v", tx.Hash)
+			}
+
+			commitmentTxExists = true
+
+			if err := verifyBridgeCommitmentTx(
+				tx.Hash,
+				signedCommitment,
+				validator.NewValidatorSet(validators, p.logger)); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

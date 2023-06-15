@@ -20,19 +20,19 @@ type TestValidators struct {
 	Validators map[string]*TestValidator
 }
 
-func NewTestValidators(t *testing.T, validatorsCount int) *TestValidators {
-	t.Helper()
+func NewTestValidators(tb testing.TB, validatorsCount int) *TestValidators {
+	tb.Helper()
 
 	aliases := make([]string, validatorsCount)
 	for i := 0; i < validatorsCount; i++ {
 		aliases[i] = strconv.Itoa(i)
 	}
 
-	return NewTestValidatorsWithAliases(t, aliases)
+	return NewTestValidatorsWithAliases(tb, aliases)
 }
 
-func NewTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers ...[]uint64) *TestValidators {
-	t.Helper()
+func NewTestValidatorsWithAliases(tb testing.TB, aliases []string, votingPowers ...[]uint64) *TestValidators {
+	tb.Helper()
 
 	validators := map[string]*TestValidator{}
 
@@ -42,7 +42,7 @@ func NewTestValidatorsWithAliases(t *testing.T, aliases []string, votingPowers .
 			votingPower = votingPowers[0][i]
 		}
 
-		validators[alias] = NewTestValidator(t, alias, votingPower)
+		validators[alias] = NewTestValidator(tb, alias, votingPower)
 	}
 
 	return &TestValidators{Validators: validators}
@@ -139,13 +139,13 @@ type TestValidator struct {
 	VotingPower uint64
 }
 
-func NewTestValidator(t *testing.T, alias string, votingPower uint64) *TestValidator {
-	t.Helper()
+func NewTestValidator(tb testing.TB, alias string, votingPower uint64) *TestValidator {
+	tb.Helper()
 
 	return &TestValidator{
 		Alias:       alias,
 		VotingPower: votingPower,
-		Account:     generateTestAccount(t),
+		Account:     generateTestAccount(tb),
 	}
 }
 
@@ -185,11 +185,11 @@ func (v *TestValidator) MustSign(hash, domain []byte) *bls.Signature {
 	return signature
 }
 
-func generateTestAccount(t *testing.T) *wallet.Account {
-	t.Helper()
+func generateTestAccount(tb testing.TB) *wallet.Account {
+	tb.Helper()
 
 	acc, err := wallet.GenerateAccount()
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return acc
 }

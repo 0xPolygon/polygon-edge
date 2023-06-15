@@ -23,12 +23,6 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	// minimum number of stateSyncEvents that a commitment can have
-	// (minimum number is 2 because smart contract expects that the merkle tree has at least two leaves)
-	minCommitmentSize = 2
-)
-
 type StateSyncProof struct {
 	Proof     []types.Hash
 	StateSync *contractsapi.StateSyncedEvent
@@ -96,15 +90,13 @@ type topic interface {
 }
 
 // newStateSyncManager creates a new instance of state sync manager
-func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) (*stateSyncManager, error) {
-	s := &stateSyncManager{
+func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) *stateSyncManager {
+	return &stateSyncManager{
 		logger:  logger,
 		state:   state,
 		config:  config,
 		closeCh: make(chan struct{}),
 	}
-
-	return s, nil
 }
 
 // Init subscribes to bridge topics (getting votes) and start the event tracker routine
@@ -503,17 +495,14 @@ func (s *stateSyncManager) buildCommitment() error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	epoch := s.epoch
-	fromIndex := s.nextCommittedIndex
-
-	stateSyncEvents, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(fromIndex,
-		fromIndex+s.config.maxCommitmentSize-1)
+	stateSyncEvents, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(s.nextCommittedIndex,
+		s.nextCommittedIndex+s.config.maxCommitmentSize-1)
 	if err != nil && !errors.Is(err, errNotEnoughStateSyncs) {
 		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
 	}
 
-	if len(stateSyncEvents) < minCommitmentSize {
-		// there is not enough state sync events to build at least the minimum commitment
+	if len(stateSyncEvents) == 0 {
+		// there are no state sync events
 		return nil
 	}
 
@@ -523,7 +512,7 @@ func (s *stateSyncManager) buildCommitment() error {
 		return nil
 	}
 
-	commitment, err := NewPendingCommitment(epoch, stateSyncEvents)
+	commitment, err := NewPendingCommitment(s.epoch, stateSyncEvents)
 	if err != nil {
 		return err
 	}
@@ -545,7 +534,7 @@ func (s *stateSyncManager) buildCommitment() error {
 		Signature: signature,
 	}
 
-	if _, err = s.state.StateSyncStore.insertMessageVote(epoch, hashBytes, sig); err != nil {
+	if _, err = s.state.StateSyncStore.insertMessageVote(s.epoch, hashBytes, sig); err != nil {
 		return fmt.Errorf(
 			"failed to insert signature for hash=%v to the state. Error: %w",
 			hex.EncodeToString(hashBytes),
@@ -558,7 +547,7 @@ func (s *stateSyncManager) buildCommitment() error {
 		Hash:        hashBytes,
 		Signature:   signature,
 		From:        s.config.key.String(),
-		EpochNumber: epoch,
+		EpochNumber: s.epoch,
 	})
 
 	s.logger.Debug(

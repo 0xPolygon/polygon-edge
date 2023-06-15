@@ -75,7 +75,7 @@ type TestClusterConfig struct {
 	Name                 string
 	Premine              []string // address[:amount]
 	PremineValidators    []string // address[:amount]
-	StakeAmounts         []string // address[:amount]
+	StakeAmounts         []*big.Int
 	WithoutBridge        bool
 	BootnodeCount        int
 	NonValidatorCount    int
@@ -385,7 +385,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochSize:     10,
 		EpochReward:   1,
 		BlockGasLimit: 1e7, // 10M
-		StakeAmounts:  []string{},
+		StakeAmounts:  []*big.Int{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -495,11 +495,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		// provide validators' stakes
-		for _, validatorStake := range cluster.Config.StakeAmounts {
-			args = append(args, "--stake", validatorStake)
-		}
-
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
 			args = append(args, "--contract-deployer-allow-list-admin",
 				strings.Join(sliceAddressToSliceString(cluster.Config.ContractDeployerAllowListAdmin), ","))
@@ -570,8 +565,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
 		require.NoError(t, err)
 
+		// deploy stake manager contract
+		err := cluster.Bridge.deployStakeManager(genesisPath)
+		require.NoError(t, err)
+
 		// deploy rootchain contracts
-		err := cluster.Bridge.deployRootchainContracts(genesisPath)
+		err = cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
 		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
@@ -906,7 +905,10 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	}
 
 	if txn.GasPrice == 0 {
-		txn.GasPrice = txrelayer.DefaultGasPrice
+		gasPrice, err := client.Eth().GasPrice()
+		require.NoError(t, err)
+
+		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
