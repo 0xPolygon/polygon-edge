@@ -60,6 +60,9 @@ type blockchainBackend interface {
 
 	// GetChainID returns chain id of the current blockchain
 	GetChainID() uint64
+
+	// GetReceiptsByHash retrieves receipts by hash
+	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -76,11 +79,7 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
-	if err := p.blockchain.WriteFullBlock(block, consensusSource); err != nil {
-		return err
-	}
-
-	return nil
+	return p.blockchain.WriteFullBlock(block, consensusSource)
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
@@ -188,6 +187,10 @@ func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 
 func (p *blockchainWrapper) GetChainID() uint64 {
 	return uint64(p.blockchain.Config().ChainID)
+}
+
+func (p *blockchainWrapper) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	return p.blockchain.GetReceiptsByHash(hash)
 }
 
 var _ contract.Provider = &stateProvider{}

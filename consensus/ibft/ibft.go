@@ -490,10 +490,10 @@ func (i *backendIBFT) GetBlockCreator(header *types.Header) (types.Address, erro
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (i *backendIBFT) PreCommitState(header *types.Header, txn *state.Transition) error {
-	hooks := i.forkManager.GetHooks(header.Number)
+func (i *backendIBFT) PreCommitState(block *types.Block, txn *state.Transition) error {
+	hooks := i.forkManager.GetHooks(block.Number())
 
-	return hooks.PreCommitState(header, txn)
+	return hooks.PreCommitState(block.Header, txn)
 }
 
 // GetEpoch returns the current epoch
