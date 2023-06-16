@@ -14,7 +14,7 @@ import (
 
 const couldNotFoundBlockFormat = "could not find block. Number: %d, Hash: %s"
 
-// Default config for gas helper (as per ethereum)
+// DefaultGasHelperConfig is the default config for gas helper (as per ethereum)
 var DefaultGasHelperConfig = &Config{
 	NumOfBlocksToCheck: 20,
 	PricePercentile:    60,
@@ -130,8 +130,8 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 		blockMiner := types.BytesToAddress(currentBlock.Header.Miner)
 		signer := crypto.NewSigner(g.backend.Config().Forks.At(currentBlock.Number()),
 			uint64(g.backend.Config().ChainID))
-
 		blockTxPrices := make([]*big.Int, 0)
+
 		for _, tx := range txSorter.txs {
 			tip := tx.EffectiveTip(baseFee)
 
@@ -193,6 +193,7 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 	}
 
 	var price *big.Int
+
 	if len(allPrices) > 0 {
 		// sort prices from lowest to highest
 		sort.Sort(bigIntSorted(allPrices))
