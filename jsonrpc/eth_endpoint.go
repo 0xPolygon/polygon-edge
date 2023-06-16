@@ -795,5 +795,10 @@ func (e *Eth) Unsubscribe(id string) (bool, error) {
 
 // MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
 func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
-	return e.store.MaxPriorityFeePerGas()
+	priorityFee, err := e.store.MaxPriorityFeePerGas()
+	if err != nil {
+		return nil, err
+	}
+
+	return argBigPtr(priorityFee), nil
 }
