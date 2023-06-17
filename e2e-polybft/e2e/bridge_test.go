@@ -656,7 +656,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
-		framework.WithNativeTokenConfig(fmt.Sprintf("Mintable Edge Coin:MEC:18:true:%s", adminAddr)),
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeBlockListAdmin(adminAddr),
 		framework.WithPremine(append(depositors, adminAddr)...)) //nolint:makezero

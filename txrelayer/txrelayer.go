@@ -111,14 +111,17 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			return ethgo.ZeroHash, err
 		}
 
+		fmt.Println("Tx relayer Gas Price", gasPrice, "To", txn.To)
 		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
-		gasLimit, err := t.estimateGasLimit(txn)
+		gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
 		if err != nil {
 			return ethgo.ZeroHash, err
 		}
+
+		fmt.Println("Tx relayer Gas Limit", gasLimit, "To", txn.To)
 
 		txn.Gas = gasLimit
 	}
@@ -155,7 +158,7 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 
 	txn.From = accounts[0]
 
-	gasLimit, err := t.estimateGasLimit(txn)
+	gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
 	if err != nil {
 		return nil, err
 	}
@@ -195,9 +198,9 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 	}
 }
 
-// estimateGasLimit returns estimated gas limit for the given transaction
-func (t *TxRelayerImpl) estimateGasLimit(txn *ethgo.Transaction) (uint64, error) {
-	callMsg := &ethgo.CallMsg{
+// ConvertTxnToCallMsg converts txn instance to call message
+func ConvertTxnToCallMsg(txn *ethgo.Transaction) *ethgo.CallMsg {
+	return &ethgo.CallMsg{
 		From:     txn.From,
 		To:       txn.To,
 		Data:     txn.Input,
@@ -205,8 +208,6 @@ func (t *TxRelayerImpl) estimateGasLimit(txn *ethgo.Transaction) (uint64, error)
 		Value:    txn.Value,
 		Gas:      big.NewInt(int64(txn.Gas)),
 	}
-
-	return t.client.Eth().EstimateGas(callMsg)
 }
 
 type TxRelayerOption func(*TxRelayerImpl)

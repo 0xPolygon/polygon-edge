@@ -871,7 +871,7 @@ func (c *TestCluster) Transfer(t *testing.T, sender ethgo.Key, target types.Addr
 
 	targetAddr := ethgo.Address(target)
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{To: &targetAddr, Value: value})
+	return c.SendTxn(t, sender, &ethgo.Transaction{From: sender.Address(), To: &targetAddr, Value: value})
 }
 
 func (c *TestCluster) MethodTxn(t *testing.T, sender ethgo.Key, target types.Address, input []byte) *TestTxn {
@@ -879,7 +879,7 @@ func (c *TestCluster) MethodTxn(t *testing.T, sender ethgo.Key, target types.Add
 
 	targetAddr := ethgo.Address(target)
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{To: &targetAddr, Input: input})
+	return c.SendTxn(t, sender, &ethgo.Transaction{From: sender.Address(), To: &targetAddr, Input: input})
 }
 
 // SendTxn sends a transaction
@@ -912,7 +912,12 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	}
 
 	if txn.Gas == 0 {
-		txn.Gas = txrelayer.DefaultGasLimit
+		callMsg := txrelayer.ConvertTxnToCallMsg(txn)
+
+		gasLimit, err := client.Eth().EstimateGas(callMsg)
+		require.NoError(t, err)
+
+		txn.Gas = gasLimit
 	}
 
 	chainID, err := client.Eth().ChainID()
@@ -928,13 +933,11 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	hash, err := client.Eth().SendRawTransaction(txnRaw)
 	require.NoError(t, err)
 
-	tTxn := &TestTxn{
+	return &TestTxn{
 		client: client.Eth(),
 		txn:    txn,
 		hash:   hash,
 	}
-
-	return tTxn
 }
 
 type TestTxn struct {
