@@ -192,7 +192,7 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 		}
 	}
 
-	var price *big.Int
+	price := lastPrice
 
 	if len(allPrices) > 0 {
 		// sort prices from lowest to highest
