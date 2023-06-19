@@ -137,7 +137,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 
 	if t.writer != nil {
 		_, _ = t.writer.Write([]byte(
-			fmt.Sprintf("[TRANSACTION DETAIL]\nFrom = %s \nGas = %d  \nGas Price = %d\n",
+			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\n",
 				txn.From, txn.Gas, txn.GasPrice)))
 	}
 
