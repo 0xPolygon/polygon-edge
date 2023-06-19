@@ -233,3 +233,5 @@ require (
 	gotest.tools/v3 v3.0.2 // indirect
 	inet.af/netaddr v0.0.0-20220811202034-502d2d690317 // indirect
 )
+
+replace github.com/umbracle/ethgo => github.com/Nemanja0x/ethgo v0.1.3-0.20230612102212-b7fd5e53367d
