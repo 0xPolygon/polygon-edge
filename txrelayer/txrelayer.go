@@ -203,7 +203,7 @@ func ConvertTxnToCallMsg(txn *ethgo.Transaction) *ethgo.CallMsg {
 		Data:     txn.Input,
 		GasPrice: txn.GasPrice,
 		Value:    txn.Value,
-		Gas:      big.NewInt(int64(txn.Gas)),
+		Gas:      new(big.Int).SetUint64(txn.Gas),
 	}
 }
 
