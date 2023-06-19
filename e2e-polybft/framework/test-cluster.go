@@ -863,7 +863,7 @@ func (c *TestCluster) Call(t *testing.T, to types.Address, method *abi.Method,
 func (c *TestCluster) Deploy(t *testing.T, sender ethgo.Key, bytecode []byte) *TestTxn {
 	t.Helper()
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{Input: bytecode})
+	return c.SendTxn(t, sender, &ethgo.Transaction{From: sender.Address(), Input: bytecode})
 }
 
 func (c *TestCluster) Transfer(t *testing.T, sender ethgo.Key, target types.Address, value *big.Int) *TestTxn {
@@ -915,9 +915,13 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 		callMsg := txrelayer.ConvertTxnToCallMsg(txn)
 
 		gasLimit, err := client.Eth().EstimateGas(callMsg)
-		require.NoError(t, err)
-
-		txn.Gas = gasLimit
+		if err != nil {
+			// gas estimation can fail in case an account is not allow-listed
+			// (fallback it to default gas limit in that case)
+			txn.Gas = txrelayer.DefaultGasLimit
+		} else {
+			txn.Gas = gasLimit
+		}
 	}
 
 	chainID, err := client.Eth().ChainID()

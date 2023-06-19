@@ -111,7 +111,6 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			return ethgo.ZeroHash, err
 		}
 
-		fmt.Println("Tx relayer Gas Price", gasPrice, "To", txn.To)
 		txn.GasPrice = gasPrice
 	}
 
@@ -120,8 +119,6 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		if err != nil {
 			return ethgo.ZeroHash, err
 		}
-
-		fmt.Println("Tx relayer Gas Limit", gasLimit, "To", txn.To)
 
 		txn.Gas = gasLimit
 	}
