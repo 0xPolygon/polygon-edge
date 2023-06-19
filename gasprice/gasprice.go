@@ -123,12 +123,12 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 	var allPrices []*big.Int
 
 	collectPrices := func(block *types.Block) error {
-		baseFee := currentBlock.Header.BaseFee
-		txSorter := newTxByEffectiveTipSorter(currentBlock.Transactions, baseFee)
+		baseFee := block.Header.BaseFee
+		txSorter := newTxByEffectiveTipSorter(block.Transactions, baseFee)
 		sort.Sort(txSorter)
 
-		blockMiner := types.BytesToAddress(currentBlock.Header.Miner)
-		signer := crypto.NewSigner(g.backend.Config().Forks.At(currentBlock.Number()),
+		blockMiner := types.BytesToAddress(block.Header.Miner)
+		signer := crypto.NewSigner(g.backend.Config().Forks.At(block.Number()),
 			uint64(g.backend.Config().ChainID))
 		blockTxPrices := make([]*big.Int, 0)
 
