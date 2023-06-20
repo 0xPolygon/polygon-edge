@@ -188,12 +188,10 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 
 	// at least amount of transactions to get
 	minNumOfTx := int(g.numOfBlocksToCheck) * 2
-	if len(allPrices) < minNumOfTx {
-		// collect some more blocks and transactions if not enough transactions were collected
-		for len(allPrices) < minNumOfTx && currentBlock.Number() > 0 {
-			if err := collectPrices(currentBlock); err != nil {
-				return nil, err
-			}
+	// collect some more blocks and transactions if not enough transactions were collected
+	for len(allPrices) < minNumOfTx && currentBlock.Number() > 0 {
+		if err := collectPrices(currentBlock); err != nil {
+			return nil, err
 		}
 	}
 
