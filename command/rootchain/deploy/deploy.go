@@ -573,7 +573,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 				results[i] = newDeployContractsResult(contract.name,
 					types.Address(receipt.ContractAddress),
-					receipt.TransactionHash)
+					receipt.TransactionHash,
+					receipt.GasUsed)
 
 				return nil
 			}
