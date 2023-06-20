@@ -334,24 +334,26 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	currentValidators := f.validators.Accounts()
-	nextValidators := f.validators.Accounts()
 
-	validateExtraData := func(transition *state.Transition) error {
-		if f.isEndOfEpoch {
-			if !extra.Validators.Equals(f.newValidatorsDelta) {
-				return errValidatorSetDeltaMismatch
-			}
-		} else if !extra.Validators.IsEmpty() {
-			// delta should be empty in non epoch ending blocks
-			return errValidatorsUpdateInNonEpochEnding
+	// validate validators delta
+	if f.isEndOfEpoch {
+		if !extra.Validators.Equals(f.newValidatorsDelta) {
+			return errValidatorSetDeltaMismatch
 		}
+	} else if !extra.Validators.IsEmpty() {
+		// delta should be empty in non epoch ending blocks
+		return errValidatorsUpdateInNonEpochEnding
+	}
 
-		nextValidators, err = f.getValidatorsTransition(extra.Validators)
-		if err != nil {
-			return err
-		}
+	nextValidators, err := f.getValidatorsTransition(extra.Validators)
+	if err != nil {
+		return err
+	}
 
-		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
+	// validate checkpoint data
+	if err := extra.Checkpoint.Validate(parentExtra.Checkpoint,
+		currentValidators, nextValidators, f.exitEventRootHash); err != nil {
+		return err
 	}
 
 	if f.logger.IsTrace() && block.Number() > 1 {
@@ -363,7 +365,7 @@ func (f *fsm) Validate(proposal []byte) error {
 		f.logger.Trace("[FSM Validate]", "Block", block.Number(), "parent validators", validators)
 	}
 
-	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
+	stateBlock, err := f.backend.ProcessBlock(f.parent, &block)
 	if err != nil {
 		return err
 	}
