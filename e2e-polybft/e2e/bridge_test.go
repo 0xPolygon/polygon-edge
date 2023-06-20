@@ -344,8 +344,8 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
 	require.NoError(t, err)
 
-	deployTxn := &ethgo.Transaction{To: nil, Input: contractsapi.RootERC721.Bytecode}
 	// deploy root ERC 721 token
+	deployTxn := &ethgo.Transaction{To: nil, Input: contractsapi.RootERC721.Bytecode}
 	receipt, err := rootchainTxRelayer.SendTransaction(deployTxn, rootchainDeployer)
 	require.NoError(t, err)
 
@@ -499,7 +499,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
 	require.NoError(t, err)
 
-	// Deploy root ERC 1155 token
+	// deploy root ERC 1155 token
 	deployTxn := &ethgo.Transaction{To: nil, Input: contractsapi.RootERC1155.Bytecode}
 	receipt, err := rootchainTxRelayer.SendTransaction(deployTxn, rootchainDeployer)
 	require.NoError(t, err)
