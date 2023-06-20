@@ -24,10 +24,10 @@ func TestForkManager(t *testing.T) {
 
 	forkManager := GetInstance()
 
-	forkManager.RegisterFork(ForkA)
-	forkManager.RegisterFork(ForkB)
-	forkManager.RegisterFork(ForkC)
-	forkManager.RegisterFork(ForkD)
+	forkManager.RegisterFork(ForkA, &ForkParams{EpochSize: 100})
+	forkManager.RegisterFork(ForkB, &ForkParams{EpochSize: 300})
+	forkManager.RegisterFork(ForkC, nil)
+	forkManager.RegisterFork(ForkD, &ForkParams{EpochSize: 200})
 
 	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "AAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkC, HandlerA, func() string { return "ACH" }))
@@ -156,6 +156,17 @@ func TestForkManager(t *testing.T) {
 
 		assert.Nil(t, forkManager.GetHandler(HandlerD, 0))
 	})
+
+	t.Run("get params", func(t *testing.T) {
+		t.Parallel()
+
+		for i := uint64(0); i < uint64(4); i++ {
+			assert.Equal(t, uint64(100), forkManager.GetParams(i).EpochSize)
+			assert.Equal(t, uint64(300), forkManager.GetParams(i+100).EpochSize)
+			assert.Equal(t, uint64(300), forkManager.GetParams(i+200).EpochSize)
+			assert.Equal(t, uint64(200), forkManager.GetParams(i+300).EpochSize)
+		}
+	})
 }
 
 func TestForkManager_Deactivate(t *testing.T) {
@@ -166,8 +177,8 @@ func TestForkManager_Deactivate(t *testing.T) {
 		handlersMap: map[HandlerDesc][]Handler{},
 	}
 
-	forkManager.RegisterFork(ForkA)
-	forkManager.RegisterFork(ForkB)
+	forkManager.RegisterFork(ForkA, nil)
+	forkManager.RegisterFork(ForkB, nil)
 
 	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "AAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkB, HandlerA, func() string { return "ABH" }))

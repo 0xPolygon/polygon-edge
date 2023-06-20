@@ -117,20 +117,25 @@ func (f *Forks) At(block uint64) ForksInTime {
 	}
 }
 
-type Fork uint64
+type Fork struct {
+	Block  uint64      `json:"block"`
+	Params interface{} `json:"params"`
+}
 
 func NewFork(n uint64) *Fork {
-	f := Fork(n)
+	f := Fork{
+		Block: n,
+	}
 
 	return &f
 }
 
 func (f Fork) Active(block uint64) bool {
-	return block >= uint64(f)
+	return block >= f.Block
 }
 
-func (f Fork) Int() *big.Int {
-	return big.NewInt(int64(f))
+func (f Fork) BigInt() *big.Int {
+	return new(big.Int).SetUint64(f.Block)
 }
 
 // ForksInTime should contain all supported forks by current edge version

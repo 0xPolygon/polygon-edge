@@ -27,6 +27,7 @@ type forkManager struct {
 
 	forkMap     map[string]*Fork
 	handlersMap map[HandlerDesc][]Handler
+	params      []*ForkParamsBlock
 }
 
 // GeInstance returns fork manager singleton instance. Thread safe
@@ -51,7 +52,7 @@ func (fm *forkManager) Clear() {
 }
 
 // RegisterFork registers fork by its name
-func (fm *forkManager) RegisterFork(name string) {
+func (fm *forkManager) RegisterFork(name string, forkParams *ForkParams) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -59,6 +60,7 @@ func (fm *forkManager) RegisterFork(name string) {
 		Name:            name,
 		FromBlockNumber: 0,
 		IsActive:        false,
+		Params:          forkParams,
 		Handlers:        map[HandlerDesc]interface{}{},
 	}
 }
@@ -100,6 +102,8 @@ func (fm *forkManager) ActivateFork(forkName string, blockNumber uint64) error {
 		fm.addHandler(forkHandlerName, blockNumber, forkHandler)
 	}
 
+	fm.addParams(blockNumber, fork.Params)
+
 	return nil
 }
 
@@ -124,6 +128,8 @@ func (fm *forkManager) DeactivateFork(forkName string) error {
 		fm.removeHandler(forkHandlerName, fork.FromBlockNumber)
 	}
 
+	fm.removeParams(fork.FromBlockNumber)
+
 	return nil
 }
 
@@ -146,6 +152,22 @@ func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interfac
 	}
 
 	return handlers[pos].Handler
+}
+
+// GetHandler retrieves handler for handler name and for a block number
+func (fm *forkManager) GetParams(blockNumber uint64) *ForkParams {
+	fm.lock.Lock()
+	defer fm.lock.Unlock()
+
+	// binary search to find the latest handler defined for a specific block
+	pos := sort.Search(len(fm.params), func(i int) bool {
+		return blockNumber < fm.params[i].FromBlockNumber
+	}) - 1
+	if pos < 0 {
+		return nil
+	}
+
+	return fm.params[pos].Params
 }
 
 // IsForkRegistered checks if fork is registered
@@ -221,9 +243,44 @@ func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64
 		return handlers[i].FromBlockNumber == blockNumber
 	})
 
-	if index != -1 {
+	if index < len(handlers) {
 		copy(handlers[index:], handlers[index+1:])
 		handlers[len(handlers)-1] = Handler{}
 		fm.handlersMap[handlerName] = handlers[:len(handlers)-1]
+	}
+}
+
+func (fm *forkManager) addParams(blockNumber uint64, params *ForkParams) {
+	if params == nil {
+		return
+	}
+
+	item := &ForkParamsBlock{FromBlockNumber: blockNumber, Params: params}
+
+	if len(fm.params) == 1 {
+		fm.params = append(fm.params, item)
+
+		return
+	}
+
+	// keep everything in sorted order
+	index := sort.Search(len(fm.params), func(i int) bool {
+		return fm.params[i].FromBlockNumber >= blockNumber
+	})
+
+	fm.params = append(fm.params, (*ForkParamsBlock)(nil))
+	copy(fm.params[index+1:], fm.params[index:])
+	fm.params[index] = item
+}
+
+func (fm *forkManager) removeParams(blockNumber uint64) {
+	index := sort.Search(len(fm.params), func(i int) bool {
+		return fm.params[i].FromBlockNumber == blockNumber
+	})
+
+	if index < len(fm.params) {
+		copy(fm.params[index:], fm.params[index+1:])
+		fm.params[len(fm.params)-1] = nil
+		fm.params = fm.params[:len(fm.params)-1]
 	}
 }
