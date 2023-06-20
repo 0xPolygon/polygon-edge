@@ -463,8 +463,7 @@ func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 	// exit root hash of proposer and
 	// validator that validates proposal have to match
 	if exitRootHash != c.EventRoot {
-		return fmt.Errorf("exit root hash not as expected. Expected: %s. Actual: %s",
-			exitRootHash, c.EventRoot)
+		return fmt.Errorf("exit root hash not as expected")
 	}
 
 	return nil
