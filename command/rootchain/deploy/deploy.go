@@ -427,6 +427,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
 				return nil, 0, err
 			}
+		} else {
+			// deploy MockERC20 as a root chain root native token
+			tokenContracts = append(tokenContracts,
+				&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
 		}
 	}
 
