@@ -82,9 +82,14 @@ type GasHelper struct {
 
 // NewGasHelper is the constructor function for GasHelper struct
 func NewGasHelper(config *Config, backend Backend) *GasHelper {
+	pricePercentile := config.PricePercentile
+	if pricePercentile > 100 {
+		pricePercentile = 100
+	}
+
 	return &GasHelper{
 		numOfBlocksToCheck: config.NumOfBlocksToCheck,
-		pricePercentile:    config.PricePercentile,
+		pricePercentile:    pricePercentile,
 		sampleNumber:       config.SampleNumber,
 		ignorePrice:        config.IgnorePrice,
 		lastPrice:          config.LastPrice,
@@ -136,7 +141,7 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 			tip := tx.EffectiveTip(baseFee)
 
 			if tip.Cmp(g.ignorePrice) == -1 {
-				// ignore transactions with tip lower then ignore price
+				// ignore transactions with tip lower than ignore price
 				continue
 			}
 
@@ -198,13 +203,13 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 		// sort prices from lowest to highest
 		sort.Sort(bigIntSorted(allPrices))
 		// take the biggest price that is in the configured percentage
-		// by default its 60, so it will take the price on that percentage
+		// by default it's 60, so it will take the price on that percentage
 		// of all prices in the array
 		price = allPrices[(len(allPrices)-1)*int(g.pricePercentile)/100]
 	}
 
 	if price.Cmp(g.maxPrice) > 0 {
-		// if price is larger then the configured max price
+		// if price is larger than the configured max price
 		// return max price
 		price = new(big.Int).Set(g.maxPrice)
 	}
