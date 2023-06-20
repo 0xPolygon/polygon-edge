@@ -38,11 +38,9 @@ const (
 	erc20TemplateName                 = "ERC20Template"
 	rootERC721PredicateName           = "RootERC721Predicate"
 	childERC721MintablePredicateName  = "ChildERC721MintablePredicate"
-	rootERC721Name                    = "RootERC721"
 	erc721TemplateName                = "ERC721Template"
 	rootERC1155PredicateName          = "RootERC1155Predicate"
 	childERC1155MintablePredicateName = "ChildERC1155MintablePredicate"
-	rootERC1155Name                   = "RootERC1155"
 	erc1155TemplateName               = "ERC1155Template"
 	customSupernetManagerName         = "CustomSupernetManager"
 )
@@ -90,9 +88,6 @@ var (
 		childERC721MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC721PredicateAddress = addr
 		},
-		rootERC721Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootERC721Address = addr
-		},
 		erc721TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ERC721TemplateAddress = addr
 		},
@@ -101,9 +96,6 @@ var (
 		},
 		childERC1155MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC1155PredicateAddress = addr
-		},
-		rootERC1155Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootERC1155Address = addr
 		},
 		erc1155TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ERC1155TemplateAddress = addr
@@ -274,20 +266,6 @@ func GetCommand() *cobra.Command {
 		"existing root chain root native token address",
 	)
 
-	cmd.Flags().StringVar(
-		&params.rootERC721TokenAddr,
-		erc721AddrFlag,
-		"",
-		"existing root chain ERC 721 token address",
-	)
-
-	cmd.Flags().StringVar(
-		&params.rootERC1155TokenAddr,
-		erc1155AddrFlag,
-		"",
-		"existing root chain ERC 1155 token address",
-	)
-
 	cmd.Flags().BoolVar(
 		&params.isTestMode,
 		helper.TestModeFlag,
@@ -449,35 +427,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
 				return nil, 0, err
 			}
-		} else {
-			// deploy MockERC20 as a root chain root native token
-			tokenContracts = append(tokenContracts,
-				&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
 		}
-	}
-
-	if params.rootERC721TokenAddr != "" {
-		// use existing root chain ERC721 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC721TokenAddr, rootERC721Name, rootchainConfig); err != nil {
-			return nil, 0, err
-		}
-	} else {
-		// deploy MockERC721 as a default root chain ERC721 token
-		tokenContracts = append(tokenContracts,
-			&contractInfo{name: rootERC721Name, artifact: contractsapi.RootERC721})
-	}
-
-	if params.rootERC1155TokenAddr != "" {
-		// use existing root chain ERC1155 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC1155TokenAddr, rootERC1155Name, rootchainConfig); err != nil {
-			return nil, 0, err
-		}
-	} else {
-		// deploy MockERC1155 as a default root chain ERC1155 token
-		tokenContracts = append(tokenContracts,
-			&contractInfo{name: rootERC1155Name, artifact: contractsapi.RootERC1155})
 	}
 
 	allContracts := []*contractInfo{

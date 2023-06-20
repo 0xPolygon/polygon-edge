@@ -17,15 +17,13 @@ const (
 )
 
 type deployParams struct {
-	genesisPath          string
-	deployerKey          string
-	jsonRPCAddress       string
-	stakeTokenAddr       string
-	rootERC20TokenAddr   string
-	rootERC721TokenAddr  string
-	rootERC1155TokenAddr string
-	stakeManagerAddr     string
-	isTestMode           bool
+	genesisPath        string
+	deployerKey        string
+	jsonRPCAddress     string
+	stakeTokenAddr     string
+	rootERC20TokenAddr string
+	stakeManagerAddr   string
+	isTestMode         bool
 }
 
 func (ip *deployParams) validateFlags() error {

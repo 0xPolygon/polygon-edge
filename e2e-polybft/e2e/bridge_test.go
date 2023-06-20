@@ -338,13 +338,26 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
+	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
+	require.NoError(t, err)
+
+	deployTxn := &ethgo.Transaction{To: nil, Input: contractsapi.RootERC721.Bytecode}
+	// deploy root ERC 721 token
+	receipt, err := rootchainTxRelayer.SendTransaction(deployTxn, rootchainDeployer)
+	require.NoError(t, err)
+
+	rootERC721Addr := receipt.ContractAddress
+
 	// DEPOSIT ERC721 TOKENS
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
 		cluster.Bridge.Deposit(
 			common.ERC721,
-			polybftCfg.Bridge.RootERC721Addr,
+			types.Address(rootERC721Addr),
 			polybftCfg.Bridge.RootERC721PredicateAddr,
 			rootHelper.TestAccountPrivKey,
 			strings.Join(receivers[:], ","),
@@ -377,7 +390,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 	// retrieve child token address
 	rootToChildTokenFn := contractsapi.ChildERC721Predicate.Abi.Methods["rootTokenToChildToken"]
-	input, err := rootToChildTokenFn.Encode([]interface{}{polybftCfg.Bridge.RootERC721Addr})
+	input, err := rootToChildTokenFn.Encode([]interface{}{rootERC721Addr})
 	require.NoError(t, err)
 
 	childTokenRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC721PredicateContract), input)
@@ -393,9 +406,6 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	t.Log("Deposits were successfully processed")
 
 	// WITHDRAW ERC721 TOKENS
-	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
 	for i, receiverKey := range receiverKeys {
 		// send withdraw transactions
 		err = cluster.Bridge.Withdraw(
@@ -433,7 +443,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 	// assert that owners of given token ids are the accounts on the root chain ERC 721 token
 	for i, receiver := range receiversAddrs {
-		owner := erc721OwnerOf(t, big.NewInt(int64(i)), polybftCfg.Bridge.RootERC721Addr, rootchainTxRelayer)
+		owner := erc721OwnerOf(t, big.NewInt(int64(i)), types.Address(rootERC721Addr), rootchainTxRelayer)
 		require.Equal(t, receiver, owner)
 	}
 }
@@ -483,13 +493,26 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
+	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
+	require.NoError(t, err)
+
+	// Deploy root ERC 1155 token
+	deployTxn := &ethgo.Transaction{To: nil, Input: contractsapi.RootERC1155.Bytecode}
+	receipt, err := rootchainTxRelayer.SendTransaction(deployTxn, rootchainDeployer)
+	require.NoError(t, err)
+
+	rootERC1155Addr := receipt.ContractAddress
+
 	// DEPOSIT ERC1155 TOKENS
 	// send a few transactions to the bridge
 	require.NoError(
 		t,
 		cluster.Bridge.Deposit(
 			common.ERC1155,
-			polybftCfg.Bridge.RootERC1155Addr,
+			types.Address(rootERC1155Addr),
 			polybftCfg.Bridge.RootERC1155PredicateAddr,
 			rootHelper.TestAccountPrivKey,
 			strings.Join(receivers[:], ","),
@@ -522,7 +545,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 
 	// retrieve child token address
 	rootToChildTokenFn := contractsapi.ChildERC1155Predicate.Abi.Methods["rootTokenToChildToken"]
-	input, err := rootToChildTokenFn.Encode([]interface{}{polybftCfg.Bridge.RootERC1155Addr})
+	input, err := rootToChildTokenFn.Encode([]interface{}{rootERC1155Addr})
 	require.NoError(t, err)
 
 	childTokenRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC1155PredicateContract), input)
@@ -552,9 +575,6 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	t.Log("Deposits were successfully processed")
 
 	// WITHDRAW ERC1155 TOKENS
-	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
-	require.NoError(t, err)
-
 	senderAccount, err := sidechain.GetAccountFromDir(cluster.Servers[0].DataDir())
 	require.NoError(t, err)
 
@@ -606,8 +626,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		balanceInput, err := balanceOfFn.EncodeAbi()
 		require.NoError(t, err)
 
-		balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress,
-			ethgo.Address(polybftCfg.Bridge.RootERC1155Addr), balanceInput)
+		balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, rootERC1155Addr, balanceInput)
 		require.NoError(t, err)
 
 		balance, err := types.ParseUint256orHex(&balanceRaw)
