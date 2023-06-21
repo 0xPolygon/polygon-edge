@@ -30,7 +30,7 @@ type Params struct {
 
 	// Governance contract where the token will be sent to and burn in london fork
 	BurnContract map[uint64]string `json:"burnContract"`
-	// Destination adress to initialize default burn contract with
+	// Destination address to initialize default burn contract with
 	BurnContractDestinationAddress string `json:"burnContractDestinationAddress,omitempty"`
 }
 

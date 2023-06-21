@@ -153,7 +153,7 @@ func parseBurnContractInfo(burnContractInfoRaw string) (uint64, types.Address, t
 			fmt.Errorf("failed to parse destination address %s: %w", destinationAddress, err)
 	}
 
-	return block.Uint64(), types.StringToAddress(contractAddress), types.StringToAddress(burnContractParts[2]), nil
+	return block.Uint64(), types.StringToAddress(contractAddress), types.StringToAddress(destinationAddress), nil
 }
 
 // GetValidatorKeyFiles returns file names which has validator secrets

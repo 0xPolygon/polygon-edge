@@ -174,9 +174,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 	// burn contract can be set only for non mintable native token
 	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) == 1 {
+		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
 		block, address, destAddr, err := parseBurnContractInfo(p.burnContracts[0])
 		if err != nil {
@@ -185,10 +185,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 		chainConfig.Params.BurnContract[block] = address.String()
 		chainConfig.Params.BurnContractDestinationAddress = destAddr.String()
-
-	} else {
-		// if native token is mintable or burn contract is not set, add zero address as burn address
-		chainConfig.Params.BurnContract[0] = types.ZeroAddress.String()
 	}
 
 	// deploy genesis contracts
@@ -295,8 +291,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
-	chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+	if len(p.burnContracts) > 0 {
+		// only populate base fee and base fee multiplier values if burn contract(s)
+		// is provided
+		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
@@ -361,13 +361,14 @@ func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
 				address:  contracts.NativeERC20TokenContract,
 			})
 
-		// burn contract can be set only for non mintable native token. If set, default EIP1559 contract should be deployed,
-		// otherwise zero address will be used as a burn address and contract would not be deployed
-		if len(chainConfig.Params.BurnContract) == 1 && chainConfig.Params.BurnContractDestinationAddress != "" {
+		// burn contract can be set only for non mintable native token. If burn contract is set,
+		// default EIP1559 contract will be deployed.
+		if chainConfig.Params.BurnContract != nil && len(chainConfig.Params.BurnContract) == 1 {
 			var contractAddress types.Address
 			for _, address := range chainConfig.Params.BurnContract {
 				contractAddress = types.StringToAddress(address)
 			}
+
 			genesisContracts = append(genesisContracts,
 				&contractInfo{
 					artifact: contractsapi.EIP1559Burn,
