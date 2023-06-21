@@ -72,7 +72,7 @@ var (
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
-	if err := forkmanager.ForkManagerInit(polybft.ForkManagerFactory, chain.AllForksEnabled); err != nil {
+	if err := forkmanager.ForkManagerInit(nil, polybft.ForkManagerFactory, chain.AllForksEnabled); err != nil {
 		return err
 	}
 

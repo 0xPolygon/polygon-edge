@@ -1,11 +1,9 @@
 package forkmanager
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const InitialFork = "initialfork"
@@ -14,30 +12,13 @@ const InitialFork = "initialfork"
 // eq: "extra", "proposer_calculator", etc
 type HandlerDesc string
 
-// ForkParams hard-coded fork params
-type ForkParams struct {
-	// MaxValidatorSetSize indicates the maximum size of validator set
-	MaxValidatorSetSize uint64 `json:"maxValidatorSetSize"`
-
-	EpochSize uint64 `json:"epochSize"`
-
-	// SprintSize is size of sprint
-	SprintSize uint64 `json:"sprintSize"`
-
-	// BlockTime is target frequency of blocks production
-	BlockTime common.Duration `json:"blockTime"`
-
-	// BlockTimeDrift defines the time slot in which a new block can be created
-	BlockTimeDrift uint64 `json:"blockTimeDrift"`
-}
-
 // Fork structure defines one fork
 type Fork struct {
 	// name of the fork
 	Name string
 	// after the fork is activated, `FromBlockNumber` shows from which block is enabled
 	FromBlockNumber uint64
-	Params          *ForkParams
+	Params          *chain.ForkParams
 	// this value is false if fork is registered but not activated
 	IsActive bool
 	// map of all handlers registered for this fork
@@ -56,10 +37,13 @@ type ForkParamsBlock struct {
 	// Params should be active from block `FromBlockNumber``
 	FromBlockNumber uint64
 	// actual params
-	Params *ForkParams
+	Params *chain.ForkParams
 }
 
-func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error {
+func ForkManagerInit(
+	initialParams *chain.ForkParams,
+	factory func(*chain.Forks) error,
+	forks *chain.Forks) error {
 	if factory == nil {
 		return nil
 	}
@@ -68,39 +52,25 @@ func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error
 	fm.Clear()
 
 	// register initial fork
-	fm.RegisterFork(InitialFork, nil)
-
-	var (
-		forkParams *ForkParams
-		ok         bool
-	)
+	fm.RegisterFork(InitialFork, initialParams)
 
 	// Register forks
 	for name, f := range *forks {
 		// check if fork is not supported by current edge version
-		if _, ok = (*chain.AllForksEnabled)[name]; !ok {
+		if _, found := (*chain.AllForksEnabled)[name]; !found {
 			return fmt.Errorf("fork is not available: %s", name)
 		}
 
-		if dt := f.Params; dt != nil {
-			customJSON, err := json.Marshal(dt)
-			if err != nil {
-				return fmt.Errorf("fork params error: %s, %w", name, err)
-			}
-
-			if err = json.Unmarshal(customJSON, &forkParams); err != nil {
-				return fmt.Errorf("fork params error: %s, %w", name, err)
-			}
+		if f != nil {
+			fm.RegisterFork(name, f.Params)
+		} else {
+			fm.RegisterFork(name, nil)
 		}
-
-		fm.RegisterFork(name, forkParams)
 	}
 
 	// Register handlers and additional forks here
-	if factory != nil {
-		if err := factory(forks); err != nil {
-			return err
-		}
+	if err := factory(forks); err != nil {
+		return err
 	}
 
 	// Activate initial fork

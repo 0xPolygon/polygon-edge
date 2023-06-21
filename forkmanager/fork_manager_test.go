@@ -3,6 +3,7 @@ package forkmanager
 import (
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -24,10 +25,10 @@ func TestForkManager(t *testing.T) {
 
 	forkManager := GetInstance()
 
-	forkManager.RegisterFork(ForkA, &ForkParams{EpochSize: 100})
-	forkManager.RegisterFork(ForkB, &ForkParams{EpochSize: 300})
+	forkManager.RegisterFork(ForkA, &chain.ForkParams{EpochSize: 100})
+	forkManager.RegisterFork(ForkB, &chain.ForkParams{EpochSize: 300})
 	forkManager.RegisterFork(ForkC, nil)
-	forkManager.RegisterFork(ForkD, &ForkParams{EpochSize: 200})
+	forkManager.RegisterFork(ForkD, &chain.ForkParams{EpochSize: 200})
 
 	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "AAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkC, HandlerA, func() string { return "ACH" }))
@@ -177,8 +178,8 @@ func TestForkManager_Deactivate(t *testing.T) {
 		handlersMap: map[HandlerDesc][]Handler{},
 	}
 
-	forkManager.RegisterFork(ForkA, nil)
-	forkManager.RegisterFork(ForkB, nil)
+	forkManager.RegisterFork(ForkA, &chain.ForkParams{MaxValidatorSetSize: 1})
+	forkManager.RegisterFork(ForkB, &chain.ForkParams{MaxValidatorSetSize: 2})
 
 	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "AAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkB, HandlerA, func() string { return "ABH" }))
@@ -187,12 +188,15 @@ func TestForkManager_Deactivate(t *testing.T) {
 	assert.NoError(t, forkManager.ActivateFork(ForkB, 0))
 
 	assert.Equal(t, 2, len(forkManager.handlersMap[HandlerA]))
+	assert.Equal(t, 2, len(forkManager.params))
 
 	assert.NoError(t, forkManager.DeactivateFork(ForkA))
 
 	assert.Equal(t, 1, len(forkManager.handlersMap[HandlerA]))
+	assert.Equal(t, 1, len(forkManager.params))
 
 	assert.NoError(t, forkManager.DeactivateFork(ForkB))
 
 	assert.Equal(t, 0, len(forkManager.handlersMap[HandlerA]))
+	assert.Equal(t, 0, len(forkManager.params))
 }

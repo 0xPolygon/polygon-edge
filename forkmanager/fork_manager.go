@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/0xPolygon/polygon-edge/chain"
 )
 
 /*
@@ -52,7 +54,7 @@ func (fm *forkManager) Clear() {
 }
 
 // RegisterFork registers fork by its name
-func (fm *forkManager) RegisterFork(name string, forkParams *ForkParams) {
+func (fm *forkManager) RegisterFork(name string, forkParams *chain.ForkParams) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -155,7 +157,7 @@ func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interfac
 }
 
 // GetHandler retrieves handler for handler name and for a block number
-func (fm *forkManager) GetParams(blockNumber uint64) *ForkParams {
+func (fm *forkManager) GetParams(blockNumber uint64) *chain.ForkParams {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -250,7 +252,7 @@ func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64
 	}
 }
 
-func (fm *forkManager) addParams(blockNumber uint64, params *ForkParams) {
+func (fm *forkManager) addParams(blockNumber uint64, params *chain.ForkParams) {
 	if params == nil {
 		return
 	}
@@ -259,18 +261,16 @@ func (fm *forkManager) addParams(blockNumber uint64, params *ForkParams) {
 
 	if len(fm.params) == 1 {
 		fm.params = append(fm.params, item)
+	} else {
+		// keep everything in sorted order
+		index := sort.Search(len(fm.params), func(i int) bool {
+			return fm.params[i].FromBlockNumber >= blockNumber
+		})
 
-		return
+		fm.params = append(fm.params, (*ForkParamsBlock)(nil))
+		copy(fm.params[index+1:], fm.params[index:])
+		fm.params[index] = item
 	}
-
-	// keep everything in sorted order
-	index := sort.Search(len(fm.params), func(i int) bool {
-		return fm.params[i].FromBlockNumber >= blockNumber
-	})
-
-	fm.params = append(fm.params, (*ForkParamsBlock)(nil))
-	copy(fm.params[index+1:], fm.params[index:])
-	fm.params[index] = item
 }
 
 func (fm *forkManager) removeParams(blockNumber uint64) {

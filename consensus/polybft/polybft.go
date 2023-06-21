@@ -435,6 +435,21 @@ func (p *Polybft) Initialize() error {
 	return nil
 }
 
+func ForkManagerInitialParamsFactory(config *chain.Chain) (*chain.ForkParams, error) {
+	pbftConfig, err := GetPolyBFTConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &chain.ForkParams{
+		MaxValidatorSetSize: pbftConfig.MaxValidatorSetSize,
+		EpochSize:           pbftConfig.EpochSize,
+		SprintSize:          pbftConfig.SprintSize,
+		BlockTime:           pbftConfig.BlockTime,
+		BlockTimeDrift:      pbftConfig.BlockTimeDrift,
+	}, nil
+}
+
 // Start starts the consensus and servers
 func (p *Polybft) Start() error {
 	p.logger.Info("starting polybft consensus", "signer", p.key.String())
