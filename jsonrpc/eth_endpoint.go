@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -79,6 +80,7 @@ type ethStore interface {
 	ethStateStore
 	ethBlockchainStore
 	ethFilter
+	gasprice.GasStore
 }
 
 // Eth is the eth jsonrpc endpoint
@@ -789,4 +791,14 @@ func (e *Eth) UninstallFilter(id string) (bool, error) {
 // Unsubscribe uninstalls a filter in a websocket
 func (e *Eth) Unsubscribe(id string) (bool, error) {
 	return e.filterManager.Uninstall(id), nil
+}
+
+// MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
+func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
+	priorityFee, err := e.store.MaxPriorityFeePerGas()
+	if err != nil {
+		return nil, err
+	}
+
+	return argBigPtr(priorityFee), nil
 }
