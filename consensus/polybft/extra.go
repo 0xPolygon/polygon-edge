@@ -426,7 +426,8 @@ func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
 // Validate encapsulates validation logic for checkpoint data
 // (with regards to current and next epoch validators)
 func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
-	currentValidators validator.AccountSet, nextValidators validator.AccountSet) error {
+	currentValidators validator.AccountSet, nextValidators validator.AccountSet,
+	exitRootHash types.Hash) error {
 	if err := c.ValidateBasic(parentCheckpoint); err != nil {
 		return err
 	}
@@ -457,6 +458,12 @@ func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 		// epoch ending blocks should have the same epoch number as parent block
 		// (as they belong to the same epoch)
 		return fmt.Errorf("epoch number should not change for epoch-ending block")
+	}
+
+	// exit root hash of proposer and
+	// validator that validates proposal have to match
+	if exitRootHash != c.EventRoot {
+		return fmt.Errorf("exit root hash not as expected")
 	}
 
 	return nil

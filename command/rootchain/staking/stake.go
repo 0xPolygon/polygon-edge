@@ -163,7 +163,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
-		result.amount = stakeAddedEvent.Amount.Uint64()
+		result.amount = stakeAddedEvent.Amount
 		result.validatorAddress = stakeAddedEvent.Validator.String()
 		foundLog = true
 

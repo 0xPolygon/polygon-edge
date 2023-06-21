@@ -710,6 +710,69 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestFSM_Validate_ExitEventRootNotExpected(t *testing.T) {
+	t.Parallel()
+
+	const (
+		accountsCount     = 5
+		parentBlockNumber = 25
+		signaturesCount   = 3
+	)
+
+	validators := validator.NewTestValidators(t, accountsCount)
+	parentExtra := createTestExtraObject(validators.GetPublicIdentities(), validator.AccountSet{}, 4, signaturesCount, signaturesCount)
+	parentExtra.Validators = nil
+
+	parent := &types.Header{
+		Number:    parentBlockNumber,
+		ExtraData: parentExtra.MarshalRLPTo(nil),
+	}
+	parent.ComputeHash()
+
+	polybftBackendMock := new(polybftBackendMock)
+	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.GetPublicIdentities(), nil).Once()
+
+	extra := createTestExtraObject(validators.GetPublicIdentities(), validator.AccountSet{}, 4, signaturesCount, signaturesCount)
+	extra.Validators = nil
+	parentCheckpointHash, err := extra.Checkpoint.Hash(0, parentBlockNumber, parent.Hash)
+	require.NoError(t, err)
+
+	currentValSetHash, err := validators.GetPublicIdentities().Hash()
+	require.NoError(t, err)
+
+	extra.Parent = createSignature(t, validators.GetPrivateIdentities(), parentCheckpointHash, bls.DomainCheckpointManager)
+	extra.Checkpoint.EpochNumber = 1
+	extra.Checkpoint.CurrentValidatorsHash = currentValSetHash
+	extra.Checkpoint.NextValidatorsHash = currentValSetHash
+
+	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, extra.MarshalRLPTo(nil))
+
+	proposalHash, err := extra.Checkpoint.Hash(0, stateBlock.Block.Number(), stateBlock.Block.Hash())
+	require.NoError(t, err)
+
+	stateBlock.Block.Header.Hash = proposalHash
+	stateBlock.Block.Header.ParentHash = parent.Hash
+	stateBlock.Block.Header.Timestamp = uint64(time.Now().UTC().Unix())
+	stateBlock.Block.Transactions = []*types.Transaction{}
+
+	proposal := stateBlock.Block.MarshalRLP()
+
+	fsm := &fsm{
+		parent:            parent,
+		backend:           new(blockchainMock),
+		validators:        validators.ToValidatorSet(),
+		logger:            hclog.NewNullLogger(),
+		polybftBackend:    polybftBackendMock,
+		config:            &PolyBFTConfig{BlockTimeDrift: 1},
+		exitEventRootHash: types.BytesToHash([]byte{0, 1, 2, 3, 4}), // expect this to be in proposal extra
+	}
+
+	err = fsm.Validate(proposal)
+	require.ErrorContains(t, err, "exit root hash not as expected")
+
+	polybftBackendMock.AssertExpectations(t)
+}
+
 func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 	t.Parallel()
 
@@ -763,7 +826,7 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 	proposal := stateBlock.Block.MarshalRLP()
 
 	blockchainMock := new(blockchainMock)
-	blockchainMock.On("ProcessBlock", mock.Anything, mock.Anything, mock.Anything).
+	blockchainMock.On("ProcessBlock", mock.Anything, mock.Anything).
 		Return(stateBlock, error(nil)).
 		Maybe()
 
@@ -854,7 +917,7 @@ func TestFSM_Validate_EpochEndingBlock_UpdatingValidatorSetInNonEpochEndingBlock
 	proposal := stateBlock.Block.MarshalRLP()
 
 	blockchainMock := new(blockchainMock)
-	blockchainMock.On("ProcessBlock", mock.Anything, mock.Anything, mock.Anything).
+	blockchainMock.On("ProcessBlock", mock.Anything, mock.Anything).
 		Return(stateBlock, error(nil)).
 		Maybe()
 
@@ -1062,7 +1125,7 @@ func TestFSM_Insert_Good(t *testing.T) {
 		builderMock := newBlockBuilderMock(builtBlock)
 		chainMock := &blockchainMock{}
 		chainMock.On("CommitBlock", mock.Anything).Return(error(nil)).Once()
-		chainMock.On("ProcessBlock", mock.Anything, mock.Anything, mock.Anything).
+		chainMock.On("ProcessBlock", mock.Anything, mock.Anything).
 			Return(builtBlock, error(nil)).
 			Maybe()
 
@@ -1362,8 +1425,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	txns = append(txns,
 		createStateTransactionWithData(contracts.StateReceiverContract, inputData))
 
-	err = f.VerifyStateTransactions(txns)
-	require.ErrorContains(t, err, "invalid signature for tx")
+	require.ErrorContains(t, f.VerifyStateTransactions(txns), "invalid signature for state tx")
 }
 
 func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {

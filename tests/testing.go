@@ -186,7 +186,7 @@ func (e *env) ToEnv(t *testing.T) runtime.TxContext {
 
 func buildState(
 	allocs map[types.Address]*chain.GenesisAccount,
-) (state.State, state.Snapshot, types.Hash) {
+) (state.State, state.Snapshot, types.Hash, error) {
 	s := itrie.NewState(itrie.NewMemoryStorage())
 	snap := s.NewSnapshot()
 
@@ -206,10 +206,14 @@ func buildState(
 		}
 	}
 
-	objs := txn.Commit(false)
+	objs, err := txn.Commit(false)
+	if err != nil {
+		return nil, nil, types.ZeroHash, err
+	}
+
 	snap, root := snap.Commit(objs)
 
-	return s, snap, types.BytesToHash(root)
+	return s, snap, types.BytesToHash(root), nil
 }
 
 type indexes struct {

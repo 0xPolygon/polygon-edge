@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Check if jq is installed
+if [[ "$1" == "polybft" ]] && ! command -v jq >/dev/null 2>&1; then
+  echo "jq is not installed. Please install it manually and run the script again."
+  echo "Manual installation instructions: Visit https://jqlang.github.io/jq/ for more information."
+  exit 1
+fi
+
 function initIbftConsensus() {
   echo "Running with ibft consensus"
   ./polygon-edge secrets init --insecure --data-dir test-chain- --num 4
@@ -29,7 +36,8 @@ function createGenesis() {
     --premine 0x0000000000000000000000000000000000000000 \
     --epoch-size 10 \
     --burn-contract 0:0x0000000000000000000000000000000000000000 \
-    --reward-wallet 0xDEADBEEF:1000000
+    --reward-wallet 0xDEADBEEF:1000000 \
+    --native-token-config "Polygon:MATIC:18:true:$address1"
 }
 
 function initRootchain() {

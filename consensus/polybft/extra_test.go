@@ -646,6 +646,7 @@ func TestCheckpointData_Validate(t *testing.T) {
 		nextValidators        validator.AccountSet
 		currentValidatorsHash types.Hash
 		nextValidatorsHash    types.Hash
+		exitRootHash          types.Hash
 		errString             string
 	}{
 		{
@@ -713,6 +714,17 @@ func TestCheckpointData_Validate(t *testing.T) {
 			nextValidatorsHash:    nextValidatorsHash,
 			errString:             "epoch number should not change for epoch-ending block",
 		},
+		{
+			name:                  "Invalid exit root hash",
+			parentEpochNumber:     2,
+			epochNumber:           2,
+			currentValidators:     currentValidators,
+			nextValidators:        currentValidators,
+			currentValidatorsHash: currentValidatorsHash,
+			nextValidatorsHash:    currentValidatorsHash,
+			exitRootHash:          types.BytesToHash([]byte{0, 1, 2, 3, 4, 5, 6, 7}),
+			errString:             "exit root hash not as expected",
+		},
 	}
 
 	for _, c := range cases {
@@ -723,9 +735,10 @@ func TestCheckpointData_Validate(t *testing.T) {
 				EpochNumber:           c.epochNumber,
 				CurrentValidatorsHash: c.currentValidatorsHash,
 				NextValidatorsHash:    c.nextValidatorsHash,
+				EventRoot:             c.exitRootHash,
 			}
 			parentCheckpoint := &CheckpointData{EpochNumber: c.parentEpochNumber}
-			err := checkpoint.Validate(parentCheckpoint, c.currentValidators, c.nextValidators)
+			err := checkpoint.Validate(parentCheckpoint, c.currentValidators, c.nextValidators, types.ZeroHash)
 
 			if c.errString != "" {
 				require.ErrorContains(t, err, c.errString)

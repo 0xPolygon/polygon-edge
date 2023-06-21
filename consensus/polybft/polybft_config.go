@@ -104,6 +104,8 @@ type BridgeConfig struct {
 	StakeManagerAddr                  types.Address `json:"stakeManagerAddr"`
 	// only populated if stake-manager-deploy command is executed, and used for e2e tests
 	StakeTokenAddr types.Address `json:"stakeTokenAddr,omitempty"`
+	BLSAddress     types.Address `json:"blsAddr"`
+	BN256G2Address types.Address `json:"bn256G2Addr"`
 
 	JSONRPCEndpoint         string                   `json:"jsonRPCEndpoint"`
 	EventTrackerStartBlocks map[types.Address]uint64 `json:"eventTrackerStartBlocks"`
@@ -158,15 +160,18 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		ChildMintableERC1155PredicateAddr: r.ChildMintableERC1155PredicateAddress,
 		CustomSupernetManagerAddr:         r.CustomSupernetManagerAddress,
 		StakeManagerAddr:                  r.StakeManagerAddress,
+		BLSAddress:                        r.BLSAddress,
+		BN256G2Address:                    r.BN256G2Address,
 	}
 }
 
 // TokenConfig is the configuration of native token used by edge network
 type TokenConfig struct {
-	Name       string `json:"name"`
-	Symbol     string `json:"symbol"`
-	Decimals   uint8  `json:"decimals"`
-	IsMintable bool   `json:"isMintable"`
+	Name       string        `json:"name"`
+	Symbol     string        `json:"symbol"`
+	Decimals   uint8         `json:"decimals"`
+	IsMintable bool          `json:"isMintable"`
+	Owner      types.Address `json:"owner"`
 }
 
 type RewardsConfig struct {

@@ -29,7 +29,7 @@ type Consensus interface {
 	GetBlockCreator(header *types.Header) (types.Address, error)
 
 	// PreCommitState a hook to be called before finalizing state transition on inserting block
-	PreCommitState(header *types.Header, txn *state.Transition) error
+	PreCommitState(block *types.Block, txn *state.Transition) error
 
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression

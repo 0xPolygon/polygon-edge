@@ -40,14 +40,8 @@ func (m *blockchainMock) NewBlockBuilder(parent *types.Header, coinbase types.Ad
 	return args.Get(0).(blockBuilder), args.Error(1) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block, callback func(*state.Transition) error) (*types.FullBlock, error) {
-	args := m.Called(parent, block, callback)
-
-	if callback != nil {
-		if err := callback(nil); err != nil {
-			return nil, err
-		}
-	}
+func (m *blockchainMock) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
+	args := m.Called(parent, block)
 
 	return args.Get(0).(*types.FullBlock), args.Error(1) //nolint:forcetypeassert
 }
@@ -123,6 +117,12 @@ func (m *blockchainMock) CalculateGasLimit(number uint64) (uint64, error) {
 
 func (m *blockchainMock) GetChainID() uint64 {
 	return 0
+}
+
+func (m *blockchainMock) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	args := m.Called(hash)
+
+	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
 var _ polybftBackend = (*polybftBackendMock)(nil)

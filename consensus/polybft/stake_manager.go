@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -56,6 +57,7 @@ type stakeManager struct {
 	validatorSetContract    types.Address
 	supernetManagerContract types.Address
 	maxValidatorSetSize     int
+	blockchain              blockchainBackend
 }
 
 // newStakeManager returns a new instance of stake manager
@@ -65,6 +67,7 @@ func newStakeManager(
 	rootchainRelayer txrelayer.TxRelayer,
 	key ethgo.Key,
 	validatorSetAddr, supernetManagerAddr types.Address,
+	blockchain blockchainBackend,
 	maxValidatorSetSize int,
 ) *stakeManager {
 	return &stakeManager{
@@ -75,6 +78,7 @@ func newStakeManager(
 		validatorSetContract:    validatorSetAddr,
 		supernetManagerContract: supernetManagerAddr,
 		maxValidatorSetSize:     maxValidatorSetSize,
+		blockchain:              blockchain,
 	}
 }
 
@@ -86,71 +90,100 @@ func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 
 	// save initial validator set as full validator set in db
 	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
-		BlockNumber: 0,
-		EpochID:     0,
-		Validators:  newValidatorStakeMap(req.ValidatorSet.Accounts()),
+		BlockNumber:          0,
+		EpochID:              0,
+		UpdatedAtBlockNumber: 0,
+		Validators:           newValidatorStakeMap(req.ValidatorSet.Accounts()),
 	})
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any transfer event that happened in block and update full validator set in db
 func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
-	events, err := s.getTransferEventsFromReceipts(req.FullBlock.Receipts)
-	if err != nil {
-		return err
-	}
-
-	if len(events) == 0 {
-		return nil
-	}
-
-	s.logger.Debug("Gotten transfer (stake changed) events from logs on block",
-		"eventsNum", len(events), "block", req.FullBlock.Block.Number())
-
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
 	if err != nil {
 		return err
 	}
 
-	stakeMap := fullValidatorSet.Validators
+	s.logger.Debug("Stake manager on post block", "block", req.FullBlock.Block.Number(),
+		"last saved", fullValidatorSet.BlockNumber, "last updated", fullValidatorSet.UpdatedAtBlockNumber)
 
-	s.logger.Debug("full validator set before", "block", fullValidatorSet.BlockNumber, "data", stakeMap)
+	// update with missing blocks
+	for i := fullValidatorSet.BlockNumber + 1; i < req.FullBlock.Block.Number(); i++ {
+		blockHeader, found := s.blockchain.GetHeaderByNumber(i)
+		if !found {
+			return blockchain.ErrNoBlock
+		}
+
+		receipts, err := s.blockchain.GetReceiptsByHash(blockHeader.Hash)
+		if err != nil {
+			return err
+		}
+
+		if err := s.updateWithReceipts(&fullValidatorSet, receipts, i); err != nil {
+			return err
+		}
+	}
+
+	// finally update with received block
+	err = s.updateWithReceipts(&fullValidatorSet, req.FullBlock.Receipts, req.FullBlock.Block.Number())
+	if err != nil {
+		return err
+	}
+
+	fullValidatorSet.EpochID = req.Epoch
+	fullValidatorSet.BlockNumber = req.FullBlock.Block.Number()
+
+	return s.state.StakeStore.insertFullValidatorSet(fullValidatorSet)
+}
+
+func (s *stakeManager) updateWithReceipts(
+	fullValidatorSet *validatorSetState, receipts []*types.Receipt, block uint64) error {
+	events, err := s.getTransferEventsFromReceipts(receipts)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Debug("Full validator set before",
+		"block", block-1, "evnts", len(events), "data", fullValidatorSet.Validators)
+
+	if len(events) == 0 {
+		return nil
+	}
 
 	for _, event := range events {
 		if event.IsStake() {
-			s.logger.Debug("Stake transfer event", "To", event.To, "Value", event.Value)
+			s.logger.Debug("Stake transfer event", "to", event.To, "value", event.Value)
 
 			// then this amount was minted To validator address
-			stakeMap.addStake(event.To, event.Value)
+			fullValidatorSet.Validators.addStake(event.To, event.Value)
 		} else if event.IsUnstake() {
-			s.logger.Debug("Unstake transfer event", "From", event.From, "Value", event.Value)
+			s.logger.Debug("Unstake transfer event", "from", event.From, "value", event.Value)
 
 			// then this amount was burned From validator address
-			stakeMap.removeStake(event.From, event.Value)
+			fullValidatorSet.Validators.removeStake(event.From, event.Value)
 		} else {
 			// this should not happen, but lets log it if it does
 			s.logger.Warn("Found a transfer event that represents neither stake nor unstake")
 		}
 	}
 
-	for addr, data := range stakeMap {
+	for addr, data := range fullValidatorSet.Validators {
 		if data.BlsKey == nil {
 			data.BlsKey, err = s.getBlsKey(data.Address)
 			if err != nil {
-				s.logger.Warn("Could not get info for new validator", "epoch", req.Epoch, "address", addr)
+				s.logger.Warn("Could not get info for new validator", "block", block, "address", addr)
 			}
 		}
 
 		data.IsActive = data.VotingPower.Cmp(bigZero) > 0
 	}
 
-	s.logger.Debug("full validator set after", "block", req.FullBlock.Block.Number(), "data", stakeMap)
+	fullValidatorSet.UpdatedAtBlockNumber = block // mark on which block validator set has been updated
 
-	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
-		EpochID:     req.Epoch,
-		BlockNumber: req.FullBlock.Block.Number(),
-		Validators:  stakeMap,
-	})
+	s.logger.Debug("Full validator set after", "block", block, "data", fullValidatorSet.Validators)
+
+	return nil
 }
 
 // UpdateValidatorSet returns an updated validator set
@@ -308,9 +341,10 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 }
 
 type validatorSetState struct {
-	BlockNumber uint64            `json:"block"`
-	EpochID     uint64            `json:"epoch"`
-	Validators  validatorStakeMap `json:"validators"`
+	BlockNumber          uint64            `json:"block"`
+	EpochID              uint64            `json:"epoch"`
+	UpdatedAtBlockNumber uint64            `json:"updated_at_block"`
+	Validators           validatorStakeMap `json:"validators"`
 }
 
 func (vs validatorSetState) Marshal() ([]byte, error) {

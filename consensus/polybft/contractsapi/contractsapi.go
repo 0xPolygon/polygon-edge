@@ -443,11 +443,12 @@ func (i *InitializeRootMintableERC20PredicateACLFn) DecodeAbi(buf []byte) error 
 }
 
 type InitializeNativeERC20Fn struct {
-	Predicate_ types.Address `abi:"predicate_"`
-	RootToken_ types.Address `abi:"rootToken_"`
-	Name_      string        `abi:"name_"`
-	Symbol_    string        `abi:"symbol_"`
-	Decimals_  uint8         `abi:"decimals_"`
+	Predicate_   types.Address `abi:"predicate_"`
+	RootToken_   types.Address `abi:"rootToken_"`
+	Name_        string        `abi:"name_"`
+	Symbol_      string        `abi:"symbol_"`
+	Decimals_    uint8         `abi:"decimals_"`
+	TokenSupply_ *big.Int      `abi:"tokenSupply_"`
 }
 
 func (i *InitializeNativeERC20Fn) Sig() []byte {
@@ -463,12 +464,13 @@ func (i *InitializeNativeERC20Fn) DecodeAbi(buf []byte) error {
 }
 
 type InitializeNativeERC20MintableFn struct {
-	Predicate_ types.Address `abi:"predicate_"`
-	Owner_     types.Address `abi:"owner_"`
-	RootToken_ types.Address `abi:"rootToken_"`
-	Name_      string        `abi:"name_"`
-	Symbol_    string        `abi:"symbol_"`
-	Decimals_  uint8         `abi:"decimals_"`
+	Predicate_   types.Address `abi:"predicate_"`
+	Owner_       types.Address `abi:"owner_"`
+	RootToken_   types.Address `abi:"rootToken_"`
+	Name_        string        `abi:"name_"`
+	Symbol_      string        `abi:"symbol_"`
+	Decimals_    uint8         `abi:"decimals_"`
+	TokenSupply_ *big.Int      `abi:"tokenSupply_"`
 }
 
 func (i *InitializeNativeERC20MintableFn) Sig() []byte {
@@ -519,6 +521,27 @@ func (d *DepositToRootERC20PredicateFn) EncodeAbi() ([]byte, error) {
 
 func (d *DepositToRootERC20PredicateFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootERC20Predicate.Abi.Methods["depositTo"], buf, d)
+}
+
+type TokenMappedEvent struct {
+	RootToken  types.Address `abi:"rootToken"`
+	ChildToken types.Address `abi:"childToken"`
+}
+
+func (*TokenMappedEvent) Sig() ethgo.Hash {
+	return RootERC20Predicate.Abi.Events["TokenMapped"].ID()
+}
+
+func (*TokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return RootERC20Predicate.Abi.Events["TokenMapped"].Inputs.Encode(inputs)
+}
+
+func (t *TokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !RootERC20Predicate.Abi.Events["TokenMapped"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(RootERC20Predicate.Abi.Events["TokenMapped"], log, t)
 }
 
 type InitializeChildMintableERC20PredicateFn struct {
@@ -839,6 +862,27 @@ func (i *InitializeRootMintableERC1155PredicateACLFn) EncodeAbi() ([]byte, error
 
 func (i *InitializeRootMintableERC1155PredicateACLFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RootMintableERC1155PredicateACL.Abi.Methods["initialize"], buf, i)
+}
+
+type L2MintableTokenMappedEvent struct {
+	RootToken  types.Address `abi:"rootToken"`
+	ChildToken types.Address `abi:"childToken"`
+}
+
+func (*L2MintableTokenMappedEvent) Sig() ethgo.Hash {
+	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].ID()
+}
+
+func (*L2MintableTokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Inputs.Encode(inputs)
+}
+
+func (l *L2MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"], log, l)
 }
 
 type InitializeChildERC1155Fn struct {

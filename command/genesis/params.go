@@ -43,7 +43,7 @@ const (
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
 	defaultNativeTokenDecimals = uint8(18)
-	nativeTokenParamsNumber    = 4
+	minNativeTokenParamsNumber = 4
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -60,7 +60,7 @@ var (
 	errUnsupportedConsensus   = errors.New("specified consensusRaw not supported")
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format " +
-		"(<name:symbol:decimals count:mintable flag>)")
+		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
 )
 
@@ -99,7 +99,6 @@ type genesisParams struct {
 	// PolyBFT
 	validatorsPath       string
 	validatorsPrefixPath string
-	stakes               []string
 	validators           []string
 	sprintSize           uint64
 	blockTime            time.Duration
@@ -481,34 +480,50 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 			Symbol:     defaultNativeTokenSymbol,
 			Decimals:   defaultNativeTokenDecimals,
 			IsMintable: false,
+			Owner:      types.ZeroAddress,
 		}
 
 		return nil
 	}
 
 	params := strings.Split(p.nativeTokenConfigRaw, ":")
-	if len(params) != nativeTokenParamsNumber {
+	if len(params) < minNativeTokenParamsNumber {
 		return errInvalidTokenParams
 	}
 
+	// name
 	name := strings.TrimSpace(params[0])
 	if name == "" {
 		return errInvalidTokenParams
 	}
 
+	// symbol
 	symbol := strings.TrimSpace(params[1])
 	if symbol == "" {
 		return errInvalidTokenParams
 	}
 
+	// decimals
 	decimals, err := strconv.ParseUint(strings.TrimSpace(params[2]), 10, 8)
 	if err != nil || decimals > math.MaxUint8 {
 		return errInvalidTokenParams
 	}
 
+	// is mintable native token used
 	isMintable, err := strconv.ParseBool(strings.TrimSpace(params[3]))
 	if err != nil {
 		return errInvalidTokenParams
+	}
+
+	// in case it is mintable native token, it is expected to have 5 parameters provided
+	if isMintable && len(params) != minNativeTokenParamsNumber+1 {
+		return errInvalidTokenParams
+	}
+
+	// owner address
+	owner := types.ZeroAddress
+	if isMintable {
+		owner = types.StringToAddress(strings.TrimSpace(params[4]))
 	}
 
 	p.nativeTokenConfig = &polybft.TokenConfig{
@@ -516,6 +531,7 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		Symbol:     symbol,
 		Decimals:   uint8(decimals),
 		IsMintable: isMintable,
+		Owner:      owner,
 	}
 
 	return nil

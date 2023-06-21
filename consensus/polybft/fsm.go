@@ -334,24 +334,26 @@ func (f *fsm) Validate(proposal []byte) error {
 	}
 
 	currentValidators := f.validators.Accounts()
-	nextValidators := f.validators.Accounts()
 
-	validateExtraData := func(transition *state.Transition) error {
-		if f.isEndOfEpoch {
-			if !extra.Validators.Equals(f.newValidatorsDelta) {
-				return errValidatorSetDeltaMismatch
-			}
-		} else if !extra.Validators.IsEmpty() {
-			// delta should be empty in non epoch ending blocks
-			return errValidatorsUpdateInNonEpochEnding
+	// validate validators delta
+	if f.isEndOfEpoch {
+		if !extra.Validators.Equals(f.newValidatorsDelta) {
+			return errValidatorSetDeltaMismatch
 		}
+	} else if !extra.Validators.IsEmpty() {
+		// delta should be empty in non epoch ending blocks
+		return errValidatorsUpdateInNonEpochEnding
+	}
 
-		nextValidators, err = f.getValidatorsTransition(extra.Validators)
-		if err != nil {
-			return err
-		}
+	nextValidators, err := f.getValidatorsTransition(extra.Validators)
+	if err != nil {
+		return err
+	}
 
-		return extra.Checkpoint.Validate(parentExtra.Checkpoint, currentValidators, nextValidators)
+	// validate checkpoint data
+	if err := extra.Checkpoint.Validate(parentExtra.Checkpoint,
+		currentValidators, nextValidators, f.exitEventRootHash); err != nil {
+		return err
 	}
 
 	if f.logger.IsTrace() && block.Number() > 1 {
@@ -363,7 +365,7 @@ func (f *fsm) Validate(proposal []byte) error {
 		f.logger.Trace("[FSM Validate]", "Block", block.Number(), "parent validators", validators)
 	}
 
-	stateBlock, err := f.backend.ProcessBlock(f.parent, &block, validateExtraData)
+	stateBlock, err := f.backend.ProcessBlock(f.parent, &block)
 	if err != nil {
 		return err
 	}
@@ -419,7 +421,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			continue
 		}
 
-		decodedStateTx, err := decodeStateTransaction(tx.Input) // used to be Data
+		decodedStateTx, err := decodeStateTransaction(tx.Input)
 		if err != nil {
 			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
 		}
@@ -427,37 +429,17 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if !f.isEndOfSprint {
-				return fmt.Errorf("found commitment tx in block which should not contain it: tx = %v", tx.Hash)
+				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", tx.Hash)
 			}
 
 			if commitmentTxExists {
-				return fmt.Errorf("only one commitment tx is allowed per block: %v", tx.Hash)
+				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", tx.Hash)
 			}
 
 			commitmentTxExists = true
 
-			signers, err := f.validators.Accounts().GetFilteredValidators(stateTxData.AggSignature.Bitmap)
-			if err != nil {
-				return fmt.Errorf("error for state transaction while retrieving signers: tx = %v, error = %w", tx.Hash, err)
-			}
-
-			if !f.validators.HasQuorum(signers.GetAddressesAsSet()) {
-				return fmt.Errorf("quorum size not reached for state tx: %v", tx.Hash)
-			}
-
-			aggs, err := bls.UnmarshalSignature(stateTxData.AggSignature.AggregatedSignature)
-			if err != nil {
-				return fmt.Errorf("error for state transaction while unmarshaling signature: tx = %v, error = %w", tx.Hash, err)
-			}
-
-			hash, err := stateTxData.Hash()
-			if err != nil {
+			if err = verifyBridgeCommitmentTx(tx.Hash, stateTxData, f.validators); err != nil {
 				return err
-			}
-
-			verified := aggs.VerifyAggregated(signers.GetBlsKeys(), hash.Bytes(), bls.DomainStateReceiver)
-			if !verified {
-				return fmt.Errorf("invalid signature for tx = %v", tx.Hash)
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
 			if commitEpochTxExists {
@@ -633,6 +615,37 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 	}
 
 	return errDistributeRewardsTxNotExpected
+}
+
+// verifyBridgeCommitmentTx validates bridge commitment transaction
+func verifyBridgeCommitmentTx(txHash types.Hash,
+	commitment *CommitmentMessageSigned,
+	validators validator.ValidatorSet) error {
+	signers, err := validators.Accounts().GetFilteredValidators(commitment.AggSignature.Bitmap)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve signers for state tx (%s): %w", txHash, err)
+	}
+
+	if !validators.HasQuorum(signers.GetAddressesAsSet()) {
+		return fmt.Errorf("quorum size not reached for state tx (%s)", txHash)
+	}
+
+	commitmentHash, err := commitment.Hash()
+	if err != nil {
+		return err
+	}
+
+	signature, err := bls.UnmarshalSignature(commitment.AggSignature.AggregatedSignature)
+	if err != nil {
+		return fmt.Errorf("error for state tx (%s) while unmarshaling signature: %w", txHash, err)
+	}
+
+	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), bls.DomainStateReceiver)
+	if !verified {
+		return fmt.Errorf("invalid signature for state tx (%s)", txHash)
+	}
+
+	return nil
 }
 
 func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeDrift uint64) error {

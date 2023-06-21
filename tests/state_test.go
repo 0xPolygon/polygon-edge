@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/require"
 )
 
 // Currently used test cases suite version is v10.4.
@@ -57,7 +58,9 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 		t.Fatalf("failed to create transaction: %v", err)
 	}
 
-	s, snapshot, pastRoot := buildState(c.Pre)
+	s, snapshot, pastRoot, err := buildState(c.Pre)
+	require.NoError(t, err)
+
 	forks := config.At(uint64(env.Number))
 
 	xxx := state.NewExecutor(&chain.Params{
@@ -88,7 +91,9 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
-	objs := txn.Commit(forks.EIP155)
+	objs, err := txn.Commit(forks.EIP155)
+	require.NoError(t, err)
+
 	_, root := snapshot.Commit(objs)
 
 	// Check block root

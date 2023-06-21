@@ -166,9 +166,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
+	type bridgeTxData struct {
+		exitEventID    *big.Int
+		blockNumber    uint64
+		childTokenAddr *types.Address
+	}
+
 	g, ctx := errgroup.WithContext(cmd.Context())
-	exitEventIDsCh := make(chan *big.Int, len(dp.Receivers))
-	blockNumbersCh := make(chan uint64, len(dp.Receivers))
+	bridgeTxCh := make(chan bridgeTxData, len(dp.Receivers))
 	exitEventIDs := make([]*big.Int, 0, len(dp.Receivers))
 	blockNumbers := make([]uint64, 0, len(dp.Receivers))
 
@@ -196,15 +201,25 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
-				blockNumbersCh <- receipt.BlockNumber
+				var exitEventID *big.Int
 
 				if dp.ChildChainMintable {
-					exitEventID, err := common.ExtractExitEventID(receipt)
-					if err != nil {
+					if exitEventID, err = common.ExtractExitEventID(receipt); err != nil {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
+				}
 
-					exitEventIDsCh <- exitEventID
+				// populate child token address if a token is mapped alongside with deposit
+				childToken, err := common.ExtractChildTokenAddr(receipt, dp.ChildChainMintable)
+				if err != nil {
+					return fmt.Errorf("failed to extract child token address: %w", err)
+				}
+
+				// send aggregated data to channel if everything went ok
+				bridgeTxCh <- bridgeTxData{
+					blockNumber:    receipt.BlockNumber,
+					exitEventID:    exitEventID,
+					childTokenAddr: childToken,
 				}
 
 				return nil
@@ -218,25 +233,31 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	close(exitEventIDsCh)
-	close(blockNumbersCh)
+	close(bridgeTxCh)
 
-	for exitEventID := range exitEventIDsCh {
-		exitEventIDs = append(exitEventIDs, exitEventID)
-	}
+	var childToken *types.Address
 
-	for blockNum := range blockNumbersCh {
-		blockNumbers = append(blockNumbers, blockNum)
+	for x := range bridgeTxCh {
+		if x.exitEventID != nil {
+			exitEventIDs = append(exitEventIDs, x.exitEventID)
+		}
+
+		blockNumbers = append(blockNumbers, x.blockNumber)
+
+		if x.childTokenAddr != nil {
+			childToken = x.childTokenAddr
+		}
 	}
 
 	outputter.SetCommandResult(
 		&common.BridgeTxResult{
-			Sender:       depositorAddr.String(),
-			Receivers:    dp.Receivers,
-			Amounts:      dp.Amounts,
-			ExitEventIDs: exitEventIDs,
-			BlockNumbers: blockNumbers,
-			Title:        "DEPOSIT ERC 20",
+			Sender:         depositorAddr.String(),
+			Receivers:      dp.Receivers,
+			Amounts:        dp.Amounts,
+			ExitEventIDs:   exitEventIDs,
+			ChildTokenAddr: childToken,
+			BlockNumbers:   blockNumbers,
+			Title:          "DEPOSIT ERC 20",
 		})
 }
 

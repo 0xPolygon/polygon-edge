@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"path/filepath"
 	"time"
 
@@ -125,34 +126,41 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return err
 		}
 
+		// calculate initial total supply of native erc20 token
+		// we skip zero address, since its a special case address
+		// that is used for minting and burning native token
+		initialTotalSupply := big.NewInt(0)
+
+		for addr, alloc := range config.Genesis.Alloc {
+			if addr == types.ZeroAddress {
+				continue
+			}
+
+			initialTotalSupply.Add(initialTotalSupply, alloc.Balance)
+		}
+
 		bridgeCfg := polyBFTConfig.Bridge
 		if bridgeCfg == nil {
 			return errMissingBridgeConfig
 		}
 
 		// initialize ValidatorSet SC
-		input, err := getInitValidatorSetInput(polyBFTConfig)
-		if err != nil {
+		if err = initValidatorSet(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
-		if err = callContract(contracts.SystemCaller,
-			contracts.ValidatorSetContract, input, "ValidatorSet", transition); err != nil {
+		// approve reward pool
+		if err = approveRewardPoolAsSpender(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
-		if err = mintRewardTokensToWalletAddress(&polyBFTConfig, transition); err != nil {
+		// mint reward tokens to reward wallet
+		if err = mintRewardTokensToWallet(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
 		// initialize RewardPool SC
-		input, err = getInitRewardPoolInput(polyBFTConfig)
-		if err != nil {
-			return err
-		}
-
-		if err = callContract(contracts.SystemCaller,
-			contracts.RewardPoolContract, input, "RewardPool", transition); err != nil {
+		if err = initRewardPool(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
@@ -179,7 +187,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize ChildERC20PredicateAccessList SC
-			input, err = getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, false)
+			input, err := getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
@@ -245,7 +253,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 		} else {
 			// initialize ChildERC20Predicate SC
-			input, err = getInitERC20PredicateInput(bridgeCfg, false)
+			input, err := getInitERC20PredicateInput(bridgeCfg, false)
 			if err != nil {
 				return err
 			}
@@ -314,12 +322,13 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		if polyBFTConfig.NativeTokenConfig.IsMintable {
 			// initialize NativeERC20Mintable SC
 			params := &contractsapi.InitializeNativeERC20MintableFn{
-				Predicate_: contracts.ChildERC20PredicateContract,
-				Owner_:     polyBFTConfig.Governance,
-				RootToken_: polyBFTConfig.Bridge.RootNativeERC20Addr,
-				Name_:      polyBFTConfig.NativeTokenConfig.Name,
-				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
-				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
+				Predicate_:   contracts.ChildERC20PredicateContract,
+				Owner_:       polyBFTConfig.NativeTokenConfig.Owner,
+				RootToken_:   polyBFTConfig.Bridge.RootNativeERC20Addr,
+				Name_:        polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
+				TokenSupply_: initialTotalSupply,
 			}
 
 			input, err := params.EncodeAbi()
@@ -334,11 +343,12 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		} else {
 			// initialize NativeERC20 SC
 			params := &contractsapi.InitializeNativeERC20Fn{
-				Name_:      polyBFTConfig.NativeTokenConfig.Name,
-				Symbol_:    polyBFTConfig.NativeTokenConfig.Symbol,
-				Decimals_:  polyBFTConfig.NativeTokenConfig.Decimals,
-				RootToken_: polyBFTConfig.Bridge.RootNativeERC20Addr,
-				Predicate_: contracts.ChildERC20PredicateContract,
+				Name_:        polyBFTConfig.NativeTokenConfig.Name,
+				Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
+				Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
+				RootToken_:   polyBFTConfig.Bridge.RootNativeERC20Addr,
+				Predicate_:   contracts.ChildERC20PredicateContract,
+				TokenSupply_: initialTotalSupply,
 			}
 
 			input, err := params.EncodeAbi()
@@ -662,8 +672,41 @@ func (p *Polybft) GetBlockCreator(h *types.Header) (types.Address, error) {
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (p *Polybft) PreCommitState(_ *types.Header, _ *state.Transition) error {
-	// Not required
+func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error {
+	commitmentTxExists := false
+
+	validators, err := p.GetValidators(block.Number()-1, nil)
+	if err != nil {
+		return err
+	}
+
+	// validate commitment state transactions
+	for _, tx := range block.Transactions {
+		if tx.Type != types.StateTx {
+			continue
+		}
+
+		decodedStateTx, err := decodeStateTransaction(tx.Input)
+		if err != nil {
+			return fmt.Errorf("unknown state transaction: tx=%v, error: %w", tx.Hash, err)
+		}
+
+		if signedCommitment, ok := decodedStateTx.(*CommitmentMessageSigned); ok {
+			if commitmentTxExists {
+				return fmt.Errorf("only one commitment state tx is allowed per block: %v", tx.Hash)
+			}
+
+			commitmentTxExists = true
+
+			if err := verifyBridgeCommitmentTx(
+				tx.Hash,
+				signedCommitment,
+				validator.NewValidatorSet(validators, p.logger)); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 

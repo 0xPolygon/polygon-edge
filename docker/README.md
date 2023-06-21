@@ -7,7 +7,7 @@
 ### `polybft` consensus
 When deploying with `polybft` consensus, there are some additional dependencies:
 * [npm](https://nodejs.org/en/)
-* [go 1.19.x](https://go.dev/dl/)
+* [go 1.20.x](https://go.dev/dl/)
 
 ## Local development
 Running `polygon-edge` local cluster with docker can be done very easily by using provided `scripts` folder

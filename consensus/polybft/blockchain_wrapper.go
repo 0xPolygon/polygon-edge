@@ -38,8 +38,7 @@ type blockchainBackend interface {
 		txPool txPoolInterface, blockTime time.Duration, logger hclog.Logger) (blockBuilder, error)
 
 	// ProcessBlock builds a final block from given 'block' on top of 'parent'.
-	ProcessBlock(parent *types.Header, block *types.Block,
-		callback func(*state.Transition) error) (*types.FullBlock, error)
+	ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error)
 
 	// GetStateProviderForBlock returns a reference to make queries to the state at 'block'.
 	GetStateProviderForBlock(block *types.Header) (contract.Provider, error)
@@ -60,6 +59,9 @@ type blockchainBackend interface {
 
 	// GetChainID returns chain id of the current blockchain
 	GetChainID() uint64
+
+	// GetReceiptsByHash retrieves receipts by hash
+	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -76,16 +78,11 @@ func (p *blockchainWrapper) CurrentHeader() *types.Header {
 
 // CommitBlock commits a block to the chain
 func (p *blockchainWrapper) CommitBlock(block *types.FullBlock) error {
-	if err := p.blockchain.WriteFullBlock(block, consensusSource); err != nil {
-		return err
-	}
-
-	return nil
+	return p.blockchain.WriteFullBlock(block, consensusSource)
 }
 
 // ProcessBlock builds a final block from given 'block' on top of 'parent'
-func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block,
-	callback func(*state.Transition) error) (*types.FullBlock, error) {
+func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Block) (*types.FullBlock, error) {
 	header := block.Header.Copy()
 	start := time.Now().UTC()
 
@@ -101,13 +98,10 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		}
 	}
 
-	if callback != nil {
-		if err := callback(transition); err != nil {
-			return nil, err
-		}
+	_, root, err := transition.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}
-
-	_, root := transition.Commit()
 
 	updateBlockExecutionMetric(start)
 
@@ -185,6 +179,10 @@ func (p *blockchainWrapper) SubscribeEvents() blockchain.Subscription {
 
 func (p *blockchainWrapper) GetChainID() uint64 {
 	return uint64(p.blockchain.Config().ChainID)
+}
+
+func (p *blockchainWrapper) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	return p.blockchain.GetReceiptsByHash(hash)
 }
 
 var _ contract.Provider = &stateProvider{}
