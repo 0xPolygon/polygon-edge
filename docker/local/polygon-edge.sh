@@ -52,6 +52,7 @@ case "$1" in
                 --validators-path /data \
                 --validators-prefix data- \
                 --reward-wallet 0xDEADBEEF:1000000 \
+                --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
                 --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
                 --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
                 --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
@@ -68,6 +69,7 @@ case "$1" in
 
               "$POLYGON_EDGE_BIN" rootchain deploy \
                 --stake-manager ${stakeManagerAddr} \
+                --stake-token ${stakeToken} \
                 --json-rpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
                 --test
