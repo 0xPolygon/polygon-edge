@@ -113,8 +113,8 @@ func TestPoAPoSSwitch(t *testing.T) {
 	}
 
 	// Stake balance
-	// 3 genesis validators will stake but 1 gensis validator won't
-	numStakedValidators := 3
+	// 4 genesis validators will stake but 1 gensis validator won't
+	numStakedValidators := 4
 	wg = sync.WaitGroup{}
 
 	for idx := 0; idx < numStakedValidators; idx++ {
@@ -143,7 +143,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 		t.Fatalf("Unable to wait for all nodes to seal blocks, %v", waitErrors)
 	}
 
-	expectedPoSValidators := genesisValidatorAddrs[:3]
+	expectedPoSValidators := genesisValidatorAddrs[:4]
 
 	// Test in PoS
 	wg = sync.WaitGroup{}
@@ -159,7 +159,7 @@ func TestPoAPoSSwitch(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), framework.DefaultTimeout)
 			defer cancel()
 
-			// every validator should have only 3 validators in validator set
+			// every validator should have only 4 validators in validator set
 			validateSnapshot(ctx, srv, posStartAt, expectedPoSValidators)
 		}(srv)
 	}
