@@ -895,10 +895,14 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 		return err
 	}
 
-	b.dispatchEvent(evnt)
-
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
+
+	if err := batchHelper.WriteBatch(); err != nil {
+		return err
+	}
+
+	b.dispatchEvent(evnt)
 
 	logArgs := []interface{}{
 		"number", header.Number,
@@ -911,10 +915,6 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
 		logArgs = append(logArgs, "generation_time_in_seconds", diff)
-	}
-
-	if err := batchHelper.WriteBatch(); err != nil {
-		return err
 	}
 
 	b.logger.Info("new block", logArgs...)
@@ -966,10 +966,14 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 		return err
 	}
 
-	b.dispatchEvent(evnt)
-
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
+
+	if err := batchHelper.WriteBatch(); err != nil {
+		return err
+	}
+
+	b.dispatchEvent(evnt)
 
 	logArgs := []interface{}{
 		"number", header.Number,
@@ -982,10 +986,6 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
 		logArgs = append(logArgs, "generation_time_in_seconds", diff)
-	}
-
-	if err := batchHelper.WriteBatch(); err != nil {
-		return err
 	}
 
 	b.logger.Info("new block", logArgs...)
