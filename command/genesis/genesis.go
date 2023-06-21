@@ -74,7 +74,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.burnContracts,
 		burnContractFlag,
 		[]string{},
-		"the burn contract blocks and addresses (format: <block>:<address>)",
+		"the burn contract blocks and addresses (format: <block>:<address>[:<burn destination>])",
 	)
 
 	cmd.Flags().StringArrayVar(

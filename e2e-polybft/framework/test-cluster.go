@@ -84,7 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
-	BurnContracts        map[uint64]types.Address
+	BurnContracts        []string // block:address[:destination address]
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -254,13 +254,11 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(block uint64, address types.Address) ClusterOption {
+func WithBurnContract(burnContracts ...string) ClusterOption {
 	return func(h *TestClusterConfig) {
-		if h.BurnContracts == nil {
-			h.BurnContracts = map[uint64]types.Address{}
+		for _, burnContract := range burnContracts {
+			h.BurnContracts = append(h.BurnContracts, burnContract)
 		}
-
-		h.BurnContracts[block] = address
 	}
 }
 
@@ -472,8 +470,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		}
 
 		if len(cluster.Config.BurnContracts) != 0 {
-			for block, addr := range cluster.Config.BurnContracts {
-				args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
+			for _, contract := range cluster.Config.BurnContracts {
+				args = append(args, "--burn-contract", contract)
 			}
 		} else {
 			// London hardfork is enabled by default so there must be a default burn contract

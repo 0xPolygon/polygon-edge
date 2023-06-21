@@ -1635,3 +1635,20 @@ func (d *DistributeRewardForRewardPoolFn) EncodeAbi() ([]byte, error) {
 func (d *DistributeRewardForRewardPoolFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(RewardPool.Abi.Methods["distributeRewardFor"], buf, d)
 }
+
+type InitializeEIP1559BurnFn struct {
+	NewChildERC20Predicate types.Address `abi:"newChildERC20Predicate"`
+	NewBurnDestination     types.Address `abi:"newBurnDestination"`
+}
+
+func (i *InitializeEIP1559BurnFn) Sig() []byte {
+	return EIP1559Burn.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeEIP1559BurnFn) EncodeAbi() ([]byte, error) {
+	return EIP1559Burn.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeEIP1559BurnFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(EIP1559Burn.Abi.Methods["initialize"], buf, i)
+}

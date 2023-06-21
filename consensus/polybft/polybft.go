@@ -360,6 +360,25 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
 				return err
 			}
+
+			// initialize EIP1559Burn SC
+			if config.Params.DefaultBurnContract != nil {
+				burnParams := &contractsapi.InitializeEIP1559BurnFn{
+					NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
+					NewBurnDestination:     types.StringToAddress(config.Params.DefaultBurnContract.BurnContractDestinationAddress),
+				}
+
+				input, err = burnParams.EncodeAbi()
+				if err != nil {
+					return err
+				}
+
+				if err = callContract(contracts.SystemCaller,
+					types.StringToAddress(config.Params.DefaultBurnContract.BurnContractAddress),
+					input, "EIP1559Burn", transition); err != nil {
+					return err
+				}
+			}
 		}
 
 		return nil

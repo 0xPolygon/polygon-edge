@@ -395,12 +395,25 @@ func (p *genesisParams) initGenesisConfig() error {
 		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
 
 		for _, burnContract := range p.burnContracts {
-			block, address, err := parseBurnContractInfo(burnContract)
+			block, address, destAddr, err := parseBurnContractInfo(burnContract)
 			if err != nil {
 				return err
 			}
 
 			chainConfig.Params.BurnContract[block] = address.String()
+
+			// TODO: validate that only one burn contract has specified dest. addr?
+			// TODO: set to non zero only if native token is non mintable?
+			// TODO: should we validate burn token len in accordance with the isMintable param?
+			// before deploying default contract the check if the native token is non mintable will be done regardless
+			// TODO: check that it is not well known predeployed address
+			if !p.nativeTokenConfig.IsMintable &&
+				chainConfig.Params.DefaultBurnContract == nil && destAddr != types.ZeroAddress {
+				chainConfig.Params.DefaultBurnContract = &chain.DefaultBurnContract{
+					BurnContractAddress:            address.String(),
+					BurnContractDestinationAddress: destAddr.String(),
+				}
+			}
 		}
 	}
 
