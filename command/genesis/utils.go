@@ -124,7 +124,7 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 
 // parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
 func parseBurnContractInfo(burnContractInfoRaw string) (uint64, types.Address, types.Address, error) {
-	// <block>:<address>
+	// <block>:<address>[:<destination address>]
 	burnContractParts := strings.Split(burnContractInfoRaw, ":")
 	if len(burnContractParts) < 2 || len(burnContractParts) > 3 {
 		return 0, types.ZeroAddress, types.ZeroAddress, fmt.Errorf("expected format: <block>:<address>[:<burn destination>]")

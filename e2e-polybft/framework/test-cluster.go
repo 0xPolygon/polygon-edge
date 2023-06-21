@@ -473,9 +473,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for _, contract := range cluster.Config.BurnContracts {
 				args = append(args, "--burn-contract", contract)
 			}
-		} else {
-			// London hardfork is enabled by default so there must be a default burn contract
-			args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(

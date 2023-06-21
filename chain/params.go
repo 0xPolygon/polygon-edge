@@ -30,15 +30,7 @@ type Params struct {
 
 	// Governance contract where the token will be sent to and burn in london fork
 	BurnContract map[uint64]string `json:"burnContract"`
-	// Default burn contract that will be deployed on genesis if a native token is non mintable
-	DefaultBurnContract *DefaultBurnContract `json:"defaultBurnContract"`
-}
-
-type DefaultBurnContract struct {
-	// Default burn contract address
-	BurnContractAddress string `json:"burnContractAddress,omitempty"`
-
-	// Default burn contract destination address where tokens will be sent on withdrawal
+	// Destination adress to initialize default burn contract with
 	BurnContractDestinationAddress string `json:"burnContractDestinationAddress,omitempty"`
 }
 

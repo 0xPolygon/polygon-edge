@@ -362,10 +362,15 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize EIP1559Burn SC
-			if config.Params.DefaultBurnContract != nil {
+			if len(config.Params.BurnContract) == 1 && config.Params.BurnContractDestinationAddress != "" {
+				var contractAddress types.Address
+				for _, address := range config.Params.BurnContract {
+					contractAddress = types.StringToAddress(address)
+				}
+
 				burnParams := &contractsapi.InitializeEIP1559BurnFn{
 					NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
-					NewBurnDestination:     types.StringToAddress(config.Params.DefaultBurnContract.BurnContractDestinationAddress),
+					NewBurnDestination:     types.StringToAddress(config.Params.BurnContractDestinationAddress),
 				}
 
 				input, err = burnParams.EncodeAbi()
@@ -374,7 +379,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 				}
 
 				if err = callContract(contracts.SystemCaller,
-					types.StringToAddress(config.Params.DefaultBurnContract.BurnContractAddress),
+					contractAddress,
 					input, "EIP1559Burn", transition); err != nil {
 					return err
 				}

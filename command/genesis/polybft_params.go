@@ -174,29 +174,21 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	if len(p.burnContracts) > 0 {
-		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
+	chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
+	// burn contract can be set only for non mintable native token
+	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) == 1 {
 
-		for _, burnContract := range p.burnContracts {
-			block, addr, destAddr, err := parseBurnContractInfo(burnContract)
-			if err != nil {
-				return err
-			}
-
-			chainConfig.Params.BurnContract[block] = addr.String()
-			// TODO: validate that only one burn contract has specified dest. addr?
-			// TODO: set to non zero only if native token is non mintable?
-			// TODO: should we validate burn token len in accordance with the isMintable param?
-			// before deploying default contract the check if the native token is non mintable will be done regardless
-			// TODO: check that it is not well known predeployed address
-			if !p.nativeTokenConfig.IsMintable &&
-				chainConfig.Params.DefaultBurnContract == nil && destAddr != types.ZeroAddress {
-				chainConfig.Params.DefaultBurnContract = &chain.DefaultBurnContract{
-					BurnContractAddress:            addr.String(),
-					BurnContractDestinationAddress: destAddr.String(),
-				}
-			}
+		block, address, destAddr, err := parseBurnContractInfo(p.burnContracts[0])
+		if err != nil {
+			return err
 		}
+
+		chainConfig.Params.BurnContract[block] = address.String()
+		chainConfig.Params.BurnContractDestinationAddress = destAddr.String()
+
+	} else {
+		// if native token is mintable or burn contract is not set, add zero address as burn address
+		chainConfig.Params.BurnContract[0] = types.ZeroAddress.String()
 	}
 
 	// deploy genesis contracts
@@ -303,19 +295,14 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if len(p.burnContracts) > 0 {
-		// only populate base fee and base fee multiplier values if burn contract(s)
-		// is provided
-		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
-		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
-	}
+	chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+	chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
 func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
-	polybftConfig *polybft.PolyBFTConfig,
-	chainConfig *chain.Chain) (map[types.Address]*chain.GenesisAccount, error) {
+	polybftConfig *polybft.PolyBFTConfig, chainConfig *chain.Chain) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {
 		artifact *artifact.Artifact
 		address  types.Address
@@ -374,11 +361,17 @@ func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
 				address:  contracts.NativeERC20TokenContract,
 			})
 
-		if chainConfig.Params.DefaultBurnContract != nil {
+		// burn contract can be set only for non mintable native token. If set, default EIP1559 contract should be deployed,
+		// otherwise zero address will be used as a burn address and contract would not be deployed
+		if len(chainConfig.Params.BurnContract) == 1 && chainConfig.Params.BurnContractDestinationAddress != "" {
+			var contractAddress types.Address
+			for _, address := range chainConfig.Params.BurnContract {
+				contractAddress = types.StringToAddress(address)
+			}
 			genesisContracts = append(genesisContracts,
 				&contractInfo{
 					artifact: contractsapi.EIP1559Burn,
-					address:  types.StringToAddress(chainConfig.Params.DefaultBurnContract.BurnContractAddress),
+					address:  contractAddress,
 				})
 		}
 	} else {

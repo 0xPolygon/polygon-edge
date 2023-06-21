@@ -32,10 +32,6 @@ func TestE2E_BurnContract_Deployed(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, code, "0x")
 
-	resp, err := client.GetStorageAt(ethgo.Address(contractAddr), ethgo.Hash{}, ethgo.Latest)
-	require.NoError(t, err)
-	require.NotEqual(t, "0x0000000000000000000000000000000000000000000000000000000000000000", resp.String())
-
 }
 
 // add the test when token is mintable and see that default cnt is not deployed

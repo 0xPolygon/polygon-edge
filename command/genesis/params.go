@@ -147,6 +147,10 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
+		if err := p.validateBurnContract(); err != nil {
+			return err
+		}
+
 		if err := p.validateRewardWallet(); err != nil {
 			return err
 		}
@@ -366,12 +370,6 @@ func (p *genesisParams) generateGenesis() error {
 }
 
 func (p *genesisParams) initGenesisConfig() error {
-	// Disable london hardfork if burn contract address is not provided
-	enabledForks := chain.AllForksEnabled
-	if len(p.burnContracts) == 0 {
-		enabledForks.RemoveFork(chain.London)
-	}
-
 	chainConfig := &chain.Chain{
 		Name: p.name,
 		Genesis: &chain.Genesis{
@@ -383,38 +381,29 @@ func (p *genesisParams) initGenesisConfig() error {
 		},
 		Params: &chain.Params{
 			ChainID: int64(p.chainID),
-			Forks:   enabledForks,
+			Forks:   chain.AllForksEnabled,
 			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}
 
-	if len(p.burnContracts) > 0 {
-		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
-		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
-		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
+	chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
+	chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+	chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
+	// burn contract can be set only for non mintable native token
+	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) == 1 {
 
-		for _, burnContract := range p.burnContracts {
-			block, address, destAddr, err := parseBurnContractInfo(burnContract)
-			if err != nil {
-				return err
-			}
-
-			chainConfig.Params.BurnContract[block] = address.String()
-
-			// TODO: validate that only one burn contract has specified dest. addr?
-			// TODO: set to non zero only if native token is non mintable?
-			// TODO: should we validate burn token len in accordance with the isMintable param?
-			// before deploying default contract the check if the native token is non mintable will be done regardless
-			// TODO: check that it is not well known predeployed address
-			if !p.nativeTokenConfig.IsMintable &&
-				chainConfig.Params.DefaultBurnContract == nil && destAddr != types.ZeroAddress {
-				chainConfig.Params.DefaultBurnContract = &chain.DefaultBurnContract{
-					BurnContractAddress:            address.String(),
-					BurnContractDestinationAddress: destAddr.String(),
-				}
-			}
+		block, address, destAddr, err := parseBurnContractInfo(p.burnContracts[0])
+		if err != nil {
+			return err
 		}
+
+		chainConfig.Params.BurnContract[block] = address.String()
+		chainConfig.Params.BurnContractDestinationAddress = destAddr.String()
+
+	} else {
+		// if native token is mintable or burn contract is not set, add zero address as burn address
+		chainConfig.Params.BurnContract[0] = types.ZeroAddress.String()
 	}
 
 	// Predeploy staking smart contract if needed
@@ -480,6 +469,22 @@ func (p *genesisParams) validateRewardWallet() error {
 
 	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
 		return errRewardWalletAmountZero
+	}
+
+	return nil
+}
+
+// validateBurnContract validates burn contract. If native token is mintable,
+// burn contract flag must not be set. If native token is non mintable only one burn contract
+// must be set and the specified address will be used to predeploy default EIP1559 burn contract.
+// If burn contract is not set or native token is mintable, zero address will be set as a burn address.
+func (p *genesisParams) validateBurnContract() error {
+	if p.nativeTokenConfig.IsMintable && len(p.burnContracts) > 0 {
+		return errors.New("burn contract must not be defined for mintable token")
+	}
+
+	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) > 1 {
+		return errors.New("only one burn contract is allowed for non mintable token")
 	}
 
 	return nil
