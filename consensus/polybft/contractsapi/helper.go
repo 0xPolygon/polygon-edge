@@ -2,6 +2,7 @@ package contractsapi
 
 import (
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 )
 
@@ -11,6 +12,13 @@ type StateTransactionInput interface {
 	EncodeAbi() ([]byte, error)
 	// DecodeAbi contains logic for decoding given ABI data
 	DecodeAbi(b []byte) error
+}
+
+// EventAbi is an interface representing an event generated in contractsapi
+type EventAbi interface {
+	Sig() ethgo.Hash
+	Encode(inputs interface{}) ([]byte, error)
+	ParseLog(log *ethgo.Log) (bool, error)
 }
 
 var (
