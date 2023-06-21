@@ -28,6 +28,15 @@ func (e *exitEventNotFoundError) Error() string {
 	return fmt.Sprintf("could not find any exit event that has an id: %v and epoch: %v", e.exitID, e.epoch)
 }
 
+// ExitEvent is an event emitted by Exit contract
+type ExitEvent struct {
+	*contractsapi.L2StateSyncedEvent
+	// EpochNumber is the epoch number in which exit event was added
+	EpochNumber uint64 `abi:"-"`
+	// BlockNumber is the block in which exit event was added
+	BlockNumber uint64 `abi:"-"`
+}
+
 /*
 Bolt DB schema:
 
@@ -80,7 +89,7 @@ func insertExitEventToBucket(exitEventBucket, lookupBucket *bolt.Bucket, exitEve
 	}
 
 	epochBytes := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
-	exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID)
+	exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
 
 	err = exitEventBucket.Put(bytes.Join([][]byte{epochBytes,
 		exitIDBytes, common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
@@ -162,7 +171,7 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 
 	// enforce sequential order
 	sort.Slice(events, func(i, j int) bool {
-		return events[i].ID < events[j].ID
+		return events[i].ID.Cmp(events[j].ID) < 0
 	})
 
 	return events, err
@@ -182,12 +191,9 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	}
 
 	return &ExitEvent{
-		ID:          l2StateSyncedEvent.ID.Uint64(),
-		Sender:      ethgo.Address(l2StateSyncedEvent.Sender),
-		Receiver:    ethgo.Address(l2StateSyncedEvent.Receiver),
-		Data:        l2StateSyncedEvent.Data,
-		EpochNumber: epoch,
-		BlockNumber: block,
+		L2StateSyncedEvent: &l2StateSyncedEvent,
+		EpochNumber:        epoch,
+		BlockNumber:        block,
 	}, nil
 }
 

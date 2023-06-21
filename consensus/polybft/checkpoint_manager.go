@@ -75,6 +75,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
+
 	return &checkpointManager{
 		key:                   key,
 		blockchain:            blockchain,
@@ -399,7 +400,7 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 
 	var exitEventAPI contractsapi.L2StateSyncedEvent
 
-	e, err := exitEventAPI.Encode(exitEvent)
+	e, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -466,7 +467,7 @@ func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) (
 
 	// enforce sequential order
 	sort.Slice(events, func(i, j int) bool {
-		return events[i].ID < events[j].ID
+		return events[i].ID.Cmp(events[j].ID) < 0
 	})
 
 	return events, nil
@@ -479,7 +480,7 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 
 	var exitEventAPI contractsapi.L2StateSyncedEvent
 	for i := 0; i < numOfEvents; i++ {
-		b, err := exitEventAPI.Encode(exitEvents[i])
+		b, err := exitEventAPI.Encode(exitEvents[i].L2StateSyncedEvent)
 		if err != nil {
 			return nil, err
 		}

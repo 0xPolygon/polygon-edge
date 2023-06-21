@@ -161,7 +161,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(&exitResult{
-		ID:       strconv.FormatUint(exitEvent.ID, 10),
+		ID:       strconv.FormatUint(exitEvent.ID.Uint64(), 10),
 		Sender:   exitEvent.Sender.String(),
 		Receiver: exitEvent.Receiver.String(),
 	})
