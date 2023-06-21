@@ -683,22 +683,12 @@ func (t *Transition) Call2(
 }
 
 func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime.ExecutionResult {
-	// check contract deployment allow list (if any)
-	if t.deploymentAllowList != nil && t.deploymentAllowList.Addr() == contract.CodeAddress {
-		return t.deploymentAllowList.Run(contract, host, &t.config)
-	}
-
-	// check contract deployment block list (if any)
-	if t.deploymentBlockList != nil && t.deploymentBlockList.Addr() == contract.CodeAddress {
-		return t.deploymentBlockList.Run(contract, host, &t.config)
+	if result := t.handleAllowBlockListsUpdate(contract, host); result != nil {
+		return result
 	}
 
 	// check txns access lists, allow list takes precedence over block list
 	if t.txnAllowList != nil {
-		if t.txnAllowList.Addr() == contract.CodeAddress {
-			return t.txnAllowList.Run(contract, host, &t.config)
-		}
-
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnAllowList.GetRole(contract.Caller)
 			if !role.Enabled() {
@@ -709,10 +699,6 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 			}
 		}
 	} else if t.txnBlockList != nil {
-		if t.txnBlockList.Addr() == contract.CodeAddress {
-			return t.txnBlockList.Run(contract, host, &t.config)
-		}
-
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnBlockList.GetRole(contract.Caller)
 			if role == addresslist.EnabledRole {
@@ -722,16 +708,6 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
-	}
-
-	// check bridge allow list (if any)
-	if t.bridgeAllowList != nil && t.bridgeAllowList.Addr() == contract.CodeAddress {
-		return t.bridgeAllowList.Run(contract, host, &t.config)
-	}
-
-	// check contract deployment block list (if any)
-	if t.bridgeBlockList != nil && t.bridgeBlockList.Addr() == contract.CodeAddress {
-		return t.bridgeBlockList.Run(contract, host, &t.config)
 	}
 
 	// check the precompiles
@@ -938,6 +914,41 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	t.state.SetCode(c.Address, result.ReturnValue)
 
 	return result
+}
+
+func (t *Transition) handleAllowBlockListsUpdate(contract *runtime.Contract,
+	host runtime.Host) *runtime.ExecutionResult {
+	// check contract deployment allow list (if any)
+	if t.deploymentAllowList != nil && t.deploymentAllowList.Addr() == contract.CodeAddress {
+		return t.deploymentAllowList.Run(contract, host, &t.config)
+	}
+
+	// check contract deployment block list (if any)
+	if t.deploymentBlockList != nil && t.deploymentBlockList.Addr() == contract.CodeAddress {
+		return t.deploymentBlockList.Run(contract, host, &t.config)
+	}
+
+	// check bridge allow list (if any)
+	if t.bridgeAllowList != nil && t.bridgeAllowList.Addr() == contract.CodeAddress {
+		return t.bridgeAllowList.Run(contract, host, &t.config)
+	}
+
+	// check bridge block list (if any)
+	if t.bridgeBlockList != nil && t.bridgeBlockList.Addr() == contract.CodeAddress {
+		return t.bridgeBlockList.Run(contract, host, &t.config)
+	}
+
+	// check transaction allow list (if any)
+	if t.txnAllowList != nil && t.txnAllowList.Addr() == contract.CodeAddress {
+		return t.txnAllowList.Run(contract, host, &t.config)
+	}
+
+	// check transaction block list (if any)
+	if t.txnBlockList != nil && t.txnBlockList.Addr() == contract.CodeAddress {
+		return t.txnBlockList.Run(contract, host, &t.config)
+	}
+
+	return nil
 }
 
 func (t *Transition) SetState(addr types.Address, key types.Hash, value types.Hash) {

@@ -156,7 +156,7 @@ func TestRun(t *testing.T) {
 				ReturnValue: nil,
 				GasLeft:     0,
 				GasUsed:     5000,
-				Err:         errStackUnderflow,
+				Err:         &runtime.StackUnderflowError{StackLen: 0, Required: 2},
 			},
 		},
 		{
@@ -339,7 +339,7 @@ func TestRunWithTracer(t *testing.T) {
 						"cost":            uint64(2),
 						"lastReturnData":  []byte{},
 						"depth":           1,
-						"err":             errStackUnderflow,
+						"err":             &runtime.StackUnderflowError{StackLen: 0, Required: 1},
 					},
 				},
 			},

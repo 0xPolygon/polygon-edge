@@ -3,6 +3,7 @@ package txrelayer
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"sync"
 	"time"
@@ -43,6 +44,8 @@ type TxRelayerImpl struct {
 	receiptTimeout time.Duration
 
 	lock sync.Mutex
+
+	writer io.Writer
 }
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
@@ -105,6 +108,8 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 
 	txn.Nonce = nonce
 
+	txn.From = key.Address()
+
 	if txn.GasPrice == 0 {
 		gasPrice, err := t.Client().Eth().GasPrice()
 		if err != nil {
@@ -136,6 +141,12 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	data, err := txn.MarshalRLPTo(nil)
 	if err != nil {
 		return ethgo.ZeroHash, err
+	}
+
+	if t.writer != nil {
+		_, _ = t.writer.Write([]byte(
+			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\n",
+				txn.From, txn.Gas, txn.GasPrice)))
 	}
 
 	return t.client.Eth().SendRawTransaction(data)
@@ -224,5 +235,11 @@ func WithIPAddress(ipAddress string) TxRelayerOption {
 func WithReceiptTimeout(receiptTimeout time.Duration) TxRelayerOption {
 	return func(t *TxRelayerImpl) {
 		t.receiptTimeout = receiptTimeout
+	}
+}
+
+func WithWriter(writer io.Writer) TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.writer = writer
 	}
 }
