@@ -23,12 +23,12 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 		Name       string
 		Expected   *big.Int
 		Error      bool
-		GetBackend func() Backend
+		GetBackend func() Blockchain
 	}{
 		{
 			Name:     "Chain just started",
 			Expected: DefaultGasHelperConfig.LastPrice,
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				genesis := &types.Header{
 					Number: 0,
 					Hash:   types.StringToHash("genesis"),
@@ -46,7 +46,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 		{
 			Name:  "Block does not exist",
 			Error: true,
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				header := &types.Header{
 					Number: 0,
 					Hash:   types.StringToHash("some header"),
@@ -61,7 +61,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 		{
 			Name:     "Empty blocks",
 			Expected: DefaultGasHelperConfig.LastPrice, // should return last (default) price
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 10)
 
 				return backend
@@ -70,7 +70,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 		{
 			Name:     "All transactions by miner",
 			Expected: DefaultGasHelperConfig.LastPrice, // should return last (default) price
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 10)
 				rand.Seed(time.Now().UTC().UnixNano())
 
@@ -106,7 +106,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 		{
 			Name:     "All transactions have small effective tip",
 			Expected: DefaultGasHelperConfig.LastPrice, // should return last (default) price
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 10)
 				createTestTxs(t, backend, 3, 1)
 
@@ -117,7 +117,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 			Name: "Number of blocks in chain smaller than numOfBlocksToCheck",
 			Expected: DefaultGasHelperConfig.LastPrice.Mul(
 				DefaultGasHelperConfig.LastPrice, big.NewInt(2)), // at least two times of default last price
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 10)
 				createTestTxs(t, backend, 3, 200)
 
@@ -128,7 +128,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 			Name: "Number of blocks in chain higher than numOfBlocksToCheck",
 			Expected: DefaultGasHelperConfig.LastPrice.Mul(
 				DefaultGasHelperConfig.LastPrice, big.NewInt(2)), // at least two times of default last price
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 30)
 				createTestTxs(t, backend, 3, 200)
 
@@ -139,7 +139,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 			Name: "Not enough transactions in first 20 blocks, so read some more blocks",
 			Expected: DefaultGasHelperConfig.LastPrice.Mul(
 				DefaultGasHelperConfig.LastPrice, big.NewInt(2)), // at least two times of default last price
-			GetBackend: func() Backend {
+			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 50)
 				createTestTxs(t, backend, 1, 200)
 
@@ -233,7 +233,7 @@ func createTestTxs(t *testing.T, backend *backendMock, numOfTxsPerBlock, txCap i
 	}
 }
 
-var _ Backend = (*backendMock)(nil)
+var _ Blockchain = (*backendMock)(nil)
 
 type backendMock struct {
 	mock.Mock

@@ -42,8 +42,8 @@ type Config struct {
 	IgnorePrice *big.Int
 }
 
-// Backend is the interface representing blockchain and consensus backend
-type Backend interface {
+// Blockchain is the interface representing blockchain
+type Blockchain interface {
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 	Header() *types.Header
 	Config() *chain.Params
@@ -73,7 +73,7 @@ type GasHelper struct {
 	// when collecting transactions
 	ignorePrice *big.Int
 	// backend is an abstraction of blockchain
-	backend Backend
+	backend Blockchain
 	// lastHeaderHash is the last header for which maxPriorityFeePerGas was returned
 	lastHeaderHash types.Hash
 
@@ -81,7 +81,7 @@ type GasHelper struct {
 }
 
 // NewGasHelper is the constructor function for GasHelper struct
-func NewGasHelper(config *Config, backend Backend) *GasHelper {
+func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 	pricePercentile := config.PricePercentile
 	if pricePercentile > 100 {
 		pricePercentile = 100
@@ -199,7 +199,9 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 
 	if len(allPrices) > 0 {
 		// sort prices from lowest to highest
-		sort.Sort(bigIntSorted(allPrices))
+		sort.Slice(allPrices, func(i, j int) bool {
+			return allPrices[i].Cmp(allPrices[j]) < 0
+		})
 		// take the biggest price that is in the configured percentage
 		// by default it's 60, so it will take the price on that percentage
 		// of all prices in the array
@@ -249,20 +251,4 @@ func (t *txSortedByEffectiveTip) Less(i, j int) bool {
 	tip2 := t.txs[j].EffectiveTip(t.baseFee)
 
 	return tip1.Cmp(tip2) < 0
-}
-
-// bigIntSorted sorts big int slice from lowest to highest value
-type bigIntSorted []*big.Int
-
-// Len is implementation of sort.Interface
-func (b bigIntSorted) Len() int { return len(b) }
-
-// Less is implementation of sort.Interface
-func (b bigIntSorted) Less(i, j int) bool {
-	return b[i].Cmp(b[j]) < 0
-}
-
-// Swap is implementation of sort.Interface
-func (b bigIntSorted) Swap(i, j int) {
-	b[i], b[j] = b[j], b[i]
 }
