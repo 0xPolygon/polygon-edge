@@ -176,15 +176,15 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 	// burn contract can be set only for non mintable native token
 	if !p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
-		chainConfig.Params.BurnContract = make(map[uint64]string, 1)
+		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		blockNum, address, destAddr, err := parseBurnContractInfo(p.burnContract)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Params.BurnContract[blockNum] = address.String()
-		chainConfig.Params.BurnContractDestinationAddress = destAddr.String()
+		chainConfig.Params.BurnContract[blockNum] = address
+		chainConfig.Params.BurnContractDestinationAddress = destAddr
 	}
 
 	// deploy genesis contracts
@@ -366,7 +366,7 @@ func (p *genesisParams) deployContracts(rewardTokenByteCode []byte,
 		if chainConfig.Params.BurnContract != nil && len(chainConfig.Params.BurnContract) == 1 {
 			var contractAddress types.Address
 			for _, address := range chainConfig.Params.BurnContract {
-				contractAddress = types.StringToAddress(address)
+				contractAddress = address
 			}
 
 			genesisContracts = append(genesisContracts,

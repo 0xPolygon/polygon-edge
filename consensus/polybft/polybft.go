@@ -365,14 +365,14 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			if config.Params.BurnContract != nil && len(config.Params.BurnContract) == 1 {
 				var contractAddress types.Address
 				for _, address := range config.Params.BurnContract {
-					contractAddress = types.StringToAddress(address)
+					contractAddress = address
 				}
 
 				// contract address exists in allocations
 				if _, ok := config.Genesis.Alloc[contractAddress]; ok {
 					burnParams := &contractsapi.InitializeEIP1559BurnFn{
 						NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
-						NewBurnDestination:     types.StringToAddress(config.Params.BurnContractDestinationAddress),
+						NewBurnDestination:     config.Params.BurnContractDestinationAddress,
 					}
 
 					input, err = burnParams.EncodeAbi()
