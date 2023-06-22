@@ -53,6 +53,36 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 	return types.BytesToHash(res)
 }
 
+func (s *Snapshot) GetStorageProof(addr types.Address, root types.Hash, slot types.Hash) ([][]byte, error) {
+	var (
+		err  error
+		trie *Trie
+	)
+
+	if root == emptyStateHash {
+		trie = s.state.newTrie()
+	} else {
+		trie, err = s.state.newTrieAt(root)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	key := crypto.Keccak256(slot.Bytes())
+
+	proof, ok := trie.GetProof(key, s.state.storage)
+	if !ok {
+		return nil, nil
+	}
+
+	// Reverse merkle proof array, so that root is at the beginning
+	for i, j := 0, len(proof)-1; i < j; i, j = i+1, j-1 {
+		proof[i], proof[j] = proof[j], proof[i]
+	}
+
+	return proof, nil
+}
+
 func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 	key := crypto.Keccak256(addr.Bytes())
 
@@ -67,6 +97,22 @@ func (s *Snapshot) GetAccount(addr types.Address) (*state.Account, error) {
 	}
 
 	return &account, nil
+}
+
+func (s *Snapshot) GetAccountProof(addr types.Address) ([][]byte, error) {
+	key := crypto.Keccak256(addr.Bytes())
+
+	proof, ok := s.trie.GetProof(key, s.state.storage)
+	if !ok {
+		return nil, nil
+	}
+
+	// Reverse merkle proof array, so that root is at the beginning
+	for i, j := 0, len(proof)-1; i < j; i, j = i+1, j-1 {
+		proof[i], proof[j] = proof[j], proof[i]
+	}
+
+	return proof, nil
 }
 
 func (s *Snapshot) GetCode(hash types.Hash) ([]byte, bool) {

@@ -1,6 +1,7 @@
 package itrie
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"hash"
@@ -198,5 +199,78 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		t.batch.Put(tmp, h.buf)
 	}
 
+	if t.rootHashes != nil {
+		t.rootHashes[hex.EncodeToString(hh)] = h.buf
+	}
+
 	return a.NewCopyBytes(hh)
+}
+
+// Returns (hash, rlp) value
+func (t *Txn) rlp(node Node, h *hasher, a *fastrlp.Arena, d int) (*fastrlp.Value, *fastrlp.Value) {
+	var hash *fastrlp.Value
+
+	var aa *fastrlp.Arena
+
+	var idx int
+
+	if hash, rlp, ok := node.Rlp(); ok {
+		return a.NewCopyBytes(hash), a.NewCopyBytes(rlp)
+	}
+
+	switch n := node.(type) {
+	case *ValueNode:
+		return a.NewCopyBytes(n.buf), a.NewCopyBytes(n.buf)
+
+	case *ShortNode:
+		childHash := t.hash(n.child, h, a, d+1)
+
+		hash = a.NewArray()
+		hash.Set(a.NewBytes(encodeCompact(n.key)))
+		hash.Set(childHash)
+
+	case *FullNode:
+		hash = a.NewArray()
+
+		aa, idx = h.AcquireArena()
+
+		for _, i := range n.children {
+			if i == nil {
+				hash.Set(a.NewNull())
+			} else {
+				hash.Set(t.hash(i, h, aa, d+1))
+			}
+		}
+
+		// Add the value
+		if n.value == nil {
+			hash.Set(a.NewNull())
+		} else {
+			hash.Set(t.hash(n.value, h, a, d+1))
+		}
+
+	default:
+		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic
+	}
+
+	if hash.Len() < 32 {
+		return hash, hash
+	}
+
+	// marshal RLP value
+	h.buf = hash.MarshalTo(h.buf[:0])
+
+	if aa != nil {
+		h.ReleaseArenas(idx)
+	}
+
+	tmp := h.Hash(h.buf)
+	hh, rr := node.SetRlp(tmp, h.buf)
+
+	// Write data
+	if t.batch != nil {
+		t.batch.Put(tmp, h.buf)
+	}
+
+	return a.NewCopyBytes(hh), a.NewCopyBytes(rr)
 }

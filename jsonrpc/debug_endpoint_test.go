@@ -709,13 +709,13 @@ func TestTraceCall(t *testing.T) {
 	}
 }
 
-func Test_newTracer(t *testing.T) {
+func Test_NewTracer(t *testing.T) {
 	t.Parallel()
 
 	t.Run("should create tracer", func(t *testing.T) {
 		t.Parallel()
 
-		tracer, cancel, err := newTracer(&TraceConfig{
+		tracer, cancel, err := NewTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,
@@ -733,7 +733,7 @@ func Test_newTracer(t *testing.T) {
 	t.Run("should return error if arg is nil", func(t *testing.T) {
 		t.Parallel()
 
-		tracer, cancel, err := newTracer(nil)
+		tracer, cancel, err := NewTracer(nil)
 
 		assert.Nil(t, tracer)
 		assert.Nil(t, cancel)
@@ -744,7 +744,7 @@ func Test_newTracer(t *testing.T) {
 		t.Parallel()
 
 		timeout := "0s"
-		tracer, cancel, err := newTracer(&TraceConfig{
+		tracer, cancel, err := NewTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,
@@ -770,7 +770,7 @@ func Test_newTracer(t *testing.T) {
 		t.Parallel()
 
 		timeout := "5s"
-		tracer, cancel, err := newTracer(&TraceConfig{
+		tracer, cancel, err := NewTracer(&TraceConfig{
 			EnableMemory:     true,
 			EnableReturnData: true,
 			DisableStack:     false,

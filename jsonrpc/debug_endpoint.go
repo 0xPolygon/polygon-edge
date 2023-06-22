@@ -159,7 +159,7 @@ func (d *Debug) TraceTransaction(
 		return nil, ErrTraceGenesisBlock
 	}
 
-	tracer, cancel, err := newTracer(config)
+	tracer, cancel, err := NewTracer(config)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (d *Debug) TraceCall(
 		tx.Gas = header.GasLimit
 	}
 
-	tracer, cancel, err := newTracer(config)
+	tracer, cancel, err := NewTracer(config)
 	defer cancel()
 
 	if err != nil {
@@ -211,7 +211,7 @@ func (d *Debug) traceBlock(
 		return nil, ErrTraceGenesisBlock
 	}
 
-	tracer, cancel, err := newTracer(config)
+	tracer, cancel, err := NewTracer(config)
 	defer cancel()
 
 	if err != nil {
@@ -221,8 +221,8 @@ func (d *Debug) traceBlock(
 	return d.store.TraceBlock(block, tracer)
 }
 
-// newTracer creates new tracer by config
-func newTracer(config *TraceConfig) (
+// NewTracer creates new tracer by config
+func NewTracer(config *TraceConfig) (
 	tracer.Tracer,
 	context.CancelFunc,
 	error,

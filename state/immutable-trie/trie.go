@@ -2,12 +2,14 @@ package itrie
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/umbracle/fastrlp"
 	"golang.org/x/crypto/sha3"
 
 	commonHelpers "github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -15,6 +17,8 @@ import (
 type Node interface {
 	Hash() ([]byte, bool)
 	SetHash(b []byte) []byte
+	Rlp() ([]byte, []byte, bool)
+	SetRlp(h []byte, r []byte) ([]byte, []byte)
 }
 
 // ValueNode is a leaf on the merkle-trie
@@ -34,8 +38,19 @@ func (v *ValueNode) SetHash(b []byte) []byte {
 	panic("We cannot set hash on value node") //nolint:gocritic
 }
 
+// Rlp implements the node interface
+func (v *ValueNode) Rlp() ([]byte, []byte, bool) {
+	return v.buf, v.buf, v.hash
+}
+
+// SetRlp implements the node interface
+func (v *ValueNode) SetRlp(h []byte, r []byte) ([]byte, []byte) {
+	panic("We cannot set rlp on value node") //nolint:gocritic
+}
+
 type common struct {
 	hash []byte
+	rlp  []byte
 }
 
 // Hash implements the node interface
@@ -49,6 +64,21 @@ func (c *common) SetHash(b []byte) []byte {
 	copy(c.hash, b)
 
 	return c.hash
+}
+
+// Rlp implements the node interface, return hash and plain rlp values
+func (c *common) Rlp() ([]byte, []byte, bool) {
+	return c.hash, c.rlp, len(c.hash) != 0 && len(c.rlp) != 0
+}
+
+// SetRlp implements the node interface
+func (c *common) SetRlp(h []byte, r []byte) ([]byte, []byte) {
+	c.hash = commonHelpers.ExtendByteSlice(c.hash, len(h))
+	c.rlp = commonHelpers.ExtendByteSlice(c.rlp, len(r))
+	copy(c.hash, h)
+	copy(c.rlp, r)
+
+	return c.hash, c.rlp
 }
 
 // ShortNode is an extension or short node
@@ -106,6 +136,28 @@ func (t *Trie) Get(k []byte, storage Storage) ([]byte, bool) {
 	return res, res != nil
 }
 
+func (t *Trie) GetProof(k []byte, storage Storage) ([][]byte, bool) {
+	txn := t.Txn(storage)
+	path, err := txn.LookupWithProof(k)
+
+	// Return result, merkle proof and if result is found
+	return path, path != nil && err == nil
+}
+
+func (t *Trie) GetRootRlpData(storage Storage) ([]byte, types.Hash, bool) {
+	txn := t.Txn(storage)
+
+	// While calculating root keccak hash, rlp hash of the root node is also calculated
+	keccakHash, err := txn.Hash()
+	if err != nil {
+		return nil, types.Hash{}, false
+	}
+
+	rlpHash := txn.rootHashes[hex.EncodeToString(keccakHash[:])]
+
+	return rlpHash, types.BytesToHash(keccakHash), len(rlpHash) != 0
+}
+
 func hashit(k []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
 	h.Write(k)
@@ -136,7 +188,8 @@ func (t *Trie) hashRoot() []byte {
 }
 
 func (t *Trie) Txn(storage Storage) *Txn {
-	return &Txn{root: t.root, epoch: t.epoch + 1, storage: storage}
+	return &Txn{root: t.root, epoch: t.epoch + 1, storage: storage,
+		rootHashes: make(map[string][]byte)}
 }
 
 type Putter interface {
@@ -148,6 +201,8 @@ type Txn struct {
 	epoch   uint32
 	storage Storage
 	batch   Putter
+	// Map of root keccak hash to its full rlp root hash
+	rootHashes map[string][]byte
 }
 
 func (t *Txn) Commit() *Trie {
@@ -158,6 +213,32 @@ func (t *Txn) Lookup(key []byte) []byte {
 	_, res := t.lookup(t.root, bytesToHexNibbles(key))
 
 	return res
+}
+
+func (t *Txn) LookupWithProof(key []byte) ([][]byte, error) {
+	h, ok := hasherPool.Get().(*hasher)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	arena, _ := h.AcquireArena()
+
+	path := make([]*fastrlp.Value, 0)
+	path = t.lookupMerklePath(t.root, bytesToHexNibbles(key), path, h, arena)
+
+	result := make([][]byte, 0)
+
+	for _, p := range path {
+		b, err := p.Bytes()
+		if err == nil {
+			result = append(result, b)
+		}
+	}
+
+	h.ReleaseArenas(0)
+	hasherPool.Put(h)
+
+	return result, nil
 }
 
 func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
@@ -213,6 +294,155 @@ func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
 		}
 
 		return nil, res
+
+	default:
+		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic
+	}
+}
+
+func (t *Txn) lookupMerklePath(node interface{}, key []byte, path []*fastrlp.Value,
+	h *hasher, a *fastrlp.Arena) []*fastrlp.Value {
+	switch n := node.(type) {
+	case nil:
+		return nil
+
+	case *ValueNode:
+		if n.hash {
+			nc, ok, err := GetNode(n.buf, t.storage)
+			if err != nil {
+				panic(err) //nolint:gocritic
+			}
+
+			if !ok {
+				return nil
+			}
+
+			path := t.lookupMerklePath(nc, key, path, h, a)
+
+			return path
+		}
+
+		if len(key) == 0 {
+			_, rlp := t.rlp(n, h, a, 1)
+			path = append(path, rlp)
+
+			return path
+		} else {
+			return nil
+		}
+
+	case *ShortNode:
+		plen := len(n.key)
+		if plen > len(key) || !bytes.Equal(key[:plen], n.key) {
+			return nil
+		}
+
+		path := t.lookupMerklePath(n.child, key[plen:], path, h, a)
+
+		if path != nil {
+			_, rlp := t.rlp(n, h, a, 0)
+			path := append(path, rlp)
+
+			return path
+		} else {
+			return nil
+		}
+
+	case *FullNode:
+		if len(key) == 0 {
+			path := t.lookupMerklePath(n.value, key, path, h, a)
+			_, rlp := t.rlp(n, h, a, 1)
+			path = append(path, rlp)
+
+			return path
+		} else {
+			path := t.lookupMerklePath(n.getEdge(key[0]), key[1:], path, h, a)
+			_, rlp := t.rlp(n, h, a, 1)
+			path = append(path, rlp)
+
+			return path
+		}
+	default:
+		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic
+	}
+}
+
+func decodeRlp(value []byte) types.Hash {
+	p := &fastrlp.Parser{}
+
+	v, err := p.Parse(value)
+	if err != nil {
+		return types.Hash{}
+	}
+
+	res := []byte{}
+	if res, err = v.GetBytes(res[:0]); err != nil {
+		return types.Hash{}
+	}
+
+	return types.BytesToHash(res)
+}
+
+func (t *Txn) PrintTrie() {
+	t.printTrie(t.root, 0)
+
+	return
+}
+
+func (t *Txn) printTrie(node interface{}, level int) {
+	for i := 0; i <= level; i++ {
+		fmt.Print(" ")
+	}
+
+	switch n := node.(type) {
+	case nil:
+		return
+
+	case *ValueNode:
+		if n.hash {
+			nc, ok, err := GetNode(n.buf, t.storage)
+			if err != nil {
+				panic(err) //nolint:gocritic
+			}
+
+			if !ok {
+				return
+			}
+
+			t.printTrie(nc, level+1)
+
+			return
+		} else {
+			fmt.Println("ValueNode level", level, " value:", decodeRlp(n.buf))
+		}
+
+		return
+
+	case *ShortNode:
+		fmt.Println("ShortNode level", level, " common:", hex.EncodeToHex(n.common.hash),
+			" key:", hex.EncodeToHex(n.key))
+
+		t.printTrie(n.child, level+1)
+
+		return
+
+	case *FullNode:
+		fmt.Println("FullNode level", level, " number of children:", len(n.children),
+			" common:", hex.EncodeToHex(n.common.hash), " value:", n.value)
+
+		if n.value != nil {
+			t.printTrie(n.value, level+1)
+		}
+
+		for i, child := range n.children {
+			if child != nil {
+				fmt.Println("FullNode level", level, " entering child:", i)
+			}
+
+			t.printTrie(child, level+1)
+		}
+
+		return
 
 	default:
 		panic(fmt.Sprintf("unknown node type %v", n)) //nolint:gocritic

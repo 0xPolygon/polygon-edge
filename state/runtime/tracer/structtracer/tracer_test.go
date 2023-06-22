@@ -190,9 +190,11 @@ func TestStructTracerTxStart(t *testing.T) {
 			storage: []map[types.Address]map[types.Hash]types.Hash{
 				make(map[types.Address]map[types.Hash]types.Hash),
 			},
-			gasLimit:      gasLimit,
-			currentMemory: make([]([]byte), 1),
-			currentStack:  make([]([]*big.Int), 1),
+			gasLimit:              gasLimit,
+			currentMemory:         make([]([]byte), 1),
+			currentStack:          make([]([]*big.Int), 1),
+			storageUpdates:        make([][]StorageUpdate, 1),
+			accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
 		},
 		tracer,
 	)
@@ -218,10 +220,12 @@ func TestStructTracerTxEnd(t *testing.T) {
 			storage: []map[types.Address]map[types.Hash]types.Hash{
 				make(map[types.Address]map[types.Hash]types.Hash),
 			},
-			gasLimit:      gasLimit,
-			consumedGas:   gasLimit - gasLeft,
-			currentMemory: make([]([]byte), 1),
-			currentStack:  make([]([]*big.Int), 1),
+			gasLimit:              gasLimit,
+			consumedGas:           gasLimit - gasLeft,
+			currentMemory:         make([]([]byte), 1),
+			currentStack:          make([]([]*big.Int), 1),
+			storageUpdates:        make([][]StorageUpdate, 1),
+			accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
 		},
 		tracer,
 	)
@@ -275,10 +279,12 @@ func TestStructTracerCallEnd(t *testing.T) {
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
 				},
-				output:        output,
-				err:           err,
-				currentMemory: make([]([]byte), 1),
-				currentStack:  make([]([]*big.Int), 1),
+				output:                output,
+				err:                   err,
+				currentMemory:         make([]([]byte), 1),
+				currentStack:          make([]([]*big.Int), 1),
+				storageUpdates:        make([][]StorageUpdate, 1),
+				accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
 			},
 		},
 		{
@@ -291,8 +297,10 @@ func TestStructTracerCallEnd(t *testing.T) {
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
 				},
-				currentMemory: make([]([]byte), 1),
-				currentStack:  make([]([]*big.Int), 1),
+				currentMemory:         make([]([]byte), 1),
+				currentStack:          make([]([]*big.Int), 1),
+				storageUpdates:        make([][]StorageUpdate, 1),
+				accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
 			},
 		},
 	}
@@ -451,6 +459,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 						},
 					},
 				},
+				storageUpdates:        make([][]StorageUpdate, 1),
+				accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -472,7 +482,14 @@ func TestStructTracerCaptureState(t *testing.T) {
 							types.BytesToHash(big.NewInt(2).Bytes()): types.BytesToHash(big.NewInt(1).Bytes()),
 						},
 					},
-				}},
+				},
+				storageUpdates: [][]StorageUpdate{
+					{
+						StorageUpdate{types.BytesToHash(big.NewInt(2).Bytes()), types.BytesToHash(big.NewInt(1).Bytes())},
+					},
+				},
+				accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
+			},
 			expectedVMState: &mockState{},
 		},
 		{

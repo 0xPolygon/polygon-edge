@@ -472,6 +472,21 @@ func getAccountImpl(state state.State, root types.Hash, addr types.Address) (*st
 	return account, nil
 }
 
+// getAccountProofImpl is used for fetching account state from both TxPool and JSON-RPC
+func getAccountProofImpl(state state.State, root types.Hash, addr types.Address) ([][]byte, error) {
+	snap, err := state.NewSnapshotAt(root)
+	if err != nil {
+		return nil, fmt.Errorf("unable to get snapshot for root '%s': %w", root, err)
+	}
+
+	proof, err := snap.GetAccountProof(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return proof, nil
+}
+
 func (t *txpoolHub) GetNonce(root types.Hash, addr types.Address) uint64 {
 	account, err := getAccountImpl(t.state, root, addr)
 
@@ -682,11 +697,23 @@ func (j *jsonRPCHub) GetAccount(root types.Hash, addr types.Address) (*jsonrpc.A
 	}
 
 	account := &jsonrpc.Account{
-		Nonce:   acct.Nonce,
-		Balance: new(big.Int).Set(acct.Balance),
+		Nonce:    acct.Nonce,
+		Balance:  new(big.Int).Set(acct.Balance),
+		Root:     acct.Root,
+		CodeHash: acct.CodeHash,
 	}
 
 	return account, nil
+}
+
+// TODO: use eth_getProof once it is available in Polygon Edge
+func (j *jsonRPCHub) GetAccountProof(root types.Hash, addr types.Address) ([][]byte, error) {
+	proof, err := getAccountProofImpl(j.state, root, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	return proof, nil
 }
 
 // GetForksInTime returns the active forks at the given block height
@@ -708,6 +735,26 @@ func (j *jsonRPCHub) GetStorage(stateRoot types.Hash, addr types.Address, slot t
 	res := snap.GetStorage(addr, account.Root, slot)
 
 	return res.Bytes(), nil
+}
+
+// TODO: use eth_getProof once it is available in Polygon Edge
+func (j *jsonRPCHub) GetStorageProof(stateRoot types.Hash, addr types.Address, slot types.Hash) ([][]byte, error) {
+	account, err := getAccountImpl(j.state, stateRoot, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	snap, err := j.state.NewSnapshotAt(stateRoot)
+	if err != nil {
+		return nil, err
+	}
+
+	storageProof, err := snap.GetStorageProof(addr, account.Root, slot)
+	if err != nil {
+		return nil, err
+	}
+
+	return storageProof, nil
 }
 
 func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
