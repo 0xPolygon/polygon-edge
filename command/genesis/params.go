@@ -394,18 +394,18 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	// burn contract can be set only for non mintable native token
-	if !p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
+	if p.isBurnContractEnabled() {
 		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
 		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
-		block, address, destAddr, err := parseBurnContractInfo(p.burnContract)
+		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Params.BurnContract[block] = address
-		chainConfig.Params.BurnContractDestinationAddress = destAddr
+		chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractInfo.Address
+		chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
 	}
 
 	// Predeploy staking smart contract if needed

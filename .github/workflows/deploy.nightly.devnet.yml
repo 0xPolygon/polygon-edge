@@ -123,7 +123,6 @@ jobs:
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "fullnode" or hostvars[item].tags.Role == "validator") %} --premine $(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address'):1000000000000000000000000 {% endif %}{% endfor %} \
                           --premine {{ loadtest_account }}:1000000000000000000000000000 \
                           --premine $BURN_CONTRACT_ADDRESS \
-                          --burn-contract 0:$BURN_CONTRACT_ADDRESS \
                           --reward-wallet 0x0101010101010101010101010101010101010101:1000000000000000000000000000 \
                           --premine 0xA39Fed214820cF843E2Bcd6cA1759257a530894B:1000000000000000000000000000 \
                           --premine 0x181d9fEc79EC674DD3cB30dd9dd4188E737939FE:1000000000000000000000000000 \

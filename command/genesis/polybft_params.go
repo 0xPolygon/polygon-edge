@@ -178,13 +178,13 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	if !p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
-		blockNum, address, destAddr, err := parseBurnContractInfo(p.burnContract)
+		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Params.BurnContract[blockNum] = address
-		chainConfig.Params.BurnContractDestinationAddress = destAddr
+		chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractInfo.Address
+		chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
 	}
 
 	// deploy genesis contracts

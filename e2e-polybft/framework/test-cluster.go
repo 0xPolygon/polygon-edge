@@ -84,7 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
-	BurnContract         *BurnContractInfo
+	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -115,13 +115,6 @@ type TestClusterConfig struct {
 	TestRewardToken string
 
 	logsDirOnce sync.Once
-}
-
-// BurnContractInfo contains metadata for burn contract, which is part of EIP-1559 specification
-type BurnContractInfo struct {
-	BlockNumber            uint64
-	Address                types.Address
-	BurnDestinationAddress types.Address
 }
 
 func (c *TestClusterConfig) Dir(name string) string {
@@ -261,7 +254,7 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(burnContract *BurnContractInfo) ClusterOption {
+func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BurnContract = burnContract
 	}
@@ -474,12 +467,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		if cluster.Config.BurnContract != nil {
+		burnContract := cluster.Config.BurnContract
+		if burnContract != nil {
 			args = append(args, "--burn-contract",
 				fmt.Sprintf("%d:%s:%s",
-					cluster.Config.BurnContract.BlockNumber,
-					cluster.Config.BurnContract.Address,
-					cluster.Config.BurnContract.BurnDestinationAddress))
+					burnContract.BlockNumber, burnContract.Address, burnContract.DestinationAddress))
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
