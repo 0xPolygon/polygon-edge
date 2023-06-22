@@ -442,11 +442,11 @@ func ForkManagerInitialParamsFactory(config *chain.Chain) (*chain.ForkParams, er
 	}
 
 	return &chain.ForkParams{
-		MaxValidatorSetSize: pbftConfig.MaxValidatorSetSize,
-		EpochSize:           pbftConfig.EpochSize,
-		SprintSize:          pbftConfig.SprintSize,
-		BlockTime:           pbftConfig.BlockTime,
-		BlockTimeDrift:      pbftConfig.BlockTimeDrift,
+		MaxValidatorSetSize: &pbftConfig.MaxValidatorSetSize,
+		EpochSize:           &pbftConfig.EpochSize,
+		SprintSize:          &pbftConfig.SprintSize,
+		BlockTime:           &pbftConfig.BlockTime,
+		BlockTimeDrift:      &pbftConfig.BlockTimeDrift,
 	}, nil
 }
 

@@ -25,18 +25,19 @@ type Fork struct {
 	Handlers map[HandlerDesc]interface{}
 }
 
-// Handler defines one custom handler
-type Handler struct {
+// forkHandler defines one custom handler
+type forkHandler struct {
 	// Handler should be active from block `FromBlockNumber``
 	FromBlockNumber uint64
 	// instance of some structure, function etc
 	Handler interface{}
 }
 
-type ForkParamsBlock struct {
+// forkParamsBlock encapsulates block and actual fork params
+type forkParamsBlock struct {
 	// Params should be active from block `FromBlockNumber``
 	FromBlockNumber uint64
-	// actual params
+	// pointer to fork params
 	Params *chain.ForkParams
 }
 
