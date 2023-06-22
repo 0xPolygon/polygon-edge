@@ -263,9 +263,7 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 
 func WithBurnContract(burnContracts []*BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
-		for _, burnContract := range burnContracts {
-			h.BurnContracts = append(h.BurnContracts, burnContract)
-		}
+		h.BurnContracts = append(h.BurnContracts, burnContracts...)
 	}
 }
 
