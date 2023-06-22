@@ -480,14 +480,20 @@ func (p *genesisParams) validateRewardWallet() error {
 // burn contract flag must not be set. If native token is non mintable only one burn contract
 // can be set and the specified address will be used to predeploy default EIP1559 burn contract.
 func (p *genesisParams) validateBurnContract() error {
-	if p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
+	if p.isBurnContractEnabled() {
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
 		if err != nil {
 			return fmt.Errorf("invalid burn contract info provided: %w", err)
 		}
 
-		if burnContractInfo.Address != types.ZeroAddress {
-			return errors.New("only zero address is allowed as burn destination for mintable native token")
+		if p.nativeTokenConfig.IsMintable {
+			if burnContractInfo.Address != types.ZeroAddress {
+				return errors.New("only zero address is allowed as burn destination for mintable native token")
+			}
+		} else {
+			if burnContractInfo.Address == types.ZeroAddress {
+				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
+			}
 		}
 	}
 
