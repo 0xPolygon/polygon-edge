@@ -36,7 +36,8 @@ function createGenesis() {
     --premine 0x0000000000000000000000000000000000000000 \
     --epoch-size 10 \
     --reward-wallet 0xDEADBEEF:1000000 \
-    --native-token-config "Polygon:MATIC:18:true:$address1"
+    --native-token-config "Polygon:MATIC:18:true:$address1" \
+    --burn-contract 0:0x0000000000000000000000000000000000000000
 }
 
 function initRootchain() {

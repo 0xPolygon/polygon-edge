@@ -174,8 +174,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		Bootnodes: p.bootnodes,
 	}
 
-	// burn contract can be set only for non mintable native token
-	if !p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
+	if p.isBurnContractEnabled() {
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
@@ -183,8 +182,14 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			return err
 		}
 
-		chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractInfo.Address
-		chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
+		if !p.nativeTokenConfig.IsMintable {
+			// burn contract can be specified on arbitrary address for non-mintable native tokens
+			chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = burnContractInfo.Address
+			chainConfig.Params.BurnContractDestinationAddress = burnContractInfo.DestinationAddress
+		} else {
+			// burnt funds are sent to zero address when dealing with mintable native tokens
+			chainConfig.Params.BurnContract[burnContractInfo.BlockNumber] = types.ZeroAddress
+		}
 	}
 
 	// deploy genesis contracts

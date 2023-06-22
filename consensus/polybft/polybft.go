@@ -362,7 +362,9 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize EIP1559Burn SC
-			if config.Params.BurnContract != nil && len(config.Params.BurnContract) == 1 {
+			if config.Params.BurnContract != nil &&
+				len(config.Params.BurnContract) == 1 &&
+				!polyBFTConfig.NativeTokenConfig.IsMintable {
 				var contractAddress types.Address
 				for _, address := range config.Params.BurnContract {
 					contractAddress = address

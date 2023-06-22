@@ -134,7 +134,7 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 
 	blockNum, err := types.ParseUint64orHex(&blockRaw)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse amount %s: %w", blockRaw, err)
+		return nil, fmt.Errorf("failed to parse block number %s: %w", blockRaw, err)
 	}
 
 	contractAddress := burnContractParts[1]
