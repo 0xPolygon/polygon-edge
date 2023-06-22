@@ -19,12 +19,10 @@ func TestE2E_BurnContract_Deployed(t *testing.T) {
 	destinationAddr := types.Address(destinationKey.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBurnContract(
-			[]*framework.BurnContractInfo{
-				{
-					Address:                contractAddr,
-					BurnDestinationAddress: destinationAddr,
-				}}),
+		framework.WithBurnContract(&framework.BurnContractInfo{
+			Address:                contractAddr,
+			BurnDestinationAddress: destinationAddr,
+		}),
 	)
 	defer cluster.Stop()
 

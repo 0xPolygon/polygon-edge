@@ -158,7 +158,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
-	if len(p.burnContracts) == 0 {
+	if !p.isBurnContractEnabled() {
 		enabledForks.RemoveFork(chain.London)
 	}
 
@@ -175,15 +175,15 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	// burn contract can be set only for non mintable native token
-	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) == 1 {
-		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
+	if !p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
+		chainConfig.Params.BurnContract = make(map[uint64]string, 1)
 
-		block, address, destAddr, err := parseBurnContractInfo(p.burnContracts[0])
+		blockNum, address, destAddr, err := parseBurnContractInfo(p.burnContract)
 		if err != nil {
 			return err
 		}
 
-		chainConfig.Params.BurnContract[block] = address.String()
+		chainConfig.Params.BurnContract[blockNum] = address.String()
 		chainConfig.Params.BurnContractDestinationAddress = destAddr.String()
 	}
 
@@ -291,7 +291,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if len(p.burnContracts) > 0 {
+	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
 		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee

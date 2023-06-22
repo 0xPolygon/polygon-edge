@@ -81,7 +81,7 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	burnContracts []string
+	burnContract string
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -372,8 +372,8 @@ func (p *genesisParams) generateGenesis() error {
 func (p *genesisParams) initGenesisConfig() error {
 	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
-	if len(p.burnContracts) == 0 {
-		enabledForks.SetFork(chain.London, nil)
+	if !p.isBurnContractEnabled() {
+		enabledForks.RemoveFork(chain.London)
 	}
 
 	chainConfig := &chain.Chain{
@@ -394,12 +394,12 @@ func (p *genesisParams) initGenesisConfig() error {
 	}
 
 	// burn contract can be set only for non mintable native token
-	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) == 1 {
+	if !p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
 		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
 		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
-		chainConfig.Params.BurnContract = make(map[uint64]string, len(p.burnContracts))
+		chainConfig.Params.BurnContract = make(map[uint64]string, 1)
 
-		block, address, destAddr, err := parseBurnContractInfo(p.burnContracts[0])
+		block, address, destAddr, err := parseBurnContractInfo(p.burnContract)
 		if err != nil {
 			return err
 		}
@@ -480,15 +480,16 @@ func (p *genesisParams) validateRewardWallet() error {
 // burn contract flag must not be set. If native token is non mintable only one burn contract
 // can be set and the specified address will be used to predeploy default EIP1559 burn contract.
 func (p *genesisParams) validateBurnContract() error {
-	if p.nativeTokenConfig.IsMintable && len(p.burnContracts) > 0 {
+	if p.nativeTokenConfig.IsMintable && p.isBurnContractEnabled() {
 		return errors.New("burn contract must not be defined for mintable token")
 	}
 
-	if !p.nativeTokenConfig.IsMintable && len(p.burnContracts) > 1 {
-		return errors.New("only one burn contract is allowed for non mintable token")
-	}
-
 	return nil
+}
+
+// isBurnContractEnabled returns true in case burn contract info is provided
+func (p *genesisParams) isBurnContractEnabled() bool {
+	return p.burnContract != ""
 }
 
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
