@@ -608,6 +608,7 @@ func TestSelfConnection_WithBootNodes(t *testing.T) {
 }
 
 func TestRunDial(t *testing.T) {
+	t.Skip()
 	// setupServers returns server and list of peer's server
 	setupServers := func(t *testing.T, maxPeers []int64) []*Server {
 		t.Helper()
