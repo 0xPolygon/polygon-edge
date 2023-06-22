@@ -291,16 +291,16 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
 		require.NoError(t, err)
-		var firstValidaotor *validator.ValidatorMetadata
-		firstValidaotor = nil
+		var updatedValidator *validator.ValidatorMetadata
+		updatedValidator = nil
 		for _, validator := range fullValidatorSet.Validators {
 			if validator.Address.String() == validators.GetValidator(initialSetAliases[secondValidator]).Address().String() {
-				firstValidaotor = validator
+				updatedValidator = validator
 			}
 		}
-		require.NotNil(t, firstValidaotor)
-		require.Equal(t, big.NewInt(501), firstValidaotor.VotingPower) // 250 + 250 + initial 1
-		require.True(t, firstValidaotor.IsActive)
+		require.NotNil(t, updatedValidator)
+		require.Equal(t, big.NewInt(501), updatedValidator.VotingPower) // 250 + 250 + initial 1
+		require.True(t, updatedValidator.IsActive)
 
 		bcMock.AssertExpectations(t)
 	})

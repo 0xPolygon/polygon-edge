@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -108,25 +107,7 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	s.logger.Debug("Stake manager on post block", "block", req.FullBlock.Block.Number(),
 		"last saved", fullValidatorSet.BlockNumber, "last updated", fullValidatorSet.UpdatedAtBlockNumber)
 
-	// update with missing blocks
-	for i := fullValidatorSet.BlockNumber + 1; i < req.FullBlock.Block.Number(); i++ {
-		blockHeader, found := s.blockchain.GetHeaderByNumber(i)
-		if !found {
-			return blockchain.ErrNoBlock
-		}
-
-		receipts, err := s.blockchain.GetReceiptsByHash(blockHeader.Hash)
-		if err != nil {
-			return err
-		}
-
-		if err := s.updateWithReceipts(&fullValidatorSet, receipts, i); err != nil {
-			return err
-		}
-	}
-
-	// finally update with received block
-	err = s.updateWithReceipts(&fullValidatorSet, req.FullBlock.Receipts, req.FullBlock.Block.Number())
+	err = s.updateWithReceipts(&fullValidatorSet, req.FullBlock)
 	if err != nil {
 		return err
 	}
@@ -138,20 +119,47 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 }
 
 func (s *stakeManager) updateWithReceipts(
-	fullValidatorSet *validatorSetState, receipts []*types.Receipt, block uint64) error {
-	events, err := s.getTransferEventsFromReceipts(receipts)
-	if err != nil {
-		return err
+	fullValidatorSet *validatorSetState, fullBlock *types.FullBlock) error {
+	var transferEvents []*contractsapi.TransferEvent
+
+	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
+		blockchain: s.blockchain,
+		saveEventsFn: func(te []*contractsapi.TransferEvent) error {
+			transferEvents = append(transferEvents, te...)
+
+			return nil
+		},
+		isValidLogFn: func(l *types.Log) bool {
+			return l.Address == s.validatorSetContract
+		},
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.TransferEvent, bool, error) {
+			var transferEvent contractsapi.TransferEvent
+			doesMatch, err := transferEvent.ParseLog(l)
+
+			return &transferEvent, doesMatch, err
+		},
 	}
 
-	s.logger.Debug("Full validator set before",
-		"block", block-1, "evnts", len(events), "data", fullValidatorSet.Validators)
+	if fullValidatorSet.BlockNumber+1 < fullBlock.Block.Number() {
+		// get transfer events we missed until current block
+		if err := eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber+1,
+			fullBlock.Block.Number()-1); err != nil {
+			return fmt.Errorf("could not get transfer events from missed blocks. Error: %w", err)
+		}
+	}
 
-	if len(events) == 0 {
+	// get transfer currentBlockEvents from current block
+	currentBlockEvents, err := eventsGetter.getEventsFromReceipts(fullBlock.Block.Header, fullBlock.Receipts)
+	if err != nil {
+		return fmt.Errorf("could not get transfer events from current block. Error: %w", err)
+	}
+
+	transferEvents = append(transferEvents, currentBlockEvents...)
+	if len(transferEvents) == 0 {
 		return nil
 	}
 
-	for _, event := range events {
+	for _, event := range transferEvents {
 		if event.IsStake() {
 			s.logger.Debug("Stake transfer event", "to", event.To, "value", event.Value)
 
@@ -172,16 +180,18 @@ func (s *stakeManager) updateWithReceipts(
 		if data.BlsKey == nil {
 			data.BlsKey, err = s.getBlsKey(data.Address)
 			if err != nil {
-				s.logger.Warn("Could not get info for new validator", "block", block, "address", addr)
+				s.logger.Warn("Could not get info for new validator",
+					"block", fullBlock.Block.Number(), "address", addr)
 			}
 		}
 
 		data.IsActive = data.VotingPower.Cmp(bigZero) > 0
 	}
 
-	fullValidatorSet.UpdatedAtBlockNumber = block // mark on which block validator set has been updated
+	// mark on which block validator set has been updated
+	fullValidatorSet.UpdatedAtBlockNumber = fullValidatorSet.BlockNumber
 
-	s.logger.Debug("Full validator set after", "block", block, "data", fullValidatorSet.Validators)
+	s.logger.Debug("Full validator set after", "block", fullBlock.Block, "data", fullValidatorSet.Validators)
 
 	return nil
 }
@@ -259,38 +269,6 @@ func (s *stakeManager) UpdateValidatorSet(
 	}
 
 	return delta, nil
-}
-
-// getTransferEventsFromReceipts parses logs from receipts to find transfer events
-func (s *stakeManager) getTransferEventsFromReceipts(receipts []*types.Receipt) ([]*contractsapi.TransferEvent, error) {
-	events := make([]*contractsapi.TransferEvent, 0)
-
-	for i := 0; i < len(receipts); i++ {
-		if receipts[i].Status == nil || *receipts[i].Status != types.ReceiptSuccess {
-			continue
-		}
-
-		for _, log := range receipts[i].Logs {
-			if log.Address != s.validatorSetContract {
-				continue
-			}
-
-			var transferEvent contractsapi.TransferEvent
-
-			doesMatch, err := transferEvent.ParseLog(convertLog(log))
-			if err != nil {
-				return nil, err
-			}
-
-			if !doesMatch {
-				continue
-			}
-
-			events = append(events, &transferEvent)
-		}
-	}
-
-	return events, nil
 }
 
 // getBlsKey returns bls key for validator from the supernet contract

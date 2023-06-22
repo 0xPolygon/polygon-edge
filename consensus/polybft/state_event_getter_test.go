@@ -11,7 +11,7 @@ import (
 	"github.com/umbracle/ethgo"
 )
 
-func TestEventDBInsertRetry_TransferEvents(t *testing.T) {
+func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 	receipt := &types.Receipt{
 		Logs: []*types.Log{
 			createTestLogForTransferEvent(t, contracts.ValidatorSetContract, types.ZeroAddress, types.ZeroAddress, 10),
@@ -31,7 +31,7 @@ func TestEventDBInsertRetry_TransferEvents(t *testing.T) {
 		return nil
 	}
 
-	retryManager := &eventDBInsertRetry[*contractsapi.TransferEvent]{
+	retryManager := &eventsGetter[*contractsapi.TransferEvent]{
 		blockchain:   backend,
 		saveEventsFn: saveEventsFn,
 		isValidLogFn: func(l *types.Log) bool {
@@ -45,5 +45,5 @@ func TestEventDBInsertRetry_TransferEvents(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, retryManager.insertRetry(1, 1))
+	require.NoError(t, retryManager.getFromBlocks(1, 1))
 }

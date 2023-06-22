@@ -43,8 +43,9 @@ var (
 		"allowed in an epoch ending block")
 	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	errValidatorSetDeltaMismatch        = errors.New("validator set delta mismatch")
-	errValidatorsUpdateInNonEpochEnding = errors.New("trying to update validator set in a non epoch ending block")
+	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
+	errValidatorsUpdateInNonEpochEnding    = errors.New("trying to update validator set in a non epoch ending block")
+	errValidatorDeltaNilInEpochEndingBlock = errors.New("validator set delta is nil in epoch ending block")
 )
 
 type fsm struct {
@@ -337,11 +338,15 @@ func (f *fsm) Validate(proposal []byte) error {
 
 	// validate validators delta
 	if f.isEndOfEpoch {
+		if extra.Validators == nil {
+			return errValidatorDeltaNilInEpochEndingBlock
+		}
+
 		if !extra.Validators.Equals(f.newValidatorsDelta) {
 			return errValidatorSetDeltaMismatch
 		}
-	} else if !extra.Validators.IsEmpty() {
-		// delta should be empty in non epoch ending blocks
+	} else if extra.Validators != nil {
+		// delta should be nil in non epoch ending blocks
 		return errValidatorsUpdateInNonEpochEnding
 	}
 

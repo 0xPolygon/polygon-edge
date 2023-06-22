@@ -68,6 +68,8 @@ type checkpointManager struct {
 	logger hclog.Logger
 	// state boltDb instance
 	state *State
+	// eventGetter gets exit events (missed or current) from blocks
+	eventGetter *eventsGetter[*ExitEvent]
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
@@ -75,6 +77,43 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
+	retry := &eventsGetter[*ExitEvent]{
+		blockchain: blockchain,
+		isValidLogFn: func(l *types.Log) bool {
+			return l.Address == contracts.L2StateSenderContract
+		},
+		saveEventsFn: func(events []*ExitEvent) error {
+			// enforce sequential order
+			sort.Slice(events, func(i, j int) bool {
+				return events[i].ID.Cmp(events[j].ID) < 0
+			})
+
+			return state.CheckpointStore.insertExitEvents(events)
+		},
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (*ExitEvent, bool, error) {
+			extra, err := GetIbftExtra(h.ExtraData)
+			if err != nil {
+				return nil, false,
+					fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
+			}
+
+			epoch := extra.Checkpoint.EpochNumber
+			block := h.Number
+			if extra.Validators != nil {
+				// exit events that happened in epoch ending blocks,
+				// should be added to the tree of the next epoch
+				epoch++
+				block++
+			}
+
+			event, err := decodeExitEvent(l, epoch, block)
+			if err != nil {
+				return nil, false, err
+			}
+
+			return event, true, nil
+		},
+	}
 
 	return &checkpointManager{
 		key:                   key,
@@ -85,6 +124,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
 		state:                 state,
+		eventGetter:           retry,
 	}
 }
 
@@ -274,30 +314,33 @@ func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingB
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
 func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
-	var (
-		epoch = req.Epoch
-		block = req.FullBlock.Block.Number()
-	)
+	block := req.FullBlock.Block.Number()
 
-	if req.IsEpochEndingBlock {
-		// exit events that happened in epoch ending blocks,
-		// should be added to the tree of the next epoch
-		epoch++
-		block++
+	lastBlock, err := c.state.CheckpointStore.getLastSaved()
+	if err != nil {
+		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
-	// commit exit events only when we finalize a block
-	events, err := getExitEventsFromReceipts(epoch, block, req.FullBlock.Receipts)
-	if err != nil {
+	// get any missed events
+	if lastBlock+1 < block {
+		// since we save exit events from epoch ending blocks,
+		// to next epoch and next block, check that block as well
+		// to not miss any events that might happen in it
+		if err := c.eventGetter.getFromBlocks(lastBlock+1, block-1); err != nil {
+			return fmt.Errorf("could not get exit events from missed blocks. Error: %w", err)
+		}
+
+		if err := c.state.CheckpointStore.updateLastSaved(block - 1); err != nil {
+			return err
+		}
+	}
+
+	// get exit events from current block
+	if err := c.eventGetter.saveBlockEvents(req.FullBlock.Block.Header, req.FullBlock.Receipts); err != nil {
 		return err
 	}
 
-	if len(events) > 0 {
-		c.logger.Debug("Gotten exit events from logs on block",
-			"eventsNum", len(events), "block", req.FullBlock.Block.Number())
-	}
-
-	if err := c.state.CheckpointStore.insertExitEvents(events); err != nil {
+	if err := c.state.CheckpointStore.updateLastSaved(block); err != nil {
 		return err
 	}
 
@@ -435,42 +478,6 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 			"CheckpointBlock": checkpointBlock,
 		},
 	}, nil
-}
-
-// getExitEventsFromReceipts parses logs from receipts to find exit events
-func getExitEventsFromReceipts(epoch, block uint64, receipts []*types.Receipt) ([]*ExitEvent, error) {
-	events := make([]*ExitEvent, 0)
-
-	for i := 0; i < len(receipts); i++ {
-		if receipts[i].Status == nil || *receipts[i].Status != types.ReceiptSuccess {
-			continue
-		}
-
-		for _, log := range receipts[i].Logs {
-			if log.Address != contracts.L2StateSenderContract {
-				continue
-			}
-
-			event, err := decodeExitEvent(convertLog(log), epoch, block)
-			if err != nil {
-				return nil, err
-			}
-
-			if event == nil {
-				// valid case, not an exit event
-				continue
-			}
-
-			events = append(events, event)
-		}
-	}
-
-	// enforce sequential order
-	sort.Slice(events, func(i, j int) bool {
-		return events[i].ID.Cmp(events[j].ID) < 0
-	})
-
-	return events, nil
 }
 
 // createExitTree creates an exit event merkle tree from provided exit events

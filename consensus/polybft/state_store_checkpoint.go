@@ -3,6 +3,7 @@ package polybft
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 
@@ -17,6 +18,10 @@ var (
 	// bucket to store exit contract events
 	exitEventsBucket             = []byte("exitEvent")
 	exitEventToEpochLookupBucket = []byte("exitIdToEpochLookup")
+	exitEventLastSavedBucket     = []byte("lastSavedExitEvent")
+
+	lastSavedEventKey   = []byte("lastSaved")
+	errNoLastSavedEntry = errors.New("there is no last saved block in last saved bucket")
 )
 
 type exitEventNotFoundError struct {
@@ -58,7 +63,11 @@ func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventToEpochLookupBucket), err)
 	}
 
-	return nil
+	if _, err := tx.CreateBucketIfNotExists(exitEventLastSavedBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventLastSavedBucket), err)
+	}
+
+	return tx.Bucket(exitEventLastSavedBucket).Put(lastSavedEventKey, common.EncodeUint64ToBytes(0))
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
@@ -175,6 +184,32 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 	})
 
 	return events, err
+}
+
+// updateLastSaved saves the last block processed for exit events
+func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(exitEventLastSavedBucket).Put(lastSavedEventKey,
+			common.EncodeUint64ToBytes(blockNumber))
+	})
+}
+
+// updateLastSaved saves the last block processed for exit events
+func (s *CheckpointStore) getLastSaved() (uint64, error) {
+	var lastSavedBlock uint64
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		v := tx.Bucket(exitEventLastSavedBucket).Get(lastSavedEventKey)
+		if v == nil {
+			return errNoLastSavedEntry
+		}
+
+		lastSavedBlock = common.EncodeBytesToUint64(v)
+
+		return nil
+	})
+
+	return lastSavedBlock, err
 }
 
 // decodeExitEvent tries to decode exit event from the provided log

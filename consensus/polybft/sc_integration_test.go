@@ -163,16 +163,16 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 		{
 			L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
 				ID:       big.NewInt(1),
-				Sender:   types.Address(contracts.ChildERC20PredicateContract),
-				Receiver: types.Address(rootERC20PredicateAddr),
+				Sender:   contracts.ChildERC20PredicateContract,
+				Receiver: rootERC20PredicateAddr,
 				Data:     exitData1,
 			},
 		},
 		{
 			L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
 				ID:       big.NewInt(2),
-				Sender:   types.Address(contracts.ChildERC20PredicateContract),
-				Receiver: types.Address(rootERC20PredicateAddr),
+				Sender:   contracts.ChildERC20PredicateContract,
+				Receiver: rootERC20PredicateAddr,
 				Data:     exitData2,
 			},
 		},

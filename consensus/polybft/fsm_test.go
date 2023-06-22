@@ -365,7 +365,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	blockChainMock.AssertExpectations(t)
 }
 
-func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T) {
+func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaNil(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -396,7 +396,7 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaEmpty(t *testing.T
 
 	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
 	assert.NoError(t, err)
-	assert.True(t, blockExtra.Validators.IsEmpty())
+	assert.Nil(t, blockExtra.Validators)
 
 	blockBuilderMock.AssertExpectations(t)
 }
@@ -799,7 +799,7 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 	parentCheckpointHash, err := extra.Checkpoint.Hash(0, parentBlockNumber, parent.Hash)
 	require.NoError(t, err)
 
-	extra.Validators = nil // this will cause test to fail
+	extra.Validators = &validator.ValidatorSetDelta{} // this will cause test to fail
 	extra.Parent = createSignature(t, validators.GetPrivateIdentities(), parentCheckpointHash, bls.DomainCheckpointManager)
 
 	stateBlock := createDummyStateBlock(parent.Number+1, types.Hash{100, 15}, extra.MarshalRLPTo(nil))
