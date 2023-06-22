@@ -2,7 +2,6 @@ package leveldb
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"os"
@@ -260,16 +259,17 @@ insertloop:
 			batchHelper.PutHeadNumber(uint64(i))
 			batchHelper.PutHeadHash(b.Block.Header.Hash)
 			batchHelper.PutReceipts(b.Block.Hash(), b.Receipts)
+			batchHelper.PutCanonicalHash(uint64(i), b.Block.Hash())
 
 			if err := batchHelper.WriteBatch(); err != nil {
 				require.NoError(t, err)
 			}
 
-			fmt.Println("writing block", i)
+			t.Logf("writing block %d", i)
 
 			size := dirSize(t, path)
-			fmt.Println("\tldb file count:", countLdbFilesInPath(path))
-			fmt.Println("\tdir size", size/1_000_000, "MBs")
+			t.Logf("\tldb file count: %d", countLdbFilesInPath(path))
+			t.Logf("\tdir size %d MBs", size/1_000_000)
 		}
 	}
 }
