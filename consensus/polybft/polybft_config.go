@@ -94,10 +94,8 @@ type BridgeConfig struct {
 	RootERC20PredicateAddr            types.Address `json:"erc20PredicateAddress"`
 	ChildMintableERC20PredicateAddr   types.Address `json:"erc20ChildMintablePredicateAddress"`
 	RootNativeERC20Addr               types.Address `json:"nativeERC20Address"`
-	RootERC721Addr                    types.Address `json:"erc721Address"`
 	RootERC721PredicateAddr           types.Address `json:"erc721PredicateAddress"`
 	ChildMintableERC721PredicateAddr  types.Address `json:"erc721ChildMintablePredicateAddress"`
-	RootERC1155Addr                   types.Address `json:"erc1155Address"`
 	RootERC1155PredicateAddr          types.Address `json:"erc1155PredicateAddress"`
 	ChildMintableERC1155PredicateAddr types.Address `json:"erc1155ChildMintablePredicateAddress"`
 	CustomSupernetManagerAddr         types.Address `json:"customSupernetManagerAddr"`
@@ -130,11 +128,9 @@ type RootchainConfig struct {
 	ERC20TemplateAddress                 types.Address
 	RootERC721PredicateAddress           types.Address
 	ChildMintableERC721PredicateAddress  types.Address
-	RootERC721Address                    types.Address
 	ERC721TemplateAddress                types.Address
 	RootERC1155PredicateAddress          types.Address
 	ChildMintableERC1155PredicateAddress types.Address
-	RootERC1155Address                   types.Address
 	ERC1155TemplateAddress               types.Address
 	CustomSupernetManagerAddress         types.Address
 	StakeManagerAddress                  types.Address
@@ -152,10 +148,8 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		RootERC20PredicateAddr:            r.RootERC20PredicateAddress,
 		ChildMintableERC20PredicateAddr:   r.ChildMintableERC20PredicateAddress,
 		RootNativeERC20Addr:               r.RootNativeERC20Address,
-		RootERC721Addr:                    r.RootERC721Address,
 		RootERC721PredicateAddr:           r.RootERC721PredicateAddress,
 		ChildMintableERC721PredicateAddr:  r.ChildMintableERC721PredicateAddress,
-		RootERC1155Addr:                   r.RootERC1155Address,
 		RootERC1155PredicateAddr:          r.RootERC1155PredicateAddress,
 		ChildMintableERC1155PredicateAddr: r.ChildMintableERC1155PredicateAddress,
 		CustomSupernetManagerAddr:         r.CustomSupernetManagerAddress,
