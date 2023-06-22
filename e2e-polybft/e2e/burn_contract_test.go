@@ -1,7 +1,6 @@
 package e2e
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,12 @@ func TestE2E_BurnContract_Deployed(t *testing.T) {
 	destinationAddr := types.Address(destinationKey.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBurnContract(fmt.Sprintf("0:%s:%s", contractAddr.String(), destinationAddr.String())),
+		framework.WithBurnContract(
+			[]*framework.BurnContractInfo{
+				{
+					Address:                contractAddr,
+					BurnDestinationAddress: destinationAddr,
+				}}),
 	)
 	defer cluster.Stop()
 

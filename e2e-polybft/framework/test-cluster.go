@@ -84,7 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
-	BurnContracts        []string // block:address[:destination address]
+	BurnContracts        []*BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -115,6 +115,13 @@ type TestClusterConfig struct {
 	TestRewardToken string
 
 	logsDirOnce sync.Once
+}
+
+// BurnContractInfo contains metadata for burn contract, which is part of EIP-1559 specification
+type BurnContractInfo struct {
+	BlockNumber            uint64
+	Address                types.Address
+	BurnDestinationAddress types.Address
 }
 
 func (c *TestClusterConfig) Dir(name string) string {
@@ -254,7 +261,7 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(burnContracts ...string) ClusterOption {
+func WithBurnContract(burnContracts []*BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
 		for _, burnContract := range burnContracts {
 			h.BurnContracts = append(h.BurnContracts, burnContract)
@@ -471,7 +478,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		if len(cluster.Config.BurnContracts) != 0 {
 			for _, contract := range cluster.Config.BurnContracts {
-				args = append(args, "--burn-contract", contract)
+				args = append(args, "--burn-contract",
+					fmt.Sprintf("%d:%s:%s",
+						contract.BlockNumber,
+						contract.Address,
+						contract.BurnDestinationAddress))
 			}
 		}
 
