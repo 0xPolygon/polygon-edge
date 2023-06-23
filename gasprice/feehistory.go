@@ -8,7 +8,6 @@ import (
 
 var (
 	ErrInvalidPercentile = errors.New("invalid percentile")
-	ErrRequestedRange    = errors.New("requested range is too large")
 	ErrBlockCount        = errors.New("blockCount must be greater than 0")
 	ErrBlockInfo         = errors.New("could not find block info")
 )
