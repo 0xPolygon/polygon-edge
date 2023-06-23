@@ -18,21 +18,34 @@ type Fork struct {
 	Name string
 	// after the fork is activated, `FromBlockNumber` shows from which block is enabled
 	FromBlockNumber uint64
+	// fork consensus parameters
+	Params *chain.ForkParams
 	// this value is false if fork is registered but not activated
 	IsActive bool
 	// map of all handlers registered for this fork
 	Handlers map[HandlerDesc]interface{}
 }
 
-// Handler defines one custom handler
-type Handler struct {
+// forkHandler defines one custom handler
+type forkHandler struct {
 	// Handler should be active from block `FromBlockNumber``
 	FromBlockNumber uint64
 	// instance of some structure, function etc
 	Handler interface{}
 }
 
-func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error {
+// forkParamsBlock encapsulates block and actual fork params
+type forkParamsBlock struct {
+	// Params should be active from block `FromBlockNumber``
+	FromBlockNumber uint64
+	// pointer to fork params
+	Params *chain.ForkParams
+}
+
+func ForkManagerInit(
+	initialParams *chain.ForkParams,
+	factory func(*chain.Forks) error,
+	forks *chain.Forks) error {
 	if factory == nil {
 		return nil
 	}
@@ -41,16 +54,16 @@ func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error
 	fm.Clear()
 
 	// register initial fork
-	fm.RegisterFork(InitialFork)
+	fm.RegisterFork(InitialFork, initialParams)
 
 	// Register forks
-	for name := range *forks {
+	for name, f := range *forks {
 		// check if fork is not supported by current edge version
 		if _, found := (*chain.AllForksEnabled)[name]; !found {
 			return fmt.Errorf("fork is not available: %s", name)
 		}
 
-		fm.RegisterFork(name)
+		fm.RegisterFork(name, f.Params)
 	}
 
 	// Register handlers and additional forks here
@@ -64,12 +77,8 @@ func ForkManagerInit(factory func(*chain.Forks) error, forks *chain.Forks) error
 	}
 
 	// Activate forks
-	for name, blockNumber := range *forks {
-		if blockNumber == nil {
-			continue
-		}
-
-		if err := fm.ActivateFork(name, (uint64)(*blockNumber)); err != nil {
+	for name, f := range *forks {
+		if err := fm.ActivateFork(name, f.Block); err != nil {
 			return err
 		}
 	}

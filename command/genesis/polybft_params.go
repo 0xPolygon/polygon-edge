@@ -19,7 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -72,10 +71,6 @@ var (
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
-	if err := forkmanager.ForkManagerInit(polybft.ForkManagerFactory, chain.AllForksEnabled); err != nil {
-		return err
-	}
-
 	// populate premine balance map
 	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
 
@@ -164,7 +159,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// Disable london hardfork if burn contract address is not provided
 	enabledForks := chain.AllForksEnabled
 	if len(p.burnContracts) == 0 {
-		enabledForks.SetFork(chain.London, nil)
+		enabledForks.RemoveFork(chain.London)
 	}
 
 	chainConfig := &chain.Chain{

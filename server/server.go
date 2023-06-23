@@ -281,7 +281,16 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	var initialParams *chain.ForkParams
+
+	if pf := forkManagerInitialParamsFactory[ConsensusType(engineName)]; pf != nil {
+		if initialParams, err = pf(config.Chain); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := forkmanager.ForkManagerInit(
+		initialParams,
 		forkManagerFactory[ConsensusType(engineName)],
 		config.Chain.Params.Forks); err != nil {
 		return nil, err

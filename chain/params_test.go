@@ -17,7 +17,7 @@ func TestParamsForks(t *testing.T) {
 	}{
 		{
 			input: `{
-				"homestead": 1000
+				"homestead": { "block": 1000 }
 			}`,
 			output: &Forks{
 				Homestead: NewFork(1000),
