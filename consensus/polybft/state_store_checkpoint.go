@@ -16,12 +16,12 @@ import (
 
 var (
 	// bucket to store exit contract events
-	exitEventsBucket             = []byte("exitEvent")
-	exitEventToEpochLookupBucket = []byte("exitIdToEpochLookup")
-	exitEventLastSavedBucket     = []byte("lastSavedExitEvent")
+	exitEventsBucket                  = []byte("exitEvent")
+	exitEventToEpochLookupBucket      = []byte("exitIdToEpochLookup")
+	exitEventLastProcessedBlockBucket = []byte("lastProcessedBlock")
 
-	lastSavedEventKey   = []byte("lastSaved")
-	errNoLastSavedEntry = errors.New("there is no last saved block in last saved bucket")
+	lastProcessedBlockKey = []byte("lastProcessedBlock")
+	errNoLastSavedEntry   = errors.New("there is no last saved block in last saved bucket")
 )
 
 type exitEventNotFoundError struct {
@@ -48,6 +48,7 @@ Bolt DB schema:
 exit events/
 |--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
 |--> (exitEventID) -> epochNumber
+|--> (lastProcessedBlockKey) -> block number
 */
 type CheckpointStore struct {
 	db *bolt.DB
@@ -63,11 +64,11 @@ func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventToEpochLookupBucket), err)
 	}
 
-	if _, err := tx.CreateBucketIfNotExists(exitEventLastSavedBucket); err != nil {
-		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventLastSavedBucket), err)
+	if _, err := tx.CreateBucketIfNotExists(exitEventLastProcessedBlockBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventLastProcessedBlockBucket), err)
 	}
 
-	return tx.Bucket(exitEventLastSavedBucket).Put(lastSavedEventKey, common.EncodeUint64ToBytes(0))
+	return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
@@ -189,7 +190,7 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 // updateLastSaved saves the last block processed for exit events
 func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(exitEventLastSavedBucket).Put(lastSavedEventKey,
+		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey,
 			common.EncodeUint64ToBytes(blockNumber))
 	})
 }
@@ -199,7 +200,7 @@ func (s *CheckpointStore) getLastSaved() (uint64, error) {
 	var lastSavedBlock uint64
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		v := tx.Bucket(exitEventLastSavedBucket).Get(lastSavedEventKey)
+		v := tx.Bucket(exitEventLastProcessedBlockBucket).Get(lastProcessedBlockKey)
 		if v == nil {
 			return errNoLastSavedEntry
 		}
