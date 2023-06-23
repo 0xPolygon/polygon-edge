@@ -18,7 +18,8 @@ type Fork struct {
 	Name string
 	// after the fork is activated, `FromBlockNumber` shows from which block is enabled
 	FromBlockNumber uint64
-	Params          *chain.ForkParams
+	// fork consensus parameters
+	Params *chain.ForkParams
 	// this value is false if fork is registered but not activated
 	IsActive bool
 	// map of all handlers registered for this fork
@@ -62,11 +63,7 @@ func ForkManagerInit(
 			return fmt.Errorf("fork is not available: %s", name)
 		}
 
-		if f != nil {
-			fm.RegisterFork(name, f.Params)
-		} else {
-			fm.RegisterFork(name, nil)
-		}
+		fm.RegisterFork(name, f.Params)
 	}
 
 	// Register handlers and additional forks here
@@ -81,10 +78,6 @@ func ForkManagerInit(
 
 	// Activate forks
 	for name, f := range *forks {
-		if f == nil {
-			continue
-		}
-
 		if err := fm.ActivateFork(name, f.Block); err != nil {
 			return err
 		}

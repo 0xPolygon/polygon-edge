@@ -2,7 +2,6 @@ package chain
 
 import (
 	"errors"
-	"math/big"
 	"sort"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -89,18 +88,22 @@ const (
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
-type Forks map[string]*Fork
+type Forks map[string]Fork
 
 // IsActive returns true if fork defined by name exists and defined for the block
 func (f *Forks) IsActive(name string, block uint64) bool {
-	ff := (*f)[name]
+	ff, exists := (*f)[name]
 
-	return ff != nil && ff.Active(block)
+	return exists && ff.Active(block)
 }
 
 // SetFork adds/updates fork defined by name
-func (f *Forks) SetFork(name string, value *Fork) {
+func (f *Forks) SetFork(name string, value Fork) {
 	(*f)[name] = value
+}
+
+func (f *Forks) RemoveFork(name string) {
+	delete(*f, name)
 }
 
 // At returns ForksInTime instance that shows which supported forks are enabled for the block
@@ -123,6 +126,7 @@ type ForkParams struct {
 	// MaxValidatorSetSize indicates the maximum size of validator set
 	MaxValidatorSetSize *uint64 `json:"maxValidatorSetSize,omitempty"`
 
+	// EpochSize is size of epoch
 	EpochSize *uint64 `json:"epochSize,omitempty"`
 
 	// SprintSize is size of sprint
@@ -140,18 +144,12 @@ type Fork struct {
 	Params *ForkParams `json:"params,omitempty"`
 }
 
-func NewFork(n uint64) *Fork {
-	return &Fork{
-		Block: n,
-	}
+func NewFork(n uint64) Fork {
+	return Fork{Block: n}
 }
 
 func (f Fork) Active(block uint64) bool {
 	return block >= f.Block
-}
-
-func (f Fork) BigInt() *big.Int {
-	return new(big.Int).SetUint64(f.Block)
 }
 
 // ForksInTime should contain all supported forks by current edge version

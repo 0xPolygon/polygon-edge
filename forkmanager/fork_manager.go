@@ -9,17 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 )
 
-/*
-Regarding whether it is okay to use the Singleton pattern in Go, it's a topic of some debate.
-The Singleton pattern can introduce global state and make testing and concurrent programming more challenging.
-It can also make code tightly coupled and harder to maintain.
-In general, it's recommended to favor dependency injection and explicit collaboration over singletons.
-
-However, there might be scenarios where the Singleton pattern is still useful,
-such as managing shared resources or maintaining a global configuration.
-Just be mindful of the potential drawbacks and consider alternative patterns when appropriate.
-*/
-
 var (
 	forkManagerInstance     *forkManager
 	forkManagerInstanceLock sync.Mutex
@@ -84,7 +73,7 @@ func (fm *forkManager) RegisterHandler(forkName string, handlerName HandlerDesc,
 }
 
 // ActivateFork activates fork from some block number
-// All handlers and parameters belong to this fork are also activated
+// All handlers and parameters belonging to this fork are also activated
 func (fm *forkManager) ActivateFork(forkName string, blockNumber uint64) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
