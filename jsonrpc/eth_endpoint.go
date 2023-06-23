@@ -803,30 +803,74 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 	return argBigPtr(priorityFee), nil
 }
 func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
+	type feeHistoryResult struct {
+		OldestBlock   argUint64
+		BaseFeePerGas []argUint64
+		GasUsedRatio  []argUint64
+		Reward        [][]argUint64
+	}
+
+	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
 	oldestBlock, baseFeePerGas, gasUsedRatio, reward, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
 	if err != nil {
 		return nil, err
 	}
-	//convert responses to argUint64 suitable for JSON marshalling
-	baseFeeSlice := make([]argUint64, len(*baseFeePerGas))
-	for i, value := range *baseFeePerGas {
-		baseFeeSlice[i] = argUint64(value)
-	}
-	gasUsedSlice := make([]argUint64, len(*gasUsedRatio))
-	for i, value := range *gasUsedRatio {
-		gasUsedSlice[i] = argUint64(value)
-	}
-	rewardSlice := make([][]argUint64, len(*reward))
-	for i, value := range *reward {
-		rewardSlice[i] = make([]argUint64, len(value))
-		for c := range value {
-			rewardSlice[i][c] = argUint64(value[c])
-		}
-	}
-	return &feeHistory{
+
+	// Create channels to receive the processed slices asynchronously
+	baseFeePerGasCh := make(chan []argUint64)
+	gasUsedRatioCh := make(chan []argUint64)
+	rewardCh := make(chan [][]argUint64)
+
+	// Process baseFeePerGas asynchronously
+	go func() {
+		baseFeePerGasCh <- convertToArgUint64Slice(*baseFeePerGas)
+	}()
+
+	// Process gasUsedRatio asynchronously
+	go func() {
+		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(*gasUsedRatio)
+	}()
+
+	// Process reward asynchronously
+	go func() {
+		rewardCh <- convertToArgUint64SliceSlice(*reward)
+	}()
+
+	// Wait for the processed slices from goroutines
+	baseFeePerGasResult := <-baseFeePerGasCh
+	gasUsedRatioResult := <-gasUsedRatioCh
+	rewardResult := <-rewardCh
+
+	result := &feeHistoryResult{
 		OldestBlock:   argUint64(*oldestBlock),
-		BaseFeePerGas: baseFeeSlice,
-		GasUsedRatio:  gasUsedSlice,
-		Reward:        rewardSlice,
-	}, nil
+		BaseFeePerGas: baseFeePerGasResult,
+		GasUsedRatio:  gasUsedRatioResult,
+		Reward:        rewardResult,
+	}
+
+	return result, nil
+}
+
+func convertToArgUint64Slice(slice []uint64) []argUint64 {
+	argSlice := make([]argUint64, len(slice))
+	for i, value := range slice {
+		argSlice[i] = argUint64(value)
+	}
+	return argSlice
+}
+
+func convertToArgUint64SliceSlice(slice [][]uint64) [][]argUint64 {
+	argSlice := make([][]argUint64, len(slice))
+	for i, value := range slice {
+		argSlice[i] = convertToArgUint64Slice(value)
+	}
+	return argSlice
+}
+
+func convertFloat64SliceToArgUint64Slice(slice []float64) []argUint64 {
+	argSlice := make([]argUint64, len(slice))
+	for i, value := range slice {
+		argSlice[i] = argUint64(value)
+	}
+	return argSlice
 }

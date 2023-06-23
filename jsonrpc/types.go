@@ -344,10 +344,3 @@ type progression struct {
 	CurrentBlock  argUint64 `json:"currentBlock"`
 	HighestBlock  argUint64 `json:"highestBlock"`
 }
-
-type feeHistory struct {
-	OldestBlock   argUint64     `json:"oldestBlock"`
-	BaseFeePerGas []argUint64   `json:"baseFeePerGas"`
-	GasUsedRatio  []argUint64   `json:"gasUsedRatio"`
-	Reward        [][]argUint64 `json:"reward"`
-}
