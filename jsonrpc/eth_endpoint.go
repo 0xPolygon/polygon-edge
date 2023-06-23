@@ -802,3 +802,31 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 
 	return argBigPtr(priorityFee), nil
 }
+func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
+	oldestBlock, baseFeePerGas, gasUsedRatio, reward, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
+	if err != nil {
+		return nil, err
+	}
+	//convert responses to argUint64 suitable for JSON marshalling
+	baseFeeSlice := make([]argUint64, len(*baseFeePerGas))
+	for i, value := range *baseFeePerGas {
+		baseFeeSlice[i] = argUint64(value)
+	}
+	gasUsedSlice := make([]argUint64, len(*gasUsedRatio))
+	for i, value := range *gasUsedRatio {
+		gasUsedSlice[i] = argUint64(value)
+	}
+	rewardSlice := make([][]argUint64, len(*reward))
+	for i, value := range *reward {
+		rewardSlice[i] = make([]argUint64, len(value))
+		for c := range value {
+			rewardSlice[i][c] = argUint64(value[c])
+		}
+	}
+	return &feeHistory{
+		OldestBlock:   argUint64(*oldestBlock),
+		BaseFeePerGas: baseFeeSlice,
+		GasUsedRatio:  gasUsedSlice,
+		Reward:        rewardSlice,
+	}, nil
+}

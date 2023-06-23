@@ -44,6 +44,7 @@ type Config struct {
 
 // Blockchain is the interface representing blockchain
 type Blockchain interface {
+	GetBlockByNumber(number uint64, full bool) (*types.Block, bool)
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 	Header() *types.Header
 	Config() *chain.Params
@@ -53,6 +54,7 @@ type Blockchain interface {
 type GasStore interface {
 	// MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
 	MaxPriorityFeePerGas() (*big.Int, error)
+	FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (*uint64, *[]uint64, *[]float64, *[][]uint64, error)
 }
 
 var _ GasStore = (*GasHelper)(nil)
