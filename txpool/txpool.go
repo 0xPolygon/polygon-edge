@@ -108,8 +108,7 @@ through their designated channels. */
 // This request is created for (new) transactions
 // that passed validation in addTx.
 type enqueueRequest struct {
-	tx      *types.Transaction
-	errchan chan<- error
+	tx *types.Transaction
 }
 
 // A promoteRequest is created each time some account
@@ -370,8 +369,14 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	account.promoted.lock(true)
 	defer account.promoted.unlock()
 
+	account.nonceToTx.lock()
+	defer account.nonceToTx.unlock()
+
 	// pop the top most promoted tx
 	account.promoted.pop()
+
+	// update the account nonce -> *tx map
+	account.nonceToTx.remove(tx)
 
 	// successfully popping an account resets its demotions count to 0
 	account.resetDemotions()
@@ -381,8 +386,6 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 
 	// update metrics
 	p.updatePending(-1)
-
-	account.nonceToTx.remove(tx) // update the account nonce -> *tx map
 
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
@@ -413,14 +416,17 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}
 
 	defer func() {
+		account.nonceToTx.unlock()
 		account.enqueued.unlock()
 		account.promoted.unlock()
-		account.nonceToTx.unlock()
 	}()
 
 	// rollback nonce
 	nextNonce := tx.Nonce
 	account.setNonce(nextNonce)
+
+	// reset accounts nonce map
+	account.nonceToTx.reset()
 
 	// drop promoted
 	dropped := account.promoted.clear()
@@ -432,8 +438,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	// drop enqueued
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
-
-	account.nonceToTx.reset() // reset accounts nonce map
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 
@@ -770,20 +774,44 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return ErrAlreadyKnown
 	}
 
+	if account := p.accounts.get(tx.From); account != nil {
+		// reject low nonce tx
+		if tx.Nonce < account.getNonce() {
+			return ErrNonceTooLow
+		}
+
+		// check if max items in enqueue reached
+		account.enqueued.lock(true)
+		maxItemsReached := account.enqueued.length() == account.maxEnqueued
+		account.enqueued.unlock()
+
+		if maxItemsReached {
+			return ErrMaxEnqueuedLimitReached
+		}
+
+		// check if nonce for tx.From account already exists. do tx replacement if needed
+		replacedTx, err := account.addTxWithNonce(tx)
+		if err != nil {
+			return err
+		}
+
+		// if there was tx replacement, remove old tx from index and update slots
+		if replacedTx != nil {
+			p.index.remove(replacedTx)
+			p.gauge.decrease(slotsRequired(replacedTx))
+			// TODO: something elske like signal event?
+
+			return nil
+		}
+	}
+
 	// initialize account for this address once
 	p.createAccountOnce(tx.From)
 
 	// send request [BLOCKING]
-	errchan := make(chan error, 1)
-	defer close(errchan)
-
-	p.enqueueReqCh <- enqueueRequest{tx: tx, errchan: errchan}
-
-	if err := <-errchan; err != nil {
-		return err
-	}
-
+	p.enqueueReqCh <- enqueueRequest{tx: tx}
 	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+
 	metrics.SetGauge([]string{txPoolMetrics, "added_tx"}, 1)
 
 	return nil
@@ -801,23 +829,12 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	account := p.accounts.get(addr)
 
 	// enqueue tx
-	replacedTx, err := account.enqueue(tx)
-	if err != nil {
+	if err := account.enqueue(tx); err != nil {
 		p.logger.Error("enqueue request", "err", err)
+
 		p.index.remove(tx)
-		req.errchan <- err // notify observer about enqueue error
 
 		return
-	}
-
-	req.errchan <- nil // notify observer that there is no enqueue error
-
-	if replacedTx != nil {
-		// the old transaction should be evicted from the lookup
-		// but because we are copying contents of the new tx into pointer of the old tx
-		// we need to decrease slots by the size of the old tx
-		p.index.remove(replacedTx)
-		p.gauge.decrease(slotsRequired(replacedTx))
 	}
 
 	if p.logger.IsDebug() {
@@ -829,7 +846,8 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	if tx.Nonce > account.getNonce() {
-		// don't signal promotion for higher nonce txs
+		// don't signal promotion for
+		// higher nonce txs
 		return
 	}
 

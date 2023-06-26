@@ -673,7 +673,6 @@ func TestEnqueueHandler(t *testing.T) {
 				err := pool.addTx(local, newTx(addr1, 10, 1)) // 10 < 20
 				assert.EqualError(t, err, "nonce too low")
 			}()
-			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 			assert.Equal(t, uint64(0), pool.gauge.read())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
@@ -683,7 +682,7 @@ func TestEnqueueHandler(t *testing.T) {
 	t.Run(
 		"signal promotion for new tx with expected nonce",
 		func(t *testing.T) {
-			// t.Parallel()
+			t.Parallel()
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -708,7 +707,7 @@ func TestEnqueueHandler(t *testing.T) {
 	t.Run(
 		"reject new tx when enqueued is full",
 		func(t *testing.T) {
-			// t.Parallel()
+			t.Parallel()
 
 			fillEnqueued := func(pool *TxPool, num uint64) {
 				//	first tx will signal promotion, grab the signal
@@ -750,8 +749,6 @@ func TestEnqueueHandler(t *testing.T) {
 				err := pool.addTx(local, newTx(addr1, 1, 1))
 				assert.True(t, errors.Is(err, ErrMaxEnqueuedLimitReached))
 			}()
-
-			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
 			//	assert the transaction was rejected
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())

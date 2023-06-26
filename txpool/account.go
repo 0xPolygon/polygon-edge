@@ -167,19 +167,6 @@ func (m *NonceToTxLookup) reset() {
 	m.mapping = make(map[uint64]*types.Transaction)
 }
 
-func (m *NonceToTxLookup) replace(tx *types.Transaction) *types.Transaction {
-	if oldTx, ok := m.mapping[tx.Nonce]; ok {
-		toReturn := new(types.Transaction)
-
-		oldTx.CopyTo(toReturn)
-		tx.CopyTo(oldTx)
-
-		return toReturn
-	}
-
-	return nil
-}
-
 func (m *NonceToTxLookup) remove(txs ...*types.Transaction) {
 	for _, tx := range txs {
 		delete(m.mapping, tx.Nonce)
@@ -281,39 +268,65 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	return
 }
 
-// enqueue attempts tp push the transaction onto the enqueued queue.
-// first returning value is transaction that is being replaced
-func (a *account) enqueue(tx *types.Transaction) (*types.Transaction, error) {
-	a.enqueued.lock(true)
-	a.promoted.lock(true)
+func (a *account) addTxWithNonce(tx *types.Transaction) (*types.Transaction, error) {
 	a.nonceToTx.lock()
+	defer a.nonceToTx.unlock()
 
-	defer func() {
-		a.nonceToTx.unlock()
-		a.promoted.unlock()
-		a.enqueued.unlock()
-	}()
-
-	if a.enqueued.length() == a.maxEnqueued {
-		return nil, ErrMaxEnqueuedLimitReached
+	oldTx := a.nonceToTx.get(tx.Nonce)
+	if oldTx == nil {
+		// if transaction with same nonce does not exist -> return immediately
+		return nil, nil
+	} else if oldTx.GasPrice.Cmp(tx.GasPrice) >= 0 {
+		// if transaction with same nonce does exist and has >= gas price -> return error
+		return oldTx, ErrUnderpriced
 	}
 
-	// the only case when the tx should be replaced is when the nonces are the same and the new one is pricier
-	if oldTx := a.nonceToTx.get(tx.Nonce); oldTx != nil {
-		if oldTx.GasPrice.Cmp(tx.GasPrice) < 0 {
-			return a.nonceToTx.replace(tx), nil
-		} else {
-			return nil, ErrUnderpriced
+	a.enqueued.lock(true)
+	defer a.enqueued.unlock()
+
+	a.promoted.lock(true)
+	defer a.promoted.unlock()
+
+	replaceInQueue := func(txs minNonceQueue) bool {
+		for i, x := range txs {
+			if x.Nonce == tx.Nonce {
+				txs[i] = tx
+
+				return true
+			}
 		}
-	} else if tx.Nonce < a.getNonce() {
-		return nil, ErrNonceTooLow
+
+		return false
+	}
+
+	// add to nonce map
+	a.nonceToTx.set(tx)
+	// first -> try to replace in enqueued
+	if !replaceInQueue(a.enqueued.queue) {
+		replaceInQueue(a.promoted.queue) // .. then try to replace in promoted
+	}
+
+	return oldTx, nil
+}
+
+// enqueue attempts tp push the transaction onto the enqueued queue.
+func (a *account) enqueue(tx *types.Transaction) error {
+	a.enqueued.lock(true)
+	defer a.enqueued.unlock()
+
+	if a.enqueued.length() == a.maxEnqueued {
+		return ErrMaxEnqueuedLimitReached
+	}
+
+	// reject low nonce tx
+	if tx.Nonce < a.getNonce() {
+		return ErrNonceTooLow
 	}
 
 	// enqueue tx
 	a.enqueued.push(tx)
-	a.nonceToTx.set(tx)
 
-	return nil, nil
+	return nil
 }
 
 // Promote moves eligible transactions from enqueued to promoted.
