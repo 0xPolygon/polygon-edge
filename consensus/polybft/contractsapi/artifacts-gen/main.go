@@ -185,6 +185,10 @@ func main() {
 			"child/validator/ValidatorSet.sol",
 			"ValidatorSet",
 		},
+		{
+			"child/EIP1559Burn.sol",
+			"EIP1559Burn",
+		},
 	}
 
 	for _, v := range readContracts {

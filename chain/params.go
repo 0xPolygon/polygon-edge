@@ -29,7 +29,9 @@ type Params struct {
 	BridgeBlockList           *AddressListConfig `json:"bridgeBlockList,omitempty"`
 
 	// Governance contract where the token will be sent to and burn in london fork
-	BurnContract map[uint64]string `json:"burnContract"`
+	BurnContract map[uint64]types.Address `json:"burnContract"`
+	// Destination address to initialize default burn contract with
+	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
 }
 
 type AddressListConfig struct {
@@ -58,11 +60,11 @@ func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
 
 	for i := 0; i < len(blocks)-1; i++ {
 		if block >= blocks[i] && block < blocks[i+1] {
-			return types.StringToAddress(p.BurnContract[blocks[i]]), nil
+			return p.BurnContract[blocks[i]], nil
 		}
 	}
 
-	return types.StringToAddress(p.BurnContract[blocks[len(blocks)-1]]), nil
+	return p.BurnContract[blocks[len(blocks)-1]], nil
 }
 
 func (p *Params) GetEngine() string {

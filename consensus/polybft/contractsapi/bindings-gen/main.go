@@ -394,6 +394,15 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"EIP1559Burn",
+			gensc.EIP1559Burn,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}
