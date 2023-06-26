@@ -5,6 +5,7 @@
 When deploying with `polybft` consensus, there are some additional dependencies:
 * [npm](https://nodejs.org/en/)
 * [go 1.19.x](https://go.dev/dl/)
+* [jq](https://jqlang.github.io/jq)
 
 ## Local development
 Running `polygon-edge` from local binary can be done very easily by using provided `scripts` folder.
