@@ -55,17 +55,22 @@ type StructTracer struct {
 	consumedGas uint64
 	output      []byte
 	err         error
-	storage     map[types.Address]map[types.Hash]types.Hash
 
-	currentMemory []byte
-	currentStack  []*big.Int
+	storage       []map[types.Address]map[types.Hash]types.Hash
+	currentMemory []([]byte)
+	currentStack  []([]*big.Int)
 }
 
 func NewStructTracer(config Config) *StructTracer {
+	storage := make([](map[types.Address]map[types.Hash]types.Hash), 1)
+	storage[0] = make(map[types.Address]map[types.Hash]types.Hash)
+
 	return &StructTracer{
-		Config:     config,
-		cancelLock: sync.RWMutex{},
-		storage:    make(map[types.Address]map[types.Hash]types.Hash),
+		Config:        config,
+		cancelLock:    sync.RWMutex{},
+		storage:       storage,
+		currentMemory: make([]([]byte), 1),
+		currentStack:  make([]([]*big.Int), 1),
 	}
 }
 
@@ -92,9 +97,10 @@ func (t *StructTracer) Clear() {
 	t.consumedGas = 0
 	t.output = t.output[:0]
 	t.err = nil
-	t.storage = make(map[types.Address]map[types.Hash]types.Hash)
-	t.currentMemory = t.currentMemory[:0]
-	t.currentStack = t.currentStack[:0]
+	t.storage = make([](map[types.Address]map[types.Hash]types.Hash), 1)
+	t.storage[0] = make(map[types.Address]map[types.Hash]types.Hash)
+	t.currentMemory = make([]([]byte), 1)
+	t.currentStack = make([]([]*big.Int), 1)
 }
 
 func (t *StructTracer) TxStart(gasLimit uint64) {
@@ -141,9 +147,9 @@ func (t *StructTracer) CaptureState(
 		return
 	}
 
-	t.captureMemory(memory)
+	t.captureMemory(memory, opCode)
 
-	t.captureStack(stack, sp)
+	t.captureStack(stack, sp, opCode)
 
 	t.captureStorage(
 		stack,
@@ -156,33 +162,46 @@ func (t *StructTracer) CaptureState(
 
 func (t *StructTracer) captureMemory(
 	memory []byte,
+	opCode int,
 ) {
 	if !t.Config.EnableMemory {
 		return
 	}
 
 	// always allocate new space to get new reference
-	t.currentMemory = make([]byte, len(memory))
+	currentMemory := make([]byte, len(memory))
+	copy(currentMemory, memory)
 
-	copy(t.currentMemory, memory)
+	t.currentMemory[len(t.currentMemory)-1] = currentMemory
+
+	if opCode == evm.CALL || opCode == evm.STATICCALL {
+		t.currentMemory = append(t.currentMemory, make([]byte, len(memory)))
+	}
 }
 
 func (t *StructTracer) captureStack(
 	stack []*big.Int,
 	sp int,
+	opCode int,
 ) {
 	if !t.Config.EnableStack {
 		return
 	}
 
-	t.currentStack = make([]*big.Int, sp)
+	currentStack := make([]*big.Int, sp)
 
 	for i, v := range stack {
 		if i >= sp {
 			break
 		}
 
-		t.currentStack[i] = new(big.Int).Set(v)
+		currentStack[i] = new(big.Int).Set(v)
+	}
+
+	t.currentStack[len(t.currentStack)-1] = currentStack
+
+	if opCode == evm.CALL || opCode == evm.STATICCALL {
+		t.currentStack = append(t.currentStack, make([]*big.Int, sp))
 	}
 }
 
@@ -193,11 +212,16 @@ func (t *StructTracer) captureStorage(
 	sp int,
 	host tracer.RuntimeHost,
 ) {
+	if opCode == evm.CALL || opCode == evm.STATICCALL {
+		t.storage = append(t.storage, make(map[types.Address]map[types.Hash]types.Hash))
+	}
+
 	if !t.Config.EnableStorage || (opCode != evm.SLOAD && opCode != evm.SSTORE) {
 		return
 	}
 
-	_, initialized := t.storage[contractAddress]
+	storage := &t.storage[len(t.storage)-1]
+	_, initialized := (*storage)[contractAddress]
 
 	switch opCode {
 	case evm.SLOAD:
@@ -206,13 +230,13 @@ func (t *StructTracer) captureStorage(
 		}
 
 		if !initialized {
-			t.storage[contractAddress] = make(map[types.Hash]types.Hash)
+			(*storage)[contractAddress] = make(map[types.Hash]types.Hash)
 		}
 
 		slot := types.BytesToHash(stack[sp-1].Bytes())
 		value := host.GetStorage(contractAddress, slot)
 
-		t.storage[contractAddress][slot] = value
+		(*storage)[contractAddress][slot] = value
 
 	case evm.SSTORE:
 		if sp < 2 {
@@ -220,13 +244,13 @@ func (t *StructTracer) captureStorage(
 		}
 
 		if !initialized {
-			t.storage[contractAddress] = make(map[types.Hash]types.Hash)
+			(*storage)[contractAddress] = make(map[types.Hash]types.Hash)
 		}
 
-		slot := types.BytesToHash(stack[sp-2].Bytes())
-		value := types.BytesToHash(stack[sp-1].Bytes())
+		slot := types.BytesToHash(stack[sp-1].Bytes())
+		value := types.BytesToHash(stack[sp-2].Bytes())
 
-		t.storage[contractAddress][slot] = value
+		(*storage)[contractAddress][slot] = value
 	}
 }
 
@@ -250,16 +274,22 @@ func (t *StructTracer) ExecuteState(
 	)
 
 	if t.Config.EnableMemory {
-		memorySize = len(t.currentMemory)
+		if opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String() {
+			t.currentMemory = t.currentMemory[:len(t.currentMemory)-1]
+		}
 
+		memorySize = len(t.currentMemory[len(t.currentMemory)-1])
 		memory = make([]byte, memorySize)
-		copy(memory, t.currentMemory)
+		copy(memory, t.currentMemory[len(t.currentMemory)-1])
 	}
 
 	if t.Config.EnableStack {
-		stack = make([]*big.Int, len(t.currentStack))
+		if opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String() {
+			t.currentStack = t.currentStack[:len(t.currentStack)-1]
+		}
 
-		for i, v := range t.currentStack {
+		stack = make([]*big.Int, len(t.currentStack[len(t.currentStack)-1]))
+		for i, v := range t.currentStack[len(t.currentStack)-1] {
 			stack[i] = new(big.Int).Set(v)
 		}
 	}
@@ -271,7 +301,12 @@ func (t *StructTracer) ExecuteState(
 	}
 
 	if t.Config.EnableStorage {
-		contractStorage, ok := t.storage[contractAddress]
+		if opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String() {
+			t.storage = t.storage[:len(t.storage)-1]
+		}
+
+		contractStorage, ok := t.storage[len(t.storage)-1][contractAddress]
+
 		if ok {
 			storage = make(map[types.Hash]types.Hash, len(contractStorage))
 
