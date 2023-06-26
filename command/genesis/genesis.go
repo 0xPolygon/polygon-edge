@@ -70,11 +70,11 @@ func setFlags(cmd *cobra.Command) {
 		"the maximum amount of gas used by all transactions in a block",
 	)
 
-	cmd.Flags().StringArrayVar(
-		&params.burnContracts,
+	cmd.Flags().StringVar(
+		&params.burnContract,
 		burnContractFlag,
-		[]string{},
-		"the burn contract blocks and addresses (format: <block>:<address>)",
+		"",
+		"the burn contract block and address (format: <block>:<address>[:<burn destination>])",
 	)
 
 	cmd.Flags().StringArrayVar(

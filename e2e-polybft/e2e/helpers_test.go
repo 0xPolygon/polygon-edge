@@ -331,3 +331,20 @@ func queryNativeERC20Metadata(t *testing.T, funcName string, abiType *abi.Type, 
 
 	return decodedResult["0"]
 }
+
+// getChildToken queries child token address for provided root token on the target predicate
+func getChildToken(t *testing.T, predicateABI *abi.ABI, predicateAddr types.Address,
+	rootToken types.Address, relayer txrelayer.TxRelayer) types.Address {
+	t.Helper()
+
+	rootToChildTokenFn, exists := predicateABI.Methods["rootTokenToChildToken"]
+	require.True(t, exists, "rootTokenToChildToken function is not found in the provided predicate ABI definition")
+
+	input, err := rootToChildTokenFn.Encode([]interface{}{rootToken})
+	require.NoError(t, err)
+
+	childTokenRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(predicateAddr), input)
+	require.NoError(t, err)
+
+	return types.StringToAddress(childTokenRaw)
+}

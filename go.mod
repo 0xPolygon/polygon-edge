@@ -31,13 +31,13 @@ require (
 	github.com/umbracle/fastrlp v0.1.1-0.20230504065717-58a1b8a9929d
 	github.com/umbracle/go-eth-bn256 v0.0.0-20230125114011-47cb310d9b0b
 	golang.org/x/crypto v0.10.0
-	google.golang.org/grpc v1.56.0
+	google.golang.org/grpc v1.56.1
 	google.golang.org/protobuf v1.30.0
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce
 )
 
 require (
-	cloud.google.com/go/secretmanager v1.11.0
+	cloud.google.com/go/secretmanager v1.11.1
 	github.com/armon/go-metrics v0.4.1
 	github.com/aws/aws-sdk-go v1.44.61
 	github.com/benbjohnson/clock v1.3.0 // indirect
@@ -48,7 +48,7 @@ require (
 	github.com/klauspost/compress v1.16.4 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/umbracle/ethgo v0.1.4-0.20230620074316-bcb1d27b7ba9
+	github.com/umbracle/ethgo v0.1.4-0.20230622091706-8230f57578b2
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/sys v0.9.0 // indirect
@@ -71,14 +71,14 @@ require (
 	github.com/sethvargo/go-retry v0.2.4
 	golang.org/x/sync v0.3.0
 	google.golang.org/genproto v0.0.0-20230530153820-e85fd2cbaebc
-	gopkg.in/DataDog/dd-trace-go.v1 v1.51.0
+	gopkg.in/DataDog/dd-trace-go.v1 v1.52.0
 	pgregory.net/rapid v1.0.0
 )
 
 require (
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	github.com/DataDog/appsec-internal-go v1.0.0 // indirect
-	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.45.0-rc.1 // indirect
+	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.45.0 // indirect
 	github.com/DataDog/go-libddwaf v1.2.0 // indirect
 	github.com/DataDog/go-tuf v0.3.0--fix-localmeta-fork // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
@@ -96,7 +96,7 @@ require (
 	github.com/quic-go/webtransport-go v0.5.2 // indirect
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
-	github.com/secure-systems-lab/go-securesystemslib v0.5.0 // indirect
+	github.com/secure-systems-lab/go-securesystemslib v0.6.0 // indirect
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/fx v1.19.2 // indirect
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
@@ -107,7 +107,7 @@ require (
 
 require (
 	cloud.google.com/go/compute v1.19.3 // indirect
-	cloud.google.com/go/iam v1.0.1 // indirect
+	cloud.google.com/go/iam v1.1.0 // indirect
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.45.0-rc.1 // indirect
@@ -144,9 +144,9 @@ require (
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect
-	github.com/google/pprof v0.0.0-20230405160723-4a4c7d95572b // indirect
+	github.com/google/pprof v0.0.0-20230509042627-b1315fad0c5a // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
-	github.com/googleapis/gax-go/v2 v2.10.0 // indirect
+	github.com/googleapis/gax-go/v2 v2.11.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.1 // indirect
@@ -225,9 +225,9 @@ require (
 	golang.org/x/net v0.11.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
 	golang.org/x/text v0.10.0 // indirect
-	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
+	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
-	google.golang.org/api v0.125.0 // indirect
+	google.golang.org/api v0.126.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gotest.tools/v3 v3.0.2 // indirect
 	inet.af/netaddr v0.0.0-20220811202034-502d2d690317 // indirect

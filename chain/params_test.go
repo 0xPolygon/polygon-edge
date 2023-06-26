@@ -17,7 +17,7 @@ func TestParamsForks(t *testing.T) {
 	}{
 		{
 			input: `{
-				"homestead": 1000
+				"homestead": { "block": 1000 }
 			}`,
 			output: &Forks{
 				Homestead: NewFork(1000),
@@ -64,22 +64,22 @@ func TestParams_CalculateBurnContract(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		burnContract map[uint64]string
+		burnContract map[uint64]types.Address
 		block        uint64
 		want         types.Address
 		wantErr      bool
 	}{
 		{
 			name:         "no addresses in the list",
-			burnContract: map[uint64]string{},
+			burnContract: map[uint64]types.Address{},
 			block:        10,
 			want:         types.ZeroAddress,
 			wantErr:      true,
 		},
 		{
 			name: "last address is used",
-			burnContract: map[uint64]string{
-				15: "0x8888f1f195afa192cfee860698584c030f4c9db1",
+			burnContract: map[uint64]types.Address{
+				15: types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db1"),
 			},
 			block:   10,
 			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db1"),
@@ -87,9 +87,9 @@ func TestParams_CalculateBurnContract(t *testing.T) {
 		},
 		{
 			name: "first address is used",
-			burnContract: map[uint64]string{
-				5:  "0x8888f1f195afa192cfee860698584c030f4c9db2",
-				15: "0x8888f1f195afa192cfee860698584c030f4c9db1",
+			burnContract: map[uint64]types.Address{
+				5:  types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db2"),
+				15: types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db1"),
 			},
 			block:   10,
 			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c9db2"),
@@ -97,10 +97,10 @@ func TestParams_CalculateBurnContract(t *testing.T) {
 		},
 		{
 			name: "same block as key",
-			burnContract: map[uint64]string{
-				5:  "0x8888f1f195afa192cfee860698584c030f4c4db2",
-				10: "0x8888f1f195afa192cfee860698584c030f4c5db1",
-				15: "0x8888f1f195afa192cfee860698584c030f4c6db0",
+			burnContract: map[uint64]types.Address{
+				5:  types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c4db2"),
+				10: types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c5db1"),
+				15: types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c6db0"),
 			},
 			block:   10,
 			want:    types.StringToAddress("0x8888f1f195afa192cfee860698584c030f4c5db1"),

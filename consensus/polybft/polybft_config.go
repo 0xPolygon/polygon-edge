@@ -94,12 +94,13 @@ type BridgeConfig struct {
 	RootERC20PredicateAddr            types.Address `json:"erc20PredicateAddress"`
 	ChildMintableERC20PredicateAddr   types.Address `json:"erc20ChildMintablePredicateAddress"`
 	RootNativeERC20Addr               types.Address `json:"nativeERC20Address"`
-	RootERC721Addr                    types.Address `json:"erc721Address"`
 	RootERC721PredicateAddr           types.Address `json:"erc721PredicateAddress"`
 	ChildMintableERC721PredicateAddr  types.Address `json:"erc721ChildMintablePredicateAddress"`
-	RootERC1155Addr                   types.Address `json:"erc1155Address"`
 	RootERC1155PredicateAddr          types.Address `json:"erc1155PredicateAddress"`
 	ChildMintableERC1155PredicateAddr types.Address `json:"erc1155ChildMintablePredicateAddress"`
+	ChildERC20Addr                    types.Address `json:"childERC20Address"`
+	ChildERC721Addr                   types.Address `json:"childERC721Address"`
+	ChildERC1155Addr                  types.Address `json:"childERC1155Address"`
 	CustomSupernetManagerAddr         types.Address `json:"customSupernetManagerAddr"`
 	StakeManagerAddr                  types.Address `json:"stakeManagerAddr"`
 	// only populated if stake-manager-deploy command is executed, and used for e2e tests
@@ -127,15 +128,13 @@ type RootchainConfig struct {
 	RootERC20PredicateAddress            types.Address
 	ChildMintableERC20PredicateAddress   types.Address
 	RootNativeERC20Address               types.Address
-	ERC20TemplateAddress                 types.Address
+	ChildERC20Address                    types.Address
 	RootERC721PredicateAddress           types.Address
 	ChildMintableERC721PredicateAddress  types.Address
-	RootERC721Address                    types.Address
-	ERC721TemplateAddress                types.Address
+	ChildERC721Address                   types.Address
 	RootERC1155PredicateAddress          types.Address
 	ChildMintableERC1155PredicateAddress types.Address
-	RootERC1155Address                   types.Address
-	ERC1155TemplateAddress               types.Address
+	ChildERC1155Address                  types.Address
 	CustomSupernetManagerAddress         types.Address
 	StakeManagerAddress                  types.Address
 	StakeTokenAddress                    types.Address
@@ -152,12 +151,13 @@ func (r *RootchainConfig) ToBridgeConfig() *BridgeConfig {
 		RootERC20PredicateAddr:            r.RootERC20PredicateAddress,
 		ChildMintableERC20PredicateAddr:   r.ChildMintableERC20PredicateAddress,
 		RootNativeERC20Addr:               r.RootNativeERC20Address,
-		RootERC721Addr:                    r.RootERC721Address,
 		RootERC721PredicateAddr:           r.RootERC721PredicateAddress,
 		ChildMintableERC721PredicateAddr:  r.ChildMintableERC721PredicateAddress,
-		RootERC1155Addr:                   r.RootERC1155Address,
 		RootERC1155PredicateAddr:          r.RootERC1155PredicateAddress,
 		ChildMintableERC1155PredicateAddr: r.ChildMintableERC1155PredicateAddress,
+		ChildERC20Addr:                    r.ChildERC20Address,
+		ChildERC721Addr:                   r.ChildERC721Address,
+		ChildERC1155Addr:                  r.ChildERC1155Address,
 		CustomSupernetManagerAddr:         r.CustomSupernetManagerAddress,
 		StakeManagerAddr:                  r.StakeManagerAddress,
 		BLSAddress:                        r.BLSAddress,
@@ -220,4 +220,11 @@ type rewardsConfigRaw struct {
 	TokenAddress  types.Address `json:"rewardTokenAddress"`
 	WalletAddress types.Address `json:"rewardWalletAddress"`
 	WalletAmount  *string       `json:"rewardWalletAmount"`
+}
+
+// BurnContractInfo contains metadata for burn contract, which is part of EIP-1559 specification
+type BurnContractInfo struct {
+	BlockNumber        uint64
+	Address            types.Address
+	DestinationAddress types.Address
 }

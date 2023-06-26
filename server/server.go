@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
+	"github.com/0xPolygon/polygon-edge/gasprice"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -90,6 +91,9 @@ type Server struct {
 
 	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
 	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
+
+	// gasHelper is providing functions regarding gas and fees
+	gasHelper *gasprice.GasHelper
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -277,7 +281,16 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	var initialParams *chain.ForkParams
+
+	if pf := forkManagerInitialParamsFactory[ConsensusType(engineName)]; pf != nil {
+		if initialParams, err = pf(config.Chain); err != nil {
+			return nil, err
+		}
+	}
+
 	if err := forkmanager.ForkManagerInit(
+		initialParams,
 		forkManagerFactory[ConsensusType(engineName)],
 		config.Chain.Params.Forks); err != nil {
 		return nil, err
@@ -327,6 +340,9 @@ func NewServer(config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// here we can provide some other configuration
+	m.gasHelper = gasprice.NewGasHelper(gasprice.DefaultGasHelperConfig, m.blockchain)
 
 	m.executor.GetHash = m.blockchain.GetHashHelper
 
@@ -657,6 +673,7 @@ type jsonRPCHub struct {
 	*network.Server
 	consensus.Consensus
 	consensus.BridgeDataProvider
+	gasprice.GasStore
 }
 
 func (j *jsonRPCHub) GetPeers() int {
@@ -885,6 +902,7 @@ func (s *Server) setupJSONRPC() error {
 		Consensus:          s.consensus,
 		Server:             s.network,
 		BridgeDataProvider: s.consensus.GetBridgeProvider(),
+		GasStore:           s.gasHelper,
 	}
 
 	conf := &jsonrpc.Config{

@@ -2,9 +2,9 @@ package chain
 
 import (
 	"errors"
-	"math/big"
 	"sort"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -29,7 +29,9 @@ type Params struct {
 	BridgeBlockList           *AddressListConfig `json:"bridgeBlockList,omitempty"`
 
 	// Governance contract where the token will be sent to and burn in london fork
-	BurnContract map[uint64]string `json:"burnContract"`
+	BurnContract map[uint64]types.Address `json:"burnContract"`
+	// Destination address to initialize default burn contract with
+	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
 }
 
 type AddressListConfig struct {
@@ -58,11 +60,11 @@ func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
 
 	for i := 0; i < len(blocks)-1; i++ {
 		if block >= blocks[i] && block < blocks[i+1] {
-			return types.StringToAddress(p.BurnContract[blocks[i]]), nil
+			return p.BurnContract[blocks[i]], nil
 		}
 	}
 
-	return types.StringToAddress(p.BurnContract[blocks[len(blocks)-1]]), nil
+	return p.BurnContract[blocks[len(blocks)-1]], nil
 }
 
 func (p *Params) GetEngine() string {
@@ -88,18 +90,22 @@ const (
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
-type Forks map[string]*Fork
+type Forks map[string]Fork
 
 // IsActive returns true if fork defined by name exists and defined for the block
 func (f *Forks) IsActive(name string, block uint64) bool {
-	ff := (*f)[name]
+	ff, exists := (*f)[name]
 
-	return ff != nil && ff.Active(block)
+	return exists && ff.Active(block)
 }
 
 // SetFork adds/updates fork defined by name
-func (f *Forks) SetFork(name string, value *Fork) {
+func (f *Forks) SetFork(name string, value Fork) {
 	(*f)[name] = value
+}
+
+func (f *Forks) RemoveFork(name string) {
+	delete(*f, name)
 }
 
 // At returns ForksInTime instance that shows which supported forks are enabled for the block
@@ -117,20 +123,35 @@ func (f *Forks) At(block uint64) ForksInTime {
 	}
 }
 
-type Fork uint64
+// ForkParams hard-coded fork params
+type ForkParams struct {
+	// MaxValidatorSetSize indicates the maximum size of validator set
+	MaxValidatorSetSize *uint64 `json:"maxValidatorSetSize,omitempty"`
 
-func NewFork(n uint64) *Fork {
-	f := Fork(n)
+	// EpochSize is size of epoch
+	EpochSize *uint64 `json:"epochSize,omitempty"`
 
-	return &f
+	// SprintSize is size of sprint
+	SprintSize *uint64 `json:"sprintSize,omitempty"`
+
+	// BlockTime is target frequency of blocks production
+	BlockTime *common.Duration `json:"blockTime,omitempty"`
+
+	// BlockTimeDrift defines the time slot in which a new block can be created
+	BlockTimeDrift *uint64 `json:"blockTimeDrift,omitempty"`
+}
+
+type Fork struct {
+	Block  uint64      `json:"block"`
+	Params *ForkParams `json:"params,omitempty"`
+}
+
+func NewFork(n uint64) Fork {
+	return Fork{Block: n}
 }
 
 func (f Fork) Active(block uint64) bool {
-	return block >= uint64(f)
-}
-
-func (f Fork) Int() *big.Int {
-	return big.NewInt(int64(f))
+	return block >= f.Block
 }
 
 // ForksInTime should contain all supported forks by current edge version

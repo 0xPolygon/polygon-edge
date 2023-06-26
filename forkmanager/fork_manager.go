@@ -2,20 +2,12 @@ package forkmanager
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"sync"
+
+	"github.com/0xPolygon/polygon-edge/chain"
 )
-
-/*
-Regarding whether it is okay to use the Singleton pattern in Go, it's a topic of some debate.
-The Singleton pattern can introduce global state and make testing and concurrent programming more challenging.
-It can also make code tightly coupled and harder to maintain.
-In general, it's recommended to favor dependency injection and explicit collaboration over singletons.
-
-However, there might be scenarios where the Singleton pattern is still useful,
-such as managing shared resources or maintaining a global configuration.
-Just be mindful of the potential drawbacks and consider alternative patterns when appropriate.
-*/
 
 var (
 	forkManagerInstance     *forkManager
@@ -26,7 +18,8 @@ type forkManager struct {
 	lock sync.Mutex
 
 	forkMap     map[string]*Fork
-	handlersMap map[HandlerDesc][]Handler
+	handlersMap map[HandlerDesc][]forkHandler
+	params      []*forkParamsBlock
 }
 
 // GeInstance returns fork manager singleton instance. Thread safe
@@ -47,11 +40,11 @@ func (fm *forkManager) Clear() {
 	defer fm.lock.Unlock()
 
 	fm.forkMap = map[string]*Fork{}
-	fm.handlersMap = map[HandlerDesc][]Handler{}
+	fm.handlersMap = map[HandlerDesc][]forkHandler{}
 }
 
 // RegisterFork registers fork by its name
-func (fm *forkManager) RegisterFork(name string) {
+func (fm *forkManager) RegisterFork(name string, forkParams *chain.ForkParams) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -59,6 +52,7 @@ func (fm *forkManager) RegisterFork(name string) {
 		Name:            name,
 		FromBlockNumber: 0,
 		IsActive:        false,
+		Params:          forkParams,
 		Handlers:        map[HandlerDesc]interface{}{},
 	}
 }
@@ -79,7 +73,7 @@ func (fm *forkManager) RegisterHandler(forkName string, handlerName HandlerDesc,
 }
 
 // ActivateFork activates fork from some block number
-// All handlers belong to this fork are also activated
+// All handlers and parameters belonging to this fork are also activated
 func (fm *forkManager) ActivateFork(forkName string, blockNumber uint64) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -96,15 +90,17 @@ func (fm *forkManager) ActivateFork(forkName string, blockNumber uint64) error {
 	fork.IsActive = true
 	fork.FromBlockNumber = blockNumber
 
-	for forkHandlerName, forkHandler := range fork.Handlers {
-		fm.addHandler(forkHandlerName, blockNumber, forkHandler)
+	for name, handler := range fork.Handlers {
+		fm.addHandler(name, blockNumber, handler)
 	}
+
+	fm.addParams(blockNumber, fork.Params)
 
 	return nil
 }
 
 // DeactivateFork de-activates fork
-// All handlers belong to this fork are also de-activated
+// All handlers and parameters belong to this fork are also de-activated
 func (fm *forkManager) DeactivateFork(forkName string) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
@@ -124,6 +120,8 @@ func (fm *forkManager) DeactivateFork(forkName string) error {
 		fm.removeHandler(forkHandlerName, fork.FromBlockNumber)
 	}
 
+	fm.removeParams(fork.FromBlockNumber)
+
 	return nil
 }
 
@@ -139,13 +137,29 @@ func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interfac
 
 	// binary search to find the latest handler defined for a specific block
 	pos := sort.Search(len(handlers), func(i int) bool {
-		return blockNumber < handlers[i].FromBlockNumber
+		return handlers[i].FromBlockNumber > blockNumber
 	}) - 1
 	if pos < 0 {
 		return nil
 	}
 
 	return handlers[pos].Handler
+}
+
+// GetParams retrieves chain.ForkParams for a block number
+func (fm *forkManager) GetParams(blockNumber uint64) *chain.ForkParams {
+	fm.lock.Lock()
+	defer fm.lock.Unlock()
+
+	// binary search to find the desired *chain.ForkParams
+	pos := sort.Search(len(fm.params), func(i int) bool {
+		return fm.params[i].FromBlockNumber > blockNumber
+	}) - 1
+	if pos < 0 {
+		return nil
+	}
+
+	return fm.params[pos].Params
 }
 
 // IsForkRegistered checks if fork is registered
@@ -190,7 +204,7 @@ func (fm *forkManager) GetForkBlock(name string) (uint64, error) {
 
 func (fm *forkManager) addHandler(handlerName HandlerDesc, blockNumber uint64, handler interface{}) {
 	if handlers, exists := fm.handlersMap[handlerName]; !exists {
-		fm.handlersMap[handlerName] = []Handler{
+		fm.handlersMap[handlerName] = []forkHandler{
 			{
 				FromBlockNumber: blockNumber,
 				Handler:         handler,
@@ -201,9 +215,9 @@ func (fm *forkManager) addHandler(handlerName HandlerDesc, blockNumber uint64, h
 		index := sort.Search(len(handlers), func(i int) bool {
 			return handlers[i].FromBlockNumber >= blockNumber
 		})
-		handlers = append(handlers, Handler{})
+		handlers = append(handlers, forkHandler{})
 		copy(handlers[index+1:], handlers[index:])
-		handlers[index] = Handler{
+		handlers[index] = forkHandler{
 			FromBlockNumber: blockNumber,
 			Handler:         handler,
 		}
@@ -218,12 +232,70 @@ func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64
 	}
 
 	index := sort.Search(len(handlers), func(i int) bool {
-		return handlers[i].FromBlockNumber == blockNumber
+		return handlers[i].FromBlockNumber >= blockNumber
 	})
 
-	if index != -1 {
+	if index < len(handlers) && handlers[index].FromBlockNumber == blockNumber {
 		copy(handlers[index:], handlers[index+1:])
-		handlers[len(handlers)-1] = Handler{}
+		handlers[len(handlers)-1] = forkHandler{}
 		fm.handlersMap[handlerName] = handlers[:len(handlers)-1]
+	}
+}
+
+func (fm *forkManager) addParams(blockNumber uint64, params *chain.ForkParams) {
+	if params == nil {
+		return
+	}
+
+	item := &forkParamsBlock{FromBlockNumber: blockNumber, Params: params}
+
+	if len(fm.params) == 0 {
+		fm.params = append(fm.params, item)
+	} else {
+		// keep everything in sorted order
+		index := sort.Search(len(fm.params), func(i int) bool {
+			return fm.params[i].FromBlockNumber >= blockNumber
+		})
+
+		fm.params = append(fm.params, (*forkParamsBlock)(nil))
+		copy(fm.params[index+1:], fm.params[index:])
+		fm.params[index] = item
+
+		if index > 0 {
+			// copy all nil parameters from previous
+			copyParams(item.Params, fm.params[index-1].Params)
+		}
+
+		// update parameters for next
+		for i := index; i < len(fm.params)-1; i++ {
+			copyParams(fm.params[i+1].Params, fm.params[i].Params)
+		}
+	}
+}
+
+func (fm *forkManager) removeParams(blockNumber uint64) {
+	index := sort.Search(len(fm.params), func(i int) bool {
+		return fm.params[i].FromBlockNumber >= blockNumber
+	})
+
+	if index < len(fm.params) && fm.params[index].FromBlockNumber == blockNumber {
+		copy(fm.params[index:], fm.params[index+1:])
+		fm.params[len(fm.params)-1] = nil
+		fm.params = fm.params[:len(fm.params)-1]
+	}
+}
+
+func copyParams(dest, src *chain.ForkParams) {
+	srcValue := reflect.ValueOf(src).Elem()
+	dstValue := reflect.ValueOf(dest).Elem()
+
+	for i := 0; i < srcValue.NumField(); i++ {
+		dstField := dstValue.Field(i)
+		srcField := srcValue.Field(i)
+
+		// copy if dst is nil, but src is not
+		if dstField.Kind() == reflect.Ptr && dstField.IsNil() && !srcField.IsNil() {
+			dstField.Set(srcField)
+		}
 	}
 }

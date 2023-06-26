@@ -38,11 +38,9 @@ const (
 	erc20TemplateName                 = "ERC20Template"
 	rootERC721PredicateName           = "RootERC721Predicate"
 	childERC721MintablePredicateName  = "ChildERC721MintablePredicate"
-	rootERC721Name                    = "RootERC721"
 	erc721TemplateName                = "ERC721Template"
 	rootERC1155PredicateName          = "RootERC1155Predicate"
 	childERC1155MintablePredicateName = "ChildERC1155MintablePredicate"
-	rootERC1155Name                   = "RootERC1155"
 	erc1155TemplateName               = "ERC1155Template"
 	customSupernetManagerName         = "CustomSupernetManager"
 )
@@ -82,7 +80,7 @@ var (
 			rootchainConfig.RootNativeERC20Address = addr
 		},
 		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.ERC20TemplateAddress = addr
+			rootchainConfig.ChildERC20Address = addr
 		},
 		rootERC721PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC721PredicateAddress = addr
@@ -90,11 +88,8 @@ var (
 		childERC721MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC721PredicateAddress = addr
 		},
-		rootERC721Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootERC721Address = addr
-		},
 		erc721TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.ERC721TemplateAddress = addr
+			rootchainConfig.ChildERC721Address = addr
 		},
 		rootERC1155PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155PredicateAddress = addr
@@ -102,11 +97,8 @@ var (
 		childERC1155MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC1155PredicateAddress = addr
 		},
-		rootERC1155Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.RootERC1155Address = addr
-		},
 		erc1155TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
-			rootchainConfig.ERC1155TemplateAddress = addr
+			rootchainConfig.ChildERC1155Address = addr
 		},
 		customSupernetManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.CustomSupernetManagerAddress = addr
@@ -157,7 +149,7 @@ var (
 				NewStateSender:         config.StateSenderAddress,
 				NewExitHelper:          config.ExitHelperAddress,
 				NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
-				NewChildTokenTemplate:  config.ERC20TemplateAddress,
+				NewChildTokenTemplate:  contracts.ChildERC20Contract,
 				NativeTokenRootAddress: nativeTokenRootAddr,
 			}
 
@@ -172,7 +164,7 @@ var (
 				NewStateSender:        config.StateSenderAddress,
 				NewExitHelper:         config.ExitHelperAddress,
 				NewRootERC20Predicate: contracts.RootMintableERC20PredicateContract,
-				NewChildTokenTemplate: config.ERC20TemplateAddress,
+				NewChildTokenTemplate: config.ChildERC20Address,
 			}
 
 			return initContract(fmt, relayer, initParams,
@@ -186,7 +178,7 @@ var (
 				NewStateSender:          config.StateSenderAddress,
 				NewExitHelper:           config.ExitHelperAddress,
 				NewChildERC721Predicate: contracts.ChildERC721PredicateContract,
-				NewChildTokenTemplate:   config.ERC721TemplateAddress,
+				NewChildTokenTemplate:   contracts.ChildERC721Contract,
 			}
 
 			return initContract(fmt, relayer, initParams,
@@ -200,7 +192,7 @@ var (
 				NewStateSender:         config.StateSenderAddress,
 				NewExitHelper:          config.ExitHelperAddress,
 				NewRootERC721Predicate: contracts.RootMintableERC721PredicateContract,
-				NewChildTokenTemplate:  config.ERC721TemplateAddress,
+				NewChildTokenTemplate:  config.ChildERC721Address,
 			}
 
 			return initContract(fmt, relayer, initParams,
@@ -214,7 +206,7 @@ var (
 				NewStateSender:           config.StateSenderAddress,
 				NewExitHelper:            config.ExitHelperAddress,
 				NewChildERC1155Predicate: contracts.ChildERC1155PredicateContract,
-				NewChildTokenTemplate:    config.ERC1155TemplateAddress,
+				NewChildTokenTemplate:    contracts.ChildERC1155Contract,
 			}
 
 			return initContract(fmt, relayer, initParams,
@@ -228,7 +220,7 @@ var (
 				NewStateSender:          config.StateSenderAddress,
 				NewExitHelper:           config.ExitHelperAddress,
 				NewRootERC1155Predicate: contracts.RootMintableERC1155PredicateContract,
-				NewChildTokenTemplate:   config.ERC1155TemplateAddress,
+				NewChildTokenTemplate:   config.ChildERC1155Address,
 			}
 
 			return initContract(fmt, relayer, initParams,
@@ -272,20 +264,6 @@ func GetCommand() *cobra.Command {
 		erc20AddrFlag,
 		"",
 		"existing root chain root native token address",
-	)
-
-	cmd.Flags().StringVar(
-		&params.rootERC721TokenAddr,
-		erc721AddrFlag,
-		"",
-		"existing root chain ERC 721 token address",
-	)
-
-	cmd.Flags().StringVar(
-		&params.rootERC1155TokenAddr,
-		erc1155AddrFlag,
-		"",
-		"existing root chain ERC 1155 token address",
 	)
 
 	cmd.Flags().BoolVar(
@@ -454,30 +432,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			tokenContracts = append(tokenContracts,
 				&contractInfo{name: rootERC20Name, artifact: contractsapi.RootERC20})
 		}
-	}
-
-	if params.rootERC721TokenAddr != "" {
-		// use existing root chain ERC721 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC721TokenAddr, rootERC721Name, rootchainConfig); err != nil {
-			return nil, 0, err
-		}
-	} else {
-		// deploy MockERC721 as a default root chain ERC721 token
-		tokenContracts = append(tokenContracts,
-			&contractInfo{name: rootERC721Name, artifact: contractsapi.RootERC721})
-	}
-
-	if params.rootERC1155TokenAddr != "" {
-		// use existing root chain ERC1155 token
-		if err := populateExistingTokenAddr(client.Eth(),
-			params.rootERC1155TokenAddr, rootERC1155Name, rootchainConfig); err != nil {
-			return nil, 0, err
-		}
-	} else {
-		// deploy MockERC1155 as a default root chain ERC1155 token
-		tokenContracts = append(tokenContracts,
-			&contractInfo{name: rootERC1155Name, artifact: contractsapi.RootERC1155})
 	}
 
 	allContracts := []*contractInfo{

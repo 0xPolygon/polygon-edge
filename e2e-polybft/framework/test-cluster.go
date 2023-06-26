@@ -84,7 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
-	BurnContracts        map[uint64]types.Address
+	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -254,13 +254,9 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(block uint64, address types.Address) ClusterOption {
+func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
-		if h.BurnContracts == nil {
-			h.BurnContracts = map[uint64]types.Address{}
-		}
-
-		h.BurnContracts[block] = address
+		h.BurnContract = burnContract
 	}
 }
 
@@ -471,13 +467,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		if len(cluster.Config.BurnContracts) != 0 {
-			for block, addr := range cluster.Config.BurnContracts {
-				args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
-			}
-		} else {
-			// London hardfork is enabled by default so there must be a default burn contract
-			args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
+		burnContract := cluster.Config.BurnContract
+		if burnContract != nil {
+			args = append(args, "--burn-contract",
+				fmt.Sprintf("%d:%s:%s",
+					burnContract.BlockNumber, burnContract.Address, burnContract.DestinationAddress))
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
