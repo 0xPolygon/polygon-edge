@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/ethgo"
 )
 
@@ -80,6 +81,8 @@ type GasHelper struct {
 	lastHeaderHash types.Hash
 
 	lock sync.Mutex
+
+	historyCache *lru.Cache
 }
 
 // NewGasHelper is the constructor function for GasHelper struct
@@ -87,6 +90,11 @@ func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 	pricePercentile := config.PricePercentile
 	if pricePercentile > 100 {
 		pricePercentile = 100
+	}
+
+	cache, err := lru.New(100)
+	if err != nil {
+		panic(err)
 	}
 
 	return &GasHelper{
@@ -97,6 +105,7 @@ func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 		lastPrice:          config.LastPrice,
 		maxPrice:           config.MaxPrice,
 		backend:            backend,
+		historyCache:       cache,
 	}
 }
 

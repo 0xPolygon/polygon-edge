@@ -1,7 +1,10 @@
 package gasprice
 
 import (
+	"encoding/binary"
 	"errors"
+	"log"
+	"math"
 	"math/big"
 	"sort"
 )
@@ -15,6 +18,18 @@ var (
 const (
 	maxBlockRequest = 1024
 )
+
+type cacheKey struct {
+	number      uint64
+	percentiles string
+}
+
+// processedFees contains the results of a processed block.
+type processedFees struct {
+	reward       []uint64
+	baseFee      uint64
+	gasUsedRatio float64
+}
 
 type txGasAndReward struct {
 	gasUsed *big.Int
@@ -52,12 +67,27 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 	if oldestBlock < 1 {
 		oldestBlock = 1
 	}
+	percentileKey := make([]byte, 8*len(rewardPercentiles))
+	for i, p := range rewardPercentiles {
+		binary.LittleEndian.PutUint64(percentileKey[i*8:(i+1)*8], math.Float64bits(p))
+	}
 
 	for i := oldestBlock; i < oldestBlock+blockCount; i++ {
+
+		cacheKey := cacheKey{number: i, percentiles: string(percentileKey)}
+		//cache is hit, load from cache and continue to next block
+		if p, ok := g.historyCache.Get(cacheKey); ok {
+			log.Println("cache hit", p)
+			baseFeePerGas[i-oldestBlock] = p.(*processedFees).baseFee
+			gasUsedRatio[i-oldestBlock] = p.(*processedFees).gasUsedRatio
+			reward[i-oldestBlock] = p.(*processedFees).reward
+			continue
+		}
 		block, ok := g.backend.GetBlockByNumber(i, false)
 		if !ok {
 			return nil, nil, nil, nil, ErrBlockInfo
 		}
+
 		baseFeePerGas[i-oldestBlock] = block.Header.BaseFee
 		gasUsedRatio[i-oldestBlock] = float64(block.Header.GasUsed) / float64(block.Header.GasLimit)
 
@@ -98,6 +128,12 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 			}
 			reward[i-oldestBlock][c] = sorter[txIndex].reward.Uint64()
 		}
+		blockFees := &processedFees{
+			reward:       reward[i-oldestBlock],
+			baseFee:      block.Header.BaseFee,
+			gasUsedRatio: gasUsedRatio[i-oldestBlock],
+		}
+		g.historyCache.Add(cacheKey, blockFees)
 	}
 
 	baseFeePerGas[blockCount] = g.backend.Header().BaseFee
