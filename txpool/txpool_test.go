@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -670,7 +671,7 @@ func TestEnqueueHandler(t *testing.T) {
 			// send tx
 			go func() {
 				err := pool.addTx(local, newTx(addr1, 10, 1)) // 10 < 20
-				assert.NoError(t, err)
+				assert.EqualError(t, err, "nonce too low")
 			}()
 			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
 
@@ -682,7 +683,7 @@ func TestEnqueueHandler(t *testing.T) {
 	t.Run(
 		"signal promotion for new tx with expected nonce",
 		func(t *testing.T) {
-			t.Parallel()
+			// t.Parallel()
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
@@ -707,7 +708,7 @@ func TestEnqueueHandler(t *testing.T) {
 	t.Run(
 		"reject new tx when enqueued is full",
 		func(t *testing.T) {
-			t.Parallel()
+			// t.Parallel()
 
 			fillEnqueued := func(pool *TxPool, num uint64) {
 				//	first tx will signal promotion, grab the signal
@@ -746,9 +747,8 @@ func TestEnqueueHandler(t *testing.T) {
 
 			//	send next expected tx
 			go func() {
-				assert.NoError(t,
-					pool.addTx(local, newTx(addr1, 1, 1)),
-				)
+				err := pool.addTx(local, newTx(addr1, 1, 1))
+				assert.True(t, errors.Is(err, ErrMaxEnqueuedLimitReached))
 			}()
 
 			pool.handleEnqueueRequest(<-pool.enqueueReqCh)
@@ -900,7 +900,7 @@ func TestPromoteHandler(t *testing.T) {
 	t.Run(
 		"promote handler discards cheaper tx",
 		func(t *testing.T) {
-			t.Parallel()
+			// t.Parallel()
 
 			// helper
 			newPricedTx := func(
@@ -919,13 +919,15 @@ func TestPromoteHandler(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
 			addTx := func(tx *types.Transaction) enqueueRequest {
 				tx.ComputeHash()
 
 				go func() {
-					assert.NoError(t,
-						pool.addTx(local, tx),
-					)
+					err := pool.addTx(local, tx)
+					assert.NoError(t, err)
 				}()
 
 				//	grab the enqueue signal
@@ -947,9 +949,6 @@ func TestPromoteHandler(t *testing.T) {
 				assert.Equal(t, shouldExists, exists)
 			}
 
-			tx1 := newPricedTx(addr1, 0, 10, 2)
-			tx2 := newPricedTx(addr1, 0, 20, 3)
-
 			// add the transactions
 			enqTx1 := addTx(tx1)
 			enqTx2 := addTx(tx2)
@@ -964,12 +963,16 @@ func TestPromoteHandler(t *testing.T) {
 			promReq1 := handleEnqueueRequest(enqTx1)
 			promReq2 := handleEnqueueRequest(enqTx2)
 
+			// at this point the pointer of the first tx should be overwritten by the second pricier tx
+			assertTxExists(t, tx2, true)
+			assert.Equal(t, len(pool.index.all), int(1))
+
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
-			assert.Equal(t, uint64(2), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 			assert.Equal(
 				t,
-				slotsRequired(tx1)+slotsRequired(tx2),
+				slotsRequired(tx2),
 				pool.gauge.read(),
 			)
 
@@ -979,8 +982,9 @@ func TestPromoteHandler(t *testing.T) {
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length()) // should be empty
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
-			assertTxExists(t, tx1, false)
 			assertTxExists(t, tx2, true)
+			assert.Equal(t, len(pool.index.all), int(1))
+
 			assert.Equal(
 				t,
 				slotsRequired(tx2),
@@ -993,8 +997,9 @@ func TestPromoteHandler(t *testing.T) {
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
-			assertTxExists(t, tx1, false)
-			assertTxExists(t, tx2, true)
+			assertTxExists(t, tx2, true) // because the *tx1 and *tx2 now contain the same hash we only need to check for *tx2 existence
+			assert.Equal(t, len(pool.index.all), int(1))
+
 			assert.Equal(
 				t,
 				slotsRequired(tx2),

@@ -59,6 +59,8 @@ var (
 	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
 	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
+	ErrNonceExistsInPool       = errors.New("tx with the same nonce is already present")
+	ErrReplacementUnderpriced  = errors.New("replacement tx underpriced")
 )
 
 // indicates origin of a transaction
@@ -106,7 +108,8 @@ through their designated channels. */
 // This request is created for (new) transactions
 // that passed validation in addTx.
 type enqueueRequest struct {
-	tx *types.Transaction
+	tx      *types.Transaction
+	errchan chan<- error
 }
 
 // A promoteRequest is created each time some account
@@ -379,6 +382,8 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	// update metrics
 	p.updatePending(-1)
 
+	account.nonceToTx.remove(tx) // update the account nonce -> *tx map
+
 	// update executables
 	if tx := account.promoted.peek(); tx != nil {
 		p.executables.push(tx)
@@ -393,6 +398,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
+	account.nonceToTx.lock()
 
 	// num of all txs dropped
 	droppedCount := 0
@@ -409,6 +415,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	defer func() {
 		account.enqueued.unlock()
 		account.promoted.unlock()
+		account.nonceToTx.unlock()
 	}()
 
 	// rollback nonce
@@ -425,6 +432,8 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	// drop enqueued
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
+
+	account.nonceToTx.reset() // reset accounts nonce map
 
 	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 
@@ -765,9 +774,16 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	p.createAccountOnce(tx.From)
 
 	// send request [BLOCKING]
-	p.enqueueReqCh <- enqueueRequest{tx: tx}
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+	errchan := make(chan error, 1)
+	defer close(errchan)
 
+	p.enqueueReqCh <- enqueueRequest{tx: tx, errchan: errchan}
+
+	if err := <-errchan; err != nil {
+		return err
+	}
+
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
 	metrics.SetGauge([]string{txPoolMetrics, "added_tx"}, 1)
 
 	return nil
@@ -785,12 +801,23 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	account := p.accounts.get(addr)
 
 	// enqueue tx
-	if err := account.enqueue(tx); err != nil {
+	replacedTx, err := account.enqueue(tx)
+	if err != nil {
 		p.logger.Error("enqueue request", "err", err)
-
 		p.index.remove(tx)
+		req.errchan <- err // notify observer about enqueue error
 
 		return
+	}
+
+	req.errchan <- nil // notify observer that there is no enqueue error
+
+	if replacedTx != nil {
+		// the old transaction should be evicted from the lookup
+		// but because we are copying contents of the new tx into pointer of the old tx
+		// we need to decrease slots by the size of the old tx
+		p.index.remove(replacedTx)
+		p.gauge.decrease(slotsRequired(replacedTx))
 	}
 
 	if p.logger.IsDebug() {
@@ -802,8 +829,7 @@ func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	if tx.Nonce > account.getNonce() {
-		// don't signal promotion for
-		// higher nonce txs
+		// don't signal promotion for higher nonce txs
 		return
 	}
 

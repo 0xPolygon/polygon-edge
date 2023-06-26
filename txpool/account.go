@@ -12,8 +12,7 @@ import (
 type accountsMap struct {
 	sync.Map
 
-	count uint64
-
+	count            uint64
 	maxEnqueuedLimit uint64
 }
 
@@ -22,6 +21,7 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	a, loaded := m.LoadOrStore(addr, &account{
 		enqueued:    newAccountQueue(),
 		promoted:    newAccountQueue(),
+		nonceToTx:   newNonceToTxLookup(),
 		maxEnqueued: m.maxEnqueuedLimit,
 		nextNonce:   nonce,
 	})
@@ -136,6 +136,56 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
+type NonceToTxLookup struct {
+	mapping map[uint64]*types.Transaction
+	mutex   sync.Mutex
+}
+
+func newNonceToTxLookup() *NonceToTxLookup {
+	return &NonceToTxLookup{
+		mapping: make(map[uint64]*types.Transaction),
+	}
+}
+
+func (m *NonceToTxLookup) lock() {
+	m.mutex.Lock()
+}
+
+func (m *NonceToTxLookup) unlock() {
+	m.mutex.Unlock()
+}
+
+func (m *NonceToTxLookup) get(nonce uint64) *types.Transaction {
+	return m.mapping[nonce]
+}
+
+func (m *NonceToTxLookup) set(tx *types.Transaction) {
+	m.mapping[tx.Nonce] = tx
+}
+
+func (m *NonceToTxLookup) reset() {
+	m.mapping = make(map[uint64]*types.Transaction)
+}
+
+func (m *NonceToTxLookup) replace(tx *types.Transaction) *types.Transaction {
+	if oldTx, ok := m.mapping[tx.Nonce]; ok {
+		toReturn := new(types.Transaction)
+
+		oldTx.CopyTo(toReturn)
+		tx.CopyTo(oldTx)
+
+		return toReturn
+	}
+
+	return nil
+}
+
+func (m *NonceToTxLookup) remove(txs ...*types.Transaction) {
+	for _, tx := range txs {
+		delete(m.mapping, tx.Nonce)
+	}
+}
+
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
 // field is what separates the enqueued from promoted transactions:
@@ -156,6 +206,8 @@ type account struct {
 
 	//	maximum number of enqueued transactions
 	maxEnqueued uint64
+
+	nonceToTx *NonceToTxLookup
 }
 
 // getNonce returns the next expected nonce for this account.
@@ -192,10 +244,16 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	prunedEnqueued []*types.Transaction,
 ) {
 	a.promoted.lock(true)
-	defer a.promoted.unlock()
+	a.nonceToTx.lock()
+
+	defer func() {
+		a.promoted.unlock()
+		a.nonceToTx.unlock()
+	}()
 
 	// prune the promoted txs
 	prunedPromoted = a.promoted.prune(nonce)
+	a.nonceToTx.remove(prunedPromoted...)
 
 	if nonce <= a.getNonce() {
 		// only the promoted queue needed pruning
@@ -207,6 +265,7 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 
 	// prune the enqueued txs
 	prunedEnqueued = a.enqueued.prune(nonce)
+	a.nonceToTx.remove(prunedEnqueued...)
 
 	// update nonce expected for this account
 	a.setNonce(nonce)
@@ -223,23 +282,38 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 }
 
 // enqueue attempts tp push the transaction onto the enqueued queue.
-func (a *account) enqueue(tx *types.Transaction) error {
+// first returning value is transaction that is being replaced
+func (a *account) enqueue(tx *types.Transaction) (*types.Transaction, error) {
 	a.enqueued.lock(true)
-	defer a.enqueued.unlock()
+	a.promoted.lock(true)
+	a.nonceToTx.lock()
+
+	defer func() {
+		a.nonceToTx.unlock()
+		a.promoted.unlock()
+		a.enqueued.unlock()
+	}()
 
 	if a.enqueued.length() == a.maxEnqueued {
-		return ErrMaxEnqueuedLimitReached
+		return nil, ErrMaxEnqueuedLimitReached
 	}
 
-	// reject low nonce tx
-	if tx.Nonce < a.getNonce() {
-		return ErrNonceTooLow
+	// the only case when the tx should be replaced is when the nonces are the same and the new one is pricier
+	if oldTx := a.nonceToTx.get(tx.Nonce); oldTx != nil {
+		if oldTx.GasPrice.Cmp(tx.GasPrice) < 0 {
+			return a.nonceToTx.replace(tx), nil
+		} else {
+			return nil, ErrUnderpriced
+		}
+	} else if tx.Nonce < a.getNonce() {
+		return nil, ErrNonceTooLow
 	}
 
 	// enqueue tx
 	a.enqueued.push(tx)
+	a.nonceToTx.set(tx)
 
-	return nil
+	return nil, nil
 }
 
 // Promote moves eligible transactions from enqueued to promoted.

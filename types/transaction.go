@@ -89,7 +89,15 @@ func (t *Transaction) ComputeHash() *Transaction {
 
 func (t *Transaction) Copy() *Transaction {
 	tt := new(Transaction)
+	t.CopyTo(tt)
+
+	return tt
+}
+
+func (t *Transaction) CopyTo(tt *Transaction) {
 	*tt = *t
+
+	tt.size = atomic.Pointer[uint64]{} // clear size pointer
 
 	tt.GasPrice = new(big.Int)
 	if t.GasPrice != nil {
@@ -112,19 +120,19 @@ func (t *Transaction) Copy() *Transaction {
 	}
 
 	if t.R != nil {
-		tt.R = new(big.Int)
-		tt.R = big.NewInt(0).SetBits(t.R.Bits())
+		tt.R = new(big.Int).SetBytes(t.R.Bytes())
 	}
 
 	if t.S != nil {
-		tt.S = new(big.Int)
-		tt.S = big.NewInt(0).SetBits(t.S.Bits())
+		tt.S = new(big.Int).SetBytes(t.S.Bytes())
+	}
+
+	if t.V != nil {
+		tt.V = new(big.Int).SetBytes(t.V.Bytes())
 	}
 
 	tt.Input = make([]byte, len(t.Input))
 	copy(tt.Input[:], t.Input[:])
-
-	return tt
 }
 
 // Cost returns gas * gasPrice + value
