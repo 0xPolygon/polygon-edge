@@ -1,9 +1,9 @@
 
 ![Banner](.github/banner.jpg)
 
-## Update: Edge v0.9.0 is here!  
+## Update: Edge v1.0.0-rc1 is here!  
 
-Developers at Polygon Labs have been hard at work gathering and incorporating community feedback into the Edge client and a new version of Edge, v0.9.0, is here with several new features! Check out the Release Notes included with the release to find out more! 
+Developers at Polygon Labs have been hard at work gathering and incorporating community feedback into the Edge client and a new version of Edge, v1.0.0-rc1, is here with several new features! Check out the Release Notes included with the release to find out more! 
 
 ## Polygon Edge
 
@@ -24,7 +24,7 @@ As this project evolves, the Polygon Labs developer team will focus on the lates
 
 ---
 
-Copyright 2022 Polygon Technology
+Copyright 2023 Polygon Technology
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
