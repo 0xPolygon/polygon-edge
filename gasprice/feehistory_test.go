@@ -32,7 +32,12 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			NewestBlock:       30,
 			RewardPercentiles: []float64{15, 20},
 			GetBackend: func() Blockchain {
+				header := &types.Header{
+					Number: 0,
+					Hash:   types.StringToHash("some header"),
+				}
 				backend := new(backendMock)
+				backend.On("Header").Return(header)
 				backend.On("GetBlockByNumber", mock.Anything, true).Return(errors.New("block not found"))
 
 				return backend
@@ -56,7 +61,7 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			Error:             true,
 			BlockRange:        10,
 			NewestBlock:       30,
-			RewardPercentiles: []float64{50, 15},
+			RewardPercentiles: []float64{101, 0},
 			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 50)
 				createTestTxs(t, backend, 1, 200)
