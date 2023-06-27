@@ -1,6 +1,7 @@
 package txpool
 
 import (
+	"container/heap"
 	"sync"
 	"sync/atomic"
 
@@ -268,18 +269,21 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	return
 }
 
-func (a *account) addTxWithNonce(tx *types.Transaction) (*types.Transaction, error) {
+func (a *account) tryAddTxWithNonce(tx *types.Transaction) (*types.Transaction, error) {
 	a.nonceToTx.lock()
 	defer a.nonceToTx.unlock()
 
 	oldTx := a.nonceToTx.get(tx.Nonce)
 	if oldTx == nil {
-		// if transaction with same nonce does not exist -> return immediately
+		a.nonceToTx.set(tx) // tx with same nonce does not exist -> add that tx to nonceToTx map
+
 		return nil, nil
 	} else if oldTx.GasPrice.Cmp(tx.GasPrice) >= 0 {
-		// if transaction with same nonce does exist and has >= gas price -> return error
+		// if tx with same nonce does exist and has same or better gas price -> return error
 		return oldTx, ErrUnderpriced
 	}
+
+	a.nonceToTx.set(tx) // replace old tx with new tx inside nonceToTx map
 
 	a.enqueued.lock(true)
 	defer a.enqueued.unlock()
@@ -287,10 +291,10 @@ func (a *account) addTxWithNonce(tx *types.Transaction) (*types.Transaction, err
 	a.promoted.lock(true)
 	defer a.promoted.unlock()
 
-	replaceInQueue := func(txs minNonceQueue) bool {
-		for i, x := range txs {
+	replaceInQueue := func(queue minNonceQueue) bool {
+		for i, x := range queue {
 			if x.Nonce == tx.Nonce {
-				txs[i] = tx
+				heap.Remove(&queue, i) // remove old tx from queue, new one will be inserted after enqueue stage
 
 				return true
 			}
@@ -299,8 +303,6 @@ func (a *account) addTxWithNonce(tx *types.Transaction) (*types.Transaction, err
 		return false
 	}
 
-	// add to nonce map
-	a.nonceToTx.set(tx)
 	// first -> try to replace in enqueued
 	if !replaceInQueue(a.enqueued.queue) {
 		replaceInQueue(a.promoted.queue) // .. then try to replace in promoted

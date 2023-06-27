@@ -774,39 +774,34 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return ErrAlreadyKnown
 	}
 
-	if account := p.accounts.get(tx.From); account != nil {
-		// reject low nonce tx
-		if tx.Nonce < account.getNonce() {
-			return ErrNonceTooLow
-		}
+	// initialize account for this address once
+	account, _ := p.createAccountOnce(tx.From)
 
-		// check if max items in enqueue reached
-		account.enqueued.lock(true)
-		maxItemsReached := account.enqueued.length() == account.maxEnqueued
-		account.enqueued.unlock()
-
-		if maxItemsReached {
-			return ErrMaxEnqueuedLimitReached
-		}
-
-		// check if nonce for tx.From account already exists. do tx replacement if needed
-		replacedTx, err := account.addTxWithNonce(tx)
-		if err != nil {
-			return err
-		}
-
-		// if there was tx replacement, remove old tx from index and update slots
-		if replacedTx != nil {
-			p.index.remove(replacedTx)
-			p.gauge.decrease(slotsRequired(replacedTx))
-			// TODO: something elske like signal event?
-
-			return nil
-		}
+	// reject low nonce tx
+	if tx.Nonce < account.getNonce() {
+		return ErrNonceTooLow
 	}
 
-	// initialize account for this address once
-	p.createAccountOnce(tx.From)
+	// check if max items in enqueue reached
+	account.enqueued.lock(true)
+	maxItemsReached := account.enqueued.length() == account.maxEnqueued
+	account.enqueued.unlock()
+
+	if maxItemsReached {
+		return ErrMaxEnqueuedLimitReached
+	}
+
+	// check if nonce for tx.From account already exists. do tx replacement if needed
+	replacedTx, err := account.tryAddTxWithNonce(tx)
+	if err != nil {
+		return err
+	}
+
+	// if there was tx replacement, remove old tx from index and from the slots
+	if replacedTx != nil {
+		p.index.remove(replacedTx)
+		p.gauge.decrease(slotsRequired(replacedTx))
+	}
 
 	// send request [BLOCKING]
 	p.enqueueReqCh <- enqueueRequest{tx: tx}
@@ -1017,9 +1012,9 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 
 // createAccountOnce creates an account and
 // ensures it is only initialized once.
-func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
-	if p.accounts.exists(newAddr) {
-		return nil
+func (p *TxPool) createAccountOnce(newAddr types.Address) (*account, bool) {
+	if account := p.accounts.get(newAddr); account != nil {
+		return account, false
 	}
 
 	// fetch nonce from state
@@ -1027,7 +1022,7 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) *account {
 	stateNonce := p.store.GetNonce(stateRoot, newAddr)
 
 	// initialize the account
-	return p.accounts.initOnce(newAddr, stateNonce)
+	return p.accounts.initOnce(newAddr, stateNonce), true
 }
 
 // Length returns the total number of all promoted transactions.
