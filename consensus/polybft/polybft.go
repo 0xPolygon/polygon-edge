@@ -324,7 +324,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			params := &contractsapi.InitializeNativeERC20MintableFn{
 				Predicate_:   contracts.ChildERC20PredicateContract,
 				Owner_:       polyBFTConfig.NativeTokenConfig.Owner,
-				RootToken_:   polyBFTConfig.Bridge.RootNativeERC20Addr,
+				RootToken_:   types.ZeroAddress, // in case native mintable token is used, it is always root token
 				Name_:        polyBFTConfig.NativeTokenConfig.Name,
 				Symbol_:      polyBFTConfig.NativeTokenConfig.Symbol,
 				Decimals_:    polyBFTConfig.NativeTokenConfig.Decimals,
@@ -359,6 +359,35 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			if err = callContract(contracts.SystemCaller,
 				contracts.NativeERC20TokenContract, input, "NativeERC20", transition); err != nil {
 				return err
+			}
+
+			// initialize EIP1559Burn SC
+			if config.Params.BurnContract != nil &&
+				len(config.Params.BurnContract) == 1 &&
+				!polyBFTConfig.NativeTokenConfig.IsMintable {
+				var contractAddress types.Address
+				for _, address := range config.Params.BurnContract {
+					contractAddress = address
+				}
+
+				// contract address exists in allocations
+				if _, ok := config.Genesis.Alloc[contractAddress]; ok {
+					burnParams := &contractsapi.InitializeEIP1559BurnFn{
+						NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
+						NewBurnDestination:     config.Params.BurnContractDestinationAddress,
+					}
+
+					input, err = burnParams.EncodeAbi()
+					if err != nil {
+						return err
+					}
+
+					if err = callContract(contracts.SystemCaller,
+						contractAddress,
+						input, "EIP1559Burn", transition); err != nil {
+						return err
+					}
+				}
 			}
 		}
 
@@ -433,6 +462,21 @@ func (p *Polybft) Initialize() error {
 	}
 
 	return nil
+}
+
+func ForkManagerInitialParamsFactory(config *chain.Chain) (*chain.ForkParams, error) {
+	pbftConfig, err := GetPolyBFTConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &chain.ForkParams{
+		MaxValidatorSetSize: &pbftConfig.MaxValidatorSetSize,
+		EpochSize:           &pbftConfig.EpochSize,
+		SprintSize:          &pbftConfig.SprintSize,
+		BlockTime:           &pbftConfig.BlockTime,
+		BlockTimeDrift:      &pbftConfig.BlockTimeDrift,
+	}, nil
 }
 
 // Start starts the consensus and servers

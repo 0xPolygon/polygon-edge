@@ -53,6 +53,7 @@ var (
 	ValidatorSet                    *artifact.Artifact
 	RootERC721                      *artifact.Artifact
 	RootERC1155                     *artifact.Artifact
+	EIP1559Burn                     *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -272,6 +273,11 @@ func init() {
 	}
 
 	ValidatorSet, err = artifact.DecodeArtifact([]byte(ValidatorSetArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	EIP1559Burn, err = artifact.DecodeArtifact([]byte(EIP1559BurnArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
