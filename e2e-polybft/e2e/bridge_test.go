@@ -377,7 +377,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
-	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 100, childEthEndpoint)
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 50, childEthEndpoint)
 	require.NoError(t, err)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
@@ -532,7 +532,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
-	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 100, childEthEndpoint)
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 50, childEthEndpoint)
 	require.NoError(t, err)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
