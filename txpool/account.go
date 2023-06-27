@@ -1,7 +1,6 @@
 package txpool
 
 import (
-	"container/heap"
 	"sync"
 	"sync/atomic"
 
@@ -269,32 +268,12 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	return
 }
 
-func (a *account) tryAddTxWithNonce(tx *types.Transaction) (*types.Transaction, error) {
-	a.nonceToTx.lock()
-	defer a.nonceToTx.unlock()
-
-	oldTx := a.nonceToTx.get(tx.Nonce)
-	if oldTx == nil {
-		a.nonceToTx.set(tx) // tx with same nonce does not exist -> add that tx to nonceToTx map
-
-		return nil, nil
-	} else if oldTx.GasPrice.Cmp(tx.GasPrice) >= 0 {
-		// if tx with same nonce does exist and has same or better gas price -> return error
-		return oldTx, ErrUnderpriced
-	}
-
-	a.nonceToTx.set(tx) // replace old tx with new tx inside nonceToTx map
-
-	a.enqueued.lock(true)
-	defer a.enqueued.unlock()
-
-	a.promoted.lock(true)
-	defer a.promoted.unlock()
-
+// enqueue push the transaction onto the enqueued queue or replace it
+func (a *account) enqueue(tx *types.Transaction, replace bool) {
 	replaceInQueue := func(queue minNonceQueue) bool {
 		for i, x := range queue {
 			if x.Nonce == tx.Nonce {
-				heap.Remove(&queue, i) // remove old tx from queue, new one will be inserted after enqueue stage
+				queue[i] = tx // replace
 
 				return true
 			}
@@ -303,32 +282,17 @@ func (a *account) tryAddTxWithNonce(tx *types.Transaction) (*types.Transaction, 
 		return false
 	}
 
-	// first -> try to replace in enqueued
-	if !replaceInQueue(a.enqueued.queue) {
-		replaceInQueue(a.promoted.queue) // .. then try to replace in promoted
+	a.nonceToTx.set(tx)
+
+	if !replace {
+		a.enqueued.push(tx)
+	} else {
+		// first -> try to replace in enqueued
+		if !replaceInQueue(a.enqueued.queue) {
+			// .. then try to replace in promoted
+			replaceInQueue(a.promoted.queue)
+		}
 	}
-
-	return oldTx, nil
-}
-
-// enqueue attempts tp push the transaction onto the enqueued queue.
-func (a *account) enqueue(tx *types.Transaction) error {
-	a.enqueued.lock(true)
-	defer a.enqueued.unlock()
-
-	if a.enqueued.length() == a.maxEnqueued {
-		return ErrMaxEnqueuedLimitReached
-	}
-
-	// reject low nonce tx
-	if tx.Nonce < a.getNonce() {
-		return ErrNonceTooLow
-	}
-
-	// enqueue tx
-	a.enqueued.push(tx)
-
-	return nil
 }
 
 // Promote moves eligible transactions from enqueued to promoted.

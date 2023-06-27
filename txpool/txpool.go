@@ -164,7 +164,6 @@ type TxPool struct {
 
 	// channels on which the pool's event loop
 	// does dispatching/handling requests.
-	enqueueReqCh chan enqueueRequest
 	promoteReqCh chan promoteRequest
 	pruneCh      chan struct{}
 
@@ -210,7 +209,6 @@ func NewTxPool(
 		priceLimit:  config.PriceLimit,
 
 		//	main loop channels
-		enqueueReqCh: make(chan enqueueRequest),
 		promoteReqCh: make(chan promoteRequest),
 		pruneCh:      make(chan struct{}),
 		shutdownCh:   make(chan struct{}),
@@ -274,8 +272,6 @@ func (p *TxPool) Start() {
 			select {
 			case <-p.shutdownCh:
 				return
-			case req := <-p.enqueueReqCh:
-				go p.handleEnqueueRequest(req)
 			case req := <-p.promoteReqCh:
 				go p.handlePromoteRequest(req)
 			}
@@ -737,10 +733,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 // (only once) and an enqueueRequest is signaled.
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if p.logger.IsDebug() {
-		p.logger.Debug("add tx",
-			"origin", origin.String(),
-			"hash", tx.Hash.String(),
-		)
+		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash.String())
 	}
 
 	// validate incoming tx
@@ -748,24 +741,63 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return err
 	}
 
+	// initialize account for this address once or retrieve existing one
+	account, created := p.createAccountOnce(tx.From)
+	// populate currently free slots
+	slotsFree := p.gauge.max - p.gauge.read()
+	// calculate tx hash
+	tx.ComputeHash()
+
+	account.nonceToTx.lock()
+	defer account.nonceToTx.unlock()
+
+	account.enqueued.lock(true)
+	defer account.enqueued.unlock()
+
+	account.promoted.lock(true)
+	defer account.promoted.unlock()
+
+	accountNonce := account.getNonce()
+
+	// reject low nonce tx
+	if tx.Nonce < accountNonce {
+		return ErrNonceTooLow
+	}
+
+	//	only accept transactions with expected nonce
 	if p.gauge.highPressure() {
 		p.signalPruning()
 
-		//	only accept transactions with expected nonce
-		if account := p.accounts.get(tx.From); account != nil &&
-			tx.Nonce > account.getNonce() {
+		if !created && tx.Nonce > accountNonce {
 			metrics.IncrCounter([]string{txPoolMetrics, "rejected_future_tx"}, 1)
 
 			return ErrRejectFutureTx
 		}
 	}
 
-	// check for overflow
-	if slotsRequired(tx) > p.gauge.max-p.gauge.read() {
-		return ErrTxPoolOverflow
+	// try to see if there is transaction with same nonce for this account
+	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce)
+	if oldTxWithSameNonce != nil {
+		if oldTxWithSameNonce.Hash == tx.Hash {
+			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
+
+			return ErrAlreadyKnown
+		} else if oldTxWithSameNonce.GasPrice.Cmp(tx.GasPrice) >= 0 {
+			// if tx with same nonce does exist and has same or better gas price -> return error
+			return ErrUnderpriced
+		}
+
+		slotsFree -= slotsRequired(oldTxWithSameNonce) // decrement old tx slots
+	} else {
+		if account.enqueued.length() == account.maxEnqueued {
+			return ErrMaxEnqueuedLimitReached
+		}
 	}
 
-	tx.ComputeHash()
+	// check for overflow
+	if slotsRequired(tx) > slotsFree {
+		return ErrTxPoolOverflow
+	}
 
 	// add to index
 	if ok := p.index.add(tx); !ok {
@@ -774,79 +806,35 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return ErrAlreadyKnown
 	}
 
-	// initialize account for this address once
-	account, _ := p.createAccountOnce(tx.From)
-
-	// reject low nonce tx
-	if tx.Nonce < account.getNonce() {
-		return ErrNonceTooLow
+	if oldTxWithSameNonce != nil {
+		p.index.remove(oldTxWithSameNonce)
+		p.gauge.decrease(slotsRequired(oldTxWithSameNonce))
+	} else {
+		metrics.SetGauge([]string{txPoolMetrics, "added_tx"}, 1)
 	}
 
-	// check if max items in enqueue reached
-	account.enqueued.lock(true)
-	maxItemsReached := account.enqueued.length() == account.maxEnqueued
-	account.enqueued.unlock()
-
-	if maxItemsReached {
-		return ErrMaxEnqueuedLimitReached
-	}
-
-	// check if nonce for tx.From account already exists. do tx replacement if needed
-	replacedTx, err := account.tryAddTxWithNonce(tx)
-	if err != nil {
-		return err
-	}
-
-	// if there was tx replacement, remove old tx from index and from the slots
-	if replacedTx != nil {
-		p.index.remove(replacedTx)
-		p.gauge.decrease(slotsRequired(replacedTx))
-	}
-
-	// send request [BLOCKING]
-	p.enqueueReqCh <- enqueueRequest{tx: tx}
+	account.enqueue(tx, oldTxWithSameNonce != nil) // add or replace tx into account
+	p.gauge.increase(slotsRequired(tx))
 	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
 
-	metrics.SetGauge([]string{txPoolMetrics, "added_tx"}, 1)
+	go p.invokePromotion(tx, tx.Nonce == accountNonce) // don't signal promotion for higher nonce txs
 
 	return nil
 }
 
-// handleEnqueueRequest attempts to enqueue the transaction
-// contained in the given request to the associated account.
-// If, afterwards, the account is eligible for promotion,
-// a promoteRequest is signaled.
-func (p *TxPool) handleEnqueueRequest(req enqueueRequest) {
-	tx := req.tx
-	addr := req.tx.From
-
-	// fetch account
-	account := p.accounts.get(addr)
-
-	// enqueue tx
-	if err := account.enqueue(tx); err != nil {
-		p.logger.Error("enqueue request", "err", err)
-
-		p.index.remove(tx)
-
-		return
-	}
-
+func (p *TxPool) invokePromotion(tx *types.Transaction, callPromote bool) {
 	if p.logger.IsDebug() {
 		p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 	}
 
-	p.gauge.increase(slotsRequired(tx))
-
 	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
-	if tx.Nonce > account.getNonce() {
-		// don't signal promotion for
-		// higher nonce txs
-		return
+	if callPromote {
+		select {
+		case <-p.shutdownCh:
+		case p.promoteReqCh <- promoteRequest{account: tx.From}: // BLOCKING
+		}
 	}
-
-	p.promoteReqCh <- promoteRequest{account: addr} // BLOCKING
 }
 
 // handlePromoteRequest handles moving promotable transactions
