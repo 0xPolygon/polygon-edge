@@ -47,7 +47,7 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			Error:             true,
 			BlockRange:        0,
 			NewestBlock:       30,
-			RewardPercentiles: []float64{101, 0},
+			RewardPercentiles: []float64{10, 15},
 			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 30)
 				createTestTxs(t, backend, 3, 200)
@@ -60,7 +60,7 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			Error:             true,
 			BlockRange:        10,
 			NewestBlock:       30,
-			RewardPercentiles: []float64{50, 15},
+			RewardPercentiles: []float64{101, 0},
 			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 50)
 				createTestTxs(t, backend, 1, 200)
