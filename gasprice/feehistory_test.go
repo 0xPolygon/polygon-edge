@@ -1,13 +1,13 @@
 package gasprice
 
 import (
+	"errors"
 	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	// "github.com/umbracle/ethgo"
 )
 
 func TestGasHelper_FeeHistory(t *testing.T) {
@@ -32,13 +32,8 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			NewestBlock:       30,
 			RewardPercentiles: []float64{15, 20},
 			GetBackend: func() Blockchain {
-				header := &types.Header{
-					Number: 0,
-					Hash:   types.StringToHash("some header"),
-				}
 				backend := new(backendMock)
-				backend.On("Header").Return(header)
-				backend.On("GetBlockByNumber", mock.Anything, true).Return(&types.Block{}, false)
+				backend.On("GetBlockByNumber", mock.Anything, true).Return(errors.New("block not found"))
 
 				return backend
 			},
