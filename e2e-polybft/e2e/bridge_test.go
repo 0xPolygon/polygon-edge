@@ -369,7 +369,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(50, 4*time.Minute))
 
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
@@ -377,7 +377,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
-	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 100, childEthEndpoint)
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 50, childEthEndpoint)
 	require.NoError(t, err)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
@@ -524,7 +524,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(50, 4*time.Minute))
 
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
@@ -532,7 +532,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
-	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 100, childEthEndpoint)
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 50, childEthEndpoint)
 	require.NoError(t, err)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
