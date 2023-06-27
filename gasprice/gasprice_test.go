@@ -154,7 +154,8 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 			t.Parallel()
 
 			backend := tc.GetBackend()
-			gasHelper := NewGasHelper(DefaultGasHelperConfig, backend)
+			gasHelper, err := NewGasHelper(DefaultGasHelperConfig, backend)
+			require.NoError(t, err)
 			price, err := gasHelper.MaxPriorityFeePerGas()
 
 			if tc.Error {

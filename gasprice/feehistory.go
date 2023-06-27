@@ -3,7 +3,6 @@ package gasprice
 import (
 	"encoding/binary"
 	"errors"
-	"log"
 	"math"
 	"math/big"
 	"sort"
@@ -12,7 +11,7 @@ import (
 var (
 	ErrInvalidPercentile = errors.New("invalid percentile")
 	ErrBlockCount        = errors.New("blockCount must be greater than 0")
-	ErrBlockInfo         = errors.New("could not find block info")
+	ErrBlockNotFound     = errors.New("could not find block")
 )
 
 const (
@@ -49,6 +48,7 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 	if blockCount > newestBlock {
 		blockCount = newestBlock
 	}
+
 	for i, p := range rewardPercentiles {
 		if p < 0 || p > 100 {
 			return nil, nil, nil, nil, ErrInvalidPercentile
@@ -72,20 +72,23 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 		binary.LittleEndian.PutUint64(percentileKey[i*8:(i+1)*8], math.Float64bits(p))
 	}
 
-	for i := oldestBlock; i < oldestBlock+blockCount; i++ {
+	for i := oldestBlock; i <= newestBlock; i++ {
 
 		cacheKey := cacheKey{number: i, percentiles: string(percentileKey)}
 		//cache is hit, load from cache and continue to next block
 		if p, ok := g.historyCache.Get(cacheKey); ok {
-			log.Println("cache hit", p)
-			baseFeePerGas[i-oldestBlock] = p.(*processedFees).baseFee
-			gasUsedRatio[i-oldestBlock] = p.(*processedFees).gasUsedRatio
-			reward[i-oldestBlock] = p.(*processedFees).reward
+			processedFee, isOk := p.(*processedFees)
+			if !isOk {
+				return nil, nil, nil, nil, errors.New("could not convert catched processed fee")
+			}
+			baseFeePerGas[i-oldestBlock] = processedFee.baseFee
+			gasUsedRatio[i-oldestBlock] = processedFee.gasUsedRatio
+			reward[i-oldestBlock] = processedFee.reward
 			continue
 		}
 		block, ok := g.backend.GetBlockByNumber(i, false)
 		if !ok {
-			return nil, nil, nil, nil, ErrBlockInfo
+			return nil, nil, nil, nil, ErrBlockNotFound
 		}
 
 		baseFeePerGas[i-oldestBlock] = block.Header.BaseFee

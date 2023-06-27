@@ -77,7 +77,8 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			t.Parallel()
 
 			backend := tc.GetBackend()
-			gasHelper := NewGasHelper(DefaultGasHelperConfig, backend)
+			gasHelper, err := NewGasHelper(DefaultGasHelperConfig, backend)
+			require.NoError(t, err)
 			oldestBlock, baseFeePerGas, gasUsedRatio, rewards, err := gasHelper.FeeHistory(tc.BlockRange, tc.NewestBlock, tc.RewardPercentiles)
 
 			if tc.Error {
@@ -102,10 +103,10 @@ func (b *backendMock) GetBlockByNumber(n uint64, full bool) (*types.Block, bool)
 		return args.Get(0).(*types.Block), args.Get(1).(bool) //nolint:forcetypeassert
 	}
 
-	block, exists := b.blocks[Uint64ToHash(n)]
+	block, exists := b.blocks[uint64ToHash(n)]
 
 	return block, exists
 }
-func Uint64ToHash(n uint64) types.Hash {
+func uint64ToHash(n uint64) types.Hash {
 	return types.BytesToHash(big.NewInt(int64(n)).Bytes())
 }

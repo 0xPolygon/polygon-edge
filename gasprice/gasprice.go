@@ -86,7 +86,7 @@ type GasHelper struct {
 }
 
 // NewGasHelper is the constructor function for GasHelper struct
-func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
+func NewGasHelper(config *Config, backend Blockchain) (*GasHelper, error) {
 	pricePercentile := config.PricePercentile
 	if pricePercentile > 100 {
 		pricePercentile = 100
@@ -94,7 +94,7 @@ func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 
 	cache, err := lru.New(100)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &GasHelper{
@@ -106,7 +106,7 @@ func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 		maxPrice:           config.MaxPrice,
 		backend:            backend,
 		historyCache:       cache,
-	}
+	}, nil
 }
 
 // MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
