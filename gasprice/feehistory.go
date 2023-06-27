@@ -35,10 +35,8 @@ type txGasAndReward struct {
 	reward  *big.Int
 }
 
-func (g *GasHelper) FeeHistory(
-	blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (
+func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (
 	*uint64, *[]uint64, *[]float64, *[][]uint64, error) {
-
 	if blockCount < 1 {
 		return nil, nil, nil, nil, ErrBlockCount
 	}
