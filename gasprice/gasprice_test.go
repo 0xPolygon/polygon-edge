@@ -238,7 +238,8 @@ var _ Blockchain = (*backendMock)(nil)
 
 type backendMock struct {
 	mock.Mock
-	blocks map[types.Hash]*types.Block
+	blocks         map[types.Hash]*types.Block
+	blocksByNumber map[uint64]*types.Block
 }
 
 func (b *backendMock) Header() *types.Header {

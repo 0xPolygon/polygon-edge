@@ -32,12 +32,12 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			RewardPercentiles: []float64{15, 20},
 			GetBackend: func() Blockchain {
 				header := &types.Header{
-					Number: 0,
+					Number: 1,
 					Hash:   types.StringToHash("some header"),
 				}
 				backend := new(backendMock)
 				backend.On("Header").Return(header)
-				backend.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, false)
+				backend.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(&types.Block{}, false)
 
 				return backend
 			},
@@ -95,14 +95,14 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 
 var _ Blockchain = (*backendMock)(nil)
 
-func (b *backendMock) GetBlockByNumber(n uint64, full bool) (*types.Block, bool) {
+func (b *backendMock) GetBlockByNumber(number uint64, full bool) (*types.Block, bool) {
 	if len(b.blocks) == 0 {
-		args := b.Called(n, full)
+		args := b.Called(number, full)
 
 		return args.Get(0).(*types.Block), args.Get(1).(bool) //nolint:forcetypeassert
 	}
 
-	block, exists := b.blocks[uint64ToHash(n)]
+	block, exists := b.blocksByNumber[number]
 
 	return block, exists
 }
