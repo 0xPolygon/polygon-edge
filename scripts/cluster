@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
 
+dp_error_flag=0
+
 # Check if jq is installed
 if [[ "$1" == "polybft" ]] && ! command -v jq >/dev/null 2>&1; then
-  echo "jq is not installed. Please install it manually and run the script again."
+  echo "jq is not installed."
   echo "Manual installation instructions: Visit https://jqlang.github.io/jq/ for more information."
-  exit 1
+  dp_error_flag=1
 fi
+
+# Check if nc is installed
+if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
+  echo "Netcat (nc) is not installed."
+  dp_error_flag=1
+fi
+
+# Stop script if any of the dependencies have failed
+if [[ "$dp_error_flag" -eq 1]]; then
+  echo "Missing dependencies. Please install them and run the script again."
+  exit 1
+fi	
 
 function initIbftConsensus() {
   echo "Running with ibft consensus"
