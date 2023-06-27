@@ -95,7 +95,7 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 			continue
 		}
 
-		block, ok := g.backend.GetBlockByNumber(i, false)
+		block, ok := g.backend.GetBlockByNumber(i, true)
 		if !ok {
 			return nil, nil, nil, nil, ErrBlockNotFound
 		}
