@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"sync"
 	"time"
 
@@ -98,6 +99,8 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	txn.From = key.Address()
+
 	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
 	if err != nil {
 		return ethgo.ZeroHash, err
@@ -117,7 +120,12 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	}
 
 	if txn.Gas == 0 {
-		txn.Gas = DefaultGasLimit
+		gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
+		if err != nil {
+			return ethgo.ZeroHash, err
+		}
+
+		txn.Gas = gasLimit
 	}
 
 	chainID, err := t.client.Eth().ChainID()
@@ -157,7 +165,13 @@ func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	}
 
 	txn.From = accounts[0]
-	txn.Gas = DefaultGasLimit
+
+	gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
+	if err != nil {
+		return nil, err
+	}
+
+	txn.Gas = gasLimit
 	txn.GasPrice = defaultGasPrice
 
 	txnHash, err := t.client.Eth().SendTransaction(txn)
@@ -189,6 +203,18 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 
 		time.Sleep(t.receiptTimeout)
 		count++
+	}
+}
+
+// ConvertTxnToCallMsg converts txn instance to call message
+func ConvertTxnToCallMsg(txn *ethgo.Transaction) *ethgo.CallMsg {
+	return &ethgo.CallMsg{
+		From:     txn.From,
+		To:       txn.To,
+		Data:     txn.Input,
+		GasPrice: txn.GasPrice,
+		Value:    txn.Value,
+		Gas:      new(big.Int).SetUint64(txn.Gas),
 	}
 }
 
