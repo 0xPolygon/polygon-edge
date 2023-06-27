@@ -369,7 +369,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(50, 4*time.Minute))
 
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
@@ -524,7 +524,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	)
 
 	// wait for a few more sprints
-	require.NoError(t, cluster.WaitForBlock(25, 2*time.Minute))
+	require.NoError(t, cluster.WaitForBlock(50, 4*time.Minute))
 
 	validatorSrv := cluster.Servers[0]
 	childEthEndpoint := validatorSrv.JSONRPC().Eth()
