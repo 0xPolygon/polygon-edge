@@ -1,7 +1,6 @@
 package gasprice
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -105,7 +104,4 @@ func (b *backendMock) GetBlockByNumber(number uint64, full bool) (*types.Block, 
 	block, exists := b.blocksByNumber[number]
 
 	return block, exists
-}
-func uint64ToHash(n uint64) types.Hash {
-	return types.BytesToHash(big.NewInt(int64(n)).Bytes())
 }
