@@ -695,6 +695,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 					"contract.Caller", contract.Caller,
 					"contract.Address", contract.Address,
 				)
+
 				return &runtime.ExecutionResult{
 					GasLeft: 0,
 					Err:     runtime.ErrNotAuth,
@@ -714,6 +715,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 					"contract.Caller", contract.Caller,
 					"contract.Address", contract.Address,
 				)
+
 				return &runtime.ExecutionResult{
 					GasLeft: 0,
 					Err:     runtime.ErrNotAuth,
@@ -870,6 +872,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				"contract.Caller", c.Caller,
 				"contract.Address", c.Address,
 			)
+
 			return &runtime.ExecutionResult{
 				GasLeft: 0,
 				Err:     runtime.ErrNotAuth,
@@ -884,6 +887,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				"contract.Caller", c.Caller,
 				"contract.Address", c.Address,
 			)
+
 			return &runtime.ExecutionResult{
 				GasLeft: 0,
 				Err:     runtime.ErrNotAuth,
