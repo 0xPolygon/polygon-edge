@@ -739,6 +739,333 @@ func TestEnqueueHandler(t *testing.T) {
 	)
 }
 
+func TestAddTx(t *testing.T) {
+	t.Parallel()
+
+	t.Run(
+		"return underpriced for cheaper tx when pricier tx exists in enqueued",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice,
+				slots uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, slots)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			assert.NoError(t, pool.addTx(local, tx2))
+
+			_, exists := pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			// check the account nonce before promoting
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+
+			//	execute the enqueue handlers
+			<-pool.promoteReqCh
+
+			// at this point the pointer of the first tx should be overwritten by the second pricier tx
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			assert.Len(t, pool.index.all, int(1))
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+		},
+	)
+
+	t.Run(
+		"return underpriced for cheaper tx when pricier tx exists in promoted",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice,
+				slots uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, slots)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			assert.NoError(t, pool.addTx(local, tx2))
+
+			_, exists := pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			// check the account nonce before promoting
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			//	execute the enqueue handlers
+			promoteReq := <-pool.promoteReqCh
+			pool.handlePromoteRequest(promoteReq)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+		},
+	)
+
+	t.Run(
+		"addTx handler discards cheaper tx",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice,
+				slots uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, slots)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			assert.NoError(t, pool.addTx(local, tx1))
+			assert.NoError(t, pool.addTx(local, tx2))
+
+			_, exists := pool.index.get(tx1.Hash)
+			assert.False(t, exists)
+
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			// check the account nonce before promoting
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			//	execute the enqueue handlers
+			promReq1 := <-pool.promoteReqCh
+			promReq2 := <-pool.promoteReqCh
+
+			// at this point the pointer of the first tx should be overwritten by the second pricier tx
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			assert.Len(t, pool.index.all, int(1))
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			// promote the second Tx and remove the first Tx
+			pool.handlePromoteRequest(promReq1)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length()) // should be empty
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			assert.Equal(t, len(pool.index.all), int(1))
+
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			// should do nothing in the 2nd promotion
+			pool.handlePromoteRequest(promReq2)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+			// because the *tx1 and *tx2 now contain the same hash we only need to check for *tx2 existence
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			assert.Equal(t, len(pool.index.all), int(1))
+
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+		},
+	)
+
+	t.Run(
+		"addTx discards cheaper tx from enqueued",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice,
+				slots uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, slots)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			assert.NoError(t, pool.addTx(local, tx1))
+			assert.NoError(t, pool.addTx(local, tx2))
+
+			_, exists := pool.index.get(tx1.Hash)
+			assert.False(t, exists)
+
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			assert.Equal(t, len(pool.index.all), int(1))
+
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+		},
+	)
+
+	t.Run(
+		"addTx discards cheaper tx from promoted",
+		func(t *testing.T) {
+			t.Parallel()
+
+			// helper
+			newPricedTx := func(
+				addr types.Address,
+				nonce,
+				gasPrice,
+				slots uint64,
+			) *types.Transaction {
+				tx := newTx(addr, nonce, slots)
+				tx.GasPrice.SetUint64(gasPrice)
+
+				return tx
+			}
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			tx1 := newPricedTx(addr1, 0, 10, 2)
+			tx2 := newPricedTx(addr1, 0, 20, 3)
+
+			// add the transactions
+			assert.NoError(t, pool.addTx(local, tx1))
+
+			promReq1 := <-pool.promoteReqCh
+			pool.handlePromoteRequest(promReq1)
+
+			assert.Equal(t, len(pool.index.all), int(1))
+
+			assert.Equal(
+				t,
+				slotsRequired(tx1),
+				pool.gauge.read(),
+			)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+
+			_, exists := pool.index.get(tx1.Hash)
+			assert.True(t, exists)
+
+			_, exists = pool.index.get(tx2.Hash)
+			assert.False(t, exists)
+
+			assert.NoError(t, pool.addTx(local, tx2))
+
+			_, exists = pool.index.get(tx1.Hash)
+			assert.False(t, exists)
+
+			_, exists = pool.index.get(tx2.Hash)
+			assert.True(t, exists)
+
+			assert.Equal(t, len(pool.index.all), int(1))
+
+			assert.Equal(
+				t,
+				slotsRequired(tx2),
+				pool.gauge.read(),
+			)
+
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
+		},
+	)
+}
+
 func TestPromoteHandler(t *testing.T) {
 	t.Parallel()
 
@@ -860,102 +1187,6 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 		assert.Equal(t, uint64(20), pool.accounts.get(addr1).promoted.length())
 	})
-
-	t.Run(
-		"promote handler discards cheaper tx",
-		func(t *testing.T) {
-			t.Parallel()
-
-			// helper
-			newPricedTx := func(
-				addr types.Address,
-				nonce,
-				gasPrice,
-				slots uint64,
-			) *types.Transaction {
-				tx := newTx(addr, nonce, slots)
-				tx.GasPrice.SetUint64(gasPrice)
-
-				return tx
-			}
-
-			pool, err := newTestPool()
-			assert.NoError(t, err)
-			pool.SetSigner(&mockSigner{})
-
-			tx1 := newPricedTx(addr1, 0, 10, 2)
-			tx2 := newPricedTx(addr1, 0, 20, 3)
-
-			// add the transactions
-			assert.NoError(t, pool.addTx(local, tx1))
-			assert.NoError(t, pool.addTx(local, tx2))
-
-			_, exists := pool.index.get(tx1.Hash)
-			assert.False(t, exists)
-
-			_, exists = pool.index.get(tx2.Hash)
-			assert.True(t, exists)
-
-			// check the account nonce before promoting
-			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
-
-			//	execute the enqueue handlers
-			promReq1 := <-pool.promoteReqCh
-			promReq2 := <-pool.promoteReqCh
-
-			// at this point the pointer of the first tx should be overwritten by the second pricier tx
-			_, exists = pool.index.get(tx2.Hash)
-			assert.True(t, exists)
-
-			assert.Len(t, pool.index.all, int(1))
-
-			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
-			assert.Equal(t, uint64(1), pool.accounts.get(addr1).enqueued.length())
-			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
-			assert.Equal(
-				t,
-				slotsRequired(tx2),
-				pool.gauge.read(),
-			)
-
-			// promote the second Tx and remove the first Tx
-			pool.handlePromoteRequest(promReq1)
-
-			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
-			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length()) // should be empty
-			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
-
-			_, exists = pool.index.get(tx2.Hash)
-			assert.True(t, exists)
-
-			assert.Equal(t, len(pool.index.all), int(1))
-
-			assert.Equal(
-				t,
-				slotsRequired(tx2),
-				pool.gauge.read(),
-			)
-
-			// should do nothing in the 2nd promotion
-			pool.handlePromoteRequest(promReq2)
-
-			assert.Equal(t, uint64(1), pool.accounts.get(addr1).getNonce())
-			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
-			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
-
-			// because the *tx1 and *tx2 now contain the same hash we only need to check for *tx2 existence
-			_, exists = pool.index.get(tx2.Hash)
-			assert.True(t, exists)
-
-			assert.Equal(t, len(pool.index.all), int(1))
-
-			assert.Equal(
-				t,
-				slotsRequired(tx2),
-				pool.gauge.read(),
-			)
-		},
-	)
 }
 
 func TestResetAccount(t *testing.T) {
