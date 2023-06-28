@@ -112,15 +112,13 @@ func (t *Transaction) Copy() *Transaction {
 	}
 
 	if t.R != nil {
-		tt.R = new(big.Int).SetBytes(t.R.Bytes())
+		tt.R = new(big.Int)
+		tt.R = big.NewInt(0).SetBits(t.R.Bits())
 	}
 
 	if t.S != nil {
-		tt.S = new(big.Int).SetBytes(t.S.Bytes())
-	}
-
-	if t.V != nil {
-		tt.V = new(big.Int).SetBytes(t.V.Bytes())
+		tt.S = new(big.Int)
+		tt.S = big.NewInt(0).SetBits(t.S.Bits())
 	}
 
 	tt.Input = make([]byte, len(t.Input))

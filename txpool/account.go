@@ -136,38 +136,38 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
-type NonceToTxLookup struct {
+type nonceToTxLookup struct {
 	mapping map[uint64]*types.Transaction
 	mutex   sync.Mutex
 }
 
-func newNonceToTxLookup() *NonceToTxLookup {
-	return &NonceToTxLookup{
+func newNonceToTxLookup() *nonceToTxLookup {
+	return &nonceToTxLookup{
 		mapping: make(map[uint64]*types.Transaction),
 	}
 }
 
-func (m *NonceToTxLookup) lock() {
+func (m *nonceToTxLookup) lock() {
 	m.mutex.Lock()
 }
 
-func (m *NonceToTxLookup) unlock() {
+func (m *nonceToTxLookup) unlock() {
 	m.mutex.Unlock()
 }
 
-func (m *NonceToTxLookup) get(nonce uint64) *types.Transaction {
+func (m *nonceToTxLookup) get(nonce uint64) *types.Transaction {
 	return m.mapping[nonce]
 }
 
-func (m *NonceToTxLookup) set(tx *types.Transaction) {
+func (m *nonceToTxLookup) set(tx *types.Transaction) {
 	m.mapping[tx.Nonce] = tx
 }
 
-func (m *NonceToTxLookup) reset() {
+func (m *nonceToTxLookup) reset() {
 	m.mapping = make(map[uint64]*types.Transaction)
 }
 
-func (m *NonceToTxLookup) remove(txs ...*types.Transaction) {
+func (m *nonceToTxLookup) remove(txs ...*types.Transaction) {
 	for _, tx := range txs {
 		delete(m.mapping, tx.Nonce)
 	}
@@ -184,17 +184,18 @@ func (m *NonceToTxLookup) remove(txs ...*types.Transaction) {
 // a promoteRequest is signaled for this account
 // indicating the account's enqueued transaction(s)
 // are ready to be moved to the promoted queue.
+// lock order is important! promoted.lock(true), enqueued.lock(true), nonceToTx.lock()
 type account struct {
 	enqueued, promoted *accountQueue
-	nextNonce          uint64
-	demotions          uint64
+	nonceToTx          *nonceToTxLookup
+
+	nextNonce uint64
+	demotions uint64
 	// the number of consecutive blocks that don't contain account's transaction
 	skips uint64
 
 	//	maximum number of enqueued transactions
 	maxEnqueued uint64
-
-	nonceToTx *NonceToTxLookup
 }
 
 // getNonce returns the next expected nonce for this account.

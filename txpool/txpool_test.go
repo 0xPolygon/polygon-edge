@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2841,11 +2842,11 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 
 	// subscribe to enqueue and promote events
 	subscription := pool.eventManager.subscribe([]proto.EventType{proto.EventType_ENQUEUED, proto.EventType_PROMOTED})
-	defer pool.eventManager.cancelSubscription(subscription.subscriptionID)
 
 	txHashMap := map[types.Hash]struct{}{}
 	// mutex for txHashMap
 	mux := &sync.RWMutex{}
+	counter := uint64(0)
 
 	// run max number of addTx concurrently
 	for i := 0; i < int(defaultMaxAccountEnqueued); i++ {
@@ -2861,15 +2862,24 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 
 			// submit transaction to pool
 			assert.NoError(t, pool.addTx(local, tx))
+
+			atomic.AddUint64(&counter, 1)
 		}(uint64(i))
 	}
 
 	enqueuedCount := 0
 	promotedCount := 0
+	ev := (*proto.TxPoolEvent)(nil)
 
 	// wait for all the submitted transactions to be promoted
 	for {
-		ev := <-subscription.subscriptionChannel
+		select {
+		case ev = <-subscription.subscriptionChannel:
+		case <-time.After(time.Second * 3):
+			t.Fatal(fmt.Sprintf("timeout. processed: %d/%d and %d/%d. Added: %d",
+				enqueuedCount, defaultMaxAccountEnqueued, promotedCount, defaultMaxAccountEnqueued,
+				atomic.LoadUint64(&counter)))
+		}
 
 		// check if valid transaction hash
 		mux.Lock()

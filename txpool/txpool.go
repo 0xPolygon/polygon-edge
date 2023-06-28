@@ -282,7 +282,7 @@ func (p *TxPool) Start() {
 // Close shuts down the pool's main loop.
 func (p *TxPool) Close() {
 	p.eventManager.Close()
-	p.shutdownCh <- struct{}{}
+	close(p.shutdownCh)
 }
 
 // SetSigner sets the signer the pool will use
@@ -363,10 +363,12 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	account := p.accounts.get(tx.From)
 
 	account.promoted.lock(true)
-	defer account.promoted.unlock()
-
 	account.nonceToTx.lock()
-	defer account.nonceToTx.unlock()
+
+	defer func() {
+		account.nonceToTx.unlock()
+		account.promoted.unlock()
+	}()
 
 	// pop the top most promoted tx
 	account.promoted.pop()
@@ -399,6 +401,12 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	account.enqueued.lock(true)
 	account.nonceToTx.lock()
 
+	defer func() {
+		account.nonceToTx.unlock()
+		account.enqueued.unlock()
+		account.promoted.unlock()
+	}()
+
 	// num of all txs dropped
 	droppedCount := 0
 
@@ -410,12 +418,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 		// increase counter
 		droppedCount += len(txs)
 	}
-
-	defer func() {
-		account.nonceToTx.unlock()
-		account.enqueued.unlock()
-		account.promoted.unlock()
-	}()
 
 	// rollback nonce
 	nextNonce := tx.Nonce
@@ -741,34 +743,31 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return err
 	}
 
-	// initialize account for this address once or retrieve existing one
-	account, created := p.createAccountOnce(tx.From)
-	// populate currently free slots
-	slotsFree := p.gauge.max - p.gauge.read()
 	// calculate tx hash
 	tx.ComputeHash()
 
-	account.nonceToTx.lock()
-	defer account.nonceToTx.unlock()
-
-	account.enqueued.lock(true)
-	defer account.enqueued.unlock()
+	// initialize account for this address once or retrieve existing one
+	account, _ := p.createAccountOnce(tx.From)
+	// populate currently free slots
+	slotsFree := p.gauge.max - p.gauge.read()
 
 	account.promoted.lock(true)
-	defer account.promoted.unlock()
+	account.enqueued.lock(true)
+	account.nonceToTx.lock()
+
+	defer func() {
+		account.nonceToTx.unlock()
+		account.enqueued.unlock()
+		account.promoted.unlock()
+	}()
 
 	accountNonce := account.getNonce()
-
-	// reject low nonce tx
-	if tx.Nonce < accountNonce {
-		return ErrNonceTooLow
-	}
 
 	//	only accept transactions with expected nonce
 	if p.gauge.highPressure() {
 		p.signalPruning()
 
-		if !created && tx.Nonce > accountNonce {
+		if tx.Nonce > accountNonce {
 			metrics.IncrCounter([]string{txPoolMetrics, "rejected_future_tx"}, 1)
 
 			return ErrRejectFutureTx
@@ -787,10 +786,15 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 			return ErrUnderpriced
 		}
 
-		slotsFree -= slotsRequired(oldTxWithSameNonce) // decrement old tx slots
+		slotsFree += slotsRequired(oldTxWithSameNonce) // add old tx slots
 	} else {
 		if account.enqueued.length() == account.maxEnqueued {
 			return ErrMaxEnqueuedLimitReached
+		}
+
+		// reject low nonce tx
+		if tx.Nonce < accountNonce {
+			return ErrNonceTooLow
 		}
 	}
 
@@ -815,7 +819,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	account.enqueue(tx, oldTxWithSameNonce != nil) // add or replace tx into account
 	p.gauge.increase(slotsRequired(tx))
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
 
 	go p.invokePromotion(tx, tx.Nonce == accountNonce) // don't signal promotion for higher nonce txs
 
@@ -823,6 +826,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 }
 
 func (p *TxPool) invokePromotion(tx *types.Transaction, callPromote bool) {
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+
 	if p.logger.IsDebug() {
 		p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 	}
