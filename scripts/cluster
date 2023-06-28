@@ -15,29 +15,34 @@ if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
   dp_error_flag=1
 fi
 
+# Check if docker-compose is installed
+if [[ "$2" == "--docker" ]] && ! command -v docker-compose >/dev/null 2>&1; then
+  echo "docker-compose is not installed."
+  echo "Manual installation instructions: Visit https://docs.docker.com/compose/install/ for more information."
+  dp_error_flag=1
+fi
+
 # Stop script if any of the dependencies have failed
 if [[ "$dp_error_flag" -eq 1 ]]; then
   echo "Missing dependencies. Please install them and run the script again."
   exit 1
-fi	
+fi
 
 function showhelp(){
-  echo ""
   echo "Usage: cluster {consensus} [{command}] [{flags}]"
   echo "Consensus:"
-  echo "  ibft            Start Supernets test enviornment locally with ibft consensus"
-  echo "  polybft         Start Supernets test enviornment locally with polybft consensus"
+  echo "  ibft            Start Supernets test environment locally with ibft consensus"
+  echo "  polybft         Start Supernets test environment locally with polybft consensus"
   echo "Commands:"
-  echo "  stop            Stop the running enviornment"
-  echo "  destroy         Destroy the running enviornment"
+  echo "  stop            Stop the running environment"
+  echo "  destroy         Destroy the running environment"
   echo "Flags:"
   echo "  --docker        Run using Docker (requires docker-compose)."
   echo "  --help          Display this help information"
   echo "Examples:"
   echo "  cluster polybft -- Run the script with the polybft consensus"
   echo "  cluster polybtt --docker -- Run the script with the polybft consensus using docker"
-  echo "  cluster polybft stop -- Stop the running enviorment"
-  echo ""
+  echo "  cluster polybft stop -- Stop the running environment"
 }
 
 
