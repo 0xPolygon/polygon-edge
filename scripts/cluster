@@ -16,10 +16,30 @@ if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
 fi
 
 # Stop script if any of the dependencies have failed
-if [[ "$dp_error_flag" -eq 1]]; then
+if [[ "$dp_error_flag" -eq 1 ]]; then
   echo "Missing dependencies. Please install them and run the script again."
   exit 1
 fi	
+
+function showhelp(){
+  echo ""
+  echo "Usage: cluster {consensus} [{command}] [{flags}]"
+  echo "Consensus:"
+  echo "  ibft            Start Supernets test enviornment locally with ibft consensus"
+  echo "  polybft         Start Supernets test enviornment locally with polybft consensus"
+  echo "Commands:"
+  echo "  stop            Stop the running enviornment"
+  echo "  destroy         Destroy the running enviornment"
+  echo "Flags:"
+  echo "  --docker        Run using Docker (requires docker-compose)."
+  echo "  --help          Display this help information"
+  echo "Examples:"
+  echo "  cluster polybft -- Run the script with the polybft consensus"
+  echo "  cluster polybtt --docker -- Run the script with the polybft consensus using docker"
+  echo "  cluster polybft stop -- Stop the running enviorment"
+  echo ""
+}
+
 
 function initIbftConsensus() {
   echo "Running with ibft consensus"
@@ -181,6 +201,12 @@ function stopDockerEnvironment() {
 
 set -e
 
+# Show help if help flag is entered or no arguments are provided
+if [[ "$1" == "--help" ]] || [[ $# -eq 0 ]]; then
+  showhelp
+  exit 0
+fi
+
 # Reset test-dirs
 rm -rf test-chain-*
 rm -f genesis.json
@@ -229,7 +255,8 @@ case "$2" in
     startServerFromBinary $2
     exit 0
   else
-    echo "Unsupported consensus mode. Supported modes are: ibft and polybft "
+    echo "Unsupported consensus mode. Supported modes are: ibft and polybft."
+    showhelp
     exit 1
   fi
   ;;
