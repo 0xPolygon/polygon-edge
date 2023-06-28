@@ -84,7 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
-	BurnContracts        map[uint64]types.Address
+	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
@@ -254,13 +254,9 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(block uint64, address types.Address) ClusterOption {
+func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
-		if h.BurnContracts == nil {
-			h.BurnContracts = map[uint64]types.Address{}
-		}
-
-		h.BurnContracts[block] = address
+		h.BurnContract = burnContract
 	}
 }
 
@@ -471,13 +467,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		if len(cluster.Config.BurnContracts) != 0 {
-			for block, addr := range cluster.Config.BurnContracts {
-				args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
-			}
-		} else {
-			// London hardfork is enabled by default so there must be a default burn contract
-			args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
+		burnContract := cluster.Config.BurnContract
+		if burnContract != nil {
+			args = append(args, "--burn-contract",
+				fmt.Sprintf("%d:%s:%s",
+					burnContract.BlockNumber, burnContract.Address, burnContract.DestinationAddress))
 		}
 
 		validators, err := genesis.ReadValidatorsByPrefix(
@@ -863,7 +857,7 @@ func (c *TestCluster) Call(t *testing.T, to types.Address, method *abi.Method,
 func (c *TestCluster) Deploy(t *testing.T, sender ethgo.Key, bytecode []byte) *TestTxn {
 	t.Helper()
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{Input: bytecode})
+	return c.SendTxn(t, sender, &ethgo.Transaction{From: sender.Address(), Input: bytecode})
 }
 
 func (c *TestCluster) Transfer(t *testing.T, sender ethgo.Key, target types.Address, value *big.Int) *TestTxn {
@@ -871,7 +865,7 @@ func (c *TestCluster) Transfer(t *testing.T, sender ethgo.Key, target types.Addr
 
 	targetAddr := ethgo.Address(target)
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{To: &targetAddr, Value: value})
+	return c.SendTxn(t, sender, &ethgo.Transaction{From: sender.Address(), To: &targetAddr, Value: value})
 }
 
 func (c *TestCluster) MethodTxn(t *testing.T, sender ethgo.Key, target types.Address, input []byte) *TestTxn {
@@ -879,7 +873,7 @@ func (c *TestCluster) MethodTxn(t *testing.T, sender ethgo.Key, target types.Add
 
 	targetAddr := ethgo.Address(target)
 
-	return c.SendTxn(t, sender, &ethgo.Transaction{To: &targetAddr, Input: input})
+	return c.SendTxn(t, sender, &ethgo.Transaction{From: sender.Address(), To: &targetAddr, Input: input})
 }
 
 // SendTxn sends a transaction
@@ -912,7 +906,16 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	}
 
 	if txn.Gas == 0 {
-		txn.Gas = txrelayer.DefaultGasLimit
+		callMsg := txrelayer.ConvertTxnToCallMsg(txn)
+
+		gasLimit, err := client.Eth().EstimateGas(callMsg)
+		if err != nil {
+			// gas estimation can fail in case an account is not allow-listed
+			// (fallback it to default gas limit in that case)
+			txn.Gas = txrelayer.DefaultGasLimit
+		} else {
+			txn.Gas = gasLimit
+		}
 	}
 
 	chainID, err := client.Eth().ChainID()
@@ -928,13 +931,11 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 	hash, err := client.Eth().SendRawTransaction(txnRaw)
 	require.NoError(t, err)
 
-	tTxn := &TestTxn{
+	return &TestTxn{
 		client: client.Eth(),
 		txn:    txn,
 		hash:   hash,
 	}
-
-	return tTxn
 }
 
 type TestTxn struct {

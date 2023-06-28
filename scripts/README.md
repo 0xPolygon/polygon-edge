@@ -1,10 +1,12 @@
-# Run servers form local binary
+# Run servers from local binary
 
 ## Prerequisites
 
 When deploying with `polybft` consensus, there are some additional dependencies:
 * [npm](https://nodejs.org/en/)
-* [go 1.19.x](https://go.dev/dl/)
+* [go 1.20.x](https://go.dev/dl/)
+* [jq](https://jqlang.github.io/jq)
+* Netcat (nc)
 
 ## Local development
 Running `polygon-edge` from local binary can be done very easily by using provided `scripts` folder.

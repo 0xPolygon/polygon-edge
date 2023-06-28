@@ -8,7 +8,6 @@ CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
 --epoch-size 10
 --chain-id 51001
 --name polygon-edge-docker
---burn-contract 0:0x0000000000000000000000000000000000000000
 --premine 0x228466F2C715CbEC05dEAbfAc040ce3619d7CF0B:0xD3C21BCECCEDA1000000
 --premine 0xca48694ebcB2548dF5030372BE4dAad694ef174e:0xD3C21BCECCEDA1000000
 EOL
@@ -52,6 +51,7 @@ case "$1" in
                 --validators-path /data \
                 --validators-prefix data- \
                 --reward-wallet 0xDEADBEEF:1000000 \
+                --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
                 --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
                 --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
                 --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
@@ -68,6 +68,7 @@ case "$1" in
 
               "$POLYGON_EDGE_BIN" rootchain deploy \
                 --stake-manager ${stakeManagerAddr} \
+                --stake-token ${stakeToken} \
                 --json-rpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
                 --test

@@ -66,8 +66,8 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 	xxx := state.NewExecutor(&chain.Params{
 		Forks:   config,
 		ChainID: 1,
-		BurnContract: map[uint64]string{
-			0: types.ZeroAddress.String(),
+		BurnContract: map[uint64]types.Address{
+			0: types.ZeroAddress,
 		},
 	}, s, hclog.NewNullLogger())
 

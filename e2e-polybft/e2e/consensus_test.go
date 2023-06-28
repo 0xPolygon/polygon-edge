@@ -565,8 +565,8 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 			To:    &nativeTokenAddr,
 			Input: mintInput,
 		}, nonMinterAcc.Ecdsa)
-	require.NoError(t, err)
-	require.Equal(t, uint64(types.ReceiptFailed), receipt.Status)
+	require.Error(t, err)
+	require.Nil(t, receipt)
 }
 
 func TestE2E_Consensus_CustomRewardToken(t *testing.T) {

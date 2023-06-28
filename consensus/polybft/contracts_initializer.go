@@ -68,7 +68,7 @@ func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) (
 			NewL2StateSender:       contracts.L2StateSenderContract,
 			NewStateReceiver:       contracts.StateReceiverContract,
 			NewChildERC20Predicate: config.ChildMintableERC20PredicateAddr,
-			NewChildTokenTemplate:  contracts.ChildERC20Contract,
+			NewChildTokenTemplate:  config.ChildERC20Addr,
 		}
 	} else {
 		params = &contractsapi.InitializeChildERC20PredicateFn{
@@ -92,7 +92,7 @@ func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
 			NewL2StateSender:       contracts.L2StateSenderContract,
 			NewStateReceiver:       contracts.StateReceiverContract,
 			NewChildERC20Predicate: config.ChildMintableERC20PredicateAddr,
-			NewChildTokenTemplate:  contracts.ChildERC20Contract,
+			NewChildTokenTemplate:  config.ChildERC20Addr,
 			NewUseAllowList:        owner != contracts.SystemCaller,
 			NewUseBlockList:        owner != contracts.SystemCaller,
 			NewOwner:               owner,
@@ -121,7 +121,7 @@ func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens boo
 			NewL2StateSender:        contracts.L2StateSenderContract,
 			NewStateReceiver:        contracts.StateReceiverContract,
 			NewChildERC721Predicate: config.ChildMintableERC721PredicateAddr,
-			NewChildTokenTemplate:   contracts.ChildERC20Contract,
+			NewChildTokenTemplate:   config.ChildERC721Addr,
 		}
 	} else {
 		params = &contractsapi.InitializeChildERC721PredicateFn{
@@ -145,7 +145,7 @@ func getInitERC721PredicateACLInput(config *BridgeConfig, owner types.Address,
 			NewL2StateSender:        contracts.L2StateSenderContract,
 			NewStateReceiver:        contracts.StateReceiverContract,
 			NewChildERC721Predicate: config.ChildMintableERC721PredicateAddr,
-			NewChildTokenTemplate:   contracts.ChildERC721Contract,
+			NewChildTokenTemplate:   config.ChildERC721Addr,
 			NewUseAllowList:         owner != contracts.SystemCaller,
 			NewUseBlockList:         owner != contracts.SystemCaller,
 			NewOwner:                owner,
@@ -173,7 +173,7 @@ func getInitERC1155PredicateInput(config *BridgeConfig, childChainMintable bool)
 			NewL2StateSender:         contracts.L2StateSenderContract,
 			NewStateReceiver:         contracts.StateReceiverContract,
 			NewChildERC1155Predicate: config.ChildMintableERC1155PredicateAddr,
-			NewChildTokenTemplate:    contracts.ChildERC1155Contract,
+			NewChildTokenTemplate:    config.ChildERC1155Addr,
 		}
 	} else {
 		params = &contractsapi.InitializeChildERC1155PredicateFn{
@@ -197,7 +197,7 @@ func getInitERC1155PredicateACLInput(config *BridgeConfig, owner types.Address,
 			NewL2StateSender:         contracts.L2StateSenderContract,
 			NewStateReceiver:         contracts.StateReceiverContract,
 			NewChildERC1155Predicate: config.ChildMintableERC1155PredicateAddr,
-			NewChildTokenTemplate:    contracts.ChildERC1155Contract,
+			NewChildTokenTemplate:    config.ChildERC1155Addr,
 			NewUseAllowList:          owner != contracts.SystemCaller,
 			NewUseBlockList:          owner != contracts.SystemCaller,
 			NewOwner:                 owner,
