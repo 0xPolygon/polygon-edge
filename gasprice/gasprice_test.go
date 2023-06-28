@@ -192,6 +192,7 @@ func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 				Hash:       types.BytesToHash([]byte(fmt.Sprintf("Block %d", i))),
 				Miner:      types.ZeroAddress.Bytes(),
 				ParentHash: currentBlock.Hash(),
+				BaseFee:    chain.GenesisBaseFee,
 			},
 		}
 		backend.blocksByNumber[block.Number()] = block

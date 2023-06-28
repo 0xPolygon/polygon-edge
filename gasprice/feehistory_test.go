@@ -1,11 +1,17 @@
 package gasprice
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 func TestGasHelper_FeeHistory(t *testing.T) {
@@ -42,7 +48,7 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			},
 		},
 		{
-			Name:              "Block Range < 1",
+			Name:              "blockRange < 1",
 			Error:             true,
 			BlockRange:        0,
 			NewestBlock:       30,
@@ -68,12 +74,49 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 		},
 		{
 			Name:                "rewardPercentile not set",
-			BlockRange:          10,
+			BlockRange:          5,
 			NewestBlock:         30,
 			RewardPercentiles:   []float64{},
-			ExpectedOldestBlock: 21,
+			ExpectedOldestBlock: 26,
 			ExpectedBaseFeePerGas: []uint64{
-				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+			},
+			ExpectedGasUsedRatio: []float64{
+				0, 0, 0, 0, 0,
+			},
+			ExpectedRewards: [][]uint64{
+				nil, nil, nil, nil, nil,
+			},
+			GetBackend: func() Blockchain {
+				backend := createTestBlocks(t, 30)
+				createTestTxs(t, backend, 5, 500)
+
+				return backend
+			},
+		},
+		{
+			Name:                "blockRange > newestBlock",
+			BlockRange:          20,
+			NewestBlock:         10,
+			RewardPercentiles:   []float64{},
+			ExpectedOldestBlock: 1,
+			ExpectedBaseFeePerGas: []uint64{
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
 			},
 			ExpectedGasUsedRatio: []float64{
 				0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -84,6 +127,113 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 30)
 				createTestTxs(t, backend, 5, 500)
+
+				return backend
+			},
+		},
+		{
+			Name:                "blockRange == newestBlock",
+			BlockRange:          10,
+			NewestBlock:         10,
+			RewardPercentiles:   []float64{},
+			ExpectedOldestBlock: 1,
+			ExpectedBaseFeePerGas: []uint64{
+				chain.GenesisBaseFee, chain.GenesisBaseFee, chain.GenesisBaseFee,
+				chain.GenesisBaseFee, chain.GenesisBaseFee, chain.GenesisBaseFee,
+				chain.GenesisBaseFee, chain.GenesisBaseFee, chain.GenesisBaseFee,
+				chain.GenesisBaseFee, chain.GenesisBaseFee,
+			},
+			ExpectedGasUsedRatio: []float64{
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			},
+			ExpectedRewards: [][]uint64{
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+			},
+			GetBackend: func() Blockchain {
+				backend := createTestBlocks(t, 30)
+				createTestTxs(t, backend, 5, 500)
+
+				return backend
+			},
+		},
+		{
+			Name:                "rewardPercentile requested",
+			BlockRange:          5,
+			NewestBlock:         10,
+			RewardPercentiles:   []float64{10, 25},
+			ExpectedOldestBlock: 6,
+			ExpectedBaseFeePerGas: []uint64{
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+			},
+			ExpectedGasUsedRatio: []float64{
+				0, 0, 0, 0, 0,
+			},
+			ExpectedRewards: [][]uint64{
+				{0x2e90edd000, 0x2e90edd000},
+				{0x2e90edd000, 0x2e90edd000},
+				{0x2e90edd000, 0x2e90edd000},
+				{0x2e90edd000, 0x2e90edd000},
+				{0x2e90edd000, 0x2e90edd000},
+			},
+			GetBackend: func() Blockchain {
+				backend := createTestBlocks(t, 10)
+				rand.Seed(time.Now().UTC().UnixNano())
+
+				senderKey, sender := tests.GenerateKeyAndAddr(t)
+
+				for _, b := range backend.blocksByNumber {
+					signer := crypto.NewSigner(backend.Config().Forks.At(b.Number()),
+						uint64(backend.Config().ChainID))
+
+					b.Transactions = make([]*types.Transaction, 3)
+					b.Header.Miner = sender.Bytes()
+
+					for i := 0; i < 3; i++ {
+						tx := &types.Transaction{
+							From:      sender,
+							Value:     ethgo.Ether(1),
+							To:        &types.ZeroAddress,
+							Type:      types.DynamicFeeTx,
+							GasTipCap: ethgo.Gwei(uint64(200)),
+							GasFeeCap: ethgo.Gwei(uint64(200 + 200)),
+						}
+
+						tx, err := signer.SignTx(tx, senderKey)
+						require.NoError(t, err)
+						b.Transactions[i] = tx
+					}
+				}
+
+				return backend
+			},
+		},
+		{
+			Name:                "BaseFeePerGas sanity check",
+			BlockRange:          5,
+			NewestBlock:         10,
+			RewardPercentiles:   []float64{},
+			ExpectedOldestBlock: 6,
+			ExpectedBaseFeePerGas: []uint64{
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+				chain.GenesisBaseFee,
+			},
+			ExpectedGasUsedRatio: []float64{
+				0, 0, 0, 0, 0,
+			},
+			ExpectedRewards: [][]uint64{
+				nil, nil, nil, nil, nil,
+			},
+			GetBackend: func() Blockchain {
+				backend := createTestBlocks(t, 10)
 
 				return backend
 			},
