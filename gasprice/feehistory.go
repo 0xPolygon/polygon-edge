@@ -36,9 +36,9 @@ type txGasAndReward struct {
 }
 
 func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (
-	*uint64, *[]uint64, *[]float64, *[][]uint64, error) {
+	uint64, []uint64, []float64, [][]uint64, error) {
 	if blockCount < 1 {
-		return nil, nil, nil, nil, ErrBlockCount
+		return 0, nil, nil, nil, ErrBlockCount
 	}
 
 	if newestBlock > g.backend.Header().Number {
@@ -55,11 +55,11 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 
 	for i, p := range rewardPercentiles {
 		if p < 0 || p > 100 {
-			return nil, nil, nil, nil, ErrInvalidPercentile
+			return 0, nil, nil, nil, ErrInvalidPercentile
 		}
 
 		if i > 0 && p < rewardPercentiles[i-1] {
-			return nil, nil, nil, nil, ErrInvalidPercentile
+			return 0, nil, nil, nil, ErrInvalidPercentile
 		}
 	}
 
@@ -85,7 +85,7 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 		if p, ok := g.historyCache.Get(cacheKey); ok {
 			processedFee, isOk := p.(*processedFees)
 			if !isOk {
-				return nil, nil, nil, nil, errors.New("could not convert catched processed fee")
+				return 0, nil, nil, nil, errors.New("could not convert catched processed fee")
 			}
 
 			baseFeePerGas[i-oldestBlock] = processedFee.baseFee
@@ -97,11 +97,16 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 
 		block, ok := g.backend.GetBlockByNumber(i, true)
 		if !ok {
-			return nil, nil, nil, nil, ErrBlockNotFound
+			return 0, nil, nil, nil, ErrBlockNotFound
 		}
 
 		baseFeePerGas[i-oldestBlock] = block.Header.BaseFee
 		gasUsedRatio[i-oldestBlock] = float64(block.Header.GasUsed) / float64(block.Header.GasLimit)
+
+		if math.IsNaN(gasUsedRatio[i-oldestBlock]) {
+			//gasUsedRatio is NaN, set to 0
+			gasUsedRatio[i-oldestBlock] = 0
+		}
 
 		if len(rewardPercentiles) == 0 {
 			//reward percentiles not requested, skip rest of this loop
@@ -156,5 +161,5 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 
 	baseFeePerGas[blockCount] = g.backend.Header().BaseFee
 
-	return &oldestBlock, &baseFeePerGas, &gasUsedRatio, &reward, nil
+	return oldestBlock, baseFeePerGas, gasUsedRatio, reward, nil
 }

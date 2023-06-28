@@ -802,14 +802,8 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 
 	return argBigPtr(priorityFee), nil
 }
-func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
-	type feeHistoryResult struct {
-		OldestBlock   argUint64
-		BaseFeePerGas []argUint64
-		GasUsedRatio  []argUint64
-		Reward        [][]argUint64
-	}
 
+func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
 	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
 	oldestBlock, baseFeePerGas, gasUsedRatio, reward, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
 	if err != nil {
@@ -823,17 +817,17 @@ func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentile
 
 	// Process baseFeePerGas asynchronously
 	go func() {
-		baseFeePerGasCh <- convertToArgUint64Slice(*baseFeePerGas)
+		baseFeePerGasCh <- convertToArgUint64Slice(baseFeePerGas)
 	}()
 
 	// Process gasUsedRatio asynchronously
 	go func() {
-		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(*gasUsedRatio)
+		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(gasUsedRatio)
 	}()
 
 	// Process reward asynchronously
 	go func() {
-		rewardCh <- convertToArgUint64SliceSlice(*reward)
+		rewardCh <- convertToArgUint64SliceSlice(reward)
 	}()
 
 	// Wait for the processed slices from goroutines
@@ -842,38 +836,11 @@ func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentile
 	rewardResult := <-rewardCh
 
 	result := &feeHistoryResult{
-		OldestBlock:   argUint64(*oldestBlock),
+		OldestBlock:   *argUintPtr(oldestBlock),
 		BaseFeePerGas: baseFeePerGasResult,
 		GasUsedRatio:  gasUsedRatioResult,
 		Reward:        rewardResult,
 	}
 
 	return result, nil
-}
-
-func convertToArgUint64Slice(slice []uint64) []argUint64 {
-	argSlice := make([]argUint64, len(slice))
-	for i, value := range slice {
-		argSlice[i] = argUint64(value)
-	}
-
-	return argSlice
-}
-
-func convertToArgUint64SliceSlice(slice [][]uint64) [][]argUint64 {
-	argSlice := make([][]argUint64, len(slice))
-	for i, value := range slice {
-		argSlice[i] = convertToArgUint64Slice(value)
-	}
-
-	return argSlice
-}
-
-func convertFloat64SliceToArgUint64Slice(slice []float64) []argUint64 {
-	argSlice := make([]argUint64, len(slice))
-	for i, value := range slice {
-		argSlice[i] = argUint64(value)
-	}
-
-	return argSlice
 }

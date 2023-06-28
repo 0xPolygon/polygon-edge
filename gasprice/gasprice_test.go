@@ -171,7 +171,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 	t.Helper()
 
-	backend := &backendMock{blocks: make(map[types.Hash]*types.Block)}
+	backend := &backendMock{blocks: make(map[types.Hash]*types.Block), blocksByNumber: make(map[uint64]*types.Block)}
 	genesis := &types.Block{
 		Header: &types.Header{
 			Number:  0,
@@ -181,6 +181,7 @@ func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 		},
 	}
 	backend.blocks[genesis.Hash()] = genesis
+	backend.blocksByNumber[genesis.Number()] = genesis
 
 	currentBlock := genesis
 
@@ -193,7 +194,7 @@ func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 				ParentHash: currentBlock.Hash(),
 			},
 		}
-
+		backend.blocksByNumber[block.Number()] = block
 		backend.blocks[block.Hash()] = block
 		currentBlock = block
 	}

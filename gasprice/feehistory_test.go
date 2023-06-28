@@ -49,7 +49,6 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			RewardPercentiles: []float64{10, 15},
 			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 30)
-				createTestTxs(t, backend, 3, 200)
 
 				return backend
 			},
@@ -63,6 +62,28 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			GetBackend: func() Blockchain {
 				backend := createTestBlocks(t, 50)
 				createTestTxs(t, backend, 1, 200)
+
+				return backend
+			},
+		},
+		{
+			Name:                "rewardPercentile not set",
+			BlockRange:          10,
+			NewestBlock:         30,
+			RewardPercentiles:   []float64{},
+			ExpectedOldestBlock: 21,
+			ExpectedBaseFeePerGas: []uint64{
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			},
+			ExpectedGasUsedRatio: []float64{
+				0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			},
+			ExpectedRewards: [][]uint64{
+				nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+			},
+			GetBackend: func() Blockchain {
+				backend := createTestBlocks(t, 30)
+				createTestTxs(t, backend, 5, 500)
 
 				return backend
 			},
@@ -83,10 +104,10 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.True(t, oldestBlock == &tc.ExpectedOldestBlock)
-				require.True(t, baseFeePerGas == &tc.ExpectedBaseFeePerGas)
-				require.True(t, gasUsedRatio == &tc.ExpectedGasUsedRatio)
-				require.True(t, rewards == &tc.ExpectedRewards)
+				require.Equal(t, tc.ExpectedOldestBlock, oldestBlock)
+				require.Equal(t, tc.ExpectedBaseFeePerGas, baseFeePerGas)
+				require.Equal(t, tc.ExpectedGasUsedRatio, gasUsedRatio)
+				require.Equal(t, tc.ExpectedRewards, rewards)
 			}
 		})
 	}
