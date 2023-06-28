@@ -232,11 +232,13 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	prunedEnqueued []*types.Transaction,
 ) {
 	a.promoted.lock(true)
+	a.enqueued.lock(true)
 	a.nonceToTx.lock()
 
 	defer func() {
-		a.promoted.unlock()
 		a.nonceToTx.unlock()
+		a.enqueued.unlock()
+		a.promoted.unlock()
 	}()
 
 	// prune the promoted txs
@@ -247,9 +249,6 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 		// only the promoted queue needed pruning
 		return
 	}
-
-	a.enqueued.lock(true)
-	defer a.enqueued.unlock()
 
 	// prune the enqueued txs
 	prunedEnqueued = a.enqueued.prune(nonce)
@@ -348,6 +347,10 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 	if nextNonce > currentNonce {
 		a.setNonce(nextNonce)
 	}
+
+	a.nonceToTx.lock()
+	a.nonceToTx.remove(pruned...)
+	a.nonceToTx.unlock()
 
 	return
 }

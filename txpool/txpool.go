@@ -709,6 +709,9 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 			account.enqueued.lock(true)
 			defer account.enqueued.unlock()
 
+			account.nonceToTx.lock()
+			defer account.nonceToTx.unlock()
+
 			firstTx := account.enqueued.peek()
 
 			if firstTx == nil {
@@ -721,6 +724,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 
 			removed := account.enqueued.clear()
 
+			account.nonceToTx.remove(removed...)
 			p.index.remove(removed...)
 			p.gauge.decrease(slotsRequired(removed...))
 
