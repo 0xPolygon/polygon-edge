@@ -36,6 +36,7 @@ function showhelp(){
   echo "Commands:"
   echo "  stop            Stop the running environment"
   echo "  destroy         Destroy the running environment"
+  echo "  write-logs      Writes STDOUT and STDERR output to log file. Not applicable when using --docker flag."
   echo "Flags:"
   echo "  --docker        Run using Docker (requires docker-compose)."
   echo "  --help          Display this help information"
