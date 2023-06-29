@@ -23,6 +23,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type Runtime interface {
+	IsActiveValidator() bool
+}
+
 type StateSyncProof struct {
 	Proof     []types.Hash
 	StateSync *contractsapi.StateSyncedEvent
@@ -81,6 +85,8 @@ type stateSyncManager struct {
 	validatorSet       validator.ValidatorSet
 	epoch              uint64
 	nextCommittedIndex uint64
+
+	runtime Runtime
 }
 
 // topic is an interface for p2p message gossiping
@@ -90,12 +96,14 @@ type topic interface {
 }
 
 // newStateSyncManager creates a new instance of state sync manager
-func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig) *stateSyncManager {
+func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncConfig,
+	runtime Runtime) *stateSyncManager {
 	return &stateSyncManager{
 		logger:  logger,
 		state:   state,
 		config:  config,
 		closeCh: make(chan struct{}),
+		runtime: runtime,
 	}
 }
 
@@ -140,6 +148,11 @@ func (s *stateSyncManager) initTracker() error {
 // initTransport subscribes to bridge topics (getting votes for commitments)
 func (s *stateSyncManager) initTransport() error {
 	return s.config.topic.Subscribe(func(obj interface{}, _ peer.ID) {
+		if !s.runtime.IsActiveValidator() {
+			// don't save votes if not a validator
+			return
+		}
+
 		msg, ok := obj.(*polybftProto.TransportMessage)
 		if !ok {
 			s.logger.Warn("failed to deliver vote, invalid msg", "obj", obj)
@@ -492,6 +505,11 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
 func (s *stateSyncManager) buildCommitment() error {
+	if !s.runtime.IsActiveValidator() {
+		// don't build commitment if not a validator
+		return nil
+	}
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
 

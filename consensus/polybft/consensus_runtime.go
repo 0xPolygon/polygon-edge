@@ -180,6 +180,7 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				maxCommitmentSize:     maxCommitmentSize,
 				numBlockConfirmations: c.config.numBlockConfirmations,
 			},
+			c,
 		)
 
 		c.stateSyncManager = stateSyncManager
@@ -604,7 +605,7 @@ func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 }
 
 // isActiveValidator indicates if node is in validator set or not
-func (c *consensusRuntime) isActiveValidator() bool {
+func (c *consensusRuntime) IsActiveValidator() bool {
 	return c.activeValidatorFlag.Load()
 }
 
