@@ -52,7 +52,8 @@ services:
       "--libp2p", "0.0.0.0:1478",
       "--jsonrpc", "0.0.0.0:8545",
       "--prometheus", "0.0.0.0:5001",
-      "--seal"
+      "--seal",
+      "--relayer"
     ]
     depends_on:
       init:
