@@ -214,8 +214,12 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 	var stateSyncResult contractsapi.StateSyncResultEvent
 	for _, log := range receipt.Logs {
 		matches, err := stateSyncResult.ParseLog(log)
-		if err != nil || !matches {
+		if err != nil {
 			return fmt.Errorf("failed to find state sync event result log for state sync id: %d", sse.ID)
+		}
+
+		if !matches {
+			continue
 		}
 
 		if !stateSyncResult.Status {
