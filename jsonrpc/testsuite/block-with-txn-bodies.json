@@ -37,5 +37,5 @@
         }
     ],
     "uncles": null,
-    "baseFee": "0xf"
+    "baseFeePerGas": "0xf"
 }
