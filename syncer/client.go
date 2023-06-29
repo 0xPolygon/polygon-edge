@@ -165,7 +165,9 @@ func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 
 			syncPeersLock.Lock()
 
-			syncPeers = append(syncPeers, status)
+			if status != nil {
+				syncPeers = append(syncPeers, status)
+			}
 
 			syncPeersLock.Unlock()
 		}()
