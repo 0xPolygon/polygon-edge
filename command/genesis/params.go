@@ -61,7 +61,8 @@ var (
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format " +
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
-	errRewardWalletAmountZero = errors.New("reward wallet amount can not be zero or negative")
+	errRewardWalletAmountZero  = errors.New("reward wallet amount can not be zero or negative")
+	errEscrowAccMustBePremined = errors.New("it is mandatory to premine escrow account (0x0 address)")
 )
 
 type genesisParams struct {
@@ -124,6 +125,8 @@ type genesisParams struct {
 	nativeTokenConfigRaw string
 	nativeTokenConfig    *polybft.TokenConfig
 
+	premineInfos []*premineInfo
+
 	// rewards
 	rewardTokenCode string
 	rewardWallet    string
@@ -152,6 +155,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateRewardWallet(); err != nil {
+			return err
+		}
+
+		if err := p.validatePremineInfo(); err != nil {
 			return err
 		}
 	}
@@ -418,12 +425,7 @@ func (p *genesisParams) initGenesisConfig() error {
 		chainConfig.Genesis.Alloc[staking.AddrStakingContract] = stakingAccount
 	}
 
-	for _, premineRaw := range p.premine {
-		premineInfo, err := parsePremineInfo(premineRaw)
-		if err != nil {
-			return err
-		}
-
+	for _, premineInfo := range p.premineInfos {
 		chainConfig.Genesis.Alloc[premineInfo.address] = &chain.GenesisAccount{
 			Balance: premineInfo.amount,
 		}
@@ -471,6 +473,31 @@ func (p *genesisParams) validateRewardWallet() error {
 
 	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
 		return errRewardWalletAmountZero
+	}
+
+	return nil
+}
+
+// validatePremineInfo validates whether escrow account (0x0 address) is premined
+func (p *genesisParams) validatePremineInfo() error {
+	p.premineInfos = make([]*premineInfo, 0, len(p.premine))
+	isEscrowAccPremined := false
+
+	for _, premine := range p.premine {
+		premineInfo, err := parsePremineInfo(premine)
+		if err != nil {
+			return fmt.Errorf("invalid premine balance amount provided: %w", err)
+		}
+
+		p.premineInfos = append(p.premineInfos, premineInfo)
+
+		if premineInfo.address == types.ZeroAddress {
+			isEscrowAccPremined = true
+		}
+	}
+
+	if !isEscrowAccPremined {
+		return errEscrowAccMustBePremined
 	}
 
 	return nil

@@ -1,10 +1,13 @@
 package genesis
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 
+	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -113,6 +116,62 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, c.expectedCfg, p.nativeTokenConfig)
 			}
+		})
+	}
+}
+
+func Test_validatePremineInfo(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name             string
+		premineRaw       []string
+		expectedPremines []*premineInfo
+		expectErrMsg     string
+	}{
+		{
+			name:             "invalid premine balance",
+			premineRaw:       []string{"0x12345:loremIpsum"},
+			expectedPremines: []*premineInfo{},
+			expectErrMsg:     "invalid premine balance amount provided",
+		},
+		{
+			name:       "missing zero address premine",
+			premineRaw: []string{types.StringToAddress("12").String()},
+			expectedPremines: []*premineInfo{
+				{address: types.StringToAddress("12"), amount: command.DefaultPremineBalance},
+			},
+			expectErrMsg: errEscrowAccMustBePremined.Error(),
+		},
+		{
+			name: "valid premine information",
+			premineRaw: []string{
+				fmt.Sprintf("%s:%d", types.StringToAddress("1"), ethgo.Ether(10)),
+				fmt.Sprintf("%s:%d", types.ZeroAddress, ethgo.Ether(10000)),
+			},
+			expectedPremines: []*premineInfo{
+				{address: types.StringToAddress("1"), amount: ethgo.Ether(10)},
+				{address: types.ZeroAddress, amount: ethgo.Ether(10000)},
+			},
+			expectErrMsg: "",
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &genesisParams{premine: c.premineRaw}
+			err := p.validatePremineInfo()
+
+			if c.expectErrMsg != "" {
+				require.ErrorContains(t, err, c.expectErrMsg)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, c.expectedPremines, p.premineInfos)
 		})
 	}
 }
