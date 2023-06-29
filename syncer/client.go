@@ -161,6 +161,7 @@ func (m *syncPeerClient) GetConnectedPeerStatuses() []*NoForkPeer {
 			status, err := m.GetPeerStatus(peerID)
 			if err != nil {
 				m.logger.Warn("failed to get status from a peer, skip", "id", peerID, "err", err)
+
 				return //Skip appending nil status
 			}
 
