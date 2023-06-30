@@ -389,7 +389,7 @@ func TestPruneAccountsWithNonceHoles(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			pool.createAccountOnce(addr1)
+			pool.getOrCreateAccount(addr1)
 
 			assert.Equal(t, uint64(0), pool.gauge.read())
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
@@ -509,7 +509,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			pool.createAccountOnce(addr1)
+			pool.getOrCreateAccount(addr1)
 			pool.accounts.get(addr1).nextNonce = 5
 
 			//	mock high pressure
@@ -536,7 +536,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			pool.createAccountOnce(addr1)
+			pool.getOrCreateAccount(addr1)
 			pool.accounts.get(addr1).nextNonce = 5
 
 			//	mock high pressure
@@ -598,7 +598,7 @@ func TestAddGossipTx(t *testing.T) {
 
 		pool.SetSealing(false)
 
-		pool.createAccountOnce(sender)
+		pool.getOrCreateAccount(sender)
 
 		signedTx, err := signer.SignTx(tx, key)
 		if err != nil {
@@ -674,9 +674,7 @@ func TestEnqueueHandler(t *testing.T) {
 			pool.SetSigner(&mockSigner{})
 
 			// setup prestate
-			acc, created := pool.createAccountOnce(addr1)
-			assert.True(t, created)
-
+			acc := pool.getOrCreateAccount(addr1)
 			acc.setNonce(20)
 
 			// send tx
@@ -1153,7 +1151,7 @@ func TestPromoteHandler(t *testing.T) {
 		}
 
 		// fresh account (queues are empty)
-		acc, _ := pool.createAccountOnce(addr1)
+		acc := pool.getOrCreateAccount(addr1)
 		acc.setNonce(7)
 
 		// fake a promotion
@@ -1399,9 +1397,7 @@ func TestResetAccount(t *testing.T) {
 				pool.SetSigner(&mockSigner{})
 
 				// setup prestate
-				acc, created := pool.createAccountOnce(addr1)
-				assert.True(t, created)
-
+				acc := pool.getOrCreateAccount(addr1)
 				acc.setNonce(test.txs[0].Nonce)
 
 				err = pool.addTx(local, test.txs[0])
@@ -1697,9 +1693,7 @@ func TestResetAccount(t *testing.T) {
 				pool.SetSigner(&mockSigner{})
 
 				// setup prestate
-				acc, created := pool.createAccountOnce(addr1)
-				assert.True(t, created)
-
+				acc := pool.getOrCreateAccount(addr1)
 				acc.setNonce(test.txs[0].Nonce)
 
 				err = pool.addTx(local, test.txs[0])
@@ -2924,9 +2918,7 @@ func TestRecovery(t *testing.T) {
 			expectedEnqueued := uint64(0)
 			for addr, txs := range test.allTxs {
 				// preset nonce so promotions can happen
-				acc, created := pool.createAccountOnce(addr)
-				assert.True(t, created)
-
+				acc := pool.getOrCreateAccount(addr)
 				acc.setNonce(txs[0].tx.Nonce)
 
 				expectedEnqueued += test.expected.accounts[addr].enqueued

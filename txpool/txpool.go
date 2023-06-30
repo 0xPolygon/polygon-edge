@@ -751,7 +751,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	tx.ComputeHash()
 
 	// initialize account for this address once or retrieve existing one
-	account, _ := p.createAccountOnce(tx.From)
+	account := p.getOrCreateAccount(tx.From)
 	// populate currently free slots
 	slotsFree := p.gauge.max - p.gauge.read()
 
@@ -778,7 +778,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		}
 	}
 
-	// try to see if there is transaction with same nonce for this account
+	// try to find if there is transaction with same nonce for this account
 	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce)
 	if oldTxWithSameNonce != nil {
 		if oldTxWithSameNonce.Hash == tx.Hash {
@@ -1007,11 +1007,11 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 	)
 }
 
-// createAccountOnce creates an account and
+// getOrCreateAccount creates an account and
 // ensures it is only initialized once.
-func (p *TxPool) createAccountOnce(newAddr types.Address) (*account, bool) {
+func (p *TxPool) getOrCreateAccount(newAddr types.Address) *account {
 	if account := p.accounts.get(newAddr); account != nil {
-		return account, false
+		return account
 	}
 
 	// fetch nonce from state
@@ -1019,7 +1019,7 @@ func (p *TxPool) createAccountOnce(newAddr types.Address) (*account, bool) {
 	stateNonce := p.store.GetNonce(stateRoot, newAddr)
 
 	// initialize the account
-	return p.accounts.initOnce(newAddr, stateNonce), true
+	return p.accounts.initOnce(newAddr, stateNonce)
 }
 
 // Length returns the total number of all promoted transactions.
