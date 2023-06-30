@@ -91,7 +91,7 @@ func (txn *Txn) getCompactJournal() map[types.Address]*types.JournalEntry {
 	for _, entry := range txn.journal {
 		obj, ok := res[entry.Addr]
 		if !ok {
-			obj = &types.JournalEntry{}
+			obj = &types.JournalEntry{Addr: entry.Addr}
 			res[entry.Addr] = obj
 		}
 
