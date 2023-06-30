@@ -248,16 +248,16 @@ func TestGasHelper_FeeHistory(t *testing.T) {
 			backend := tc.GetBackend()
 			gasHelper, err := NewGasHelper(DefaultGasHelperConfig, backend)
 			require.NoError(t, err)
-			oldestBlock, baseFeePerGas, gasUsedRatio, rewards, err := gasHelper.FeeHistory(tc.BlockRange, tc.NewestBlock, tc.RewardPercentiles)
+			history, err := gasHelper.FeeHistory(tc.BlockRange, tc.NewestBlock, tc.RewardPercentiles)
 
 			if tc.Error {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, tc.ExpectedOldestBlock, oldestBlock)
-				require.Equal(t, tc.ExpectedBaseFeePerGas, baseFeePerGas)
-				require.Equal(t, tc.ExpectedGasUsedRatio, gasUsedRatio)
-				require.Equal(t, tc.ExpectedRewards, rewards)
+				require.Equal(t, tc.ExpectedOldestBlock, history.OldestBlock)
+				require.Equal(t, tc.ExpectedBaseFeePerGas, history.BaseFeePerGas)
+				require.Equal(t, tc.ExpectedGasUsedRatio, history.GasUsedRatio)
+				require.Equal(t, tc.ExpectedRewards, history.Reward)
 			}
 		})
 	}

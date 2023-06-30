@@ -805,7 +805,7 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 
 func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
 	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
-	oldestBlock, baseFeePerGas, gasUsedRatio, reward, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
+	history, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
 	if err != nil {
 		return nil, err
 	}
@@ -817,17 +817,17 @@ func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentile
 
 	// Process baseFeePerGas asynchronously
 	go func() {
-		baseFeePerGasCh <- convertToArgUint64Slice(baseFeePerGas)
+		baseFeePerGasCh <- convertToArgUint64Slice(history.BaseFeePerGas)
 	}()
 
 	// Process gasUsedRatio asynchronously
 	go func() {
-		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(gasUsedRatio)
+		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(history.GasUsedRatio)
 	}()
 
 	// Process reward asynchronously
 	go func() {
-		rewardCh <- convertToArgUint64SliceSlice(reward)
+		rewardCh <- convertToArgUint64SliceSlice(history.Reward)
 	}()
 
 	// Wait for the processed slices from goroutines
@@ -836,7 +836,7 @@ func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentile
 	rewardResult := <-rewardCh
 
 	result := &feeHistoryResult{
-		OldestBlock:   *argUintPtr(oldestBlock),
+		OldestBlock:   *argUintPtr(history.OldestBlock),
 		BaseFeePerGas: baseFeePerGasResult,
 		GasUsedRatio:  gasUsedRatioResult,
 		Reward:        rewardResult,

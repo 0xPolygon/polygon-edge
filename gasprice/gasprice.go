@@ -56,7 +56,7 @@ type GasStore interface {
 	// MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
 	MaxPriorityFeePerGas() (*big.Int, error)
 	// FeeHistory returns the collection of historical gas information
-	FeeHistory(uint64, uint64, []float64) (uint64, []uint64, []float64, [][]uint64, error)
+	FeeHistory(uint64, uint64, []float64) (*FeeHistoryReturn, error)
 }
 
 var _ GasStore = (*GasHelper)(nil)
