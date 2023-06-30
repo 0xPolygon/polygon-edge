@@ -138,7 +138,7 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 		}
 
 		if err := r.executeStateSync(stateSyncProof); err != nil {
-			r.logger.Error("Failed to execute state sync", "err", err)
+			r.logger.Error("State sync execution failed", "err", err)
 
 			continue
 		}
@@ -204,11 +204,27 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 
 	receipt, err := r.txRelayer.SendTransaction(txn, r.key)
 	if err != nil {
-		return fmt.Errorf("failed to send state sync transaction: %w", err)
+		return fmt.Errorf("failed to send execute state sync transaction for id %d: %w", sse.ID, err)
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("state sync execution failed: %d", execute.Obj.ID)
+		return fmt.Errorf("transaction execution reverted for state sync id: %d", sse.ID)
+	}
+
+	var stateSyncResult contractsapi.StateSyncResultEvent
+	for _, log := range receipt.Logs {
+		matches, err := stateSyncResult.ParseLog(log)
+		if err != nil {
+			return fmt.Errorf("failed to find state sync event result log for state sync id: %d", sse.ID)
+		}
+
+		if !matches {
+			continue
+		}
+
+		if !stateSyncResult.Status {
+			return fmt.Errorf("failed to execute state sync id: %d", sse.ID)
+		}
 	}
 
 	return nil

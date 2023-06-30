@@ -16,10 +16,10 @@ if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
 fi
 
 # Stop script if any of the dependencies have failed
-if [[ "$dp_error_flag" -eq 1]]; then
+if [[ "$dp_error_flag" -eq 1 ]]; then
   echo "Missing dependencies. Please install them and run the script again."
   exit 1
-fi	
+fi
 
 function initIbftConsensus() {
   echo "Running with ibft consensus"
