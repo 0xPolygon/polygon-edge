@@ -42,7 +42,8 @@ type FeeHistoryReturn struct {
 	Reward        [][]uint64
 }
 
-func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (*FeeHistoryReturn, error) {
+func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (
+	*FeeHistoryReturn, error) {
 	if blockCount < 1 {
 		return &FeeHistoryReturn{0, nil, nil, nil}, ErrBlockCount
 	}
