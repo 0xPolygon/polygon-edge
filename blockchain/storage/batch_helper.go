@@ -11,7 +11,7 @@ import (
 type Batch interface {
 	Delete(key []byte)
 	Write() error
-	Put(k []byte, data []byte)
+	Put(k []byte, v []byte)
 }
 
 type BatchHelper struct {
@@ -19,9 +19,7 @@ type BatchHelper struct {
 }
 
 func NewBatchHelper(storage Storage) *BatchHelper {
-	batch := storage.NewBatch()
-
-	return &BatchHelper{batch: batch}
+	return &BatchHelper{batch: storage.NewBatch()}
 }
 
 func (b *BatchHelper) PutHeader(h *types.Header) {
@@ -82,7 +80,7 @@ func (b *BatchHelper) putRlp(p, k []byte, raw types.RLPMarshaler) {
 }
 
 func (b *BatchHelper) putWithPrefix(p, k, data []byte) {
-	fullKey := append(append([]byte{}, p...), k...)
+	fullKey := append(append(make([]byte, 0, len(p)+len(k)), p...), k...)
 
 	b.batch.Put(fullKey, data)
 }

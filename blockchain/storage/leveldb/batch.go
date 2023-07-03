@@ -1,8 +1,11 @@
 package leveldb
 
 import (
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/syndtr/goleveldb/leveldb"
 )
+
+var _ storage.Batch = (*batchLevelDB)(nil)
 
 type batchLevelDB struct {
 	db *leveldb.DB
@@ -20,10 +23,10 @@ func (b *batchLevelDB) Delete(key []byte) {
 	b.b.Delete(key)
 }
 
-func (b *batchLevelDB) Write() error {
-	return b.db.Write(b.b, nil)
+func (b *batchLevelDB) Put(k []byte, v []byte) {
+	b.b.Put(k, v)
 }
 
-func (b *batchLevelDB) Put(k []byte, data []byte) {
-	b.b.Put(k, data)
+func (b *batchLevelDB) Write() error {
+	return b.db.Write(b.b, nil)
 }

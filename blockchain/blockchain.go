@@ -1206,8 +1206,6 @@ func (b *Blockchain) writeHeaderImpl(batch *storage.BatchHelper, evnt *Event, he
 		return b.writeCanonicalHeader(batch, evnt, header)
 	}
 
-	batch.PutHeader(header)
-
 	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
 	if !ok {
 		return errors.New("failed to get header difficulty")
@@ -1223,6 +1221,7 @@ func (b *Blockchain) writeHeaderImpl(batch *storage.BatchHelper, evnt *Event, he
 		)
 	}
 
+	batch.PutHeader(header)
 	// Write the difficulty
 	batch.PutTotalDifficulty(
 		header.Hash,

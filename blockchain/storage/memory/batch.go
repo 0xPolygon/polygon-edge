@@ -1,8 +1,11 @@
 package memory
 
 import (
+	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
+
+var _ storage.Batch = (*batchMemory)(nil)
 
 type batchMemory struct {
 	db           map[string][]byte
@@ -18,6 +21,10 @@ func (b *batchMemory) Delete(key []byte) {
 	b.keysToDelete = append(b.keysToDelete, key)
 }
 
+func (b *batchMemory) Put(k []byte, v []byte) {
+	b.valuesToPut = append(b.valuesToPut, [2][]byte{k, v})
+}
+
 func (b *batchMemory) Write() error {
 	for _, x := range b.keysToDelete {
 		delete(b.db, hex.EncodeToHex(x))
@@ -28,8 +35,4 @@ func (b *batchMemory) Write() error {
 	}
 
 	return nil
-}
-
-func (b *batchMemory) Put(k []byte, data []byte) {
-	b.valuesToPut = append(b.valuesToPut, [2][]byte{k, data})
 }
