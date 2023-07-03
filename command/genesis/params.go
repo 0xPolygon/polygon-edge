@@ -61,8 +61,8 @@ var (
 	errInvalidEpochSize       = errors.New("epoch size must be greater than 1")
 	errInvalidTokenParams     = errors.New("native token params were not submitted in proper format " +
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
-	errRewardWalletAmountZero  = errors.New("reward wallet amount can not be zero or negative")
-	errEscrowAccMustBePremined = errors.New("it is mandatory to premine escrow account (0x0 address)")
+	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
+	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 )
 
 type genesisParams struct {
@@ -478,10 +478,10 @@ func (p *genesisParams) validateRewardWallet() error {
 	return nil
 }
 
-// validatePremineInfo validates whether escrow account (0x0 address) is premined
+// validatePremineInfo validates whether reserve account (0x0 address) is premined
 func (p *genesisParams) validatePremineInfo() error {
 	p.premineInfos = make([]*premineInfo, 0, len(p.premine))
-	isEscrowAccPremined := false
+	isReserveAccPremined := false
 
 	for _, premine := range p.premine {
 		premineInfo, err := parsePremineInfo(premine)
@@ -492,12 +492,12 @@ func (p *genesisParams) validatePremineInfo() error {
 		p.premineInfos = append(p.premineInfos, premineInfo)
 
 		if premineInfo.address == types.ZeroAddress {
-			isEscrowAccPremined = true
+			isReserveAccPremined = true
 		}
 	}
 
-	if !isEscrowAccPremined {
-		return errEscrowAccMustBePremined
+	if !isReserveAccPremined {
+		return errReserveAccMustBePremined
 	}
 
 	return nil

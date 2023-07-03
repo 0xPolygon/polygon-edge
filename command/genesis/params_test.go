@@ -141,7 +141,7 @@ func Test_validatePremineInfo(t *testing.T) {
 			expectedPremines: []*premineInfo{
 				{address: types.StringToAddress("12"), amount: command.DefaultPremineBalance},
 			},
-			expectErrMsg: errEscrowAccMustBePremined.Error(),
+			expectErrMsg: errReserveAccMustBePremined.Error(),
 		},
 		{
 			name: "valid premine information",
