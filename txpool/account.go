@@ -12,8 +12,7 @@ import (
 type accountsMap struct {
 	sync.Map
 
-	count uint64
-
+	count            uint64
 	maxEnqueuedLimit uint64
 }
 
@@ -22,6 +21,7 @@ func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	a, loaded := m.LoadOrStore(addr, &account{
 		enqueued:    newAccountQueue(),
 		promoted:    newAccountQueue(),
+		nonceToTx:   newNonceToTxLookup(),
 		maxEnqueued: m.maxEnqueuedLimit,
 		nextNonce:   nonce,
 	})
@@ -136,6 +136,43 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 	return
 }
 
+type nonceToTxLookup struct {
+	mapping map[uint64]*types.Transaction
+	mutex   sync.Mutex
+}
+
+func newNonceToTxLookup() *nonceToTxLookup {
+	return &nonceToTxLookup{
+		mapping: make(map[uint64]*types.Transaction),
+	}
+}
+
+func (m *nonceToTxLookup) lock() {
+	m.mutex.Lock()
+}
+
+func (m *nonceToTxLookup) unlock() {
+	m.mutex.Unlock()
+}
+
+func (m *nonceToTxLookup) get(nonce uint64) *types.Transaction {
+	return m.mapping[nonce]
+}
+
+func (m *nonceToTxLookup) set(tx *types.Transaction) {
+	m.mapping[tx.Nonce] = tx
+}
+
+func (m *nonceToTxLookup) reset() {
+	m.mapping = make(map[uint64]*types.Transaction)
+}
+
+func (m *nonceToTxLookup) remove(txs ...*types.Transaction) {
+	for _, tx := range txs {
+		delete(m.mapping, tx.Nonce)
+	}
+}
+
 // An account is the core structure for processing
 // transactions from a specific address. The nextNonce
 // field is what separates the enqueued from promoted transactions:
@@ -147,10 +184,13 @@ func (m *accountsMap) allTxs(includeEnqueued bool) (
 // a promoteRequest is signaled for this account
 // indicating the account's enqueued transaction(s)
 // are ready to be moved to the promoted queue.
+// lock order is important! promoted.lock(true), enqueued.lock(true), nonceToTx.lock()
 type account struct {
 	enqueued, promoted *accountQueue
-	nextNonce          uint64
-	demotions          uint64
+	nonceToTx          *nonceToTxLookup
+
+	nextNonce uint64
+	demotions uint64
 	// the number of consecutive blocks that don't contain account's transaction
 	skips uint64
 
@@ -192,21 +232,27 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	prunedEnqueued []*types.Transaction,
 ) {
 	a.promoted.lock(true)
-	defer a.promoted.unlock()
+	a.enqueued.lock(true)
+	a.nonceToTx.lock()
+
+	defer func() {
+		a.nonceToTx.unlock()
+		a.enqueued.unlock()
+		a.promoted.unlock()
+	}()
 
 	// prune the promoted txs
 	prunedPromoted = a.promoted.prune(nonce)
+	a.nonceToTx.remove(prunedPromoted...)
 
 	if nonce <= a.getNonce() {
 		// only the promoted queue needed pruning
 		return
 	}
 
-	a.enqueued.lock(true)
-	defer a.enqueued.unlock()
-
 	// prune the enqueued txs
 	prunedEnqueued = a.enqueued.prune(nonce)
+	a.nonceToTx.remove(prunedEnqueued...)
 
 	// update nonce expected for this account
 	a.setNonce(nonce)
@@ -222,24 +268,31 @@ func (a *account) reset(nonce uint64, promoteCh chan<- promoteRequest) (
 	return
 }
 
-// enqueue attempts tp push the transaction onto the enqueued queue.
-func (a *account) enqueue(tx *types.Transaction) error {
-	a.enqueued.lock(true)
-	defer a.enqueued.unlock()
+// enqueue push the transaction onto the enqueued queue or replace it
+func (a *account) enqueue(tx *types.Transaction, replace bool) {
+	replaceInQueue := func(queue minNonceQueue) bool {
+		for i, x := range queue {
+			if x.Nonce == tx.Nonce {
+				queue[i] = tx // replace
 
-	if a.enqueued.length() == a.maxEnqueued {
-		return ErrMaxEnqueuedLimitReached
+				return true
+			}
+		}
+
+		return false
 	}
 
-	// reject low nonce tx
-	if tx.Nonce < a.getNonce() {
-		return ErrNonceTooLow
+	a.nonceToTx.set(tx)
+
+	if !replace {
+		a.enqueued.push(tx)
+	} else {
+		// first -> try to replace in enqueued
+		if !replaceInQueue(a.enqueued.queue) {
+			// .. then try to replace in promoted
+			replaceInQueue(a.promoted.queue)
+		}
 	}
-
-	// enqueue tx
-	a.enqueued.push(tx)
-
-	return nil
 }
 
 // Promote moves eligible transactions from enqueued to promoted.
@@ -294,6 +347,10 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 	if nextNonce > currentNonce {
 		a.setNonce(nextNonce)
 	}
+
+	a.nonceToTx.lock()
+	a.nonceToTx.remove(pruned...)
+	a.nonceToTx.unlock()
 
 	return
 }
