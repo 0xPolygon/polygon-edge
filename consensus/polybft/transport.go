@@ -17,7 +17,7 @@ type BridgeTransport interface {
 // subscribeToIbftTopic subscribes to ibft topic
 func (p *Polybft) subscribeToIbftTopic() error {
 	return p.consensusTopic.Subscribe(func(obj interface{}, _ peer.ID) {
-		if !p.runtime.isActiveValidator() {
+		if !p.runtime.IsActiveValidator() {
 			return
 		}
 
