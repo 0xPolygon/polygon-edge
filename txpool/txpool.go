@@ -753,7 +753,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)
 	// populate currently free slots
-	slotsFree := p.gauge.max - p.gauge.read()
+	slotsFree := p.gauge.freeSlots()
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
@@ -824,7 +824,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	account.enqueue(tx, oldTxWithSameNonce != nil) // add or replace tx into account
 	p.gauge.increase(slotsRequired(tx))
 
-	go p.invokePromotion(tx, tx.Nonce == accountNonce) // don't signal promotion for higher nonce txs
+	go p.invokePromotion(tx, tx.Nonce <= accountNonce) // don't signal promotion for higher nonce txs
 
 	return nil
 }

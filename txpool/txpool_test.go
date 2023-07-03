@@ -3336,3 +3336,139 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 
 	acc.nonceToTx.unlock()
 }
+
+func TestAddTxsInOrder(t *testing.T) {
+	t.Parallel()
+
+	const accountCount = 10
+
+	type container struct {
+		key  *ecdsa.PrivateKey
+		addr types.Address
+		txs  []*types.Transaction
+	}
+
+	addrsTxs := [accountCount]container{}
+
+	for i := 0; i < accountCount; i++ {
+		key, err := crypto.GenerateECDSAKey()
+		require.NoError(t, err)
+
+		addrsTxs[i] = container{
+			key:  key,
+			addr: crypto.PubKeyToAddress(&key.PublicKey),
+			txs:  make([]*types.Transaction, defaultMaxAccountEnqueued),
+		}
+
+		for j := uint64(0); j < defaultMaxAccountEnqueued; j++ {
+			addrsTxs[i].txs[j] = newTx(addrsTxs[i].addr, j, uint64(1))
+		}
+	}
+
+	pool, err := newTestPool()
+	require.NoError(t, err)
+
+	signer := crypto.NewEIP155Signer(100, true)
+
+	pool.SetSigner(signer)
+	pool.Start()
+
+	wg := new(sync.WaitGroup)
+	wg.Add(len(addrsTxs) * int(defaultMaxAccountEnqueued))
+
+	for _, atx := range addrsTxs {
+		for i, tx := range atx.txs {
+			go func(i int, tx *types.Transaction, key *ecdsa.PrivateKey) {
+				if i%2 == 1 {
+					time.Sleep(time.Millisecond * 50)
+				}
+
+				signedTx, err := signer.SignTx(tx, key)
+				require.NoError(t, err)
+
+				require.NoError(t, pool.addTx(local, signedTx))
+
+				wg.Done()
+			}(i, tx, atx.key)
+		}
+	}
+
+	wg.Wait()
+
+	time.Sleep(time.Second * 2)
+
+	pool.Close()
+
+	for _, addrtx := range addrsTxs {
+		acc := pool.accounts.get(addrtx.addr)
+		require.NotNil(t, acc)
+
+		assert.Equal(t, uint64(0), acc.enqueued.length())
+		assert.Equal(t, len(acc.nonceToTx.mapping), int(acc.promoted.length()))
+	}
+}
+
+func BenchmarkAddTxTime(b *testing.B) {
+	b.Run("benchmark add one tx", func(b *testing.B) {
+		signer := crypto.NewEIP155Signer(100, true)
+
+		key, err := crypto.GenerateECDSAKey()
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		signedTx, err := signer.SignTx(newTx(crypto.PubKeyToAddress(&key.PublicKey), 0, 1), key)
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		for i := 0; i < b.N; i++ {
+			pool, err := newTestPool()
+			if err != nil {
+				b.Fatal("fail to create pool", "err", err)
+			}
+
+			pool.SetSigner(signer)
+
+			err = pool.addTx(local, signedTx)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("benchmark fill account", func(b *testing.B) {
+		signer := crypto.NewEIP155Signer(100, true)
+
+		key, err := crypto.GenerateECDSAKey()
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		addr := crypto.PubKeyToAddress(&key.PublicKey)
+		txs := make([]*types.Transaction, defaultMaxAccountEnqueued)
+
+		for i := range txs {
+			txs[i], err = signer.SignTx(newTx(addr, uint64(i), uint64(1)), key)
+			if err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		for i := 0; i < b.N; i++ {
+			pool, err := newTestPool()
+			if err != nil {
+				b.Fatal("fail to create pool", "err", err)
+			}
+
+			pool.SetSigner(signer)
+
+			for i := 0; i < len(txs); i++ {
+				err = pool.addTx(local, txs[i])
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		}
+	})
+}
