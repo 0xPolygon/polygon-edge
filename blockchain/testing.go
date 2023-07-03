@@ -116,8 +116,13 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 		t.Fatal(err)
 	}
 
-	if headers != nil {
-		if _, err := b.advanceHead(headers[0]); err != nil {
+	if len(headers) > 0 {
+		bh := storage.NewBatchHelper(b.db)
+		td := new(big.Int).SetUint64(headers[0].Difficulty)
+
+		bh.PutCanonicalHeader(headers[0], td)
+
+		if err := b.writeBatchAndUpdate(bh, headers[0], td, true); err != nil {
 			t.Fatal(err)
 		}
 

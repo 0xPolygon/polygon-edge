@@ -67,6 +67,12 @@ func (b *BatchHelper) PutTotalDifficulty(hash types.Hash, diff *big.Int) {
 	b.putWithPrefix(DIFFICULTY, hash.Bytes(), diff.Bytes())
 }
 
+func (b *BatchHelper) PutForks(forks []types.Hash) {
+	ff := Forks(forks)
+
+	b.putRlp(FORK, EMPTY, &ff)
+}
+
 func (b *BatchHelper) putRlp(p, k []byte, raw types.RLPMarshaler) {
 	var data []byte
 

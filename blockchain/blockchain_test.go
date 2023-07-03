@@ -25,8 +25,7 @@ func TestGenesis(t *testing.T) {
 	genesis := &types.Header{Difficulty: 1, Number: 0}
 	genesis.ComputeHash()
 
-	_, err := b.advanceHead(genesis)
-	assert.NoError(t, err)
+	assert.NoError(t, b.writeGenesisImpl(genesis))
 
 	header := b.Header()
 	assert.Equal(t, header.Hash, genesis.Hash)
@@ -533,8 +532,12 @@ func TestForkUnknownParents(t *testing.T) {
 	h1 := AppendNewTestHeaders(h0[:5], 10)
 
 	// Write genesis
-	_, err := b.advanceHead(h0[0])
-	assert.NoError(t, err)
+	bh := storage.NewBatchHelper(b.db)
+	td := new(big.Int).SetUint64(h0[0].Difficulty)
+
+	bh.PutCanonicalHeader(h0[0], td)
+
+	assert.NoError(t, b.writeBatchAndUpdate(bh, h0[0], td, true))
 
 	// Write 10 headers
 	assert.NoError(t, b.WriteHeaders(h0[1:]))

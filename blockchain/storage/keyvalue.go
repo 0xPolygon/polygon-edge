@@ -92,11 +92,6 @@ func (s *KeyValueStorage) ReadCanonicalHash(n uint64) (types.Hash, bool) {
 	return types.BytesToHash(data), true
 }
 
-// WriteCanonicalHash writes a hash for a number block in the canonical chain
-func (s *KeyValueStorage) WriteCanonicalHash(n uint64, hash types.Hash) error {
-	return s.set(CANONICAL, s.encodeUint(n), hash.Bytes())
-}
-
 // HEAD //
 
 // ReadHeadHash returns the hash of the head
@@ -123,24 +118,7 @@ func (s *KeyValueStorage) ReadHeadNumber() (uint64, bool) {
 	return s.decodeUint(data), true
 }
 
-// WriteHeadHash writes the hash of the head
-func (s *KeyValueStorage) WriteHeadHash(h types.Hash) error {
-	return s.set(HEAD, HASH, h.Bytes())
-}
-
-// WriteHeadNumber writes the number of the head
-func (s *KeyValueStorage) WriteHeadNumber(n uint64) error {
-	return s.set(HEAD, NUMBER, s.encodeUint(n))
-}
-
 // FORK //
-
-// WriteForks writes the current forks
-func (s *KeyValueStorage) WriteForks(forks []types.Hash) error {
-	ff := Forks(forks)
-
-	return s.writeRLP(FORK, EMPTY, &ff)
-}
 
 // ReadForks read the current forks
 func (s *KeyValueStorage) ReadForks() ([]types.Hash, error) {
@@ -151,11 +129,6 @@ func (s *KeyValueStorage) ReadForks() ([]types.Hash, error) {
 }
 
 // DIFFICULTY //
-
-// WriteTotalDifficulty writes the difficulty
-func (s *KeyValueStorage) WriteTotalDifficulty(hash types.Hash, diff *big.Int) error {
-	return s.set(DIFFICULTY, hash.Bytes(), diff.Bytes())
-}
 
 // ReadTotalDifficulty reads the difficulty
 func (s *KeyValueStorage) ReadTotalDifficulty(hash types.Hash) (*big.Int, bool) {
@@ -169,11 +142,6 @@ func (s *KeyValueStorage) ReadTotalDifficulty(hash types.Hash) (*big.Int, bool) 
 
 // HEADER //
 
-// WriteHeader writes the header
-func (s *KeyValueStorage) WriteHeader(h *types.Header) error {
-	return s.writeRLP(HEADER, h.Hash.Bytes(), h)
-}
-
 // ReadHeader reads the header
 func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, error) {
 	header := &types.Header{}
@@ -182,37 +150,7 @@ func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, error) {
 	return header, err
 }
 
-// WriteCanonicalHeader implements the storage interface
-func (s *KeyValueStorage) WriteCanonicalHeader(h *types.Header, diff *big.Int) error {
-	if err := s.WriteHeader(h); err != nil {
-		return err
-	}
-
-	if err := s.WriteHeadHash(h.Hash); err != nil {
-		return err
-	}
-
-	if err := s.WriteHeadNumber(h.Number); err != nil {
-		return err
-	}
-
-	if err := s.WriteCanonicalHash(h.Number, h.Hash); err != nil {
-		return err
-	}
-
-	if err := s.WriteTotalDifficulty(h.Hash, diff); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // BODY //
-
-// WriteBody writes the body
-func (s *KeyValueStorage) WriteBody(hash types.Hash, body *types.Body) error {
-	return s.writeRLP(BODY, hash.Bytes(), body)
-}
 
 // ReadBody reads the body
 func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
@@ -224,13 +162,6 @@ func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
 
 // RECEIPTS //
 
-// WriteReceipts writes the receipts
-func (s *KeyValueStorage) WriteReceipts(hash types.Hash, receipts []*types.Receipt) error {
-	rr := types.Receipts(receipts)
-
-	return s.writeRLP(RECEIPTS, hash.Bytes(), &rr)
-}
-
 // ReadReceipts reads the receipts
 func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, error) {
 	receipts := &types.Receipts{}
@@ -240,14 +171,6 @@ func (s *KeyValueStorage) ReadReceipts(hash types.Hash) ([]*types.Receipt, error
 }
 
 // TX LOOKUP //
-
-// WriteTxLookup maps the transaction hash to the block hash
-func (s *KeyValueStorage) WriteTxLookup(hash types.Hash, blockHash types.Hash) error {
-	ar := &fastrlp.Arena{}
-	vr := ar.NewBytes(blockHash.Bytes())
-
-	return s.write2(TX_LOOKUP_PREFIX, hash.Bytes(), vr)
-}
 
 // ReadTxLookup reads the block hash using the transaction hash
 func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
@@ -269,17 +192,6 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 }
 
 // WRITE OPERATIONS //
-
-func (s *KeyValueStorage) writeRLP(p, k []byte, raw types.RLPMarshaler) error {
-	var data []byte
-	if obj, ok := raw.(types.RLPStoreMarshaler); ok {
-		data = obj.MarshalStoreRLPTo(nil)
-	} else {
-		data = raw.MarshalRLPTo(nil)
-	}
-
-	return s.set(p, k, data)
-}
 
 var ErrNotFound = fmt.Errorf("not found")
 
@@ -322,18 +234,6 @@ func (s *KeyValueStorage) read2(p, k []byte, parser *fastrlp.Parser) *fastrlp.Va
 	}
 
 	return v
-}
-
-func (s *KeyValueStorage) write2(p, k []byte, v *fastrlp.Value) error {
-	dst := v.MarshalTo(nil)
-
-	return s.set(p, k, dst)
-}
-
-func (s *KeyValueStorage) set(p []byte, k []byte, v []byte) error {
-	p = append(p, k...)
-
-	return s.db.Set(p, v)
 }
 
 func (s *KeyValueStorage) get(p []byte, k []byte) ([]byte, bool) {
