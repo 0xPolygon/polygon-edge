@@ -14,44 +14,44 @@ type Batch interface {
 	Put(k []byte, v []byte)
 }
 
-type BatchHelper struct {
+type BatchWriter struct {
 	batch Batch
 }
 
-func NewBatchHelper(storage Storage) *BatchHelper {
-	return &BatchHelper{batch: storage.NewBatch()}
+func NewBatchWriter(storage Storage) *BatchWriter {
+	return &BatchWriter{batch: storage.NewBatch()}
 }
 
-func (b *BatchHelper) PutHeader(h *types.Header) {
+func (b *BatchWriter) PutHeader(h *types.Header) {
 	b.putRlp(HEADER, h.Hash.Bytes(), h)
 }
 
-func (b *BatchHelper) PutBody(hash types.Hash, body *types.Body) {
+func (b *BatchWriter) PutBody(hash types.Hash, body *types.Body) {
 	b.putRlp(BODY, hash.Bytes(), body)
 }
 
-func (b *BatchHelper) PutHeadHash(h types.Hash) {
+func (b *BatchWriter) PutHeadHash(h types.Hash) {
 	b.putWithPrefix(HEAD, HASH, h.Bytes())
 }
 
-func (b *BatchHelper) PutTxLookup(hash types.Hash, blockHash types.Hash) {
+func (b *BatchWriter) PutTxLookup(hash types.Hash, blockHash types.Hash) {
 	ar := &fastrlp.Arena{}
 	vr := ar.NewBytes(blockHash.Bytes()).MarshalTo(nil)
 
 	b.putWithPrefix(TX_LOOKUP_PREFIX, hash.Bytes(), vr)
 }
 
-func (b *BatchHelper) PutHeadNumber(n uint64) {
+func (b *BatchWriter) PutHeadNumber(n uint64) {
 	b.putWithPrefix(HEAD, NUMBER, common.EncodeUint64ToBytes(n))
 }
 
-func (b *BatchHelper) PutReceipts(hash types.Hash, receipts []*types.Receipt) {
+func (b *BatchWriter) PutReceipts(hash types.Hash, receipts []*types.Receipt) {
 	rr := types.Receipts(receipts)
 
 	b.putRlp(RECEIPTS, hash.Bytes(), &rr)
 }
 
-func (b *BatchHelper) PutCanonicalHeader(h *types.Header, diff *big.Int) {
+func (b *BatchWriter) PutCanonicalHeader(h *types.Header, diff *big.Int) {
 	b.PutHeader(h)
 	b.PutHeadHash(h.Hash)
 	b.PutHeadNumber(h.Number)
@@ -59,21 +59,21 @@ func (b *BatchHelper) PutCanonicalHeader(h *types.Header, diff *big.Int) {
 	b.PutTotalDifficulty(h.Hash, diff)
 }
 
-func (b *BatchHelper) PutCanonicalHash(n uint64, hash types.Hash) {
+func (b *BatchWriter) PutCanonicalHash(n uint64, hash types.Hash) {
 	b.putWithPrefix(CANONICAL, common.EncodeUint64ToBytes(n), hash.Bytes())
 }
 
-func (b *BatchHelper) PutTotalDifficulty(hash types.Hash, diff *big.Int) {
+func (b *BatchWriter) PutTotalDifficulty(hash types.Hash, diff *big.Int) {
 	b.putWithPrefix(DIFFICULTY, hash.Bytes(), diff.Bytes())
 }
 
-func (b *BatchHelper) PutForks(forks []types.Hash) {
+func (b *BatchWriter) PutForks(forks []types.Hash) {
 	ff := Forks(forks)
 
 	b.putRlp(FORK, EMPTY, &ff)
 }
 
-func (b *BatchHelper) putRlp(p, k []byte, raw types.RLPMarshaler) {
+func (b *BatchWriter) putRlp(p, k []byte, raw types.RLPMarshaler) {
 	var data []byte
 
 	if obj, ok := raw.(types.RLPStoreMarshaler); ok {
@@ -85,12 +85,12 @@ func (b *BatchHelper) putRlp(p, k []byte, raw types.RLPMarshaler) {
 	b.putWithPrefix(p, k, data)
 }
 
-func (b *BatchHelper) putWithPrefix(p, k, data []byte) {
+func (b *BatchWriter) putWithPrefix(p, k, data []byte) {
 	fullKey := append(append(make([]byte, 0, len(p)+len(k)), p...), k...)
 
 	b.batch.Put(fullKey, data)
 }
 
-func (b *BatchHelper) WriteBatch() error {
+func (b *BatchWriter) WriteBatch() error {
 	return b.batch.Write()
 }

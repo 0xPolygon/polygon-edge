@@ -247,21 +247,21 @@ insertloop:
 		case <-ctx.Done():
 			break insertloop
 		case b := <-blockchain:
-			batchHelper := storage.NewBatchHelper(s)
+			batchWriter := storage.NewBatchWriter(s)
 
-			batchHelper.PutBody(b.Block.Hash(), b.Block.Body())
+			batchWriter.PutBody(b.Block.Hash(), b.Block.Body())
 
 			for _, tx := range b.Block.Transactions {
-				batchHelper.PutTxLookup(tx.Hash, b.Block.Hash())
+				batchWriter.PutTxLookup(tx.Hash, b.Block.Hash())
 			}
 
-			batchHelper.PutHeader(b.Block.Header)
-			batchHelper.PutHeadNumber(uint64(i))
-			batchHelper.PutHeadHash(b.Block.Header.Hash)
-			batchHelper.PutReceipts(b.Block.Hash(), b.Receipts)
-			batchHelper.PutCanonicalHash(uint64(i), b.Block.Hash())
+			batchWriter.PutHeader(b.Block.Header)
+			batchWriter.PutHeadNumber(uint64(i))
+			batchWriter.PutHeadHash(b.Block.Header.Hash)
+			batchWriter.PutReceipts(b.Block.Hash(), b.Receipts)
+			batchWriter.PutCanonicalHash(uint64(i), b.Block.Hash())
 
-			if err := batchHelper.WriteBatch(); err != nil {
+			if err := batchWriter.WriteBatch(); err != nil {
 				require.NoError(t, err)
 			}
 

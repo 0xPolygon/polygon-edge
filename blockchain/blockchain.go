@@ -400,13 +400,13 @@ func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 
 // writeGenesisImpl writes the genesis file to the DB + blockchain reference
 func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
-	batchHelper := storage.NewBatchHelper(b.db)
+	batchWriter := storage.NewBatchWriter(b.db)
 
 	newTD := new(big.Int).SetUint64(header.Difficulty)
 
-	batchHelper.PutCanonicalHeader(header, newTD)
+	batchWriter.PutCanonicalHeader(header, newTD)
 
-	if err := b.writeBatchAndUpdate(batchHelper, header, newTD, true); err != nil {
+	if err := b.writeBatchAndUpdate(batchWriter, header, newTD, true); err != nil {
 		return err
 	}
 
@@ -493,11 +493,11 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 
 	// To return from field in the transactions of the past blocks
 	if updated := b.recoverFromFieldsInTransactions(bb.Transactions); updated {
-		batchHelper := storage.NewBatchHelper(b.db)
+		batchWriter := storage.NewBatchWriter(b.db)
 
-		batchHelper.PutBody(hash, bb)
+		batchWriter.PutBody(hash, bb)
 
-		if err := batchHelper.WriteBatch(); err != nil {
+		if err := batchWriter.WriteBatch(); err != nil {
 			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
 		}
 	}
@@ -580,14 +580,14 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	for _, header := range headers {
 		event := &Event{}
 
-		batchHelper := storage.NewBatchHelper(b.db)
+		batchWriter := storage.NewBatchWriter(b.db)
 
-		isCanonical, newTD, err := b.writeHeaderImpl(batchHelper, event, header)
+		isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, event, header)
 		if err != nil {
 			return err
 		}
 
-		if err := b.writeBatchAndUpdate(batchHelper, header, newTD, isCanonical); err != nil {
+		if err := b.writeBatchAndUpdate(batchWriter, header, newTD, isCanonical); err != nil {
 			return err
 		}
 
@@ -818,16 +818,16 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 
 	header := block.Header
 
-	batchHelper := storage.NewBatchHelper(b.db)
+	batchWriter := storage.NewBatchWriter(b.db)
 
-	if err := b.writeBody(batchHelper, block); err != nil {
+	if err := b.writeBody(batchWriter, block); err != nil {
 		return err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
 
-	isCanonical, newTD, err := b.writeHeaderImpl(batchHelper, evnt, header)
+	isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, evnt, header)
 	if err != nil {
 		return err
 	}
@@ -835,7 +835,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchHelper.PutReceipts(block.Hash(), fblock.Receipts)
+	batchWriter.PutReceipts(block.Hash(), fblock.Receipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -845,7 +845,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
 
-	if err := b.writeBatchAndUpdate(batchHelper, header, newTD, isCanonical); err != nil {
+	if err := b.writeBatchAndUpdate(batchWriter, header, newTD, isCanonical); err != nil {
 		return err
 	}
 
@@ -883,16 +883,16 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	header := block.Header
 
-	batchHelper := storage.NewBatchHelper(b.db)
+	batchWriter := storage.NewBatchWriter(b.db)
 
-	if err := b.writeBody(batchHelper, block); err != nil {
+	if err := b.writeBody(batchWriter, block); err != nil {
 		return err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
 
-	isCanonical, newTD, err := b.writeHeaderImpl(batchHelper, evnt, header)
+	isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, evnt, header)
 	if err != nil {
 		return err
 	}
@@ -906,7 +906,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchHelper.PutReceipts(block.Hash(), blockReceipts)
+	batchWriter.PutReceipts(block.Hash(), blockReceipts)
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
@@ -916,7 +916,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
 
-	if err := b.writeBatchAndUpdate(batchHelper, header, newTD, isCanonical); err != nil {
+	if err := b.writeBatchAndUpdate(batchWriter, header, newTD, isCanonical); err != nil {
 		return err
 	}
 
@@ -997,7 +997,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
-func (b *Blockchain) writeBody(batch *storage.BatchHelper, block *types.Block) error {
+func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Block) error {
 	// Recover 'from' field in tx before saving
 	// Because the block passed from the consensus layer doesn't have from field in tx,
 	// due to missing encoding in RLP
@@ -1006,11 +1006,11 @@ func (b *Blockchain) writeBody(batch *storage.BatchHelper, block *types.Block) e
 	}
 
 	// Write the full body (txns + receipts)
-	batch.PutBody(block.Header.Hash, block.Body())
+	batchWriter.PutBody(block.Header.Hash, block.Body())
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		batch.PutTxLookup(txn.Hash, block.Hash())
+		batchWriter.PutTxLookup(txn.Hash, block.Hash())
 	}
 
 	return nil
@@ -1146,7 +1146,7 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 // writeHeaderImpl writes a block and the data, assumes the genesis is already set
 // Returnning parameters (is canonical header, new total difficulty, error)
 func (b *Blockchain) writeHeaderImpl(
-	batchHelper *storage.BatchHelper, evnt *Event, header *types.Header) (bool, *big.Int, error) {
+	batchWriter *storage.BatchWriter, evnt *Event, header *types.Header) (bool, *big.Int, error) {
 	// parent total difficulty of incoming header
 	parentTD, ok := b.readTotalDifficulty(header.ParentHash)
 	if !ok {
@@ -1163,7 +1163,7 @@ func (b *Blockchain) writeHeaderImpl(
 	// if parent of new header is current header just put everything in batch and update event
 	// new header will be canonical one
 	if header.ParentHash == currentHeader.Hash {
-		batchHelper.PutCanonicalHeader(header, incomingTD)
+		batchWriter.PutCanonicalHeader(header, incomingTD)
 
 		evnt.Type = EventHead
 		evnt.AddNewHeader(header)
@@ -1179,11 +1179,11 @@ func (b *Blockchain) writeHeaderImpl(
 
 	if incomingTD.Cmp(currentTD) > 0 {
 		// new block has higher difficulty, reorg the chain
-		if err := b.handleReorg(batchHelper, evnt, currentHeader, header, incomingTD); err != nil {
+		if err := b.handleReorg(batchWriter, evnt, currentHeader, header, incomingTD); err != nil {
 			return false, nil, err
 		}
 
-		batchHelper.PutCanonicalHeader(header, incomingTD)
+		batchWriter.PutCanonicalHeader(header, incomingTD)
 
 		return true, incomingTD, nil
 	}
@@ -1193,9 +1193,9 @@ func (b *Blockchain) writeHeaderImpl(
 		return false, nil, err
 	}
 
-	batchHelper.PutHeader(header)
-	batchHelper.PutTotalDifficulty(header.Hash, incomingTD)
-	batchHelper.PutForks(forks)
+	batchWriter.PutHeader(header)
+	batchWriter.PutTotalDifficulty(header.Hash, incomingTD)
+	batchWriter.PutForks(forks)
 
 	// new block has lower difficulty, create a new fork
 	evnt.AddOldHeader(header)
@@ -1228,7 +1228,7 @@ func (b *Blockchain) getForksToWrite(header *types.Header) ([]types.Hash, error)
 
 // handleReorg handles a reorganization event
 func (b *Blockchain) handleReorg(
-	batchHelper *storage.BatchHelper,
+	batchWriter *storage.BatchWriter,
 	evnt *Event,
 	oldHeader *types.Header,
 	newHeader *types.Header,
@@ -1281,11 +1281,11 @@ func (b *Blockchain) handleReorg(
 		return fmt.Errorf("failed to write the old header as fork: %w", err)
 	}
 
-	batchHelper.PutForks(forks)
+	batchWriter.PutForks(forks)
 
 	// Update canonical chain numbers
 	for _, h := range newChain {
-		batchHelper.PutCanonicalHash(h.Number, h.Hash)
+		batchWriter.PutCanonicalHash(h.Number, h.Hash)
 	}
 
 	for _, b := range oldChain[:len(oldChain)-1] {
@@ -1394,11 +1394,11 @@ func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 }
 
 func (b *Blockchain) writeBatchAndUpdate(
-	batchHelper *storage.BatchHelper,
+	batchWriter *storage.BatchWriter,
 	header *types.Header,
 	newTD *big.Int,
 	isCanonnical bool) error {
-	if err := batchHelper.WriteBatch(); err != nil {
+	if err := batchWriter.WriteBatch(); err != nil {
 		return err
 	}
 

@@ -77,7 +77,7 @@ func testCanonicalChain(t *testing.T, m PlaceholderStorage) {
 	}
 
 	for _, cc := range cases {
-		batch := NewBatchHelper(s)
+		batch := NewBatchWriter(s)
 
 		h := &types.Header{
 			Number:     cc.Number,
@@ -124,7 +124,7 @@ func testDifficulty(t *testing.T, m PlaceholderStorage) {
 	}
 
 	for indx, cc := range cases {
-		batch := NewBatchHelper(s)
+		batch := NewBatchWriter(s)
 
 		h := &types.Header{
 			Number:    uint64(indx),
@@ -156,7 +156,7 @@ func testHead(t *testing.T, m PlaceholderStorage) {
 	defer closeFn()
 
 	for i := uint64(0); i < 5; i++ {
-		batch := NewBatchHelper(s)
+		batch := NewBatchWriter(s)
 
 		h := &types.Header{
 			Number:    i,
@@ -204,7 +204,7 @@ func testForks(t *testing.T, m PlaceholderStorage) {
 	}
 
 	for _, cc := range cases {
-		batch := NewBatchHelper(s)
+		batch := NewBatchWriter(s)
 
 		batch.PutForks(cc.Forks)
 
@@ -235,7 +235,7 @@ func testHeader(t *testing.T, m PlaceholderStorage) {
 	}
 	header.ComputeHash()
 
-	batch := NewBatchHelper(s)
+	batch := NewBatchWriter(s)
 
 	batch.PutHeader(header)
 
@@ -263,7 +263,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		ExtraData:  []byte{}, // if not set it will fail
 	}
 
-	batch := NewBatchHelper(s)
+	batch := NewBatchWriter(s)
 
 	batch.PutHeader(header)
 
@@ -298,7 +298,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		Transactions: []*types.Transaction{t0, t1},
 	}
 
-	batch2 := NewBatchHelper(s)
+	batch2 := NewBatchWriter(s)
 	body0 := block.Body()
 
 	batch2.PutBody(header.Hash, body0)
@@ -327,7 +327,7 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 	s, closeFn := m(t)
 	defer closeFn()
 
-	batch := NewBatchHelper(s)
+	batch := NewBatchWriter(s)
 
 	h := &types.Header{
 		Difficulty: 133,
@@ -407,7 +407,7 @@ func testWriteCanonicalHeader(t *testing.T, m PlaceholderStorage) {
 	h.ComputeHash()
 
 	diff := new(big.Int).SetUint64(100)
-	batch := NewBatchHelper(s)
+	batch := NewBatchWriter(s)
 
 	batch.PutCanonicalHeader(h, diff)
 
