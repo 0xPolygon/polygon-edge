@@ -135,19 +135,19 @@ func TestToTransaction_EIP1559(t *testing.T) {
 	r, _ := hex.DecodeHex(hexWithLeading0)
 	s, _ := hex.DecodeHex(hexWithLeading0)
 	txn := types.Transaction{
-		Nonce:    0,
-		GasPrice: nil,
+		Nonce:     0,
+		GasPrice:  nil,
 		GasTipCap: big.NewInt(10),
 		GasFeeCap: big.NewInt(10),
-		Gas:      0,
-		To:       nil,
-		Value:    big.NewInt(0),
-		Input:    nil,
-		V:        new(big.Int).SetBytes(v),
-		R:        new(big.Int).SetBytes(r),
-		S:        new(big.Int).SetBytes(s),
-		Hash:     types.Hash{},
-		From:     types.Address{},
+		Gas:       0,
+		To:        nil,
+		Value:     big.NewInt(0),
+		Input:     nil,
+		V:         new(big.Int).SetBytes(v),
+		R:         new(big.Int).SetBytes(r),
+		S:         new(big.Int).SetBytes(s),
+		Hash:      types.Hash{},
+		From:      types.Address{},
 	}
 
 	jsonTx := toTransaction(&txn, nil, nil, nil)
