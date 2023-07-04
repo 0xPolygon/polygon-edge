@@ -74,13 +74,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// populate premine balance map
 	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
 
-	for _, premine := range p.premine {
-		premineInfo, err := parsePremineInfo(premine)
-		if err != nil {
-			return fmt.Errorf("invalid balance amount provided '%s' : %w", premine, err)
-		}
-
-		premineBalances[premineInfo.address] = premineInfo
+	for _, premine := range p.premineInfos {
+		premineBalances[premine.address] = premine
 	}
 
 	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
