@@ -342,7 +342,10 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// here we can provide some other configuration
-	m.gasHelper = gasprice.NewGasHelper(gasprice.DefaultGasHelperConfig, m.blockchain)
+	m.gasHelper, err = gasprice.NewGasHelper(gasprice.DefaultGasHelperConfig, m.blockchain)
+	if err != nil {
+		return nil, err
+	}
 
 	m.executor.GetHash = m.blockchain.GetHashHelper
 

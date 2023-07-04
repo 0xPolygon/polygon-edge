@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/ethgo"
 )
 
@@ -44,6 +45,7 @@ type Config struct {
 
 // Blockchain is the interface representing blockchain
 type Blockchain interface {
+	GetBlockByNumber(number uint64, full bool) (*types.Block, bool)
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 	Header() *types.Header
 	Config() *chain.Params
@@ -53,6 +55,8 @@ type Blockchain interface {
 type GasStore interface {
 	// MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
 	MaxPriorityFeePerGas() (*big.Int, error)
+	// FeeHistory returns the collection of historical gas information
+	FeeHistory(uint64, uint64, []float64) (*FeeHistoryReturn, error)
 }
 
 var _ GasStore = (*GasHelper)(nil)
@@ -78,13 +82,20 @@ type GasHelper struct {
 	lastHeaderHash types.Hash
 
 	lock sync.Mutex
+
+	historyCache *lru.Cache
 }
 
 // NewGasHelper is the constructor function for GasHelper struct
-func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
+func NewGasHelper(config *Config, backend Blockchain) (*GasHelper, error) {
 	pricePercentile := config.PricePercentile
 	if pricePercentile > 100 {
 		pricePercentile = 100
+	}
+
+	cache, err := lru.New(100)
+	if err != nil {
+		return nil, err
 	}
 
 	return &GasHelper{
@@ -95,7 +106,8 @@ func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 		lastPrice:          config.LastPrice,
 		maxPrice:           config.MaxPrice,
 		backend:            backend,
-	}
+		historyCache:       cache,
+	}, nil
 }
 
 // MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block

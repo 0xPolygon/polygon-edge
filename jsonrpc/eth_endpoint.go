@@ -802,3 +802,45 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 
 	return argBigPtr(priorityFee), nil
 }
+
+func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
+	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
+	history, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create channels to receive the processed slices asynchronously
+	baseFeePerGasCh := make(chan []argUint64)
+	gasUsedRatioCh := make(chan []argUint64)
+	rewardCh := make(chan [][]argUint64)
+
+	// Process baseFeePerGas asynchronously
+	go func() {
+		baseFeePerGasCh <- convertToArgUint64Slice(history.BaseFeePerGas)
+	}()
+
+	// Process gasUsedRatio asynchronously
+	go func() {
+		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(history.GasUsedRatio)
+	}()
+
+	// Process reward asynchronously
+	go func() {
+		rewardCh <- convertToArgUint64SliceSlice(history.Reward)
+	}()
+
+	// Wait for the processed slices from goroutines
+	baseFeePerGasResult := <-baseFeePerGasCh
+	gasUsedRatioResult := <-gasUsedRatioCh
+	rewardResult := <-rewardCh
+
+	result := &feeHistoryResult{
+		OldestBlock:   *argUintPtr(history.OldestBlock),
+		BaseFeePerGas: baseFeePerGasResult,
+		GasUsedRatio:  gasUsedRatioResult,
+		Reward:        rewardResult,
+	}
+
+	return result, nil
+}

@@ -154,7 +154,8 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 			t.Parallel()
 
 			backend := tc.GetBackend()
-			gasHelper := NewGasHelper(DefaultGasHelperConfig, backend)
+			gasHelper, err := NewGasHelper(DefaultGasHelperConfig, backend)
+			require.NoError(t, err)
 			price, err := gasHelper.MaxPriorityFeePerGas()
 
 			if tc.Error {
@@ -170,7 +171,7 @@ func TestGasHelper_MaxPriorityFeePerGas(t *testing.T) {
 func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 	t.Helper()
 
-	backend := &backendMock{blocks: make(map[types.Hash]*types.Block)}
+	backend := &backendMock{blocks: make(map[types.Hash]*types.Block), blocksByNumber: make(map[uint64]*types.Block)}
 	genesis := &types.Block{
 		Header: &types.Header{
 			Number:  0,
@@ -180,6 +181,7 @@ func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 		},
 	}
 	backend.blocks[genesis.Hash()] = genesis
+	backend.blocksByNumber[genesis.Number()] = genesis
 
 	currentBlock := genesis
 
@@ -190,9 +192,10 @@ func createTestBlocks(t *testing.T, numOfBlocks int) *backendMock {
 				Hash:       types.BytesToHash([]byte(fmt.Sprintf("Block %d", i))),
 				Miner:      types.ZeroAddress.Bytes(),
 				ParentHash: currentBlock.Hash(),
+				BaseFee:    chain.GenesisBaseFee,
 			},
 		}
-
+		backend.blocksByNumber[block.Number()] = block
 		backend.blocks[block.Hash()] = block
 		currentBlock = block
 	}
@@ -237,7 +240,8 @@ var _ Blockchain = (*backendMock)(nil)
 
 type backendMock struct {
 	mock.Mock
-	blocks map[types.Hash]*types.Block
+	blocks         map[types.Hash]*types.Block
+	blocksByNumber map[uint64]*types.Block
 }
 
 func (b *backendMock) Header() *types.Header {
