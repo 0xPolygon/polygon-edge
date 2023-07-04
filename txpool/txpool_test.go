@@ -31,10 +31,11 @@ const (
 )
 
 var (
-	forks = &chain.Forks{
-		Homestead: chain.NewFork(0),
-		Istanbul:  chain.NewFork(0),
-	}
+	forks = (&chain.Forks{
+		chain.Homestead: chain.NewFork(0),
+		chain.Istanbul:  chain.NewFork(0),
+		chain.London:    chain.NewFork(0),
+	})
 )
 
 // addresses used in tests
@@ -91,10 +92,9 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 		nil,
 		nil,
 		&Config{
-			PriceLimit:          defaultPriceLimit,
-			MaxSlots:            maxSlots,
-			MaxAccountEnqueued:  defaultMaxAccountEnqueued,
-			DeploymentWhitelist: []types.Address{},
+			PriceLimit:         defaultPriceLimit,
+			MaxSlots:           maxSlots,
+			MaxAccountEnqueued: defaultMaxAccountEnqueued,
 		},
 	)
 }
@@ -115,7 +115,7 @@ type result struct {
 func TestAddTxErrors(t *testing.T) {
 	t.Parallel()
 
-	poolSigner := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+	poolSigner := crypto.NewEIP155Signer(100, true)
 
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
@@ -546,7 +546,7 @@ func TestAddGossipTx(t *testing.T) {
 	t.Parallel()
 
 	key, sender := tests.GenerateKeyAndAddr(t)
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(100))
+	signer := crypto.NewEIP155Signer(100, true)
 	tx := newTx(types.ZeroAddress, 1, 1)
 
 	t.Run("node is a validator", func(t *testing.T) {
@@ -1435,7 +1435,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare()
+	pool.Prepare(0)
 	tx := pool.Peek()
 	pool.Pop(tx)
 
@@ -1463,7 +1463,7 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare()
+	pool.Prepare(0)
 	tx := pool.Peek()
 	pool.Drop(tx)
 
@@ -1496,7 +1496,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
-		pool.Prepare()
+		pool.Prepare(0)
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -1532,7 +1532,7 @@ func TestDemote(t *testing.T) {
 		pool.accounts.get(addr1).demotions = maxAccountDemotions
 
 		// call demote
-		pool.Prepare()
+		pool.Prepare(0)
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -1684,14 +1684,10 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 	})
 }
 
-// TestPermissionSmartContractDeployment tests sending deployment tx with deployment whitelist
-func TestPermissionSmartContractDeployment(t *testing.T) {
+func Test_TxPool_validateTx(t *testing.T) {
 	t.Parallel()
 
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(100))
-
-	poolSigner := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
-
+	signer := crypto.NewEIP155Signer(100, true)
 	// Generate a private key and address
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
@@ -1707,7 +1703,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 	}
 
 	signTx := func(transaction *types.Transaction) *types.Transaction {
-		signedTx, signErr := poolSigner.SignTx(transaction, defaultKey)
+		signedTx, signErr := signer.SignTx(transaction, defaultKey)
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
 		}
@@ -1715,42 +1711,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		return signedTx
 	}
 
-	t.Run("contract deployment whitelist empty, anyone can deploy", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.NoError(t, pool.validateTx(signTx(tx)))
-	})
-	t.Run("Addresses inside whitelist can deploy smart contract", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-		pool.deploymentWhitelist.add(addr1)
-		pool.deploymentWhitelist.add(defaultAddr)
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.NoError(t, pool.validateTx(signTx(tx)))
-	})
-	t.Run("Addresses outside whitelist can not deploy smart contract", func(t *testing.T) {
-		t.Parallel()
-		pool := setupPool()
-		pool.deploymentWhitelist.add(addr1)
-		pool.deploymentWhitelist.add(addr2)
-
-		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-
-		assert.ErrorIs(t,
-			pool.validateTx(signTx(tx)),
-			ErrSmartContractRestricted,
-		)
-	})
-
-	t.Run("Input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
+	t.Run("tx input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.EIP158 = true
@@ -1769,7 +1730,7 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		)
 	})
 
-	t.Run("Input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
+	t.Run("tx input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
 		pool.forks.EIP158 = true
@@ -1785,6 +1746,131 @@ func TestPermissionSmartContractDeployment(t *testing.T) {
 		assert.NoError(t,
 			pool.validateTx(signTx(tx)),
 			runtime.ErrMaxCodeSizeExceeded,
+		)
+	})
+
+	t.Run("transaction with eip-1559 fields can pass", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(1100)
+		tx.GasTipCap = big.NewInt(10)
+
+		assert.NoError(t, pool.validateTx(signTx(tx)))
+	})
+
+	t.Run("eip-1559 tx (gas fee cap less than base fee)", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(100)
+		tx.GasTipCap = big.NewInt(10)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrUnderpriced,
+		)
+	})
+
+	t.Run("eip-1559 tx (gas fee cap less than tip cap)", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(10000)
+		tx.GasTipCap = big.NewInt(100000)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrTipAboveFeeCap,
+		)
+	})
+
+	t.Run("eip-1559 tx (gas fee cap and/or gas tip cap undefined)", func(t *testing.T) {
+		t.Parallel()
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		// undefined gas tip cap
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(10000)
+
+		signedTx := signTx(tx)
+		signedTx.GasTipCap = nil
+
+		assert.ErrorIs(t,
+			pool.validateTx(signedTx),
+			ErrUnderpriced,
+		)
+
+		// undefined gas fee cap
+		tx = newTx(defaultAddr, 1, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasTipCap = big.NewInt(1000)
+		signedTx = signTx(tx)
+		signedTx.GasFeeCap = nil
+
+		assert.ErrorIs(t,
+			pool.validateTx(signedTx),
+			ErrUnderpriced,
+		)
+	})
+
+	t.Run("eip-1559 tx (gas fee cap and gas tip cap very high)", func(t *testing.T) {
+		t.Parallel()
+
+		bitLength := 512
+
+		pool := setupPool()
+		pool.baseFee = 1000
+
+		// very high gas fee cap
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrFeeCapVeryHigh,
+		)
+
+		// very high gas tip cap
+		tx = newTx(defaultAddr, 1, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasTipCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrTipVeryHigh,
+		)
+	})
+
+	t.Run("eip-1559 tx placed without eip-1559 fork enabled", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.London = false
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.GasFeeCap = big.NewInt(10000)
+		tx.GasTipCap = big.NewInt(100000)
+
+		assert.ErrorIs(t,
+			pool.validateTx(signTx(tx)),
+			ErrInvalidTxType,
 		)
 	})
 }
@@ -1842,7 +1928,7 @@ func (e *eoa) signTx(t *testing.T, tx *types.Transaction, signer crypto.TxSigner
 	return signedTx
 }
 
-var signerEIP155 = crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100)
+var signerEIP155 = crypto.NewEIP155Signer(100, true)
 
 func TestResetAccounts_Promoted(t *testing.T) {
 	t.Parallel()
@@ -2493,7 +2579,7 @@ func TestRecovery(t *testing.T) {
 			assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
 
 			func() {
-				pool.Prepare()
+				pool.Prepare(0)
 				for {
 					tx := pool.Peek()
 					if tx == nil {
@@ -2788,9 +2874,9 @@ func TestSetSealing(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Set initial value
-			pool.sealing = 0
+			pool.sealing.Store(false)
 			if test.initialValue {
-				pool.sealing = 1
+				pool.sealing.Store(true)
 			}
 
 			// call the target
@@ -2800,7 +2886,7 @@ func TestSetSealing(t *testing.T) {
 			assert.Equal(
 				t,
 				test.expectedValue,
-				pool.getSealing(),
+				pool.sealing.Load(),
 			)
 		})
 	}

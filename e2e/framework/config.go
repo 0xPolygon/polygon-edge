@@ -50,17 +50,19 @@ type TestServerConfig struct {
 	EpochSize               uint64                   // The epoch size in blocks for the IBFT layer
 	BlockGasLimit           uint64                   // Block gas limit
 	BlockGasTarget          uint64                   // Gas target for new blocks
+	BaseFee                 uint64                   // Initial base fee
 	ShowsLog                bool                     // Flag specifying if logs are shown
 	Name                    string                   // Name of the server
 	SaveLogs                bool                     // Flag specifying if logs are saved
 	LogsDir                 string                   // Directory where logs are saved
 	IsPos                   bool                     // Specifies the mechanism used for IBFT (PoA / PoS)
-	Signer                  *crypto.EIP155Signer     // Signer used for transactions
+	Signer                  crypto.TxSigner          // Signer used for transactions
 	MinValidatorCount       uint64                   // Min validator count
 	MaxValidatorCount       uint64                   // Max validator count
 	BlockTime               uint64                   // Minimum block generation time (in s)
 	IBFTBaseTimeout         uint64                   // Base Timeout in seconds for IBFT
 	PredeployParams         *PredeployParams
+	BurnContracts           map[uint64]types.Address
 }
 
 func (t *TestServerConfig) SetPredeployParams(params *PredeployParams) {
@@ -77,7 +79,7 @@ func (t *TestServerConfig) DataDir() string {
 	}
 }
 
-func (t *TestServerConfig) SetSigner(signer *crypto.EIP155Signer) {
+func (t *TestServerConfig) SetSigner(signer crypto.TxSigner) {
 	t.Signer = signer
 }
 
@@ -116,6 +118,15 @@ func (t *TestServerConfig) PremineValidatorBalance(balance *big.Int) {
 // SetBlockGasTarget sets the gas target for the test server
 func (t *TestServerConfig) SetBlockGasTarget(target uint64) {
 	t.BlockGasTarget = target
+}
+
+// SetBurnContract sets the given burn contract for the test server
+func (t *TestServerConfig) SetBurnContract(block uint64, address types.Address) {
+	if t.BurnContracts == nil {
+		t.BurnContracts = map[uint64]types.Address{}
+	}
+
+	t.BurnContracts[block] = address
 }
 
 // SetConsensus callback sets consensus

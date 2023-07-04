@@ -907,6 +907,16 @@ func opGasLimit(c *state) {
 	c.push1().SetInt64(c.host.GetTxContext().GasLimit)
 }
 
+func opBaseFee(c *state) {
+	if !c.config.London {
+		c.exit(errOpCodeNotFound)
+
+		return
+	}
+
+	c.push(c.host.GetTxContext().BaseFee)
+}
+
 func opSelfDestruct(c *state) {
 	if c.inStaticCall() {
 		c.exit(errWriteProtection)
@@ -984,7 +994,7 @@ func opPush(n int) instruction {
 func opDup(n int) instruction {
 	return func(c *state) {
 		if !c.stackAtLeast(n) {
-			c.exit(errStackUnderflow)
+			c.exit(&runtime.StackUnderflowError{StackLen: c.sp, Required: n})
 		} else {
 			val := c.peekAt(n)
 			c.push1().Set(val)
@@ -995,7 +1005,7 @@ func opDup(n int) instruction {
 func opSwap(n int) instruction {
 	return func(c *state) {
 		if !c.stackAtLeast(n + 1) {
-			c.exit(errStackUnderflow)
+			c.exit(&runtime.StackUnderflowError{StackLen: c.sp, Required: n + 1})
 		} else {
 			c.swap(n)
 		}
@@ -1013,7 +1023,7 @@ func opLog(size int) instruction {
 		}
 
 		if !c.stackAtLeast(2 + size) {
-			c.exit(errStackUnderflow)
+			c.exit(&runtime.StackUnderflowError{StackLen: c.sp, Required: 2 + size})
 
 			return
 		}
@@ -1091,7 +1101,9 @@ func opCreate(op OpCode) instruction {
 		v := c.push1()
 		if op == CREATE && c.config.Homestead && errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
 			v.Set(zero)
-		} else if result.Failed() && !errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
+		} else if op == CREATE && result.Failed() && !errors.Is(result.Err, runtime.ErrCodeStoreOutOfGas) {
+			v.Set(zero)
+		} else if op == CREATE2 && result.Failed() {
 			v.Set(zero)
 		} else {
 			v.SetBytes(contract.Address.Bytes())

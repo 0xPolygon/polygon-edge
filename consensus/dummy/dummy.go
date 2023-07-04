@@ -61,7 +61,7 @@ func (d *Dummy) GetBlockCreator(header *types.Header) (types.Address, error) {
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (d *Dummy) PreCommitState(_header *types.Header, _txn *state.Transition) error {
+func (d *Dummy) PreCommitState(_ *types.Block, _ *state.Transition) error {
 	return nil
 }
 
@@ -77,6 +77,10 @@ func (d *Dummy) Close() error {
 
 func (d *Dummy) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
+}
+
+func (d *Dummy) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
 }
 
 func (d *Dummy) run() {

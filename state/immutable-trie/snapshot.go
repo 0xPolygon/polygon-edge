@@ -100,11 +100,8 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, *types.Trace, [
 	tt := s.trie.Txn(s.state.storage)
 	tt.batch = batch
 
-	arena := accountArenaPool.Get()
-	defer accountArenaPool.Put(arena)
-
-	ar1 := stateArenaPool.Get()
-	defer stateArenaPool.Put(ar1)
+	arena := stateArenaPool.Get()
+	defer stateArenaPool.Put(arena)
 
 	for _, obj := range objs {
 		if obj.Deleted {
@@ -131,7 +128,7 @@ func (s *Snapshot) Commit(objs []*state.Object) (state.Snapshot, *types.Trace, [
 					if entry.Deleted {
 						localTxn.Delete(k)
 					} else {
-						vv := ar1.NewBytes(bytes.TrimLeft(entry.Val, "\x00"))
+						vv := arena.NewBytes(bytes.TrimLeft(entry.Val, "\x00"))
 						localTxn.Insert(k, vv.MarshalTo(nil))
 					}
 				}

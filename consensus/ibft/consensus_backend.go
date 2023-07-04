@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"path/filepath"
 	"time"
 
@@ -142,39 +143,21 @@ func (i *backendIBFT) MaximumFaultyNodes() uint64 {
 	return uint64(CalcMaxFaultyNodes(i.currentValidators))
 }
 
-func (i *backendIBFT) HasQuorum(
-	blockNumber uint64,
-	messages []*proto.Message,
-	msgType proto.MessageType,
-) bool {
-	validators, err := i.forkManager.GetValidators(blockNumber)
+// DISCLAIMER: IBFT will be deprecated so we set 1 as a voting power to all validators
+func (i *backendIBFT) GetVotingPowers(height uint64) (map[string]*big.Int, error) {
+	validators, err := i.forkManager.GetValidators(height)
 	if err != nil {
-		i.logger.Error(
-			"failed to get validators when calculation quorum",
-			"height", blockNumber,
-			"err", err,
-		)
-
-		return false
+		return nil, err
 	}
 
-	quorum := i.quorumSize(blockNumber)(validators)
+	result := make(map[string]*big.Int, validators.Len())
 
-	switch msgType {
-	case proto.MessageType_PREPREPARE:
-		return len(messages) > 0
-	case proto.MessageType_PREPARE:
-		// two cases -> first message is MessageType_PREPREPARE, and other -> MessageType_PREPREPARE is not included
-		if len(messages) > 0 && messages[0].Type == proto.MessageType_PREPREPARE {
-			return len(messages) >= quorum
-		}
-
-		return len(messages) >= quorum-1
-	case proto.MessageType_COMMIT, proto.MessageType_ROUND_CHANGE:
-		return len(messages) >= quorum
-	default:
-		return false
+	for index := 0; index < validators.Len(); index++ {
+		strAddress := types.AddressToString(validators.At(uint64(index)).Addr())
+		result[strAddress] = big.NewInt(1) // set 1 as voting power to everyone
 	}
+
+	return result, nil
 }
 
 // buildBlock builds the block, based on the passed in snapshot and parent header
@@ -197,6 +180,9 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// calculate base fee
+	baseFee := i.blockchain.CalculateBaseFee(parent)
 
 	header.GasLimit = gasLimit
 
@@ -226,16 +212,23 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 
 	txs := i.writeTransactions(
 		writeCtx,
+		baseFee,
 		gasLimit,
 		header.Number,
 		transition,
 	)
 
-	if err := i.PreCommitState(header, transition); err != nil {
+	// provide dummy block instance to the PreCommitState
+	// (for the IBFT consensus, it is correct to have just a header, as only it is used)
+	if err := i.PreCommitState(&types.Block{Header: header}, transition); err != nil {
 		return nil, err
 	}
 
-	_, trace, root := transition.Commit()
+	_, trace, root, err := transition.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
+	}
+
 	trace.ParentStateRoot = parent.StateRoot
 
 	// write the trace
@@ -318,11 +311,11 @@ type txExeResult struct {
 
 type transitionInterface interface {
 	Write(txn *types.Transaction) error
-	WriteFailedReceipt(txn *types.Transaction) error
 }
 
 func (i *backendIBFT) writeTransactions(
 	writeCtx context.Context,
+	baseFee,
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
@@ -349,7 +342,7 @@ func (i *backendIBFT) writeTransactions(
 		)
 	}()
 
-	i.txpool.Prepare()
+	i.txpool.Prepare(baseFee)
 
 write:
 	for {
@@ -397,17 +390,8 @@ func (i *backendIBFT) writeTransaction(
 		return nil, false
 	}
 
-	if tx.ExceedsBlockGasLimit(gasLimit) {
+	if tx.Gas > gasLimit {
 		i.txpool.Drop(tx)
-
-		if err := transition.WriteFailedReceipt(tx); err != nil {
-			i.logger.Error(
-				fmt.Sprintf(
-					"unable to write failed receipt for transaction %s",
-					tx.Hash,
-				),
-			)
-		}
 
 		// continue processing
 		return &txExeResult{tx, fail}, true

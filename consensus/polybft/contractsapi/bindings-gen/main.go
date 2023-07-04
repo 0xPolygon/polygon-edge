@@ -29,14 +29,16 @@ type generatedData struct {
 
 func main() {
 	cases := []struct {
-		contractName string
-		artifact     *artifact.Artifact
-		functions    []string
-		events       []string
+		contractName        string
+		artifact            *artifact.Artifact
+		generateConstructor bool
+		functions           []string
+		events              []string
 	}{
 		{
 			"StateReceiver",
 			gensc.StateReceiver,
+			false,
 			[]string{
 				"commit",
 				"execute",
@@ -47,27 +49,9 @@ func main() {
 			},
 		},
 		{
-			"ChildValidatorSet",
-			gensc.ChildValidatorSet,
-			[]string{
-				"commitEpoch",
-				"initialize",
-				"addToWhitelist",
-				"register",
-			},
-			[]string{
-				"NewValidator",
-				"Staked",
-				"Delegated",
-				"Unstaked",
-				"Undelegated",
-				"AddedToWhitelist",
-				"Withdrawal",
-			},
-		},
-		{
 			"StateSender",
 			gensc.StateSender,
+			false,
 			[]string{
 				"syncState",
 			},
@@ -78,6 +62,7 @@ func main() {
 		{
 			"L2StateSender",
 			gensc.L2StateSender,
+			false,
 			[]string{},
 			[]string{
 				"L2StateSynced",
@@ -86,6 +71,7 @@ func main() {
 		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
+			false,
 			[]string{
 				"submit",
 				"initialize",
@@ -96,7 +82,9 @@ func main() {
 		{
 			"ExitHelper",
 			gensc.ExitHelper,
+			false,
 			[]string{
+				"initialize",
 				"exit",
 			},
 			[]string{},
@@ -104,6 +92,7 @@ func main() {
 		{
 			"ChildERC20Predicate",
 			gensc.ChildERC20Predicate,
+			false,
 			[]string{
 				"initialize",
 				"withdrawTo",
@@ -111,8 +100,37 @@ func main() {
 			[]string{},
 		},
 		{
+			"ChildERC20PredicateACL",
+			gensc.ChildERC20PredicateACL,
+			false,
+			[]string{
+				"initialize",
+				"withdrawTo",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC20Predicate",
+			gensc.RootMintableERC20Predicate,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC20PredicateACL",
+			gensc.RootMintableERC20PredicateACL,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
 			"NativeERC20",
 			gensc.NativeERC20,
+			false,
 			[]string{
 				"initialize",
 			},
@@ -121,6 +139,7 @@ func main() {
 		{
 			"NativeERC20Mintable",
 			gensc.NativeERC20Mintable,
+			false,
 			[]string{
 				"initialize",
 			},
@@ -129,18 +148,258 @@ func main() {
 		{
 			"RootERC20Predicate",
 			gensc.RootERC20Predicate,
+			false,
 			[]string{
 				"initialize",
 				"depositTo",
 			},
-			[]string{},
+			[]string{
+				"TokenMapped",
+			},
+		},
+		{
+			"ChildMintableERC20Predicate",
+			gensc.ChildMintableERC20Predicate,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{
+				"MintableTokenMapped",
+			},
 		},
 		{
 			"RootERC20",
 			gensc.RootERC20,
+			false,
 			[]string{
+				"balanceOf",
 				"approve",
 				"mint",
+			},
+			[]string{},
+		},
+		{
+			"RootERC1155Predicate",
+			gensc.RootERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildMintableERC1155Predicate",
+			gensc.ChildMintableERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootERC1155",
+			gensc.RootERC1155,
+			false,
+			[]string{
+				"setApprovalForAll",
+				"mintBatch",
+				"balanceOf",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC1155Predicate",
+			gensc.ChildERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC1155PredicateACL",
+			gensc.ChildERC1155PredicateACL,
+			false,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC1155Predicate",
+			gensc.RootMintableERC1155Predicate,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC1155PredicateACL",
+			gensc.RootMintableERC1155PredicateACL,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{
+				"L2MintableTokenMapped",
+			},
+		},
+		{
+			"ChildERC1155",
+			gensc.ChildERC1155,
+			false,
+			[]string{
+				"initialize",
+				"balanceOf",
+			},
+			[]string{},
+		},
+		{
+			"RootERC721Predicate",
+			gensc.RootERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+				"depositBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildMintableERC721Predicate",
+			gensc.ChildMintableERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootERC721",
+			gensc.RootERC721,
+			false,
+			[]string{
+				"setApprovalForAll",
+				"mint",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC721Predicate",
+			gensc.ChildERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC721PredicateACL",
+			gensc.ChildERC721PredicateACL,
+			false,
+			[]string{
+				"initialize",
+				"withdrawBatch",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC721Predicate",
+			gensc.RootMintableERC721Predicate,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"RootMintableERC721PredicateACL",
+			gensc.RootMintableERC721PredicateACL,
+			false,
+			[]string{
+				"initialize",
+			},
+			[]string{},
+		},
+		{
+			"ChildERC721",
+			gensc.ChildERC721,
+			false,
+			[]string{
+				"initialize",
+				"ownerOf",
+			},
+			[]string{},
+		},
+		{
+			"CustomSupernetManager",
+			gensc.CustomSupernetManager,
+			false,
+			[]string{
+				"initialize",
+				"whitelistValidators",
+				"register",
+				"getValidator",
+			},
+			[]string{
+				"ValidatorRegistered",
+				"AddedToWhitelist",
+			},
+		},
+		{
+			"StakeManager",
+			gensc.StakeManager,
+			false,
+			[]string{
+				"initialize",
+				"registerChildChain",
+				"stakeFor",
+				"releaseStakeOf",
+				"withdrawStake",
+				"stakeOf",
+			},
+			[]string{
+				"ChildManagerRegistered",
+				"StakeAdded",
+				"StakeWithdrawn",
+			},
+		},
+		{
+			"ValidatorSet",
+			gensc.ValidatorSet,
+			false,
+			[]string{
+				"commitEpoch",
+				"unstake",
+				"initialize",
+			},
+			[]string{
+				"Transfer",
+				"WithdrawalRegistered",
+				"Withdrawal",
+			},
+		},
+		{
+			"RewardPool",
+			gensc.RewardPool,
+			false,
+			[]string{
+				"initialize",
+				"distributeRewardFor",
+			},
+			[]string{},
+		},
+		{
+			"EIP1559Burn",
+			gensc.EIP1559Burn,
+			false,
+			[]string{
+				"initialize",
 			},
 			[]string{},
 		},
@@ -149,6 +408,12 @@ func main() {
 	generatedData := &generatedData{}
 
 	for _, c := range cases {
+		if c.generateConstructor {
+			if err := generateConstructor(generatedData, c.contractName, c.artifact.Abi.Constructor); err != nil {
+				log.Fatal(err)
+			}
+		}
+
 		for _, method := range c.functions {
 			if err := generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method]); err != nil {
 				log.Fatal(err)
@@ -364,6 +629,52 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
 		"Name":         event.Name,
 		"TName":        strings.Title(name),
 		"ContractName": contractName,
+	}
+
+	renderedString, err := renderTmpl(tmplStr, inputs)
+	if err != nil {
+		return err
+	}
+
+	generatedData.resultString = append(generatedData.resultString, renderedString)
+
+	return nil
+}
+
+// generateConstruct generates stubs for a smart contract constructor
+func generateConstructor(generatedData *generatedData,
+	contractName string, constructor *abi.Method) error {
+	methodName := fmt.Sprintf(functionNameFormat, strings.Title(contractName+"Constructor"))
+	res := []string{}
+
+	_, err := generateType(generatedData, methodName, constructor.Inputs, &res)
+	if err != nil {
+		return err
+	}
+
+	// write encode/decode functions
+	tmplStr := `
+{{range .Structs}}
+	{{.}}
+{{ end }}
+
+func ({{.Sig}} *{{.TName}}) Sig() []byte {
+	return {{.ContractName}}.Abi.Constructor.ID()
+}
+
+func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+	return {{.ContractName}}.Abi.Constructor.Inputs.Encode({{.Sig}})
+}
+
+func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+	return decodeMethod({{.ContractName}}.Abi.Constructor, buf, {{.Sig}})
+}`
+
+	inputs := map[string]interface{}{
+		"Structs":      res,
+		"Sig":          strings.ToLower(string(methodName[0])),
+		"ContractName": contractName,
+		"TName":        strings.Title(methodName),
 	}
 
 	renderedString, err := renderTmpl(tmplStr, inputs)

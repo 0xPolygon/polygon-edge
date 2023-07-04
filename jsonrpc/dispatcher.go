@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -56,6 +59,10 @@ type dispatcherParams struct {
 	priceLimit              uint64
 	jsonRPCBatchLengthLimit uint64
 	blockRangeLimit         uint64
+}
+
+func (dp dispatcherParams) isExceedingBatchLengthLimit(value uint64) bool {
+	return dp.jsonRPCBatchLengthLimit != 0 && value > dp.jsonRPCBatchLengthLimit
 }
 
 func newDispatcher(
@@ -161,22 +168,23 @@ type wsConn interface {
 
 // as per https://www.jsonrpc.org/specification, the `id` in JSON-RPC 2.0
 // can only be a string or a non-decimal integer
-func formatFilterResponse(id interface{}, resp string) (string, Error) {
+func formatID(id interface{}) (interface{}, Error) {
 	switch t := id.(type) {
 	case string:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","id":"%s","result":"%s"}`, t, resp), nil
+		return t, nil
 	case float64:
 		if t == math.Trunc(t) {
-			return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":"%s"}`, int(t), resp), nil
+			return int(t), nil
 		} else {
 			return "", NewInvalidRequestError("Invalid json request")
 		}
 	case nil:
-		return fmt.Sprintf(`{"jsonrpc":"2.0","id":null,"result":"%s"}`, resp), nil
+		return nil, nil
 	default:
 		return "", NewInvalidRequestError("Invalid json request")
 	}
 }
+
 func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 	var params []interface{}
 	if err := json.Unmarshal(req.Params, &params); err != nil {
@@ -231,54 +239,90 @@ func (d *Dispatcher) RemoveFilterByWs(conn wsConn) {
 }
 
 func (d *Dispatcher) HandleWs(reqBody []byte, conn wsConn) ([]byte, error) {
+	const (
+		openSquareBracket  byte = '['
+		closeSquareBracket byte = ']'
+		comma              byte = ','
+	)
+
+	reqBody = bytes.TrimLeft(reqBody, " \t\r\n")
+
+	// if body begins with [ consider it as a batch request
+	if len(reqBody) > 0 && reqBody[0] == openSquareBracket {
+		var batchReq BatchRequest
+
+		err := json.Unmarshal(reqBody, &batchReq)
+		if err != nil {
+			return NewRPCResponse(nil, "2.0", nil,
+				NewInvalidRequestError("Invalid json batch request")).Bytes()
+		}
+
+		// if not disabled, avoid handling long batch requests
+		if d.params.isExceedingBatchLengthLimit(uint64(len(batchReq))) {
+			return NewRPCResponse(
+				nil,
+				"2.0",
+				nil,
+				NewInvalidRequestError("Batch request length too long"),
+			).Bytes()
+		}
+
+		responses := make([][]byte, len(batchReq))
+
+		for i, req := range batchReq {
+			responses[i], err = d.handleSingleWs(req, conn).Bytes()
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		var buf bytes.Buffer
+
+		// batch output should look like:
+		// [ { "requestId": "1", "status": 200 }, { "requestId": "2", "status": 200 } ]
+		buf.WriteByte(openSquareBracket)                // [
+		buf.Write(bytes.Join(responses, []byte{comma})) // join responses with the comma separator
+		buf.WriteByte(closeSquareBracket)               // ]
+
+		return buf.Bytes(), nil
+	}
+
 	var req Request
 	if err := json.Unmarshal(reqBody, &req); err != nil {
 		return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 	}
 
-	// if the request method is eth_subscribe we need to create a
-	// new filter with ws connection
-	if req.Method == "eth_subscribe" {
-		filterID, err := d.handleSubscribe(req, conn)
-		if err != nil {
-			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
-		}
+	return d.handleSingleWs(req, conn).Bytes()
+}
 
-		resp, err := formatFilterResponse(req.ID, filterID)
-
-		if err != nil {
-			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
-		}
-
-		return []byte(resp), nil
-	}
-
-	if req.Method == "eth_unsubscribe" {
-		ok, err := d.handleUnsubscribe(req)
-		if err != nil {
-			return nil, err
-		}
-
-		res := "false"
-		if ok {
-			res = "true"
-		}
-
-		resp, err := formatFilterResponse(req.ID, res)
-		if err != nil {
-			return NewRPCResponse(req.ID, "2.0", nil, err).Bytes()
-		}
-
-		return []byte(resp), nil
-	}
-
-	// its a normal query that we handle with the dispatcher
-	resp, err := d.handleReq(req)
+func (d *Dispatcher) handleSingleWs(req Request, conn wsConn) Response {
+	id, err := formatID(req.ID)
 	if err != nil {
-		return nil, err
+		return NewRPCResponse(nil, "2.0", nil, err)
 	}
 
-	return NewRPCResponse(req.ID, "2.0", resp, err).Bytes()
+	var response []byte
+
+	switch req.Method {
+	case "eth_subscribe":
+		var filterID string
+
+		// if the request method is eth_subscribe we need to create a new filter with ws connection
+		if filterID, err = d.handleSubscribe(req, conn); err == nil {
+			response = []byte(fmt.Sprintf("\"%s\"", filterID))
+		}
+	case "eth_unsubscribe":
+		var ok bool
+
+		if ok, err = d.handleUnsubscribe(req); err == nil {
+			response = []byte(strconv.FormatBool(ok))
+		}
+	default:
+		// its a normal query that we handle with the dispatcher
+		response, err = d.handleReq(req)
+	}
+
+	return NewRPCResponse(id, "2.0", response, err)
 }
 
 func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
@@ -303,7 +347,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	}
 
 	// handle batch requests
-	var requests []Request
+	var requests BatchRequest
 	if err := json.Unmarshal(reqBody, &requests); err != nil {
 		return NewRPCResponse(
 			nil,
@@ -314,7 +358,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	}
 
 	// if not disabled, avoid handling long batch requests
-	if d.params.jsonRPCBatchLengthLimit != 0 && len(requests) > int(d.params.jsonRPCBatchLengthLimit) {
+	if d.params.isExceedingBatchLengthLimit(uint64(len(requests))) {
 		return NewRPCResponse(
 			nil,
 			"2.0",
@@ -328,7 +372,7 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 	for _, req := range requests {
 		var response, err = d.handleReq(req)
 		if err != nil {
-			errorResponse := NewRPCResponse(req.ID, "2.0", nil, err)
+			errorResponse := NewRPCResponse(req.ID, "2.0", response, err)
 			responses = append(responses, errorResponse)
 
 			continue
@@ -371,17 +415,32 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 		}
 	}
 
-	output := fd.fv.Call(inArgs)
-	if err := getError(output[1]); err != nil {
-		d.logInternalError(req.Method, err)
-
-		return nil, NewInvalidRequestError(err.Error())
-	}
-
 	var (
 		data []byte
 		err  error
+		ok   bool
 	)
+
+	start := time.Now().UTC()
+	output := fd.fv.Call(inArgs) // call rpc endpoint function
+	// measure execution time of rpc endpoint function
+	metrics.SetGauge([]string{jsonRPCMetric, req.Method + "_time"}, float32(time.Now().UTC().Sub(start).Seconds()))
+
+	if err := getError(output[1]); err != nil {
+		// measure error on the rpc endpoint function
+		metrics.IncrCounter([]string{jsonRPCMetric, req.Method + "_errors"}, 1)
+		d.logInternalError(req.Method, err)
+
+		if res := output[0].Interface(); res != nil {
+			data, ok = res.([]byte)
+
+			if !ok {
+				return nil, NewInternalError(err.Error())
+			}
+		}
+
+		return data, NewInvalidRequestError(err.Error())
+	}
 
 	if res := output[0].Interface(); res != nil {
 		data, err = json.Marshal(res)
@@ -396,7 +455,7 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 }
 
 func (d *Dispatcher) logInternalError(method string, err error) {
-	d.logger.Error("failed to dispatch", "method", method, "err", err)
+	d.logger.Warn("failed to dispatch", "method", method, "err", err)
 }
 
 func (d *Dispatcher) registerService(serviceName string, service interface{}) error {

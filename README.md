@@ -1,9 +1,9 @@
 
 ![Banner](.github/banner.jpg)
 
-## Update: Edge v0.8 is here!  
+## Update: Edge v1.0.0 is here!  
 
-Developers at Polygon Labs have been hard at work gathering and incorporating community feedback into the Edge client and a new version of Edge, v0.8, is here with several new features! Check out the Release Notes included with the release to find out more! 
+Developers at Polygon Labs have been hard at work gathering and incorporating community feedback into the Edge client and a new version of Edge, v1.0.0, is here with several new features! Check out the Release Notes included with the release to find out more! 
 
 ## Polygon Edge
 

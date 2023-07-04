@@ -1,6 +1,9 @@
 package polybft
 
-import "github.com/0xPolygon/polygon-edge/types"
+import (
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/types"
+)
 
 type PostBlockRequest struct {
 	// FullBlock is a reference of the executed block
@@ -23,5 +26,5 @@ type PostEpochRequest struct {
 	SystemState SystemState
 
 	// ValidatorSet is the validator set for the new epoch
-	ValidatorSet *validatorSet
+	ValidatorSet validator.ValidatorSet
 }

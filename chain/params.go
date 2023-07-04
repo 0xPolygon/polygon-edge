@@ -1,9 +1,16 @@
 package chain
 
 import (
-	"math/big"
+	"errors"
+	"sort"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
+)
+
+var (
+	// ErrBurnContractAddressMissing is the error when a contract address is not provided
+	ErrBurnContractAddressMissing = errors.New("burn contract address missing")
 )
 
 // Params are all the set of params for the chain
@@ -11,19 +18,53 @@ type Params struct {
 	Forks          *Forks                 `json:"forks"`
 	ChainID        int64                  `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
-	Whitelists     *Whitelists            `json:"whitelists,omitempty"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
-	// AllowList configuration
-	ContractDeployerAllowList *AllowListConfig `json:"contractDeployerAllowListConfig,omitempty"`
+	// Access control configuration
+	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
+	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
+	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
+	TransactionsBlockList     *AddressListConfig `json:"transactionsBlockList,omitempty"`
+	BridgeAllowList           *AddressListConfig `json:"bridgeAllowList,omitempty"`
+	BridgeBlockList           *AddressListConfig `json:"bridgeBlockList,omitempty"`
+
+	// Governance contract where the token will be sent to and burn in london fork
+	BurnContract map[uint64]types.Address `json:"burnContract"`
+	// Destination address to initialize default burn contract with
+	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
 }
 
-type AllowListConfig struct {
+type AddressListConfig struct {
 	// AdminAddresses is the list of the initial admin addresses
 	AdminAddresses []types.Address `json:"adminAddresses,omitempty"`
 
 	// EnabledAddresses is the list of the initial enabled addresses
 	EnabledAddresses []types.Address `json:"enabledAddresses,omitempty"`
+}
+
+// CalculateBurnContract calculates burn contract address for the given block number
+func (p *Params) CalculateBurnContract(block uint64) (types.Address, error) {
+	blocks := make([]uint64, 0, len(p.BurnContract))
+
+	for startBlock := range p.BurnContract {
+		blocks = append(blocks, startBlock)
+	}
+
+	if len(blocks) == 0 {
+		return types.ZeroAddress, ErrBurnContractAddressMissing
+	}
+
+	sort.Slice(blocks, func(i, j int) bool {
+		return blocks[i] < blocks[j]
+	})
+
+	for i := 0; i < len(blocks)-1; i++ {
+		if block >= blocks[i] && block < blocks[i+1] {
+			return p.BurnContract[blocks[i]], nil
+		}
+	}
+
+	return p.BurnContract[blocks[len(blocks)-1]], nil
 }
 
 func (p *Params) GetEngine() string {
@@ -35,94 +76,85 @@ func (p *Params) GetEngine() string {
 	return ""
 }
 
-// Whitelists specifies supported whitelists
-type Whitelists struct {
-	Deployment []types.Address `json:"deployment,omitempty"`
+// predefined forks
+const (
+	Homestead      = "homestead"
+	Byzantium      = "byzantium"
+	Constantinople = "constantinople"
+	Petersburg     = "petersburg"
+	Istanbul       = "istanbul"
+	London         = "london"
+	EIP150         = "EIP150"
+	EIP158         = "EIP158"
+	EIP155         = "EIP155"
+)
+
+// Forks is map which contains all forks and their starting blocks from genesis
+type Forks map[string]Fork
+
+// IsActive returns true if fork defined by name exists and defined for the block
+func (f *Forks) IsActive(name string, block uint64) bool {
+	ff, exists := (*f)[name]
+
+	return exists && ff.Active(block)
 }
 
-// Forks specifies when each fork is activated
-type Forks struct {
-	Homestead      *Fork `json:"homestead,omitempty"`
-	Byzantium      *Fork `json:"byzantium,omitempty"`
-	Constantinople *Fork `json:"constantinople,omitempty"`
-	Petersburg     *Fork `json:"petersburg,omitempty"`
-	Istanbul       *Fork `json:"istanbul,omitempty"`
-	London         *Fork `json:"london,omitempty"`
-	EIP150         *Fork `json:"EIP150,omitempty"`
-	EIP158         *Fork `json:"EIP158,omitempty"`
-	EIP155         *Fork `json:"EIP155,omitempty"`
+// SetFork adds/updates fork defined by name
+func (f *Forks) SetFork(name string, value Fork) {
+	(*f)[name] = value
 }
 
-func (f *Forks) active(ff *Fork, block uint64) bool {
-	if ff == nil {
-		return false
-	}
-
-	return ff.Active(block)
+func (f *Forks) RemoveFork(name string) {
+	delete(*f, name)
 }
 
-func (f *Forks) IsHomestead(block uint64) bool {
-	return f.active(f.Homestead, block)
-}
-
-func (f *Forks) IsByzantium(block uint64) bool {
-	return f.active(f.Byzantium, block)
-}
-
-func (f *Forks) IsConstantinople(block uint64) bool {
-	return f.active(f.Constantinople, block)
-}
-
-func (f *Forks) IsPetersburg(block uint64) bool {
-	return f.active(f.Petersburg, block)
-}
-
-func (f *Forks) IsLondon(block uint64) bool {
-	return f.active(f.London, block)
-}
-
-func (f *Forks) IsEIP150(block uint64) bool {
-	return f.active(f.EIP150, block)
-}
-
-func (f *Forks) IsEIP158(block uint64) bool {
-	return f.active(f.EIP158, block)
-}
-
-func (f *Forks) IsEIP155(block uint64) bool {
-	return f.active(f.EIP155, block)
-}
-
+// At returns ForksInTime instance that shows which supported forks are enabled for the block
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:      f.active(f.Homestead, block),
-		Byzantium:      f.active(f.Byzantium, block),
-		Constantinople: f.active(f.Constantinople, block),
-		Petersburg:     f.active(f.Petersburg, block),
-		Istanbul:       f.active(f.Istanbul, block),
-		London:         f.active(f.London, block),
-		EIP150:         f.active(f.EIP150, block),
-		EIP158:         f.active(f.EIP158, block),
-		EIP155:         f.active(f.EIP155, block),
+		Homestead:      f.IsActive(Homestead, block),
+		Byzantium:      f.IsActive(Byzantium, block),
+		Constantinople: f.IsActive(Constantinople, block),
+		Petersburg:     f.IsActive(Petersburg, block),
+		Istanbul:       f.IsActive(Istanbul, block),
+		London:         f.IsActive(London, block),
+		EIP150:         f.IsActive(EIP150, block),
+		EIP158:         f.IsActive(EIP158, block),
+		EIP155:         f.IsActive(EIP155, block),
 	}
 }
 
-type Fork uint64
+// ForkParams hard-coded fork params
+type ForkParams struct {
+	// MaxValidatorSetSize indicates the maximum size of validator set
+	MaxValidatorSetSize *uint64 `json:"maxValidatorSetSize,omitempty"`
 
-func NewFork(n uint64) *Fork {
-	f := Fork(n)
+	// EpochSize is size of epoch
+	EpochSize *uint64 `json:"epochSize,omitempty"`
 
-	return &f
+	// SprintSize is size of sprint
+	SprintSize *uint64 `json:"sprintSize,omitempty"`
+
+	// BlockTime is target frequency of blocks production
+	BlockTime *common.Duration `json:"blockTime,omitempty"`
+
+	// BlockTimeDrift defines the time slot in which a new block can be created
+	BlockTimeDrift *uint64 `json:"blockTimeDrift,omitempty"`
+}
+
+type Fork struct {
+	Block  uint64      `json:"block"`
+	Params *ForkParams `json:"params,omitempty"`
+}
+
+func NewFork(n uint64) Fork {
+	return Fork{Block: n}
 }
 
 func (f Fork) Active(block uint64) bool {
-	return block >= uint64(f)
+	return block >= f.Block
 }
 
-func (f Fork) Int() *big.Int {
-	return big.NewInt(int64(f))
-}
-
+// ForksInTime should contain all supported forks by current edge version
 type ForksInTime struct {
 	Homestead,
 	Byzantium,
@@ -135,6 +167,7 @@ type ForksInTime struct {
 	EIP155 bool
 }
 
+// AllForksEnabled should contain all supported forks by current edge version
 var AllForksEnabled = &Forks{
 	Homestead:      NewFork(0),
 	EIP150:         NewFork(0),

@@ -1,0 +1,31 @@
+---
+### This manually triggers the edge nightly build loadtest when pushed to jesse/nightly-loadtest-workflow
+
+name: Nightly DevNet Workflow (Manual)
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - jesse/fix-*
+  workflow_call: {}
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  devnet:
+    name: Build Devnet
+    uses: ./.github/workflows/deploy.nightly.devnet.yml
+    secrets:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+      TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
+      TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
+      SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
+      DD_API_KEY: ${{ secrets.DD_API_KEY }}
+      LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
+      VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
+    with:
+      environment: devnet

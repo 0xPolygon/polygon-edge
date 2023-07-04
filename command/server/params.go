@@ -33,7 +33,6 @@ const (
 	blockGasTargetFlag           = "block-gas-target"
 	secretsConfigFlag            = "secrets-config"
 	restoreFlag                  = "restore"
-	blockTimeFlag                = "block-time"
 	devIntervalFlag              = "dev-interval"
 	devFlag                      = "dev"
 	corsOriginFlag               = "access-control-allow-origins"
@@ -81,8 +80,6 @@ type serverParams struct {
 	blockGasTarget uint64
 	devInterval    uint64
 	isDevMode      bool
-
-	corsAllowedOrigins []string
 
 	ibftBaseTimeoutLegacy uint64
 
@@ -152,7 +149,7 @@ func (p *serverParams) generateConfig() *server.Config {
 		Chain: p.genesisConfig,
 		JSONRPC: &server.JSONRPC{
 			JSONRPCAddr:              p.jsonRPCAddress,
-			AccessControlAllowOrigin: p.corsAllowedOrigins,
+			AccessControlAllowOrigin: p.rawConfig.CorsAllowedOrigins,
 			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
 			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
 		},
@@ -179,7 +176,6 @@ func (p *serverParams) generateConfig() *server.Config {
 		MaxAccountEnqueued: p.rawConfig.TxPool.MaxAccountEnqueued,
 		SecretsManager:     p.secretsConfig,
 		RestoreFile:        p.getRestoreFilePath(),
-		BlockTime:          p.rawConfig.BlockTime,
 		LogLevel:           hclog.LevelFromString(p.rawConfig.LogLevel),
 		JSONLogFormat:      p.rawConfig.JSONLogFormat,
 		LogFilePath:        p.logFileLocation,

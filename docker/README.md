@@ -7,7 +7,7 @@
 ### `polybft` consensus
 When deploying with `polybft` consensus, there are some additional dependencies:
 * [npm](https://nodejs.org/en/)
-* [go 1.18.x](https://go.dev/dl/)
+* [go 1.20.x](https://go.dev/dl/)
 
 ## Local development
 Running `polygon-edge` local cluster with docker can be done very easily by using provided `scripts` folder
@@ -50,10 +50,10 @@ Primarily, the `--premine` parameter needs to be edited to include the accounts 
 
 ### Submodules
 Before deploying `polybft` environment, `core-contracts` submodule needs to be downloaded.  
-To do that simply run `make download-submodules`.
+To do that, simply run `make download-submodules`.
 
 ### Build times
-When building containers for the first time (or after purging docker build cache)
+When building containers for the first time (or after purging docker build cache),
 it might take a while to complete, depending on the hardware that the build operation is running on.
 
 ### Production

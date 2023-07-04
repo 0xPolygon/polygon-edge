@@ -218,6 +218,14 @@ func (h *Header) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 
 	h.SetNonce(nonce)
 
+	// basefee
+	// In order to be backward compatible, the len should be checked before accessing the element
+	if len(elems) > 15 {
+		if h.BaseFee, err = elems[15].GetUint64(); err != nil {
+			return err
+		}
+	}
+
 	// compute the hash after the decoding
 	h.ComputeHash()
 
@@ -376,30 +384,71 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	if len(elems) < 9 {
-		return fmt.Errorf("incorrect number of elements to decode transaction, expected 9 but found %d", len(elems))
+	getElem := func() *fastrlp.Value {
+		val := elems[0]
+		elems = elems[1:]
+
+		return val
+	}
+
+	var num int
+
+	switch t.Type {
+	case LegacyTx:
+		num = 9
+	case StateTx:
+		num = 10
+	case DynamicFeeTx:
+		num = 12
+	default:
+		return fmt.Errorf("transaction type %d not found", t.Type)
+	}
+
+	if numElems := len(elems); numElems != num {
+		return fmt.Errorf("incorrect number of transaction elements, expected %d but found %d", num, numElems)
 	}
 
 	p.Hash(t.Hash[:0], v)
 
+	// Skipping Chain ID field since we don't support it (yet)
+	// This is needed to be compatible with other EVM chains and have the same format.
+	// Since we don't have a chain ID, just skip it here.
+	if t.Type == DynamicFeeTx {
+		_ = getElem()
+	}
+
 	// nonce
-	if t.Nonce, err = elems[0].GetUint64(); err != nil {
+	if t.Nonce, err = getElem().GetUint64(); err != nil {
 		return err
 	}
 
-	// gasPrice
-	t.GasPrice = new(big.Int)
-	if err = elems[1].GetBigInt(t.GasPrice); err != nil {
-		return err
+	if t.Type == DynamicFeeTx {
+		// gasTipCap
+		t.GasTipCap = new(big.Int)
+		if err = getElem().GetBigInt(t.GasTipCap); err != nil {
+			return err
+		}
+
+		// gasFeeCap
+		t.GasFeeCap = new(big.Int)
+		if err = getElem().GetBigInt(t.GasFeeCap); err != nil {
+			return err
+		}
+	} else {
+		// gasPrice
+		t.GasPrice = new(big.Int)
+		if err = getElem().GetBigInt(t.GasPrice); err != nil {
+			return err
+		}
 	}
 
 	// gas
-	if t.Gas, err = elems[2].GetUint64(); err != nil {
+	if t.Gas, err = getElem().GetUint64(); err != nil {
 		return err
 	}
 
 	// to
-	if vv, _ := v.Get(3).Bytes(); len(vv) == 20 {
+	if vv, _ := getElem().Bytes(); len(vv) == 20 {
 		// address
 		addr := BytesToAddress(vv)
 		t.To = &addr
@@ -410,45 +459,48 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// value
 	t.Value = new(big.Int)
-	if err = elems[4].GetBigInt(t.Value); err != nil {
+	if err = getElem().GetBigInt(t.Value); err != nil {
 		return err
 	}
 
 	// input
-	if t.Input, err = elems[5].GetBytes(t.Input[:0]); err != nil {
+	if t.Input, err = getElem().GetBytes(t.Input[:0]); err != nil {
 		return err
+	}
+
+	// Skipping Access List field since we don't support it.
+	// This is needed to be compatible with other EVM chains and have the same format.
+	// Since we don't have access list, just skip it here.
+	if t.Type == DynamicFeeTx {
+		_ = getElem()
 	}
 
 	// V
 	t.V = new(big.Int)
-	if err = elems[6].GetBigInt(t.V); err != nil {
+	if err = getElem().GetBigInt(t.V); err != nil {
 		return err
 	}
 
 	// R
 	t.R = new(big.Int)
-	if err = elems[7].GetBigInt(t.R); err != nil {
+	if err = getElem().GetBigInt(t.R); err != nil {
 		return err
 	}
 
 	// S
 	t.S = new(big.Int)
-	if err = elems[8].GetBigInt(t.S); err != nil {
+	if err = getElem().GetBigInt(t.S); err != nil {
 		return err
 	}
 
 	if t.Type == StateTx {
-		// set From with default value
 		t.From = ZeroAddress
 
 		// We need to set From field for state transaction,
 		// because we are using unique, predefined address, for sending such transactions
-		// From
-		if len(elems) >= 10 {
-			if vv, err := v.Get(9).Bytes(); err == nil && len(vv) == AddressLength {
-				// address
-				t.From = BytesToAddress(vv)
-			}
+		if vv, err := getElem().Bytes(); err == nil && len(vv) == AddressLength {
+			// address
+			t.From = BytesToAddress(vv)
 		}
 	}
 

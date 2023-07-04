@@ -7,6 +7,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/grpc"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
@@ -64,6 +65,7 @@ func (s *syncPeerService) GetBlocks(
 		}
 
 		resp := toProtoBlock(block)
+		metrics.SetGauge([]string{syncerMetrics, "egress_bytes"}, float32(len(resp.Block)))
 
 		// if client closes stream, context.Canceled is given
 		if err := stream.Send(resp); err != nil {

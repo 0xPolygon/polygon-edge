@@ -123,6 +123,7 @@ func init() {
 	register(NUMBER, handler{opNumber, 0, 2})
 	register(DIFFICULTY, handler{opDifficulty, 0, 2})
 	register(GASLIMIT, handler{opGasLimit, 0, 2})
+	register(BASEFEE, handler{opBaseFee, 0, 2})
 
 	register(SELFDESTRUCT, handler{opSelfDestruct, 1, 0})
 

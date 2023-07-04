@@ -115,10 +115,10 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (d *Dev) writeTransactions(baseFee, gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
-	d.txpool.Prepare()
+	d.txpool.Prepare(baseFee)
 
 	for {
 		tx := d.txpool.Peek()
@@ -126,7 +126,7 @@ func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface)
 			break
 		}
 
-		if tx.ExceedsBlockGasLimit(gasLimit) {
+		if tx.Gas > gasLimit {
 			d.txpool.Drop(tx)
 
 			continue
@@ -173,7 +173,10 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
+	baseFee := d.blockchain.CalculateBaseFee(parent)
+
 	header.GasLimit = gasLimit
+	header.BaseFee = baseFee
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
@@ -186,10 +189,14 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	txns := d.writeTransactions(gasLimit, transition)
+	txns := d.writeTransactions(baseFee, gasLimit, transition)
 
 	// Commit the changes
-	_, trace, root := transition.Commit()
+	_, trace, root, err := transition.Commit()
+	if err != nil {
+		return fmt.Errorf("failed to commit the state changes: %w", err)
+	}
+
 	trace.ParentStateRoot = parent.StateRoot
 
 	// write the trace
@@ -249,7 +256,7 @@ func (d *Dev) GetBlockCreator(header *types.Header) (types.Address, error) {
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (d *Dev) PreCommitState(_header *types.Header, _txn *state.Transition) error {
+func (d *Dev) PreCommitState(_ *types.Block, _ *state.Transition) error {
 	return nil
 }
 
@@ -265,4 +272,8 @@ func (d *Dev) Close() error {
 
 func (d *Dev) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
+}
+
+func (d *Dev) FilterExtra(extra []byte) ([]byte, error) {
+	return extra, nil
 }

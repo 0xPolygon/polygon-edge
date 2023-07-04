@@ -13,42 +13,63 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/require"
+)
+
+// Currently used test cases suite version is v10.4.
+// It does not include Merge hardfork test cases.
+
+const (
+	stateTests         = "tests/GeneralStateTests"
+	legacyStateTests   = "tests/LegacyTests/Constantinople/GeneralStateTests"
+	testGenesisBaseFee = 0x0a
 )
 
 var (
-	stateTests       = "GeneralStateTests"
-	legacyStateTests = "LegacyTests/Constantinople/GeneralStateTests"
+	ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
 )
 
-type stateCase struct {
-	Info        *info                                   `json:"_info"`
-	Env         *env                                    `json:"env"`
-	Pre         map[types.Address]*chain.GenesisAccount `json:"pre"`
-	Post        map[string]postState                    `json:"post"`
-	Transaction *stTransaction                          `json:"transaction"`
-}
-
-var ripemd = types.StringToAddress("0000000000000000000000000000000000000003")
-
-func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, index int, p postEntry) {
+func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, index int, p postEntry) {
 	t.Helper()
 
 	config, ok := Forks[fork]
 	if !ok {
-		t.Fatalf("config %s not found", fork)
+		t.Skipf("%s fork is not supported", fork)
+
+		return
 	}
 
 	env := c.Env.ToEnv(t)
 
-	msg, err := c.Transaction.At(p.Indexes)
-	if err != nil {
-		t.Fatal(err)
+	var baseFee *big.Int
+
+	if config.IsActive(chain.London, 0) {
+		if c.Env.BaseFee != "" {
+			baseFee = stringToBigIntT(t, c.Env.BaseFee)
+		} else {
+			// Retesteth uses `10` for genesis baseFee. Therefore, it defaults to
+			// parent - 2 : 0xa as the basefee for 'this' context.
+			baseFee = big.NewInt(testGenesisBaseFee)
+		}
 	}
 
-	s, snapshot, pastRoot := buildState(c.Pre)
+	msg, err := c.Transaction.At(p.Indexes, baseFee)
+	if err != nil {
+		t.Fatalf("failed to create transaction: %v", err)
+	}
+
+	s, snapshot, pastRoot, err := buildState(c.Pre)
+	require.NoError(t, err)
+
 	forks := config.At(uint64(env.Number))
 
-	xxx := state.NewExecutor(&chain.Params{Forks: config, ChainID: 1}, s, hclog.NewNullLogger())
+	xxx := state.NewExecutor(&chain.Params{
+		Forks:   config,
+		ChainID: 1,
+		BurnContract: map[uint64]types.Address{
+			0: types.ZeroAddress,
+		},
+	}, s, hclog.NewNullLogger())
 
 	xxx.PostHook = func(t *state.Transition) {
 		if name == "failed_tx_xcf416c53" {
@@ -70,9 +91,12 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 	// mining rewards
 	txn.AddSealingReward(env.Coinbase, big.NewInt(0))
 
-	objs := txn.Commit(forks.EIP155)
+	objs, err := txn.Commit(forks.EIP155)
+	require.NoError(t, err)
+
 	_, _, root := snapshot.Commit(objs)
 
+	// Check block root
 	if !bytes.Equal(root, p.Root.Bytes()) {
 		t.Fatalf(
 			"root mismatch (%s %s %s %d): expected %s but found %s",
@@ -85,6 +109,7 @@ func RunSpecificTest(t *testing.T, file string, c stateCase, name, fork string, 
 		)
 	}
 
+	// Check transaction logs
 	if logs := rlpHashLogs(txn.Logs()); logs != p.Logs {
 		t.Fatalf(
 			"logs mismatch (%s, %s %d): expected %s but found %s",
@@ -151,12 +176,12 @@ func TestState(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				var c map[string]stateCase
-				if err := json.Unmarshal(data, &c); err != nil {
-					t.Fatal(err)
+				var testCases map[string]testCase
+				if err = json.Unmarshal(data, &testCases); err != nil {
+					t.Fatalf("failed to unmarshal %s: %v", file, err)
 				}
 
-				for name, i := range c {
+				for name, i := range testCases {
 					for fork, f := range i.Post {
 						for indx, e := range f {
 							RunSpecificTest(t, file, i, name, fork, indx, e)
