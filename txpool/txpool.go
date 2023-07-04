@@ -202,7 +202,7 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		executables: newPricedQueue(),
+		executables: newPricedQueue(0, nil),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
@@ -331,7 +331,8 @@ func (p *TxPool) Prepare(baseFee uint64) {
 	}
 
 	// set base fee
-	p.updateBaseFee(baseFee)
+	atomic.StoreUint64(&p.baseFee, baseFee)
+	p.executables.updateBaseFee(new(big.Int).SetUint64(baseFee))
 
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
@@ -1025,12 +1026,6 @@ func (p *TxPool) getOrCreateAccount(newAddr types.Address) *account {
 // Length returns the total number of all promoted transactions.
 func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
-}
-
-// updateBaseFee updates base fee in the tx pool and priced queue
-func (p *TxPool) updateBaseFee(baseFee uint64) {
-	atomic.StoreUint64(&p.baseFee, baseFee)
-	atomic.StoreUint64(&p.executables.queue.baseFee, baseFee)
 }
 
 // toHash returns the hash(es) of given transaction(s)
