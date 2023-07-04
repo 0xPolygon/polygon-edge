@@ -202,7 +202,7 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		executables: (&pricedQueue{}).init(0),
+		executables: (&pricedQueue{}).init(0, nil),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
@@ -328,16 +328,11 @@ func (p *TxPool) Prepare(baseFee uint64) {
 	// set base fee
 	atomic.StoreUint64(&p.baseFee, baseFee)
 
-	// re-initialize executables queue
-	p.executables.init(baseFee)
-
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
 
-	// push primaries to the executables queue
-	for _, tx := range primaries {
-		p.executables.push(tx)
-	}
+	// re-initialize executables queue with primaries
+	p.executables.init(baseFee, primaries)
 }
 
 // Peek returns the best-price selected
