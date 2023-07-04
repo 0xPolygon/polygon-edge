@@ -11,22 +11,26 @@ type pricedQueue struct {
 	queue *maxPriceQueue
 }
 
-func newPricedQueue(baseFee uint64, initialTxs []*types.Transaction) *pricedQueue {
-	q := pricedQueue{
-		queue: &maxPriceQueue{
-			baseFee: new(big.Int).SetUint64(baseFee),
-			txs:     initialTxs,
-		},
+// init initializes the underlying queue
+func (q *pricedQueue) init(baseFee uint64) *pricedQueue {
+	q.queue = &maxPriceQueue{
+		baseFee: new(big.Int).SetUint64(baseFee),
+		txs:     nil,
+	}
+
+	return q
+}
+
+// initWithTxs initializes the underlying queue with initial transactions
+func (q *pricedQueue) initWithTxs(baseFee uint64, initialTxs []*types.Transaction) *pricedQueue {
+	q.queue = &maxPriceQueue{
+		baseFee: new(big.Int).SetUint64(baseFee),
+		txs:     initialTxs,
 	}
 
 	heap.Init(q.queue)
 
-	return &q
-}
-
-// clear empties the underlying queue.
-func (q *pricedQueue) clear() {
-	q.queue.txs = make([]*types.Transaction, 0) // q.queue.txt[:0] can create memory leaks
+	return q
 }
 
 // Pushes the given transactions onto the queue.
@@ -52,10 +56,6 @@ func (q *pricedQueue) pop() *types.Transaction {
 // length returns the number of transactions in the queue.
 func (q *pricedQueue) length() int {
 	return q.queue.Len()
-}
-
-func (q *pricedQueue) updateBaseFee(baseFee *big.Int) {
-	q.queue.baseFee = baseFee
 }
 
 // transactions sorted by gas price (descending)

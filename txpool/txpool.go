@@ -202,7 +202,7 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		executables: newPricedQueue(0, nil),
+		executables: (&pricedQueue{}).init(0),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
@@ -325,14 +325,11 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 // Prepare generates all the transactions
 // ready for execution. (primaries)
 func (p *TxPool) Prepare(baseFee uint64) {
-	// clear from previous round
-	if p.executables.length() != 0 {
-		p.executables.clear()
-	}
-
 	// set base fee
 	atomic.StoreUint64(&p.baseFee, baseFee)
-	p.executables.updateBaseFee(new(big.Int).SetUint64(baseFee))
+
+	// re-initialize executables queue
+	p.executables.init(baseFee)
 
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
