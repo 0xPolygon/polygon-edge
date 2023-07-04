@@ -121,7 +121,7 @@ This document outlines step necessary to perform a regenesis data migration.
     [4]  + exit 1     ./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json  :40000 
     ```
 
-    It fails, because we havent provided trie database with correct state trie.
+    It fails, because we haven't provided trie database with correct state trie.
 
 9. Copy snapshot trie to our data directory
 

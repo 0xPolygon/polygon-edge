@@ -223,7 +223,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(t, err)
 
 		// wait for next sprint block as the starting point,
-		// in order to be able to make assertions against blocks offseted by sprints
+		// in order to be able to make assertions against blocks offsetted by sprints
 		initialBlockNum = initialBlockNum + sprintSize - (initialBlockNum % sprintSize)
 		require.NoError(t, cluster.WaitForBlock(initialBlockNum, 1*time.Minute))
 

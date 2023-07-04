@@ -16,7 +16,7 @@ type accountsMap struct {
 	maxEnqueuedLimit uint64
 }
 
-// Intializes an account for the given address.
+// Initializes an account for the given address.
 func (m *accountsMap) initOnce(addr types.Address, nonce uint64) *account {
 	a, loaded := m.LoadOrStore(addr, &account{
 		enqueued:    newAccountQueue(),

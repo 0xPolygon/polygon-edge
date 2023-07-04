@@ -198,7 +198,7 @@ case "$2" in
   # cluster {consensus} --docker stop
   elif [ "$3" == "stop" ]; then
     stopDockerEnvironment
-    echo "Docker $1 environment stoped!"
+    echo "Docker $1 environment stopped!"
     exit 0
   fi
 

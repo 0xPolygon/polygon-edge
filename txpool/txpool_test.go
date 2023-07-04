@@ -602,7 +602,7 @@ func TestAddGossipTx(t *testing.T) {
 
 		signedTx, err := signer.SignTx(tx, key)
 		if err != nil {
-			t.Fatalf("cannot sign transction - err: %v", err)
+			t.Fatalf("cannot sign transaction - err: %v", err)
 		}
 
 		// send tx
