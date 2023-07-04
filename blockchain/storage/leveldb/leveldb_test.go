@@ -2,8 +2,8 @@ package leveldb
 
 import (
 	"context"
+	"crypto/rand"
 	"math/big"
-	"math/rand"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -48,81 +48,62 @@ func TestStorage(t *testing.T) {
 	storage.TestStorage(t, newStorage)
 }
 
-func generateRandomByteSlice(count int) []byte {
-	s := make([]byte, count)
-	for i := 0; i < count; i++ {
-		s[i] = byte(rand.Int())
-	}
-
-	return s
-}
-
-func generateFullTx(nonce uint64, from types.Address, to *types.Address, value *big.Int, dynamic bool, v *big.Int) *types.Transaction {
-	tx := &types.Transaction{}
-
-	tx.Gas = types.StateTransactionGasLimit
-	tx.Nonce = nonce
-	tx.From = from
-	tx.To = to
-	tx.Value = value
-	tx.V = v
-	tx.Input = generateRandomByteSlice(1000)
-	tx.Hash = types.BytesToHash(generateRandomByteSlice(32))
-
-	if dynamic {
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = v
-		tx.GasTipCap = v
-	} else {
-		tx.Type = types.LegacyTx
-		tx.GasPrice = v
-	}
-
-	return tx
-}
-
-func generateFullTxs(t *testing.T, startNonce, count int, from types.Address, to *types.Address) []*types.Transaction {
+func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *types.Address) []*types.Transaction {
 	t.Helper()
 
-	v := big.NewInt(1)
 	txs := make([]*types.Transaction, count)
 
-	for i := 0; i < count; i++ {
-		txs[i] = generateFullTx(uint64(startNonce+i), from, to, big.NewInt(1), false, v)
+	for i := range txs {
+		tx := &types.Transaction{
+			Gas:       types.StateTransactionGasLimit,
+			Nonce:     uint64(startNonce + i),
+			From:      from,
+			To:        to,
+			Value:     big.NewInt(2000),
+			Type:      types.DynamicFeeTx,
+			GasFeeCap: big.NewInt(100),
+			GasTipCap: big.NewInt(10),
+		}
+
+		input := make([]byte, 1000)
+		_, err := rand.Read(input)
+
+		require.NoError(t, err)
+
+		tx.ComputeHash()
+
+		txs[i] = tx
 	}
 
 	return txs
 }
 
-var (
-	addr1 = types.StringToAddress("1")
-	addr2 = types.StringToAddress("2")
-)
-
 func generateBlock(t *testing.T, num uint64) *types.FullBlock {
 	t.Helper()
 
-	b := &types.FullBlock{}
-
-	b.Block = &types.Block{}
-	b.Block.Header = &types.Header{
-		Number:    num,
-		ExtraData: generateRandomByteSlice(32),
-		Hash:      types.BytesToHash(generateRandomByteSlice(32)),
+	transactionsCount := 2500
+	status := types.ReceiptSuccess
+	addr1 := types.StringToAddress("17878aa")
+	addr2 := types.StringToAddress("2bf5653")
+	b := &types.FullBlock{
+		Block: &types.Block{
+			Header: &types.Header{
+				Number:    num,
+				ExtraData: make([]byte, 32),
+				Hash:      types.ZeroHash,
+			},
+			Transactions: generateTxs(t, 0, transactionsCount, addr1, &addr2),
+			Uncles:       blockchain.NewTestHeaders(10),
+		},
+		Receipts: make([]*types.Receipt, transactionsCount),
 	}
-
-	b.Block.Transactions = generateFullTxs(t, 0, 2500, addr1, &addr2)
-	b.Receipts = make([]*types.Receipt, len(b.Block.Transactions))
-	b.Block.Uncles = blockchain.NewTestHeaders(10)
-
-	var status types.ReceiptStatus = types.ReceiptSuccess
 
 	logs := make([]*types.Log, 10)
 
 	for i := 0; i < 10; i++ {
 		logs[i] = &types.Log{
 			Address: addr1,
-			Topics:  []types.Hash{types.StringToHash("topic1"), types.StringToHash("topic2"), types.StringToHash("topic3")},
+			Topics:  []types.Hash{types.StringToHash("t1"), types.StringToHash("t2"), types.StringToHash("t3")},
 			Data:    []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xbb, 0xaa, 0x01, 0x012},
 		}
 	}

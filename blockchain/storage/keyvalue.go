@@ -2,10 +2,10 @@
 package storage
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math/big"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/fastrlp"
@@ -53,7 +53,6 @@ var (
 // KV = Key-Value
 type KV interface {
 	Close() error
-	Set(p []byte, v []byte) error
 	Get(p []byte) ([]byte, bool, error)
 	NewBatch() Batch
 }
@@ -69,22 +68,11 @@ func NewKeyValueStorage(logger hclog.Logger, db KV) Storage {
 	return &KeyValueStorage{logger: logger, db: db}
 }
 
-func (s *KeyValueStorage) encodeUint(n uint64) []byte {
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b[:], n)
-
-	return b[:]
-}
-
-func (s *KeyValueStorage) decodeUint(b []byte) uint64 {
-	return binary.BigEndian.Uint64(b[:])
-}
-
 // -- canonical hash --
 
 // ReadCanonicalHash gets the hash from the number of the canonical chain
 func (s *KeyValueStorage) ReadCanonicalHash(n uint64) (types.Hash, bool) {
-	data, ok := s.get(CANONICAL, s.encodeUint(n))
+	data, ok := s.get(CANONICAL, common.EncodeUint64ToBytes(n))
 	if !ok {
 		return types.Hash{}, false
 	}
@@ -115,7 +103,7 @@ func (s *KeyValueStorage) ReadHeadNumber() (uint64, bool) {
 		return 0, false
 	}
 
-	return s.decodeUint(data), true
+	return common.EncodeBytesToUint64(data), true
 }
 
 // FORK //
@@ -191,8 +179,6 @@ func (s *KeyValueStorage) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 	return types.BytesToHash(blockHash), true
 }
 
-// WRITE OPERATIONS //
-
 var ErrNotFound = fmt.Errorf("not found")
 
 func (s *KeyValueStorage) readRLP(p, k []byte, raw types.RLPUnmarshaler) error {
@@ -252,6 +238,7 @@ func (s *KeyValueStorage) Close() error {
 	return s.db.Close()
 }
 
+// NewBatch creates batch used for write/update/delete operations
 func (s *KeyValueStorage) NewBatch() Batch {
 	return s.db.NewBatch()
 }
