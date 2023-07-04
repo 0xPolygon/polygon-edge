@@ -130,12 +130,13 @@ func (g *GasHelper) FeeHistory(blockCount uint64, newestBlock uint64, rewardPerc
 		}
 
 		sorter := make([]*txGasAndReward, len(block.Transactions))
+		baseFee := new(big.Int).SetUint64(block.Header.BaseFee)
 
 		for j, tx := range block.Transactions {
 			cost := tx.Cost()
 			sorter[j] = &txGasAndReward{
 				gasUsed: cost.Sub(cost, tx.Value),
-				reward:  tx.EffectiveTip(block.Header.BaseFee),
+				reward:  tx.EffectiveGasTip(baseFee),
 			}
 		}
 
