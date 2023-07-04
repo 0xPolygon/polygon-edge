@@ -8,6 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 )
@@ -240,13 +241,18 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.F
 
 			fullBlock, err := s.blockchain.VerifyFinalizedBlock(block)
 			if err != nil {
+				metrics.IncrCounter([]string{syncerMetrics, "bad_block"}, 1)
+
 				return lastReceivedNumber, false, fmt.Errorf("unable to verify block, %w", err)
 			}
 
 			if err := s.blockchain.WriteFullBlock(fullBlock, syncerName); err != nil {
+				metrics.IncrCounter([]string{syncerMetrics, "bad_block"}, 1)
+
 				return lastReceivedNumber, false, fmt.Errorf("failed to write block while bulk syncing: %w", err)
 			}
 
+			updateMetrics(fullBlock)
 			shouldTerminate = newBlockCallback(fullBlock)
 
 			lastReceivedNumber = block.Number()
@@ -254,4 +260,10 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.F
 			return lastReceivedNumber, shouldTerminate, errTimeout
 		}
 	}
+}
+
+func updateMetrics(fullBlock *types.FullBlock) {
+	metrics.SetGauge([]string{syncerMetrics, "tx_num"}, float32(len(fullBlock.Block.Transactions)))
+	metrics.SetGauge([]string{syncerMetrics, "receipts_num"}, float32(len(fullBlock.Receipts)))
+	metrics.SetGauge([]string{syncerMetrics, "blocks_num"}, 1)
 }

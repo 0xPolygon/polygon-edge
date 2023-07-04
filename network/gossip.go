@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
 	"sync/atomic"
 
+	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -22,10 +24,11 @@ const (
 type Topic struct {
 	logger hclog.Logger
 
-	topic   *pubsub.Topic
-	typ     reflect.Type
-	closeCh chan struct{}
-	closed  *uint64
+	topic     *pubsub.Topic
+	typ       reflect.Type
+	closeCh   chan struct{}
+	closed    atomic.Bool
+	waitGroup sync.WaitGroup
 }
 
 func (t *Topic) createObj() proto.Message {
@@ -38,17 +41,19 @@ func (t *Topic) createObj() proto.Message {
 }
 
 func (t *Topic) Close() {
-	if atomic.SwapUint64(t.closed, 1) > 0 {
+	if t.closed.Swap(true) {
 		// Already closed.
 		return
 	}
 
+	close(t.closeCh)   // close all subscribers
+	t.waitGroup.Wait() // wait for all the subscribers to finish
+
+	// if all subscribers are finished, close the topic
 	if t.topic != nil {
 		t.topic.Close()
 		t.topic = nil
 	}
-
-	close(t.closeCh)
 }
 
 func (t *Topic) Publish(obj proto.Message) error {
@@ -56,6 +61,8 @@ func (t *Topic) Publish(obj proto.Message) error {
 	if err != nil {
 		return err
 	}
+
+	metrics.SetGauge([]string{networkMetrics, "egress_bytes"}, float32(len(data)))
 
 	return t.topic.Publish(context.Background(), data)
 }
@@ -67,7 +74,7 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 	}
 
 	// Mark topic active.
-	atomic.StoreUint64(t.closed, 0)
+	t.closed.Store(false)
 
 	go t.readLoop(sub, handler)
 
@@ -75,6 +82,9 @@ func (t *Topic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 }
 
 func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{}, from peer.ID)) {
+	t.waitGroup.Add(1)
+	defer t.waitGroup.Done()
+
 	ctx, cancelFn := context.WithCancel(context.Background())
 
 	go func() {
@@ -91,6 +101,7 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{},
 			}
 
 			t.logger.Error("failed to get topic", "err", err)
+			metrics.IncrCounter([]string{networkMetrics, "bad_messages"}, float32(1))
 
 			continue
 		}
@@ -99,9 +110,12 @@ func (t *Topic) readLoop(sub *pubsub.Subscription, handler func(obj interface{},
 			obj := t.createObj()
 			if err := proto.Unmarshal(msg.Data, obj); err != nil {
 				t.logger.Error("failed to unmarshal topic", "err", err)
+				metrics.IncrCounter([]string{networkMetrics, "bad_messages"}, float32(1))
 
 				return
 			}
+
+			metrics.SetGauge([]string{networkMetrics, "ingress_bytes"}, float32(len(msg.Data)))
 
 			handler(obj, msg.GetFrom())
 		}()
@@ -119,8 +133,8 @@ func (s *Server) NewTopic(protoID string, obj proto.Message) (*Topic, error) {
 		topic:   topic,
 		typ:     reflect.TypeOf(obj).Elem(),
 		closeCh: make(chan struct{}),
-		closed:  new(uint64),
 	}
+	tt.closed.Store(false)
 
 	return tt, nil
 }

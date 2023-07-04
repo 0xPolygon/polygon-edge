@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,6 +16,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
+	"github.com/0xPolygon/polygon-edge/gasprice"
 
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -25,7 +28,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	configHelper "github.com/0xPolygon/polygon-edge/helper/config"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -34,7 +36,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
-	"github.com/0xPolygon/polygon-edge/state/runtime/allowlist"
+	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -44,6 +46,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
+)
+
+var (
+	errBlockTimeMissing = errors.New("block time configuration is missing")
+	errBlockTimeInvalid = errors.New("block time configuration is invalid")
 )
 
 // Server is the central manager of the blockchain client
@@ -84,6 +91,9 @@ type Server struct {
 
 	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
 	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
+
+	// gasHelper is providing functions regarding gas and fees
+	gasHelper *gasprice.GasHelper
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -206,10 +216,40 @@ func NewServer(config *Config) (*Server, error) {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
 
-	// apply allow list genesis data
+	// apply allow list contracts deployer genesis data
 	if m.config.Chain.Params.ContractDeployerAllowList != nil {
-		allowlist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
 			m.config.Chain.Params.ContractDeployerAllowList)
+	}
+
+	// apply block list contracts deployer genesis data
+	if m.config.Chain.Params.ContractDeployerBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
+			m.config.Chain.Params.ContractDeployerBlockList)
+	}
+
+	// apply transactions execution allow list genesis data
+	if m.config.Chain.Params.TransactionsAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+			m.config.Chain.Params.TransactionsAllowList)
+	}
+
+	// apply transactions execution block list genesis data
+	if m.config.Chain.Params.TransactionsBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
+			m.config.Chain.Params.TransactionsBlockList)
+	}
+
+	// apply bridge allow list genesis data
+	if m.config.Chain.Params.BridgeAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
+			m.config.Chain.Params.BridgeAllowList)
+	}
+
+	// apply bridge block list genesis data
+	if m.config.Chain.Params.BridgeBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
+			m.config.Chain.Params.BridgeBlockList)
 	}
 
 	var initialStateRoot = types.ZeroHash
@@ -241,11 +281,33 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
+	var initialParams *chain.ForkParams
+
+	if pf := forkManagerInitialParamsFactory[ConsensusType(engineName)]; pf != nil {
+		if initialParams, err = pf(config.Chain); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := forkmanager.ForkManagerInit(
+		initialParams,
+		forkManagerFactory[ConsensusType(engineName)],
+		config.Chain.Params.Forks); err != nil {
+		return nil, err
+	}
+
 	// compute the genesis root state
 	config.Chain.Genesis.StateRoot = genesisRoot
 
-	// use the eip155 signer
-	signer := crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), uint64(m.config.Chain.Params.ChainID))
+	// Use the london signer with eip-155 as a fallback one
+	var signer crypto.TxSigner = crypto.NewLondonSigner(
+		uint64(m.config.Chain.Params.ChainID),
+		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
+		crypto.NewEIP155Signer(
+			uint64(m.config.Chain.Params.ChainID),
+			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
+		),
+	)
 
 	// create storage instance for blockchain
 	var db storage.Storage
@@ -268,11 +330,21 @@ func NewServer(config *Config) (*Server, error) {
 
 	// blockchain object
 	blockchainConfig := &blockchain.Config{Chain: config.Chain, DataDir: config.DataDir}
-	m.blockchain, err = blockchain.NewBlockchain(logger, db, blockchainConfig, nil, m.executor, signer)
+	m.blockchain, err = blockchain.NewBlockchain(
+		logger,
+		db,
+		blockchainConfig,
+		nil,
+		m.executor,
+		signer,
+	)
 
 	if err != nil {
 		return nil, err
 	}
+
+	// here we can provide some other configuration
+	m.gasHelper = gasprice.NewGasHelper(gasprice.DefaultGasHelperConfig, m.blockchain)
 
 	m.executor.GetHash = m.blockchain.GetHashHelper
 
@@ -280,11 +352,6 @@ func NewServer(config *Config) (*Server, error) {
 		hub := &txpoolHub{
 			state:      m.state,
 			Blockchain: m.blockchain,
-		}
-
-		deploymentWhitelist, err := configHelper.GetDeploymentWhitelist(config.Chain)
-		if err != nil {
-			return nil, err
 		}
 
 		// start transaction pool
@@ -295,10 +362,9 @@ func NewServer(config *Config) (*Server, error) {
 			m.grpcServer,
 			m.network,
 			&txpool.Config{
-				MaxSlots:            m.config.MaxSlots,
-				PriceLimit:          m.config.PriceLimit,
-				MaxAccountEnqueued:  m.config.MaxAccountEnqueued,
-				DeploymentWhitelist: deploymentWhitelist,
+				MaxSlots:           m.config.MaxSlots,
+				PriceLimit:         m.config.PriceLimit,
+				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 			},
 		)
 		if err != nil {
@@ -496,6 +562,18 @@ func (s *Server) setupConsensus() error {
 		engineConfig = map[string]interface{}{}
 	}
 
+	var (
+		blockTime = common.Duration{Duration: 0}
+		err       error
+	)
+
+	if engineName != string(DummyConsensus) && engineName != string(DevConsensus) {
+		blockTime, err = extractBlockTime(engineConfig)
+		if err != nil {
+			return err
+		}
+	}
+
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,
 		Config: engineConfig,
@@ -513,7 +591,7 @@ func (s *Server) setupConsensus() error {
 			Grpc:                  s.grpcServer,
 			Logger:                s.logger,
 			SecretsManager:        s.secretsManager,
-			BlockTime:             s.config.BlockTime,
+			BlockTime:             uint64(blockTime.Seconds()),
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
 		},
 	)
@@ -525,6 +603,32 @@ func (s *Server) setupConsensus() error {
 	s.consensus = consensus
 
 	return nil
+}
+
+// extractBlockTime extracts blockTime parameter from consensus engine configuration.
+// If it is missing or invalid, an appropriate error is returned.
+func extractBlockTime(engineConfig map[string]interface{}) (common.Duration, error) {
+	blockTimeGeneric, ok := engineConfig["blockTime"]
+	if !ok {
+		return common.Duration{}, errBlockTimeMissing
+	}
+
+	blockTimeRaw, err := json.Marshal(blockTimeGeneric)
+	if err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	var blockTime common.Duration
+
+	if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	if blockTime.Seconds() < 1 {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	return blockTime, nil
 }
 
 // setupRelayer sets up the relayer
@@ -571,6 +675,7 @@ type jsonRPCHub struct {
 	*network.Server
 	consensus.Consensus
 	consensus.BridgeDataProvider
+	gasprice.GasStore
 }
 
 func (j *jsonRPCHub) GetPeers() int {
@@ -629,6 +734,7 @@ func (j *jsonRPCHub) GetCode(root types.Hash, addr types.Address) ([]byte, error
 func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
+	override types.StateOverride,
 ) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
@@ -638,6 +744,12 @@ func (j *jsonRPCHub) ApplyTxn(
 	transition, err := j.BeginTxn(header.StateRoot, header, blockCreator)
 	if err != nil {
 		return
+	}
+
+	if override != nil {
+		if err = transition.WithStateOverride(override); err != nil {
+			return
+		}
 	}
 
 	result, err = transition.Apply(txn)
@@ -792,6 +904,7 @@ func (s *Server) setupJSONRPC() error {
 		Consensus:          s.consensus,
 		Server:             s.network,
 		BridgeDataProvider: s.consensus.GetBridgeProvider(),
+		GasStore:           s.gasHelper,
 	}
 
 	conf := &jsonrpc.Config{
@@ -824,6 +937,7 @@ func (s *Server) setupGRPC() error {
 		return err
 	}
 
+	// Start server with infinite retries
 	go func() {
 		if err := s.grpcServer.Serve(lis); err != nil {
 			s.logger.Error(err.Error())
@@ -903,11 +1017,13 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	go func() {
-		s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
-		if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			if !errors.Is(err, http.ErrServerClosed) {
+				s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+			}
 		}
 	}()
 

@@ -1,12 +1,11 @@
 package polybft
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -27,8 +26,7 @@ var PolyBFTMixDigest = types.StringToHash("adce6e5230abe012342a44e4e9b6d05997d6f
 
 // Extra defines the structure of the extra field for Istanbul
 type Extra struct {
-	Validators *ValidatorSetDelta
-	Seal       []byte
+	Validators *validator.ValidatorSetDelta
 	Parent     *Signature
 	Committed  *Signature
 	Checkpoint *CheckpointData
@@ -38,7 +36,7 @@ type Extra struct {
 func (i *Extra) MarshalRLPTo(dst []byte) []byte {
 	ar := &fastrlp.Arena{}
 
-	return i.MarshalRLPWith(ar).MarshalTo(dst)
+	return append(make([]byte, ExtraVanity), i.MarshalRLPWith(ar).MarshalTo(dst)...)
 }
 
 // MarshalRLPWith defines the marshal function implementation for Extra
@@ -52,21 +50,14 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 		vv.Set(i.Validators.MarshalRLPWith(ar))
 	}
 
-	// Seal
-	if len(i.Seal) == 0 {
-		vv.Set(ar.NewNull())
-	} else {
-		vv.Set(ar.NewBytes(i.Seal))
-	}
-
-	// ParentSeal
+	// Parent Signatures
 	if i.Parent == nil {
 		vv.Set(ar.NewNullArray())
 	} else {
 		vv.Set(i.Parent.MarshalRLPWith(ar))
 	}
 
-	// CommittedSeal
+	// Committed Signatures
 	if i.Committed == nil {
 		vv.Set(ar.NewNullArray())
 	} else {
@@ -85,12 +76,12 @@ func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
 
 // UnmarshalRLP defines the unmarshal function wrapper for Extra
 func (i *Extra) UnmarshalRLP(input []byte) error {
-	return fastrlp.UnmarshalRLP(input, i)
+	return fastrlp.UnmarshalRLP(input[ExtraVanity:], i)
 }
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
-	const expectedElements = 5
+	const expectedElements = 4
 
 	elems, err := v.GetElems()
 	if err != nil {
@@ -103,39 +94,32 @@ func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
 
 	// Validators
 	if elems[0].Elems() > 0 {
-		i.Validators = &ValidatorSetDelta{}
+		i.Validators = &validator.ValidatorSetDelta{}
 		if err := i.Validators.UnmarshalRLPWith(elems[0]); err != nil {
 			return err
 		}
 	}
 
-	// Seal
-	if elems[1].Len() > 0 {
-		if i.Seal, err = elems[1].GetBytes(i.Seal); err != nil {
-			return err
-		}
-	}
-
-	// Parent
-	if elems[2].Elems() > 0 {
+	// Parent Signatures
+	if elems[1].Elems() > 0 {
 		i.Parent = &Signature{}
-		if err := i.Parent.UnmarshalRLPWith(elems[2]); err != nil {
+		if err := i.Parent.UnmarshalRLPWith(elems[1]); err != nil {
 			return err
 		}
 	}
 
-	// Committed
-	if elems[3].Elems() > 0 {
+	// Committed Signatures
+	if elems[2].Elems() > 0 {
 		i.Committed = &Signature{}
-		if err := i.Committed.UnmarshalRLPWith(elems[3]); err != nil {
+		if err := i.Committed.UnmarshalRLPWith(elems[2]); err != nil {
 			return err
 		}
 	}
 
 	// Checkpoint
-	if elems[4].Elems() > 0 {
+	if elems[3].Elems() > 0 {
 		i.Checkpoint = &CheckpointData{}
-		if err := i.Checkpoint.UnmarshalRLPWith(elems[4]); err != nil {
+		if err := i.Checkpoint.UnmarshalRLPWith(elems[3]); err != nil {
 			return err
 		}
 	}
@@ -186,21 +170,6 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 	return i.Checkpoint.ValidateBasic(parentExtra.Checkpoint)
 }
 
-// ValidateDelta validates validator set delta provided in the Extra
-// with the one being calculated by the validator itself
-func (i *Extra) ValidateDelta(oldValidators AccountSet, newValidators AccountSet) error {
-	delta, err := createValidatorSetDelta(oldValidators, newValidators)
-	if err != nil {
-		return err
-	}
-
-	if !i.Validators.Equals(delta) {
-		return fmt.Errorf("validator set delta is invalid")
-	}
-
-	return nil
-}
-
 // ValidateParentSignatures validates signatures for parent block
 func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend polybftBackend, parents []*types.Header,
 	parent *types.Header, parentExtra *Extra, chainID uint64, domain []byte, logger hclog.Logger) error {
@@ -234,190 +203,6 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 	}
 
 	return nil
-}
-
-// createValidatorSetDelta calculates ValidatorSetDelta based on the provided old and new validator sets
-func createValidatorSetDelta(oldValidatorSet, newValidatorSet AccountSet) (*ValidatorSetDelta, error) {
-	var addedValidators, updatedValidators AccountSet
-
-	oldValidatorSetMap := make(map[types.Address]*ValidatorMetadata)
-	removedValidators := map[types.Address]int{}
-
-	for i, validator := range oldValidatorSet {
-		if (validator.Address != types.Address{}) {
-			removedValidators[validator.Address] = i
-			oldValidatorSetMap[validator.Address] = validator
-		}
-	}
-
-	for _, newValidator := range newValidatorSet {
-		// Check if the validator is among both old and new validator set
-		oldValidator, validatorExists := oldValidatorSetMap[newValidator.Address]
-		if validatorExists {
-			if !oldValidator.EqualAddressAndBlsKey(newValidator) {
-				return nil, fmt.Errorf("validator '%s' found in both old and new validator set, but its BLS keys differ",
-					newValidator.Address.String())
-			}
-
-			// If it is, then discard it from removed validators...
-			delete(removedValidators, newValidator.Address)
-
-			if !oldValidator.Equals(newValidator) {
-				updatedValidators = append(updatedValidators, newValidator)
-			}
-		} else {
-			// ...otherwise it is added
-			addedValidators = append(addedValidators, newValidator)
-		}
-	}
-
-	removedValsBitmap := bitmap.Bitmap{}
-	for _, i := range removedValidators {
-		removedValsBitmap.Set(uint64(i))
-	}
-
-	delta := &ValidatorSetDelta{
-		Added:   addedValidators,
-		Updated: updatedValidators,
-		Removed: removedValsBitmap,
-	}
-
-	return delta, nil
-}
-
-// ValidatorSetDelta holds information about added and removed validators compared to the previous epoch
-type ValidatorSetDelta struct {
-	// Added is the slice of added validators
-	Added AccountSet
-	// Updated is the slice of updated valiadtors
-	Updated AccountSet
-	// Removed is a bitmap of the validators removed from the set
-	Removed bitmap.Bitmap
-}
-
-// Equals checks validator set delta equality
-func (d *ValidatorSetDelta) Equals(other *ValidatorSetDelta) bool {
-	if other == nil {
-		return false
-	}
-
-	return d.Added.Equals(other.Added) &&
-		d.Updated.Equals(other.Updated) &&
-		bytes.Equal(d.Removed, other.Removed)
-}
-
-// MarshalRLPWith marshals ValidatorSetDelta to RLP format
-func (d *ValidatorSetDelta) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
-	vv := ar.NewArray()
-	addedValidatorsRaw := ar.NewArray()
-	updatedValidatorsRaw := ar.NewArray()
-
-	for _, validatorAccount := range d.Added {
-		addedValidatorsRaw.Set(validatorAccount.MarshalRLPWith(ar))
-	}
-
-	for _, validatorAccount := range d.Updated {
-		updatedValidatorsRaw.Set(validatorAccount.MarshalRLPWith(ar))
-	}
-
-	vv.Set(addedValidatorsRaw)         // added
-	vv.Set(updatedValidatorsRaw)       // updated
-	vv.Set(ar.NewCopyBytes(d.Removed)) // removed
-
-	return vv
-}
-
-// UnmarshalRLPWith unmarshals ValidatorSetDelta from RLP format
-func (d *ValidatorSetDelta) UnmarshalRLPWith(v *fastrlp.Value) error {
-	elems, err := v.GetElems()
-	if err != nil {
-		return err
-	}
-
-	if len(elems) == 0 {
-		return nil
-	} else if num := len(elems); num != 3 {
-		return fmt.Errorf("incorrect elements count to decode validator set delta, expected 3 but found %d", num)
-	}
-
-	// Validators (added)
-	{
-		validatorsRaw, err := elems[0].GetElems()
-		if err != nil {
-			return fmt.Errorf("array expected for added validators")
-		}
-
-		d.Added, err = unmarshalValidators(validatorsRaw)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Validators (updated)
-	{
-		validatorsRaw, err := elems[1].GetElems()
-		if err != nil {
-			return fmt.Errorf("array expected for updated validators")
-		}
-
-		d.Updated, err = unmarshalValidators(validatorsRaw)
-		if err != nil {
-			return err
-		}
-	}
-
-	// Bitmap (removed)
-	{
-		dst, err := elems[2].GetBytes(nil)
-		if err != nil {
-			return err
-		}
-
-		d.Removed = bitmap.Bitmap(dst)
-	}
-
-	return nil
-}
-
-// unmarshalValidators unmarshals RLP encoded validators and returns AccountSet instance
-func unmarshalValidators(validatorsRaw []*fastrlp.Value) (AccountSet, error) {
-	if len(validatorsRaw) == 0 {
-		return nil, nil
-	}
-
-	validators := make(AccountSet, len(validatorsRaw))
-
-	for i, validatorRaw := range validatorsRaw {
-		acc := &ValidatorMetadata{}
-		if err := acc.UnmarshalRLPWith(validatorRaw); err != nil {
-			return nil, err
-		}
-
-		validators[i] = acc
-	}
-
-	return validators, nil
-}
-
-// IsEmpty returns indication whether delta is empty (namely added, updated slices and removed bitmap are empty)
-func (d *ValidatorSetDelta) IsEmpty() bool {
-	return len(d.Added) == 0 &&
-		len(d.Updated) == 0 &&
-		d.Removed.Len() == 0
-}
-
-// Copy creates deep copy of ValidatorSetDelta
-func (d *ValidatorSetDelta) Copy() *ValidatorSetDelta {
-	added := d.Added.Copy()
-	removed := make([]byte, len(d.Removed))
-	copy(removed, d.Removed)
-
-	return &ValidatorSetDelta{Added: added, Removed: removed}
-}
-
-// fmt.Stringer interface implementation
-func (d *ValidatorSetDelta) String() string {
-	return fmt.Sprintf("Added: \n%v Removed: %v\n Updated: \n%v", d.Added, d.Removed, d.Updated)
 }
 
 // Signature represents aggregated signatures of signers accompanied with a bitmap
@@ -471,13 +256,13 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // Verify is used to verify aggregated signature based on current validator set, message hash and domain
-func (s *Signature) Verify(validators AccountSet, hash types.Hash, domain []byte, logger hclog.Logger) error {
+func (s *Signature) Verify(validators validator.AccountSet, hash types.Hash, domain []byte, logger hclog.Logger) error {
 	signers, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
 	}
 
-	validatorSet := NewValidatorSet(validators, logger)
+	validatorSet := validator.NewValidatorSet(validators, logger)
 	if !validatorSet.HasQuorum(signers.GetAddressesAsSet()) {
 		return fmt.Errorf("quorum not reached")
 	}
@@ -641,7 +426,8 @@ func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
 // Validate encapsulates validation logic for checkpoint data
 // (with regards to current and next epoch validators)
 func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
-	currentValidators AccountSet, nextValidators AccountSet) error {
+	currentValidators validator.AccountSet, nextValidators validator.AccountSet,
+	exitRootHash types.Hash) error {
 	if err := c.ValidateBasic(parentCheckpoint); err != nil {
 		return err
 	}
@@ -674,6 +460,12 @@ func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 		return fmt.Errorf("epoch number should not change for epoch-ending block")
 	}
 
+	// exit root hash of proposer and
+	// validator that validates proposal have to match
+	if exitRootHash != c.EventRoot {
+		return fmt.Errorf("exit root hash not as expected")
+	}
+
 	return nil
 }
 
@@ -689,7 +481,6 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 		Parent:     extra.Parent,
 		Validators: extra.Validators,
 		Checkpoint: extra.Checkpoint,
-		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
 
@@ -697,20 +488,19 @@ func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
 }
 
 // GetIbftExtra returns the istanbul extra data field from the passed in header
-func GetIbftExtra(extraB []byte) (*Extra, error) {
-	if len(extraB) < ExtraVanity {
-		return nil, fmt.Errorf("wrong extra size: %d", len(extraB))
+func GetIbftExtra(extraRaw []byte) (*Extra, error) {
+	if len(extraRaw) < ExtraVanity {
+		return nil, fmt.Errorf("wrong extra size: %d", len(extraRaw))
 	}
 
-	data := extraB[ExtraVanity:]
 	extra := &Extra{}
 
-	if err := extra.UnmarshalRLP(data); err != nil {
+	if err := extra.UnmarshalRLP(extraRaw); err != nil {
 		return nil, err
 	}
 
 	if extra.Validators == nil {
-		extra.Validators = &ValidatorSetDelta{}
+		extra.Validators = &validator.ValidatorSetDelta{}
 	}
 
 	return extra, nil

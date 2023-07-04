@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -12,10 +13,9 @@ import (
 
 func Test_setupHeaderHashFunc(t *testing.T) {
 	extra := &Extra{
-		Validators: &ValidatorSetDelta{Removed: bitmap.Bitmap{1}},
+		Validators: &validator.ValidatorSetDelta{Removed: bitmap.Bitmap{1}},
 		Parent:     createSignature(t, []*wallet.Account{generateTestAccount(t)}, types.ZeroHash, bls.DomainCheckpointManager),
 		Checkpoint: &CheckpointData{},
-		Seal:       []byte{},
 		Committed:  &Signature{},
 	}
 
@@ -25,12 +25,11 @@ func Test_setupHeaderHashFunc(t *testing.T) {
 		Timestamp: 18,
 	}
 
-	header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	header.ExtraData = extra.MarshalRLPTo(nil)
 	notFullExtraHash := types.HeaderHash(header)
 
-	extra.Seal = []byte{1, 2, 3, 255}
 	extra.Committed = createSignature(t, []*wallet.Account{generateTestAccount(t)}, types.ZeroHash, bls.DomainCheckpointManager)
-	header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+	header.ExtraData = extra.MarshalRLPTo(nil)
 	fullExtraHash := types.HeaderHash(header)
 
 	assert.Equal(t, notFullExtraHash, fullExtraHash)

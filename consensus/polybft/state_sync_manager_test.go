@@ -7,10 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/stretchr/testify/require"
@@ -18,9 +14,15 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/testutil"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager {
+func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateSyncManager {
 	t.Helper()
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")
@@ -31,7 +33,7 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 
 	topic := &mockTopic{}
 
-	s, err := newStateSyncManager(hclog.NewNullLogger(), state,
+	s := newStateSyncManager(hclog.NewNullLogger(), state,
 		&stateSyncConfig{
 			stateSenderAddr:   types.Address{},
 			jsonrpcAddr:       "",
@@ -41,8 +43,6 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 			maxCommitmentSize: maxCommitmentSize,
 		})
 
-	require.NoError(t, err)
-
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
 	})
@@ -51,8 +51,8 @@ func newTestStateSyncManager(t *testing.T, key *testValidator) *stateSyncManager
 }
 
 func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
-	vals := newTestValidators(t, 5)
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	vals := validator.NewTestValidators(t, 5)
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
 	// there are no state syncs
 	require.NoError(t, s.buildCommitment())
@@ -87,9 +87,9 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 }
 
 func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 	s.epoch = 1
 
 	msg := &TransportMessage{
@@ -117,8 +117,8 @@ func (m *mockMsg) WithHash(hash []byte) *mockMsg {
 	return m
 }
 
-func (m *mockMsg) sign(val *testValidator, domain []byte) (*TransportMessage, error) {
-	signature, err := val.mustSign(m.hash, domain).Marshal()
+func (m *mockMsg) sign(val *validator.TestValidator, domain []byte) (*TransportMessage, error) {
+	signature, err := val.MustSign(m.hash, domain).Marshal()
 	if err != nil {
 		return nil, err
 	}
@@ -132,12 +132,12 @@ func (m *mockMsg) sign(val *testValidator, domain []byte) (*TransportMessage, er
 }
 
 func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSet()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
-	badVal := newTestValidator(t, "a", 0)
+	badVal := validator.NewTestValidator(t, "a", 0)
 	msg, err := newMockMsg().sign(badVal, bls.DomainStateReceiver)
 	require.NoError(t, err)
 
@@ -147,13 +147,13 @@ func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
 func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSet()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
 	val := newMockMsg()
-	msg, err := val.sign(vals.getValidator("0"), bls.DomainStateReceiver)
+	msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	msg.EpochNumber = 1
@@ -173,39 +173,39 @@ func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSet()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
 	// validator signs the msg in behalf of another validator
 	val := newMockMsg()
-	msg, err := val.sign(vals.getValidator("0"), bls.DomainStateReceiver)
+	msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	msg.From = vals.getValidator("1").Address().String()
+	msg.From = vals.GetValidator("1").Address().String()
 	require.Error(t, s.saveVote(msg))
 
 	// non validator signs the msg in behalf of a validator
-	badVal := newTestValidator(t, "a", 0)
+	badVal := validator.NewTestValidator(t, "a", 0)
 	msg, err = newMockMsg().sign(badVal, bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	msg.From = vals.getValidator("1").Address().String()
+	msg.From = vals.GetValidator("1").Address().String()
 	require.Error(t, s.saveVote(msg))
 }
 
 func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSet()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
 	msg := newMockMsg()
-	val1signed, err := msg.sign(vals.getValidator("1"), bls.DomainStateReceiver)
+	val1signed, err := msg.sign(vals.GetValidator("1"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	val2signed, err := msg.sign(vals.getValidator("2"), bls.DomainStateReceiver)
+	val2signed, err := msg.sign(vals.GetValidator("2"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	// vote with validator 1
@@ -227,10 +227,10 @@ func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
 }
 
 func TestStateSyncManager_BuildCommitment(t *testing.T) {
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
-	s.validatorSet = vals.toValidatorSet()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
 	// commitment is empty
 	commitment, err := s.Commitment()
@@ -258,10 +258,10 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validators 0 and 1 vote for the proposal, there is not enough
 	// voting power for the proposal
-	signedMsg1, err := msg.sign(vals.getValidator("0"), bls.DomainStateReceiver)
+	signedMsg1, err := msg.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	signedMsg2, err := msg.sign(vals.getValidator("1"), bls.DomainStateReceiver)
+	signedMsg2, err := msg.sign(vals.GetValidator("1"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.NoError(t, s.saveVote(signedMsg1))
@@ -273,10 +273,10 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 
 	// validator 2 and 3 vote for the proposal, there is enough voting power now
 
-	signedMsg1, err = msg.sign(vals.getValidator("2"), bls.DomainStateReceiver)
+	signedMsg1, err = msg.sign(vals.GetValidator("2"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
-	signedMsg2, err = msg.sign(vals.getValidator("3"), bls.DomainStateReceiver)
+	signedMsg2, err = msg.sign(vals.GetValidator("3"), bls.DomainStateReceiver)
 	require.NoError(t, err)
 
 	require.NoError(t, s.saveVote(signedMsg1))
@@ -288,9 +288,9 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 }
 
 func TestStateSyncerManager_BuildProofs(t *testing.T) {
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
 	for _, evnt := range generateStateSyncEvents(t, 20, 0) {
 		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(evnt))
@@ -330,9 +330,9 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 }
 
 func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
-	vals := newTestValidators(t, 5)
+	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
 	// empty log which is not an state sync
 	s.AddLog(&ethgo.Log{})
@@ -371,16 +371,18 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
 	require.NoError(t, err)
 	require.Len(t, stateSyncs, 1)
-	require.Len(t, s.pendingCommitments, 0)
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(0), s.pendingCommitments[0].EndID.Uint64())
 
 	// add one more log to have a minimum commitment
 	goodLog2 := goodLog.Copy()
 	goodLog2.Topics[1] = ethgo.BytesToHash([]byte{0x1}) // state sync index 1
 	s.AddLog(goodLog2)
 
-	require.Len(t, s.pendingCommitments, 1)
-	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
-	require.Equal(t, uint64(1), s.pendingCommitments[0].EndID.Uint64())
+	require.Len(t, s.pendingCommitments, 2)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
+	require.Equal(t, uint64(1), s.pendingCommitments[1].EndID.Uint64())
 
 	// add two more logs to have larger commitments
 	goodLog3 := goodLog.Copy()
@@ -391,52 +393,50 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 	goodLog4.Topics[1] = ethgo.BytesToHash([]byte{0x3}) // state sync index 3
 	s.AddLog(goodLog4)
 
-	require.Len(t, s.pendingCommitments, 3)
-	require.Equal(t, uint64(0), s.pendingCommitments[2].StartID.Uint64())
-	require.Equal(t, uint64(3), s.pendingCommitments[2].EndID.Uint64())
+	require.Len(t, s.pendingCommitments, 4)
+	require.Equal(t, uint64(0), s.pendingCommitments[3].StartID.Uint64())
+	require.Equal(t, uint64(3), s.pendingCommitments[3].EndID.Uint64())
 }
 
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	t.Parallel()
 
-	vals := newTestValidators(t, 5)
-	s := newTestStateSyncManager(t, vals.getValidator("0"))
+	vals := validator.NewTestValidators(t, 5)
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
 	server := testutil.DeployTestServer(t, nil)
 
-	//nolint:godox
-	// TODO: Deploy local artifacts (to be fixed in EVM-542)
-	cc := &testutil.Contract{}
-	cc.AddCallback(func() string {
-		return `
-			event StateSynced(uint256 indexed id, address indexed sender, address indexed receiver, bytes data);
-			uint256 indx;
-
-			function emitEvent() public payable {
-				emit StateSynced(indx, msg.sender, msg.sender, bytes(""));
-				indx++;
-			}
-			`
+	// Deploy contract
+	contractReceipt, err := server.SendTxn(&ethgo.Transaction{
+		Input: contractsapi.StateSender.Bytecode,
 	})
+	require.NoError(t, err)
 
-	_, addr, err := server.DeployContract(cc)
+	// Create contract function call payload
+	encodedSyncStateData, err := (&contractsapi.SyncStateStateSenderFn{
+		Receiver: types.BytesToAddress(server.Account(0).Bytes()),
+		Data:     []byte{},
+	}).EncodeAbi()
 	require.NoError(t, err)
 
 	// prefill with 10 events
 	for i := 0; i < 10; i++ {
-		receipt, err := server.TxnTo(addr, "emitEvent")
+		receipt, err := server.SendTxn(&ethgo.Transaction{
+			To:    &contractReceipt.ContractAddress,
+			Input: encodedSyncStateData,
+		})
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 	}
 
-	s.config.stateSenderAddr = types.Address(addr)
+	s.config.stateSenderAddr = types.Address(contractReceipt.ContractAddress)
 	s.config.jsonrpcAddr = server.HTTPAddr()
 
 	require.NoError(t, s.initTracker())
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 9)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }
@@ -444,7 +444,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 func TestStateSyncManager_Close(t *testing.T) {
 	t.Parallel()
 
-	mgr := newTestStateSyncManager(t, newTestValidator(t, "A", 100))
+	mgr := newTestStateSyncManager(t, validator.NewTestValidator(t, "A", 100))
 	require.NotPanics(t, func() { mgr.Close() })
 }
 

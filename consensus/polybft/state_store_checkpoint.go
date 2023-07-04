@@ -173,12 +173,12 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 	var l2StateSyncedEvent contractsapi.L2StateSyncedEvent
 
 	doesMatch, err := l2StateSyncedEvent.ParseLog(log)
-	if !doesMatch {
-		return nil, nil
-	}
-
 	if err != nil {
 		return nil, err
+	}
+
+	if !doesMatch {
+		return nil, nil
 	}
 
 	return &ExitEvent{
@@ -195,9 +195,11 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 func convertLog(log *types.Log) *ethgo.Log {
 	l := &ethgo.Log{
 		Address: ethgo.Address(log.Address),
-		Data:    log.Data,
+		Data:    make([]byte, len(log.Data)),
 		Topics:  make([]ethgo.Hash, len(log.Topics)),
 	}
+
+	copy(l.Data, log.Data)
 
 	for i, topic := range log.Topics {
 		l.Topics[i] = ethgo.Hash(topic)

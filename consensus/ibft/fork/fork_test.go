@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
@@ -62,6 +63,7 @@ func TestIBFTForkUnmarshalJSON(t *testing.T) {
 			data: fmt.Sprintf(`{
 				"type": "%s",
 				"validator_type": "%s",
+				"blockTime": %d,
 				"validators": [
 					{
 						"Address": "%s"
@@ -72,8 +74,9 @@ func TestIBFTForkUnmarshalJSON(t *testing.T) {
 				],
 				"from": %d,
 				"to": %d
-			}`,
+				}`,
 				PoA, validators.ECDSAValidatorType,
+				3000000000,
 				types.StringToAddress("1"), types.StringToAddress("2"),
 				16, 20,
 			),
@@ -86,6 +89,7 @@ func TestIBFTForkUnmarshalJSON(t *testing.T) {
 					validators.NewECDSAValidator(types.StringToAddress("1")),
 					validators.NewECDSAValidator(types.StringToAddress("2")),
 				),
+				BlockTime:         &common.Duration{Duration: 3 * time.Second},
 				MaxValidatorCount: nil,
 				MinValidatorCount: nil,
 			},

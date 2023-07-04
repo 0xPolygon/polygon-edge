@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEIP55(t *testing.T) {
@@ -68,19 +69,46 @@ func TestEIP55(t *testing.T) {
 func TestTransactionCopy(t *testing.T) {
 	addrTo := StringToAddress("11")
 	txn := &Transaction{
-		Nonce:    0,
-		GasPrice: big.NewInt(11),
-		Gas:      11,
-		To:       &addrTo,
-		Value:    big.NewInt(1),
-		Input:    []byte{1, 2},
-		V:        big.NewInt(25),
-		S:        big.NewInt(26),
-		R:        big.NewInt(27),
+		Nonce:     0,
+		GasTipCap: big.NewInt(11),
+		GasFeeCap: big.NewInt(11),
+		GasPrice:  big.NewInt(11),
+		Gas:       11,
+		To:        &addrTo,
+		Value:     big.NewInt(1),
+		Input:     []byte{1, 2},
+		V:         big.NewInt(25),
+		S:         big.NewInt(26),
+		R:         big.NewInt(27),
 	}
 	newTxn := txn.Copy()
 
 	if !reflect.DeepEqual(txn, newTxn) {
 		t.Fatal("[ERROR] Copied transaction not equal base transaction")
+	}
+}
+
+func TestIsValidAddress(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		address string
+		isValid bool
+	}{
+		{address: "0x123", isValid: false},
+		{address: "FooBar", isValid: false},
+		{address: "123FooBar", isValid: false},
+		{address: "0x1234567890987654321012345678909876543210", isValid: true},
+		{address: "0x0000000000000000000000000000000000000000", isValid: true},
+		{address: "0x1000000000000000000000000000000000000000", isValid: true},
+	}
+
+	for _, c := range cases {
+		err := IsValidAddress(c.address)
+		if c.isValid {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err)
+		}
 	}
 }

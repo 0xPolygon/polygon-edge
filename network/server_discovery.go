@@ -206,8 +206,11 @@ func (s *Server) setupDiscovery() error {
 
 	// Set the PeerAdded event handler
 	routingTable.PeerAdded = func(p peer.ID) {
-		info := s.host.Peerstore().PeerInfo(p)
-		s.addToDialQueue(&info, common.PriorityRandomDial)
+		// this is called from the lock. because of that execute addToDialQueue on separated routine
+		go func() {
+			info := s.host.Peerstore().PeerInfo(p)
+			s.addToDialQueue(&info, common.PriorityRandomDial)
+		}()
 	}
 
 	// Set the PeerRemoved event handler

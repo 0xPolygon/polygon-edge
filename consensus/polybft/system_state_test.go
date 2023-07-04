@@ -2,7 +2,6 @@ package polybft
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"math/big"
 	"testing"
 
@@ -19,71 +18,6 @@ import (
 	"github.com/umbracle/ethgo/contract"
 	"github.com/umbracle/ethgo/testutil"
 )
-
-func TestSystemState_GetValidatorSet(t *testing.T) {
-	t.Parallel()
-
-	cc := &testutil.Contract{}
-	cc.AddCallback(func() string {
-		return `
-
-		function getCurrentValidatorSet() public returns (address[] memory) {
-			address[] memory addresses = new address[](1);
-			addresses[0] = address(1);
-			return addresses;
-		}
-
-		function getValidator(
-			address validator
-		)
-			external
-			view
-			returns (
-				uint256[4] memory blsKey,
-				uint256 stake,
-				uint256 totalStake,
-				uint256 commission,
-				uint256 withdrawableRewards,
-				bool active
-			)
-		{
-			blsKey = [
-				1708568697487735112380375954529256823287318886168633341382922712646533763844,
-				14713639476280042449606484361428781226013866637570951139712205035697871856089,
-				16798350082249088544573448433070681576641749462807627179536437108134609634615,
-				21427200503135995176566340351867145775962083994845221446131416289459495591422
-			];
-			stake = 10;
-			totalStake = 15;
-			commission = 20;
-			withdrawableRewards = 30;
-			active = true;
-		}
-		`
-	})
-
-	solcContract, err := cc.Compile()
-	assert.NoError(t, err)
-
-	bin, err := hex.DecodeString(solcContract.Bin)
-	assert.NoError(t, err)
-
-	transition := newTestTransition(t, nil)
-
-	// deploy a contract
-	result := transition.Create2(types.Address{}, bin, big.NewInt(0), 1000000000)
-	assert.NoError(t, result.Err)
-
-	provider := &stateProvider{
-		transition: transition,
-	}
-
-	st := NewSystemState(result.Address, contracts.StateReceiverContract, provider)
-	validators, err := st.GetValidatorSet()
-	assert.NoError(t, err)
-	assert.Equal(t, types.Address(ethgo.HexToAddress("1")), validators[0].Address)
-	assert.Equal(t, new(big.Int).SetUint64(15), validators[0].VotingPower)
-}
 
 func TestSystemState_GetNextCommittedIndex(t *testing.T) {
 	t.Parallel()
@@ -199,6 +133,9 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
+		BurnContract: map[uint64]types.Address{
+			0: types.ZeroAddress,
+		},
 	}, st, hclog.NewNullLogger())
 
 	rootHash, err := ex.WriteGenesis(alloc, types.Hash{})
@@ -218,72 +155,4 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 	assert.NoError(t, err)
 
 	return transition
-}
-
-func Test_buildLogsFromReceipts(t *testing.T) {
-	t.Parallel()
-
-	defaultHeader := &types.Header{
-		Number: 100,
-	}
-
-	type args struct {
-		entry  []*types.Receipt
-		header *types.Header
-	}
-
-	data := map[string]interface{}{
-		"Hash":   defaultHeader.Hash,
-		"Number": defaultHeader.Number,
-	}
-
-	dataArray, err := json.Marshal(&data)
-	require.NoError(t, err)
-
-	tests := []struct {
-		name string
-		args args
-		want []*types.Log
-	}{
-		{
-			name: "no entries provided",
-		},
-		{
-			name: "successfully created logs",
-			args: args{
-				entry: []*types.Receipt{
-					{
-						Logs: []*types.Log{
-							{
-								Address: types.BytesToAddress([]byte{0, 1}),
-								Topics:  nil,
-								Data:    dataArray,
-							},
-						},
-					},
-				},
-				header: defaultHeader,
-			},
-			want: []*types.Log{
-				{
-					Address: types.BytesToAddress([]byte{0, 1}),
-					Topics:  nil,
-					Data:    dataArray,
-				},
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			assert.EqualValuesf(t,
-				tt.want,
-				buildLogsFromReceipts(tt.args.entry, tt.args.header),
-				"buildLogsFromReceipts(%v, %v)", tt.args.entry, tt.args.header,
-			)
-		})
-	}
 }

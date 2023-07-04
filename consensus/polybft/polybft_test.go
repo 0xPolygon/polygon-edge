@@ -5,9 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/txpool"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 )
 
 // the test initializes polybft and chain mock (map of headers) after which a new header is verified
@@ -32,7 +34,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	)
 
 	updateHeaderExtra := func(header *types.Header,
-		validators *ValidatorSetDelta,
+		validators *validator.ValidatorSetDelta,
 		parentSignature *Signature,
 		checkpointData *CheckpointData,
 		committedAccounts []*wallet.Account) *Signature {
@@ -41,14 +43,13 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			Parent:     parentSignature,
 			Checkpoint: checkpointData,
 			Committed:  &Signature{},
-			Seal:       []byte{},
 		}
 
 		if extra.Checkpoint == nil {
 			extra.Checkpoint = &CheckpointData{}
 		}
 
-		header.ExtraData = append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...)
+		header.ExtraData = extra.MarshalRLPTo(nil)
 		header.ComputeHash()
 
 		if len(committedAccounts) > 0 {
@@ -56,24 +57,25 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			require.NoError(t, err)
 
 			extra.Committed = createSignature(t, committedAccounts, checkpointHash, bls.DomainCheckpointManager)
-			header.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
+			header.ExtraData = extra.MarshalRLPTo(nil)
 		}
 
 		return extra.Committed
 	}
 
 	// create all validators
-	validators := newTestValidators(t, allValidatorsSize)
+	validators := validator.NewTestValidators(t, allValidatorsSize)
 
 	// create configuration
 	polyBftConfig := PolyBFTConfig{
-		InitialValidatorSet: validators.getParamValidators(),
+		InitialValidatorSet: validators.GetParamValidators(),
 		EpochSize:           fixedEpochSize,
 		SprintSize:          5,
+		BlockTimeDrift:      10,
 	}
 
-	validatorSet := validators.getPublicIdentities()
-	accounts := validators.getPrivateIdentities()
+	validatorSet := validators.GetPublicIdentities()
+	accounts := validators.GetPrivateIdentities()
 
 	// calculate validators before and after the end of the first epoch
 	validatorSetParent, validatorSetCurrent := validatorSet[:len(validatorSet)-1], validatorSet[1:]
@@ -83,7 +85,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap := &testHeadersMap{}
 
 	// create genesis header
-	genesisDelta, err := createValidatorSetDelta(nil, validatorSetParent)
+	genesisDelta, err := validator.CreateValidatorSetDelta(nil, validatorSetParent)
 	require.NoError(t, err)
 
 	genesisHeader := &types.Header{Number: 0}
@@ -94,7 +96,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create headers from 1 to 9
 	for i := uint64(1); i < polyBftConfig.EpochSize; i++ {
-		delta, err := createValidatorSetDelta(validatorSetParent, validatorSetParent)
+		delta, err := validator.CreateValidatorSetDelta(validatorSetParent, validatorSetParent)
 		require.NoError(t, err)
 
 		header := &types.Header{Number: i}
@@ -123,12 +125,12 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	}
 
 	// create parent header (block 10)
-	parentDelta, err := createValidatorSetDelta(validatorSetParent, validatorSetCurrent)
+	parentDelta, err := validator.CreateValidatorSetDelta(validatorSetParent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	parentHeader := &types.Header{
 		Number:    polyBftConfig.EpochSize,
-		Timestamp: uint64(time.Now().UTC().UnixMilli()),
+		Timestamp: uint64(time.Now().UTC().Unix()),
 	}
 	parentCommitment := updateHeaderExtra(parentHeader, parentDelta, nil, &CheckpointData{EpochNumber: 1}, accountSetParent)
 
@@ -136,7 +138,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	headersMap.addHeader(parentHeader)
 
 	// create current header (block 11) with all appropriate fields required for validation
-	currentDelta, err := createValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
+	currentDelta, err := validator.CreateValidatorSetDelta(validatorSetCurrent, validatorSetCurrent)
 	require.NoError(t, err)
 
 	currentHeader := &types.Header{
@@ -270,4 +272,76 @@ func Test_Factory(t *testing.T) {
 	assert.Equal(t, txPool, polybft.txPool)
 	assert.Equal(t, epochSize, polybft.consensusConfig.EpochSize)
 	assert.Equal(t, params, polybft.config)
+}
+
+func Test_GenesisPostHookFactory(t *testing.T) {
+	t.Parallel()
+
+	const (
+		epochSize     = 15
+		maxValidators = 150
+	)
+
+	validators := validator.NewTestValidators(t, 6)
+	bridgeCfg := createTestBridgeConfig()
+	cases := []struct {
+		name            string
+		config          *PolyBFTConfig
+		bridgeAllowList *chain.AddressListConfig
+		expectedErr     error
+	}{
+		{
+			name: "non-mintable native token; access lists disabled",
+			config: &PolyBFTConfig{
+				InitialValidatorSet: validators.GetParamValidators(),
+				Bridge:              bridgeCfg,
+				EpochSize:           epochSize,
+				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
+				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
+				MaxValidatorSetSize: maxValidators,
+			},
+		},
+		{
+			name: "mintable native token; access lists enabled",
+			config: &PolyBFTConfig{
+				InitialValidatorSet: validators.GetParamValidators(),
+				Bridge:              bridgeCfg,
+				EpochSize:           epochSize,
+				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
+				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
+				MaxValidatorSetSize: maxValidators,
+			},
+			bridgeAllowList: &chain.AddressListConfig{
+				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},
+				EnabledAddresses: []types.Address{validators.Validators["1"].Address()},
+			},
+		},
+		{
+			name:        "missing bridge configuration",
+			config:      &PolyBFTConfig{},
+			expectedErr: errMissingBridgeConfig,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			params := &chain.Params{
+				Engine:          map[string]interface{}{ConsensusName: tc.config},
+				BridgeAllowList: tc.bridgeAllowList,
+			}
+			chainConfig := &chain.Chain{Params: params, Genesis: &chain.Genesis{Alloc: make(map[types.Address]*chain.GenesisAccount)}}
+			initHandler := GenesisPostHookFactory(chainConfig, ConsensusName)
+			require.NotNil(t, initHandler)
+
+			transition := newTestTransition(t, nil)
+			if tc.expectedErr == nil {
+				require.NoError(t, initHandler(transition))
+			} else {
+				require.ErrorIs(t, initHandler(transition), tc.expectedErr)
+			}
+		})
+	}
 }

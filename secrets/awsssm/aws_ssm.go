@@ -20,6 +20,9 @@ type AwsSsmManager struct {
 	// The AWS region
 	region string
 
+	// Custom AWS endpoint, e.g. localstack
+	endpoint string
+
 	// The AWS SSM client
 	client *ssm.SSM
 
@@ -44,8 +47,9 @@ func SecretsManagerFactory(
 
 	// / Set up the base object
 	awsSsmManager := &AwsSsmManager{
-		logger: params.Logger.Named(string(secrets.AWSSSM)),
-		region: fmt.Sprintf("%v", config.Extra["region"]),
+		logger:   params.Logger.Named(string(secrets.AWSSSM)),
+		region:   fmt.Sprintf("%v", config.Extra["region"]),
+		endpoint: config.ServerURL,
 	}
 
 	// Set the base path to store the secrets in SSM
@@ -61,15 +65,20 @@ func SecretsManagerFactory(
 
 // Setup sets up the AWS SSM secrets manager
 func (a *AwsSsmManager) Setup() error {
+	cfg := aws.NewConfig().WithRegion(a.region)
+	if a.endpoint != "" {
+		cfg = cfg.WithEndpoint(a.endpoint)
+	}
+
 	sess, err := session.NewSessionWithOptions(session.Options{
-		Config:            aws.Config{Region: aws.String(a.region)},
+		Config:            *cfg,
 		SharedConfigState: session.SharedConfigEnable,
 	})
 	if err != nil {
 		return fmt.Errorf("unable to initialize AWS SSM client: %w", err)
 	}
 
-	ssmsvc := ssm.New(sess, aws.NewConfig().WithRegion(a.region))
+	ssmsvc := ssm.New(sess, cfg)
 	a.client = ssmsvc
 
 	return nil

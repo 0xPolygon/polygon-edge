@@ -1,14 +1,40 @@
 version: '3.9'
 
 services:
-  ## INITIALIZE GENESIS AND SECRETS
+  ## RUN ROOTCHAIN
+  rootchain:
+    image: ghcr.io/0xpolygon/go-ethereum-console:latest
+    container_name: polygon-edge-rootchain
+    command: [
+      "--dev",
+      "--dev.period", "2",
+      "--datadir", "/eth1data",
+      "--ipcpath", "/eth1data/geth.ipc",
+      "--http",
+      "--http.addr", "0.0.0.0",
+      "--http.vhosts", "*",
+      "--http.api", "eth,net,web3,debug",
+      "--ws",
+      "--ws.addr", "0.0.0.0"
+    ]
+    ports:
+      - '8545:8545'
+    volumes:
+      - eth1data:/eth1data
+    networks:
+      - polygon-edge-docker
+
+  ## INITIALIZE GENESIS AND SECRETS, ETC.
   init:
     build:
       context: ../../
       dockerfile: docker/local/Dockerfile
     image: local/polygon-edge
     container_name: polygon-edge-bootstrapper
-    command: [ "init", "${EDGE_CONSENSUS:-ibft}" ]
+    command: [ "init", "${EDGE_CONSENSUS:-polybft}" ]
+    depends_on:
+      rootchain:
+        condition: service_started
     volumes:
       - data:/data
     networks:
@@ -18,10 +44,21 @@ services:
   node-1:
     image: local/polygon-edge
     container_name: polygon-edge-validator-1
-    command: ["server", "--data-dir", "/data/data-1", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir", "/data/data-1",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '10000:9632'
       - '10002:8545'
@@ -35,10 +72,22 @@ services:
   node-2:
     image: local/polygon-edge
     container_name: polygon-edge-validator-2
-    command: ["server", "--data-dir", "/data/data-2", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir",
+      "/data/data-2",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '20000:9632'
       - '20002:8545'
@@ -52,10 +101,21 @@ services:
   node-3:
     image: local/polygon-edge
     container_name: polygon-edge-validator-3
-    command: ["server", "--data-dir", "/data/data-3", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir", "/data/data-3",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '30000:9632'
       - '30002:8545'
@@ -69,10 +129,21 @@ services:
   node-4:
     image: local/polygon-edge
     container_name: polygon-edge-validator-4
-    command: ["server", "--data-dir", "/data/data-4", "--chain", "/data/genesis.json", "--grpc-address", "0.0.0.0:9632", "--libp2p", "0.0.0.0:1478", "--jsonrpc", "0.0.0.0:8545", "--prometheus", "0.0.0.0:5001", "--seal"]
+    command: [
+      "server",
+      "--data-dir",  "/data/data-4",
+      "--chain", "/data/genesis.json",
+      "--grpc-address", "0.0.0.0:9632",
+      "--libp2p", "0.0.0.0:1478",
+      "--jsonrpc", "0.0.0.0:8545",
+      "--prometheus", "0.0.0.0:5001",
+      "--seal"
+    ]
     depends_on:
       init:
         condition: service_completed_successfully
+      rootchain:
+        condition: service_started
     ports:
       - '40000:9632'
       - '40002:8545'
@@ -90,4 +161,5 @@ networks:
 
 volumes:
   data:
+  eth1data:
   genesis:

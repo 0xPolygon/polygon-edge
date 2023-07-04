@@ -38,7 +38,7 @@ func sanitizeRPCEndpoint(rpcEndpoint string) string {
 		if err == nil {
 			rpcEndpoint = fmt.Sprintf("http://%s:%s", "127.0.0.1", port)
 		} else {
-			rpcEndpoint = "http://127.0.0.1:8545"
+			rpcEndpoint = txrelayer.DefaultRPCAddress
 		}
 	}
 
@@ -196,11 +196,10 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 
 	// execute the state sync
 	txn := &ethgo.Transaction{
-		From:     r.key.Address(),
-		To:       (*ethgo.Address)(&contracts.StateReceiverContract),
-		GasPrice: 0,
-		Gas:      types.StateTransactionGasLimit,
-		Input:    input,
+		From:  r.key.Address(),
+		To:    (*ethgo.Address)(&contracts.StateReceiverContract),
+		Gas:   types.StateTransactionGasLimit,
+		Input: input,
 	}
 
 	receipt, err := r.txRelayer.SendTransaction(txn, r.key)

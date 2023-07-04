@@ -400,7 +400,7 @@ func (s *Server) runDial() {
 		//nolint:godox
 		// TODO: Right now the dial task are done sequentially because Connect
 		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently (to be fixed in EVM-541)
+		// maxDials requests concurrently (to be fixed in EVM-543)
 		for s.connectionCounts.HasFreeOutboundConn() {
 			tt := s.dialQueue.PopTask()
 			if tt == nil {
@@ -473,7 +473,12 @@ func (s *Server) IsConnected(peerID peer.ID) bool {
 
 // GetProtocols fetches the list of node-supported protocols
 func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
-	return s.host.Peerstore().GetProtocols(peerID)
+	protocols, err := s.host.Peerstore().GetProtocols(peerID)
+	if err != nil {
+		return nil, err
+	}
+
+	return protocol.ConvertToStrings(protocols), nil
 }
 
 // removePeer removes a peer from the networking server's peer list,

@@ -7,6 +7,7 @@ import (
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -36,37 +37,52 @@ func GenerateAccount() (*Account, error) {
 
 // NewAccountFromSecret creates new account by using provided secretsManager
 func NewAccountFromSecret(secretsManager secrets.SecretsManager) (*Account, error) {
-	var (
-		encodedKey []byte
-		err        error
-	)
-
-	// ECDSA
-	if encodedKey, err = secretsManager.GetSecret(secrets.ValidatorKey); err != nil {
-		return nil, fmt.Errorf("failed to read account data: %w", err)
-	}
-
-	ecdsaRaw, err := hex.DecodeString(string(encodedKey))
+	ecdsaKey, err := GetEcdsaFromSecret(secretsManager)
 	if err != nil {
 		return nil, err
 	}
 
-	ecdsaKey, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
-	if err != nil {
-		return nil, err
-	}
-
-	// BLS
-	if encodedKey, err = secretsManager.GetSecret(secrets.ValidatorBLSKey); err != nil {
-		return nil, fmt.Errorf("failed to read account data: %w", err)
-	}
-
-	blsKey, err := bls.UnmarshalPrivateKey(encodedKey)
+	blsKey, err := GetBlsFromSecret(secretsManager)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Account{Ecdsa: ecdsaKey, Bls: blsKey}, nil
+}
+
+// GetEcdsaFromSecret retrieves validator(ECDSA) key by using provided secretsManager
+func GetEcdsaFromSecret(secretsManager secrets.SecretsManager) (*wallet.Key, error) {
+	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve ecdsa key: %w", err)
+	}
+
+	ecdsaRaw, err := hex.DecodeString(string(encodedKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve ecdsa key: %w", err)
+	}
+
+	key, err := wallet.NewWalletFromPrivKey(ecdsaRaw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve ecdsa key: %w", err)
+	}
+
+	return key, nil
+}
+
+// GetBlsFromSecret retrieves BLS key by using provided secretsManager
+func GetBlsFromSecret(secretsManager secrets.SecretsManager) (*bls.PrivateKey, error) {
+	encodedKey, err := secretsManager.GetSecret(secrets.ValidatorBLSKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve bls key: %w", err)
+	}
+
+	blsKey, err := bls.UnmarshalPrivateKey(encodedKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve bls key: %w", err)
+	}
+
+	return blsKey, nil
 }
 
 // Save persists ECDSA and BLS private keys to the SecretsManager
@@ -100,4 +116,8 @@ func (a *Account) GetEcdsaPrivateKey() (*ecdsa.PrivateKey, error) {
 	}
 
 	return wallet.ParsePrivateKey(ecdsaRaw)
+}
+
+func (a Account) Address() types.Address {
+	return types.Address(a.Ecdsa.Address())
 }

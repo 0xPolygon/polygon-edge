@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/monitor"
 	"github.com/0xPolygon/polygon-edge/command/peers"
 	"github.com/0xPolygon/polygon-edge/command/polybft"
-	"github.com/0xPolygon/polygon-edge/command/polybftmanifest"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	"github.com/0xPolygon/polygon-edge/command/regenesis"
 	"github.com/0xPolygon/polygon-edge/command/rootchain"
@@ -25,7 +24,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/status"
 	"github.com/0xPolygon/polygon-edge/command/txpool"
 	"github.com/0xPolygon/polygon-edge/command/version"
-	"github.com/0xPolygon/polygon-edge/command/whitelist"
 )
 
 type RootCommand struct {
@@ -59,12 +57,10 @@ func (rc *RootCommand) registerSubCommands() {
 		backup.GetCommand(),
 		genesis.GetCommand(),
 		server.GetCommand(),
-		whitelist.GetCommand(),
 		license.GetCommand(),
 		sidecar.GetCommand(),
 		polybftsecrets.GetCommand(),
 		polybft.GetCommand(),
-		polybftmanifest.GetCommand(),
 		bridge.GetCommand(),
 		regenesis.GetCommand(),
 	)

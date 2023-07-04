@@ -76,6 +76,7 @@ func (b Bloom) MarshalText() ([]byte, error) {
 // CreateBloom creates a new bloom filter from a set of receipts
 func CreateBloom(receipts []*Receipt) (b Bloom) {
 	h := keccak.DefaultKeccakPool.Get()
+	defer keccak.DefaultKeccakPool.Put(h)
 
 	for _, receipt := range receipts {
 		for _, log := range receipt.Logs {
@@ -87,8 +88,6 @@ func CreateBloom(receipts []*Receipt) (b Bloom) {
 		}
 	}
 
-	keccak.DefaultKeccakPool.Put(h)
-
 	return
 }
 
@@ -99,35 +98,31 @@ func (b *Bloom) setEncode(hasher *keccak.Keccak, h []byte) {
 
 	for i := 0; i < 6; i += 2 {
 		// Find the global bit location
-		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
+		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & (BloomByteLength*8 - 1)
 
-		// Find where the bit maps in the [0..255] byte array
-		byteLocation := 256 - 1 - bit/8
+		// Find where the bit maps in the [0..BloomByteLength-1] byte array
+		byteLocation := BloomByteLength - 1 - bit/8
 		bitLocation := bit % 8
-		b[byteLocation] = b[byteLocation] | (1 << bitLocation)
+		b[byteLocation] |= 1 << bitLocation
 	}
 }
 
 // IsLogInBloom checks if the log has a possible presence in the bloom filter
 func (b *Bloom) IsLogInBloom(log *Log) bool {
 	hasher := keccak.DefaultKeccakPool.Get()
+	defer keccak.DefaultKeccakPool.Put(hasher)
 
 	// Check if the log address is present
-	addressPresent := b.isByteArrPresent(hasher, log.Address.Bytes())
-	if !addressPresent {
+	if !b.isByteArrPresent(hasher, log.Address.Bytes()) {
 		return false
 	}
 
 	// Check if all the topics are present
 	for _, topic := range log.Topics {
-		topicsPresent := b.isByteArrPresent(hasher, topic.Bytes())
-
-		if !topicsPresent {
+		if !b.isByteArrPresent(hasher, topic.Bytes()) {
 			return false
 		}
 	}
-
-	keccak.DefaultKeccakPool.Put(hasher)
 
 	return true
 }
@@ -140,15 +135,12 @@ func (b *Bloom) isByteArrPresent(hasher *keccak.Keccak, data []byte) bool {
 
 	for i := 0; i < 6; i += 2 {
 		// Find the global bit location
-		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & 2047
+		bit := (uint(buf[i+1]) + (uint(buf[i]) << 8)) & (BloomByteLength*8 - 1)
 
-		// Find where the bit maps in the [0..255] byte array
-		byteLocation := 256 - 1 - bit/8
+		// Find where the bit maps in the [0..BloomByteLength-1] byte array
+		byteLocation := BloomByteLength - 1 - bit/8
 		bitLocation := bit % 8
-
-		referenceByte := b[byteLocation]
-
-		isSet := uint(referenceByte & (1 << (bitLocation - 1)))
+		isSet := b[byteLocation] & (1 << bitLocation)
 
 		if isSet == 0 {
 			return false
