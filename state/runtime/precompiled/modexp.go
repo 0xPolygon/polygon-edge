@@ -152,6 +152,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 		if gasCost.Uint64() < 200 {
 			return 200
 		}
+
 		return gasCost.Uint64()
 	}
 
