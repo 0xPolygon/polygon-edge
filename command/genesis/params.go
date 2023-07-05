@@ -504,7 +504,8 @@ func (p *genesisParams) validatePremineInfo() error {
 
 	for _, premineInfo := range p.premineInfos {
 		if premineInfo.address == types.ZeroAddress {
-			isReserveAccPremined = true
+			// we have premine of zero address, just return
+			return nil
 		}
 	}
 
