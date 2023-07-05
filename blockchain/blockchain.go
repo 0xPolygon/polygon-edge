@@ -546,11 +546,6 @@ func (b *Blockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	return h, true
 }
 
-// WriteHeaders writes an array of headers
-func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
-	return b.WriteHeadersWithBodies(headers)
-}
-
 // WriteHeadersWithBodies writes a batch of headers
 func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	// Check the size

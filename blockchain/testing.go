@@ -126,7 +126,7 @@ func NewTestBlockchain(t *testing.T, headers []*types.Header) *Blockchain {
 			t.Fatal(err)
 		}
 
-		if err := b.WriteHeaders(headers[1:]); err != nil {
+		if err := b.WriteHeadersWithBodies(headers[1:]); err != nil {
 			t.Fatal(err)
 		}
 	}

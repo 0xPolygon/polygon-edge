@@ -461,6 +461,7 @@ type readSnapshotDelegate func(types.Hash) ([]byte, bool)
 type readReceiptsDelegate func(types.Hash) ([]*types.Receipt, error)
 type readTxLookupDelegate func(types.Hash) (types.Hash, bool)
 type closeDelegate func() error
+type newBatchDelegate func() Batch
 
 type MockStorage struct {
 	readCanonicalHashFn   readCanonicalHashDelegate
@@ -473,6 +474,7 @@ type MockStorage struct {
 	readReceiptsFn        readReceiptsDelegate
 	readTxLookupFn        readTxLookupDelegate
 	closeFn               closeDelegate
+	newBatchFn            newBatchDelegate
 }
 
 func NewMockStorage() *MockStorage {
@@ -599,6 +601,14 @@ func (m *MockStorage) HookClose(fn closeDelegate) {
 	m.closeFn = fn
 }
 
+func (m *MockStorage) HookNewBatch(fn newBatchDelegate) {
+	m.newBatchFn = fn
+}
+
 func (m *MockStorage) NewBatch() Batch {
+	if m.newBatchFn != nil {
+		return m.newBatchFn()
+	}
+
 	return nil
 }
