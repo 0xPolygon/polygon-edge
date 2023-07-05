@@ -486,6 +486,7 @@ func parseExitEvent(h *types.Header, l *ethgo.Log) (*ExitEvent, bool, error) {
 
 	epoch := extra.Checkpoint.EpochNumber
 	block := h.Number
+
 	if extra.Validators != nil {
 		// exit events that happened in epoch ending blocks,
 		// should be added to the tree of the next epoch
