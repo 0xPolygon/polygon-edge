@@ -90,29 +90,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 
 			return state.CheckpointStore.insertExitEvents(events)
 		},
-		parseEventFn: func(h *types.Header, l *ethgo.Log) (*ExitEvent, bool, error) {
-			extra, err := GetIbftExtra(h.ExtraData)
-			if err != nil {
-				return nil, false,
-					fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
-			}
-
-			epoch := extra.Checkpoint.EpochNumber
-			block := h.Number
-			if extra.Validators != nil {
-				// exit events that happened in epoch ending blocks,
-				// should be added to the tree of the next epoch
-				epoch++
-				block++
-			}
-
-			event, err := decodeExitEvent(l, epoch, block)
-			if err != nil {
-				return nil, false, err
-			}
-
-			return event, true, nil
-		},
+		parseEventFn: parseExitEvent,
 	}
 
 	return &checkpointManager{
@@ -496,4 +474,29 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	}
 
 	return merkle.NewMerkleTree(data)
+}
+
+// parseExitEvent parses exit event from provided log
+func parseExitEvent(h *types.Header, l *ethgo.Log) (*ExitEvent, bool, error) {
+	extra, err := GetIbftExtra(h.ExtraData)
+	if err != nil {
+		return nil, false,
+			fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
+	}
+
+	epoch := extra.Checkpoint.EpochNumber
+	block := h.Number
+	if extra.Validators != nil {
+		// exit events that happened in epoch ending blocks,
+		// should be added to the tree of the next epoch
+		epoch++
+		block++
+	}
+
+	event, err := decodeExitEvent(l, epoch, block)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return event, true, nil
 }
