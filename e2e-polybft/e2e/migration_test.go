@@ -14,7 +14,6 @@ import (
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/umbracle/ethgo"
@@ -41,14 +40,14 @@ func TestE2E_Migration(t *testing.T) {
 		userAddr,
 		ethgo.Latest,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, balanceSender.Cmp(initialBalance), 0)
+	require.NoError(t, err)
+	require.Equal(t, balanceSender.Cmp(initialBalance), 0)
 
 	balanceReceiver, err := rpcClient.Eth().GetBalance(
 		userAddr2,
 		ethgo.Latest,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	if balanceReceiver.Uint64() != 0 {
 		t.Fatal("balanceReceiver is not 0")
@@ -65,8 +64,8 @@ func TestE2E_Migration(t *testing.T) {
 		Gas:   1000000,
 		Value: sendAmount,
 	}, userKey)
-	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
+	require.NoError(t, err)
+	require.NotNil(t, receipt)
 
 	receipt, err = relayer.SendTransaction(&ethgo.Transaction{
 		From:  userAddr,
@@ -91,14 +90,14 @@ func TestE2E_Migration(t *testing.T) {
 		userAddr,
 		ethgo.Latest,
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	balanceReceiver, err = rpcClient.Eth().GetBalance(
 		userAddr2,
 		ethgo.Latest,
 	)
-	assert.NoError(t, err)
-	assert.Equal(t, sendAmount, balanceReceiver)
+	require.NoError(t, err)
+	require.Equal(t, sendAmount, balanceReceiver)
 
 	block, err := rpcClient.Eth().GetBlockByNumber(ethgo.Latest, true)
 	if err != nil {
@@ -163,8 +162,8 @@ func TestE2E_Migration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assert.Equal(t, balanceSender, senderBalanceAfterMigration)
-	assert.Equal(t, balanceReceiver, receiverBalanceAfterMigration)
+	require.Equal(t, balanceSender, senderBalanceAfterMigration)
+	require.Equal(t, balanceReceiver, receiverBalanceAfterMigration)
 
 	deployedCode, err := cluster.Servers[0].JSONRPC().Eth().GetCode(deployedContractBalance, ethgo.Latest)
 	if err != nil {

@@ -145,6 +145,10 @@ func (p *genesisParams) validateFlags() error {
 		return errValidatorsNotSpecified
 	}
 
+	if err := p.parsePremineInfo(); err != nil {
+		return err
+	}
+
 	if p.isPolyBFTConsensus() {
 		if err := p.extractNativeTokenMetadata(); err != nil {
 			return err
@@ -478,10 +482,9 @@ func (p *genesisParams) validateRewardWallet() error {
 	return nil
 }
 
-// validatePremineInfo validates whether reserve account (0x0 address) is premined
-func (p *genesisParams) validatePremineInfo() error {
+// parsePremineInfo parses premine flag
+func (p *genesisParams) parsePremineInfo() error {
 	p.premineInfos = make([]*premineInfo, 0, len(p.premine))
-	isReserveAccPremined := false
 
 	for _, premine := range p.premine {
 		premineInfo, err := parsePremineInfo(premine)
@@ -490,7 +493,16 @@ func (p *genesisParams) validatePremineInfo() error {
 		}
 
 		p.premineInfos = append(p.premineInfos, premineInfo)
+	}
 
+	return nil
+}
+
+// validatePremineInfo validates whether reserve account (0x0 address) is premined
+func (p *genesisParams) validatePremineInfo() error {
+	isReserveAccPremined := false
+
+	for _, premineInfo := range p.premineInfos {
 		if premineInfo.address == types.ZeroAddress {
 			isReserveAccPremined = true
 		}
