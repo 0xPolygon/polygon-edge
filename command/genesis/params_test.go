@@ -124,16 +124,17 @@ func Test_validatePremineInfo(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name             string
-		premineRaw       []string
-		expectedPremines []*premineInfo
-		expectErrMsg     string
+		name                 string
+		premineRaw           []string
+		expectedPremines     []*premineInfo
+		expectValidateErrMsg string
+		expectedParseErrMsg  string
 	}{
 		{
-			name:             "invalid premine balance",
-			premineRaw:       []string{"0x12345:loremIpsum"},
-			expectedPremines: []*premineInfo{},
-			expectErrMsg:     "invalid premine balance amount provided",
+			name:                "invalid premine balance",
+			premineRaw:          []string{"0x12345:loremIpsum"},
+			expectedPremines:    []*premineInfo{},
+			expectedParseErrMsg: "invalid premine balance amount provided",
 		},
 		{
 			name:       "missing zero address premine",
@@ -141,7 +142,7 @@ func Test_validatePremineInfo(t *testing.T) {
 			expectedPremines: []*premineInfo{
 				{address: types.StringToAddress("12"), amount: command.DefaultPremineBalance},
 			},
-			expectErrMsg: errReserveAccMustBePremined.Error(),
+			expectValidateErrMsg: errReserveAccMustBePremined.Error(),
 		},
 		{
 			name: "valid premine information",
@@ -153,7 +154,7 @@ func Test_validatePremineInfo(t *testing.T) {
 				{address: types.StringToAddress("1"), amount: ethgo.Ether(10)},
 				{address: types.ZeroAddress, amount: ethgo.Ether(10000)},
 			},
-			expectErrMsg: "",
+			expectValidateErrMsg: "",
 		},
 	}
 
@@ -163,10 +164,19 @@ func Test_validatePremineInfo(t *testing.T) {
 			t.Parallel()
 
 			p := &genesisParams{premine: c.premineRaw}
-			err := p.validatePremineInfo()
+			err := p.parsePremineInfo()
+			if c.expectedParseErrMsg != "" {
+				require.ErrorContains(t, err, c.expectedParseErrMsg)
 
-			if c.expectErrMsg != "" {
-				require.ErrorContains(t, err, c.expectErrMsg)
+				return
+			} else {
+				require.NoError(t, err)
+			}
+
+			err = p.validatePremineInfo()
+
+			if c.expectValidateErrMsg != "" {
+				require.ErrorContains(t, err, c.expectValidateErrMsg)
 			} else {
 				require.NoError(t, err)
 			}
