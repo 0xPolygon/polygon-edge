@@ -178,6 +178,7 @@ var modExpTestsEIP2565 = []precompiledTest{
 func TestModExp(t *testing.T) {
 	p := &Precompiled{}
 	enabledForks.EIP2565 = false
+
 	testPrecompiled(t, &modExp{p}, modExpTests)
 }
 
