@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -13,6 +14,20 @@ type precompiledTest struct {
 	Name     string
 	Input    string
 	Expected string
+	Gas      uint64
+}
+
+var enabledForks = &chain.ForksInTime{
+	Homestead:      true,
+	Byzantium:      true,
+	Constantinople: true,
+	Petersburg:     true,
+	Istanbul:       true,
+	London:         true,
+	EIP150:         true,
+	EIP158:         true,
+	EIP155:         true,
+	EIP2565:        true,
 }
 
 func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
@@ -21,8 +36,13 @@ func testPrecompiled(t *testing.T, p contract, cases []precompiledTest) {
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			h, _ := hex.DecodeString(c.Input)
-			found, err := p.run(h, types.ZeroAddress, nil)
 
+			if c.Gas != 0 {
+				gas := p.gas(h, enabledForks)
+				assert.Equal(t, c.Gas, gas, "Inncorrect gas estimation")
+			}
+
+			found, err := p.run(h, types.ZeroAddress, nil)
 			assert.NoError(t, err)
 			assert.Equal(t, c.Expected, hex.EncodeToString(found))
 		})
