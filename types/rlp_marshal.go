@@ -189,6 +189,8 @@ func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
 }
 
 // MarshalRLPWith marshals the transaction to RLP with a specific fastrlp.Arena
+// Be careful! This function does not serialize tx type as a first byte.
+// Use MarshalRLP/MarshalRLPTo in most cases
 func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 

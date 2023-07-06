@@ -75,13 +75,8 @@ func (t *Transaction) IsContractCreation() bool {
 
 // ComputeHash computes the hash of the transaction
 func (t *Transaction) ComputeHash() *Transaction {
-	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
-
-	v := t.MarshalRLPWith(ar)
-	hash.WriteRlp(t.Hash[:0], v)
-
-	marshalArenaPool.Put(ar)
+	hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
 	keccak.DefaultKeccakPool.Put(hash)
 
 	return t
