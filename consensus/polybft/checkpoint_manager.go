@@ -82,14 +82,6 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		isValidLogFn: func(l *types.Log) bool {
 			return l.Address == contracts.L2StateSenderContract
 		},
-		saveEventsFn: func(events []*ExitEvent) error {
-			// enforce sequential order
-			sort.Slice(events, func(i, j int) bool {
-				return events[i].ID.Cmp(events[j].ID) < 0
-			})
-
-			return state.CheckpointStore.insertExitEvents(events)
-		},
 		parseEventFn: parseExitEvent,
 	}
 
@@ -299,8 +291,17 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
-	// get exit events from current block
-	if err := c.eventGetter.getFromBlocks(lastBlock, req.FullBlock); err != nil {
+	exitEvents, err := c.eventGetter.getFromBlocks(lastBlock, req.FullBlock)
+	if err != nil {
+		return err
+	}
+
+	sort.Slice(exitEvents, func(i, j int) bool {
+		// keep events in sequential order
+		return exitEvents[i].ID.Cmp(exitEvents[j].ID) < 0
+	})
+
+	if err := c.state.CheckpointStore.insertExitEvents(exitEvents); err != nil {
 		return err
 	}
 

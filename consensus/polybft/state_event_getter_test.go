@@ -25,15 +25,8 @@ func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 	}, true)
 	backend.On("GetReceiptsByHash", mock.Anything).Return([]*types.Receipt{receipt}, nil)
 
-	saveEventsFn := func(events []*contractsapi.TransferEvent) error {
-		require.NotEmpty(t, events)
-
-		return nil
-	}
-
 	retryManager := &eventsGetter[*contractsapi.TransferEvent]{
-		blockchain:   backend,
-		saveEventsFn: saveEventsFn,
+		blockchain: backend,
 		isValidLogFn: func(l *types.Log) bool {
 			return l.Address == contracts.ValidatorSetContract
 		},
@@ -45,8 +38,11 @@ func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, retryManager.getFromBlocks(0, &types.FullBlock{
+	events, err := retryManager.getFromBlocks(0, &types.FullBlock{
 		Block:    &types.Block{Header: &types.Header{Number: 2}},
 		Receipts: []*types.Receipt{},
-	}))
+	})
+
+	require.NoError(t, err)
+	require.Len(t, events, 1)
 }

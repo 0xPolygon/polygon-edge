@@ -13,9 +13,6 @@ type eventsGetter[T contractsapi.EventAbi] struct {
 	// blockchain is an abstraction of blockchain that provides necessary functions
 	// for querying blockchain data (blocks, receipts, etc.)
 	blockchain blockchainBackend
-	// saveEventsFn is a plugin function used to return gotten events
-	// and/or to save them to some db
-	saveEventsFn func([]T) error
 	// parseEventFn is a plugin function used to parse the event from transaction log
 	parseEventFn func(*types.Header, *ethgo.Log) (T, bool, error)
 	// isValidLogFn is a plugin function that validates the log
@@ -25,23 +22,24 @@ type eventsGetter[T contractsapi.EventAbi] struct {
 
 // getFromBlocks gets events of specified type from specified blocks
 // and saves them using the provided saveEventsFn
-func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64, currentBlock *types.FullBlock) error {
+func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
+	currentBlock *types.FullBlock) ([]T, error) {
 	var allEvents []T
 
 	for i := lastProcessedBlock + 1; i < currentBlock.Block.Number(); i++ {
 		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
 		if !found {
-			return blockchain.ErrNoBlock
+			return nil, blockchain.ErrNoBlock
 		}
 
 		receipts, err := e.blockchain.GetReceiptsByHash(blockHeader.Hash)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		eventsFromBlock, err := e.getEventsFromReceipts(blockHeader, receipts)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		allEvents = append(allEvents, eventsFromBlock...)
@@ -49,16 +47,12 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64, currentBlock 
 
 	currentEvents, err := e.getEventsFromReceipts(currentBlock.Block.Header, currentBlock.Receipts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	allEvents = append(allEvents, currentEvents...)
 
-	if len(allEvents) > 0 {
-		return e.saveEventsFn(allEvents)
-	}
-
-	return nil
+	return allEvents, nil
 }
 
 // getEventsFromReceipts returns events of specified type from block transaction receipts

@@ -57,6 +57,7 @@ type stakeManager struct {
 	supernetManagerContract types.Address
 	maxValidatorSetSize     int
 	blockchain              blockchainBackend
+	eventsGetter            *eventsGetter[*contractsapi.TransferEvent]
 }
 
 // newStakeManager returns a new instance of stake manager
@@ -69,6 +70,19 @@ func newStakeManager(
 	blockchain blockchainBackend,
 	maxValidatorSetSize int,
 ) *stakeManager {
+	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
+		blockchain: blockchain,
+		isValidLogFn: func(l *types.Log) bool {
+			return l.Address == validatorSetAddr
+		},
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.TransferEvent, bool, error) {
+			var transferEvent contractsapi.TransferEvent
+			doesMatch, err := transferEvent.ParseLog(l)
+
+			return &transferEvent, doesMatch, err
+		},
+	}
+
 	return &stakeManager{
 		logger:                  logger,
 		state:                   state,
@@ -78,6 +92,7 @@ func newStakeManager(
 		supernetManagerContract: supernetManagerAddr,
 		maxValidatorSetSize:     maxValidatorSetSize,
 		blockchain:              blockchain,
+		eventsGetter:            eventsGetter,
 	}
 }
 
@@ -122,26 +137,9 @@ func (s *stakeManager) updateWithReceipts(
 	fullValidatorSet *validatorSetState, fullBlock *types.FullBlock) error {
 	var transferEvents []*contractsapi.TransferEvent
 
-	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
-		blockchain: s.blockchain,
-		saveEventsFn: func(te []*contractsapi.TransferEvent) error {
-			transferEvents = append(transferEvents, te...)
-
-			return nil
-		},
-		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == s.validatorSetContract
-		},
-		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.TransferEvent, bool, error) {
-			var transferEvent contractsapi.TransferEvent
-			doesMatch, err := transferEvent.ParseLog(l)
-
-			return &transferEvent, doesMatch, err
-		},
-	}
-
 	// get transfer currentBlockEvents from current block
-	if err := eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber, fullBlock); err != nil {
+	transferEvents, err := s.eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber, fullBlock)
+	if err != nil {
 		return fmt.Errorf("could not get transfer events from current block. Error: %w", err)
 	}
 
