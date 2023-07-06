@@ -2,6 +2,8 @@ package precompiled
 
 import (
 	"testing"
+
+	"github.com/0xPolygon/polygon-edge/chain"
 )
 
 var modExpTests = []precompiledTest{
@@ -177,14 +179,15 @@ var modExpTestsEIP2565 = []precompiledTest{
 
 func TestModExp(t *testing.T) {
 	p := &Precompiled{}
+	enabledForks := chain.AllForksEnabled.At(0)
 	enabledForks.EIP2565 = false
 
-	testPrecompiled(t, &modExp{p}, modExpTests)
+	testPrecompiled(t, &modExp{p}, modExpTests, &enabledForks)
 }
 
 func TestModExpWithEIP2565(t *testing.T) {
 	p := &Precompiled{}
-	enabledForks.EIP2565 = true
+	enabledForks := chain.AllForksEnabled.At(0)
 
-	testPrecompiled(t, &modExp{p}, modExpTestsEIP2565)
+	testPrecompiled(t, &modExp{p}, modExpTestsEIP2565, &enabledForks)
 }
