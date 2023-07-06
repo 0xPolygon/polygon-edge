@@ -53,10 +53,8 @@ type stakeManager struct {
 	state                   *State
 	rootChainRelayer        txrelayer.TxRelayer
 	key                     ethgo.Key
-	validatorSetContract    types.Address
 	supernetManagerContract types.Address
 	maxValidatorSetSize     int
-	blockchain              blockchainBackend
 	eventsGetter            *eventsGetter[*contractsapi.TransferEvent]
 }
 
@@ -88,10 +86,8 @@ func newStakeManager(
 		state:                   state,
 		rootChainRelayer:        rootchainRelayer,
 		key:                     key,
-		validatorSetContract:    validatorSetAddr,
 		supernetManagerContract: supernetManagerAddr,
 		maxValidatorSetSize:     maxValidatorSetSize,
-		blockchain:              blockchain,
 		eventsGetter:            eventsGetter,
 	}
 }

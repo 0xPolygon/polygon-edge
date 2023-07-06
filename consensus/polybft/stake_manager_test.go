@@ -63,6 +63,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		newStake          = uint64(100)
 		firstValidator    = uint64(0)
 		secondValidator   = uint64(1)
+		validatorSetAddr  = types.StringToAddress("0x0001")
 	)
 
 	state := newTestState(t)
@@ -75,7 +76,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			state,
 			nil,
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
-			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
+			validatorSetAddr, types.StringToAddress("0x0002"),
 			nil,
 			5,
 		)
@@ -90,7 +91,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			Logs: []*types.Log{
 				createTestLogForTransferEvent(
 					t,
-					stakeManager.validatorSetContract,
+					validatorSetAddr,
 					validators.GetValidator(initialSetAliases[firstValidator]).Address(),
 					types.ZeroAddress,
 					1, // initial validator stake was 1
@@ -146,7 +147,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			Logs: []*types.Log{
 				createTestLogForTransferEvent(
 					t,
-					stakeManager.validatorSetContract,
+					validatorSetAddr,
 					types.ZeroAddress,
 					validators.GetValidator(initialSetAliases[secondValidator]).Address(),
 					250,
@@ -213,7 +214,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			receipts[i] = &types.Receipt{Logs: []*types.Log{
 				createTestLogForTransferEvent(
 					t,
-					stakeManager.validatorSetContract,
+					validatorSetAddr,
 					types.ZeroAddress,
 					validators.GetValidator(allAliases[i]).Address(),
 					newStake,
@@ -272,7 +273,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		receipt.Logs = []*types.Log{
 			createTestLogForTransferEvent(
 				t,
-				stakeManager.validatorSetContract,
+				validatorSetAddr,
 				types.ZeroAddress,
 				validators.GetValidator(initialSetAliases[secondValidator]).Address(),
 				250,
