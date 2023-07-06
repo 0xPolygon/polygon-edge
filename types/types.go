@@ -202,3 +202,13 @@ type OverrideAccount struct {
 }
 
 type StateOverride map[Address]OverrideAccount
+
+// HashFromBytes calculates hash by using src slice and populates result into dst slice
+func HashFromBytes(dst, src []byte) Hash {
+	hash := keccak.DefaultKeccakPool.Get()
+	hash.Write(src) //nolint:errcheck
+	result := hash.Sum(dst)
+	keccak.DefaultKeccakPool.Put(hash)
+
+	return Hash(result)
+}

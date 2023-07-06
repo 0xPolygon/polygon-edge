@@ -374,10 +374,19 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 		offset = 1
 	}
 
-	return UnmarshalRlp(t.unmarshalRLPFrom, input[offset:])
+	if err := UnmarshalRlp(t.unmarshalRLPFrom, input[offset:]); err != nil {
+		return err
+	}
+
+	t.Hash = HashFromBytes(t.Hash[:], input)
+
+	return nil
 }
 
 // unmarshalRLPFrom unmarshals a Transaction in RLP format
+// Be careful! This function does not de-serialize tx type, it assumes that t.Type is already set
+// Hash calculation should also be done from the outside!
+// Use UnmarshalRLP in most cases
 func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
@@ -407,8 +416,6 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	if numElems := len(elems); numElems != num {
 		return fmt.Errorf("incorrect number of transaction elements, expected %d but found %d", num, numElems)
 	}
-
-	p.Hash(t.Hash[:0], v)
 
 	// Skipping Chain ID field since we don't support it (yet)
 	// This is needed to be compatible with other EVM chains and have the same format.
