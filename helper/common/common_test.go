@@ -116,19 +116,11 @@ func TestRetryForever_AlwaysReturnError_ShouldNeverEnd(t *testing.T) {
 	require.False(t, ended)
 }
 
-func TestRetryForever_ReturnNilAfterFirstRun_ShouldEnd(t *testing.T) {
+func TestRetryForever_CancelContext_ShouldEnd(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	cancel()
 	RetryForever(ctx, time.Millisecond*100, func(ctx context.Context) error {
-		select {
-		case <-ctx.Done():
-
-			return nil
-		default:
-			cancel()
-
-			return errors.New("")
-		}
+		return errors.New("")
 	})
-	<-ctx.Done()
 	require.True(t, errors.Is(ctx.Err(), context.Canceled))
 }
