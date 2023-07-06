@@ -25,10 +25,10 @@ type eventsGetter[T contractsapi.EventAbi] struct {
 
 // getFromBlocks gets events of specified type from specified blocks
 // and saves them using the provided saveEventsFn
-func (e *eventsGetter[T]) getFromBlocks(fromBlock, toBlock uint64) error {
-	var missedEvents []T
+func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64, currentBlock *types.FullBlock) error {
+	var allEvents []T
 
-	for i := fromBlock; i <= toBlock; i++ {
+	for i := lastProcessedBlock + 1; i < currentBlock.Block.Number(); i++ {
 		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
 		if !found {
 			return blockchain.ErrNoBlock
@@ -44,11 +44,18 @@ func (e *eventsGetter[T]) getFromBlocks(fromBlock, toBlock uint64) error {
 			return err
 		}
 
-		missedEvents = append(missedEvents, eventsFromBlock...)
+		allEvents = append(allEvents, eventsFromBlock...)
 	}
 
-	if len(missedEvents) > 0 {
-		return e.saveEventsFn(missedEvents)
+	currentEvents, err := e.getEventsFromReceipts(currentBlock.Block.Header, currentBlock.Receipts)
+	if err != nil {
+		return err
+	}
+
+	allEvents = append(allEvents, currentEvents...)
+
+	if len(allEvents) > 0 {
+		return e.saveEventsFn(allEvents)
 	}
 
 	return nil
@@ -83,16 +90,4 @@ func (e *eventsGetter[T]) getEventsFromReceipts(blockHeader *types.Header,
 	}
 
 	return events, nil
-}
-
-// saveBlockEvents gets events of specified block from block receipts
-// and saves them using the provided saveEventsFn
-func (e *eventsGetter[T]) saveBlockEvents(blockHeader *types.Header,
-	receipts []*types.Receipt) error {
-	events, err := e.getEventsFromReceipts(blockHeader, receipts)
-	if err != nil {
-		return err
-	}
-
-	return e.saveEventsFn(events)
 }

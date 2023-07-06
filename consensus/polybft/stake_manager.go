@@ -140,21 +140,11 @@ func (s *stakeManager) updateWithReceipts(
 		},
 	}
 
-	if fullValidatorSet.BlockNumber+1 < fullBlock.Block.Number() {
-		// get transfer events we missed until current block
-		if err := eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber+1,
-			fullBlock.Block.Number()-1); err != nil {
-			return fmt.Errorf("could not get transfer events from missed blocks. Error: %w", err)
-		}
-	}
-
 	// get transfer currentBlockEvents from current block
-	currentBlockEvents, err := eventsGetter.getEventsFromReceipts(fullBlock.Block.Header, fullBlock.Receipts)
-	if err != nil {
+	if err := eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber, fullBlock); err != nil {
 		return fmt.Errorf("could not get transfer events from current block. Error: %w", err)
 	}
 
-	transferEvents = append(transferEvents, currentBlockEvents...)
 	if len(transferEvents) == 0 {
 		return nil
 	}
@@ -178,11 +168,13 @@ func (s *stakeManager) updateWithReceipts(
 
 	for addr, data := range fullValidatorSet.Validators {
 		if data.BlsKey == nil {
-			data.BlsKey, err = s.getBlsKey(data.Address)
+			blsKey, err := s.getBlsKey(data.Address)
 			if err != nil {
 				s.logger.Warn("Could not get info for new validator",
 					"block", fullBlock.Block.Number(), "address", addr)
 			}
+
+			data.BlsKey = blsKey
 		}
 
 		data.IsActive = data.VotingPower.Cmp(bigZero) > 0

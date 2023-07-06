@@ -45,5 +45,8 @@ func TestEventDBInsertRetry_GetEvents(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, retryManager.getFromBlocks(1, 1))
+	require.NoError(t, retryManager.getFromBlocks(0, &types.FullBlock{
+		Block:    &types.Block{Header: &types.Header{Number: 2}},
+		Receipts: []*types.Receipt{},
+	}))
 }

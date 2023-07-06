@@ -299,22 +299,8 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
-	// get any missed events
-	if lastBlock+1 < block {
-		// since we save exit events from epoch ending blocks,
-		// to next epoch and next block, check that block as well
-		// to not miss any events that might happen in it
-		if err := c.eventGetter.getFromBlocks(lastBlock+1, block-1); err != nil {
-			return fmt.Errorf("could not get exit events from missed blocks. Error: %w", err)
-		}
-
-		if err := c.state.CheckpointStore.updateLastSaved(block - 1); err != nil {
-			return err
-		}
-	}
-
 	// get exit events from current block
-	if err := c.eventGetter.saveBlockEvents(req.FullBlock.Block.Header, req.FullBlock.Receipts); err != nil {
+	if err := c.eventGetter.getFromBlocks(lastBlock, req.FullBlock); err != nil {
 		return err
 	}
 
