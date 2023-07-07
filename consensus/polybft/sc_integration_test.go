@@ -161,16 +161,20 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 
 	exits := []*ExitEvent{
 		{
-			ID:       1,
-			Sender:   ethgo.Address(contracts.ChildERC20PredicateContract),
-			Receiver: ethgo.Address(rootERC20PredicateAddr),
-			Data:     exitData1,
+			L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
+				ID:       big.NewInt(1),
+				Sender:   contracts.ChildERC20PredicateContract,
+				Receiver: rootERC20PredicateAddr,
+				Data:     exitData1,
+			},
 		},
 		{
-			ID:       2,
-			Sender:   ethgo.Address(contracts.ChildERC20PredicateContract),
-			Receiver: ethgo.Address(rootERC20PredicateAddr),
-			Data:     exitData2,
+			L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
+				ID:       big.NewInt(2),
+				Sender:   contracts.ChildERC20PredicateContract,
+				Receiver: rootERC20PredicateAddr,
+				Data:     exitData2,
+			},
 		},
 	}
 	exitTree, err := createExitTree(exits)
@@ -226,7 +230,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	require.Equal(t, 0, int(res[31]))
 
 	var exitEventAPI contractsapi.L2StateSyncedEvent
-	proofExitEvent, err := exitEventAPI.Encode(exits[0])
+	proofExitEvent, err := exitEventAPI.Encode(exits[0].L2StateSyncedEvent)
 	require.NoError(t, err)
 
 	proof, err := exitTree.GenerateProof(proofExitEvent)

@@ -15,7 +15,7 @@ import (
 const minBlockMaxBacklog = 96
 
 type eventSubscription interface {
-	AddLog(log *ethgo.Log)
+	AddLog(log *ethgo.Log) error
 }
 
 type EventTracker struct {

@@ -231,12 +231,12 @@ func (s *stateSyncManager) verifyVoteSignature(valSet validator.ValidatorSet, si
 }
 
 // AddLog saves the received log from event tracker if it matches a state sync event ABI
-func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
+func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) error {
 	event := &contractsapi.StateSyncedEvent{}
 
 	doesMatch, err := event.ParseLog(eventLog)
 	if !doesMatch {
-		return
+		return nil
 	}
 
 	s.logger.Info(
@@ -249,18 +249,22 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) {
 	if err != nil {
 		s.logger.Error("could not decode state sync event", "err", err)
 
-		return
+		return err
 	}
 
 	if err := s.state.StateSyncStore.insertStateSyncEvent(event); err != nil {
 		s.logger.Error("could not save state sync event to boltDb", "err", err)
 
-		return
+		return err
 	}
 
 	if err := s.buildCommitment(); err != nil {
+		// we don't return an error here. If state sync event is inserted in db,
+		// we will just try to build a commitment on next block or next event arrival
 		s.logger.Error("could not build a commitment on arrival of new state sync", "err", err, "stateSyncID", event.ID)
 	}
+
+	return nil
 }
 
 // Commitment returns a commitment to be submitted if there is a pending commitment with quorum

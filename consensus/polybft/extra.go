@@ -499,9 +499,5 @@ func GetIbftExtra(extraRaw []byte) (*Extra, error) {
 		return nil, err
 	}
 
-	if extra.Validators == nil {
-		extra.Validators = &validator.ValidatorSetDelta{}
-	}
-
 	return extra, nil
 }
