@@ -9,6 +9,8 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 )
 
+const updateChBufferSize = 20
+
 // DialQueue is a queue that holds dials tasks for potential peers, implemented as a min-heap
 type DialQueue struct {
 	sync.Mutex
@@ -25,7 +27,7 @@ func NewDialQueue() *DialQueue {
 	return &DialQueue{
 		heap:     dialQueueImpl{},
 		tasks:    map[peer.ID]*DialTask{},
-		updateCh: make(chan struct{}),
+		updateCh: make(chan struct{}, updateChBufferSize),
 		closeCh:  make(chan struct{}),
 	}
 }
@@ -38,14 +40,12 @@ func (d *DialQueue) Close() {
 // PopTask is a loop that handles update and close events [BLOCKING]
 func (d *DialQueue) PopTask() *DialTask {
 	for {
-		task := d.popTaskImpl() // Blocking pop
-		if task != nil {
-			return task
-		}
-
 		select {
-		case <-d.updateCh:
-		case <-d.closeCh:
+		case <-d.updateCh: // blocks until AddTask is called...
+			if task := d.popTaskImpl(); task != nil {
+				return task
+			}
+		case <-d.closeCh: // ... or dial queue is closed
 			return nil
 		}
 	}
@@ -58,12 +58,12 @@ func (d *DialQueue) popTaskImpl() *DialTask {
 
 	if len(d.heap) != 0 {
 		// pop the first value and remove it from the heap
-		tt := heap.Pop(&d.heap)
-
-		task, ok := tt.(*DialTask)
+		task, ok := heap.Pop(&d.heap).(*DialTask)
 		if !ok {
 			return nil
 		}
+
+		delete(d.tasks, task.addrInfo.ID)
 
 		return task
 	}
@@ -78,22 +78,36 @@ func (d *DialQueue) DeleteTask(peer peer.ID) {
 
 	item, ok := d.tasks[peer]
 	if ok {
-		// negative index for popped element
-		if item.index >= 0 {
-			heap.Remove(&d.heap, item.index)
-		}
-
+		heap.Remove(&d.heap, item.index)
 		delete(d.tasks, peer)
 	}
 }
 
 // AddTask adds a new task to the dial queue
-func (d *DialQueue) AddTask(
-	addrInfo *peer.AddrInfo,
-	priority common.DialPriority,
-) {
+func (d *DialQueue) AddTask(addrInfo *peer.AddrInfo, priority common.DialPriority) {
+	if d.addTaskImpl(addrInfo, priority) {
+		select {
+		case <-d.closeCh:
+		case d.updateCh <- struct{}{}:
+		}
+	}
+}
+
+func (d *DialQueue) addTaskImpl(addrInfo *peer.AddrInfo, priority common.DialPriority) bool {
 	d.Lock()
 	defer d.Unlock()
+
+	// do not spam queue with same addresses
+	if item, ok := d.tasks[addrInfo.ID]; ok {
+		// if existing priority greater than new one, replace item
+		if item.priority > uint64(priority) {
+			item.addrInfo = addrInfo
+			item.priority = uint64(priority)
+			heap.Fix(&d.heap, item.index)
+		}
+
+		return false
+	}
 
 	task := &DialTask{
 		addrInfo: addrInfo,
@@ -102,8 +116,5 @@ func (d *DialQueue) AddTask(
 	d.tasks[addrInfo.ID] = task
 	heap.Push(&d.heap, task)
 
-	select {
-	case d.updateCh <- struct{}{}:
-	default:
-	}
+	return true
 }

@@ -365,14 +365,13 @@ func (s *Server) runDial() {
 	defer close(notifyCh)
 	defer cancel()
 
-	if err := s.SubscribeFn(ctx, func(event *peerEvent.PeerEvent) {
+	if err := s.Subscribe(ctx, func(event *peerEvent.PeerEvent) {
 		// Only concerned about the listed event types
+		// PeerConnected, PeerDialCompleted will not change HasFreeOutboundConn from false to true
 		switch event.Type {
 		case
-			peerEvent.PeerConnected,
 			peerEvent.PeerFailedToConnect,
 			peerEvent.PeerDisconnected,
-			peerEvent.PeerDialCompleted,
 			peerEvent.PeerAddedToDialQueue:
 		default:
 			return
@@ -411,13 +410,13 @@ func (s *Server) runDial() {
 
 			peerInfo := tt.GetAddrInfo()
 
-			s.logger.Debug(fmt.Sprintf("Dialing peer [%s] as local [%s]", peerInfo.String(), s.host.ID()))
+			s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
 
 			if !s.IsConnected(peerInfo.ID) {
 				// the connection process is async because it involves connection (here) +
 				// the handshake done in the identity service.
-				if err := s.host.Connect(context.Background(), *peerInfo); err != nil {
-					s.logger.Debug("failed to dial", "addr", peerInfo.String(), "err", err.Error())
+				if err := s.host.Connect(ctx, *peerInfo); err != nil {
+					s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
 
 					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
 				}
@@ -485,7 +484,7 @@ func (s *Server) GetProtocols(peerID peer.ID) ([]string, error) {
 // and updates relevant counters and metrics. It is called from the
 // disconnection callback of the libp2p network bundle (when the connection is closed)
 func (s *Server) removePeer(peerID peer.ID) {
-	s.logger.Info("Peer disconnected", "id", peerID.String())
+	s.logger.Info("Peer disconnected", "id", peerID)
 
 	// Remove the peer from the peers map
 	connectionInfo := s.removePeerInfo(peerID)
@@ -549,10 +548,10 @@ func (s *Server) updateBootnodeConnCount(peerID peer.ID, delta int64) {
 // DisconnectFromPeer disconnects the networking server from the specified peer
 func (s *Server) DisconnectFromPeer(peer peer.ID, reason string) {
 	if s.host.Network().Connectedness(peer) == network.Connected {
-		s.logger.Info(fmt.Sprintf("Closing connection to peer [%s] for reason [%s]", peer.String(), reason))
+		s.logger.Info("Closing connection", "id", peer, "reason", reason)
 
-		if closeErr := s.host.Network().ClosePeer(peer); closeErr != nil {
-			s.logger.Error(fmt.Sprintf("Unable to gracefully close peer connection, %v", closeErr))
+		if err := s.host.Network().ClosePeer(peer); err != nil {
+			s.logger.Error("Unable to gracefully close connection", "id", peer, "err", err)
 		}
 	}
 }
@@ -585,7 +584,7 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 
 // joinPeer creates a new dial task for the peer (for async joining)
 func (s *Server) joinPeer(peerInfo *peer.AddrInfo) {
-	s.logger.Info("Join request", "addr", peerInfo.String())
+	s.logger.Info("Join request", "addr", peerInfo)
 
 	// This method can be completely refactored to support some kind of active
 	// feedback information on the dial status, and not just asynchronous updates.
@@ -674,54 +673,9 @@ func (s *Server) emitEvent(peerID peer.ID, peerEventType peerEvent.PeerEventType
 	}
 }
 
-type Subscription struct {
-	sub event.Subscription
-	ch  chan *peerEvent.PeerEvent
-}
-
-func (s *Subscription) run() {
-	// convert interface{} to *PeerEvent channels
-	for {
-		evnt := <-s.sub.Out()
-		if obj, ok := evnt.(peerEvent.PeerEvent); ok {
-			s.ch <- &obj
-		}
-	}
-}
-
-func (s *Subscription) GetCh() chan *peerEvent.PeerEvent {
-	return s.ch
-}
-
-func (s *Subscription) Get() *peerEvent.PeerEvent {
-	obj := <-s.ch
-
-	return obj
-}
-
-func (s *Subscription) Close() {
-	s.sub.Close()
-}
-
-// Subscribe starts a PeerEvent subscription
-func (s *Server) Subscribe() (*Subscription, error) {
-	raw, err := s.host.EventBus().Subscribe(new(peerEvent.PeerEvent))
-	if err != nil {
-		return nil, err
-	}
-
-	sub := &Subscription{
-		sub: raw,
-		ch:  make(chan *peerEvent.PeerEvent),
-	}
-	go sub.run()
-
-	return sub, nil
-}
-
-// SubscribeFn is a helper method to run subscription of PeerEvents
-func (s *Server) SubscribeFn(ctx context.Context, handler func(evnt *peerEvent.PeerEvent)) error {
-	sub, err := s.Subscribe()
+// Subscribe is a helper method to run subscription of PeerEvents
+func (s *Server) Subscribe(ctx context.Context, handler func(evnt *peerEvent.PeerEvent)) error {
+	sub, err := s.host.EventBus().Subscribe(new(peerEvent.PeerEvent))
 	if err != nil {
 		return err
 	}
@@ -737,8 +691,10 @@ func (s *Server) SubscribeFn(ctx context.Context, handler func(evnt *peerEvent.P
 			case <-s.closeCh:
 				return
 
-			case evnt := <-sub.GetCh():
-				handler(evnt)
+			case evnt := <-sub.Out():
+				if obj, ok := evnt.(peerEvent.PeerEvent); ok {
+					handler(&obj)
+				}
 			}
 		}
 	}()
@@ -751,7 +707,7 @@ func (s *Server) SubscribeCh(ctx context.Context) (<-chan *peerEvent.PeerEvent, 
 	ch := make(chan *peerEvent.PeerEvent)
 	ctx, cancel := context.WithCancel(ctx)
 
-	err := s.SubscribeFn(ctx, func(evnt *peerEvent.PeerEvent) {
+	err := s.Subscribe(ctx, func(evnt *peerEvent.PeerEvent) {
 		select {
 		case <-ctx.Done():
 			return
