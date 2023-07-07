@@ -423,6 +423,14 @@
       "created_at": "2023-06-26T22:03:04Z",
       "repoId": 287542207,
       "pullRequestNo": 1669
+    },
+    {
+      "name": "owahlgren",
+      "id": 117230035,
+      "comment_id": 1626096338,
+      "created_at": "2023-07-07T20:56:34Z",
+      "repoId": 287542207,
+      "pullRequestNo": 1708
     }
   ]
 }
