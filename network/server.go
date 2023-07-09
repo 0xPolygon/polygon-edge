@@ -366,7 +366,7 @@ func (s *Server) runDial() {
 			peerEvent.PeerFailedToConnect,
 			peerEvent.PeerDisconnected:
 			slots.Release()
-			s.logger.Debug("slot released", "event", event.Type)
+			s.logger.Debug("slot released", "event", event.Type, "peerID", event.PeerID)
 		}
 	}); err != nil {
 		s.logger.Error(

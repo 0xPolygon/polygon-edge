@@ -87,8 +87,8 @@ func (d *DialQueue) DeleteTask(peer peer.ID) {
 func (d *DialQueue) AddTask(addrInfo *peer.AddrInfo, priority common.DialPriority) {
 	if d.addTaskImpl(addrInfo, priority) {
 		select {
-		case <-d.closeCh:
 		case d.updateCh <- struct{}{}:
+		default:
 		}
 	}
 }
@@ -104,6 +104,8 @@ func (d *DialQueue) addTaskImpl(addrInfo *peer.AddrInfo, priority common.DialPri
 			item.addrInfo = addrInfo
 			item.priority = uint64(priority)
 			heap.Fix(&d.heap, item.index)
+
+			return true
 		}
 
 		return false
