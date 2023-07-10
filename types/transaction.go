@@ -64,6 +64,8 @@ type Transaction struct {
 
 	Type TxType
 
+	ChainID *big.Int
+
 	// Cache
 	size atomic.Pointer[uint64]
 }

@@ -417,11 +417,12 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return fmt.Errorf("incorrect number of transaction elements, expected %d but found %d", num, numElems)
 	}
 
-	// Skipping Chain ID field since we don't support it (yet)
-	// This is needed to be compatible with other EVM chains and have the same format.
-	// Since we don't have a chain ID, just skip it here.
+	// Load Chain ID for dynamic transactions
 	if t.Type == DynamicFeeTx {
-		_ = getElem()
+		t.ChainID = new(big.Int)
+		if err = getElem().GetBigInt(t.ChainID); err != nil {
+			return err
+		}
 	}
 
 	// nonce

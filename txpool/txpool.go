@@ -98,6 +98,7 @@ type Config struct {
 	PriceLimit         uint64
 	MaxSlots           uint64
 	MaxAccountEnqueued uint64
+	ChainID            *big.Int
 }
 
 /* All requests are passed to the main loop
@@ -187,6 +188,9 @@ type TxPool struct {
 	// pending is the list of pending and ready transactions. This variable
 	// is accessed with atomics
 	pending int64
+
+	// chain id
+	chainID *big.Int
 }
 
 // NewTxPool returns a new pool for processing incoming transactions.
@@ -207,6 +211,7 @@ func NewTxPool(
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
+		chainID:     config.ChainID,
 
 		//	main loop channels
 		promoteReqCh: make(chan promoteRequest),
@@ -739,6 +744,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if err := p.validateTx(tx); err != nil {
 		return err
 	}
+
+	tx.ChainID = p.chainID // add chainID to the tx
 
 	// calculate tx hash
 	tx.ComputeHash()
