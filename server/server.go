@@ -291,7 +291,25 @@ func NewServer(config *Config) (*Server, error) {
 
 	if err := forkmanager.ForkManagerInit(
 		initialParams,
-		forkManagerFactory[ConsensusType(engineName)],
+		func(forks *chain.Forks) error {
+			if err := forkmanager.GetInstance().RegisterHandler(
+				forkmanager.InitialFork, chain.TxHashHandler, &types.TransactionHashForkV1{}); err != nil {
+				return err
+			}
+
+			if forkmanager.GetInstance().IsForkRegistered(chain.TxHashWithType) {
+				if err := forkmanager.GetInstance().RegisterHandler(
+					chain.TxHashWithType, chain.TxHashHandler, &types.TransactionHashForkV2{}); err != nil {
+					return err
+				}
+			}
+
+			if fc := forkManagerFactory[ConsensusType(engineName)]; fc != nil {
+				return fc(forks)
+			}
+
+			return nil
+		},
 		config.Chain.Params.Forks); err != nil {
 		return nil, err
 	}
