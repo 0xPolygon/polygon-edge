@@ -1,6 +1,7 @@
 package dial
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,6 +12,9 @@ import (
 func TestDialQueue(t *testing.T) {
 	q := NewDialQueue()
 	infos := [3]*peer.AddrInfo{}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+
+	defer cancel()
 
 	for i, x := range []string{"a", "b", "c"} {
 		infos[i] = &peer.AddrInfo{
@@ -32,17 +36,18 @@ func TestDialQueue(t *testing.T) {
 	q.AddTask(infos[2], 1) // existing task, more priority
 	assert.Equal(t, 3, q.heap.Len())
 
-	assert.Equal(t, peer.ID("b"), q.popTaskImpl().addrInfo.ID)
-	assert.Equal(t, peer.ID("c"), q.popTaskImpl().addrInfo.ID)
-	assert.Equal(t, peer.ID("a"), q.popTaskImpl().addrInfo.ID)
+	assert.Equal(t, peer.ID("b"), q.PopTask().addrInfo.ID)
+	assert.Equal(t, peer.ID("c"), q.PopTask().addrInfo.ID)
+	assert.Equal(t, peer.ID("a"), q.PopTask().addrInfo.ID)
 	assert.Equal(t, 0, q.heap.Len())
 
-	assert.Nil(t, q.popTaskImpl())
+	assert.Nil(t, q.PopTask())
 
 	done := make(chan struct{})
 
 	go func() {
-		q.PopTask()
+		q.Wait(ctx) // wait for first update
+		q.Wait(ctx) // wait for second update (line 61)
 		done <- struct{}{}
 	}()
 

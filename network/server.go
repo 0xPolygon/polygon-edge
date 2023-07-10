@@ -381,36 +381,41 @@ func (s *Server) runDial() {
 	}
 
 	for {
-		tt := s.dialQueue.PopTask()
-		if tt == nil {
-			// The dial queue is closed,
-			// no further dial tasks are incoming
+		if closed := s.dialQueue.Wait(ctx); closed {
+			// The dial queue is closed, no further dial tasks are incoming
 			return
 		}
 
-		peerInfo := tt.GetAddrInfo()
-
-		if s.IsConnected(peerInfo.ID) {
-			continue
-		}
-
-		s.logger.Debug("Waiting for a dialing slot", "addr", peerInfo, "local", s.host.ID())
-
-		if closed := slots.Take(ctx); closed {
-			return
-		}
-
-		// the connection process is async because it involves connection (here) +
-		// the handshake done in the identity service.
-		go func() {
-			s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
-
-			if err := s.host.Connect(ctx, *peerInfo); err != nil {
-				s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
-
-				s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
+		for {
+			tt := s.dialQueue.PopTask()
+			if tt == nil {
+				break
 			}
-		}()
+
+			peerInfo := tt.GetAddrInfo()
+
+			if s.IsConnected(peerInfo.ID) {
+				continue
+			}
+
+			s.logger.Debug("Waiting for a dialing slot", "addr", peerInfo, "local", s.host.ID())
+
+			if closed := slots.Take(ctx); closed {
+				return
+			}
+
+			// the connection process is async because it involves connection (here) +
+			// the handshake done in the identity service.
+			go func() {
+				s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
+
+				if err := s.host.Connect(ctx, *peerInfo); err != nil {
+					s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
+
+					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
+				}
+			}()
+		}
 	}
 }
 
