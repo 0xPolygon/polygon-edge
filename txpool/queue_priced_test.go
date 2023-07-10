@@ -236,7 +236,7 @@ func Test_maxPriceQueue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			queue := (&pricedQueue{}).init(tt.baseFee, tt.unsorted)
+			queue := newPricesQueue(tt.baseFee, tt.unsorted)
 
 			for _, tx := range tt.sorted {
 				actual := queue.pop()
@@ -268,7 +268,7 @@ func Benchmark_pricedQueue(t *testing.B) {
 	for _, tt := range testTable {
 		t.Run(tt.name, func(b *testing.B) {
 			for i := 0; i < t.N; i++ {
-				q := (&pricedQueue{}).init(uint64(100), tt.unsortedTxs)
+				q := newPricesQueue(uint64(100), tt.unsortedTxs)
 
 				for q.length() > 0 {
 					_ = q.pop()

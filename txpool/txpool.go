@@ -202,7 +202,7 @@ func NewTxPool(
 		logger:      logger.Named("txpool"),
 		forks:       forks,
 		store:       store,
-		executables: (&pricedQueue{}).init(0, nil),
+		executables: newPricesQueue(0, nil),
 		accounts:    accountsMap{maxEnqueuedLimit: config.MaxAccountEnqueued},
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
@@ -331,8 +331,8 @@ func (p *TxPool) Prepare(baseFee uint64) {
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
 
-	// re-initialize executables queue with primaries
-	p.executables.init(baseFee, primaries)
+	// create new executables queue with base fee and initial transactions (primaries)
+	p.executables = newPricesQueue(baseFee, primaries)
 }
 
 // Peek returns the best-price selected

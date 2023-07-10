@@ -11,11 +11,13 @@ type pricedQueue struct {
 	queue *maxPriceQueue
 }
 
-// init initializes the underlying queue with initial transactions
-func (q *pricedQueue) init(baseFee uint64, initialTxs []*types.Transaction) *pricedQueue {
-	q.queue = &maxPriceQueue{
-		baseFee: new(big.Int).SetUint64(baseFee),
-		txs:     initialTxs,
+// newPricesQueue creates the priced queue with initial transactions and base fee
+func newPricesQueue(baseFee uint64, initialTxs []*types.Transaction) *pricedQueue {
+	q := &pricedQueue{
+		queue: &maxPriceQueue{
+			baseFee: new(big.Int).SetUint64(baseFee),
+			txs:     initialTxs,
+		},
 	}
 
 	heap.Init(q.queue)
