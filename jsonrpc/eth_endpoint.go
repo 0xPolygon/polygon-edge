@@ -490,10 +490,6 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 
 // EstimateGas estimates the gas needed to execute a transaction
 func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
-	if arg == nil {
-		return nil, errors.New("missing value for required argument 0")
-	}
-
 	transaction, err := DecodeTxn(arg, e.store)
 	if err != nil {
 		return nil, err
