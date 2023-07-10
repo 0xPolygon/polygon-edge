@@ -705,7 +705,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, erro
 	}
 
 	// Make sure the transactions root matches up
-	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+	if hash := buildroot.CalculateTransactionsRoot(block.Transactions, block.Number()); hash != block.Header.TxRoot {
 		b.logger.Error(fmt.Sprintf(
 			"transaction root hash mismatch: have %s, want %s",
 			hash,
