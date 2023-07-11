@@ -128,6 +128,7 @@ func TestEth_GetTransactionByHash(t *testing.T) {
 		assert.Equal(t, argUint64(block.Number()), *foundTxn.BlockNumber)
 		assert.Equal(t, block.Hash(), *foundTxn.BlockHash)
 		assert.Equal(t, argUint64(testTxnIndex), *foundTxn.TxIndex)
+		assert.NotZero(t, foundTxn.ChainId) // Validate chainId is populated
 	})
 
 	t.Run("returns correct transaction data if transaction is found in tx pool (pending)", func(t *testing.T) {
