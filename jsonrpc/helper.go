@@ -168,6 +168,9 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 }
 
 func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
+	if arg == nil {
+		return nil, errors.New("missing value for required argument 0")
+	}
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
