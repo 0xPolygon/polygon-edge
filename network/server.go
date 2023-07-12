@@ -366,7 +366,7 @@ func (s *Server) runDial() {
 			peerEvent.PeerFailedToConnect,
 			peerEvent.PeerDisconnected:
 			slots.Release()
-			s.logger.Debug("slot released", "event", event.Type)
+			s.logger.Debug("slot released", "event", event.Type, "peerID", event.PeerID)
 		}
 	}); err != nil {
 		s.logger.Error(
@@ -381,37 +381,40 @@ func (s *Server) runDial() {
 	}
 
 	for {
-		//nolint:godox
-		// TODO: Right now the dial task are done sequentially because Connect
-		// is a blocking request. In the future we should try to make up to
-		// maxDials requests concurrently (to be fixed in EVM-543)
-		tt := s.dialQueue.PopTask()
-		if tt == nil {
-			// The dial queue is closed,
-			// no further dial tasks are incoming
+		if closed := s.dialQueue.Wait(ctx); closed {
+			// The dial queue is closed, no further dial tasks are incoming
 			return
 		}
 
-		peerInfo := tt.GetAddrInfo()
+		for {
+			tt := s.dialQueue.PopTask()
+			if tt == nil {
+				break
+			}
 
-		if s.IsConnected(peerInfo.ID) {
-			continue
-		}
+			peerInfo := tt.GetAddrInfo()
 
-		s.logger.Debug("Waiting for a dialing slot", "addr", peerInfo, "local", s.host.ID())
+			if s.IsConnected(peerInfo.ID) {
+				continue
+			}
 
-		if closed := slots.Take(ctx); closed {
-			return
-		}
+			s.logger.Debug("Waiting for a dialing slot", "addr", peerInfo, "local", s.host.ID())
 
-		s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
+			if closed := slots.Take(ctx); closed {
+				return
+			}
 
-		// the connection process is async because it involves connection (here) +
-		// the handshake done in the identity service.
-		if err := s.host.Connect(ctx, *peerInfo); err != nil {
-			s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
+			// the connection process is async because it involves connection (here) +
+			// the handshake done in the identity service.
+			go func() {
+				s.logger.Debug("Dialing peer", "addr", peerInfo, "local", s.host.ID())
 
-			s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
+				if err := s.host.Connect(ctx, *peerInfo); err != nil {
+					s.logger.Debug("failed to dial", "addr", peerInfo, "err", err.Error())
+
+					s.emitEvent(peerInfo.ID, peerEvent.PeerFailedToConnect)
+				}
+			}()
 		}
 	}
 }

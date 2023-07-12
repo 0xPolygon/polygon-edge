@@ -2,14 +2,13 @@ package dial
 
 import (
 	"container/heap"
+	"context"
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/network/common"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 )
-
-const updateChBufferSize = 20
 
 // DialQueue is a queue that holds dials tasks for potential peers, implemented as a min-heap
 type DialQueue struct {
@@ -27,7 +26,7 @@ func NewDialQueue() *DialQueue {
 	return &DialQueue{
 		heap:     dialQueueImpl{},
 		tasks:    map[peer.ID]*DialTask{},
-		updateCh: make(chan struct{}, updateChBufferSize),
+		updateCh: make(chan struct{}, 1),
 		closeCh:  make(chan struct{}),
 	}
 }
@@ -37,22 +36,21 @@ func (d *DialQueue) Close() {
 	close(d.closeCh)
 }
 
-// PopTask is a loop that handles update and close events [BLOCKING]
-func (d *DialQueue) PopTask() *DialTask {
-	for {
-		select {
-		case <-d.updateCh: // blocks until AddTask is called...
-			if task := d.popTaskImpl(); task != nil {
-				return task
-			}
-		case <-d.closeCh: // ... or dial queue is closed
-			return nil
-		}
+// Wait waits for closing or updating event or end of context.
+// Returns true for closing event or end of the context [BLOCKING].
+func (d *DialQueue) Wait(ctx context.Context) bool {
+	select {
+	case <-ctx.Done(): // blocks until context is done ...
+		return true
+	case <-d.updateCh: // ... or AddTask is called ...
+		return false
+	case <-d.closeCh: // ... or dial queue is closed
+		return true
 	}
 }
 
-// popTaskImpl is the implementation for task popping from the min-heap
-func (d *DialQueue) popTaskImpl() *DialTask {
+// PopTask is the implementation for task popping from the min-heap
+func (d *DialQueue) PopTask() *DialTask {
 	d.Lock()
 	defer d.Unlock()
 
@@ -87,8 +85,8 @@ func (d *DialQueue) DeleteTask(peer peer.ID) {
 func (d *DialQueue) AddTask(addrInfo *peer.AddrInfo, priority common.DialPriority) {
 	if d.addTaskImpl(addrInfo, priority) {
 		select {
-		case <-d.closeCh:
 		case d.updateCh <- struct{}{}:
+		default:
 		}
 	}
 }
@@ -104,6 +102,8 @@ func (d *DialQueue) addTaskImpl(addrInfo *peer.AddrInfo, priority common.DialPri
 			item.addrInfo = addrInfo
 			item.priority = uint64(priority)
 			heap.Fix(&d.heap, item.index)
+
+			return true
 		}
 
 		return false
