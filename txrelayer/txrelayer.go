@@ -125,7 +125,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			return ethgo.ZeroHash, err
 		}
 
-		txn.Gas = gasLimit
+		txn.Gas = gasLimit * 2
 	}
 
 	chainID, err := t.client.Eth().ChainID()
