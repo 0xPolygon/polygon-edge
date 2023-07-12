@@ -122,6 +122,12 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	}
 	// Sync concurrently, retrying indefinitely
 	go common.RetryForever(ctx, time.Second, func(ctx context.Context) error {
+		// Some errors from sync can cause this channel to be closed.
+		// We need to ensure that it is not closed before we retry,
+		// otherwise we will get a panic.
+		tt.ReadyCh = make(chan struct{})
+
+		// Run the sync
 		if err := tt.Sync(ctx); err != nil {
 			if common.IsContextDone(err) {
 				return nil
