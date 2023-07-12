@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	defaultGasPrice   = 1879048192 // 0x70000000
-	DefaultGasLimit   = 5242880    // 0x500000
-	DefaultRPCAddress = "http://127.0.0.1:8545"
-	numRetries        = 1000
+	defaultGasPrice    = 1879048192 // 0x70000000
+	DefaultGasLimit    = 5242880    // 0x500000
+	DefaultRPCAddress  = "http://127.0.0.1:8545"
+	numRetries         = 1000
+	gasLimitMultiplier = 2
 )
 
 var (
@@ -125,7 +126,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			return ethgo.ZeroHash, err
 		}
 
-		txn.Gas = gasLimit * 2
+		txn.Gas = gasLimit * gasLimitMultiplier
 	}
 
 	chainID, err := t.client.Eth().ChainID()
