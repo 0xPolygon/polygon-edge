@@ -500,8 +500,6 @@ func (p *genesisParams) parsePremineInfo() error {
 
 // validatePremineInfo validates whether reserve account (0x0 address) is premined
 func (p *genesisParams) validatePremineInfo() error {
-	isReserveAccPremined := false
-
 	for _, premineInfo := range p.premineInfos {
 		if premineInfo.address == types.ZeroAddress {
 			// we have premine of zero address, just return
@@ -509,11 +507,7 @@ func (p *genesisParams) validatePremineInfo() error {
 		}
 	}
 
-	if !isReserveAccPremined {
-		return errReserveAccMustBePremined
-	}
-
-	return nil
+	return errReserveAccMustBePremined
 }
 
 // validateBurnContract validates burn contract. If native token is mintable,
