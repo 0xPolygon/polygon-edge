@@ -387,7 +387,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
-	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, []command.CommandResult, error) {
+	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (
+	*polybft.RootchainConfig, int64, []command.CommandResult, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter))
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to initialize tx relayer: %w", err)
