@@ -337,7 +337,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	rootchainCfg, supernetID, err := deployContracts(outputter, client,
+	rootchainCfg, supernetID, commandResults, err := deployContracts(outputter, client,
 		chainConfig.Params.ChainID, consensusCfg.InitialValidatorSet, cmd.Context())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
@@ -378,23 +378,24 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.SetCommandResult(&helper.MessageResult{
+	outputter.WriteCommandResult(&helper.MessageResult{
 		Message: fmt.Sprintf("%s finished. All contracts are successfully deployed and initialized.",
 			contractsDeploymentTitle),
 	})
+	outputter.SetCommandResult(command.Results(commandResults))
 }
 
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
-	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, error) {
+	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (*polybft.RootchainConfig, int64, []command.CommandResult, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter))
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to initialize tx relayer: %w", err)
+		return nil, 0, nil, fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
 	deployerKey, err := helper.DecodePrivateKey(params.deployerKey)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to initialize deployer key: %w", err)
+		return nil, 0, nil, fmt.Errorf("failed to initialize deployer key: %w", err)
 	}
 
 	if params.isTestMode {
@@ -402,7 +403,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return nil, 0, err
+			return nil, 0, nil, err
 		}
 	}
 
@@ -425,7 +426,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			// use existing root chain ERC20 token
 			if err := populateExistingTokenAddr(client.Eth(),
 				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-				return nil, 0, err
+				return nil, 0, nil, err
 			}
 		} else {
 			// deploy MockERC20 as a root chain root native token
@@ -501,6 +502,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	g, ctx := errgroup.WithContext(cmdCtx)
 	results := make([]*deployContractResult, len(allContracts))
+	commandResults := make([]command.CommandResult, len(allContracts))
 
 	for i, contract := range allContracts {
 		i := i
@@ -546,18 +548,18 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			}
 		}
 
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
-	for _, result := range results {
+	for i, result := range results {
 		populatorFn, ok := metadataPopulatorMap[result.Name]
 		if !ok {
-			return nil, 0, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)
+			return nil, 0, nil, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)
 		}
 
 		populatorFn(rootchainConfig, result.Address)
 
-		outputter.WriteCommandResult(result)
+		commandResults[i] = result
 	}
 
 	g, ctx = errgroup.WithContext(cmdCtx)
@@ -581,16 +583,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
 	// register supernets manager on stake manager
 	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 
-	return rootchainConfig, supernetID, nil
+	return rootchainConfig, supernetID, commandResults, nil
 }
 
 // populateExistingTokenAddr checks whether given token is deployed on the provided address.
