@@ -352,7 +352,7 @@ type progression struct {
 type feeHistoryResult struct {
 	OldestBlock   argUint64
 	BaseFeePerGas []argUint64
-	GasUsedRatio  []argUint64
+	GasUsedRatio  []float64
 	Reward        [][]argUint64
 }
 
@@ -369,15 +369,6 @@ func convertToArgUint64SliceSlice(slice [][]uint64) [][]argUint64 {
 	argSlice := make([][]argUint64, len(slice))
 	for i, value := range slice {
 		argSlice[i] = convertToArgUint64Slice(value)
-	}
-
-	return argSlice
-}
-
-func convertFloat64SliceToArgUint64Slice(slice []float64) []argUint64 {
-	argSlice := make([]argUint64, len(slice))
-	for i, value := range slice {
-		argSlice[i] = argUint64(value)
 	}
 
 	return argSlice

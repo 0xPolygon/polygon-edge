@@ -818,7 +818,7 @@ func (e *Eth) FeeHistory(blockCount argUint64, newestBlock BlockNumber,
 
 	// Create channels to receive the processed slices asynchronously
 	baseFeePerGasCh := make(chan []argUint64)
-	gasUsedRatioCh := make(chan []argUint64)
+	gasUsedRatioCh := make(chan []float64)
 	rewardCh := make(chan [][]argUint64)
 
 	// Process baseFeePerGas asynchronously
@@ -828,7 +828,7 @@ func (e *Eth) FeeHistory(blockCount argUint64, newestBlock BlockNumber,
 
 	// Process gasUsedRatio asynchronously
 	go func() {
-		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(history.GasUsedRatio)
+		gasUsedRatioCh <- history.GasUsedRatio
 	}()
 
 	// Process reward asynchronously
