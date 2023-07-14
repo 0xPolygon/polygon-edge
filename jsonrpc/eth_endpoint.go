@@ -803,9 +803,15 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 	return argBigPtr(priorityFee), nil
 }
 
-func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
+func (e *Eth) FeeHistory(blockCount argUint64, newestBlock BlockNumber,
+	rewardPercentiles []float64) (interface{}, error) {
+	block, err := GetNumericBlockNumber(newestBlock, e.store)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse newest block argument. Error: %w", err)
+	}
+
 	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
-	history, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
+	history, err := e.store.FeeHistory(uint64(blockCount), block, rewardPercentiles)
 	if err != nil {
 		return nil, err
 	}
