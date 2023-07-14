@@ -443,7 +443,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			commitmentTxExists = true
 
-			if err = verifyBridgeCommitmentTx(tx.Hash, stateTxData, f.validators); err != nil {
+			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash, stateTxData, f.validators); err != nil {
 				return err
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
@@ -623,7 +623,7 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 }
 
 // verifyBridgeCommitmentTx validates bridge commitment transaction
-func verifyBridgeCommitmentTx(txHash types.Hash,
+func verifyBridgeCommitmentTx(blockNumber uint64, txHash types.Hash,
 	commitment *CommitmentMessageSigned,
 	validators validator.ValidatorSet) error {
 	signers, err := validators.Accounts().GetFilteredValidators(commitment.AggSignature.Bitmap)
@@ -631,7 +631,7 @@ func verifyBridgeCommitmentTx(txHash types.Hash,
 		return fmt.Errorf("failed to retrieve signers for state tx (%s): %w", txHash, err)
 	}
 
-	if !validators.HasQuorum(signers.GetAddressesAsSet()) {
+	if !validators.HasQuorum(blockNumber, signers.GetAddressesAsSet()) {
 		return fmt.Errorf("quorum size not reached for state tx (%s)", txHash)
 	}
 

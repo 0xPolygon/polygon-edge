@@ -743,6 +743,7 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 			commitmentTxExists = true
 
 			if err := verifyBridgeCommitmentTx(
+				block.Number(),
 				tx.Hash,
 				signedCommitment,
 				validator.NewValidatorSet(validators, p.logger)); err != nil {

@@ -394,10 +394,10 @@ func TestSignature_Verify(t *testing.T) {
 				Bitmap:              bitmap,
 			}
 
-			err = s.Verify(validatorsMetadata, msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
+			err = s.Verify(10, validatorsMetadata, msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
 			signers[val.Address()] = struct{}{}
 
-			if !validatorSet.HasQuorum(signers) {
+			if !validatorSet.HasQuorum(10, signers) {
 				assert.ErrorContains(t, err, "quorum not reached", "failed for %d", i)
 			} else {
 				assert.NoError(t, err)
@@ -415,7 +415,7 @@ func TestSignature_Verify(t *testing.T) {
 		bmp.Set(uint64(validatorSet.Len() + 1))
 		s := &Signature{Bitmap: bmp}
 
-		err := s.Verify(validatorSet, types.Hash{0x1}, bls.DomainCheckpointManager, hclog.NewNullLogger())
+		err := s.Verify(0, validatorSet, types.Hash{0x1}, bls.DomainCheckpointManager, hclog.NewNullLogger())
 		require.Error(t, err)
 	})
 }
@@ -483,7 +483,7 @@ func TestSignature_VerifyRandom(t *testing.T) {
 		Bitmap:              bitmap,
 	}
 
-	err = s.Verify(vals.GetPublicIdentities(), msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
+	err = s.Verify(1, vals.GetPublicIdentities(), msgHash, bls.DomainCheckpointManager, hclog.NewNullLogger())
 	assert.NoError(t, err)
 }
 

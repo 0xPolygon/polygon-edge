@@ -556,6 +556,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 	validatorSet := validator.NewValidatorSet(validators.GetPublicIdentities(), hclog.NewNullLogger())
 
 	fsm := &fsm{
+		parent:                       &types.Header{Number: 2},
 		isEndOfEpoch:                 true,
 		isEndOfSprint:                true,
 		validators:                   validatorSet,
@@ -598,6 +599,7 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 	validatorSet := validator.NewValidatorSet(validators.GetPublicIdentities(), hclog.NewNullLogger())
 
 	fsm := &fsm{
+		parent:                       &types.Header{Number: 1},
 		isEndOfEpoch:                 true,
 		isEndOfSprint:                true,
 		validators:                   validatorSet,
@@ -1329,6 +1331,7 @@ func TestFSM_VerifyStateTransaction_ValidBothTypesOfStateTransactions(t *testing
 		}
 
 		f := &fsm{
+			parent:        &types.Header{Number: 9},
 			isEndOfSprint: true,
 			validators:    validators.ToValidatorSet(),
 		}
@@ -1372,6 +1375,7 @@ func TestFSM_VerifyStateTransaction_QuorumNotReached(t *testing.T) {
 	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
+		parent:        &types.Header{Number: 9},
 		isEndOfSprint: true,
 		validators:    validators.ToValidatorSet(),
 	}
@@ -1400,6 +1404,7 @@ func TestFSM_VerifyStateTransaction_InvalidSignature(t *testing.T) {
 	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	_, commitmentMessageSigned, _ := buildCommitmentAndStateSyncs(t, 10, uint64(3), 2)
 	f := &fsm{
+		parent:        &types.Header{Number: 9},
 		isEndOfSprint: true,
 		validators:    validators.ToValidatorSet(),
 	}
@@ -1437,6 +1442,7 @@ func TestFSM_VerifyStateTransaction_TwoCommitmentMessages(t *testing.T) {
 	validatorSet := validator.NewValidatorSet(validators.GetPublicIdentities(), hclog.NewNullLogger())
 
 	f := &fsm{
+		parent:        &types.Header{Number: 9},
 		isEndOfSprint: true,
 		validators:    validatorSet,
 	}
