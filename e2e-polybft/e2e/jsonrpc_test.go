@@ -3,6 +3,8 @@ package e2e
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -19,11 +21,25 @@ var (
 	one = big.NewInt(1)
 )
 
+func init() {
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	parent := filepath.Dir(wd)
+	wd = filepath.Join(parent, "../artifacts/polygon-edge")
+	os.Setenv("EDGE_BINARY", wd)
+	os.Setenv("E2E_TESTS", "true")
+	os.Setenv("E2E_LOGS", "true")
+	os.Setenv("E2E_LOG_LEVEL", "debug")
+}
+
 func TestE2E_JsonRPC(t *testing.T) {
 	acct, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	cluster := framework.NewTestCluster(t, 3,
+	cluster := framework.NewTestCluster(t, 4,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, acct.Address())),
 		framework.WithPremine(types.Address(acct.Address())),
 	)
