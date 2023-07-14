@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -264,8 +266,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100}
 
-	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
-	reward := uint64(math.Pow(10, 18))            // 1 token
+	initialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
+	reward := uint64(math.Pow(10, 18))             // 1 token
 	walletAddress := types.StringToAddress("1234889893")
 
 	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
@@ -277,7 +279,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		for j := 0; j < size; j++ {
 			aliases[j] = "v" + strconv.Itoa(j)
-			vps[j] = intialBalance
+			vps[j] = initialBalance
 		}
 
 		validatorSets[i] = validator.NewTestValidatorsWithAliases(t, aliases, vps)
@@ -300,8 +302,11 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			contracts.NativeERC20TokenContract: {
 				Code: contractsapi.NativeERC20.DeployedBytecode,
 			},
+			contracts.NetworkParamsContract: {
+				Code: contractsapi.NetworkParams.DeployedBytecode,
+			},
 			walletAddress: {
-				Balance: new(big.Int).SetUint64(intialBalance),
+				Balance: new(big.Int).SetUint64(initialBalance),
 			},
 		}
 
@@ -321,16 +326,29 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		}
 
 		polyBFTConfig := PolyBFTConfig{
-			InitialValidatorSet: initValidators,
-			EpochSize:           24 * 60 * 60 / 2,
-			SprintSize:          5,
-			EpochReward:         reward,
+			InitialValidatorSet:  initValidators,
+			EpochSize:            24 * 60 * 60 / 2,
+			SprintSize:           5,
+			EpochReward:          reward,
+			BlockTime:            common.Duration{Duration: time.Second},
+			MinValidatorSetSize:  4,
+			MaxValidatorSetSize:  100,
+			CheckpointInterval:   900,
+			WithdrawalWaitPeriod: 1,
+			BlockTimeDrift:       10,
 			// use 1st account as governance address
 			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],
 			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
 				WalletAddress: walletAddress,
-				WalletAmount:  new(big.Int).SetUint64(intialBalance),
+				WalletAmount:  new(big.Int).SetUint64(initialBalance),
+			},
+			GovernanceConfig: &GovernanceConfig{
+				VotingDelay:              big.NewInt(10),
+				VotingPeriod:             big.NewInt(10),
+				ProposalThreshold:        big.NewInt(25),
+				GovernorAdmin:            types.BytesToAddress([]byte{0, 1, 2, 3}),
+				ProposalQuorumPercentage: 67,
 			},
 			Bridge: &BridgeConfig{
 				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
@@ -341,6 +359,10 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		// init ValidatorSet
 		err := initValidatorSet(polyBFTConfig, transition)
+		require.NoError(t, err)
+
+		// init NetworkParams
+		err = initNetworkParamsContract(polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// init RewardPool

@@ -145,6 +145,26 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return errMissingBridgeConfig
 		}
 
+		// initialize NetworkParams SC
+		if err = initNetworkParamsContract(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize ForkParams SC
+		if err = initForkParamsContract(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize ChildTimelock SC
+		if err = initChildTimelock(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
+		// initialize ChildGovernor SC
+		if err = initChildGovernor(polyBFTConfig, transition); err != nil {
+			return err
+		}
+
 		// initialize ValidatorSet SC
 		if err = initValidatorSet(polyBFTConfig, transition); err != nil {
 			return err
