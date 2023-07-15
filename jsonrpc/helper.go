@@ -90,10 +90,8 @@ func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*ty
 		return nil, nil
 	}
 
-	for _, txn := range block.Transactions {
-		if txn.Hash == txHash {
-			return txn, block
-		}
+	if txn, _ := types.FindTxByHash(block.Transactions, txHash); txn != nil {
+		return txn, block
 	}
 
 	return nil, nil

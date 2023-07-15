@@ -1,8 +1,8 @@
 {
     "nonce": "0x1",
     "gasPrice": "0xa",
-    "gasTipCap": "0xa",
-    "gasFeeCap": "0xa",
+    "maxPriorityFeePerGas": "0xa",
+    "maxFeePerGas": "0xa",
     "gas": "0x64",
     "to": "0x0000000000000000000000000000000000000000",
     "value": "0x3e8",
