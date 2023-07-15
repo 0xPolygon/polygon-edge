@@ -84,6 +84,20 @@ func (t *Transaction) ComputeHash() *Transaction {
 	return t
 }
 
+func (t *Transaction) GetPreForkHash() Hash {
+	ar := marshalArenaPool.Get()
+	hash := keccak.DefaultKeccakPool.Get()
+	result := Hash{}
+
+	v := t.MarshalRLPWith(ar)
+	hash.WriteRlp(result[:0], v)
+
+	marshalArenaPool.Put(ar)
+	keccak.DefaultKeccakPool.Put(hash)
+
+	return result
+}
+
 func (t *Transaction) Copy() *Transaction {
 	tt := new(Transaction)
 	*tt = *t
@@ -221,4 +235,26 @@ func (t *Transaction) GetGasFeeCap() *big.Int {
 	default:
 		return t.GasPrice
 	}
+}
+
+// FindTxByHash returns transaction and its index from a slice of transactions
+func FindTxByHash(txs []*Transaction, hash Hash) (*Transaction, int) {
+	// try to find tx by comparing hash with existing hashes
+	for idx, txn := range txs {
+		if txn.Hash == hash {
+			return txn, idx
+		}
+	}
+
+	// ...then by comparing hash with old hashes
+	for idx, txn := range txs {
+		if txn.GetPreForkHash() == hash {
+			txnCopy := txn.Copy()
+			txnCopy.Hash = hash
+
+			return txnCopy, idx
+		}
+	}
+
+	return nil, -1
 }
