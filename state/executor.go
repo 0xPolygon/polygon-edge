@@ -86,6 +86,7 @@ func (e *Executor) WriteGenesis(
 		gasPool:     uint64(env.GasLimit),
 		config:      config,
 		precompiles: precompiled.NewPrecompiled(),
+		//accessList:  runtime.NewAccessList(), //check EIP2929: if access list in needed while creating genesis
 	}
 
 	for addr, account := range alloc {
@@ -216,6 +217,7 @@ func (e *Executor) BeginTxn(
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
+		//accessList:  runtime.NewAccessList(),
 	}
 
 	// enable contract deployment allow list (if any)
@@ -278,6 +280,8 @@ type Transition struct {
 	txnBlockList        *addresslist.AddressList
 	bridgeAllowList     *addresslist.AddressList
 	bridgeBlockList     *addresslist.AddressList
+
+	//accessList *runtime.AccessList
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -287,6 +291,7 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		//accessList:  runtime.NewAccessList(),
 	}
 }
 
@@ -665,7 +670,13 @@ func (t *Transition) Create2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
-	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
+	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, runtime.NewAccessList())
+	contract.AccessList.AddAddress(caller)
+
+	// add all precompiles to access list
+	for _, addr := range precompiled.ActivePrecompiles {
+		contract.AccessList.AddAddress(addr)
+	}
 
 	return t.applyCreate(contract, t)
 }
@@ -677,7 +688,14 @@ func (t *Transition) Call2(
 	value *big.Int,
 	gas uint64,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, runtime.NewAccessList())
+	c.AccessList.AddAddress(caller)
+	c.AccessList.AddAddress(to)
+
+	// add all precompiles to access list
+	for _, addr := range precompiled.ActivePrecompiles {
+		c.AccessList.AddAddress(addr)
+	}
 
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -783,8 +801,14 @@ func (t *Transition) applyCall(
 
 	t.captureCallStart(c, callType)
 
+	// create a deep copy of access list for reverted transaction
+	al := c.AccessList.Copy()
+
 	result = t.run(c, host)
 	if result.Failed() {
+		if result.Reverted() {
+			c.AccessList = al
+		}
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
@@ -820,6 +844,13 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 
 	// Increment the nonce of the caller
 	t.state.IncrNonce(c.Caller)
+
+	//EIP2929: check
+	// we add this to the access-list before taking a snapshot. Even if the creation fails,
+	// the access-list change should not be rolled back according to EIP2929 specs
+	if t.config.EIP2929 {
+		c.AccessList.AddAddress(c.Address)
+	}
 
 	// Check if there is a collision and the address already exists
 	if t.hasCodeOrNonce(c.Address) {
