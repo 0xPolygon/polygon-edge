@@ -18,6 +18,9 @@ var (
 	abiBoolTrue, abiBoolFalse []byte
 )
 
+// To store address of active precompiles
+var ActivePrecompiles []types.Address
+
 func init() {
 	// abiBoolTrue is ABI encoded true boolean value
 	encodedBool, err := abi.MustNewType("bool").Encode(true)
@@ -34,6 +37,22 @@ func init() {
 	}
 
 	abiBoolFalse = encodedBool
+}
+
+func init() {
+	ActivePrecompiles = []types.Address{
+		types.StringToAddress("1"),
+		types.StringToAddress("2"),
+		types.StringToAddress("3"),
+		types.StringToAddress("4"),
+		types.StringToAddress("5"),
+		types.StringToAddress("6"),
+		types.StringToAddress("7"),
+		types.StringToAddress("8"),
+		types.StringToAddress("9"),
+		types.StringToAddress(contracts.NativeTransferPrecompile.String()),
+		types.StringToAddress(contracts.BLSAggSigsVerificationPrecompile.String()),
+	}
 }
 
 type contract interface {
