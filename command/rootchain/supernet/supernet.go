@@ -225,8 +225,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	result := &supernetResult{
-		isGenesisSetFinalized: params.finalizeGenesisSet,
-		isStakingEnabled:      params.enableStaking,
+		IsGenesisSetFinalized: params.finalizeGenesisSet,
+		IsStakingEnabled:      params.enableStaking,
 	}
 
 	outputter.WriteCommandResult(result)

@@ -119,7 +119,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	result := &withdrawResult{
-		validatorAddress: validatorAccount.Ecdsa.Address().String(),
+		ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
 	var (
@@ -137,8 +137,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		result.amount = withdrawalEvent.Amount.Uint64()
-		result.withdrawnTo = withdrawalEvent.Recipient.String()
+		result.Amount = withdrawalEvent.Amount.Uint64()
+		result.WithdrawnTo = withdrawalEvent.Recipient.String()
 		foundLog = true
 
 		break
