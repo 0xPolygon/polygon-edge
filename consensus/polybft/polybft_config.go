@@ -246,7 +246,7 @@ type GovernanceConfig struct {
 	// ProposalThreshold indicates number of vote tokens required in order for a voter to become a proposer
 	ProposalThreshold *big.Int
 	// GovernorAdmin is the address of governance contract admin
-	// (he is the only one able to add new executors and proposers)
+	// (he is the only one able to add new and remove old executors and proposers)
 	GovernorAdmin types.Address
 }
 

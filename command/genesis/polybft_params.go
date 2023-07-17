@@ -156,10 +156,10 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	governorAdminAddr := types.ZeroAddress
+	// if no admin is defined, zero address will be the owner,
+	// meaning no new proposers and executors besides genesis validator
+	// set can be added/removed later
 	if p.governorAdmin != "" {
-		// if no admin is defined, zero address will be the owner,
-		// meaning no new proposers and executors besides genesis validator
-		// set can be added later
 		governorAdminAddr = types.StringToAddress(p.governorAdmin)
 	}
 

@@ -278,8 +278,8 @@ func setFlags(cmd *cobra.Command) {
 			&params.governorAdmin,
 			governorAdminFlag,
 			"",
-			"address of a governance admin (governance admin can add new proposers of governance proposals "+
-				"and add new executors of accepted proposals)",
+			"address of a governance admin (governance admin can add new or remove old proposers "+
+				"of governance proposals, and add new and remove old executors of accepted proposals)",
 		)
 	}
 
