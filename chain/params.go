@@ -90,8 +90,6 @@ const (
 	TxHashWithType = "txHashWithType"
 )
 
-const TxHashHandler = "txHash"
-
 // Forks is map which contains all forks and their starting blocks from genesis
 type Forks map[string]Fork
 

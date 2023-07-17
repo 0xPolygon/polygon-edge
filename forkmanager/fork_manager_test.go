@@ -4,16 +4,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
-	HandlerA = HandlerDesc("HA")
-	HandlerB = HandlerDesc("HB")
-	HandlerC = HandlerDesc("HC")
-	HandlerD = HandlerDesc("HD")
+	HandlerA = "HA"
+	HandlerB = "HB"
+	HandlerC = "HC"
+	HandlerD = "HD"
 
 	ForkA = "A"
 	ForkB = "B"
@@ -21,6 +21,12 @@ const (
 	ForkD = "D"
 	ForkE = "E"
 )
+
+type TestForkParams struct {
+	MaxValidatorSetSize *uint64          `json:"maxValidatorSetSize,omitempty"`
+	EpochSize           *uint64          `json:"epochSize,omitempty"`
+	BlockTime           *common.Duration `json:"blockTime,omitempty"`
+}
 
 func TestForkManager(t *testing.T) {
 	t.Parallel()
@@ -31,10 +37,10 @@ func TestForkManager(t *testing.T) {
 
 	forkManager := GetInstance()
 
-	forkManager.RegisterFork(ForkA, &chain.ForkParams{EpochSize: &es1, BlockTime: &bt1})
-	forkManager.RegisterFork(ForkB, &chain.ForkParams{EpochSize: &es2, MaxValidatorSetSize: &mss1})
+	forkManager.RegisterFork(ForkA, &TestForkParams{EpochSize: &es1, BlockTime: &bt1})
+	forkManager.RegisterFork(ForkB, &TestForkParams{EpochSize: &es2, MaxValidatorSetSize: &mss1})
 	forkManager.RegisterFork(ForkC, nil)
-	forkManager.RegisterFork(ForkD, &chain.ForkParams{EpochSize: &es3, BlockTime: &bt2})
+	forkManager.RegisterFork(ForkD, &TestForkParams{EpochSize: &es3, BlockTime: &bt2})
 
 	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "AAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkC, HandlerA, func() string { return "ACH" }))
@@ -138,7 +144,7 @@ func TestForkManager(t *testing.T) {
 	t.Run("get handler", func(t *testing.T) {
 		t.Parallel()
 
-		execute := func(name HandlerDesc, block uint64) string {
+		execute := func(name string, block uint64) string {
 			//nolint:forcetypeassert
 			return forkManager.GetHandler(name, block).(func() string)()
 		}
@@ -167,21 +173,31 @@ func TestForkManager(t *testing.T) {
 	t.Run("get params", func(t *testing.T) {
 		t.Parallel()
 
+		getParams := func(blockNum uint64) *TestForkParams {
+			prv := forkManager.GetParams(blockNum)
+			require.NotNil(t, prv)
+
+			params, ok := prv.(*TestForkParams)
+			require.True(t, ok)
+
+			return params
+		}
+
 		for i := uint64(0); i < uint64(4); i++ {
-			assert.Equal(t, es1, *forkManager.GetParams(i).EpochSize)
-			assert.Equal(t, es2, *forkManager.GetParams(i + 100).EpochSize)
-			assert.Equal(t, es2, *forkManager.GetParams(i + 200).EpochSize)
-			assert.Equal(t, es3, *forkManager.GetParams(i + 300).EpochSize)
+			assert.Equal(t, es1, *getParams(i).EpochSize)
+			assert.Equal(t, es2, *getParams(i + 100).EpochSize)
+			assert.Equal(t, es2, *getParams(i + 200).EpochSize)
+			assert.Equal(t, es3, *getParams(i + 300).EpochSize)
 
-			assert.Nil(t, forkManager.GetParams(i).MaxValidatorSetSize)
-			assert.Equal(t, mss1, *forkManager.GetParams(i + 100).MaxValidatorSetSize)
-			assert.Equal(t, mss1, *forkManager.GetParams(i + 200).MaxValidatorSetSize)
-			assert.Equal(t, mss1, *forkManager.GetParams(i + 300).MaxValidatorSetSize)
+			assert.Nil(t, getParams(i).MaxValidatorSetSize)
+			assert.Equal(t, mss1, *getParams(i + 100).MaxValidatorSetSize)
+			assert.Equal(t, mss1, *getParams(i + 200).MaxValidatorSetSize)
+			assert.Equal(t, mss1, *getParams(i + 300).MaxValidatorSetSize)
 
-			assert.Equal(t, bt1, *forkManager.GetParams(i).BlockTime)
-			assert.Equal(t, bt1, *forkManager.GetParams(i + 100).BlockTime)
-			assert.Equal(t, bt1, *forkManager.GetParams(i + 200).BlockTime)
-			assert.Equal(t, bt2, *forkManager.GetParams(i + 300).BlockTime)
+			assert.Equal(t, bt1, *getParams(i).BlockTime)
+			assert.Equal(t, bt1, *getParams(i + 100).BlockTime)
+			assert.Equal(t, bt1, *getParams(i + 200).BlockTime)
+			assert.Equal(t, bt2, *getParams(i + 300).BlockTime)
 		}
 	})
 }
@@ -191,13 +207,13 @@ func TestForkManager_Deactivate(t *testing.T) {
 
 	forkManager := &forkManager{
 		forkMap:     map[string]*Fork{},
-		handlersMap: map[HandlerDesc][]forkHandler{},
+		handlersMap: map[string][]forkHandler{},
 	}
 	mvs1, mvs2 := uint64(1), uint64(2)
 
-	forkManager.RegisterFork(ForkA, &chain.ForkParams{MaxValidatorSetSize: &mvs1})
-	forkManager.RegisterFork(ForkB, &chain.ForkParams{MaxValidatorSetSize: &mvs2})
-	forkManager.RegisterFork(ForkC, &chain.ForkParams{})
+	forkManager.RegisterFork(ForkA, &TestForkParams{MaxValidatorSetSize: &mvs1})
+	forkManager.RegisterFork(ForkB, &TestForkParams{MaxValidatorSetSize: &mvs2})
+	forkManager.RegisterFork(ForkC, &TestForkParams{})
 
 	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "AAH" }))
 	assert.NoError(t, forkManager.RegisterHandler(ForkB, HandlerA, func() string { return "ABH" }))
@@ -208,7 +224,14 @@ func TestForkManager_Deactivate(t *testing.T) {
 
 	assert.Equal(t, 2, len(forkManager.handlersMap[HandlerA]))
 	assert.Equal(t, 3, len(forkManager.params))
-	assert.Equal(t, mvs2, *forkManager.GetParams(30).MaxValidatorSetSize)
+
+	params := forkManager.GetParams(30)
+	require.NotNil(t, params)
+
+	tfparams, ok := params.(*TestForkParams)
+	require.True(t, ok)
+
+	assert.Equal(t, mvs2, *tfparams.MaxValidatorSetSize)
 
 	assert.NoError(t, forkManager.DeactivateFork(ForkA))
 
@@ -225,4 +248,41 @@ func TestForkManager_Deactivate(t *testing.T) {
 
 	assert.Equal(t, 0, len(forkManager.handlersMap[HandlerA]))
 	assert.Equal(t, 0, len(forkManager.params))
+}
+
+func TestForkManager_HandlerReplacement(t *testing.T) {
+	t.Parallel()
+
+	forkManager := &forkManager{
+		forkMap:     map[string]*Fork{},
+		handlersMap: map[string][]forkHandler{},
+	}
+
+	execute := func(name string, block uint64) string {
+		//nolint:forcetypeassert
+		return forkManager.GetHandler(name, block).(func() string)()
+	}
+
+	forkManager.RegisterFork(ForkA, (*TestForkParams)(nil))
+	forkManager.RegisterFork(ForkB, nil)
+	forkManager.RegisterFork(ForkC, (*TestForkParams)(nil))
+	forkManager.RegisterFork(ForkD, nil)
+	forkManager.RegisterFork(ForkE, nil)
+
+	assert.NoError(t, forkManager.RegisterHandler(ForkA, HandlerA, func() string { return "NNN" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkB, HandlerA, func() string { return "ABH" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkC, HandlerA, func() string { return "ACH" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkD, HandlerA, func() string { return "ADH" }))
+	assert.NoError(t, forkManager.RegisterHandler(ForkE, HandlerA, func() string { return "AEH" }))
+
+	assert.NoError(t, forkManager.ActivateFork(ForkA, 0))
+	assert.NoError(t, forkManager.ActivateFork(ForkB, 10))
+	assert.NoError(t, forkManager.ActivateFork(ForkC, 0))
+	assert.NoError(t, forkManager.ActivateFork(ForkD, 10))
+	assert.NoError(t, forkManager.ActivateFork(ForkE, 0))
+
+	for i := uint64(0); i < uint64(4); i++ {
+		assert.Equal(t, "AEH", execute(HandlerA, i))
+		assert.Equal(t, "ADH", execute(HandlerA, i+10))
+	}
 }

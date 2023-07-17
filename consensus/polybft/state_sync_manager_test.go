@@ -304,7 +304,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	txData, err := mockMsg.EncodeAbi()
 	require.NoError(t, err)
 
-	tx := createStateTransactionWithData(types.Address{}, txData)
+	tx := createStateTransactionWithData(1, types.Address{}, txData)
 
 	req := &PostBlockRequest{
 		FullBlock: &types.FullBlock{

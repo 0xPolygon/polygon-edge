@@ -1,8 +1,6 @@
 package buildroot
 
 import (
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -28,15 +26,7 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 
 // CalculateTransactionsRoot calculates the root of a list of transactions
 func CalculateTransactionsRoot(transactions []*types.Transaction, blockNumber uint64) types.Hash {
-	var handler types.TransactionHashFork
-
-	if h := forkmanager.GetInstance().GetHandler(chain.TxHashHandler, blockNumber); h != nil {
-		//nolint:forcetypeassert
-		handler = h.(types.TransactionHashFork)
-	} else {
-		// because of tests
-		handler = &types.TransactionHashForkV1{}
-	}
+	handler := types.GetTransactionHashHandler(blockNumber)
 
 	return CalculateRoot(len(transactions), func(indx int) []byte {
 		return handler.SerializeForRootCalculation(transactions[indx], &arenaPool)

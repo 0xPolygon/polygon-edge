@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -1004,17 +1003,9 @@ func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Bl
 	// Write the full body (txns + receipts)
 	batchWriter.PutBody(block.Header.Hash, block.Body())
 
-	// Write tx pre-fork hash only if TxHashWithType fork is not enabled or it is not enabled from the genesis block
-	bn, err := forkmanager.GetInstance().GetForkBlock(chain.TxHashWithType)
-	shouldAddOldHashes := err != nil || bn > 0
-
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
 		batchWriter.PutTxLookup(txn.Hash, block.Hash())
-
-		if txn.Type == types.DynamicFeeTx && shouldAddOldHashes {
-			batchWriter.PutTxLookup(txn.GetPreForkHash(), block.Hash())
-		}
 	}
 
 	return nil

@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -61,6 +62,7 @@ var (
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
 	ErrNonceExistsInPool       = errors.New("tx with the same nonce is already present")
 	ErrReplacementUnderpriced  = errors.New("replacement tx underpriced")
+	ErrDynamicTxNotAllowed     = errors.New("dynamic tx not allowed currently")
 )
 
 // indicates origin of a transaction
@@ -602,6 +604,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrInvalidTxType
 		}
 
+		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
+		blockNumber, err := forkmanager.GetInstance().GetForkBlock(chain.TxHashWithType)
+		if err == nil && blockNumber > p.store.Header().Number {
+			metrics.IncrCounter([]string{txPoolMetrics, "dynamic_tx_not_allowed"}, 1)
+
+			return ErrDynamicTxNotAllowed
+		}
+
 		// Check EIP-1559-related fields and make sure they are correct
 		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
@@ -748,7 +758,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	tx.ChainID = p.chainID // add chainID to the tx
 
 	// calculate tx hash
-	tx.ComputeHash()
+	tx.ComputeHash(p.store.Header().Number)
 
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)

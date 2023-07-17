@@ -267,7 +267,7 @@ func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 		S:        big.NewInt(1),
 	}
 
-	txn.ComputeHash()
+	txn.ComputeHash(1)
 
 	return txn
 }

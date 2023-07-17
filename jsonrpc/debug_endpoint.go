@@ -155,7 +155,7 @@ func (d *Debug) TraceCall(
 		return nil, ErrHeaderNotFound
 	}
 
-	tx, err := DecodeTxn(arg, d.store)
+	tx, err := DecodeTxn(arg, header.Number, d.store)
 	if err != nil {
 		return nil, err
 	}

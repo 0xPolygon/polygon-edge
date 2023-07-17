@@ -16,7 +16,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 		From: addr0,
 		V:    big.NewInt(1),
 	}
-	txn.ComputeHash()
+	txn.ComputeHash(1)
 
 	data := txn.MarshalRLP()
 	_, err := eth.SendRawTransaction(data)
@@ -54,6 +54,8 @@ type mockStoreTxn struct {
 
 func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {
 	m.txn = tx
+
+	tx.ComputeHash(1)
 
 	return nil
 }
