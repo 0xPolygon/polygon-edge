@@ -245,6 +245,9 @@ type GovernanceConfig struct {
 	VotingPeriod *big.Int
 	// ProposalThreshold indicates number of vote tokens required in order for a voter to become a proposer
 	ProposalThreshold *big.Int
+	// GovernorAdmin is the address of governance contract admin
+	// (he is the only one able to add new and remove old executors and proposers)
+	GovernorAdmin types.Address
 }
 
 func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
@@ -252,6 +255,7 @@ func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
 		VotingDelay:       types.EncodeBigInt(g.VotingDelay),
 		VotingPeriod:      types.EncodeBigInt(g.VotingPeriod),
 		ProposalThreshold: types.EncodeBigInt(g.ProposalThreshold),
+		GovernorAdmin:     g.GovernorAdmin,
 	}
 
 	return json.Marshal(raw)
@@ -282,11 +286,14 @@ func (g *GovernanceConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
+	g.GovernorAdmin = raw.GovernorAdmin
+
 	return nil
 }
 
 type governanceConfigRaw struct {
-	VotingDelay       *string `json:"votingDelay"`
-	VotingPeriod      *string `json:"votingPeriod"`
-	ProposalThreshold *string `json:"proposalThreshold"`
+	VotingDelay       *string       `json:"votingDelay"`
+	VotingPeriod      *string       `json:"votingPeriod"`
+	ProposalThreshold *string       `json:"proposalThreshold"`
+	GovernorAdmin     types.Address `json:"governorAdmin"`
 }
