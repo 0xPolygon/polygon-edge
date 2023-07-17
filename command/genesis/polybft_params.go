@@ -157,6 +157,14 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return err
 	}
 
+	governorAdminAddr := types.ZeroAddress
+	// if no admin is defined, zero address will be the owner,
+	// meaning no new proposers and executors besides genesis validator
+	// set can be added/removed later
+	if p.governorAdmin != "" {
+		governorAdminAddr = types.StringToAddress(p.governorAdmin)
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -181,6 +189,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			VotingDelay:       voteDelay,
 			VotingPeriod:      votingPeriod,
 			ProposalThreshold: proposalThreshold,
+			GovernorAdmin:     governorAdminAddr,
 		},
 	}
 
