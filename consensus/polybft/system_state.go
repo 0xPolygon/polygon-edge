@@ -13,11 +13,11 @@ import (
 // ValidatorInfo is data transfer object which holds validator information,
 // provided by smart contract
 type ValidatorInfo struct {
-	Address             ethgo.Address
-	Stake               *big.Int
-	WithdrawableRewards *big.Int
-	IsActive            bool
-	IsWhitelisted       bool
+	Address             ethgo.Address `json:"address"`
+	Stake               *big.Int      `json:"stake"`
+	WithdrawableRewards *big.Int      `json:"withdrawableRewards"`
+	IsActive            bool          `json:"isActive"`
+	IsWhitelisted       bool          `json:"isWhitelisted"`
 }
 
 // SystemState is an interface to interact with the consensus system contracts in the chain
