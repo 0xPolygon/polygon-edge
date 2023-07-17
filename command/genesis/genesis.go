@@ -273,6 +273,14 @@ func setFlags(cmd *cobra.Command) {
 			defaultVoteProposalThreshold,
 			"number of vote tokens required in order for a voter to become a proposer",
 		)
+
+		cmd.Flags().StringVar(
+			&params.governorAdmin,
+			governorAdminFlag,
+			"",
+			"address of a governance admin (governance admin can add new or remove old proposers "+
+				"of governance proposals, and add new and remove old executors of accepted proposals)",
+		)
 	}
 
 	// Access Control Lists

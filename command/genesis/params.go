@@ -44,6 +44,7 @@ const (
 	voteDelayFlag             = "vote-delay"
 	votePeriodFlag            = "vote-period"
 	voteProposalThresholdFlag = "vote-proposal-threshold"
+	governorAdminFlag         = "governor-admin"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -146,6 +147,7 @@ type genesisParams struct {
 	voteDelay         string
 	votingPeriod      string
 	proposalThreshold string
+	governorAdmin     string
 }
 
 func (p *genesisParams) validateFlags() error {
