@@ -3324,7 +3324,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 		go func(i uint64) {
 			tx := newTx(addr, i, 1)
 
-			tx.ComputeHash()
+			tx.ComputeHash(1)
 
 			// add transaction hash to map
 			mux.Lock()

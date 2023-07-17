@@ -281,36 +281,7 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	var initialParams *chain.ForkParams
-
-	if pf := forkManagerInitialParamsFactory[ConsensusType(engineName)]; pf != nil {
-		if initialParams, err = pf(config.Chain); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := forkmanager.ForkManagerInit(
-		initialParams,
-		func(forks *chain.Forks) error {
-			if err := forkmanager.GetInstance().RegisterHandler(
-				forkmanager.InitialFork, chain.TxHashHandler, &types.TransactionHashForkV1{}); err != nil {
-				return err
-			}
-
-			if forkmanager.GetInstance().IsForkRegistered(chain.TxHashWithType) {
-				if err := forkmanager.GetInstance().RegisterHandler(
-					chain.TxHashWithType, chain.TxHashHandler, &types.TransactionHashForkV2{}); err != nil {
-					return err
-				}
-			}
-
-			if fc := forkManagerFactory[ConsensusType(engineName)]; fc != nil {
-				return fc(forks)
-			}
-
-			return nil
-		},
-		config.Chain.Params.Forks); err != nil {
+	if err := initForkManager(engineName, config.Chain); err != nil {
 		return nil, err
 	}
 
@@ -1048,4 +1019,58 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	}()
 
 	return srv
+}
+
+func initForkManager(engineName string, config *chain.Chain) error {
+	var initialParams *chain.ForkParams
+
+	if factory := forkManagerInitialParamsFactory[ConsensusType(engineName)]; factory != nil {
+		params, err := factory(config)
+		if err != nil {
+			return err
+		}
+
+		initialParams = params
+	}
+
+	fm := forkmanager.GetInstance()
+	fm.Clear()
+
+	// register initial fork
+	fm.RegisterFork(forkmanager.InitialFork, initialParams)
+
+	// Register forks
+	for name, f := range *config.Params.Forks {
+		// check if fork is not supported by current edge version
+		if _, found := (*chain.AllForksEnabled)[name]; !found {
+			return fmt.Errorf("fork is not available: %s", name)
+		}
+
+		fm.RegisterFork(name, f.Params)
+	}
+
+	// Register handlers and additional forks here
+	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
+		return err
+	}
+
+	if factory := forkManagerFactory[ConsensusType(engineName)]; factory != nil {
+		if err := factory(config.Params.Forks); err != nil {
+			return err
+		}
+	}
+
+	// Activate initial fork
+	if err := fm.ActivateFork(forkmanager.InitialFork, uint64(0)); err != nil {
+		return err
+	}
+
+	// Activate forks
+	for name, f := range *config.Params.Forks {
+		if err := fm.ActivateFork(name, f.Block); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

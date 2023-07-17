@@ -48,7 +48,7 @@ func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) 
 		return nil, nil
 	}
 
-	tx.ComputeHash()
+	tx.ComputeHash(1)
 
 	res, ok := m.hashToRes[tx.Hash]
 	if ok {
@@ -203,7 +203,7 @@ func TestQueryValidators(t *testing.T) {
 
 			mock := &TxMock{
 				hashToRes: map[types.Hash]*runtime.ExecutionResult{
-					tt.mockArgs.tx.ComputeHash().Hash: tt.mockReturns.res,
+					tt.mockArgs.tx.ComputeHash(1).Hash: tt.mockReturns.res,
 				},
 				nonce: map[types.Address]uint64{
 					tt.mockArgs.addr: tt.mockReturns.nonce,

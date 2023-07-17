@@ -200,8 +200,7 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 		return nil, err
 	}
 
-	tx.ComputeHash()
-
+	// tx hash will be calculated inside e.store.AddTx
 	if err := e.store.AddTx(tx); err != nil {
 		return nil, err
 	}
@@ -443,7 +442,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 
-	transaction, err := DecodeTxn(arg, e.store)
+	transaction, err := DecodeTxn(arg, header.Number, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -480,11 +479,6 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 
 // EstimateGas estimates the gas needed to execute a transaction
 func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
-	transaction, err := DecodeTxn(arg, e.store)
-	if err != nil {
-		return nil, err
-	}
-
 	number := LatestBlockNumber
 	if rawNum != nil {
 		number = *rawNum
@@ -492,6 +486,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Fetch the requested header
 	header, err := GetBlockHeader(number, e.store)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction, err := DecodeTxn(arg, header.Number, e.store)
 	if err != nil {
 		return nil, err
 	}

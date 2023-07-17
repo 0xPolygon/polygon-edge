@@ -113,7 +113,7 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			return err
 		}
 
-		bTxn = bTxn.ComputeHash()
+		bTxn = bTxn.ComputeHash(b.Header.Number)
 
 		b.Transactions = append(b.Transactions, bTxn)
 
@@ -361,6 +361,8 @@ func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 	return nil
 }
 
+// UnmarshalRLP unmarshals transaction from byte slice
+// Caution: do not assume that hash is correct if TxHashWithType fork is not enabled from the genesis!!!!
 func (t *Transaction) UnmarshalRLP(input []byte) error {
 	t.Type = LegacyTx
 	offset := 0
