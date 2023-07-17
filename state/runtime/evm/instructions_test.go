@@ -437,6 +437,7 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+// EIP2929: check some test return error when triggered from base
 func Test_opReturnDataCopy(t *testing.T) {
 	t.Parallel()
 
@@ -680,7 +681,7 @@ func Test_opCall(t *testing.T) {
 			},
 			config: &allEnabledForks,
 			initState: &state{
-				gas: 1000,
+				gas: 2600, //EIP2929: check gas increased to remove error, org gas 1000
 				sp:  6,
 				stack: []*big.Int{
 					big.NewInt(0x00), // outSize
@@ -690,7 +691,8 @@ func Test_opCall(t *testing.T) {
 					big.NewInt(0x00), // address
 					big.NewInt(0x00), // initialGas
 				},
-				memory: []byte{0x01},
+				memory:     []byte{0x01},
+				accessList: runtime.NewAccessList(),
 			},
 			resultState: &state{
 				memory: []byte{0x01},
@@ -719,6 +721,7 @@ func Test_opCall(t *testing.T) {
 			state.memory = test.initState.memory
 			state.config = test.config
 			state.host = test.mockHost
+			state.accessList = test.initState.accessList
 
 			opCall(test.op)(state)
 
