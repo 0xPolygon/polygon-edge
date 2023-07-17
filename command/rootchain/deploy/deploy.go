@@ -229,6 +229,12 @@ var (
 	}
 )
 
+type deploymentResultInfo struct {
+	RootchainCfg   *polybft.RootchainConfig
+	SupernetID     int64
+	CommandResults []command.CommandResult
+}
+
 // GetCommand returns the rootchain deploy command
 func GetCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -337,7 +343,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	rootchainCfg, supernetID, commandResults, err := deployContracts(outputter, client,
+	deploymentResultInfo, err := deployContracts(outputter, client,
 		chainConfig.Params.ChainID, consensusCfg.InitialValidatorSet, cmd.Context())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
@@ -346,7 +352,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	// populate bridge configuration
-	bridgeConfig := rootchainCfg.ToBridgeConfig()
+	bridgeConfig := deploymentResultInfo.RootchainCfg.ToBridgeConfig()
 	if consensusCfg.Bridge != nil {
 		// only true if stake-manager-deploy command was executed
 		// users can still deploy stake manager manually
@@ -365,9 +371,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	consensusCfg.Bridge.EventTrackerStartBlocks = map[types.Address]uint64{
-		rootchainCfg.StateSenderAddress: blockNum,
+		deploymentResultInfo.RootchainCfg.StateSenderAddress: blockNum,
 	}
-	consensusCfg.SupernetID = supernetID
+	consensusCfg.SupernetID = deploymentResultInfo.SupernetID
 
 	// write updated consensus configuration
 	chainConfig.Params.Engine[polybft.ConsensusName] = consensusCfg
@@ -382,21 +388,20 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		Message: fmt.Sprintf("%s finished. All contracts are successfully deployed and initialized.",
 			contractsDeploymentTitle),
 	})
-	outputter.SetCommandResult(command.Results(commandResults))
+	outputter.SetCommandResult(command.Results(deploymentResultInfo.CommandResults))
 }
 
 // deployContracts deploys and initializes rootchain smart contracts
 func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, chainID int64,
-	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (
-	*polybft.RootchainConfig, int64, []command.CommandResult, error) {
+	initialValidators []*validator.GenesisValidator, cmdCtx context.Context) (deploymentResultInfo, error) {
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client), txrelayer.WithWriter(outputter))
 	if err != nil {
-		return nil, 0, nil, fmt.Errorf("failed to initialize tx relayer: %w", err)
+		return deploymentResultInfo{nil, 0, nil}, fmt.Errorf("failed to initialize tx relayer: %w", err)
 	}
 
 	deployerKey, err := helper.DecodePrivateKey(params.deployerKey)
 	if err != nil {
-		return nil, 0, nil, fmt.Errorf("failed to initialize deployer key: %w", err)
+		return deploymentResultInfo{nil, 0, nil}, fmt.Errorf("failed to initialize deployer key: %w", err)
 	}
 
 	if params.isTestMode {
@@ -404,7 +409,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return nil, 0, nil, err
+			return deploymentResultInfo{nil, 0, nil}, err
 		}
 	}
 
@@ -427,7 +432,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			// use existing root chain ERC20 token
 			if err := populateExistingTokenAddr(client.Eth(),
 				params.rootERC20TokenAddr, rootERC20Name, rootchainConfig); err != nil {
-				return nil, 0, nil, err
+				return deploymentResultInfo{nil, 0, nil}, err
 			}
 		} else {
 			// deploy MockERC20 as a root chain root native token
@@ -539,7 +544,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	if err := g.Wait(); err != nil {
-		_, _ = outputter.Write([]byte("[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"))
+		outputter.WriteCommandResult(&helper.MessageResult{
+			Message: "[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"})
 
 		for _, result := range results {
 			if result != nil {
@@ -549,13 +555,14 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			}
 		}
 
-		return nil, 0, nil, err
+		return deploymentResultInfo{nil, 0, nil}, err
 	}
 
 	for i, result := range results {
 		populatorFn, ok := metadataPopulatorMap[result.Name]
 		if !ok {
-			return nil, 0, nil, fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)
+			return deploymentResultInfo{nil, 0, nil},
+				fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)
 		}
 
 		populatorFn(rootchainConfig, result.Address)
@@ -584,16 +591,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	if err := g.Wait(); err != nil {
-		return nil, 0, nil, err
+		return deploymentResultInfo{nil, 0, nil}, err
 	}
 
 	// register supernets manager on stake manager
 	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
 	if err != nil {
-		return nil, 0, nil, err
+		return deploymentResultInfo{nil, 0, nil}, err
 	}
 
-	return rootchainConfig, supernetID, commandResults, nil
+	return deploymentResultInfo{rootchainConfig, supernetID, commandResults}, nil
 }
 
 // populateExistingTokenAddr checks whether given token is deployed on the provided address.
