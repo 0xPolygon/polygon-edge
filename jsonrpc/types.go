@@ -18,7 +18,7 @@ type transactionOrHash interface {
 
 type transaction struct {
 	Nonce       argUint64      `json:"nonce"`
-	GasPrice    argBig         `json:"gasPrice,omitempty"`
+	GasPrice    *argBig        `json:"gasPrice,omitempty"`
 	GasTipCap   *argBig        `json:"maxPriorityFeePerGas,omitempty"`
 	GasFeeCap   *argBig        `json:"maxFeePerGas,omitempty"`
 	Gas         argUint64      `json:"gas"`
@@ -34,7 +34,6 @@ type transaction struct {
 	BlockNumber *argUint64     `json:"blockNumber"`
 	TxIndex     *argUint64     `json:"transactionIndex"`
 	Type        argUint64      `json:"type"`
-	ChainId     *argUint64     `json:"chainId"`
 }
 
 func (t transaction) getHash() types.Hash { return t.Hash }

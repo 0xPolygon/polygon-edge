@@ -305,7 +305,6 @@ func TestE2E_JsonRPC(t *testing.T) {
 		// Test. The dynamic 'from' field is populated
 		require.NotEqual(t, ethTxn.From, ethgo.ZeroAddress)
 		// Test. chainId is included
-		require.NotZero(t, ethTxn.ChainID)
 		require.NotZero(t, ethTxn.MaxFeePerGas)
 		require.NotZero(t, ethTxn.MaxPriorityFeePerGas)
 	})
