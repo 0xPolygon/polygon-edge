@@ -671,11 +671,13 @@ func (t *Transition) Create2(
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, runtime.NewAccessList())
-	contract.AccessList.AddAddress(caller)
 
-	// add all precompiles to access list
-	for _, addr := range precompiled.ActivePrecompiles {
-		contract.AccessList.AddAddress(addr)
+	if t.config.EIP2929 {
+		contract.AccessList.AddAddress(caller)
+		// add all precompiles to access list
+		for _, addr := range precompiled.ActivePrecompiles {
+			contract.AccessList.AddAddress(addr)
+		}
 	}
 
 	return t.applyCreate(contract, t)
@@ -689,12 +691,14 @@ func (t *Transition) Call2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, runtime.NewAccessList())
-	c.AccessList.AddAddress(caller)
-	c.AccessList.AddAddress(to)
 
-	// add all precompiles to access list
-	for _, addr := range precompiled.ActivePrecompiles {
-		c.AccessList.AddAddress(addr)
+	if t.config.EIP2929 {
+		c.AccessList.AddAddress(caller)
+		c.AccessList.AddAddress(to)
+		// add all precompiles to access list
+		for _, addr := range precompiled.ActivePrecompiles {
+			c.AccessList.AddAddress(addr)
+		}
 	}
 
 	return t.applyCall(c, runtime.Call, t)
