@@ -61,6 +61,7 @@ type Transaction struct {
 	V, R, S   *big.Int
 	Hash      Hash
 	From      Address
+	ChainId   *big.Int
 
 	Type TxType
 
