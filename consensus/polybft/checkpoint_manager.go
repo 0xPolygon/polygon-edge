@@ -133,18 +133,13 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		"latest checkpoint block", lastCheckpointBlockNumber,
 		"checkpoint block", latestHeader.Number)
 
-	checkpointManagerAddr := ethgo.Address(c.checkpointManagerAddr)
-	txn := &ethgo.Transaction{
-		To:   &checkpointManagerAddr,
-		From: c.key.Address(),
-	}
-	initialBlockNumber := lastCheckpointBlockNumber + 1
-
 	var (
-		parentExtra  *Extra
-		parentHeader *types.Header
-		currentExtra *Extra
-		found        bool
+		checkpointManagerAddr = ethgo.Address(c.checkpointManagerAddr)
+		initialBlockNumber    = lastCheckpointBlockNumber + 1
+		parentExtra           *Extra
+		parentHeader          *types.Header
+		currentExtra          *Extra
+		found                 bool
 	)
 
 	if initialBlockNumber < latestHeader.Number {
@@ -181,6 +176,11 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			continue
 		}
 
+		txn := &ethgo.Transaction{
+			To:   &checkpointManagerAddr,
+			From: c.key.Address(),
+		}
+
 		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
 			return err
 		}
@@ -197,6 +197,11 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		if err != nil {
 			return err
 		}
+	}
+
+	txn := &ethgo.Transaction{
+		To:   &checkpointManagerAddr,
+		From: c.key.Address(),
 	}
 
 	return c.encodeAndSendCheckpoint(txn, latestHeader, currentExtra, isEndOfEpoch)
@@ -237,7 +242,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	// update checkpoint block number metrics
 	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
-	c.logger.Debug("send checkpoint txn success", "block number", header.Number)
+	c.logger.Debug("send checkpoint txn success", "block number", header.Number, "gasUsed", receipt.GasUsed)
 
 	return nil
 }

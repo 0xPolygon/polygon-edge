@@ -803,16 +803,22 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 	return argBigPtr(priorityFee), nil
 }
 
-func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentiles []float64) (interface{}, error) {
+func (e *Eth) FeeHistory(blockCount argUint64, newestBlock BlockNumber,
+	rewardPercentiles []float64) (interface{}, error) {
+	block, err := GetNumericBlockNumber(newestBlock, e.store)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse newest block argument. Error: %w", err)
+	}
+
 	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
-	history, err := e.store.FeeHistory(blockCount, newestBlock, rewardPercentiles)
+	history, err := e.store.FeeHistory(uint64(blockCount), block, rewardPercentiles)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create channels to receive the processed slices asynchronously
 	baseFeePerGasCh := make(chan []argUint64)
-	gasUsedRatioCh := make(chan []argUint64)
+	gasUsedRatioCh := make(chan []float64)
 	rewardCh := make(chan [][]argUint64)
 
 	// Process baseFeePerGas asynchronously
@@ -822,7 +828,7 @@ func (e *Eth) FeeHistory(blockCount uint64, newestBlock uint64, rewardPercentile
 
 	// Process gasUsedRatio asynchronously
 	go func() {
-		gasUsedRatioCh <- convertFloat64SliceToArgUint64Slice(history.GasUsedRatio)
+		gasUsedRatioCh <- history.GasUsedRatio
 	}()
 
 	// Process reward asynchronously

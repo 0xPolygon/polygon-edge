@@ -1,8 +1,8 @@
 # Deploying local docker cluster
 
 ## Prerequisites
-* [Docker Desktop](https://www.docker.com/products/docker-desktop/) - Docker 17.12.0+
-* [Docker compose 2+](https://github.com/docker/compose/releases/tag/v2.14.1)
+* [Docker Engine](https://docs.docker.com/engine/install/) - Minimum version 20.10.23
+* [Docker compose v.1.x](https://docs.docker.com/compose/install/) - Minimum version 1.29
 
 ### `polybft` consensus
 When deploying with `polybft` consensus, there are some additional dependencies:
