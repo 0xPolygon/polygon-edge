@@ -281,6 +281,13 @@ func setFlags(cmd *cobra.Command) {
 			"address of a governance admin (governance admin can add new or remove old proposers "+
 				"of governance proposals, and add new and remove old executors of accepted proposals)",
 		)
+
+		cmd.Flags().Uint64Var(
+			&params.proposalQuorum,
+			proposalQuorumFlag,
+			defaultProposalQuorumPercentage,
+			"percentage of total validator stake needed for a governance proposal to be accepted (from 0 to 100%)",
+		)
 	}
 
 	// Access Control Lists

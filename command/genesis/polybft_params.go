@@ -37,17 +37,18 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize             = uint64(10)
-	defaultSprintSize            = uint64(5)
-	defaultValidatorSetSize      = 100
-	defaultBlockTime             = 2 * time.Second
-	defaultEpochReward           = 1
-	defaultBlockTimeDrift        = uint64(10)
-	defaultCheckpointInterval    = uint64(900)
-	defaultWithdrawalWaitPeriod  = uint64(1)
-	defaultVotingDelay           = "10"
-	defaultVotingPeriod          = "20"
-	defaultVoteProposalThreshold = "1000"
+	defaultEpochSize                = uint64(10)
+	defaultSprintSize               = uint64(5)
+	defaultValidatorSetSize         = 100
+	defaultBlockTime                = 2 * time.Second
+	defaultEpochReward              = 1
+	defaultBlockTimeDrift           = uint64(10)
+	defaultCheckpointInterval       = uint64(900)
+	defaultWithdrawalWaitPeriod     = uint64(1)
+	defaultVotingDelay              = "10"
+	defaultVotingPeriod             = "20"
+	defaultVoteProposalThreshold    = "1000"
+	defaultProposalQuorumPercentage = uint64(67)
 
 	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
@@ -166,6 +167,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		governorAdminAddr = types.StringToAddress(p.governorAdmin)
 	}
 
+	proposalQuorum := p.proposalQuorum
+	if proposalQuorum > 100 {
+		// proposal can be from 0 to 100, so we sanitize the value
+		proposalQuorum = 100
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -187,10 +194,11 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		},
 		BlockTimeDrift: p.blockTimeDrift,
 		GovernanceConfig: &polybft.GovernanceConfig{
-			VotingDelay:       voteDelay,
-			VotingPeriod:      votingPeriod,
-			ProposalThreshold: proposalThreshold,
-			GovernorAdmin:     governorAdminAddr,
+			VotingDelay:              voteDelay,
+			VotingPeriod:             votingPeriod,
+			ProposalThreshold:        proposalThreshold,
+			ProposalQuorumPercentage: proposalQuorum,
+			GovernorAdmin:            governorAdminAddr,
 		},
 	}
 
