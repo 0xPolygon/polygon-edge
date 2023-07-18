@@ -248,14 +248,18 @@ type GovernanceConfig struct {
 	// GovernorAdmin is the address of governance contract admin
 	// (he is the only one able to add new and remove old executors and proposers)
 	GovernorAdmin types.Address
+	// ProposalQuorumPercentage is the percentage of total validator stake needed for a
+	// governance proposal to be accepted
+	ProposalQuorumPercentage uint64
 }
 
 func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
 	raw := &governanceConfigRaw{
-		VotingDelay:       types.EncodeBigInt(g.VotingDelay),
-		VotingPeriod:      types.EncodeBigInt(g.VotingPeriod),
-		ProposalThreshold: types.EncodeBigInt(g.ProposalThreshold),
-		GovernorAdmin:     g.GovernorAdmin,
+		VotingDelay:              types.EncodeBigInt(g.VotingDelay),
+		VotingPeriod:             types.EncodeBigInt(g.VotingPeriod),
+		ProposalThreshold:        types.EncodeBigInt(g.ProposalThreshold),
+		GovernorAdmin:            g.GovernorAdmin,
+		ProposalQuorumPercentage: g.ProposalQuorumPercentage,
 	}
 
 	return json.Marshal(raw)
@@ -287,13 +291,15 @@ func (g *GovernanceConfig) UnmarshalJSON(data []byte) error {
 	}
 
 	g.GovernorAdmin = raw.GovernorAdmin
+	g.ProposalQuorumPercentage = raw.ProposalQuorumPercentage
 
 	return nil
 }
 
 type governanceConfigRaw struct {
-	VotingDelay       *string       `json:"votingDelay"`
-	VotingPeriod      *string       `json:"votingPeriod"`
-	ProposalThreshold *string       `json:"proposalThreshold"`
-	GovernorAdmin     types.Address `json:"governorAdmin"`
+	VotingDelay              *string       `json:"votingDelay"`
+	VotingPeriod             *string       `json:"votingPeriod"`
+	ProposalThreshold        *string       `json:"proposalThreshold"`
+	GovernorAdmin            types.Address `json:"governorAdmin"`
+	ProposalQuorumPercentage uint64        `json:"proposalQuorumPercentage"`
 }
