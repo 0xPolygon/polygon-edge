@@ -13,7 +13,6 @@ const txHashHandler = "txHash"
 type TransactionHashFork interface {
 	SerializeForRootCalculation(*Transaction, *fastrlp.ArenaPool) []byte
 	ComputeHash(*Transaction)
-	ComputeHashFromBytes([]byte, []byte) Hash
 }
 
 var (
@@ -56,10 +55,6 @@ func (th *TransactionHashForkV1) ComputeHash(t *Transaction) {
 	keccak.DefaultKeccakPool.Put(hash)
 }
 
-func (th *TransactionHashForkV1) ComputeHashFromBytes(dst, src []byte) Hash {
-	return HashFromBytes(dst, src[1:])
-}
-
 type TransactionHashForkV2 struct {
 }
 
@@ -71,10 +66,6 @@ func (th *TransactionHashForkV2) ComputeHash(t *Transaction) {
 	hash := keccak.DefaultKeccakPool.Get()
 	hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
 	keccak.DefaultKeccakPool.Put(hash)
-}
-
-func (th *TransactionHashForkV2) ComputeHashFromBytes(dst, src []byte) Hash {
-	return HashFromBytes(dst, src)
 }
 
 func RegisterTxHashFork(txHashWithTypeFork string) error {

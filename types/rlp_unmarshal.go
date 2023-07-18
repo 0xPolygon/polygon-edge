@@ -362,7 +362,7 @@ func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 }
 
 // UnmarshalRLP unmarshals transaction from byte slice
-// Caution: do not assume that hash is correct if TxHashWithType fork is not enabled from the genesis!!!!
+// Caution: Hash calculation should be done from the outside!
 func (t *Transaction) UnmarshalRLP(input []byte) error {
 	t.Type = LegacyTx
 	offset := 0
@@ -379,8 +379,6 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 	if err := UnmarshalRlp(t.unmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
-
-	t.Hash = HashFromBytes(t.Hash[:], input)
 
 	return nil
 }
