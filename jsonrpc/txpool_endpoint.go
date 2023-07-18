@@ -41,8 +41,8 @@ type StatusResponse struct {
 type txpoolTransaction struct {
 	Nonce       argUint64      `json:"nonce"`
 	GasPrice    argBig         `json:"gasPrice"`
-	GasFeeCap   *argBig        `json:"gasFeeCap,omitempty"`
-	GasTipCap   *argBig        `json:"gasTipCap,omitempty"`
+	GasFeeCap   *argBig        `json:"maxFeePerGas,omitempty"`
+	GasTipCap   *argBig        `json:"maxPriorityFeePerGas,omitempty"`
 	Gas         argUint64      `json:"gas"`
 	To          *types.Address `json:"to"`
 	Value       argBig         `json:"value"`
