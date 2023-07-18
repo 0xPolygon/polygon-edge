@@ -48,7 +48,7 @@ const (
 	defaultVotingDelay              = "10"
 	defaultVotingPeriod             = "20"
 	defaultVoteProposalThreshold    = "1000"
-	defaultProposalQuorumPercentage = uint64(40)
+	defaultProposalQuorumPercentage = uint64(67)
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
