@@ -144,7 +144,7 @@ func TestForkManager(t *testing.T) {
 	t.Run("get handler", func(t *testing.T) {
 		t.Parallel()
 
-		execute := func(name string, block uint64) string {
+		execute := func(name HandlerDesc, block uint64) string {
 			//nolint:forcetypeassert
 			return forkManager.GetHandler(name, block).(func() string)()
 		}
@@ -207,7 +207,7 @@ func TestForkManager_Deactivate(t *testing.T) {
 
 	forkManager := &forkManager{
 		forkMap:     map[string]*Fork{},
-		handlersMap: map[string][]forkHandler{},
+		handlersMap: map[HandlerDesc][]forkHandler{},
 	}
 	mvs1, mvs2 := uint64(1), uint64(2)
 
@@ -255,10 +255,10 @@ func TestForkManager_HandlerReplacement(t *testing.T) {
 
 	forkManager := &forkManager{
 		forkMap:     map[string]*Fork{},
-		handlersMap: map[string][]forkHandler{},
+		handlersMap: map[HandlerDesc][]forkHandler{},
 	}
 
-	execute := func(name string, block uint64) string {
+	execute := func(name HandlerDesc, block uint64) string {
 		//nolint:forcetypeassert
 		return forkManager.GetHandler(name, block).(func() string)()
 	}

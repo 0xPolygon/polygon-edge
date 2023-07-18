@@ -2,6 +2,10 @@ package forkmanager
 
 const InitialFork = "initialfork"
 
+// HandlerDesc gives description for the handler
+// eq: "extra", "proposer_calculator", etc
+type HandlerDesc string
+
 // Fork structure defines one fork
 type Fork struct {
 	// name of the fork
@@ -13,7 +17,7 @@ type Fork struct {
 	// this value is false if fork is registered but not activated
 	IsActive bool
 	// map of all handlers registered for this fork
-	Handlers map[string]interface{}
+	Handlers map[HandlerDesc]interface{}
 }
 
 // forkHandler defines one custom handler

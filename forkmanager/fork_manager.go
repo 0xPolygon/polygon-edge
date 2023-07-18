@@ -16,7 +16,7 @@ type forkManager struct {
 	lock sync.Mutex
 
 	forkMap     map[string]*Fork
-	handlersMap map[string][]forkHandler
+	handlersMap map[HandlerDesc][]forkHandler
 	params      []forkParamsBlock
 }
 
@@ -38,7 +38,7 @@ func (fm *forkManager) Clear() {
 	defer fm.lock.Unlock()
 
 	fm.forkMap = map[string]*Fork{}
-	fm.handlersMap = map[string][]forkHandler{}
+	fm.handlersMap = map[HandlerDesc][]forkHandler{}
 }
 
 // RegisterFork registers fork by its name
@@ -51,12 +51,12 @@ func (fm *forkManager) RegisterFork(name string, forkParams interface{}) {
 		FromBlockNumber: 0,
 		IsActive:        false,
 		Params:          forkParams,
-		Handlers:        map[string]interface{}{},
+		Handlers:        map[HandlerDesc]interface{}{},
 	}
 }
 
 // RegisterHandler registers handler by its name for specific fork
-func (fm *forkManager) RegisterHandler(forkName string, handlerName string, handler interface{}) error {
+func (fm *forkManager) RegisterHandler(forkName string, handlerName HandlerDesc, handler interface{}) error {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -124,7 +124,7 @@ func (fm *forkManager) DeactivateFork(forkName string) error {
 }
 
 // GetHandler retrieves handler for handler name and for a block number
-func (fm *forkManager) GetHandler(name string, blockNumber uint64) interface{} {
+func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interface{} {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -200,7 +200,7 @@ func (fm *forkManager) GetForkBlock(name string) (uint64, error) {
 	return fork.FromBlockNumber, nil
 }
 
-func (fm *forkManager) addHandler(handlerName string, blockNumber uint64, handler interface{}) {
+func (fm *forkManager) addHandler(handlerName HandlerDesc, blockNumber uint64, handler interface{}) {
 	if handlers, exists := fm.handlersMap[handlerName]; !exists {
 		fm.handlersMap[handlerName] = []forkHandler{
 			{
@@ -230,7 +230,7 @@ func (fm *forkManager) addHandler(handlerName string, blockNumber uint64, handle
 	}
 }
 
-func (fm *forkManager) removeHandler(handlerName string, blockNumber uint64) {
+func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64) {
 	handlers, exists := fm.handlersMap[handlerName]
 	if !exists {
 		return
