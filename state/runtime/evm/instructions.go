@@ -610,6 +610,7 @@ func opBalance(c *state) {
 			gas = WarmStorageReadCostEIP2929
 		} else {
 			gas = ColdAccountAccessCostEIP2929
+			c.accessList.AddAddress(addr)
 		}
 	} else if c.config.Istanbul {
 		// eip-1884
