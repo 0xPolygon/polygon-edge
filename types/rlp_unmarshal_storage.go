@@ -11,7 +11,8 @@ type RLPStoreUnmarshaler interface {
 	UnmarshalStoreRLP(input []byte) error
 }
 
-// UnmarshalRLP unmarshals body from byte slice. Hash for each tx must be computed manually after!
+// UnmarshalRLP unmarshals body from byte slice.
+// Caution: Hash for each tx must be computed manually after!
 func (b *Body) UnmarshalRLP(input []byte) error {
 	return UnmarshalRlp(b.unmarshalRLPFrom, input)
 }

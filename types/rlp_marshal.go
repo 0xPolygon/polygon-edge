@@ -192,9 +192,6 @@ func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
 func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
-	// Specify zero chain ID as per spec.
-	// This is needed to have the same format as other EVM chains do.
-	// There is no chain ID in the TX object, so it is always 0 here just to be compatible.
 	// Check Transaction1559Payload there https://eips.ethereum.org/EIPS/eip-1559#specification
 	if t.Type == DynamicFeeTx {
 		vv.Set(arena.NewBigInt(t.ChainID))
