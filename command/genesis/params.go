@@ -45,6 +45,7 @@ const (
 	votePeriodFlag            = "vote-period"
 	voteProposalThresholdFlag = "vote-proposal-threshold"
 	governorAdminFlag         = "governor-admin"
+	proposalQuorumFlag        = "proposal-quorum"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -147,6 +148,7 @@ type genesisParams struct {
 	voteDelay         string
 	votingPeriod      string
 	proposalThreshold string
+	proposalQuorum    uint64
 	governorAdmin     string
 }
 
