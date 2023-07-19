@@ -1,9 +1,9 @@
-* @topos-network/protocol
+* @topos-protocol/protocol
 
 # Github Actions
 
-/.github/workflows/ @topos-network/protocol @topos-network/tools
+/.github/workflows/ @topos-protocol/protocol @topos-protocol/tools
 
 # Docker
 
-/docker @topos-network/protocol @topos-network/tools
+/docker @topos-protocol/protocol @topos-protocol/tools

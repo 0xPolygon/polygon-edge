@@ -55,8 +55,8 @@ jobs:
           		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
           		--rm-dist --skip-validate
         env:
-          PACKAGE_NAME: github.com/topos-protocol/polygon-edge
-          GOLANG_CROSS_VERSION: v1.20.5
+          PACKAGE_NAME: github.com/topos-network/polygon-edge
+          GOLANG_CROSS_VERSION: v1.18.3
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.prepare.outputs.tag_name }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_EDGE_GITHUB_URL }}

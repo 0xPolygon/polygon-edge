@@ -2,8 +2,8 @@ package frost
 
 import (
 	"github.com/0xPolygon/go-ibft/core"
-	"github.com/topos-network/go-topos-sequencer-client/frostclient"
-	protofrost "github.com/topos-network/go-topos-sequencer-client/frostclient/proto"
+	"github.com/topos-protocol/go-topos-sequencer-client/frostclient"
+	protofrost "github.com/topos-protocol/go-topos-sequencer-client/frostclient/proto"
 )
 
 type FrostTransport interface {

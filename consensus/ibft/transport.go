@@ -5,7 +5,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/libp2p/go-libp2p/core/peer"
-	protofrost "github.com/topos-network/go-topos-sequencer-client/frostclient/proto"
+	protofrost "github.com/topos-protocol/go-topos-sequencer-client/frostclient/proto"
 )
 
 type transport interface {
