@@ -112,7 +112,7 @@ func getQuorumSize(blockNumber uint64, totalVotingPower *big.Int) *big.Int {
 	quorum := new(big.Int)
 	quorum.Mul(totalVotingPower, big.NewInt(2))
 
-	if forkmanager.GetInstance().IsForkEnabled(chain.NoviSad, blockNumber) {
+	if forkmanager.GetInstance().IsForkEnabled(chain.QuorumCalcAlignment, blockNumber) {
 		// this will floor the 2 * totalVotingPower / 3 and add one to it
 		return quorum.Div(quorum, big.NewInt(3)).Add(quorum, big.NewInt(1))
 	}
