@@ -433,7 +433,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 
 	if stateSyncProof == nil {
 		// check if we might've missed a commitment. if it is so, we didn't build proofs for it while syncing
-		// if we are all synced up, commitment will be saved through PostBlock, but we wont have proofs,
+		// if we are all synced up, commitment will be saved through PostBlock, but we won't have proofs,
 		// so we will build them now and save them to db so that we have proofs for missed commitment
 		commitment, err := s.state.StateSyncStore.getCommitmentForStateSync(stateSyncID)
 		if err != nil {

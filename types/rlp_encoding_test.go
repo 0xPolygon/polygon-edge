@@ -191,7 +191,7 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 			fromAddrSet   bool
 		}{
 			{
-				name:        fmt.Sprintf("[%s] Insuficient params", txType),
+				name:        fmt.Sprintf("[%s] Insufficient params", txType),
 				expectedErr: true,
 				omittedValues: map[string]bool{
 					"Nonce":    true,

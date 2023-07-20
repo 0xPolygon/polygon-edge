@@ -212,7 +212,7 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 // SendTransaction rejects eth_sendTransaction json-rpc call as we don't support wallet management
 func (e *Eth) SendTransaction(_ *txnArgs) (interface{}, error) {
 	return nil, fmt.Errorf("request calls to eth_sendTransaction method are not supported," +
-		" use eth_sendRawTransaction insead")
+		" use eth_sendRawTransaction instead")
 }
 
 // GetTransactionByHash returns a transaction by its hash.

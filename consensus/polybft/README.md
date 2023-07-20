@@ -29,7 +29,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     $ polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10 \
         [--validators-path ./] [--validators-prefix test-chain-] \
         [--consensus polybft] \
-        [--reward-wallet adress:amount]
+        [--reward-wallet address:amount]
     ```
 
    - validators information are scafollded on multiple hosts and therefore necessary information are supplied using `--validators` flag. Validator information needs to be supplied in the strictly following format:
