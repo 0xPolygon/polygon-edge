@@ -347,6 +347,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		chainConfig.Params.ChainID, consensusCfg.InitialValidatorSet, cmd.Context())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to deploy rootchain contracts: %w", err))
+		outputter.SetCommandResult(command.Results(deploymentResultInfo.CommandResults))
 
 		return
 	}
@@ -384,7 +385,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	outputter.WriteCommandResult(&helper.MessageResult{
+	deploymentResultInfo.CommandResults = append(deploymentResultInfo.CommandResults, &helper.MessageResult{
 		Message: fmt.Sprintf("%s finished. All contracts are successfully deployed and initialized.",
 			contractsDeploymentTitle),
 	})
@@ -544,18 +545,23 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	if err := g.Wait(); err != nil {
-		outputter.WriteCommandResult(&helper.MessageResult{
-			Message: "[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"})
+		results := []command.CommandResult{}
 
-		for _, result := range results {
+		messageResult := helper.MessageResult{
+			Message: "[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"}
+		results = append(results, messageResult)
+
+		for i, result := range results {
 			if result != nil {
 				// In case an error happened, some of the indices may not be populated.
 				// Filter those out.
-				outputter.WriteCommandResult(result)
+				commandResults[i] = result
 			}
 		}
 
-		return deploymentResultInfo{nil, 0, nil}, err
+		results = append(results, commandResults...)
+
+		return deploymentResultInfo{nil, 0, results}, err
 	}
 
 	for i, result := range results {
