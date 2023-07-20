@@ -380,7 +380,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfSprint {
-		commitment, err := c.stateSyncManager.Commitment()
+		commitment, err := c.stateSyncManager.Commitment(pendingBlockNumber)
 		if err != nil {
 			return err
 		}
