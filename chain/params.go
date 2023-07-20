@@ -78,15 +78,16 @@ func (p *Params) GetEngine() string {
 
 // predefined forks
 const (
-	Homestead      = "homestead"
-	Byzantium      = "byzantium"
-	Constantinople = "constantinople"
-	Petersburg     = "petersburg"
-	Istanbul       = "istanbul"
-	London         = "london"
-	EIP150         = "EIP150"
-	EIP158         = "EIP158"
-	EIP155         = "EIP155"
+	Homestead           = "homestead"
+	Byzantium           = "byzantium"
+	Constantinople      = "constantinople"
+	Petersburg          = "petersburg"
+	Istanbul            = "istanbul"
+	London              = "london"
+	EIP150              = "EIP150"
+	EIP158              = "EIP158"
+	EIP155              = "EIP155"
+	QuorumCalcAlignment = "quorumcalcalignment"
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
@@ -111,15 +112,16 @@ func (f *Forks) RemoveFork(name string) {
 // At returns ForksInTime instance that shows which supported forks are enabled for the block
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:      f.IsActive(Homestead, block),
-		Byzantium:      f.IsActive(Byzantium, block),
-		Constantinople: f.IsActive(Constantinople, block),
-		Petersburg:     f.IsActive(Petersburg, block),
-		Istanbul:       f.IsActive(Istanbul, block),
-		London:         f.IsActive(London, block),
-		EIP150:         f.IsActive(EIP150, block),
-		EIP158:         f.IsActive(EIP158, block),
-		EIP155:         f.IsActive(EIP155, block),
+		Homestead:           f.IsActive(Homestead, block),
+		Byzantium:           f.IsActive(Byzantium, block),
+		Constantinople:      f.IsActive(Constantinople, block),
+		Petersburg:          f.IsActive(Petersburg, block),
+		Istanbul:            f.IsActive(Istanbul, block),
+		London:              f.IsActive(London, block),
+		EIP150:              f.IsActive(EIP150, block),
+		EIP158:              f.IsActive(EIP158, block),
+		EIP155:              f.IsActive(EIP155, block),
+		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
 	}
 }
 
@@ -164,18 +166,20 @@ type ForksInTime struct {
 	London,
 	EIP150,
 	EIP158,
-	EIP155 bool
+	EIP155,
+	QuorumCalcAlignment bool
 }
 
 // AllForksEnabled should contain all supported forks by current edge version
 var AllForksEnabled = &Forks{
-	Homestead:      NewFork(0),
-	EIP150:         NewFork(0),
-	EIP155:         NewFork(0),
-	EIP158:         NewFork(0),
-	Byzantium:      NewFork(0),
-	Constantinople: NewFork(0),
-	Petersburg:     NewFork(0),
-	Istanbul:       NewFork(0),
-	London:         NewFork(0),
+	Homestead:           NewFork(0),
+	EIP150:              NewFork(0),
+	EIP155:              NewFork(0),
+	EIP158:              NewFork(0),
+	Byzantium:           NewFork(0),
+	Constantinople:      NewFork(0),
+	Petersburg:          NewFork(0),
+	Istanbul:            NewFork(0),
+	London:              NewFork(0),
+	QuorumCalcAlignment: NewFork(0),
 }

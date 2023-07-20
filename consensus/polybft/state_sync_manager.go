@@ -36,7 +36,7 @@ type StateSyncProof struct {
 type StateSyncManager interface {
 	Init() error
 	Close()
-	Commitment() (*CommitmentMessageSigned, error)
+	Commitment(blockNumber uint64) (*CommitmentMessageSigned, error)
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
@@ -47,11 +47,13 @@ var _ StateSyncManager = (*dummyStateSyncManager)(nil)
 // dummyStateSyncManager is used when bridge is not enabled
 type dummyStateSyncManager struct{}
 
-func (n *dummyStateSyncManager) Init() error                                   { return nil }
-func (n *dummyStateSyncManager) Close()                                        {}
-func (n *dummyStateSyncManager) Commitment() (*CommitmentMessageSigned, error) { return nil, nil }
-func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error         { return nil }
-func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error         { return nil }
+func (n *dummyStateSyncManager) Init() error { return nil }
+func (n *dummyStateSyncManager) Close()      {}
+func (n *dummyStateSyncManager) Commitment(blockNumber uint64) (*CommitmentMessageSigned, error) {
+	return nil, nil
+}
+func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
 }
@@ -268,7 +270,7 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) error {
 }
 
 // Commitment returns a commitment to be submitted if there is a pending commitment with quorum
-func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
+func (s *stateSyncManager) Commitment(blockNumber uint64) (*CommitmentMessageSigned, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -277,7 +279,7 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 	// we start from the end, since last pending commitment is the largest one
 	for i := len(s.pendingCommitments) - 1; i >= 0; i-- {
 		commitment := s.pendingCommitments[i]
-		aggregatedSignature, publicKeys, err := s.getAggSignatureForCommitmentMessage(commitment)
+		aggregatedSignature, publicKeys, err := s.getAggSignatureForCommitmentMessage(blockNumber, commitment)
 
 		if err != nil {
 			if errors.Is(err, errQuorumNotReached) {
@@ -306,7 +308,7 @@ func (s *stateSyncManager) Commitment() (*CommitmentMessageSigned, error) {
 
 // getAggSignatureForCommitmentMessage checks if pending commitment has quorum,
 // and if it does, aggregates the signatures
-func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
+func (s *stateSyncManager) getAggSignatureForCommitmentMessage(blockNumber uint64,
 	commitment *PendingCommitment) (Signature, [][]byte, error) {
 	validatorSet := s.validatorSet
 
@@ -352,7 +354,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(
 		signers[types.StringToAddress(vote.From)] = struct{}{}
 	}
 
-	if !validatorSet.HasQuorum(signers) {
+	if !validatorSet.HasQuorum(blockNumber, signers) {
 		return Signature{}, nil, errQuorumNotReached
 	}
 
@@ -433,7 +435,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 
 	if stateSyncProof == nil {
 		// check if we might've missed a commitment. if it is so, we didn't build proofs for it while syncing
-		// if we are all synced up, commitment will be saved through PostBlock, but we wont have proofs,
+		// if we are all synced up, commitment will be saved through PostBlock, but we won't have proofs,
 		// so we will build them now and save them to db so that we have proofs for missed commitment
 		commitment, err := s.state.StateSyncStore.getCommitmentForStateSync(stateSyncID)
 		if err != nil {

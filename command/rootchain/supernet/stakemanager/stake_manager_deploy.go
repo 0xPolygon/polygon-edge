@@ -110,7 +110,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("faield to get deployer key: %w", err)
+		return fmt.Errorf("failed to get deployer key: %w", err)
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC))
@@ -124,7 +124,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return fmt.Errorf("faield to send local transaction: %w", err)
+			return fmt.Errorf("failed to send local transaction: %w", err)
 		}
 	}
 
