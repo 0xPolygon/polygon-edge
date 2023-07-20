@@ -389,11 +389,10 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	validators := validatorAccounts.GetPublicIdentities()
 
-	lastBuiltBlock, headerMap := createTestBlocks(t, 9, epochSize, validators)
+	lastBuiltBlock := &types.Header{Number: 9}
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
-	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
 	require.NoError(t, state.EpochStore.insertEpoch(epoch))
@@ -544,11 +543,11 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 	t.Parallel()
 
 	const (
-		epoch           = 2
-		epochSize       = 10
-		epochStartBlock = 11
-		epochEndBlock   = 20
-		sprintSize      = 5
+		currentEpoch           = 3
+		epochSize              = 10
+		currentEpochStartBlock = 21
+		currentEpochEndBlock   = 30
+		sprintSize             = 5
 	)
 
 	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"})
@@ -557,13 +556,13 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		SprintSize: sprintSize,
 	}
 
-	lastBuiltBlock, headerMap := createTestBlocks(t, 19, epochSize, validators.GetPublicIdentities())
+	lastBuiltBlock, headerMap := createTestBlocks(t, 20, epochSize, validators.GetPublicIdentities())
 
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.GetPublicIdentities()).Twice()
+	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators.GetPublicIdentities()).Times(10)
 
 	config := &runtimeConfig{
 		PolyBFTConfig:  polybftConfig,
@@ -575,21 +574,17 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 	consensusRuntime := &consensusRuntime{
 		config: config,
 		epoch: &epochMetadata{
-			Number:            epoch,
+			Number:            currentEpoch,
 			Validators:        validators.GetPublicIdentities(),
-			FirstBlockInEpoch: epochStartBlock,
+			FirstBlockInEpoch: currentEpochStartBlock,
 		},
 		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	commitEpochInput, distributeRewardsInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock,
-		consensusRuntime.epoch)
+	distributeRewardsInput, err := consensusRuntime.calculateDistributeRewardsInput(lastBuiltBlock,
+		consensusRuntime.epoch.Number-1)
 	assert.NoError(t, err)
-	assert.NotEmpty(t, commitEpochInput)
-	assert.Equal(t, uint64(epoch), commitEpochInput.ID.Uint64())
-	assert.Equal(t, uint64(epochStartBlock), commitEpochInput.Epoch.StartBlock.Uint64())
-	assert.Equal(t, uint64(epochEndBlock), commitEpochInput.Epoch.EndBlock.Uint64())
-	assert.Equal(t, uint64(epoch), distributeRewardsInput.EpochID.Uint64())
+	assert.Equal(t, uint64(currentEpoch-1), distributeRewardsInput.EpochID.Uint64())
 
 	blockchainMock.AssertExpectations(t)
 	polybftBackendMock.AssertExpectations(t)

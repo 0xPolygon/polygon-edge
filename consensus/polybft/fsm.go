@@ -36,11 +36,11 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed " +
 		"in an epoch ending block")
 	errDistributeRewardsTxDoesNotExist = errors.New("distribute rewards transaction is " +
-		"not found in the epoch ending block")
-	errDistributeRewardsTxNotExpected = errors.New("didn't expect distribute rewards transaction " +
-		"in a non epoch ending block")
+		"not found in the first block of an epoch")
+	errDistributeRewardsTxNotExpected = errors.New("distribute rewards transaction " +
+		"is only expected in the first block of epoch")
 	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is " +
-		"allowed in an epoch ending block")
+		"allowed in the first block of an epoch")
 	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
 	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
@@ -88,6 +88,9 @@ type fsm struct {
 	// isEndOfSprint indicates if sprint reached its end
 	isEndOfSprint bool
 
+	// isFirstBlockOfEpoch indicates if this is the start of new epoch
+	isFirstBlockOfEpoch bool
+
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
@@ -134,8 +137,11 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		if err := f.blockBuilder.WriteTx(tx); err != nil {
 			return nil, fmt.Errorf("failed to apply commit epoch transaction: %w", err)
 		}
+	}
 
-		tx, err = f.createDistributeRewardsTx()
+	// only create distribute rewards tx if this is not start of the chain
+	if f.isFirstBlockOfEpoch && f.Height() > 1 {
+		tx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return nil, err
 		}
@@ -483,7 +489,10 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			// but it should be
 			return errCommitEpochTxDoesNotExist
 		}
+	}
 
+	// distribute rewards tx is only present if this is not start of chain
+	if f.isFirstBlockOfEpoch && f.Height() > 1 {
 		if !distributeRewardsTxExists {
 			// this is a check if distribute rewards transaction is not in the list of transactions at all
 			// but it should be
@@ -602,7 +611,8 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 // verifyDistributeRewardsTx creates distribute rewards transaction
 // and compares its hash with the one extracted from the block.
 func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) error {
-	if f.isEndOfEpoch {
+	// we don't have distribute rewards tx if we just started the chain
+	if f.isFirstBlockOfEpoch && f.Height() > 1 {
 		localDistributeRewardsTx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return err

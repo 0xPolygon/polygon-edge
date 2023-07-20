@@ -25,7 +25,7 @@ import (
 const (
 	maxCommitmentSize       = 10
 	stateFileName           = "consensusState.db"
-	commitEpochLookbackSize = 2 // number of blocks to calculate commit epoch info from the previous epoch
+	commitEpochLookbackSize = 1 // number of blocks to calculate commit epoch info from the previous epoch
 )
 
 var (
@@ -356,6 +356,7 @@ func (c *consensusRuntime) FSM() error {
 	// calculation of epoch and sprint end does not consider slashing currently
 	isEndOfSprint := c.isFixedSizeOfSprintMet(pendingBlockNumber, epoch)
 	isEndOfEpoch := c.isFixedSizeOfEpochMet(pendingBlockNumber, epoch)
+	isFirstBlockOfEpoch := pendingBlockNumber == epoch.FirstBlockInEpoch
 
 	valSet := validator.NewValidatorSet(epoch.Validators, c.logger)
 
@@ -365,18 +366,19 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	ff := &fsm{
-		config:            c.config.PolyBFTConfig,
-		parent:            parent,
-		backend:           c.config.blockchain,
-		polybftBackend:    c.config.polybftBackend,
-		exitEventRootHash: exitRootHash,
-		epochNumber:       epoch.Number,
-		blockBuilder:      blockBuilder,
-		validators:        valSet,
-		isEndOfEpoch:      isEndOfEpoch,
-		isEndOfSprint:     isEndOfSprint,
-		proposerSnapshot:  proposerSnapshot,
-		logger:            c.logger.Named("fsm"),
+		config:              c.config.PolyBFTConfig,
+		parent:              parent,
+		backend:             c.config.blockchain,
+		polybftBackend:      c.config.polybftBackend,
+		exitEventRootHash:   exitRootHash,
+		epochNumber:         epoch.Number,
+		blockBuilder:        blockBuilder,
+		validators:          valSet,
+		isEndOfEpoch:        isEndOfEpoch,
+		isEndOfSprint:       isEndOfSprint,
+		isFirstBlockOfEpoch: isFirstBlockOfEpoch,
+		proposerSnapshot:    proposerSnapshot,
+		logger:              c.logger.Named("fsm"),
 	}
 
 	if isEndOfSprint {
@@ -389,7 +391,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfEpoch {
-		ff.commitEpochInput, ff.distributeRewardsInput, err = c.calculateCommitEpochInput(parent, epoch)
+		ff.commitEpochInput = c.calculateCommitEpochInput(parent, epoch)
 		if err != nil {
 			return fmt.Errorf("cannot calculate commit epoch info: %w", err)
 		}
@@ -397,6 +399,14 @@ func (c *consensusRuntime) FSM() error {
 		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number, epoch.Validators.Copy())
 		if err != nil {
 			return fmt.Errorf("cannot update validator set on epoch ending: %w", err)
+		}
+	}
+
+	// don't calculate uptime if we are just starting the chain (pendingBlockNumber == 1)
+	if isFirstBlockOfEpoch && pendingBlockNumber > 1 {
+		ff.distributeRewardsInput, err = c.calculateDistributeRewardsInput(parent, epoch.Number-1)
+		if err != nil {
+			return fmt.Errorf("cannot calculate uptime info: %w", err)
 		}
 	}
 
@@ -490,16 +500,26 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	}, nil
 }
 
-// calculateCommitEpochInput calculates commit epoch input data for blocks starting from the last built block
-// in the current epoch, and ending at the last block of previous epoch
+// calculateCommitEpochInput calculates commit epoch input data
 func (c *consensusRuntime) calculateCommitEpochInput(
-	currentBlock *types.Header,
-	epoch *epochMetadata,
-) (*contractsapi.CommitEpochValidatorSetFn,
-	*contractsapi.DistributeRewardForRewardPoolFn, error) {
+	currentBlock *types.Header, epoch *epochMetadata) *contractsapi.CommitEpochValidatorSetFn {
+	return &contractsapi.CommitEpochValidatorSetFn{
+		ID: new(big.Int).SetUint64(epoch.Number),
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
+			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
+			EpochRoot:  types.Hash{},
+		},
+	}
+}
+
+// calculateDistributeRewardsInput calculates distribute rewards input data
+func (c *consensusRuntime) calculateDistributeRewardsInput(
+	lastBlockInEpoch *types.Header,
+	epochID uint64,
+) (*contractsapi.DistributeRewardForRewardPoolFn, error) {
 	uptimeCounter := map[types.Address]int64{}
-	blockHeader := currentBlock
-	epochID := epoch.Number
+	blockHeader := lastBlockInEpoch
 	totalBlocks := int64(0)
 
 	getSealersForBlock := func(blockExtra *Extra, validators validator.AccountSet) error {
@@ -517,20 +537,35 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		return nil
 	}
 
-	blockExtra, err := GetIbftExtra(currentBlock.ExtraData)
+	blockExtra, err := GetIbftExtra(lastBlockInEpoch.ExtraData)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// calculate uptime for current epoch
-	for blockHeader.Number > epoch.FirstBlockInEpoch {
-		if err := getSealersForBlock(blockExtra, epoch.Validators); err != nil {
-			return nil, nil, err
+	previousBlockHeader, previousBlockExtra, err := getBlockData(lastBlockInEpoch.Number-1, c.config.blockchain)
+	if err != nil {
+		return nil, err
+	}
+
+	// calculate uptime starting from last block - 1 in epoch until first block in given epoch
+	for previousBlockExtra.Checkpoint.EpochNumber == blockExtra.Checkpoint.EpochNumber {
+		validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-1, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := getSealersForBlock(blockExtra, validators); err != nil {
+			return nil, err
 		}
 
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
+		}
+
+		previousBlockHeader, previousBlockExtra, err = getBlockData(previousBlockHeader.Number-1, c.config.blockchain)
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -540,16 +575,16 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		for i := 0; i < commitEpochLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 
 			if err := getSealersForBlock(blockExtra, validators); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 
 			blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 		}
 	}
@@ -574,21 +609,12 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 	}
 
-	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
-		ID: new(big.Int).SetUint64(epochID),
-		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
-			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
-			EpochRoot:  types.Hash{},
-		},
-	}
-
 	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
 		EpochID: new(big.Int).SetUint64(epochID),
 		Uptime:  uptime,
 	}
 
-	return commitEpoch, distributeRewards, nil
+	return distributeRewards, nil
 }
 
 // GenerateExitProof generates proof of exit and is a bridge endpoint store function
