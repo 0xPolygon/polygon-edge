@@ -397,8 +397,6 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	validatorAccounts := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E", "F"})
 	validators := validatorAccounts.GetPublicIdentities()
 
-	lastBuiltBlock := &types.Header{Number: 9}
-
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("NewBlockBuilder", mock.Anything).Return(&BlockBuilder{}, nil).Once()
 
@@ -427,7 +425,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		state:              state,
 		epoch:              metadata,
 		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
+		lastBuiltBlock:     &types.Header{Number: 9},
 		stateSyncManager:   &dummyStateSyncManager{},
 		checkpointManager:  &dummyCheckpointManager{},
 		stakeManager:       &dummyStakeManager{},

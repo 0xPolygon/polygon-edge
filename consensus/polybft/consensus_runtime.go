@@ -516,7 +516,7 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 	lastFinalizedBlock *types.Header,
 	epochID uint64,
 ) (*contractsapi.DistributeRewardForRewardPoolFn, error) {
-	if !shouldAddOrValidateRewardDistribution(isFirstBlockOfEpoch, isEndOfEpoch, pendingBlockNumber) {
+	if !isRewardDistributionBlock(isFirstBlockOfEpoch, isEndOfEpoch, pendingBlockNumber) {
 		// we don't have to distribute rewards at this block
 		return nil, nil
 	}

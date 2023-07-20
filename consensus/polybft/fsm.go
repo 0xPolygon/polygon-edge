@@ -36,11 +36,11 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed " +
 		"in an epoch ending block")
 	errDistributeRewardsTxDoesNotExist = errors.New("distribute rewards transaction is " +
-		"not found in the given block, but should be added")
+		"not found in the given block, though it is expected to be present")
 	errDistributeRewardsTxNotExpected = errors.New("distribute rewards transaction " +
 		"is not expected at this block")
 	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is " +
-		"allowed at the expected block")
+		"allowed in the given block")
 	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
 	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
@@ -139,7 +139,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		}
 	}
 
-	if shouldAddOrValidateRewardDistribution(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if isRewardDistributionBlock(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		tx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return nil, err
@@ -490,7 +490,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		}
 	}
 
-	if shouldAddOrValidateRewardDistribution(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if isRewardDistributionBlock(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		if !distributeRewardsTxExists {
 			// this is a check if distribute rewards transaction is not in the list of transactions at all
 			// but it should be
@@ -610,7 +610,7 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 // and compares its hash with the one extracted from the block.
 func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) error {
 	// we don't have distribute rewards tx if we just started the chain
-	if shouldAddOrValidateRewardDistribution(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if isRewardDistributionBlock(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		localDistributeRewardsTx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return err

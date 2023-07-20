@@ -10,12 +10,12 @@ const (
 	newRewardLookbackSize = uint64(1)
 )
 
-// shouldAddOrValidateRewardDistribution indicates if reward distribution transaction
-// should be validated or added at given block
+// isRewardDistributionBlock indicates if reward distribution transaction
+// should happen in given block
 // if governance fork is enabled, reward distribution is only present on the first block of epoch
 // and if we are not at the start of chain
 // if governance fork is not enabled, reward distribution is only present at the epoch ending block
-func shouldAddOrValidateRewardDistribution(isFirstBlockOfEpoch, isEndOfEpoch bool,
+func isRewardDistributionBlock(isFirstBlockOfEpoch, isEndOfEpoch bool,
 	pendingBlockNumber uint64) bool {
 	if forkmanager.GetInstance().IsForkEnabled(chain.Governance, pendingBlockNumber) {
 		return isFirstBlockOfEpoch && pendingBlockNumber > 1
