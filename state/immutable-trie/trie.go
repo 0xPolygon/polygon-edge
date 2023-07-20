@@ -471,6 +471,10 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			nc = aux
 		}
 
+		if t.tracer != nil {
+			t.tracer.Trace(nc)
+		}
+
 		obj, ok := nc.(*ShortNode)
 		if !ok {
 			obj := &ShortNode{}
