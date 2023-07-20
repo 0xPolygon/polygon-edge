@@ -9,11 +9,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 
@@ -23,9 +25,8 @@ import (
 )
 
 const (
-	maxCommitmentSize       = 10
-	stateFileName           = "consensusState.db"
-	commitEpochLookbackSize = 1 // number of blocks to calculate commit epoch info from the previous epoch
+	maxCommitmentSize = 10
+	stateFileName     = "consensusState.db"
 )
 
 var (
@@ -392,9 +393,6 @@ func (c *consensusRuntime) FSM() error {
 
 	if isEndOfEpoch {
 		ff.commitEpochInput = c.calculateCommitEpochInput(parent, epoch)
-		if err != nil {
-			return fmt.Errorf("cannot calculate commit epoch info: %w", err)
-		}
 
 		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number, epoch.Validators.Copy())
 		if err != nil {
@@ -402,12 +400,10 @@ func (c *consensusRuntime) FSM() error {
 		}
 	}
 
-	// don't calculate uptime if we are just starting the chain (pendingBlockNumber == 1)
-	if isFirstBlockOfEpoch && pendingBlockNumber > 1 {
-		ff.distributeRewardsInput, err = c.calculateDistributeRewardsInput(parent, epoch.Number-1)
-		if err != nil {
-			return fmt.Errorf("cannot calculate uptime info: %w", err)
-		}
+	ff.distributeRewardsInput, err = c.calculateDistributeRewardsInput(isFirstBlockOfEpoch, isEndOfEpoch,
+		pendingBlockNumber, parent, epoch.Number)
+	if err != nil {
+		return fmt.Errorf("cannot calculate uptime info: %w", err)
 	}
 
 	c.logger.Info(
@@ -515,20 +511,32 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 
 // calculateDistributeRewardsInput calculates distribute rewards input data
 func (c *consensusRuntime) calculateDistributeRewardsInput(
-	lastBlockInEpoch *types.Header,
+	isFirstBlockOfEpoch, isEndOfEpoch bool,
+	pendingBlockNumber uint64,
+	lastFinalizedBlock *types.Header,
 	epochID uint64,
 ) (*contractsapi.DistributeRewardForRewardPoolFn, error) {
-	uptimeCounter := map[types.Address]int64{}
-	blockHeader := lastBlockInEpoch
-	totalBlocks := int64(0)
+	if !shouldAddOrValidateRewardDistribution(isFirstBlockOfEpoch, isEndOfEpoch, pendingBlockNumber) {
+		// we don't have to distribute rewards at this block
+		return nil, nil
+	}
+
+	var (
+		uptimeCounter = map[types.Address]int64{}
+		blockHeader   = lastFinalizedBlock // start calculating from this block
+	)
+
+	if forkmanager.GetInstance().IsForkEnabled(chain.Governance, pendingBlockNumber) {
+		// if governance is enabled, we are distributing rewards for previous epoch
+		// at the beginning of a new epoch, so modify epochID
+		epochID--
+	}
 
 	getSealersForBlock := func(blockExtra *Extra, validators validator.AccountSet) error {
 		signers, err := validators.GetFilteredValidators(blockExtra.Parent.Bitmap)
 		if err != nil {
 			return err
 		}
-
-		totalBlocks++
 
 		for _, a := range signers.GetAddresses() {
 			uptimeCounter[a]++
@@ -537,12 +545,12 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 		return nil
 	}
 
-	blockExtra, err := GetIbftExtra(lastBlockInEpoch.ExtraData)
+	blockExtra, err := GetIbftExtra(blockHeader.ExtraData)
 	if err != nil {
 		return nil, err
 	}
 
-	previousBlockHeader, previousBlockExtra, err := getBlockData(lastBlockInEpoch.Number-1, c.config.blockchain)
+	previousBlockHeader, previousBlockExtra, err := getBlockData(blockHeader.Number-1, c.config.blockchain)
 	if err != nil {
 		return nil, err
 	}
@@ -569,10 +577,12 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 		}
 	}
 
+	lookbackSize := getLookbackSizeForRewardDistribution(pendingBlockNumber)
+
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
 	// since we can not calculate uptime for the last block in epoch (because of parent signatures)
-	if blockHeader.Number > commitEpochLookbackSize {
-		for i := 0; i < commitEpochLookbackSize; i++ {
+	if blockHeader.Number > lookbackSize {
+		for i := uint64(0); i < lookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
 				return nil, err

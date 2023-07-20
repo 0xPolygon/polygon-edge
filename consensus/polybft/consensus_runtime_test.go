@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -16,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -23,6 +25,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func init() {
+	// for tests
+	forkmanager.GetInstance().RegisterFork(chain.Governance, nil)
+	forkmanager.GetInstance().ActivateFork(chain.Governance, 0) //nolint:errcheck
+}
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
 	t.Parallel()
@@ -581,8 +589,10 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		lastBuiltBlock: lastBuiltBlock,
 	}
 
-	distributeRewardsInput, err := consensusRuntime.calculateDistributeRewardsInput(lastBuiltBlock,
-		consensusRuntime.epoch.Number-1)
+	distributeRewardsInput, err := consensusRuntime.calculateDistributeRewardsInput(
+		true, false,
+		lastBuiltBlock.Number+1,
+		lastBuiltBlock, consensusRuntime.epoch.Number)
 	assert.NoError(t, err)
 	assert.Equal(t, uint64(currentEpoch-1), distributeRewardsInput.EpochID.Uint64())
 

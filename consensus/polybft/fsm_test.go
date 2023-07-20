@@ -453,6 +453,7 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 		validatorSet := validator.NewValidatorSet(validators.GetPublicIdentities(), hclog.NewNullLogger())
 
 		fsm := &fsm{
+			parent:                 &types.Header{Number: 9},
 			isEndOfEpoch:           true,
 			isEndOfSprint:          true,
 			validators:             validatorSet,
@@ -472,7 +473,10 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 	t.Run("Middle of epoch with transactions", func(t *testing.T) {
 		t.Parallel()
 
-		fsm := &fsm{commitEpochInput: createTestCommitEpochInput(t, 0, 10)}
+		fsm := &fsm{
+			parent:           &types.Header{Number: 5},
+			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+		}
 		tx, err := fsm.createCommitEpochTx()
 		require.NoError(t, err)
 		err = fsm.VerifyStateTransactions([]*types.Transaction{tx})
@@ -482,7 +486,10 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 	t.Run("Middle of epoch without transaction", func(t *testing.T) {
 		t.Parallel()
 
-		fsm := &fsm{commitEpochInput: createTestCommitEpochInput(t, 0, 10)}
+		fsm := &fsm{
+			parent:           &types.Header{Number: 5},
+			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+		}
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
 		require.NoError(t, err)
 	})
@@ -490,7 +497,11 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 	t.Run("End of epoch without transaction", func(t *testing.T) {
 		t.Parallel()
 
-		fsm := &fsm{isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, 10)}
+		fsm := &fsm{
+			parent:           &types.Header{Number: 9},
+			isEndOfEpoch:     true,
+			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+		}
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
 		require.ErrorContains(t, err, errCommitEpochTxDoesNotExist.Error())
 	})
@@ -498,7 +509,11 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 	t.Run("End of epoch wrong commit transaction", func(t *testing.T) {
 		t.Parallel()
 
-		fsm := &fsm{isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, 10)}
+		fsm := &fsm{
+			isEndOfEpoch:     true,
+			parent:           &types.Header{Number: 9},
+			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+		}
 		commitEpochInput, err := createTestCommitEpochInput(t, 1, 5).EncodeAbi()
 		require.NoError(t, err)
 
@@ -511,7 +526,11 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 		t.Parallel()
 
 		txs := make([]*types.Transaction, 2)
-		fsm := &fsm{isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, 10)}
+		fsm := &fsm{
+			isEndOfEpoch:     true,
+			parent:           &types.Header{Number: 9},
+			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+		}
 
 		commitEpochTxOne, err := fsm.createCommitEpochTx()
 		require.NoError(t, err)
@@ -633,6 +652,7 @@ func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
 
 			f := &fsm{
 				isEndOfSprint: true,
+				parent:        &types.Header{Number: 9},
 				validators:    validators.ToValidatorSet(),
 			}
 
