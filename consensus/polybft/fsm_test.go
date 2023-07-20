@@ -697,6 +697,7 @@ func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
 
 		fsm := &fsm{
 			isEndOfSprint:                true,
+			parent:                       &types.Header{Number: 9},
 			validators:                   validatorSet,
 			proposerCommitmentToRegister: commitment,
 			logger:                       hclog.NewNullLogger(),
@@ -724,6 +725,7 @@ func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
 		fsm := &fsm{
 			isEndOfEpoch:                 true,
 			isEndOfSprint:                true,
+			parent:                       &types.Header{Number: 9},
 			validators:                   validatorSet,
 			proposerCommitmentToRegister: commitment,
 			commitEpochInput:             createTestCommitEpochInput(t, 0, 10),
@@ -768,6 +770,7 @@ func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
 		f := &fsm{
 			isEndOfSprint: true,
 			validators:    validatorSet,
+			parent:        &types.Header{Number: 9},
 		}
 
 		hash, err := commitmentMessageSigned.Hash()
