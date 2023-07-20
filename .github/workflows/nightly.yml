@@ -134,14 +134,14 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Load tests (multiple_EOA) ${{ needs.loadtest.outputs.workflow_output_loadtest1 == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                    "text": "Load tests (multiple_EOA) ${{ needs.loadtest.outputs.workflow_output_loadtest1 == 'true' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "Load tests (multiple_ERC20) ${{ needs.loadtest.outputs.workflow_output_loadtest2 == '' && ':white_check_mark:' || ':x: `failed`' }}"
+                    "text": "Load tests (multiple_ERC20) ${{ needs.loadtest.outputs.workflow_output_loadtest2 == 'true' && ':white_check_mark:' || ':x: `failed`' }}"
                   }
                 },
                 {

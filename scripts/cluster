@@ -15,11 +15,36 @@ if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
   dp_error_flag=1
 fi
 
+# Check if docker-compose is installed
+if [[ "$2" == "--docker" ]] && ! command -v docker-compose >/dev/null 2>&1; then
+  echo "docker-compose is not installed."
+  echo "Manual installation instructions: Visit https://docs.docker.com/compose/install/ for more information."
+  dp_error_flag=1
+fi
+
 # Stop script if any of the dependencies have failed
 if [[ "$dp_error_flag" -eq 1 ]]; then
   echo "Missing dependencies. Please install them and run the script again."
   exit 1
 fi
+
+function showhelp(){
+  echo "Usage: cluster {consensus} [{command}] [{flags}]"
+  echo "Consensus:"
+  echo "  ibft            Start Supernets test environment locally with ibft consensus"
+  echo "  polybft         Start Supernets test environment locally with polybft consensus"
+  echo "Commands:"
+  echo "  stop            Stop the running environment"
+  echo "  destroy         Destroy the running environment"
+  echo "  write-logs      Writes STDOUT and STDERR output to log file. Not applicable when using --docker flag."
+  echo "Flags:"
+  echo "  --docker        Run using Docker (requires docker-compose)."
+  echo "  --help          Display this help information"
+  echo "Examples:"
+  echo "  cluster polybft -- Run the script with the polybft consensus"
+  echo "  cluster polybtt --docker -- Run the script with the polybft consensus using docker"
+  echo "  cluster polybft stop -- Stop the running environment"
+}
 
 function initIbftConsensus() {
   echo "Running with ibft consensus"
@@ -180,6 +205,12 @@ function stopDockerEnvironment() {
 
 set -e
 
+# Show help if help flag is entered or no arguments are provided
+if [[ "$1" == "--help" ]] || [[ $# -eq 0 ]]; then
+  showhelp
+  exit 0
+fi
+
 # Reset test-dirs
 rm -rf test-chain-*
 rm -f genesis.json
@@ -198,7 +229,7 @@ case "$2" in
   # cluster {consensus} --docker stop
   elif [ "$3" == "stop" ]; then
     stopDockerEnvironment
-    echo "Docker $1 environment stoped!"
+    echo "Docker $1 environment stopped!"
     exit 0
   fi
 
@@ -228,7 +259,8 @@ case "$2" in
     startServerFromBinary $2
     exit 0
   else
-    echo "Unsupported consensus mode. Supported modes are: ibft and polybft "
+    echo "Unsupported consensus mode. Supported modes are: ibft and polybft."
+    showhelp
     exit 1
   fi
   ;;

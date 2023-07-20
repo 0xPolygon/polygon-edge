@@ -79,7 +79,7 @@ type Polybft struct {
 	// state is reference to the struct which encapsulates consensus data persistence logic
 	state *State
 
-	// consensus parametres
+	// consensus parameters
 	config *consensus.Params
 
 	// consensusConfig is genesis configuration for polybft consensus protocol
@@ -598,7 +598,7 @@ func (p *Polybft) startConsensusProtocol() {
 		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
-			// initialze FSM as a stateless ibft backend via runtime as an adapter
+			// initialize FSM as a stateless ibft backend via runtime as an adapter
 			err = p.runtime.FSM()
 			if err != nil {
 				p.logger.Error("failed to create fsm", "block number", latestHeader.Number, "error", err)
