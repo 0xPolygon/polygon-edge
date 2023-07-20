@@ -11,6 +11,8 @@ type RLPStoreUnmarshaler interface {
 	UnmarshalStoreRLP(input []byte) error
 }
 
+// UnmarshalRLP unmarshals body from byte slice.
+// Caution: Hash for each tx must be computed manually after!
 func (b *Body) UnmarshalRLP(input []byte) error {
 	return UnmarshalRlp(b.unmarshalRLPFrom, input)
 }
@@ -34,8 +36,6 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		if err = bTxn.unmarshalStoreRLPFrom(p, v); err != nil {
 			return err
 		}
-
-		bTxn = bTxn.ComputeHash()
 
 		b.Transactions = append(b.Transactions, bTxn)
 
@@ -62,6 +62,7 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	return nil
 }
 
+// UnmarshalStoreRLP unmarshals transaction from byte slice. Hash must be computed manually after!
 func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
 	t.Type = LegacyTx
 
@@ -103,8 +104,6 @@ func (t *Transaction) unmarshalStoreRLPFrom(p *fastrlp.Parser, v *fastrlp.Value)
 	if err = elems[1].GetAddr(t.From[:]); err != nil {
 		return err
 	}
-
-	t.ComputeHash()
 
 	return nil
 }

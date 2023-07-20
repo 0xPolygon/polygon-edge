@@ -200,8 +200,7 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 		return nil, err
 	}
 
-	tx.ComputeHash()
-
+	// tx hash will be calculated inside e.store.AddTx
 	if err := e.store.AddTx(tx); err != nil {
 		return nil, err
 	}
@@ -230,22 +229,19 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 		}
 
 		block, ok := e.store.GetBlockByHash(blockHash, true)
-
 		if !ok {
 			// Block receipts not found in storage
 			return nil
 		}
 
 		// Find the transaction within the block
-		for idx, txn := range block.Transactions {
-			if txn.Hash == hash {
-				return toTransaction(
-					txn,
-					argUintPtr(block.Number()),
-					argHashPtr(block.Hash()),
-					&idx,
-				)
-			}
+		if txn, idx := types.FindTxByHash(block.Transactions, hash); txn != nil {
+			return toTransaction(
+				txn,
+				argUintPtr(block.Number()),
+				argHashPtr(block.Hash()),
+				&idx,
+			)
 		}
 
 		return nil
@@ -318,27 +314,20 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		return nil, nil
 	}
 	// find the transaction in the body
-	txIndex := -1
 	logIndex := 0
-
-	for i, txn := range block.Transactions {
-		if txn.Hash == hash {
-			txIndex = i
-
-			break
-		}
-
-		// accumulate receipt logs indexes from block transactions
-		// that are before the desired transaction
-		logIndex += len(receipts[i].Logs)
-	}
+	txn, txIndex := types.FindTxByHash(block.Transactions, hash)
 
 	if txIndex == -1 {
 		// txn not found
 		return nil, nil
 	}
 
-	txn := block.Transactions[txIndex]
+	for i := 0; i < txIndex; i++ {
+		// accumulate receipt logs indexes from block transactions
+		// that are before the desired transaction
+		logIndex += len(receipts[i].Logs)
+	}
+
 	raw := receipts[txIndex]
 
 	logs := make([]*Log, len(raw.Logs))
@@ -349,7 +338,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 			Data:        argBytes(elem.Data),
 			BlockHash:   block.Hash(),
 			BlockNumber: argUint64(block.Number()),
-			TxHash:      txn.Hash,
+			TxHash:      hash,
 			TxIndex:     argUint64(txIndex),
 			LogIndex:    argUint64(logIndex + i),
 			Removed:     false,
@@ -361,7 +350,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
 		LogsBloom:         raw.LogsBloom,
 		Status:            argUint64(*raw.Status),
-		TxHash:            txn.Hash,
+		TxHash:            hash,
 		TxIndex:           argUint64(txIndex),
 		BlockHash:         block.Hash(),
 		BlockNumber:       argUint64(block.Number()),
@@ -453,7 +442,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 
-	transaction, err := DecodeTxn(arg, e.store)
+	transaction, err := DecodeTxn(arg, header.Number, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -490,11 +479,6 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 
 // EstimateGas estimates the gas needed to execute a transaction
 func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
-	transaction, err := DecodeTxn(arg, e.store)
-	if err != nil {
-		return nil, err
-	}
-
 	number := LatestBlockNumber
 	if rawNum != nil {
 		number = *rawNum
@@ -502,6 +486,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Fetch the requested header
 	header, err := GetBlockHeader(number, e.store)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction, err := DecodeTxn(arg, header.Number, e.store)
 	if err != nil {
 		return nil, err
 	}

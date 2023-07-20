@@ -27,6 +27,14 @@ func (k *Keccak) WriteRlp(dst []byte, v *fastrlp.Value) []byte {
 	return k.Sum(dst)
 }
 
+// WriteFn writes using value provided by custom marshalFn func
+func (k *Keccak) WriteFn(dst []byte, marshalFn func([]byte) []byte) []byte {
+	k.buf = marshalFn(k.buf[:0])
+	k.Write(k.buf) //nolint:errcheck
+
+	return k.Sum(dst)
+}
+
 // Write implements the hash interface
 func (k *Keccak) Write(b []byte) (int, error) {
 	return k.hash.Write(b)

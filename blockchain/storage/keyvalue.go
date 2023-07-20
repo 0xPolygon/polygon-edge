@@ -143,9 +143,21 @@ func (s *KeyValueStorage) ReadHeader(hash types.Hash) (*types.Header, error) {
 // ReadBody reads the body
 func (s *KeyValueStorage) ReadBody(hash types.Hash) (*types.Body, error) {
 	body := &types.Body{}
-	err := s.readRLP(BODY, hash.Bytes(), body)
+	if err := s.readRLP(BODY, hash.Bytes(), body); err != nil {
+		return nil, err
+	}
 
-	return body, err
+	// must read header because block number is needed in order to calculate each tx hash
+	header := &types.Header{}
+	if err := s.readRLP(HEADER, hash.Bytes(), header); err != nil {
+		return nil, err
+	}
+
+	for _, tx := range body.Transactions {
+		tx.ComputeHash(header.Number)
+	}
+
+	return body, nil
 }
 
 // RECEIPTS //

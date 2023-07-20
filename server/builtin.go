@@ -7,6 +7,7 @@ import (
 	consensusDummy "github.com/0xPolygon/polygon-edge/consensus/dummy"
 	consensusIBFT "github.com/0xPolygon/polygon-edge/consensus/ibft"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/awsssm"
 	"github.com/0xPolygon/polygon-edge/secrets/gcpssm"
@@ -21,7 +22,7 @@ type ConsensusType string
 
 type ForkManagerFactory func(forks *chain.Forks) error
 
-type ForkManagerInitialParamsFactory func(config *chain.Chain) (*chain.ForkParams, error)
+type ForkManagerInitialParamsFactory func(config *chain.Chain) (*forkmanager.ForkParams, error)
 
 const (
 	DevConsensus     ConsensusType = "dev"
