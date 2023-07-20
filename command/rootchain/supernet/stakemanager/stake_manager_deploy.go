@@ -21,16 +21,16 @@ import (
 var params stakeManagerDeployParams
 
 func GetCommand() *cobra.Command {
-	registerCmd := &cobra.Command{
+	stakeMgrDeployCmd := &cobra.Command{
 		Use:     "stake-manager-deploy",
 		Short:   "Command for deploying stake manager contract on rootchain",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	setFlags(registerCmd)
+	setFlags(stakeMgrDeployCmd)
 
-	return registerCmd
+	return stakeMgrDeployCmd
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
