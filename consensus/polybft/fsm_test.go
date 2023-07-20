@@ -574,7 +574,6 @@ func TestFSM_VerifyStateTransactions_StateTransactionQuorumNotReached(t *testing
 		commitEpochInput:             createTestCommitEpochInput(t, 0, 10),
 		distributeRewardsInput:       createTestDistributeRewardsInput(t, 0, nil, 10),
 		logger:                       hclog.NewNullLogger(),
-		parent:                       &types.Header{},
 	}
 
 	bridgeCommitmentTx, err := fsm.createBridgeCommitmentTx()
@@ -618,7 +617,6 @@ func TestFSM_VerifyStateTransactions_StateTransactionInvalidSignature(t *testing
 		commitEpochInput:             createTestCommitEpochInput(t, 0, 10),
 		distributeRewardsInput:       createTestDistributeRewardsInput(t, 0, nil, 10),
 		logger:                       hclog.NewNullLogger(),
-		parent:                       &types.Header{},
 	}
 
 	bridgeCommitmentTx, err := fsm.createBridgeCommitmentTx()

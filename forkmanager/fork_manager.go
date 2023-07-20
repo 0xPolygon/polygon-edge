@@ -42,7 +42,7 @@ func (fm *forkManager) Clear() {
 }
 
 // RegisterFork registers fork by its name
-func (fm *forkManager) RegisterFork(name string, forkParams interface{}) {
+func (fm *forkManager) RegisterFork(name string, forkParams *ForkParams) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -145,7 +145,7 @@ func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interfac
 }
 
 // GetParams retrieves chain.ForkParams for a block number
-func (fm *forkManager) GetParams(blockNumber uint64) interface{} {
+func (fm *forkManager) GetParams(blockNumber uint64) *ForkParams {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -247,15 +247,8 @@ func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64
 	}
 }
 
-func (fm *forkManager) addParams(blockNumber uint64, params interface{}) {
+func (fm *forkManager) addParams(blockNumber uint64, params *ForkParams) {
 	if params == nil {
-		return
-	}
-
-	value := reflect.ValueOf(params)
-	kind := value.Kind()
-
-	if (kind == reflect.Ptr || kind == reflect.Interface) && value.IsNil() {
 		return
 	}
 
@@ -297,7 +290,7 @@ func (fm *forkManager) removeParams(blockNumber uint64) {
 	}
 }
 
-func copyParams(dest, src interface{}) {
+func copyParams(dest, src *ForkParams) {
 	srcValue := reflect.ValueOf(src).Elem()
 	dstValue := reflect.ValueOf(dest).Elem()
 

@@ -1022,7 +1022,7 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 }
 
 func initForkManager(engineName string, config *chain.Chain) error {
-	var initialParams *chain.ForkParams
+	var initialParams *forkmanager.ForkParams
 
 	if factory := forkManagerInitialParamsFactory[ConsensusType(engineName)]; factory != nil {
 		params, err := factory(config)
