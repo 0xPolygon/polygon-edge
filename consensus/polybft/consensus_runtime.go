@@ -392,7 +392,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfEpoch {
-		ff.commitEpochInput = c.calculateCommitEpochInput(parent, epoch)
+		ff.commitEpochInput = createCommitEpochInput(parent, epoch)
 
 		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number, epoch.Validators.Copy())
 		if err != nil {
@@ -496,8 +496,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 	}, nil
 }
 
-// calculateCommitEpochInput calculates commit epoch input data
-func (c *consensusRuntime) calculateCommitEpochInput(
+// createCommitEpochInput creates commit epoch input data
+func createCommitEpochInput(
 	currentBlock *types.Header, epoch *epochMetadata) *contractsapi.CommitEpochValidatorSetFn {
 	return &contractsapi.CommitEpochValidatorSetFn{
 		ID: new(big.Int).SetUint64(epoch.Number),
