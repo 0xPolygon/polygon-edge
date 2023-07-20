@@ -43,6 +43,10 @@ on:  # yamllint disable-line rule:truthy
         description: Duration of the test
         required: false
         type: string
+    outputs:
+      workflow_output:
+        description: "Loadtest output"
+        value: ${{ jobs.run_k6.outputs.loadtest_output_success }}
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL:
         required: true
