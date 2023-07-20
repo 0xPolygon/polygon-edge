@@ -117,7 +117,8 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	})
 
 	if builtBlock.Header.TxRoot != block.Header.TxRoot {
-		return nil, fmt.Errorf("incorrect tx root: (%s, %s)", builtBlock.Header.TxRoot, block.Header.TxRoot)
+		return nil, fmt.Errorf("incorrect tx root (expected: %s, actual: %s)",
+			builtBlock.Header.TxRoot, block.Header.TxRoot)
 	}
 
 	return &types.FullBlock{

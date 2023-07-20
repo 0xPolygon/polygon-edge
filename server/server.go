@@ -1034,7 +1034,6 @@ func initForkManager(engineName string, config *chain.Chain) error {
 	}
 
 	fm := forkmanager.GetInstance()
-	fm.Clear()
 
 	// register initial fork
 	fm.RegisterFork(forkmanager.InitialFork, initialParams)

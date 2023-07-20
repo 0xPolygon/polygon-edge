@@ -232,7 +232,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
 	}
 
-	return createStateTransactionWithData(f.parent.Number+1, contracts.StateReceiverContract, inputData), nil
+	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
@@ -255,7 +255,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.parent.Number+1, contracts.ValidatorSetContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, input), nil
 }
 
 // createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
@@ -266,7 +266,7 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(f.parent.Number+1, contracts.RewardPoolContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.RewardPoolContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
