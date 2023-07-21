@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"errors"
+	"math/big"
 	"testing"
 	"time"
 
@@ -299,6 +300,13 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
+				GovernanceConfig: &GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					GovernorAdmin:            types.ZeroAddress,
+					ProposalQuorumPercentage: 67,
+				},
 			},
 		},
 		{
@@ -310,6 +318,13 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
 				MaxValidatorSetSize: maxValidators,
+				GovernanceConfig: &GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					GovernorAdmin:            types.ZeroAddress,
+					ProposalQuorumPercentage: 67,
+				},
 			},
 			bridgeAllowList: &chain.AddressListConfig{
 				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},
