@@ -29,7 +29,7 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 		NewStateSender:      contracts.L2StateSenderContract,
 		NewStateReceiver:    contracts.StateReceiverContract,
 		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
-		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		NewNetworkParams:    contracts.NetworkParamsContract,
 		InitialValidators:   initialValidators,
 	}
 
@@ -45,10 +45,10 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 // initRewardPool initializes RewardPool SC
 func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeRewardPoolFn{
-		NewRewardToken:  polybftConfig.RewardConfig.TokenAddress,
-		NewRewardWallet: polybftConfig.RewardConfig.WalletAddress,
-		NewValidatorSet: contracts.ValidatorSetContract,
-		NewBaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+		NewRewardToken:    polybftConfig.RewardConfig.TokenAddress,
+		NewRewardWallet:   polybftConfig.RewardConfig.WalletAddress,
+		NewValidatorSet:   contracts.ValidatorSetContract,
+		NetworkParamsAddr: contracts.NetworkParamsContract,
 	}
 
 	input, err := initFn.EncodeAbi()
@@ -275,4 +275,93 @@ func callContract(from, to types.Address, input []byte, contractName string, tra
 // isNativeRewardToken returns true in case a native token is used as a reward token as well
 func isNativeRewardToken(cfg PolyBFTConfig) bool {
 	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
+}
+
+// initNetworkParamsContract initializes NetworkParams contract on child chain
+func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
+	initFn := &contractsapi.InitializeNetworkParamsFn{
+		InitParams: &contractsapi.InitParams{
+			NewOwner:                   cfg.GovernanceConfig.GovernorAdmin,
+			NewCheckpointBlockInterval: new(big.Int).SetUint64(cfg.CheckpointInterval),
+			NewEpochSize:               new(big.Int).SetUint64(cfg.EpochSize),
+			NewEpochReward:             new(big.Int).SetUint64(cfg.EpochReward),
+			NewMinValidatorSetSize:     new(big.Int).SetUint64(cfg.MinValidatorSetSize),
+			NewMaxValidatorSetSize:     new(big.Int).SetUint64(cfg.MaxValidatorSetSize),
+			NewWithdrawalWaitPeriod:    new(big.Int).SetUint64(cfg.WithdrawalWaitPeriod),
+			NewBlockTime:               new(big.Int).SetUint64(uint64(cfg.BlockTime.Duration)),
+			NewBlockTimeDrift:          new(big.Int).SetUint64(cfg.BlockTimeDrift),
+			NewVotingDelay:             new(big.Int).Set(cfg.GovernanceConfig.VotingDelay),
+			NewVotingPeriod:            new(big.Int).Set(cfg.GovernanceConfig.VotingPeriod),
+			NewProposalThreshold:       new(big.Int).Set(cfg.GovernanceConfig.ProposalThreshold),
+		},
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("NetworkParams.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		contracts.NetworkParamsContract, input, "NetworkParams.initialize", transition)
+}
+
+// initForkParamsContract initializes ForkParams contract on child chain
+func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
+	initFn := &contractsapi.InitializeForkParamsFn{
+		NewOwner: cfg.GovernanceConfig.GovernorAdmin,
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("ForkParams.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		contracts.ForkParamsContract, input, "ForkParams.initialize", transition)
+}
+
+// initChildTimelock initializes ChildTimelock contract on child chain
+func initChildTimelock(cfg PolyBFTConfig, transition *state.Transition) error {
+	addresses := make([]types.Address, len(cfg.InitialValidatorSet))
+	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
+		addresses[i] = cfg.InitialValidatorSet[i].Address
+	}
+
+	initFn := &contractsapi.InitializeChildTimelockFn{
+		Admin:     cfg.GovernanceConfig.GovernorAdmin,
+		Proposers: addresses,
+		Executors: addresses,
+		MinDelay:  big.NewInt(1), // for now
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("ChildTimelock.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		contracts.ChildTimelockContract, input, "ChildTimelock.initialize", transition)
+}
+
+// initChildGovernor initializes ChildGovernor contract on child chain
+func initChildGovernor(cfg PolyBFTConfig, transition *state.Transition) error {
+	addresses := make([]types.Address, len(cfg.InitialValidatorSet))
+	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
+		addresses[i] = cfg.InitialValidatorSet[i].Address
+	}
+
+	initFn := &contractsapi.InitializeChildGovernorFn{
+		Token_:           contracts.ValidatorSetContract,
+		Timelock_:        contracts.ChildTimelockContract,
+		NetworkParams_:   contracts.NetworkParamsContract,
+		QuorumNumerator_: new(big.Int).SetUint64(cfg.GovernanceConfig.ProposalQuorumPercentage),
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("ChildGovernor.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		contracts.ChildGovernorContract, input, "ChildGovernor.initialize", transition)
 }
