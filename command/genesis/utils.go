@@ -217,10 +217,10 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*validator.GenesisValidator, 
 		}
 
 		validators[i] = &validator.GenesisValidator{
-			Address:       types.Address(account.Ecdsa.Address()),
-			BlsPrivateKey: account.Bls,
-			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),
-			MultiAddr:     fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
+			Address:   types.Address(account.Ecdsa.Address()),
+			BlsKey:    hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			MultiAddr: fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
+			Stake:     big.NewInt(0),
 		}
 	}
 

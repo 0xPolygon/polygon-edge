@@ -112,7 +112,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		rewardTokenAddr = contracts.RewardTokenContract
 	}
 
-	initialValidators, err := p.getValidatorAccounts(premineBalances)
+	initialValidators, err := p.getValidatorAccounts()
 	if err != nil {
 		return fmt.Errorf("failed to retrieve genesis validators: %w", err)
 	}
@@ -484,8 +484,7 @@ func (p *genesisParams) deployContracts(
 }
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
-func (p *genesisParams) getValidatorAccounts(
-	premineBalances map[types.Address]*premineInfo) ([]*validator.GenesisValidator, error) {
+func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, error) {
 	// populate validators premine info
 	if len(p.validators) > 0 {
 		validators := make([]*validator.GenesisValidator, len(p.validators))
@@ -516,7 +515,6 @@ func (p *genesisParams) getValidatorAccounts(
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
-				Balance:   getPremineAmount(addr, premineBalances, big.NewInt(0)),
 				Stake:     big.NewInt(0),
 			}
 		}
@@ -534,22 +532,7 @@ func (p *genesisParams) getValidatorAccounts(
 		return nil, err
 	}
 
-	for _, v := range validators {
-		v.Balance = getPremineAmount(v.Address, premineBalances, big.NewInt(0))
-		v.Stake = big.NewInt(0)
-	}
-
 	return validators, nil
-}
-
-// getPremineAmount retrieves amount from the premine map or if not provided, returns default amount
-func getPremineAmount(addr types.Address, premineMap map[types.Address]*premineInfo,
-	defaultAmount *big.Int) *big.Int {
-	if premine, exists := premineMap[addr]; exists {
-		return premine.amount
-	}
-
-	return defaultAmount
 }
 
 func stringSliceToAddressSlice(addrs []string) []types.Address {
