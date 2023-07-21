@@ -39,6 +39,12 @@ var (
 	// RootMintableERC1155PredicateContract is an address of mintable ERC1155 predicate on the child chain
 	RootMintableERC1155PredicateContract = types.StringToAddress("0x100b")
 
+	// Governance contracts
+	ChildGovernorContract = types.StringToAddress("0x100c")
+	ChildTimelockContract = types.StringToAddress("0x100d")
+	NetworkParamsContract = types.StringToAddress("0x100e")
+	ForkParamsContract    = types.StringToAddress("0x100f")
+
 	// SystemCaller is address of account, used for system calls to smart contracts
 	SystemCaller = types.StringToAddress("0xffffFFFfFFffffffffffffffFfFFFfffFFFfFFfE")
 
