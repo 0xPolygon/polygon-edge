@@ -93,7 +93,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	receivers := make([]ethgo.Address, len(dp.Receivers))
+	receivers := make([]types.Address, len(dp.Receivers))
 	tokenIDs := make([]*big.Int, len(dp.Receivers))
 
 	for i, tokenIDRaw := range dp.TokenIDs {
@@ -106,7 +106,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		receivers[i] = ethgo.Address(types.StringToAddress(dp.Receivers[i]))
+		receivers[i] = types.StringToAddress(dp.Receivers[i])
 		tokenIDs[i] = tokenID
 	}
 
@@ -220,7 +220,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender ethgo.Address,
-	receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
+	receivers []types.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	depositToRoot := &contractsapi.DepositBatchRootERC721PredicateFn{
 		RootToken: types.StringToAddress(dp.TokenAddr),
 		Receivers: receivers,

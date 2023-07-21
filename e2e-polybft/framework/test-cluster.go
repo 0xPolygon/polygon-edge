@@ -450,6 +450,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+			"--governor-admin", addresses[0].String(), // set first validator as governor admin
 		}
 
 		if cluster.Config.TestRewardToken != "" {
