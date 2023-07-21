@@ -406,6 +406,22 @@ func (p *genesisParams) deployContracts(
 			artifact: contractsapi.RewardPool,
 			address:  contracts.RewardPoolContract,
 		},
+		{
+			artifact: contractsapi.NetworkParams,
+			address:  contracts.NetworkParamsContract,
+		},
+		{
+			artifact: contractsapi.ForkParams,
+			address:  contracts.ForkParamsContract,
+		},
+		{
+			artifact: contractsapi.ChildGovernor,
+			address:  contracts.ChildGovernorContract,
+		},
+		{
+			artifact: contractsapi.ChildTimelock,
+			address:  contracts.ChildTimelockContract,
+		},
 	}
 
 	if !params.nativeTokenConfig.IsMintable {

@@ -189,6 +189,22 @@ func main() {
 			"child/EIP1559Burn.sol",
 			"EIP1559Burn",
 		},
+		{
+			"child/NetworkParams.sol",
+			"NetworkParams",
+		},
+		{
+			"child/ForkParams.sol",
+			"ForkParams",
+		},
+		{
+			"child/governance/ChildGovernor.sol",
+			"ChildGovernor",
+		},
+		{
+			"child/governance/ChildTimelock.sol",
+			"ChildTimelock",
+		},
 	}
 
 	for _, v := range readContracts {
