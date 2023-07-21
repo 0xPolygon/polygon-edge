@@ -655,7 +655,7 @@ func (i *InitializeRootERC1155PredicateFn) DecodeAbi(buf []byte) error {
 
 type DepositBatchRootERC1155PredicateFn struct {
 	RootToken types.Address   `abi:"rootToken"`
-	Receivers []ethgo.Address `abi:"receivers"`
+	Receivers []types.Address `abi:"receivers"`
 	TokenIDs  []*big.Int      `abi:"tokenIds"`
 	Amounts   []*big.Int      `abi:"amounts"`
 }
@@ -765,7 +765,7 @@ func (i *InitializeChildERC1155PredicateFn) DecodeAbi(buf []byte) error {
 
 type WithdrawBatchChildERC1155PredicateFn struct {
 	ChildToken types.Address   `abi:"childToken"`
-	Receivers  []ethgo.Address `abi:"receivers"`
+	Receivers  []types.Address `abi:"receivers"`
 	TokenIDs   []*big.Int      `abi:"tokenIds"`
 	Amounts    []*big.Int      `abi:"amounts"`
 }
@@ -806,7 +806,7 @@ func (i *InitializeChildERC1155PredicateACLFn) DecodeAbi(buf []byte) error {
 
 type WithdrawBatchChildERC1155PredicateACLFn struct {
 	ChildToken types.Address   `abi:"childToken"`
-	Receivers  []ethgo.Address `abi:"receivers"`
+	Receivers  []types.Address `abi:"receivers"`
 	TokenIDs   []*big.Int      `abi:"tokenIds"`
 	Amounts    []*big.Int      `abi:"amounts"`
 }
@@ -940,7 +940,7 @@ func (i *InitializeRootERC721PredicateFn) DecodeAbi(buf []byte) error {
 
 type DepositBatchRootERC721PredicateFn struct {
 	RootToken types.Address   `abi:"rootToken"`
-	Receivers []ethgo.Address `abi:"receivers"`
+	Receivers []types.Address `abi:"receivers"`
 	TokenIDs  []*big.Int      `abi:"tokenIds"`
 }
 
@@ -1029,7 +1029,7 @@ func (i *InitializeChildERC721PredicateFn) DecodeAbi(buf []byte) error {
 
 type WithdrawBatchChildERC721PredicateFn struct {
 	ChildToken types.Address   `abi:"childToken"`
-	Receivers  []ethgo.Address `abi:"receivers"`
+	Receivers  []types.Address `abi:"receivers"`
 	TokenIDs   []*big.Int      `abi:"tokenIds"`
 }
 
@@ -1069,7 +1069,7 @@ func (i *InitializeChildERC721PredicateACLFn) DecodeAbi(buf []byte) error {
 
 type WithdrawBatchChildERC721PredicateACLFn struct {
 	ChildToken types.Address   `abi:"childToken"`
-	Receivers  []ethgo.Address `abi:"receivers"`
+	Receivers  []types.Address `abi:"receivers"`
 	TokenIDs   []*big.Int      `abi:"tokenIds"`
 }
 
@@ -1183,7 +1183,7 @@ func (i *InitializeCustomSupernetManagerFn) DecodeAbi(buf []byte) error {
 }
 
 type WhitelistValidatorsCustomSupernetManagerFn struct {
-	Validators_ []ethgo.Address `abi:"validators_"`
+	Validators_ []types.Address `abi:"validators_"`
 }
 
 func (w *WhitelistValidatorsCustomSupernetManagerFn) Sig() []byte {
@@ -1505,7 +1505,7 @@ type InitializeValidatorSetFn struct {
 	NewStateSender      types.Address    `abi:"newStateSender"`
 	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
 	NewRootChainManager types.Address    `abi:"newRootChainManager"`
-	NewEpochSize        *big.Int         `abi:"newEpochSize"`
+	NewNetworkParams    types.Address    `abi:"newNetworkParams"`
 	InitialValidators   []*ValidatorInit `abi:"initialValidators"`
 }
 
@@ -1586,10 +1586,10 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeRewardPoolFn struct {
-	NewRewardToken  types.Address `abi:"newRewardToken"`
-	NewRewardWallet types.Address `abi:"newRewardWallet"`
-	NewValidatorSet types.Address `abi:"newValidatorSet"`
-	NewBaseReward   *big.Int      `abi:"newBaseReward"`
+	NewRewardToken    types.Address `abi:"newRewardToken"`
+	NewRewardWallet   types.Address `abi:"newRewardWallet"`
+	NewValidatorSet   types.Address `abi:"newValidatorSet"`
+	NetworkParamsAddr types.Address `abi:"networkParamsAddr"`
 }
 
 func (i *InitializeRewardPoolFn) Sig() []byte {
@@ -1651,4 +1651,99 @@ func (i *InitializeEIP1559BurnFn) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeEIP1559BurnFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(EIP1559Burn.Abi.Methods["initialize"], buf, i)
+}
+
+type InitParams struct {
+	NewOwner                   types.Address `abi:"newOwner"`
+	NewCheckpointBlockInterval *big.Int      `abi:"newCheckpointBlockInterval"`
+	NewEpochSize               *big.Int      `abi:"newEpochSize"`
+	NewEpochReward             *big.Int      `abi:"newEpochReward"`
+	NewMinValidatorSetSize     *big.Int      `abi:"newMinValidatorSetSize"`
+	NewMaxValidatorSetSize     *big.Int      `abi:"newMaxValidatorSetSize"`
+	NewWithdrawalWaitPeriod    *big.Int      `abi:"newWithdrawalWaitPeriod"`
+	NewBlockTime               *big.Int      `abi:"newBlockTime"`
+	NewBlockTimeDrift          *big.Int      `abi:"newBlockTimeDrift"`
+	NewVotingDelay             *big.Int      `abi:"newVotingDelay"`
+	NewVotingPeriod            *big.Int      `abi:"newVotingPeriod"`
+	NewProposalThreshold       *big.Int      `abi:"newProposalThreshold"`
+}
+
+var InitParamsABIType = abi.MustNewType("tuple(address newOwner,uint256 newCheckpointBlockInterval,uint256 newEpochSize,uint256 newEpochReward,uint256 newMinValidatorSetSize,uint256 newMaxValidatorSetSize,uint256 newWithdrawalWaitPeriod,uint256 newBlockTime,uint256 newBlockTimeDrift,uint256 newVotingDelay,uint256 newVotingPeriod,uint256 newProposalThreshold)")
+
+func (i *InitParams) EncodeAbi() ([]byte, error) {
+	return InitParamsABIType.Encode(i)
+}
+
+func (i *InitParams) DecodeAbi(buf []byte) error {
+	return decodeStruct(InitParamsABIType, buf, &i)
+}
+
+type InitializeNetworkParamsFn struct {
+	InitParams *InitParams `abi:"initParams"`
+}
+
+func (i *InitializeNetworkParamsFn) Sig() []byte {
+	return NetworkParams.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeNetworkParamsFn) EncodeAbi() ([]byte, error) {
+	return NetworkParams.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeNetworkParamsFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NetworkParams.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeForkParamsFn struct {
+	NewOwner types.Address `abi:"newOwner"`
+}
+
+func (i *InitializeForkParamsFn) Sig() []byte {
+	return ForkParams.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeForkParamsFn) EncodeAbi() ([]byte, error) {
+	return ForkParams.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeForkParamsFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ForkParams.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeChildGovernorFn struct {
+	Token_           types.Address `abi:"token_"`
+	Timelock_        types.Address `abi:"timelock_"`
+	QuorumNumerator_ *big.Int      `abi:"quorumNumerator_"`
+	NetworkParams_   types.Address `abi:"networkParams_"`
+}
+
+func (i *InitializeChildGovernorFn) Sig() []byte {
+	return ChildGovernor.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildGovernorFn) EncodeAbi() ([]byte, error) {
+	return ChildGovernor.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildGovernorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildGovernor.Abi.Methods["initialize"], buf, i)
+}
+
+type InitializeChildTimelockFn struct {
+	MinDelay  *big.Int        `abi:"minDelay"`
+	Proposers []types.Address `abi:"proposers"`
+	Executors []types.Address `abi:"executors"`
+	Admin     types.Address   `abi:"admin"`
+}
+
+func (i *InitializeChildTimelockFn) Sig() []byte {
+	return ChildTimelock.Abi.Methods["initialize"].ID()
+}
+
+func (i *InitializeChildTimelockFn) EncodeAbi() ([]byte, error) {
+	return ChildTimelock.Abi.Methods["initialize"].Encode(i)
+}
+
+func (i *InitializeChildTimelockFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildTimelock.Abi.Methods["initialize"], buf, i)
 }

@@ -99,12 +99,12 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	receivers := make([]ethgo.Address, len(wp.Receivers))
+	receivers := make([]types.Address, len(wp.Receivers))
 	amounts := make([]*big.Int, len(wp.Receivers))
 	TokenIDs := make([]*big.Int, len(wp.Receivers))
 
 	for i, receiverRaw := range wp.Receivers {
-		receivers[i] = ethgo.Address(types.StringToAddress(receiverRaw))
+		receivers[i] = types.StringToAddress(receiverRaw)
 		amountRaw := wp.Amounts[i]
 		tokenIDRaw := wp.TokenIDs[i]
 
@@ -173,7 +173,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 // createWithdrawTxn encodes parameters for withdraw function on child chain predicate contract
-func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) (*ethgo.Transaction, error) {
+func createWithdrawTxn(receivers []types.Address, amounts, TokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	withdrawFn := &contractsapi.WithdrawBatchChildERC1155PredicateFn{
 		ChildToken: types.StringToAddress(wp.TokenAddr),
 		Receivers:  receivers,
