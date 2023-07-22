@@ -4,92 +4,70 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-type AccessList struct {
-	addresses map[types.Address]int
-	slots     []map[types.Hash]struct{}
+type AccessList map[types.Address]map[types.Hash]struct{}
+
+func NewAccessList() *AccessList {
+	al := make(AccessList)
+	return &al
 }
 
-// ContainsAddress returns true if the address is in the access list.
+// Checks if  address is present within the access list.
 func (al *AccessList) ContainsAddress(address types.Address) bool {
-	_, ok := al.addresses[address]
+	_, ok := (*al)[address]
 	return ok
 }
 
-// Contains checks if a slot within an account is present in the access list, returning
-// separate flags for the presence of the account and the slot respectively.
-func (al *AccessList) Contains(address types.Address, slot types.Hash) (addressPresent bool, slotPresent bool) {
-	idx, ok := al.addresses[address]
-	if !ok {
-		// no such address (and hence zero slots)
-		return false, false
-	}
-	if idx == -1 {
-		// address yes, but no slots
-		return true, false
-	}
-	_, slotPresent = al.slots[idx][slot]
-	return true, slotPresent
+// Contains checks if a slot is present in an account.
+// Returns two boolean flags: `accountPresent` and `slotPresent`.
+func (al *AccessList) Contains(address types.Address, slot types.Hash) (bool, bool) {
+	_, addrPresent := (*al)[address]
+	_, slotPresent := (*al)[address][slot]
+
+	return addrPresent, slotPresent
 }
 
-// newAccessList creates a new AccessList.
-func NewAccessList() *AccessList {
-	return &AccessList{
-		addresses: make(map[types.Address]int),
-	}
-}
+// Copy creates an deep copy of provided AccessList.
+func (al *AccessList) Copy() *AccessList {
+	cp := make(AccessList, len(*al))
 
-// Copy creates an independent copy of an AccessList.
-func (a *AccessList) Copy() *AccessList {
-	cp := NewAccessList()
-	for k, v := range a.addresses {
-		cp.addresses[k] = v
-	}
-	cp.slots = make([]map[types.Hash]struct{}, len(a.slots))
-	for i, slotMap := range a.slots {
-		newSlotmap := make(map[types.Hash]struct{}, len(slotMap))
-		for k := range slotMap {
-			newSlotmap[k] = struct{}{}
+	for addr, slotMap := range *al {
+		cp_slotMap := make(map[types.Hash]struct{}, len(slotMap))
+		for slotHash, _ := range slotMap {
+			cp_slotMap[slotHash] = struct{}{}
 		}
-		cp.slots[i] = newSlotmap
+		cp[addr] = cp_slotMap
 	}
 
-	return cp
+	return &cp
 }
 
-// AddAddress adds an address to the access list, and returns 'true' if the operation
-// caused a change (addr was not previously in the list).
+// AddAddress adds an address to the access list
+// returns 'true' if the operation results in a change (i.e., the address was not already present in the list).
 func (al *AccessList) AddAddress(address types.Address) bool {
-	if _, present := al.addresses[address]; present {
+	if _, exists := (*al)[address]; exists {
 		return false
 	}
-	al.addresses[address] = -1
+
+	(*al)[address] = make(map[types.Hash]struct{})
 
 	return true
 }
 
-// AddSlot adds the specified (addr, slot) combo to the access list.
-// Return values are:
-// - address added
-// - slot added
+// This function adds the specified address and slot pair to the access list.
+// The return values indicate whether the address was newly added and whether the slot was newly added.
 func (al *AccessList) AddSlot(address types.Address, slot types.Hash) (addrChange bool, slotChange bool) {
-	idx, addressPresent := al.addresses[address]
-	if !addressPresent || idx == -1 {
-		// Address not present, or addr present but no slots there
-		al.addresses[address] = len(al.slots)
-		slotmap := map[types.Hash]struct{}{slot: {}}
-		al.slots = append(al.slots, slotmap)
-
-		return !addressPresent, true
+	slotMap, addressExists := (*al)[address]
+	if !addressExists {
+		(*al)[address] = make(map[types.Hash]struct{})
 	}
 
-	// There is already an (address,slot) mapping
-	slotmap := al.slots[idx]
-	if _, ok := slotmap[slot]; !ok {
-		slotmap[slot] = struct{}{}
+	_, slotPresent := slotMap[slot]
+	if !slotPresent {
+		slotMap[slot] = struct{}{}
 
-		return false, true
+		return !addressExists, true
 	}
 
-	// No changes required
+	// slot and address were already present in access list
 	return false, false
 }

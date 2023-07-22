@@ -86,7 +86,6 @@ func (e *Executor) WriteGenesis(
 		gasPool:     uint64(env.GasLimit),
 		config:      config,
 		precompiles: precompiled.NewPrecompiled(),
-		//accessList:  runtime.NewAccessList(), //check EIP2929: if access list in needed while creating genesis
 	}
 
 	for addr, account := range alloc {
@@ -217,7 +216,6 @@ func (e *Executor) BeginTxn(
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
-		//accessList:  runtime.NewAccessList(),
 	}
 
 	// enable contract deployment allow list (if any)
@@ -280,8 +278,6 @@ type Transition struct {
 	txnBlockList        *addresslist.AddressList
 	bridgeAllowList     *addresslist.AddressList
 	bridgeBlockList     *addresslist.AddressList
-
-	//accessList *runtime.AccessList
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -291,7 +287,6 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
-		//accessList:  runtime.NewAccessList(),
 	}
 }
 
