@@ -755,7 +755,10 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return err
 	}
 
-	tx.ChainID = p.chainID // add chainID to the tx
+	// add chainID to the tx - only dynamic fee tx
+	if tx.Type == types.DynamicFeeTx {
+		tx.ChainID = p.chainID
+	}
 
 	// calculate tx hash
 	tx.ComputeHash(p.store.Header().Number)
