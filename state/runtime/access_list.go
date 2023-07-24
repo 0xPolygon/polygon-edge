@@ -61,7 +61,8 @@ func (al *AccessList) AddAddress(address types.Address) bool {
 func (al *AccessList) AddSlot(address types.Address, slot types.Hash) (addrChange bool, slotChange bool) {
 	slotMap, addressExists := (*al)[address]
 	if !addressExists {
-		(*al)[address] = make(map[types.Hash]struct{})
+		slotMap = make(map[types.Hash]struct{})
+		(*al)[address] = slotMap
 	}
 
 	_, slotPresent := slotMap[slot]
