@@ -108,7 +108,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	)
 
 	result := &unstakeResult{
-		validatorAddress: validatorAccount.Ecdsa.Address().String(),
+		ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
 	// check the logs to check for the result
@@ -120,7 +120,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 		if doesMatch {
 			foundLog = true
-			result.amount = withdrawalRegisteredEvent.Amount.Uint64()
+			result.Amount = withdrawalRegisteredEvent.Amount.Uint64()
 
 			break
 		}

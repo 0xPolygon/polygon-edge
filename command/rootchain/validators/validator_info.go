@@ -101,10 +101,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	outputter.WriteCommandResult(&validatorsInfoResult{
-		address:     validatorInfo.Address.String(),
-		stake:       validatorInfo.Stake.Uint64(),
-		active:      validatorInfo.IsActive,
-		whitelisted: validatorInfo.IsWhitelisted,
+		Address:     validatorInfo.Address.String(),
+		Stake:       validatorInfo.Stake.Uint64(),
+		Active:      validatorInfo.IsActive,
+		Whitelisted: validatorInfo.IsWhitelisted,
 	})
 
 	return nil
