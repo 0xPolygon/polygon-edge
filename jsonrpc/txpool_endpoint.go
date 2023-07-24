@@ -14,6 +14,9 @@ type txPoolStore interface {
 
 	// GetCapacity returns the current and max capacity of the pool in slots
 	GetCapacity() (uint64, uint64)
+
+	// GetBaseFee returns current base fee
+	GetBaseFee() uint64
 }
 
 // TxPool is the txpool jsonrpc endpoint
@@ -22,8 +25,8 @@ type TxPool struct {
 }
 
 type ContentResponse struct {
-	Pending map[types.Address]map[uint64]*txpoolTransaction `json:"pending"`
-	Queued  map[types.Address]map[uint64]*txpoolTransaction `json:"queued"`
+	Pending map[types.Address]map[uint64]*transaction `json:"pending"`
+	Queued  map[types.Address]map[uint64]*transaction `json:"queued"`
 }
 
 type InspectResponse struct {
@@ -38,86 +41,27 @@ type StatusResponse struct {
 	Queued  uint64 `json:"queued"`
 }
 
-type txpoolTransaction struct {
-	Nonce       argUint64      `json:"nonce"`
-	GasPrice    argBig         `json:"gasPrice"`
-	GasFeeCap   *argBig        `json:"gasFeeCap,omitempty"`
-	GasTipCap   *argBig        `json:"gasTipCap,omitempty"`
-	Gas         argUint64      `json:"gas"`
-	To          *types.Address `json:"to"`
-	Value       argBig         `json:"value"`
-	Input       argBytes       `json:"input"`
-	Hash        types.Hash     `json:"hash"`
-	From        types.Address  `json:"from"`
-	BlockHash   types.Hash     `json:"blockHash"`
-	BlockNumber interface{}    `json:"blockNumber"`
-	TxIndex     interface{}    `json:"transactionIndex"`
-}
-
-func toTxPoolTransaction(t *types.Transaction) *txpoolTransaction {
-	var gasTipCap, gasFeeCap *argBig
-
-	if t.GasTipCap != nil {
-		gasTipCapVal := argBig(*t.GasTipCap)
-		gasTipCap = &gasTipCapVal
-	}
-
-	if t.GasFeeCap != nil {
-		gasFeeCapVal := argBig(*t.GasFeeCap)
-		gasFeeCap = &gasFeeCapVal
-	}
-
-	return &txpoolTransaction{
-		Nonce:       argUint64(t.Nonce),
-		GasPrice:    argBig(*t.GasPrice),
-		GasFeeCap:   gasFeeCap,
-		GasTipCap:   gasTipCap,
-		Gas:         argUint64(t.Gas),
-		To:          t.To,
-		Value:       argBig(*t.Value),
-		Input:       t.Input,
-		Hash:        t.Hash,
-		From:        t.From,
-		BlockHash:   types.ZeroHash,
-		BlockNumber: nil,
-		TxIndex:     nil,
-	}
-}
-
 // Create response for txpool_content request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_content.
 func (t *TxPool) Content() (interface{}, error) {
+	convertTxMap := func(txMap map[types.Address][]*types.Transaction) map[types.Address]map[uint64]*transaction {
+		result := make(map[types.Address]map[uint64]*transaction, len(txMap))
+
+		for addr, txs := range txMap {
+			result[addr] = make(map[uint64]*transaction, len(txs))
+
+			for _, tx := range txs {
+				result[addr][tx.Nonce] = toTransaction(tx, nil, &types.ZeroHash, nil)
+			}
+		}
+
+		return result
+	}
+
 	pendingTxs, queuedTxs := t.store.GetTxs(true)
-
-	// collect pending
-	pendingRPCTxs := make(map[types.Address]map[uint64]*txpoolTransaction)
-	for addr, txs := range pendingTxs {
-		pendingRPCTxs[addr] = make(map[uint64]*txpoolTransaction, len(txs))
-
-		for _, tx := range txs {
-			nonce := tx.Nonce
-			rpcTx := toTxPoolTransaction(tx)
-
-			pendingRPCTxs[addr][nonce] = rpcTx
-		}
-	}
-
-	// collect enqueued
-	queuedRPCTxs := make(map[types.Address]map[uint64]*txpoolTransaction)
-	for addr, txs := range queuedTxs {
-		queuedRPCTxs[addr] = make(map[uint64]*txpoolTransaction, len(txs))
-
-		for _, tx := range txs {
-			nonce := tx.Nonce
-			rpcTx := toTxPoolTransaction(tx)
-
-			queuedRPCTxs[addr][nonce] = rpcTx
-		}
-	}
-
 	resp := ContentResponse{
-		Pending: pendingRPCTxs,
-		Queued:  queuedRPCTxs,
+		Pending: convertTxMap(pendingTxs),
+		Queued:  convertTxMap(queuedTxs),
 	}
 
 	return resp, nil
@@ -126,40 +70,30 @@ func (t *TxPool) Content() (interface{}, error) {
 // Create response for txpool_inspect request.
 // See https://geth.ethereum.org/docs/rpc/ns-txpool#txpool_inspect.
 func (t *TxPool) Inspect() (interface{}, error) {
-	pendingTxs, queuedTxs := t.store.GetTxs(true)
+	baseFee := t.store.GetBaseFee()
+	convertTxMap := func(txMap map[types.Address][]*types.Transaction) map[string]map[string]string {
+		result := make(map[string]map[string]string, len(txMap))
 
-	// collect pending
-	pendingRPCTxs := make(map[string]map[string]string)
-	for addr, txs := range pendingTxs {
-		pendingRPCTxs[addr.String()] = make(map[string]string, len(txs))
+		for addr, txs := range txMap {
+			result[addr.String()] = make(map[string]string, len(txs))
 
-		for _, tx := range txs {
-			nonceStr := strconv.FormatUint(tx.Nonce, 10)
-			pendingRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
-				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
-			)
+			for _, tx := range txs {
+				nonceStr := strconv.FormatUint(tx.Nonce, 10)
+				result[addr.String()][nonceStr] = fmt.Sprintf(
+					"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GetGasPrice(baseFee),
+				)
+			}
 		}
-	}
 
-	// collect enqueued
-	queuedRPCTxs := make(map[string]map[string]string)
-	for addr, txs := range queuedTxs {
-		queuedRPCTxs[addr.String()] = make(map[string]string, len(txs))
-
-		for _, tx := range txs {
-			nonceStr := strconv.FormatUint(tx.Nonce, 10)
-			queuedRPCTxs[addr.String()][nonceStr] = fmt.Sprintf(
-				"%d wei + %d gas x %d wei", tx.Value, tx.Gas, tx.GasPrice,
-			)
-		}
+		return result
 	}
 
 	// get capacity of the TxPool
 	current, max := t.store.GetCapacity()
-
+	pendingTxs, queuedTxs := t.store.GetTxs(true)
 	resp := InspectResponse{
-		Pending:         pendingRPCTxs,
-		Queued:          queuedRPCTxs,
+		Pending:         convertTxMap(pendingTxs),
+		Queued:          convertTxMap(queuedTxs),
 		CurrentCapacity: current,
 		MaxCapacity:     max,
 	}
