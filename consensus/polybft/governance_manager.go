@@ -1,13 +1,16 @@
 package polybft
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
@@ -53,7 +56,10 @@ type governanceManager struct {
 }
 
 // newGovernanceManager is a constructor function for governance manager
-func newGovernanceManager(logger hclog.Logger, state *State, blockhain blockchainBackend) *governanceManager {
+func newGovernanceManager(initialConfig *PolyBFTConfig,
+	logger hclog.Logger,
+	state *State,
+	blockhain blockchainBackend) (*governanceManager, error) {
 	eventsGetter := &eventsGetter[contractsapi.EventAbi]{
 		blockchain: blockhain,
 		isValidLogFn: func(l *types.Log) bool {
@@ -62,11 +68,19 @@ func newGovernanceManager(logger hclog.Logger, state *State, blockhain blockchai
 		parseEventFn: parseGovernanceEvent,
 	}
 
+	config, err := state.GovernanceStore.getClientConfig()
+	if config == nil || errors.Is(err, errClientConfigNotFound) {
+		// insert initial config to db if not already inserted
+		if err = state.GovernanceStore.insertClientConfig(initialConfig); err != nil {
+			return nil, err
+		}
+	}
+
 	return &governanceManager{
 		logger:       logger,
 		state:        state,
 		eventsGetter: eventsGetter,
-	}
+	}, nil
 }
 
 // PostEpoch notifies the governance manager that an epoch has changed
@@ -88,9 +102,113 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 		return nil
 	}
 
-	// TODO - update configuration
+	// get last saved config
+	lastConfig, err := g.state.GovernanceStore.getClientConfig()
+	if err != nil {
+		return err
+	}
 
-	return nil
+	var (
+		checkpointIntervalEvent  contractsapi.NewCheckpointBlockIntervalEvent
+		epochSizeEvent           contractsapi.NewEpochSizeEvent
+		epochRewardEvent         contractsapi.NewEpochRewardEvent
+		minValidatorSetSizeEvent contractsapi.NewMinValidatorSetSizeEvent
+		maxValidatorSetSizeEvent contractsapi.NewMaxValdidatorSetSizeEvent
+		withdrawalPeriodEvent    contractsapi.NewWithdrawalWaitPeriodEvent
+		blockTimeEvent           contractsapi.NewBlockTimeEvent
+		blockTimeDriftEvent      contractsapi.NewBlockTimeDriftEvent
+		votingDelayEvent         contractsapi.NewVotingDelayEvent
+		votingPeriodEvent        contractsapi.NewVotingPeriodEvent
+		proposalThresholdEvent   contractsapi.NewProposalThresholdEvent
+	)
+
+	// unmarshal events that happened in previous epoch and update last saved config
+	for _, e := range eventsRaw {
+		switch ethgo.Hash(e[:32]) {
+		case checkpointIntervalEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewCheckpointBlockIntervalEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewCheckpointBlockIntervalEvent: %w", err)
+			}
+
+			lastConfig.CheckpointInterval = event.CheckpointInterval.Uint64()
+		case epochSizeEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewEpochSizeEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewEpochSizeEvent: %w", err)
+			}
+
+			lastConfig.EpochSize = event.Size.Uint64()
+		case epochRewardEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewEpochRewardEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewEpochRewardEvent: %w", err)
+			}
+
+			lastConfig.EpochReward = event.Reward.Uint64()
+		case minValidatorSetSizeEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewMinValidatorSetSizeEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewMinValidatorSetSizeEvent: %w", err)
+			}
+
+			lastConfig.MinValidatorSetSize = event.MinValidatorSet.Uint64()
+		case maxValidatorSetSizeEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewMaxValdidatorSetSizeEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewMaxValdidatorSetSizeEvent: %w", err)
+			}
+
+			lastConfig.MaxValidatorSetSize = event.MaxValidatorSet.Uint64()
+		case withdrawalPeriodEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewWithdrawalWaitPeriodEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewWithdrawalWaitPeriodEvent: %w", err)
+			}
+
+			lastConfig.WithdrawalWaitPeriod = event.WithdrawalPeriod.Uint64()
+		case blockTimeEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewBlockTimeEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewBlockTimeEvent: %w", err)
+			}
+
+			lastConfig.BlockTime = common.Duration{Duration: time.Duration(event.BlockTime.Int64()) * time.Second}
+		case blockTimeDriftEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewBlockTimeDriftEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewBlockTimeDriftEvent: %w", err)
+			}
+
+			lastConfig.BlockTimeDrift = event.BlockTimeDrift.Uint64()
+		case votingDelayEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewVotingDelayEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewVotingDelayEvent: %w", err)
+			}
+
+			lastConfig.GovernanceConfig.VotingDelay = event.VotingDelay
+		case votingPeriodEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewVotingPeriodEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewVotingPeriodEvent: %w", err)
+			}
+
+			lastConfig.GovernanceConfig.VotingPeriod = event.VotingPeriod
+		case proposalThresholdEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewProposalThresholdEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewProposalThresholdEvent: %w", err)
+			}
+
+			lastConfig.GovernanceConfig.ProposalThreshold = event.ProposalThreshold
+		default:
+			return errUnknownGovernanceEvent
+		}
+	}
+
+	// save updated config to db
+	return g.state.GovernanceStore.insertClientConfig(lastConfig)
 }
 
 // PostBlock notifies governance manager that a block was finalized
@@ -165,4 +283,13 @@ func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAb
 	default:
 		return nil, false, errUnknownGovernanceEvent
 	}
+}
+
+// unmarshalGovernanceEvent unmarshals given raw event to desired type
+func unmarshalGovernanceEvent[T contractsapi.EventAbi](rawEvent []byte) (T, error) {
+	var event T
+
+	err := json.Unmarshal(rawEvent[32:], &event)
+
+	return event, err
 }

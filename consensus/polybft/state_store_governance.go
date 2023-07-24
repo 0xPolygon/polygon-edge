@@ -13,10 +13,13 @@ import (
 
 var (
 	governanceEventsBucket              = []byte("governanceEvents")
+	clientConfigBucket                  = []byte("clientConfig")
+	clientConfigKey                     = []byte("clientConfigKey")
 	lastProcessedGovernanceEventsBucket = []byte("lastProcessedGovernanceEvents")
-	lastProcessedGovernanceBlockKey     = []byte("lastProcessedGovernanceBlock")
+	lastProcessedGovernanceBlockKey     = []byte("lastProcessedGovernanceBlockKey")
 
 	errNoLastProcessedGovernanceBlock = errors.New("no last processed block for governance in db")
+	errClientConfigNotFound           = errors.New("client (polybft) config not found in db")
 )
 
 type eventsRaw [][]byte
@@ -34,6 +37,12 @@ func (g *GovernanceStore) initialize(tx *bolt.Tx) error {
 	_, err := tx.CreateBucketIfNotExists(governanceEventsBucket)
 	if err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(governanceEventsBucket), err)
+	}
+
+	_, err = tx.CreateBucketIfNotExists(clientConfigBucket)
+	if err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w",
+			string(clientConfigBucket), err)
 	}
 
 	_, err = tx.CreateBucketIfNotExists(lastProcessedGovernanceEventsBucket)
@@ -124,6 +133,34 @@ func (g *GovernanceStore) getLastSaved() (uint64, error) {
 	})
 
 	return lastProcessedBlock, err
+}
+
+// insertClientConfig inserts client (polybft) config to bolt db
+func (g *GovernanceStore) insertClientConfig(config *PolyBFTConfig) error {
+	return g.db.Update(func(tx *bolt.Tx) error {
+		raw, err := json.Marshal(config)
+		if err != nil {
+			return err
+		}
+
+		return tx.Bucket(clientConfigBucket).Put(clientConfigKey, raw)
+	})
+}
+
+// getClientConfig returns client (polybft) config from bolt db
+func (g *GovernanceStore) getClientConfig() (*PolyBFTConfig, error) {
+	var config *PolyBFTConfig
+
+	err := g.db.View(func(tx *bolt.Tx) error {
+		val := tx.Bucket(clientConfigBucket).Get(clientConfigKey)
+		if val == nil {
+			return errClientConfigNotFound
+		}
+
+		return json.Unmarshal(val, &config)
+	})
+
+	return config, err
 }
 
 // governanceEventToByteArray marshals event but adds it's signature
