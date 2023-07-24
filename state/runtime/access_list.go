@@ -8,12 +8,14 @@ type AccessList map[types.Address]map[types.Hash]struct{}
 
 func NewAccessList() *AccessList {
 	al := make(AccessList)
+
 	return &al
 }
 
 // Checks if  address is present within the access list.
 func (al *AccessList) ContainsAddress(address types.Address) bool {
 	_, ok := (*al)[address]
+
 	return ok
 }
 
@@ -31,11 +33,12 @@ func (al *AccessList) Copy() *AccessList {
 	cp := make(AccessList, len(*al))
 
 	for addr, slotMap := range *al {
-		cp_slotMap := make(map[types.Hash]struct{}, len(slotMap))
+		cpSlotMap := make(map[types.Hash]struct{}, len(slotMap))
 		for slotHash, _ := range slotMap {
-			cp_slotMap[slotHash] = struct{}{}
+			cpSlotMap[slotHash] = struct{}{}
 		}
-		cp[addr] = cp_slotMap
+
+		cp[addr] = cpSlotMap
 	}
 
 	return &cp

@@ -18,7 +18,7 @@ var (
 	abiBoolTrue, abiBoolFalse []byte
 )
 
-// To store address of active precompiles
+// ActivePrecompiles to store addresses of all precompiles
 var ActivePrecompiles []types.Address
 
 func init() {

@@ -275,18 +275,19 @@ func Test_Transition_EIP2929(t *testing.T) {
 			tracerOutput, err := tracer.GetResult()
 			if err != nil {
 				fmt.Println("Error:", err)
+
 				return
 			}
 
 			indentedJSON, err := json.MarshalIndent(tracerOutput, "", "  ")
 			if err != nil {
 				fmt.Println("Error:", err)
+
 				return
 			}
 
 			fmt.Println(tt.name)
 			fmt.Println(string(indentedJSON))
-
 		})
 	}
 }
