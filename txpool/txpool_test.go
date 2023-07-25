@@ -1769,7 +1769,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare(0)
+	pool.Prepare()
 	tx := pool.Peek()
 	pool.Pop(tx)
 
@@ -1803,7 +1803,7 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare(0)
+	pool.Prepare()
 	tx := pool.Peek()
 	pool.Drop(tx)
 	assert.Equal(t, tx1, tx)
@@ -1838,7 +1838,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
-		pool.Prepare(0)
+		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -1872,7 +1872,7 @@ func TestDemote(t *testing.T) {
 		pool.accounts.get(addr1).demotions = maxAccountDemotions
 
 		// call demote
-		pool.Prepare(0)
+		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -2780,7 +2780,7 @@ func TestExecutablesOrder(t *testing.T) {
 			require.Len(t, waitForEvents(ctx, subscription, expectedPromotedTx), expectedPromotedTx)
 			require.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
 
-			pool.Prepare(1000)
+			pool.Prepare()
 
 			var successful []*types.Transaction
 			for {
@@ -2983,7 +2983,7 @@ func TestRecovery(t *testing.T) {
 			assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
 
 			func() {
-				pool.Prepare(0)
+				pool.Prepare()
 				for {
 					tx := pool.Peek()
 					if tx == nil {
