@@ -34,7 +34,7 @@ func (al *AccessList) Copy() *AccessList {
 
 	for addr, slotMap := range *al {
 		cpSlotMap := make(map[types.Hash]struct{}, len(slotMap))
-		for slotHash, _ := range slotMap {
+		for slotHash := range slotMap {
 			cpSlotMap[slotHash] = struct{}{}
 		}
 
