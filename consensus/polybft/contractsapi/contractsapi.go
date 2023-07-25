@@ -1522,7 +1522,7 @@ type InitializeValidatorSetFn struct {
 	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
 	NewRootChainManager types.Address    `abi:"newRootChainManager"`
 	NewEpochSize        *big.Int         `abi:"newEpochSize"`
-	InitalValidators    []*ValidatorInit `abi:"initalValidators"`
+	InitialValidators   []*ValidatorInit `abi:"initialValidators"`
 }
 
 func (i *InitializeValidatorSetFn) Sig() []byte {
