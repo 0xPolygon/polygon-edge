@@ -22,7 +22,10 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 		t.Fatalf("Unable to create servers, %v", createErr)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
 	t.Cleanup(func() {
+		cancel()
 		closeTestServers(t, servers)
 	})
 
@@ -31,8 +34,14 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 		t.Fatalf("Unable to join peers, %v", joinErr)
 	}
 
-	assert.Equal(t, servers[0].discovery.RoutingTableSize(), 1)
-	assert.Equal(t, servers[1].discovery.RoutingTableSize(), 1)
+	// make sure each routing table has peer
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
+		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
+	}
+
+	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
+		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
+	}
 }
 
 func TestRoutingTable_Connected(t *testing.T) {
