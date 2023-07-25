@@ -47,6 +47,28 @@ func getLookbackSizeForRewardDistribution(blockNumber uint64) uint64 {
 	return oldRewardLookbackSize
 }
 
+// GovernanceManager interface provides functions for handling governance events
+// and updating client configuration based on executed governance proposals
+type GovernanceManager interface {
+	PostBlock(req *PostBlockRequest) error
+	PostEpoch(req *PostEpochRequest) error
+	GetClientConfig() (*PolyBFTConfig, error)
+}
+
+var _ GovernanceManager = (*dummyGovernanceManager)(nil)
+
+// dummyStakeManager is a dummy implementation of GovernanceManager interface
+// used only for unit testing
+type dummyGovernanceManager struct{}
+
+func (d *dummyGovernanceManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyGovernanceManager) PostEpoch(req *PostEpochRequest) error { return nil }
+func (d *dummyGovernanceManager) GetClientConfig() (*PolyBFTConfig, error) {
+	return nil, nil
+}
+
+var _ GovernanceManager = (*governanceManager)(nil)
+
 // governanceManager is a struct that saves governance events
 // and updates the client configuration based on executed governance proposals
 type governanceManager struct {
@@ -83,6 +105,10 @@ func newGovernanceManager(initialConfig *PolyBFTConfig,
 	}, nil
 }
 
+func (g *governanceManager) GetClientConfig() (*PolyBFTConfig, error) {
+	return g.state.GovernanceStore.getClientConfig()
+}
+
 // PostEpoch notifies the governance manager that an epoch has changed
 func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 	if !forkmanager.GetInstance().IsForkEnabled(chain.Governance, req.FirstBlockOfEpoch) {
@@ -90,8 +116,13 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 		return nil
 	}
 
+	previousEpoch := req.NewEpochID - 1
+
+	g.logger.Info("Post epoch - getting events from executed governance proposals...",
+		"epoch", previousEpoch)
+
 	// get events that happened in the previous epoch
-	eventsRaw, err := g.state.GovernanceStore.getGovernanceEvents(req.NewEpochID - 1)
+	eventsRaw, err := g.state.GovernanceStore.getGovernanceEvents(previousEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get governance events on start of epoch: %d. %w",
 			req.NewEpochID, err)
@@ -99,6 +130,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 
 	if len(eventsRaw) == 0 {
 		// valid situation, no governance proposals were executed in previous epoch
+		g.logger.Info("Post epoch - no executed governance proposals happened in epoch",
+			"epoch", previousEpoch)
+
 		return nil
 	}
 
@@ -132,6 +166,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.CheckpointInterval = event.CheckpointInterval.Uint64()
+			g.logger.Info("Post epoch - Checkpoint block interval changed in governance",
+				"epoch", previousEpoch, "checkpointBlockInterval", lastConfig.CheckpointInterval)
+
 		case epochSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewEpochSizeEvent](e)
 			if err != nil {
@@ -139,6 +176,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.EpochSize = event.Size.Uint64()
+			g.logger.Info("Post epoch - Epoch size changed in governance",
+				"epoch", previousEpoch, "epochSize", lastConfig.EpochSize)
+
 		case epochRewardEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewEpochRewardEvent](e)
 			if err != nil {
@@ -146,6 +186,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.EpochReward = event.Reward.Uint64()
+			g.logger.Info("Post epoch - Epoch reward changed in governance",
+				"epoch", previousEpoch, "epochReward", lastConfig.EpochReward)
+
 		case minValidatorSetSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewMinValidatorSetSizeEvent](e)
 			if err != nil {
@@ -153,6 +196,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.MinValidatorSetSize = event.MinValidatorSet.Uint64()
+			g.logger.Info("Post epoch - Min validator set size changed in governance",
+				"epoch", previousEpoch, "minValidatorSetSize", lastConfig.MinValidatorSetSize)
+
 		case maxValidatorSetSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewMaxValdidatorSetSizeEvent](e)
 			if err != nil {
@@ -160,6 +206,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.MaxValidatorSetSize = event.MaxValidatorSet.Uint64()
+			g.logger.Info("Post epoch - Max validator set size changed in governance",
+				"epoch", previousEpoch, "maxValidatorSetSize", lastConfig.MaxValidatorSetSize)
+
 		case withdrawalPeriodEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewWithdrawalWaitPeriodEvent](e)
 			if err != nil {
@@ -167,6 +216,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.WithdrawalWaitPeriod = event.WithdrawalPeriod.Uint64()
+			g.logger.Info("Post epoch - Withdrawal wait period changed in governance",
+				"epoch", previousEpoch, "withdrawalWaitPeriod", lastConfig.WithdrawalWaitPeriod)
+
 		case blockTimeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewBlockTimeEvent](e)
 			if err != nil {
@@ -174,6 +226,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.BlockTime = common.Duration{Duration: time.Duration(event.BlockTime.Int64()) * time.Second}
+			g.logger.Info("Post epoch - Block time changed in governance",
+				"epoch", previousEpoch, "blockTime", lastConfig.BlockTime)
+
 		case blockTimeDriftEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewBlockTimeDriftEvent](e)
 			if err != nil {
@@ -181,6 +236,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.BlockTimeDrift = event.BlockTimeDrift.Uint64()
+			g.logger.Info("Post epoch - Block time drift changed in governance",
+				"epoch", previousEpoch, "blockTimeDrift", lastConfig.BlockTimeDrift)
+
 		case votingDelayEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewVotingDelayEvent](e)
 			if err != nil {
@@ -188,6 +246,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.GovernanceConfig.VotingDelay = event.VotingDelay
+			g.logger.Info("Post epoch - Voting delay changed in governance",
+				"epoch", previousEpoch, "votingDelay", lastConfig.GovernanceConfig.VotingDelay)
+
 		case votingPeriodEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewVotingPeriodEvent](e)
 			if err != nil {
@@ -195,6 +256,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.GovernanceConfig.VotingPeriod = event.VotingPeriod
+			g.logger.Info("Post epoch - Voting period changed in governance",
+				"epoch", previousEpoch, "votingPeriod", lastConfig.GovernanceConfig.VotingPeriod)
+
 		case proposalThresholdEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewProposalThresholdEvent](e)
 			if err != nil {
@@ -202,6 +266,9 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.GovernanceConfig.ProposalThreshold = event.ProposalThreshold
+			g.logger.Info("Post epoch - Proposal threshold changed in governance",
+				"epoch", previousEpoch, "proposalThreshold", lastConfig.GovernanceConfig.ProposalThreshold)
+
 		default:
 			return errUnknownGovernanceEvent
 		}
@@ -224,10 +291,24 @@ func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for governance events. Error: %w", err)
 	}
 
+	g.logger.Info("Post block - Getting governance events...", "epoch", req.Epoch,
+		"block", req.FullBlock.Block.Number(), "lastGottenBlock", lastBlock)
+
 	governanceEvents, err := g.eventsGetter.getFromBlocks(lastBlock, req.FullBlock)
 	if err != nil {
 		return err
 	}
+
+	numOfEvents := len(governanceEvents)
+	if numOfEvents == 0 {
+		g.logger.Info("Post block - Getting governance events finished, no events found.",
+			"epoch", req.Epoch, "block", req.FullBlock.Block.Number(), "lastGottenBlock", lastBlock)
+
+		return nil
+	}
+
+	g.logger.Info("Post block - Getting governance events done.", "epoch", req.Epoch,
+		"block", req.FullBlock.Block.Number(), "eventsNum", numOfEvents)
 
 	return g.state.GovernanceStore.insertGovernanceEvents(
 		req.Epoch,
