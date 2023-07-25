@@ -2027,12 +2027,15 @@ func Test_TxPool_validateTx(t *testing.T) {
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
 	setupPool := func() *TxPool {
-		pool, err := newTestPool(NewDefaultMockStore(mockHeader, 1000))
+		header := mockHeader.Copy()
+		header.BaseFee = 1000
+
+		pool, err := newTestPool(NewDefaultMockStore(header))
 		if err != nil {
 			t.Fatalf("cannot create txpool - err: %v\n", err)
 		}
 
-		pool.SetBaseFee(mockHeader)
+		pool.SetBaseFee(header)
 		pool.SetSigner(signer)
 
 		return pool
@@ -3449,6 +3452,53 @@ func TestAddTxsInOrder(t *testing.T) {
 		assert.Equal(t, uint64(0), acc.enqueued.length())
 		assert.Equal(t, len(acc.nonceToTx.mapping), int(acc.promoted.length()))
 	}
+}
+
+func TestResetWithHeadersSetsBaseFee(t *testing.T) {
+	t.Parallel()
+
+	blocks := []*types.Block{
+		{
+			Header: &types.Header{
+				BaseFee: 100,
+				Hash:    types.Hash{1},
+			},
+		},
+		{
+			Header: &types.Header{
+				BaseFee: 1000,
+				Hash:    types.Hash{1},
+			},
+		},
+		{
+			Header: &types.Header{
+				BaseFee: 2000,
+				Hash:    types.Hash{2},
+			},
+		},
+	}
+
+	store := NewDefaultMockStore(blocks[0].Header)
+	store.getBlockByHashFn = func(h types.Hash, b bool) (*types.Block, bool) {
+		for _, b := range blocks {
+			if b.Header.Hash == h {
+				return b, true
+			}
+		}
+
+		return nil, false
+	}
+
+	pool, err := newTestPool(store)
+	require.NoError(t, err)
+
+	pool.SetBaseFee(blocks[0].Header)
+
+	pool.ResetWithHeaders()
+	assert.Equal(t, blocks[0].Header.BaseFee, pool.GetBaseFee())
+
+	pool.ResetWithHeaders(blocks[len(blocks)-2].Header, blocks[len(blocks)-1].Header)
+	assert.Equal(t, blocks[len(blocks)-1].Header.BaseFee, pool.GetBaseFee())
 }
 
 func BenchmarkAddTxTime(b *testing.B) {

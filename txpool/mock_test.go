@@ -15,13 +15,17 @@ var mockHeader = &types.Header{
 
 type defaultMockStore struct {
 	DefaultHeader *types.Header
-	BaseFee       uint64
+
+	getBlockByHashFn   func(types.Hash, bool) (*types.Block, bool)
+	calculateBaseFeeFn func(*types.Header) uint64
 }
 
-func NewDefaultMockStore(header *types.Header, baseFee uint64) defaultMockStore {
+func NewDefaultMockStore(header *types.Header) defaultMockStore {
 	return defaultMockStore{
 		DefaultHeader: header,
-		BaseFee:       baseFee,
+		calculateBaseFeeFn: func(h *types.Header) uint64 {
+			return h.BaseFee
+		},
 	}
 }
 
@@ -33,7 +37,11 @@ func (m defaultMockStore) GetNonce(types.Hash, types.Address) uint64 {
 	return 0
 }
 
-func (m defaultMockStore) GetBlockByHash(types.Hash, bool) (*types.Block, bool) {
+func (m defaultMockStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {
+	if m.getBlockByHashFn != nil {
+		return m.getBlockByHashFn(hash, full)
+	}
+
 	return nil, false
 }
 
@@ -43,8 +51,12 @@ func (m defaultMockStore) GetBalance(types.Hash, types.Address) (*big.Int, error
 	return balance, nil
 }
 
-func (m defaultMockStore) CalculateBaseFee(*types.Header) uint64 {
-	return m.BaseFee
+func (m defaultMockStore) CalculateBaseFee(header *types.Header) uint64 {
+	if m.calculateBaseFeeFn != nil {
+		return m.calculateBaseFeeFn(header)
+	}
+
+	return 0
 }
 
 type faultyMockStore struct {

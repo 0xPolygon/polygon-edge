@@ -599,12 +599,12 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return runtime.ErrMaxCodeSizeExceeded
 	}
 
-	// Grab the state root, base fee, current block number and block gas limit for the latest block
+	// Grab the state root, current block number and block gas limit for the latest block
 	currentHeader := p.store.Header()
 	stateRoot := currentHeader.StateRoot
 	currentBlockNumber := currentHeader.Number
 	latestBlockGasLimit := currentHeader.GasLimit
-	baseFee := p.GetBaseFee()
+	baseFee := p.GetBaseFee() // base fee is calculated for the next block
 
 	if tx.Type == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
