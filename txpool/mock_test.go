@@ -15,11 +15,13 @@ var mockHeader = &types.Header{
 
 type defaultMockStore struct {
 	DefaultHeader *types.Header
+	BaseFee       uint64
 }
 
-func NewDefaultMockStore(header *types.Header) defaultMockStore {
+func NewDefaultMockStore(header *types.Header, baseFee uint64) defaultMockStore {
 	return defaultMockStore{
-		header,
+		DefaultHeader: header,
+		BaseFee:       baseFee,
 	}
 }
 
@@ -41,6 +43,10 @@ func (m defaultMockStore) GetBalance(types.Hash, types.Address) (*big.Int, error
 	return balance, nil
 }
 
+func (m defaultMockStore) CalculateBaseFee(*types.Header) uint64 {
+	return m.BaseFee
+}
+
 type faultyMockStore struct {
 }
 
@@ -58,6 +64,10 @@ func (fms faultyMockStore) GetBlockByHash(hash types.Hash, b bool) (*types.Block
 
 func (fms faultyMockStore) GetBalance(root types.Hash, addr types.Address) (*big.Int, error) {
 	return nil, fmt.Errorf("unable to fetch account state")
+}
+
+func (fms faultyMockStore) CalculateBaseFee(*types.Header) uint64 {
+	return 0
 }
 
 type mockSigner struct {

@@ -2027,11 +2027,12 @@ func Test_TxPool_validateTx(t *testing.T) {
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
 	setupPool := func() *TxPool {
-		pool, err := newTestPool()
+		pool, err := newTestPool(NewDefaultMockStore(mockHeader, 1000))
 		if err != nil {
 			t.Fatalf("cannot create txpool - err: %v\n", err)
 		}
 
+		pool.SetBaseFee(mockHeader)
 		pool.SetSigner(signer)
 
 		return pool
@@ -2088,7 +2089,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2102,7 +2102,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2119,7 +2118,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2136,7 +2134,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		// undefined gas tip cap
 		tx := newTx(defaultAddr, 0, 1)
@@ -2170,7 +2167,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		bitLength := 512
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		// very high gas fee cap
 		tx := newTx(defaultAddr, 0, 1)

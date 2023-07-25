@@ -416,6 +416,7 @@ func NewServer(config *Config) (*Server, error) {
 		}
 	}
 
+	m.txpool.SetBaseFee(m.blockchain.Header())
 	m.txpool.Start()
 
 	return m, nil
