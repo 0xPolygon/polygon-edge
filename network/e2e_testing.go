@@ -174,8 +174,8 @@ func WaitUntilPeerDisconnectsFrom(ctx context.Context, srv *Server, ids ...peer.
 	return resVal, nil
 }
 
-// WaitUntilRoutingTableToBeAdded check routing table has given ids and retry by timeout
-func WaitUntilRoutingTableToBeFilled(ctx context.Context, srv *Server, size int) (bool, error) {
+// WaitUntilRoutingTableIsFilled check routing table has given ids and retry by timeout
+func WaitUntilRoutingTableIsFilled(ctx context.Context, srv *Server, size int) (bool, error) {
 	res, err := tests.RetryUntilTimeout(ctx, func() (interface{}, bool) {
 		if size == srv.discovery.RoutingTableSize() {
 			return true, false

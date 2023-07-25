@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func discoveryConfig(c *Config) {
@@ -35,13 +36,11 @@ func TestDiscovery_ConnectedPopulatesRoutingTable(t *testing.T) {
 	}
 
 	// make sure each routing table has peer
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
-		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
-	}
+	_, err := WaitUntilRoutingTableIsFilled(ctx, servers[0], 1)
+	require.NoError(t, err, "server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
 
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
-		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
-	}
+	_, err = WaitUntilRoutingTableIsFilled(ctx, servers[1], 1)
+	require.NoError(t, err, "server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 }
 
 func TestRoutingTable_Connected(t *testing.T) {
@@ -76,13 +75,11 @@ func TestRoutingTable_Connected(t *testing.T) {
 		cancel()
 	})
 
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
-		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
-	}
+	_, err := WaitUntilRoutingTableIsFilled(ctx, servers[0], 1)
+	require.NoError(t, err, "server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
 
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
-		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
-	}
+	_, err = WaitUntilRoutingTableIsFilled(ctx, servers[1], 1)
+	require.NoError(t, err, "server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 
 	assert.Contains(t, servers[0].discovery.RoutingTablePeers(), servers[1].AddrInfo().ID)
 	assert.Contains(t, servers[1].discovery.RoutingTablePeers(), servers[0].AddrInfo().ID)
@@ -121,18 +118,14 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 		cancel()
 	})
 
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[0], 1); err != nil {
-		t.Fatalf("server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
-	}
+	_, err := WaitUntilRoutingTableIsFilled(ctx, servers[0], 1)
+	require.NoError(t, err, "server 0 should add a peer to routing table but didn't, peer=%s", servers[1].host.ID())
 
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx, servers[1], 1); err != nil {
-		t.Fatalf("server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
-	}
+	_, err = WaitUntilRoutingTableIsFilled(ctx, servers[1], 1)
+	require.NoError(t, err, "server 1 should add a peer to routing table but didn't, peer=%s", servers[0].host.ID())
 
 	// disconnect the servers by closing server 0 to stop auto-reconnection
-	if closeErr := servers[0].Close(); closeErr != nil {
-		t.Fatalf("Unable to close server 0, %v", closeErr)
-	}
+	require.NoError(t, servers[0].Close())
 
 	// make sure each routing table remove a peer
 	ctx2, cancel2 := context.WithTimeout(context.Background(), 15*time.Second)
@@ -141,9 +134,9 @@ func TestRoutingTable_Disconnected(t *testing.T) {
 		cancel2()
 	})
 
-	if _, err := WaitUntilRoutingTableToBeFilled(ctx2, servers[1], 0); err != nil {
-		t.Fatalf("server 1 should remove a peer from routing table but didn't, peer=%s", servers[0].host.ID())
-	}
+	_, err = WaitUntilRoutingTableIsFilled(ctx2, servers[1], 0)
+	require.NoError(t, err, "server 1 should remove a peer from routing table but didn't, peer=%s",
+		servers[0].host.ID())
 }
 
 func TestRoutingTable_ConnectionFailure(t *testing.T) {
