@@ -366,9 +366,6 @@ type InitializeChildERC20PredicateACLFn struct {
 	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
 	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
 	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
-	NewUseAllowList           bool          `abi:"newUseAllowList"`
-	NewUseBlockList           bool          `abi:"newUseBlockList"`
-	NewOwner                  types.Address `abi:"newOwner"`
 }
 
 func (i *InitializeChildERC20PredicateACLFn) Sig() []byte {
@@ -443,12 +440,11 @@ func (i *InitializeRootMintableERC20PredicateACLFn) DecodeAbi(buf []byte) error 
 }
 
 type InitializeNativeERC20Fn struct {
-	Predicate_   types.Address `abi:"predicate_"`
-	RootToken_   types.Address `abi:"rootToken_"`
-	Name_        string        `abi:"name_"`
-	Symbol_      string        `abi:"symbol_"`
-	Decimals_    uint8         `abi:"decimals_"`
-	TokenSupply_ *big.Int      `abi:"tokenSupply_"`
+	Predicate_ types.Address `abi:"predicate_"`
+	RootToken_ types.Address `abi:"rootToken_"`
+	Name_      string        `abi:"name_"`
+	Symbol_    string        `abi:"symbol_"`
+	Decimals_  uint8         `abi:"decimals_"`
 }
 
 func (i *InitializeNativeERC20Fn) Sig() []byte {
@@ -464,13 +460,12 @@ func (i *InitializeNativeERC20Fn) DecodeAbi(buf []byte) error {
 }
 
 type InitializeNativeERC20MintableFn struct {
-	Predicate_   types.Address `abi:"predicate_"`
-	Owner_       types.Address `abi:"owner_"`
-	RootToken_   types.Address `abi:"rootToken_"`
-	Name_        string        `abi:"name_"`
-	Symbol_      string        `abi:"symbol_"`
-	Decimals_    uint8         `abi:"decimals_"`
-	TokenSupply_ *big.Int      `abi:"tokenSupply_"`
+	Predicate_ types.Address `abi:"predicate_"`
+	Owner_     types.Address `abi:"owner_"`
+	RootToken_ types.Address `abi:"rootToken_"`
+	Name_      string        `abi:"name_"`
+	Symbol_    string        `abi:"symbol_"`
+	Decimals_  uint8         `abi:"decimals_"`
 }
 
 func (i *InitializeNativeERC20MintableFn) Sig() []byte {
@@ -483,6 +478,22 @@ func (i *InitializeNativeERC20MintableFn) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeNativeERC20MintableFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NativeERC20Mintable.Abi.Methods["initialize"], buf, i)
+}
+
+type BalanceOfChildERC20Fn struct {
+	Account types.Address `abi:"account"`
+}
+
+func (b *BalanceOfChildERC20Fn) Sig() []byte {
+	return ChildERC20.Abi.Methods["balanceOf"].ID()
+}
+
+func (b *BalanceOfChildERC20Fn) EncodeAbi() ([]byte, error) {
+	return ChildERC20.Abi.Methods["balanceOf"].Encode(b)
+}
+
+func (b *BalanceOfChildERC20Fn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildERC20.Abi.Methods["balanceOf"], buf, b)
 }
 
 type InitializeRootERC20PredicateFn struct {
@@ -1506,7 +1517,7 @@ type InitializeValidatorSetFn struct {
 	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
 	NewRootChainManager types.Address    `abi:"newRootChainManager"`
 	NewEpochSize        *big.Int         `abi:"newEpochSize"`
-	InitialValidators   []*ValidatorInit `abi:"initialValidators"`
+	InitalValidators    []*ValidatorInit `abi:"initalValidators"`
 }
 
 func (i *InitializeValidatorSetFn) Sig() []byte {
