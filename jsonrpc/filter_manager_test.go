@@ -715,3 +715,90 @@ func TestClosedFilterDeletion(t *testing.T) {
 	// false because filter was removed automatically
 	assert.False(t, m.Exists(id))
 }
+
+func Test_appendLogsToFilters(t *testing.T) {
+	t.Parallel()
+
+	numOfLogs := 4
+
+	block := &types.Block{
+		Header: &types.Header{Hash: types.StringToHash("someHash"), Number: 1},
+		Transactions: []*types.Transaction{
+			createTestTransaction(types.StringToHash("tx1")),
+			createTestTransaction(types.StringToHash("tx2")),
+			createTestTransaction(types.StringToHash("tx3")),
+		},
+	}
+
+	// setup test with block with 3 transactions and 4 logs
+	store := &mockBlockStore{
+		receipts: map[types.Hash][]*types.Receipt{
+			block.Header.Hash: {
+				{
+					// transaction 1 logs
+					Logs: []*types.Log{
+						{
+							Topics: []types.Hash{
+								hash1,
+							},
+						},
+						{
+							Topics: []types.Hash{
+								hash2,
+							},
+						},
+					},
+				},
+				{
+					// transaction 2 logs
+					Logs: []*types.Log{
+						{
+							Topics: []types.Hash{
+								hash3,
+							},
+						},
+					},
+				},
+				{
+					// transaction 3 logs
+					Logs: []*types.Log{
+						{
+							Topics: []types.Hash{
+								hash4,
+							},
+						},
+					},
+				},
+			},
+		}}
+
+	store.appendBlocksToStore([]*types.Block{block})
+
+	f := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+
+	logFilter := &logFilter{
+		filterBase: newFilterBase(nil),
+		query: &LogQuery{
+			fromBlock: 1,
+			toBlock:   1,
+		},
+	}
+
+	f.filters = map[string]filter{
+		"test": logFilter,
+	}
+
+	t.Cleanup(func() {
+		defer f.Close()
+	})
+
+	b := toBlock(&types.Block{Header: block.Header}, false)
+	err := f.appendLogsToFilters(b)
+
+	require.NoError(t, err)
+	require.Len(t, logFilter.logs, numOfLogs)
+
+	for i := 0; i < numOfLogs; i++ {
+		require.Equal(t, uint64(i), uint64(logFilter.logs[i].LogIndex))
+	}
+}
