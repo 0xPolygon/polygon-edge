@@ -675,7 +675,6 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		framework.WithNumBlockConfirmations(0),
 		framework.WithEpochSize(epochSize),
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
-		framework.WithBridgeAllowListAdmin(adminAddr),
 		framework.WithBridgeBlockListAdmin(adminAddr),
 		framework.WithPremine(append(depositors, adminAddr)...)) //nolint:makezero
 	defer cluster.Stop()
@@ -703,8 +702,11 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		// rootToken represents deposit token (basically native mintable token from the Supernets)
 		rootToken := contracts.NativeERC20TokenContract
 
+		// block list first depositor
+		setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, depositors[0], addresslist.EnabledRole, admin)
+
 		// try sending a single native token deposit transaction
-		// it should fail, because depositors are not allow listed for bridge transactions
+		// it should fail, because first depositor is added to bridge transactions block list
 		err = cluster.Bridge.Deposit(
 			common.ERC20,
 			rootToken,
@@ -718,11 +720,11 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 			true)
 		require.Error(t, err)
 
+		// remove first depositor from bridge transactions block list
+		setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, depositors[0], addresslist.NoRole, admin)
+
 		// allow list each depositor and make sure deposit is successfully executed
 		for i, key := range depositorKeys {
-			// add all depositors to bridge allow list
-			setAccessListRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], addresslist.EnabledRole, admin)
-
 			// make sure deposit is successfully executed
 			err = cluster.Bridge.Deposit(
 				common.ERC20,
@@ -859,9 +861,6 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		require.Error(t, err)
 
 		for i, depositorKey := range depositorKeys {
-			// add all depositors to the bridge allow list
-			setAccessListRole(t, cluster, contracts.AllowListBridgeAddr, depositors[i], addresslist.EnabledRole, admin)
-
 			// remove all depositors from the bridge block list
 			setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, depositors[i], addresslist.NoRole, admin)
 
@@ -1284,7 +1283,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		// add account to bridge block list
 		setAccessListRole(t, cluster, contracts.BlockListBridgeAddr, senderAccount.Address(), addresslist.EnabledRole, admin)
 
-		// it should fail now because in block list
+		// it should fail now because sender accont is in the block list
 		err = cluster.Bridge.Withdraw(
 			common.ERC20,
 			hex.EncodeToString(rawKey),
