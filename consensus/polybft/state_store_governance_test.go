@@ -48,11 +48,11 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(epoch, block, events))
 
 	// test for an epoch that didn't have any events
-	eventsRaw, err := state.GovernanceStore.getGovernanceEvents(10)
+	_, err := state.GovernanceStore.getGovernanceEvents(10)
 	require.NoError(t, err)
 
 	// test for the epoch that had events
-	eventsRaw, err = state.GovernanceStore.getGovernanceEvents(epoch)
+	eventsRaw, err := state.GovernanceStore.getGovernanceEvents(epoch)
 	require.NoError(t, err)
 	require.Len(t, eventsRaw, len(events))
 
@@ -68,23 +68,23 @@ func TestGovernanceStore_InsertAndGetClientConfig(t *testing.T) {
 	state := newTestState(t)
 
 	// try get config when there is none
-	configFromDb, err := state.GovernanceStore.getClientConfig()
+	_, err := state.GovernanceStore.getClientConfig()
 	require.ErrorIs(t, err, errClientConfigNotFound)
 
 	// insert config
 	require.NoError(t, state.GovernanceStore.insertClientConfig(initialConfig))
 
 	// now config should exist
-	configFromDb, err = state.GovernanceStore.getClientConfig()
+	configFromDB, err := state.GovernanceStore.getClientConfig()
 	require.NoError(t, err)
 	// check some fields to make sure they are as expected
-	require.Len(t, configFromDb.InitialValidatorSet, len(initialConfig.InitialValidatorSet))
-	require.Equal(t, configFromDb.BlockTime, initialConfig.BlockTime)
-	require.Equal(t, configFromDb.BlockTimeDrift, initialConfig.BlockTimeDrift)
-	require.Equal(t, configFromDb.CheckpointInterval, initialConfig.CheckpointInterval)
-	require.Equal(t, configFromDb.EpochReward, initialConfig.EpochReward)
-	require.Equal(t, configFromDb.EpochSize, initialConfig.EpochSize)
-	require.Equal(t, configFromDb.Governance, initialConfig.Governance)
+	require.Len(t, configFromDB.InitialValidatorSet, len(initialConfig.InitialValidatorSet))
+	require.Equal(t, configFromDB.BlockTime, initialConfig.BlockTime)
+	require.Equal(t, configFromDB.BlockTimeDrift, initialConfig.BlockTimeDrift)
+	require.Equal(t, configFromDB.CheckpointInterval, initialConfig.CheckpointInterval)
+	require.Equal(t, configFromDB.EpochReward, initialConfig.EpochReward)
+	require.Equal(t, configFromDB.EpochSize, initialConfig.EpochSize)
+	require.Equal(t, configFromDB.Governance, initialConfig.Governance)
 }
 
 func createTestPolybftConfig() *PolyBFTConfig {

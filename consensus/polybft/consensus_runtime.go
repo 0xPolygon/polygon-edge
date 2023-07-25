@@ -234,7 +234,8 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
-	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint))
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(
+		c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
 	}

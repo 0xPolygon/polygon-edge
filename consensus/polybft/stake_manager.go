@@ -30,7 +30,8 @@ var (
 type StakeManager interface {
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
-	UpdateValidatorSet(epoch, maxValidatorSetSize uint64, currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
+	UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
+		currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
 
 var _ StakeManager = (*dummyStakeManager)(nil)
