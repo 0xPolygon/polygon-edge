@@ -1,7 +1,6 @@
 package state
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"testing"
@@ -12,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
-	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -260,34 +258,8 @@ func Test_Transition_EIP2929(t *testing.T) {
 			enabledForks := chain.AllForksEnabled.At(0)
 			transition := NewTransition(enabledForks, state, txn)
 
-			tracer := structtracer.NewStructTracer(structtracer.Config{
-				EnableMemory:     true,
-				EnableStack:      true,
-				EnableStorage:    true,
-				EnableReturnData: true,
-			})
-
-			transition.SetTracer(tracer)
-
 			result := transition.Call2(transition.ctx.Origin, addr, nil, big.NewInt(0), uint64(1000000))
-			assert.Equal(t, tt.gasConsumed, result.GasUsed, "Gas consumed by transaction in not correct")
-
-			tracerOutput, err := tracer.GetResult()
-			if err != nil {
-				fmt.Println("Error:", err)
-
-				return
-			}
-
-			indentedJSON, err := json.MarshalIndent(tracerOutput, "", "  ")
-			if err != nil {
-				fmt.Println("Error:", err)
-
-				return
-			}
-
-			fmt.Println(tt.name)
-			fmt.Println(string(indentedJSON))
+			assert.Equal(t, tt.gasConsumed, result.GasUsed, "Gas consumption for %s is inaccurate according to EIP 2929", tt.name)
 		})
 	}
 }
