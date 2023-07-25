@@ -390,9 +390,6 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		t.Log("Deposits were successfully processed")
 
-		txRelayer, err = txrelayer.NewTxRelayer(txrelayer.WithIPAddress(validatorSrv.JSONRPCAddr()))
-		require.NoError(t, err)
-
 		// WITHDRAW ERC20 TOKENS
 		rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(validatorSrv.BridgeJSONRPCAddr()))
 		require.NoError(t, err)
