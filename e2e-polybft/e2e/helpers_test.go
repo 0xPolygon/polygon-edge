@@ -348,3 +348,18 @@ func getChildToken(t *testing.T, predicateABI *abi.ABI, predicateAddr types.Addr
 
 	return types.StringToAddress(childTokenRaw)
 }
+
+func getLastExitEventID(t *testing.T, relayer txrelayer.TxRelayer) uint64 {
+	exitEventsCounterFn := contractsapi.L2StateSender.Abi.Methods["counter"]
+
+	input, err := exitEventsCounterFn.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	initialExitEventIDRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
+	require.NoError(t, err)
+
+	initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
+	require.NoError(t, err)
+
+	return initialExitEventID
+}

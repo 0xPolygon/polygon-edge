@@ -114,20 +114,18 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	t.Run("bridge ERC 20 tokens", func(t *testing.T) {
 		// DEPOSIT ERC20 TOKENS
 		// send a few transactions to the bridge
-		require.NoError(
-			t,
-			cluster.Bridge.Deposit(
-				common.ERC20,
-				polybftCfg.Bridge.RootNativeERC20Addr,
-				polybftCfg.Bridge.RootERC20PredicateAddr,
-				rootHelper.TestAccountPrivKey,
-				strings.Join(receivers[:], ","),
-				strings.Join(amounts[:], ","),
-				"",
-				cluster.Bridge.JSONRPCAddr(),
-				rootHelper.TestAccountPrivKey,
-				false),
-		)
+		require.NoError(t, cluster.Bridge.Deposit(
+			common.ERC20,
+			polybftCfg.Bridge.RootNativeERC20Addr,
+			polybftCfg.Bridge.RootERC20PredicateAddr,
+			rootHelper.TestAccountPrivKey,
+			strings.Join(receivers[:], ","),
+			strings.Join(amounts[:], ","),
+			"",
+			cluster.Bridge.JSONRPCAddr(),
+			rootHelper.TestAccountPrivKey,
+			false,
+		))
 
 		finalBlockNum := 10 * sprintSize
 		// wait for a couple of sprints
@@ -324,6 +322,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		t.Log("Initial block number:", initialBlockNum)
 
+		// get initial exit id
+		initialExitEventID := getLastExitEventID(t, childchainTxRelayer)
+
 		// send a few transactions to the bridge
 		require.NoError(t, cluster.Bridge.Deposit(
 			common.ERC20,
@@ -335,8 +336,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			"",
 			cluster.Bridge.JSONRPCAddr(),
 			rootHelper.TestAccountPrivKey,
-			false),
-		)
+			false,
+		))
 
 		// wait for a few more sprints
 		finalBlockNumber := initialBlockNum + 10*sprintSize
@@ -397,8 +398,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				validatorSrv.JSONRPCAddr(),
 				contracts.ChildERC20PredicateContract,
 				childTokenAddr,
-				false),
-			)
+				false,
+			))
 		}
 
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
@@ -415,18 +416,17 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			currentEpoch,
 			3*time.Minute,
 			rootchainTxRelayer,
-			polybftCfg.Bridge.CheckpointManagerAddr),
-		)
+			polybftCfg.Bridge.CheckpointManagerAddr,
+		))
 
-		for i := uint64(0); i < transfersCount; i++ {
-			exitEventID := i + 1
+		exitHelper := polybftCfg.Bridge.ExitHelperAddr
+		childJSONRPC := validatorSrv.JSONRPCAddr()
 
+		initialExitEventID++
+		for i := initialExitEventID; i < initialExitEventID+transfersCount; i++ {
 			// send exit transaction to exit helper
-			require.NoError(t, cluster.Bridge.SendExitTransaction(
-				polybftCfg.Bridge.ExitHelperAddr,
-				exitEventID,
-				validatorSrv.JSONRPCAddr(),
-			))
+			err = cluster.Bridge.SendExitTransaction(exitHelper, i, childJSONRPC)
+			require.NoError(t, err)
 		}
 
 		// assert that receiver's balances on RootERC20 smart contract are expected
@@ -965,13 +965,8 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		rootchainInitialBlock, err := rootchainTxRelayer.Client().Eth().BlockNumber()
 		require.NoError(t, err)
 
-		exitEventsCounterFn := contractsapi.L2StateSender.Abi.Methods["counter"]
-		input, err := exitEventsCounterFn.Encode([]interface{}{})
-		require.NoError(t, err)
-		initialExitEventIDRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
-		require.NoError(t, err)
-		initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
-		require.NoError(t, err)
+		// get initial exit id
+		initialExitEventID := getLastExitEventID(t, childchainTxRelayer)
 
 		erc721DeployTxn := cluster.Deploy(t, admin, contractsapi.RootERC721.Bytecode)
 		require.NoError(t, erc721DeployTxn.Wait())
