@@ -153,7 +153,7 @@ type ForksInTime struct {
 	EIP150,
 	EIP158,
 	EIP155,
-  QuorumCalcAlignment,
+	QuorumCalcAlignment,
 	TxHashWithType,
 	EIP2929 bool
 }
