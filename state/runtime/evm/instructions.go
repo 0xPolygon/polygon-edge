@@ -471,6 +471,7 @@ func opSload(c *state) {
 	loc := c.top()
 
 	var gas uint64
+
 	if c.config.EIP2929 {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, bigToHash(loc)); !slotPresent {
 			c.accessList.AddSlot(c.msg.Address, bigToHash(loc))
@@ -520,6 +521,7 @@ func opSStore(c *state) {
 	if c.config.EIP2929 {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, key); !slotPresent {
 			cost = ColdSloadCostEIP2929
+
 			c.accessList.AddSlot(c.msg.Address, key)
 		}
 	}
@@ -1009,6 +1011,7 @@ func opSelfDestruct(c *state) {
 	// EIP 2929 gas
 	if c.config.EIP2929 && !c.accessList.ContainsAddress(address) {
 		gas += ColdAccountAccessCostEIP2929
+
 		c.accessList.AddAddress(address)
 	}
 
@@ -1299,6 +1302,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	if c.config.EIP2929 {
 		if addressPresent := c.accessList.ContainsAddress(addr); !addressPresent {
 			gasCost = ColdAccountAccessCostEIP2929
+
 			c.accessList.AddAddress(addr)
 		} else {
 			gasCost = WarmStorageReadCostEIP2929
