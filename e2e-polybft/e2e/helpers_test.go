@@ -350,6 +350,8 @@ func getChildToken(t *testing.T, predicateABI *abi.ABI, predicateAddr types.Addr
 }
 
 func getLastExitEventID(t *testing.T, relayer txrelayer.TxRelayer) uint64 {
+	t.Helper()
+
 	exitEventsCounterFn := contractsapi.L2StateSender.Abi.Methods["counter"]
 
 	input, err := exitEventsCounterFn.Encode([]interface{}{})
