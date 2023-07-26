@@ -357,7 +357,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		logs, err := childEthEndpoint.GetLogs(filter)
 		require.NoError(t, err)
 
-		checkStateSyncResultLogs(t, logs, 6)
+		checkStateSyncResultLogs(t, logs, transfersCount+6)
 
 		// retrieve child token address
 		rootToChildTokenFn := contractsapi.ChildERC20Predicate.Abi.Methods["rootTokenToChildToken"]
