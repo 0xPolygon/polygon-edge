@@ -314,7 +314,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			// create validator data for polybft config
 			initValidators[i] = &validator.GenesisValidator{
 				Address: val.Address,
-				Balance: val.VotingPower,
 				Stake:   val.VotingPower,
 				BlsKey:  hex.EncodeToString(val.BlsKey.Marshal()),
 			}

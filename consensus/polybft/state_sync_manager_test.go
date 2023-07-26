@@ -228,7 +228,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	s.validatorSet = vals.ToValidatorSet()
 
 	// commitment is empty
-	commitment, err := s.Commitment()
+	commitment, err := s.Commitment(1)
 	require.NoError(t, err)
 	require.Nil(t, commitment)
 
@@ -262,7 +262,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.NoError(t, s.saveVote(signedMsg1))
 	require.NoError(t, s.saveVote(signedMsg2))
 
-	commitment, err = s.Commitment()
+	commitment, err = s.Commitment(1)
 	require.NoError(t, err) // there is no error if quorum is not met, since its a valid case
 	require.Nil(t, commitment)
 
@@ -277,7 +277,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.NoError(t, s.saveVote(signedMsg1))
 	require.NoError(t, s.saveVote(signedMsg2))
 
-	commitment, err = s.Commitment()
+	commitment, err = s.Commitment(1)
 	require.NoError(t, err)
 	require.NotNil(t, commitment)
 }
@@ -304,7 +304,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	txData, err := mockMsg.EncodeAbi()
 	require.NoError(t, err)
 
-	tx := createStateTransactionWithData(types.Address{}, txData)
+	tx := createStateTransactionWithData(1, types.Address{}, txData)
 
 	req := &PostBlockRequest{
 		FullBlock: &types.FullBlock{

@@ -33,9 +33,9 @@ func (v *withdrawParams) validateFlags() (err error) {
 }
 
 type withdrawResult struct {
-	validatorAddress string
-	amount           uint64
-	withdrawnTo      string
+	ValidatorAddress string `json:"validatorAddress"`
+	Amount           uint64 `json:"amount"`
+	WithdrawnTo      string `json:"withdrawnTo"`
 }
 
 func (wr withdrawResult) GetOutput() string {
@@ -44,9 +44,9 @@ func (wr withdrawResult) GetOutput() string {
 	buffer.WriteString("\n[WITHDRAWN AMOUNT]\n")
 
 	vals := make([]string, 0, 3)
-	vals = append(vals, fmt.Sprintf("Validator Address|%s", wr.validatorAddress))
-	vals = append(vals, fmt.Sprintf("Amount Withdrawn|%v", wr.amount))
-	vals = append(vals, fmt.Sprintf("Withdrawn To|%s", wr.withdrawnTo))
+	vals = append(vals, fmt.Sprintf("Validator Address|%s", wr.ValidatorAddress))
+	vals = append(vals, fmt.Sprintf("Amount Withdrawn|%v", wr.Amount))
+	vals = append(vals, fmt.Sprintf("Withdrawn To|%s", wr.WithdrawnTo))
 
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")

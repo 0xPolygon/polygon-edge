@@ -9,6 +9,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -61,6 +62,7 @@ var (
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
 	ErrNonceExistsInPool       = errors.New("tx with the same nonce is already present")
 	ErrReplacementUnderpriced  = errors.New("replacement tx underpriced")
+	ErrDynamicTxNotAllowed     = errors.New("dynamic tx not allowed currently")
 )
 
 // indicates origin of a transaction
@@ -98,6 +100,7 @@ type Config struct {
 	PriceLimit         uint64
 	MaxSlots           uint64
 	MaxAccountEnqueued uint64
+	ChainID            *big.Int
 }
 
 /* All requests are passed to the main loop
@@ -187,6 +190,9 @@ type TxPool struct {
 	// pending is the list of pending and ready transactions. This variable
 	// is accessed with atomics
 	pending int64
+
+	// chain id
+	chainID *big.Int
 }
 
 // NewTxPool returns a new pool for processing incoming transactions.
@@ -207,6 +213,7 @@ func NewTxPool(
 		index:       lookupMap{all: make(map[types.Hash]*types.Transaction)},
 		gauge:       slotGauge{height: 0, max: config.MaxSlots},
 		priceLimit:  config.PriceLimit,
+		chainID:     config.ChainID,
 
 		//	main loop channels
 		promoteReqCh: make(chan promoteRequest),
@@ -477,7 +484,7 @@ func (p *TxPool) ResetWithHeaders(headers ...*types.Header) {
 	})
 }
 
-// processEvent collects the latest nonces for each account containted
+// processEvent collects the latest nonces for each account contained
 // in the received event. Resets all known accounts with the new nonce.
 func (p *TxPool) processEvent(event *blockchain.Event) {
 	// Grab the latest state root now that the block has been inserted
@@ -595,6 +602,14 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
 
 			return ErrInvalidTxType
+		}
+
+		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
+		blockNumber, err := forkmanager.GetInstance().GetForkBlock(chain.TxHashWithType)
+		if err == nil && blockNumber > p.store.Header().Number {
+			metrics.IncrCounter([]string{txPoolMetrics, "dynamic_tx_not_allowed"}, 1)
+
+			return ErrDynamicTxNotAllowed
 		}
 
 		// Check EIP-1559-related fields and make sure they are correct
@@ -740,8 +755,13 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		return err
 	}
 
+	// add chainID to the tx - only dynamic fee tx
+	if tx.Type == types.DynamicFeeTx {
+		tx.ChainID = p.chainID
+	}
+
 	// calculate tx hash
-	tx.ComputeHash()
+	tx.ComputeHash(p.store.Header().Number)
 
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)

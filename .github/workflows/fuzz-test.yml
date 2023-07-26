@@ -6,11 +6,11 @@ on:  # yamllint disable-line rule:truthy
       - main
       - develop  
   workflow_dispatch:
-  workflow_call:    
+  workflow_call:
     outputs:
       workflow_output:
         description: "Fuzz output"
-        value: ${{ jobs.build.outputs.fuzz_output_failure }} 
+        value: ${{ jobs.fuzz_test.outputs.fuzz_output_failure }} 
 
 
 jobs:

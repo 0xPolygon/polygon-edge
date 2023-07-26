@@ -110,8 +110,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	result := &withdrawRewardResult{
-		validatorAddress: validatorAccount.Ecdsa.Address().String(),
-		rewardAmount:     amount.Uint64(),
+		ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
+		RewardAmount:     amount.Uint64(),
 	}
 
 	outputter.WriteCommandResult(result)

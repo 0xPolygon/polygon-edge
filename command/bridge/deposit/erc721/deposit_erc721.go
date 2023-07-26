@@ -216,7 +216,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter.SetCommandResult(res)
 }
 
-// createDepositTxn encodes parameters for deposit fnction on rootchain predicate contract
+// createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender ethgo.Address,
 	receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	depositToRoot := &contractsapi.DepositBatchRootERC721PredicateFn{

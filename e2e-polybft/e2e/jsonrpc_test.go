@@ -23,7 +23,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 	acct, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	cluster := framework.NewTestCluster(t, 3,
+	cluster := framework.NewTestCluster(t, 4,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, acct.Address())),
 		framework.WithPremine(types.Address(acct.Address())),
 	)

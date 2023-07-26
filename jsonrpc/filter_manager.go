@@ -678,6 +678,8 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 		return nil
 	}
 
+	logIndex := uint64(0)
+
 	for indx, receipt := range receipts {
 		if receipt.TxHash == types.ZeroHash {
 			// Extract tx Hash
@@ -696,9 +698,12 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 						TxHash:      receipt.TxHash,
 						TxIndex:     argUint64(indx),
 						Removed:     false,
+						LogIndex:    argUint64(logIndex),
 					})
 				}
 			}
+
+			logIndex++
 		}
 	}
 

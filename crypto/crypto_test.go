@@ -194,7 +194,7 @@ func TestValidateSignatureValues(t *testing.T) {
 			name:      "should be invalid if v & s are out of range",
 			homestead: true, v: two, r: one, s: zero, res: false,
 		},
-		// correct v, incorrent r, s
+		// correct v, incorrect r, s
 		{
 			name:      "should be invalid if r & s are nil",
 			homestead: true, v: zero, r: nil, s: nil, res: false,

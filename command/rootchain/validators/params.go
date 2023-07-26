@@ -22,10 +22,10 @@ func (v *validatorInfoParams) validateFlags() error {
 }
 
 type validatorsInfoResult struct {
-	address     string
-	stake       uint64
-	active      bool
-	whitelisted bool
+	Address     string `json:"address"`
+	Stake       uint64 `json:"stake"`
+	Active      bool   `json:"active"`
+	Whitelisted bool   `json:"whitelisted"`
 }
 
 func (vr validatorsInfoResult) GetOutput() string {
@@ -34,10 +34,10 @@ func (vr validatorsInfoResult) GetOutput() string {
 	buffer.WriteString("\n[VALIDATOR INFO]\n")
 
 	vals := make([]string, 4)
-	vals[0] = fmt.Sprintf("Validator Address|%s", vr.address)
-	vals[1] = fmt.Sprintf("Stake|%v", vr.stake)
-	vals[2] = fmt.Sprintf("Is Whitelisted|%v", vr.whitelisted)
-	vals[3] = fmt.Sprintf("Is Active|%v", vr.active)
+	vals[0] = fmt.Sprintf("Validator Address|%s", vr.Address)
+	vals[1] = fmt.Sprintf("Stake|%v", vr.Stake)
+	vals[2] = fmt.Sprintf("Is Whitelisted|%v", vr.Whitelisted)
+	vals[3] = fmt.Sprintf("Is Active|%v", vr.Active)
 
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")

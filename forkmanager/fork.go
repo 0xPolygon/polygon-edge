@@ -1,10 +1,6 @@
 package forkmanager
 
-import (
-	"fmt"
-
-	"github.com/0xPolygon/polygon-edge/chain"
-)
+import "github.com/0xPolygon/polygon-edge/helper/common"
 
 const InitialFork = "initialfork"
 
@@ -19,11 +15,29 @@ type Fork struct {
 	// after the fork is activated, `FromBlockNumber` shows from which block is enabled
 	FromBlockNumber uint64
 	// fork consensus parameters
-	Params *chain.ForkParams
+	Params *ForkParams
 	// this value is false if fork is registered but not activated
 	IsActive bool
 	// map of all handlers registered for this fork
 	Handlers map[HandlerDesc]interface{}
+}
+
+// ForkParams hard-coded fork params
+type ForkParams struct {
+	// MaxValidatorSetSize indicates the maximum size of validator set
+	MaxValidatorSetSize *uint64 `json:"maxValidatorSetSize,omitempty"`
+
+	// EpochSize is size of epoch
+	EpochSize *uint64 `json:"epochSize,omitempty"`
+
+	// SprintSize is size of sprint
+	SprintSize *uint64 `json:"sprintSize,omitempty"`
+
+	// BlockTime is target frequency of blocks production
+	BlockTime *common.Duration `json:"blockTime,omitempty"`
+
+	// BlockTimeDrift defines the time slot in which a new block can be created
+	BlockTimeDrift *uint64 `json:"blockTimeDrift,omitempty"`
 }
 
 // forkHandler defines one custom handler
@@ -39,49 +53,5 @@ type forkParamsBlock struct {
 	// Params should be active from block `FromBlockNumber``
 	FromBlockNumber uint64
 	// pointer to fork params
-	Params *chain.ForkParams
-}
-
-func ForkManagerInit(
-	initialParams *chain.ForkParams,
-	factory func(*chain.Forks) error,
-	forks *chain.Forks) error {
-	if factory == nil {
-		return nil
-	}
-
-	fm := GetInstance()
-	fm.Clear()
-
-	// register initial fork
-	fm.RegisterFork(InitialFork, initialParams)
-
-	// Register forks
-	for name, f := range *forks {
-		// check if fork is not supported by current edge version
-		if _, found := (*chain.AllForksEnabled)[name]; !found {
-			return fmt.Errorf("fork is not available: %s", name)
-		}
-
-		fm.RegisterFork(name, f.Params)
-	}
-
-	// Register handlers and additional forks here
-	if err := factory(forks); err != nil {
-		return err
-	}
-
-	// Activate initial fork
-	if err := fm.ActivateFork(InitialFork, uint64(0)); err != nil {
-		return err
-	}
-
-	// Activate forks
-	for name, f := range *forks {
-		if err := fm.ActivateFork(name, f.Block); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	Params *ForkParams
 }

@@ -602,7 +602,7 @@ func TestAddGossipTx(t *testing.T) {
 
 		signedTx, err := signer.SignTx(tx, key)
 		if err != nil {
-			t.Fatalf("cannot sign transction - err: %v", err)
+			t.Fatalf("cannot sign transaction - err: %v", err)
 		}
 
 		// send tx
@@ -3324,7 +3324,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 		go func(i uint64) {
 			tx := newTx(addr, i, 1)
 
-			tx.ComputeHash()
+			tx.ComputeHash(1)
 
 			// add transaction hash to map
 			mux.Lock()

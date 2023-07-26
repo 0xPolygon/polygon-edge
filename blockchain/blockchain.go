@@ -705,9 +705,9 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, erro
 	}
 
 	// Make sure the transactions root matches up
-	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
+	if hash := buildroot.CalculateTransactionsRoot(block.Transactions, block.Number()); hash != block.Header.TxRoot {
 		b.logger.Error(fmt.Sprintf(
-			"transaction root hash mismatch: have %s, want %s",
+			"incorrect tx root (expected: %s, actual: %s)",
 			hash,
 			block.Header.TxRoot,
 		))
@@ -1139,7 +1139,7 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 }
 
 // writeHeaderImpl writes a block and the data, assumes the genesis is already set
-// Returnning parameters (is canonical header, new total difficulty, error)
+// Returning parameters (is canonical header, new total difficulty, error)
 func (b *Blockchain) writeHeaderImpl(
 	batchWriter *storage.BatchWriter, evnt *Event, header *types.Header) (bool, *big.Int, error) {
 	// parent total difficulty of incoming header

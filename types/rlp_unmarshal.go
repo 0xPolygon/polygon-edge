@@ -113,7 +113,7 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			return err
 		}
 
-		bTxn = bTxn.ComputeHash()
+		bTxn = bTxn.ComputeHash(b.Header.Number)
 
 		b.Transactions = append(b.Transactions, bTxn)
 
@@ -361,6 +361,8 @@ func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 	return nil
 }
 
+// UnmarshalRLP unmarshals transaction from byte slice
+// Caution: Hash calculation should be done from the outside!
 func (t *Transaction) UnmarshalRLP(input []byte) error {
 	t.Type = LegacyTx
 	offset := 0
@@ -374,10 +376,17 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 		offset = 1
 	}
 
-	return UnmarshalRlp(t.unmarshalRLPFrom, input[offset:])
+	if err := UnmarshalRlp(t.unmarshalRLPFrom, input[offset:]); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // unmarshalRLPFrom unmarshals a Transaction in RLP format
+// Be careful! This function does not de-serialize tx type, it assumes that t.Type is already set
+// Hash calculation should also be done from the outside!
+// Use UnmarshalRLP in most cases
 func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 	elems, err := v.GetElems()
 	if err != nil {
@@ -408,13 +417,12 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return fmt.Errorf("incorrect number of transaction elements, expected %d but found %d", num, numElems)
 	}
 
-	p.Hash(t.Hash[:0], v)
-
-	// Skipping Chain ID field since we don't support it (yet)
-	// This is needed to be compatible with other EVM chains and have the same format.
-	// Since we don't have a chain ID, just skip it here.
+	// Load Chain ID for dynamic transactions
 	if t.Type == DynamicFeeTx {
-		_ = getElem()
+		t.ChainID = new(big.Int)
+		if err = getElem().GetBigInt(t.ChainID); err != nil {
+			return err
+		}
 	}
 
 	// nonce

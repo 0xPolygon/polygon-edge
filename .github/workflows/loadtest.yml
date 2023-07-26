@@ -43,6 +43,10 @@ on:  # yamllint disable-line rule:truthy
         description: Duration of the test
         required: false
         type: string
+    outputs:
+      workflow_output:
+        description: "Loadtest output"
+        value: ${{ jobs.run_k6.outputs.loadtest_output_success }}
     secrets:
       SLACK_PERFORMANCE_WEBHOOK_URL:
         required: true
@@ -58,7 +62,7 @@ jobs:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     outputs:
-      loadtest_output_failure: ${{ steps.run_k6_failure.outputs.test_output }}
+      loadtest_output_success: ${{ steps.run_k6_success.outputs.test_output }}
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
@@ -118,10 +122,10 @@ jobs:
           LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
           LOADTEST_DURATION: ${{ inputs.duration }}
 
-      - name: Run tests failed
-        if: failure()
-        id: run_k6_failure
-        run: echo "test_output=false" >> $GITHUB_OUTPUT
+      - name: Run tests success
+        if: success()
+        id: run_k6_success
+        run: echo "test_output=true" >> $GITHUB_OUTPUT
       
       - name: Notify Slack
         uses: slackapi/slack-github-action@v1.23.0
