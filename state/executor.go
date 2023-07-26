@@ -808,6 +808,7 @@ func (t *Transition) applyCall(
 		if result.Reverted() {
 			c.AccessList = al
 		}
+
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,

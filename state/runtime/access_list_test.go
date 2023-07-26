@@ -25,14 +25,15 @@ func createInitialAccessList() *AccessList {
 
 func TestContainsAddress(t *testing.T) {
 	t.Parallel()
-	initialAccessList := createInitialAccessList()
 
+	initialAccessList := createInitialAccessList()
 	assert.True(t, initialAccessList.ContainsAddress(address1))
 	assert.False(t, initialAccessList.ContainsAddress(address3))
 }
 
 func TestContains(t *testing.T) {
 	t.Parallel()
+
 	initialAccessList := createInitialAccessList()
 
 	address1Present, slotHashPresent := initialAccessList.Contains(address1, slotHash)
@@ -46,14 +47,15 @@ func TestContains(t *testing.T) {
 
 func TestCopy(t *testing.T) {
 	t.Parallel()
+
 	initialAccessList := createInitialAccessList()
 	copiedAccessList := initialAccessList.Copy()
-
 	assert.Equal(t, initialAccessList, copiedAccessList)
 }
 
 func TestAddAddress(t *testing.T) {
 	t.Parallel()
+
 	initialAccessList := createInitialAccessList()
 	finalAccessList := createInitialAccessList()
 
@@ -63,12 +65,14 @@ func TestAddAddress(t *testing.T) {
 
 	addr3Present := initialAccessList.AddAddress(address3)
 	assert.True(t, addr3Present)
+
 	(*finalAccessList)[address3] = make(map[types.Hash]struct{})
 	assert.Equal(t, finalAccessList, initialAccessList)
 }
 
 func TestAddSlot(t *testing.T) {
 	t.Parallel()
+
 	initialAccessList := createInitialAccessList()
 	finalAccessList := createInitialAccessList()
 
@@ -82,6 +86,7 @@ func TestAddSlot(t *testing.T) {
 	addr2Exists, slot2Exists := initialAccessList.AddSlot(address2, slotHash)
 	assert.False(t, addr2Exists)
 	assert.True(t, slot2Exists)
+
 	(*finalAccessList)[address2][slotHash] = struct{}{}
 	assert.Equal(t, finalAccessList, initialAccessList)
 
@@ -89,6 +94,7 @@ func TestAddSlot(t *testing.T) {
 	addr3Exists, slot3Exists := initialAccessList.AddSlot(address3, slotHash)
 	assert.True(t, addr3Exists)
 	assert.True(t, slot3Exists)
+
 	(*finalAccessList)[address3] = make(map[types.Hash]struct{})
 	(*finalAccessList)[address3][slotHash] = struct{}{}
 	assert.Equal(t, finalAccessList, initialAccessList)

@@ -474,6 +474,7 @@ func opSload(c *state) {
 	if c.config.EIP2929 {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, bigToHash(loc)); !slotPresent {
 			c.accessList.AddSlot(c.msg.Address, bigToHash(loc))
+
 			gas = ColdSloadCostEIP2929
 		} else {
 			gas = WarmStorageReadCostEIP2929
@@ -605,6 +606,7 @@ func opBalance(c *state) {
 	addr, _ := c.popAddr()
 
 	var gas uint64
+
 	if c.config.EIP2929 {
 		if addressPresent := c.accessList.ContainsAddress(addr); addressPresent {
 			gas = WarmStorageReadCostEIP2929
@@ -695,6 +697,7 @@ func opExtCodeSize(c *state) {
 	addr, _ := c.popAddr()
 
 	var gas uint64
+
 	if c.config.EIP2929 {
 		if addressPresent := c.accessList.ContainsAddress(addr); addressPresent {
 			gas = WarmStorageReadCostEIP2929
@@ -737,6 +740,7 @@ func opExtCodeHash(c *state) {
 	address, _ := c.popAddr()
 
 	var gas uint64
+
 	if c.config.EIP2929 {
 		if addressPresent := c.accessList.ContainsAddress(address); addressPresent {
 			gas = WarmStorageReadCostEIP2929
@@ -818,6 +822,7 @@ func opExtCodeCopy(c *state) {
 	}
 
 	var gas uint64
+
 	if c.config.EIP2929 {
 		if addressPresent := c.accessList.ContainsAddress(address); addressPresent {
 			gas = WarmStorageReadCostEIP2929
@@ -1290,6 +1295,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	}
 
 	var gasCost uint64
+
 	if c.config.EIP2929 {
 		if addressPresent := c.accessList.ContainsAddress(addr); !addressPresent {
 			gasCost = ColdAccountAccessCostEIP2929
@@ -1456,7 +1462,16 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 		address = crypto.CreateAddress2(c.msg.Address, bigToHash(salt), input)
 	}
 
-	contract := runtime.NewContractCreation(c.msg.Depth+1, c.msg.Origin, c.msg.Address, address, value, gas, input, c.accessList)
+	contract := runtime.NewContractCreation(
+		c.msg.Depth+1,
+		c.msg.Origin,
+		c.msg.Address,
+		address,
+		value,
+		gas,
+		input,
+		c.accessList,
+	)
 
 	return contract, nil
 }
