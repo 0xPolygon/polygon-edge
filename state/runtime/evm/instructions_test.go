@@ -651,6 +651,7 @@ func Test_opReturnDataCopy(t *testing.T) {
 			state.evm = nil
 			state.bitmap = bitmap{}
 			state.ret = nil
+			state.accessList = nil
 			state.currentConsumedGas = 0
 
 			opReturnDataCopy(state)
