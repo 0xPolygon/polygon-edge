@@ -117,8 +117,16 @@ func (g *GovernanceStore) getGovernanceEvents(epoch uint64) (eventsRaw, error) {
 	return rawEvents, err
 }
 
-// getLastSaved returns the last processed block for governance events
-func (g *GovernanceStore) getLastSaved() (uint64, error) {
+// insertLastProcessed inserts last processed block for governance events
+func (g *GovernanceStore) insertLastProcessed(blockNumber uint64) error {
+	return g.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(lastProcessedGovernanceEventsBucket).Put(
+			lastProcessedGovernanceBlockKey, common.EncodeUint64ToBytes(blockNumber))
+	})
+}
+
+// getLastProcessed returns the last processed block for governance events
+func (g *GovernanceStore) getLastProcessed() (uint64, error) {
 	var lastProcessedBlock uint64
 
 	err := g.db.View(func(tx *bolt.Tx) error {

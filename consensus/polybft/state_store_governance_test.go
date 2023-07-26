@@ -48,15 +48,16 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(epoch, block, events))
 
 	// test for an epoch that didn't have any events
-	_, err := state.GovernanceStore.getGovernanceEvents(10)
+	eventsRaw, err := state.GovernanceStore.getGovernanceEvents(10)
 	require.NoError(t, err)
+	require.Len(t, eventsRaw, 0)
 
 	// test for the epoch that had events
-	eventsRaw, err := state.GovernanceStore.getGovernanceEvents(epoch)
+	eventsRaw, err = state.GovernanceStore.getGovernanceEvents(epoch)
 	require.NoError(t, err)
 	require.Len(t, eventsRaw, len(events))
 
-	lastProcessedBlock, err := state.GovernanceStore.getLastSaved()
+	lastProcessedBlock, err := state.GovernanceStore.getLastProcessed()
 	require.NoError(t, err)
 	require.Equal(t, block, lastProcessedBlock)
 }

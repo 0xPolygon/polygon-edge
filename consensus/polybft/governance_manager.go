@@ -105,6 +105,7 @@ func newGovernanceManager(initialConfig *PolyBFTConfig,
 	}, nil
 }
 
+// GetClientConfig returns latest client configuration from boltdb
 func (g *governanceManager) GetClientConfig() (*PolyBFTConfig, error) {
 	return g.state.GovernanceStore.getClientConfig()
 }
@@ -286,7 +287,7 @@ func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
 		return nil
 	}
 
-	lastBlock, err := g.state.GovernanceStore.getLastSaved()
+	lastBlock, err := g.state.GovernanceStore.getLastProcessed()
 	if err != nil {
 		return fmt.Errorf("could not get last processed block for governance events. Error: %w", err)
 	}
@@ -304,7 +305,8 @@ func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
 		g.logger.Info("Post block - Getting governance events finished, no events found.",
 			"epoch", req.Epoch, "block", req.FullBlock.Block.Number(), "lastGottenBlock", lastBlock)
 
-		return nil
+		// even if there were no governance events in block, mark it as last processed
+		return g.state.GovernanceStore.insertLastProcessed(req.FullBlock.Block.Number())
 	}
 
 	g.logger.Info("Post block - Getting governance events done.", "epoch", req.Epoch,
