@@ -2,7 +2,7 @@
 
 set -e
 
-fuzzTime=${1:-10}
+fuzzTime=${1:-30}
 
 files=$(grep -r --include='**_test.go' --files-with-matches 'func Fuzz' .)
 
