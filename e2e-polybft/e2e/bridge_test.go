@@ -323,9 +323,6 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		t.Log("Initial block number:", initialBlockNum)
 
-		// get initial exit id
-		initialExitEventID := getLastExitEventID(t, childchainTxRelayer)
-
 		// send a few transactions to the bridge
 		require.NoError(t, cluster.Bridge.Deposit(
 			common.ERC20,
@@ -372,6 +369,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		}
 
 		t.Log("Deposits were successfully processed")
+
+		// get initial exit id
+		initialExitEventID := getLastExitEventID(t, childchainTxRelayer)
 
 		// WITHDRAW ERC20 TOKENS
 		for i, receiverKey := range receiverKeys {
