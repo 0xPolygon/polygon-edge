@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/contract"
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -30,23 +29,6 @@ import (
 )
 
 const nativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s"
-
-type e2eStateProvider struct {
-	txRelayer txrelayer.TxRelayer
-}
-
-func (s *e2eStateProvider) Call(contractAddr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	response, err := s.txRelayer.Call(ethgo.Address(types.ZeroAddress), contractAddr, input)
-	if err != nil {
-		return nil, err
-	}
-
-	return hex.DecodeHex(response)
-}
-
-func (s *e2eStateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, error) {
-	return nil, errors.New("send txn is not supported")
-}
 
 // getCheckpointManagerValidators queries rootchain validator set on CheckpointManager contract
 func getCheckpointManagerValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
@@ -217,7 +199,7 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 			return err
 		}
 
-		rootchainEpoch, err := types.ParseUint64orHex(&rootchainEpochRaw)
+		rootchainEpoch, err := common.ParseUint64orHex(&rootchainEpochRaw)
 		if err != nil {
 			return err
 		}
@@ -357,11 +339,11 @@ func getLastExitEventID(t *testing.T, relayer txrelayer.TxRelayer) uint64 {
 	input, err := exitEventsCounterFn.Encode([]interface{}{})
 	require.NoError(t, err)
 
-	initialExitEventIDRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
+	exitEventIDRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
 	require.NoError(t, err)
 
-	initialExitEventID, err := types.ParseUint64orHex(&initialExitEventIDRaw)
+	exitEventID, err := common.ParseUint64orHex(&exitEventIDRaw)
 	require.NoError(t, err)
 
-	return initialExitEventID
+	return exitEventID
 }
