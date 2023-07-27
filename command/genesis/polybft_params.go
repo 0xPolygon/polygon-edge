@@ -46,7 +46,7 @@ const (
 	defaultCheckpointInterval       = uint64(900)
 	defaultWithdrawalWaitPeriod     = uint64(1)
 	defaultVotingDelay              = "10"
-	defaultVotingPeriod             = "20"
+	defaultVotingPeriod             = "10000"
 	defaultVoteProposalThreshold    = "1000"
 	defaultProposalQuorumPercentage = uint64(67)
 

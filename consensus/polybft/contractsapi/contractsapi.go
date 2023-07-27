@@ -1697,6 +1697,38 @@ func (i *InitializeNetworkParamsFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NetworkParams.Abi.Methods["initialize"], buf, i)
 }
 
+type SetNewEpochSizeNetworkParamsFn struct {
+	NewEpochSize *big.Int `abi:"newEpochSize"`
+}
+
+func (s *SetNewEpochSizeNetworkParamsFn) Sig() []byte {
+	return NetworkParams.Abi.Methods["setNewEpochSize"].ID()
+}
+
+func (s *SetNewEpochSizeNetworkParamsFn) EncodeAbi() ([]byte, error) {
+	return NetworkParams.Abi.Methods["setNewEpochSize"].Encode(s)
+}
+
+func (s *SetNewEpochSizeNetworkParamsFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NetworkParams.Abi.Methods["setNewEpochSize"], buf, s)
+}
+
+type SetNewSprintSizeNetworkParamsFn struct {
+	NewSprintSize *big.Int `abi:"newSprintSize"`
+}
+
+func (s *SetNewSprintSizeNetworkParamsFn) Sig() []byte {
+	return NetworkParams.Abi.Methods["setNewSprintSize"].ID()
+}
+
+func (s *SetNewSprintSizeNetworkParamsFn) EncodeAbi() ([]byte, error) {
+	return NetworkParams.Abi.Methods["setNewSprintSize"].Encode(s)
+}
+
+func (s *SetNewSprintSizeNetworkParamsFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NetworkParams.Abi.Methods["setNewSprintSize"], buf, s)
+}
+
 type NewCheckpointBlockIntervalEvent struct {
 	CheckpointInterval *big.Int `abi:"checkpointInterval"`
 }
@@ -1970,6 +2002,124 @@ func (i *InitializeChildGovernorFn) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeChildGovernorFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildGovernor.Abi.Methods["initialize"], buf, i)
+}
+
+type ProposeChildGovernorFn struct {
+	Targets     []types.Address `abi:"targets"`
+	Values      []*big.Int      `abi:"values"`
+	Calldatas   [][]byte        `abi:"calldatas"`
+	Description string          `abi:"description"`
+}
+
+func (p *ProposeChildGovernorFn) Sig() []byte {
+	return ChildGovernor.Abi.Methods["propose"].ID()
+}
+
+func (p *ProposeChildGovernorFn) EncodeAbi() ([]byte, error) {
+	return ChildGovernor.Abi.Methods["propose"].Encode(p)
+}
+
+func (p *ProposeChildGovernorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildGovernor.Abi.Methods["propose"], buf, p)
+}
+
+type ExecuteChildGovernorFn struct {
+	Targets         []types.Address `abi:"targets"`
+	Values          []*big.Int      `abi:"values"`
+	Calldatas       [][]byte        `abi:"calldatas"`
+	DescriptionHash types.Hash      `abi:"descriptionHash"`
+}
+
+func (e *ExecuteChildGovernorFn) Sig() []byte {
+	return ChildGovernor.Abi.Methods["execute"].ID()
+}
+
+func (e *ExecuteChildGovernorFn) EncodeAbi() ([]byte, error) {
+	return ChildGovernor.Abi.Methods["execute"].Encode(e)
+}
+
+func (e *ExecuteChildGovernorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildGovernor.Abi.Methods["execute"], buf, e)
+}
+
+type CastVoteChildGovernorFn struct {
+	ProposalID *big.Int `abi:"proposalId"`
+	Support    uint8    `abi:"support"`
+}
+
+func (c *CastVoteChildGovernorFn) Sig() []byte {
+	return ChildGovernor.Abi.Methods["castVote"].ID()
+}
+
+func (c *CastVoteChildGovernorFn) EncodeAbi() ([]byte, error) {
+	return ChildGovernor.Abi.Methods["castVote"].Encode(c)
+}
+
+func (c *CastVoteChildGovernorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildGovernor.Abi.Methods["castVote"], buf, c)
+}
+
+type StateChildGovernorFn struct {
+	ProposalID *big.Int `abi:"proposalId"`
+}
+
+func (s *StateChildGovernorFn) Sig() []byte {
+	return ChildGovernor.Abi.Methods["state"].ID()
+}
+
+func (s *StateChildGovernorFn) EncodeAbi() ([]byte, error) {
+	return ChildGovernor.Abi.Methods["state"].Encode(s)
+}
+
+func (s *StateChildGovernorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildGovernor.Abi.Methods["state"], buf, s)
+}
+
+type QueueChildGovernorFn struct {
+	Targets         []types.Address `abi:"targets"`
+	Values          []*big.Int      `abi:"values"`
+	Calldatas       [][]byte        `abi:"calldatas"`
+	DescriptionHash types.Hash      `abi:"descriptionHash"`
+}
+
+func (q *QueueChildGovernorFn) Sig() []byte {
+	return ChildGovernor.Abi.Methods["queue"].ID()
+}
+
+func (q *QueueChildGovernorFn) EncodeAbi() ([]byte, error) {
+	return ChildGovernor.Abi.Methods["queue"].Encode(q)
+}
+
+func (q *QueueChildGovernorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ChildGovernor.Abi.Methods["queue"], buf, q)
+}
+
+type ProposalCreatedEvent struct {
+	ProposalID  *big.Int        `abi:"proposalId"`
+	Proposer    types.Address   `abi:"proposer"`
+	Targets     []types.Address `abi:"targets"`
+	Values      []*big.Int      `abi:"values"`
+	Signatures  []string        `abi:"signatures"`
+	Calldatas   [][]byte        `abi:"calldatas"`
+	VoteStart   *big.Int        `abi:"voteStart"`
+	VoteEnd     *big.Int        `abi:"voteEnd"`
+	Description string          `abi:"description"`
+}
+
+func (*ProposalCreatedEvent) Sig() ethgo.Hash {
+	return ChildGovernor.Abi.Events["ProposalCreated"].ID()
+}
+
+func (*ProposalCreatedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ChildGovernor.Abi.Events["ProposalCreated"].Inputs.Encode(inputs)
+}
+
+func (p *ProposalCreatedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ChildGovernor.Abi.Events["ProposalCreated"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ChildGovernor.Abi.Events["ProposalCreated"], log, p)
 }
 
 type InitializeChildTimelockFn struct {

@@ -281,7 +281,9 @@ func isNativeRewardToken(cfg PolyBFTConfig) bool {
 func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeNetworkParamsFn{
 		InitParams: &contractsapi.InitParams{
-			NewOwner:                   cfg.GovernanceConfig.GovernorAdmin,
+			// only timelock controller can execute transactions on network params
+			// so we set it as its owner
+			NewOwner:                   contracts.ChildTimelockContract,
 			NewCheckpointBlockInterval: new(big.Int).SetUint64(cfg.CheckpointInterval),
 			NewSprintSize:              new(big.Int).SetUint64(cfg.SprintSize),
 			NewEpochSize:               new(big.Int).SetUint64(cfg.EpochSize),
@@ -309,7 +311,7 @@ func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) 
 // initForkParamsContract initializes ForkParams contract on child chain
 func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeForkParamsFn{
-		NewOwner: cfg.GovernanceConfig.GovernorAdmin,
+		NewOwner: contracts.ChildTimelockContract,
 	}
 
 	input, err := initFn.EncodeAbi()
@@ -323,9 +325,12 @@ func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) err
 
 // initChildTimelock initializes ChildTimelock contract on child chain
 func initChildTimelock(cfg PolyBFTConfig, transition *state.Transition) error {
-	addresses := make([]types.Address, len(cfg.InitialValidatorSet))
+	addresses := make([]types.Address, len(cfg.InitialValidatorSet)+1)
+	// we need to add child governor to list of proposers and executors as well
+	addresses[0] = contracts.ChildGovernorContract
+
 	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
-		addresses[i] = cfg.InitialValidatorSet[i].Address
+		addresses[i+1] = cfg.InitialValidatorSet[i].Address
 	}
 
 	initFn := &contractsapi.InitializeChildTimelockFn{
