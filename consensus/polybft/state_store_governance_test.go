@@ -23,13 +23,14 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	epochSizeEvent := &contractsapi.NewEpochSizeEvent{Size: big.NewInt(10)}
 	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(1000)}
 	minValidatorSetSizeEvent := &contractsapi.NewMinValidatorSetSizeEvent{MinValidatorSet: big.NewInt(4)}
-	maxValidatorSetSizeEvent := &contractsapi.NewMaxValdidatorSetSizeEvent{MaxValidatorSet: big.NewInt(100)}
+	maxValidatorSetSizeEvent := &contractsapi.NewMaxValidatorSetSizeEvent{MaxValidatorSet: big.NewInt(100)}
 	withdrawalPeriodEvent := &contractsapi.NewWithdrawalWaitPeriodEvent{WithdrawalPeriod: big.NewInt(1)}
 	blockTimeEvent := &contractsapi.NewBlockTimeEvent{BlockTime: big.NewInt(2)}
 	blockTimeDriftEvent := &contractsapi.NewBlockTimeDriftEvent{BlockTimeDrift: big.NewInt(10)}
 	votingDelayEvent := &contractsapi.NewVotingDelayEvent{VotingDelay: big.NewInt(1000)}
 	votingPeriodEvent := &contractsapi.NewVotingPeriodEvent{VotingPeriod: big.NewInt(10_000)}
 	proposalThresholdEvent := &contractsapi.NewProposalThresholdEvent{ProposalThreshold: big.NewInt(1000)}
+	sprintSizeEvent := &contractsapi.NewSprintSizeEvent{Size: big.NewInt(7)}
 
 	events := []contractsapi.EventAbi{
 		checkpointIntervalEvent,
@@ -60,6 +61,18 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	lastProcessedBlock, err := state.GovernanceStore.getLastProcessed()
 	require.NoError(t, err)
 	require.Equal(t, block, lastProcessedBlock)
+
+	// insert some more events for current epoch
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(epoch, block+1,
+		[]contractsapi.EventAbi{sprintSizeEvent}))
+
+	eventsRaw, err = state.GovernanceStore.getGovernanceEvents(epoch)
+	require.NoError(t, err)
+	require.Len(t, eventsRaw, len(events)+1)
+
+	lastProcessedBlock, err = state.GovernanceStore.getLastProcessed()
+	require.NoError(t, err)
+	require.Equal(t, block+1, lastProcessedBlock)
 }
 
 func TestGovernanceStore_InsertAndGetClientConfig(t *testing.T) {

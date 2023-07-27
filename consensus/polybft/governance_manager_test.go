@@ -25,6 +25,8 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	// insert some governance event
 	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10_000)}
 	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(1, 7, []contractsapi.EventAbi{epochRewardEvent}))
+	// insert last processed block
+	require.NoError(t, state.GovernanceStore.insertLastProcessed(20))
 
 	// no initial config was saved, so we expect an error
 	require.ErrorIs(t, governanceManager.PostEpoch(&PostEpochRequest{

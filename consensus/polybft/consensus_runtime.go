@@ -554,6 +554,7 @@ func createCommitEpochInput(
 			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
+		EpochSize: new(big.Int).SetUint64(epoch.CurrentClientConfig.EpochSize),
 	}
 }
 
@@ -570,6 +571,9 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 	}
 
 	var (
+		// epoch size is the number of blocks that really happened
+		// because of slashing, epochs might not have the configured number of blocks
+		epochSize     = uint64(0)
 		uptimeCounter = map[types.Address]int64{}
 		blockHeader   = lastFinalizedBlock // start calculating from this block
 	)
@@ -589,6 +593,8 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 		for _, a := range signers.GetAddresses() {
 			uptimeCounter[a]++
 		}
+
+		epochSize++
 
 		return nil
 	}
@@ -668,8 +674,9 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 	}
 
 	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
-		EpochID: new(big.Int).SetUint64(epochID),
-		Uptime:  uptime,
+		EpochID:   new(big.Int).SetUint64(epochID),
+		Uptime:    uptime,
+		EpochSize: new(big.Int).SetUint64(epochSize),
 	}
 
 	return distributeRewards, nil

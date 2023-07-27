@@ -118,9 +118,27 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 	}
 
 	previousEpoch := req.NewEpochID - 1
+	lastInsertedBlock := req.FirstBlockOfEpoch - 1
 
-	g.logger.Info("Post epoch - getting events from executed governance proposals...",
+	g.logger.Debug("Post epoch - getting events from executed governance proposals...",
 		"epoch", previousEpoch)
+
+	// if last PostBlock failed to save events, we need to try to get them again
+	// to have correct configuration at beginning of next epoch
+	lastProcessed, err := g.state.GovernanceStore.getLastProcessed()
+	if err != nil {
+		return err
+	}
+
+	missedEvents, err := g.eventsGetter.getFromBlocksWithToBlock(lastProcessed, lastInsertedBlock)
+	if err != nil {
+		return err
+	}
+
+	if err := g.state.GovernanceStore.insertGovernanceEvents(previousEpoch,
+		lastInsertedBlock, missedEvents); err != nil {
+		return err
+	}
 
 	// get events that happened in the previous epoch
 	eventsRaw, err := g.state.GovernanceStore.getGovernanceEvents(previousEpoch)
@@ -131,7 +149,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 
 	if len(eventsRaw) == 0 {
 		// valid situation, no governance proposals were executed in previous epoch
-		g.logger.Info("Post epoch - no executed governance proposals happened in epoch",
+		g.logger.Debug("Post epoch - no executed governance proposals happened in epoch",
 			"epoch", previousEpoch)
 
 		return nil
@@ -148,13 +166,14 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 		epochSizeEvent           contractsapi.NewEpochSizeEvent
 		epochRewardEvent         contractsapi.NewEpochRewardEvent
 		minValidatorSetSizeEvent contractsapi.NewMinValidatorSetSizeEvent
-		maxValidatorSetSizeEvent contractsapi.NewMaxValdidatorSetSizeEvent
+		maxValidatorSetSizeEvent contractsapi.NewMaxValidatorSetSizeEvent
 		withdrawalPeriodEvent    contractsapi.NewWithdrawalWaitPeriodEvent
 		blockTimeEvent           contractsapi.NewBlockTimeEvent
 		blockTimeDriftEvent      contractsapi.NewBlockTimeDriftEvent
 		votingDelayEvent         contractsapi.NewVotingDelayEvent
 		votingPeriodEvent        contractsapi.NewVotingPeriodEvent
 		proposalThresholdEvent   contractsapi.NewProposalThresholdEvent
+		sprintSizeEvent          contractsapi.NewSprintSizeEvent
 	)
 
 	// unmarshal events that happened in previous epoch and update last saved config
@@ -167,7 +186,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.CheckpointInterval = event.CheckpointInterval.Uint64()
-			g.logger.Info("Post epoch - Checkpoint block interval changed in governance",
+			g.logger.Debug("Post epoch - Checkpoint block interval changed in governance",
 				"epoch", previousEpoch, "checkpointBlockInterval", lastConfig.CheckpointInterval)
 
 		case epochSizeEvent.Sig():
@@ -177,7 +196,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.EpochSize = event.Size.Uint64()
-			g.logger.Info("Post epoch - Epoch size changed in governance",
+			g.logger.Debug("Post epoch - Epoch size changed in governance",
 				"epoch", previousEpoch, "epochSize", lastConfig.EpochSize)
 
 		case epochRewardEvent.Sig():
@@ -187,7 +206,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.EpochReward = event.Reward.Uint64()
-			g.logger.Info("Post epoch - Epoch reward changed in governance",
+			g.logger.Debug("Post epoch - Epoch reward changed in governance",
 				"epoch", previousEpoch, "epochReward", lastConfig.EpochReward)
 
 		case minValidatorSetSizeEvent.Sig():
@@ -197,17 +216,17 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.MinValidatorSetSize = event.MinValidatorSet.Uint64()
-			g.logger.Info("Post epoch - Min validator set size changed in governance",
+			g.logger.Debug("Post epoch - Min validator set size changed in governance",
 				"epoch", previousEpoch, "minValidatorSetSize", lastConfig.MinValidatorSetSize)
 
 		case maxValidatorSetSizeEvent.Sig():
-			event, err := unmarshalGovernanceEvent[*contractsapi.NewMaxValdidatorSetSizeEvent](e)
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewMaxValidatorSetSizeEvent](e)
 			if err != nil {
 				return fmt.Errorf("could not unmarshal NewMaxValdidatorSetSizeEvent: %w", err)
 			}
 
 			lastConfig.MaxValidatorSetSize = event.MaxValidatorSet.Uint64()
-			g.logger.Info("Post epoch - Max validator set size changed in governance",
+			g.logger.Debug("Post epoch - Max validator set size changed in governance",
 				"epoch", previousEpoch, "maxValidatorSetSize", lastConfig.MaxValidatorSetSize)
 
 		case withdrawalPeriodEvent.Sig():
@@ -217,7 +236,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.WithdrawalWaitPeriod = event.WithdrawalPeriod.Uint64()
-			g.logger.Info("Post epoch - Withdrawal wait period changed in governance",
+			g.logger.Debug("Post epoch - Withdrawal wait period changed in governance",
 				"epoch", previousEpoch, "withdrawalWaitPeriod", lastConfig.WithdrawalWaitPeriod)
 
 		case blockTimeEvent.Sig():
@@ -227,7 +246,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.BlockTime = common.Duration{Duration: time.Duration(event.BlockTime.Int64()) * time.Second}
-			g.logger.Info("Post epoch - Block time changed in governance",
+			g.logger.Debug("Post epoch - Block time changed in governance",
 				"epoch", previousEpoch, "blockTime", lastConfig.BlockTime)
 
 		case blockTimeDriftEvent.Sig():
@@ -237,7 +256,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.BlockTimeDrift = event.BlockTimeDrift.Uint64()
-			g.logger.Info("Post epoch - Block time drift changed in governance",
+			g.logger.Debug("Post epoch - Block time drift changed in governance",
 				"epoch", previousEpoch, "blockTimeDrift", lastConfig.BlockTimeDrift)
 
 		case votingDelayEvent.Sig():
@@ -247,7 +266,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.GovernanceConfig.VotingDelay = event.VotingDelay
-			g.logger.Info("Post epoch - Voting delay changed in governance",
+			g.logger.Debug("Post epoch - Voting delay changed in governance",
 				"epoch", previousEpoch, "votingDelay", lastConfig.GovernanceConfig.VotingDelay)
 
 		case votingPeriodEvent.Sig():
@@ -257,7 +276,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.GovernanceConfig.VotingPeriod = event.VotingPeriod
-			g.logger.Info("Post epoch - Voting period changed in governance",
+			g.logger.Debug("Post epoch - Voting period changed in governance",
 				"epoch", previousEpoch, "votingPeriod", lastConfig.GovernanceConfig.VotingPeriod)
 
 		case proposalThresholdEvent.Sig():
@@ -267,8 +286,18 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 			}
 
 			lastConfig.GovernanceConfig.ProposalThreshold = event.ProposalThreshold
-			g.logger.Info("Post epoch - Proposal threshold changed in governance",
+			g.logger.Debug("Post epoch - Proposal threshold changed in governance",
 				"epoch", previousEpoch, "proposalThreshold", lastConfig.GovernanceConfig.ProposalThreshold)
+
+		case sprintSizeEvent.Sig():
+			event, err := unmarshalGovernanceEvent[*contractsapi.NewSprintSizeEvent](e)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal NewSprintSizeEvent: %w", err)
+			}
+
+			lastConfig.SprintSize = event.Size.Uint64()
+			g.logger.Debug("Post epoch - Sprint size changed in governance",
+				"epoch", previousEpoch, "sprintSize", lastConfig.SprintSize)
 
 		default:
 			return errUnknownGovernanceEvent
@@ -292,7 +321,7 @@ func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for governance events. Error: %w", err)
 	}
 
-	g.logger.Info("Post block - Getting governance events...", "epoch", req.Epoch,
+	g.logger.Debug("Post block - Getting governance events...", "epoch", req.Epoch,
 		"block", req.FullBlock.Block.Number(), "lastGottenBlock", lastBlock)
 
 	governanceEvents, err := g.eventsGetter.getFromBlocks(lastBlock, req.FullBlock)
@@ -302,16 +331,17 @@ func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
 
 	numOfEvents := len(governanceEvents)
 	if numOfEvents == 0 {
-		g.logger.Info("Post block - Getting governance events finished, no events found.",
+		g.logger.Debug("Post block - Getting governance events finished, no events found.",
 			"epoch", req.Epoch, "block", req.FullBlock.Block.Number(), "lastGottenBlock", lastBlock)
 
 		// even if there were no governance events in block, mark it as last processed
 		return g.state.GovernanceStore.insertLastProcessed(req.FullBlock.Block.Number())
 	}
 
-	g.logger.Info("Post block - Getting governance events done.", "epoch", req.Epoch,
+	g.logger.Debug("Post block - Getting governance events done.", "epoch", req.Epoch,
 		"block", req.FullBlock.Block.Number(), "eventsNum", numOfEvents)
 
+	// this will also update the last processed block
 	return g.state.GovernanceStore.insertGovernanceEvents(
 		req.Epoch,
 		req.FullBlock.Block.Number(),
@@ -325,13 +355,14 @@ func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAb
 		epochSizeEvent           contractsapi.NewEpochSizeEvent
 		epochRewardEvent         contractsapi.NewEpochRewardEvent
 		minValidatorSetSizeEvent contractsapi.NewMinValidatorSetSizeEvent
-		maxValidatorSetSizeEvent contractsapi.NewMaxValdidatorSetSizeEvent
+		maxValidatorSetSizeEvent contractsapi.NewMaxValidatorSetSizeEvent
 		withdrawalPeriodEvent    contractsapi.NewWithdrawalWaitPeriodEvent
 		blockTimeEvent           contractsapi.NewBlockTimeEvent
 		blockTimeDriftEvent      contractsapi.NewBlockTimeDriftEvent
 		votingDelayEvent         contractsapi.NewVotingDelayEvent
 		votingPeriodEvent        contractsapi.NewVotingPeriodEvent
 		proposalThresholdEvent   contractsapi.NewProposalThresholdEvent
+		sprintSizeEvent          contractsapi.NewSprintSizeEvent
 	)
 
 	parseEvent := func(event contractsapi.EventAbi) (contractsapi.EventAbi, bool, error) {
@@ -363,6 +394,8 @@ func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAb
 		return parseEvent(&votingPeriodEvent)
 	case proposalThresholdEvent.Sig():
 		return parseEvent(&proposalThresholdEvent)
+	case sprintSizeEvent.Sig():
+		return parseEvent(&sprintSizeEvent)
 	default:
 		return nil, false, errUnknownGovernanceEvent
 	}

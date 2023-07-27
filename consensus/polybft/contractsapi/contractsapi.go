@@ -1454,8 +1454,9 @@ func (e *Epoch) DecodeAbi(buf []byte) error {
 }
 
 type CommitEpochValidatorSetFn struct {
-	ID    *big.Int `abi:"id"`
-	Epoch *Epoch   `abi:"epoch"`
+	ID        *big.Int `abi:"id"`
+	Epoch     *Epoch   `abi:"epoch"`
+	EpochSize *big.Int `abi:"epochSize"`
 }
 
 func (c *CommitEpochValidatorSetFn) Sig() []byte {
@@ -1620,8 +1621,9 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 }
 
 type DistributeRewardForRewardPoolFn struct {
-	EpochID *big.Int  `abi:"epochId"`
-	Uptime  []*Uptime `abi:"uptime"`
+	EpochID   *big.Int  `abi:"epochId"`
+	Uptime    []*Uptime `abi:"uptime"`
+	EpochSize *big.Int  `abi:"epochSize"`
 }
 
 func (d *DistributeRewardForRewardPoolFn) Sig() []byte {
@@ -1658,6 +1660,7 @@ type InitParams struct {
 	NewCheckpointBlockInterval *big.Int      `abi:"newCheckpointBlockInterval"`
 	NewEpochSize               *big.Int      `abi:"newEpochSize"`
 	NewEpochReward             *big.Int      `abi:"newEpochReward"`
+	NewSprintSize              *big.Int      `abi:"newSprintSize"`
 	NewMinValidatorSetSize     *big.Int      `abi:"newMinValidatorSetSize"`
 	NewMaxValidatorSetSize     *big.Int      `abi:"newMaxValidatorSetSize"`
 	NewWithdrawalWaitPeriod    *big.Int      `abi:"newWithdrawalWaitPeriod"`
@@ -1668,7 +1671,7 @@ type InitParams struct {
 	NewProposalThreshold       *big.Int      `abi:"newProposalThreshold"`
 }
 
-var InitParamsABIType = abi.MustNewType("tuple(address newOwner,uint256 newCheckpointBlockInterval,uint256 newEpochSize,uint256 newEpochReward,uint256 newMinValidatorSetSize,uint256 newMaxValidatorSetSize,uint256 newWithdrawalWaitPeriod,uint256 newBlockTime,uint256 newBlockTimeDrift,uint256 newVotingDelay,uint256 newVotingPeriod,uint256 newProposalThreshold)")
+var InitParamsABIType = abi.MustNewType("tuple(address newOwner,uint256 newCheckpointBlockInterval,uint256 newEpochSize,uint256 newEpochReward,uint256 newSprintSize,uint256 newMinValidatorSetSize,uint256 newMaxValidatorSetSize,uint256 newWithdrawalWaitPeriod,uint256 newBlockTime,uint256 newBlockTimeDrift,uint256 newVotingDelay,uint256 newVotingPeriod,uint256 newProposalThreshold)")
 
 func (i *InitParams) EncodeAbi() ([]byte, error) {
 	return InitParamsABIType.Encode(i)
@@ -1774,24 +1777,24 @@ func (n *NewMinValidatorSetSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(NetworkParams.Abi.Events["NewMinValidatorSetSize"], log, n)
 }
 
-type NewMaxValdidatorSetSizeEvent struct {
+type NewMaxValidatorSetSizeEvent struct {
 	MaxValidatorSet *big.Int `abi:"maxValidatorSet"`
 }
 
-func (*NewMaxValdidatorSetSizeEvent) Sig() ethgo.Hash {
-	return NetworkParams.Abi.Events["NewMaxValdidatorSetSize"].ID()
+func (*NewMaxValidatorSetSizeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewMaxValidatorSetSize"].ID()
 }
 
-func (*NewMaxValdidatorSetSizeEvent) Encode(inputs interface{}) ([]byte, error) {
-	return NetworkParams.Abi.Events["NewMaxValdidatorSetSize"].Inputs.Encode(inputs)
+func (*NewMaxValidatorSetSizeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewMaxValidatorSetSize"].Inputs.Encode(inputs)
 }
 
-func (n *NewMaxValdidatorSetSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	if !NetworkParams.Abi.Events["NewMaxValdidatorSetSize"].Match(log) {
+func (n *NewMaxValidatorSetSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewMaxValidatorSetSize"].Match(log) {
 		return false, nil
 	}
 
-	return true, decodeEvent(NetworkParams.Abi.Events["NewMaxValdidatorSetSize"], log, n)
+	return true, decodeEvent(NetworkParams.Abi.Events["NewMaxValidatorSetSize"], log, n)
 }
 
 type NewWithdrawalWaitPeriodEvent struct {
@@ -1912,6 +1915,26 @@ func (n *NewProposalThresholdEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(NetworkParams.Abi.Events["NewProposalThreshold"], log, n)
+}
+
+type NewSprintSizeEvent struct {
+	Size *big.Int `abi:"size"`
+}
+
+func (*NewSprintSizeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewSprintSize"].ID()
+}
+
+func (*NewSprintSizeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewSprintSize"].Inputs.Encode(inputs)
+}
+
+func (n *NewSprintSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewSprintSize"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewSprintSize"], log, n)
 }
 
 type InitializeForkParamsFn struct {
