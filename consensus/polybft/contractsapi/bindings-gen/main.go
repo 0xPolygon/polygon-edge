@@ -146,15 +146,6 @@ func main() {
 			[]string{},
 		},
 		{
-			"ChildERC20",
-			gensc.ChildERC20,
-			false,
-			[]string{
-				"balanceOf",
-			},
-			[]string{},
-		},
-		{
 			"RootERC20Predicate",
 			gensc.RootERC20Predicate,
 			false,
