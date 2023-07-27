@@ -398,10 +398,8 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
 
-		currentEpoch := currentExtra.Checkpoint.EpochNumber
-
 		require.NoError(t, waitForRootchainEpoch(
-			currentEpoch,
+			currentExtra.Checkpoint.EpochNumber+1,
 			3*time.Minute,
 			rootchainTxRelayer,
 			polybftCfg.Bridge.CheckpointManagerAddr,
