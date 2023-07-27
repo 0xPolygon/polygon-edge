@@ -37,7 +37,7 @@ var (
 
 // txPoolInterface is an abstraction of transaction pool
 type txPoolInterface interface {
-	Prepare(uint64)
+	Prepare()
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(*types.Transaction)

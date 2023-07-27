@@ -179,8 +179,6 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	}
 
 	// calculate base fee
-	baseFee := i.blockchain.CalculateBaseFee(parent)
-
 	header.GasLimit = gasLimit
 
 	if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
@@ -209,7 +207,6 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 
 	txs := i.writeTransactions(
 		writeCtx,
-		baseFee,
 		gasLimit,
 		header.Number,
 		transition,
@@ -297,7 +294,6 @@ type transitionInterface interface {
 
 func (i *backendIBFT) writeTransactions(
 	writeCtx context.Context,
-	baseFee,
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
@@ -324,7 +320,7 @@ func (i *backendIBFT) writeTransactions(
 		)
 	}()
 
-	i.txpool.Prepare(baseFee)
+	i.txpool.Prepare()
 
 write:
 	for {

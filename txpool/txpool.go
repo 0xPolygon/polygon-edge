@@ -90,6 +90,7 @@ type store interface {
 	GetNonce(root types.Hash, addr types.Address) uint64
 	GetBalance(root types.Hash, addr types.Address) (*big.Int, error)
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
+	CalculateBaseFee(parent *types.Header) uint64
 }
 
 type signer interface {
@@ -331,15 +332,12 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 
 // Prepare generates all the transactions
 // ready for execution. (primaries)
-func (p *TxPool) Prepare(baseFee uint64) {
-	// set base fee
-	atomic.StoreUint64(&p.baseFee, baseFee)
-
+func (p *TxPool) Prepare() {
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
 
 	// create new executables queue with base fee and initial transactions (primaries)
-	p.executables = newPricesQueue(baseFee, primaries)
+	p.executables = newPricesQueue(p.GetBaseFee(), primaries)
 }
 
 // Peek returns the best-price selected
@@ -532,6 +530,11 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 	}
 
+	// update base fee
+	if ln := len(event.NewChain); ln > 0 {
+		p.SetBaseFee(event.NewChain[ln-1])
+	}
+
 	// reset accounts with the new state
 	p.resetAccounts(stateNonces)
 
@@ -596,6 +599,13 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return runtime.ErrMaxCodeSizeExceeded
 	}
 
+	// Grab the state root, current block number and block gas limit for the latest block
+	currentHeader := p.store.Header()
+	stateRoot := currentHeader.StateRoot
+	currentBlockNumber := currentHeader.Number
+	latestBlockGasLimit := currentHeader.GasLimit
+	baseFee := p.GetBaseFee() // base fee is calculated for the next block
+
 	if tx.Type == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
 		if !p.forks.London {
@@ -606,7 +616,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
 		blockNumber, err := forkmanager.GetInstance().GetForkBlock(chain.TxHashWithType)
-		if err == nil && blockNumber > p.store.Header().Number {
+		if err == nil && blockNumber > currentBlockNumber {
 			metrics.IncrCounter([]string{txPoolMetrics, "dynamic_tx_not_allowed"}, 1)
 
 			return ErrDynamicTxNotAllowed
@@ -638,22 +648,19 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 
 		// Reject underpriced transactions
-		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
+		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(baseFee)) < 0 {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
 			return ErrUnderpriced
 		}
 	} else {
 		// Legacy approach to check if the given tx is not underpriced
-		if tx.GetGasPrice(p.GetBaseFee()).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+		if tx.GetGasPrice(baseFee).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
 			return ErrUnderpriced
 		}
 	}
-
-	// Grab the state root for the latest block
-	stateRoot := p.store.Header().StateRoot
 
 	// Check nonce ordering
 	if p.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
@@ -689,9 +696,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 		return ErrIntrinsicGas
 	}
-
-	// Grab the block gas limit for the latest block
-	latestBlockGasLimit := p.store.Header().GasLimit
 
 	if tx.Gas > latestBlockGasLimit {
 		metrics.IncrCounter([]string{txPoolMetrics, "block_gas_limit_exceeded_tx"}, 1)

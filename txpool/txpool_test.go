@@ -1769,7 +1769,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare(0)
+	pool.Prepare()
 	tx := pool.Peek()
 	pool.Pop(tx)
 
@@ -1803,7 +1803,7 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare(0)
+	pool.Prepare()
 	tx := pool.Peek()
 	pool.Drop(tx)
 	assert.Equal(t, tx1, tx)
@@ -1838,7 +1838,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
-		pool.Prepare(0)
+		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -1872,7 +1872,7 @@ func TestDemote(t *testing.T) {
 		pool.accounts.get(addr1).demotions = maxAccountDemotions
 
 		// call demote
-		pool.Prepare(0)
+		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -2027,11 +2027,15 @@ func Test_TxPool_validateTx(t *testing.T) {
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
 	setupPool := func() *TxPool {
-		pool, err := newTestPool()
+		header := mockHeader.Copy()
+		header.BaseFee = 1000
+
+		pool, err := newTestPool(NewDefaultMockStore(header))
 		if err != nil {
 			t.Fatalf("cannot create txpool - err: %v\n", err)
 		}
 
+		pool.SetBaseFee(header)
 		pool.SetSigner(signer)
 
 		return pool
@@ -2088,7 +2092,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2102,7 +2105,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2119,7 +2121,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2136,7 +2137,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		// undefined gas tip cap
 		tx := newTx(defaultAddr, 0, 1)
@@ -2170,7 +2170,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		bitLength := 512
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		// very high gas fee cap
 		tx := newTx(defaultAddr, 0, 1)
@@ -2781,7 +2780,7 @@ func TestExecutablesOrder(t *testing.T) {
 			require.Len(t, waitForEvents(ctx, subscription, expectedPromotedTx), expectedPromotedTx)
 			require.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
 
-			pool.Prepare(1000)
+			pool.Prepare()
 
 			var successful []*types.Transaction
 			for {
@@ -2984,7 +2983,7 @@ func TestRecovery(t *testing.T) {
 			assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
 
 			func() {
-				pool.Prepare(0)
+				pool.Prepare()
 				for {
 					tx := pool.Peek()
 					if tx == nil {
@@ -3453,6 +3452,53 @@ func TestAddTxsInOrder(t *testing.T) {
 		assert.Equal(t, uint64(0), acc.enqueued.length())
 		assert.Equal(t, len(acc.nonceToTx.mapping), int(acc.promoted.length()))
 	}
+}
+
+func TestResetWithHeadersSetsBaseFee(t *testing.T) {
+	t.Parallel()
+
+	blocks := []*types.Block{
+		{
+			Header: &types.Header{
+				BaseFee: 100,
+				Hash:    types.Hash{1},
+			},
+		},
+		{
+			Header: &types.Header{
+				BaseFee: 1000,
+				Hash:    types.Hash{1},
+			},
+		},
+		{
+			Header: &types.Header{
+				BaseFee: 2000,
+				Hash:    types.Hash{2},
+			},
+		},
+	}
+
+	store := NewDefaultMockStore(blocks[0].Header)
+	store.getBlockByHashFn = func(h types.Hash, b bool) (*types.Block, bool) {
+		for _, b := range blocks {
+			if b.Header.Hash == h {
+				return b, true
+			}
+		}
+
+		return nil, false
+	}
+
+	pool, err := newTestPool(store)
+	require.NoError(t, err)
+
+	pool.SetBaseFee(blocks[0].Header)
+
+	pool.ResetWithHeaders()
+	assert.Equal(t, blocks[0].Header.BaseFee, pool.GetBaseFee())
+
+	pool.ResetWithHeaders(blocks[len(blocks)-2].Header, blocks[len(blocks)-1].Header)
+	assert.Equal(t, blocks[len(blocks)-1].Header.BaseFee, pool.GetBaseFee())
 }
 
 func BenchmarkAddTxTime(b *testing.B) {
