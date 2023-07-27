@@ -355,14 +355,13 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		checkStateSyncResultLogs(t, logs, transfersCount+1)
 
 		// retrieve child token address
-		rootToChildTokenFn := contractsapi.ChildERC20Predicate.Abi.Methods["rootTokenToChildToken"]
-		input, err := rootToChildTokenFn.Encode([]interface{}{rootTokenAddr})
-		require.NoError(t, err)
-
-		childTokenRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC20PredicateContract), input)
-		require.NoError(t, err)
-
-		childTokenAddr := types.StringToAddress(childTokenRaw)
+		childTokenAddr := getChildToken(
+			t,
+			contractsapi.ChildERC20Predicate.Abi,
+			contracts.ChildERC20PredicateContract,
+			types.Address(rootTokenAddr),
+			childchainTxRelayer,
+		)
 
 		t.Log("Childchain token address:", childTokenAddr)
 
