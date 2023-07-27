@@ -307,10 +307,11 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		receipt, err := rootchainTxRelayer.SendTransaction(txn, rootchainDeployer)
 		require.NoError(t, err)
 		require.NotNil(t, receipt)
+		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
 
-		contractAddress := receipt.ContractAddress
+		rootTokenAddr := receipt.ContractAddress
 
-		t.Log("Rootchain token address:", contractAddress)
+		t.Log("Rootchain token address:", rootTokenAddr)
 
 		// wait for next sprint block as the starting point,
 		// in order to be able to make assertions against blocks offsetted by sprints
@@ -328,7 +329,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// send a few transactions to the bridge
 		require.NoError(t, cluster.Bridge.Deposit(
 			common.ERC20,
-			types.Address(contractAddress),
+			types.Address(rootTokenAddr),
 			polybftCfg.Bridge.RootERC20PredicateAddr,
 			rootHelper.TestAccountPrivKey,
 			strings.Join(receivers[:], ","),
@@ -350,12 +351,12 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(t, err)
 
 		// assert that all deposits are executed successfully
-		// deposit transaction only
+		// map token action is executed along with the first deposit transaction
 		checkStateSyncResultLogs(t, logs, transfersCount+1)
 
 		// retrieve child token address
 		rootToChildTokenFn := contractsapi.ChildERC20Predicate.Abi.Methods["rootTokenToChildToken"]
-		input, err := rootToChildTokenFn.Encode([]interface{}{contractAddress})
+		input, err := rootToChildTokenFn.Encode([]interface{}{rootTokenAddr})
 		require.NoError(t, err)
 
 		childTokenRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildERC20PredicateContract), input)
@@ -367,19 +368,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		// check receivers balances got increased by deposited amount
 		for _, receiver := range receiversAddrs {
-			balanceOfFn := &contractsapi.BalanceOfChildERC20Fn{Account: receiver}
-
-			balanceInput, err := balanceOfFn.EncodeAbi()
-			require.NoError(t, err)
-
-			balanceRaw, err := childchainTxRelayer.Call(ethgo.ZeroAddress, ethgo.Address(childTokenAddr), balanceInput)
-			require.NoError(t, err)
-
-			balance, err := types.ParseUint256orHex(&balanceRaw)
-			require.NoError(t, err)
-
-			t.Log("Balance:", balance)
-
+			balance := erc20BalanceOf(t, receiver, childTokenAddr, childchainTxRelayer)
 			require.Equal(t, big.NewInt(int64(amount)), balance)
 		}
 
@@ -431,15 +420,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		// assert that receiver's balances on RootERC20 smart contract are expected
 		for _, receiver := range receivers {
-			balanceOfFn := &contractsapi.BalanceOfRootERC20Fn{Account: types.StringToAddress(receiver)}
-			balanceInput, err := balanceOfFn.EncodeAbi()
-			require.NoError(t, err)
-
-			balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, contractAddress, balanceInput)
-			require.NoError(t, err)
-
-			balance, err := types.ParseUint256orHex(&balanceRaw)
-			require.NoError(t, err)
+			balance := erc20BalanceOf(t, types.StringToAddress(receiver), types.Address(rootTokenAddr), rootchainTxRelayer)
 			require.Equal(t, big.NewInt(amount), balance)
 		}
 	})
