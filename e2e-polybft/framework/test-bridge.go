@@ -229,8 +229,7 @@ func (t *TestBridge) Withdraw(token bridgeCommon.TokenType,
 			"--sender-key", senderKey,
 			"--receivers", receivers,
 			"--amounts", amounts,
-			"--json-rpc", jsonRPCAddr,
-			"--child-token", childToken.String())
+			"--json-rpc", jsonRPCAddr)
 
 		if childChainMintable {
 			args = append(args, "--child-chain-mintable")
