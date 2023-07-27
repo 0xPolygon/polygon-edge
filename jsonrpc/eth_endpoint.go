@@ -107,8 +107,9 @@ type Eth struct {
 var (
 	ErrInsufficientFunds = errors.New("insufficient funds for execution")
 	//Empty code hash is 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
-	EmptyCodeHash = hex.EncodeToHex([]byte{197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125,
-		178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112})
+	EmptyCodeHashBytes = []byte{197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125,
+		178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112}
+	EmptyCodeHash = hex.EncodeToHex(EmptyCodeHashBytes)
 )
 
 // ChainId returns the chain id of the client
@@ -922,7 +923,15 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 		// Get the full account nonce, balance, state root and code hash of the state before this
 		// block is executed
 		acc, err := e.store.GetAccount(previousHeader.StateRoot, accountAddress)
-		if err != nil {
+		if errors.Is(err, ErrStateNotFound) {
+			// Account used for the first time, not yet in storage
+			acc = &Account{
+				Nonce:    0,
+				Balance:  big.NewInt(0),
+				Root:     types.Hash{},
+				CodeHash: EmptyCodeHashBytes, // Empty code hash
+			}
+		} else if err != nil {
 			return nil, err
 		}
 

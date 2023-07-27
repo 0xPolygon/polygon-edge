@@ -48,7 +48,9 @@ func ParseBlockAccounts(block *types.Block) ([]string, error) {
 	var accounts = make([]string, 0)
 	for _, tx := range block.Transactions {
 		accounts = append(accounts, tx.From.String())
-		accounts = append(accounts, (*tx.To).String())
+		if tx.To != nil {
+			accounts = append(accounts, (*tx.To).String())
+		}
 	}
 
 	return accounts, nil
