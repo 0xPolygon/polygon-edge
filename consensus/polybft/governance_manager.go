@@ -78,7 +78,7 @@ type governanceManager struct {
 }
 
 // newGovernanceManager is a constructor function for governance manager
-func newGovernanceManager(initialConfig *PolyBFTConfig,
+func newGovernanceManager(genesisConfig *PolyBFTConfig,
 	logger hclog.Logger,
 	state *State,
 	blockhain blockchainBackend) (*governanceManager, error) {
@@ -93,7 +93,7 @@ func newGovernanceManager(initialConfig *PolyBFTConfig,
 	config, err := state.GovernanceStore.getClientConfig()
 	if config == nil || errors.Is(err, errClientConfigNotFound) {
 		// insert initial config to db if not already inserted
-		if err = state.GovernanceStore.insertClientConfig(initialConfig); err != nil {
+		if err = state.GovernanceStore.insertClientConfig(genesisConfig); err != nil {
 			return nil, err
 		}
 	}

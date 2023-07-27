@@ -701,9 +701,7 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	currentConfig := p.runtime.getCurrentClientConfig()
-
-	return p.verifyHeaderImpl(parent, header, currentConfig.BlockTimeDrift, nil)
+	return p.verifyHeaderImpl(parent, header, p.runtime.getCurrentBlockTimeDrift(), nil)
 }
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift uint64, parents []*types.Header) error {

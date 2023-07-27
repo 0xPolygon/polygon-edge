@@ -257,7 +257,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 func (c *consensusRuntime) initGovernanceManager(logger hcf.Logger) error {
 	governanceManager, err := newGovernanceManager(
 		c.config.GenesisPolyBFTConfig, // this is config from genesis file
-		logger.Named("state-sync-manager"),
+		logger.Named("governance-manager"),
 		c.state,
 		c.config.blockchain,
 	)
@@ -1040,16 +1040,12 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	return firstBlockInEpoch, nil
 }
 
-// getCurrentClientConfig returns current client config
-func (c *consensusRuntime) getCurrentClientConfig() *PolyBFTConfig {
+// getCurrentBlockTimeDrift returns current block time drift
+func (c *consensusRuntime) getCurrentBlockTimeDrift() uint64 {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	// just do a shallow copy
-	config := new(PolyBFTConfig)
-	*config = *c.epoch.CurrentClientConfig
-
-	return config
+	return c.epoch.CurrentClientConfig.BlockTimeDrift
 }
 
 // getSealersForBlock checks who sealed a given block and updates the counter
