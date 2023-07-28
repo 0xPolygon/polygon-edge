@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -55,7 +54,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		closeCh:     make(chan struct{}),
 		logger:      logger,
 		txPool:      params.TxPool,
-		msgHandlers: []IBFTMessageHandler{slashing.NewDoubleSigningTracker()},
+		msgHandlers: []IBFTMessageHandler{},
 	}
 
 	// initialize polybft consensus config
@@ -552,6 +551,8 @@ func (p *Polybft) initRuntime() error {
 	}
 
 	p.runtime = runtime
+	// register double signing tracker as IBFT messages handler
+	p.msgHandlers = append(p.msgHandlers, runtime.doubleSigningTracker)
 
 	return nil
 }

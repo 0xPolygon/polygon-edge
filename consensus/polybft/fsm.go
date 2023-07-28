@@ -391,24 +391,19 @@ func (f *fsm) Validate(proposal []byte) error {
 
 // ValidateSender validates sender address and signature
 func (f *fsm) ValidateSender(msg *proto.Message) error {
-	msgNoSig, err := msg.PayloadNoSig()
+	signerAddress, err := wallet.RecoverSignerFromIBFTMessage(msg)
 	if err != nil {
 		return err
 	}
 
-	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
-	if err != nil {
-		return fmt.Errorf("failed to recover address from signature: %w", err)
-	}
-
 	// verify the signature came from the sender
 	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
-		return fmt.Errorf("signer address %s doesn't match From field", signerAddress.String())
+		return fmt.Errorf("signer address %s doesn't match From field", signerAddress)
 	}
 
 	// verify the sender is in the active validator set
 	if !f.validators.Includes(signerAddress) {
-		return fmt.Errorf("signer address %s is not included in validator set", signerAddress.String())
+		return fmt.Errorf("signer address %s is not included in validator set", signerAddress)
 	}
 
 	return nil
