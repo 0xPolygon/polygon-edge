@@ -11,6 +11,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -117,6 +118,9 @@ type consensusRuntime struct {
 	// manager for handling validator stake change and updating validator set
 	stakeManager StakeManager
 
+	// doubleSigningTracker tracks IBFT messages and detects double signing
+	doubleSigningTracker slashing.DoubleSigningTracker
+
 	// logger instance
 	logger hcf.Logger
 }
@@ -128,12 +132,14 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
 	}
 
+	logger := log.Named("consensus_runtime")
 	runtime := &consensusRuntime{
-		state:              config.State,
-		config:             config,
-		lastBuiltBlock:     config.blockchain.CurrentHeader(),
-		proposerCalculator: proposerCalculator,
-		logger:             log.Named("consensus_runtime"),
+		state:                config.State,
+		config:               config,
+		lastBuiltBlock:       config.blockchain.CurrentHeader(),
+		proposerCalculator:   proposerCalculator,
+		logger:               logger,
+		doubleSigningTracker: slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker")),
 	}
 
 	if err := runtime.initStateSyncManager(log); err != nil {
