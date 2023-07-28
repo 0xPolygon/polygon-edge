@@ -17,7 +17,7 @@ Running `polygon-edge` from local binary can be done very easily by using provid
 ## Customisation
 Use `scripts/cluster` script to customize chain parameters.   
 It already has some default parameters, which can be easily modified.
-These are the `genesis` parameters from the official [docs](https://wiki.polygon.technology/docs/edge/get-started/cli-commands#genesis-flags).
+These are the `genesis` parameters from the official [docs](https://wiki.polygon.technology/docs/supernets/operate/supernets-param-reference).
 
 Primarily, the `--premine` parameter needs to be edited (`createGenesis` function) to include the accounts that the user has access to.
 
