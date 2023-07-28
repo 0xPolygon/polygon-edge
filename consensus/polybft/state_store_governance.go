@@ -12,11 +12,11 @@ import (
 )
 
 var (
-	governanceEventsBucket              = []byte("governanceEvents")
-	clientConfigBucket                  = []byte("clientConfig")
-	clientConfigKey                     = []byte("clientConfigKey")
-	lastProcessedGovernanceEventsBucket = []byte("lastProcessedGovernanceEvents")
-	lastProcessedGovernanceBlockKey     = []byte("lastProcessedGovernanceBlockKey")
+	governanceEventsBucket             = []byte("governanceEvents")
+	clientConfigBucket                 = []byte("clientConfig")
+	clientConfigKey                    = []byte("clientConfigKey")
+	lastProcessedGovernanceBlockBucket = []byte("lastProcessedGovernanceBlock")
+	lastProcessedGovernanceBlockKey    = []byte("lastProcessedGovernanceBlockKey")
 
 	errNoLastProcessedGovernanceBlock = errors.New("no last processed block for governance in db")
 	errClientConfigNotFound           = errors.New("client (polybft) config not found in db")
@@ -28,6 +28,8 @@ type eventsRaw [][]byte
 //
 // governance events/
 // |--> epoch -> slice of contractsapi.EventAbi
+// |--> clientConfigKey -> *PolyBFTConfig
+// |--> lastProcessedGovernanceBlockKey -> blockNumber
 type GovernanceStore struct {
 	db *bolt.DB
 }
@@ -39,21 +41,19 @@ func (g *GovernanceStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(governanceEventsBucket), err)
 	}
 
-	_, err = tx.CreateBucketIfNotExists(clientConfigBucket)
-	if err != nil {
+	if _, err = tx.CreateBucketIfNotExists(clientConfigBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w",
 			string(clientConfigBucket), err)
 	}
 
-	_, err = tx.CreateBucketIfNotExists(lastProcessedGovernanceEventsBucket)
-	if err != nil {
+	if _, err = tx.CreateBucketIfNotExists(lastProcessedGovernanceBlockBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w",
-			string(lastProcessedGovernanceEventsBucket), err)
+			string(lastProcessedGovernanceBlockBucket), err)
 	}
 
-	if val := tx.Bucket(lastProcessedGovernanceEventsBucket).Get(
+	if val := tx.Bucket(lastProcessedGovernanceBlockBucket).Get(
 		lastProcessedGovernanceBlockKey); val == nil {
-		return tx.Bucket(lastProcessedGovernanceEventsBucket).Put(
+		return tx.Bucket(lastProcessedGovernanceBlockBucket).Put(
 			lastProcessedGovernanceBlockKey, common.EncodeUint64ToBytes(0))
 	}
 
@@ -95,7 +95,7 @@ func (g *GovernanceStore) insertGovernanceEvents(epoch, block uint64, events []c
 		}
 
 		// update the last processed block
-		return tx.Bucket(lastProcessedGovernanceEventsBucket).Put(
+		return tx.Bucket(lastProcessedGovernanceBlockBucket).Put(
 			lastProcessedGovernanceBlockKey, common.EncodeUint64ToBytes(block))
 	})
 }
@@ -120,7 +120,7 @@ func (g *GovernanceStore) getGovernanceEvents(epoch uint64) (eventsRaw, error) {
 // insertLastProcessed inserts last processed block for governance events
 func (g *GovernanceStore) insertLastProcessed(blockNumber uint64) error {
 	return g.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(lastProcessedGovernanceEventsBucket).Put(
+		return tx.Bucket(lastProcessedGovernanceBlockBucket).Put(
 			lastProcessedGovernanceBlockKey, common.EncodeUint64ToBytes(blockNumber))
 	})
 }
@@ -130,7 +130,7 @@ func (g *GovernanceStore) getLastProcessed() (uint64, error) {
 	var lastProcessedBlock uint64
 
 	err := g.db.View(func(tx *bolt.Tx) error {
-		val := tx.Bucket(lastProcessedGovernanceEventsBucket).Get(lastProcessedGovernanceBlockKey)
+		val := tx.Bucket(lastProcessedGovernanceBlockBucket).Get(lastProcessedGovernanceBlockKey)
 		if val == nil {
 			return errNoLastProcessedGovernanceBlock
 		}

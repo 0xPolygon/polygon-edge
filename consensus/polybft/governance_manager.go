@@ -96,6 +96,8 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 		if err = state.GovernanceStore.insertClientConfig(genesisConfig); err != nil {
 			return nil, err
 		}
+	} else if err != nil {
+		return nil, err
 	}
 
 	return &governanceManager{
@@ -178,7 +180,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 
 	// unmarshal events that happened in previous epoch and update last saved config
 	for _, e := range eventsRaw {
-		switch ethgo.Hash(e[:32]) {
+		switch ethgo.Hash(e[:types.HashLength]) {
 		case checkpointIntervalEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewCheckpointBlockIntervalEvent](e)
 			if err != nil {
@@ -405,7 +407,7 @@ func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAb
 func unmarshalGovernanceEvent[T contractsapi.EventAbi](rawEvent []byte) (T, error) {
 	var event T
 
-	err := json.Unmarshal(rawEvent[32:], &event)
+	err := json.Unmarshal(rawEvent[types.HashLength:], &event)
 
 	return event, err
 }

@@ -256,7 +256,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 // initGovernanceManager initializes governance manager
 func (c *consensusRuntime) initGovernanceManager(logger hcf.Logger) error {
 	governanceManager, err := newGovernanceManager(
-		c.config.GenesisPolyBFTConfig, // this is config from genesis file
+		c.config.GenesisPolyBFTConfig,
 		logger.Named("governance-manager"),
 		c.state,
 		c.config.blockchain,
