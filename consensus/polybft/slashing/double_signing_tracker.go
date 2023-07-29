@@ -3,7 +3,6 @@ package slashing
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -38,11 +37,8 @@ type Messages struct {
 	mux     sync.RWMutex
 }
 
-// getSenderMsgs returns commit messages for given height, round and sender
-func (m *Messages) getSenderMsgs(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
-	m.mux.RLock()
-	defer m.mux.RUnlock()
-
+// getSenderMsgsLocked returns commit messages for given height, round and sender
+func (m *Messages) getSenderMsgsLocked(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
 	if roundMsgs, ok := m.content[view.Height]; ok {
 		if senderMsgsMap, ok := roundMsgs[view.Round]; ok {
 			return senderMsgsMap[sender]
@@ -67,7 +63,7 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
 	}
 
-	msgs := m.getSenderMsgs(msg.View, sender)
+	msgs := m.getSenderMsgsLocked(msg.View, sender)
 	if msgs == nil {
 		msgs = []*ibftProto.Message{msg}
 	} else {
@@ -194,7 +190,7 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 
 	signer, err := wallet.RecoverSignerFromIBFTMessage(msg)
 	if err != nil {
-		return fmt.Errorf("failed to recover signer from IBFT message: %w", err)
+		return err
 	}
 
 	// ignore messages where signer and sender are not the same
