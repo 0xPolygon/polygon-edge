@@ -2,6 +2,9 @@ package slashing
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
+	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
@@ -10,7 +13,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+var (
+	errViewUndefined           = errors.New("view is undefined")
+	errInvalidMsgType          = errors.New("message type is invalid")
+	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
+)
+
 type SenderMessagesMap map[types.Address][]*ibftProto.Message
+type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSignEvidence struct {
 	signer   types.Address
@@ -23,11 +33,17 @@ func newDoubleSignEvidence(signer types.Address, round uint64,
 	return &DoubleSignEvidence{signer: signer, round: round, messages: messages}
 }
 
-type MessagesMap map[uint64]map[uint64]SenderMessagesMap
+type Messages struct {
+	content MessagesMap
+	mux     sync.RWMutex
+}
 
 // getSenderMsgs returns commit messages for given height, round and sender
-func (m MessagesMap) getSenderMsgs(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
-	if roundMsgs, ok := m[view.Height]; ok {
+func (m *Messages) getSenderMsgs(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
+	m.mux.RLock()
+	defer m.mux.RUnlock()
+
+	if roundMsgs, ok := m.content[view.Height]; ok {
 		if senderMsgsMap, ok := roundMsgs[view.Round]; ok {
 			return senderMsgsMap[sender]
 		}
@@ -36,16 +52,26 @@ func (m MessagesMap) getSenderMsgs(view *ibftProto.View, sender types.Address) [
 	return nil
 }
 
-// registerSenderMsgs registers messages for the given height, round and sender
-func (m MessagesMap) registerSenderMsgs(view *ibftProto.View, sender types.Address, msgs []*ibftProto.Message) {
+// addMessage registers message for the given height, round and sender
+func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *ibftProto.Message) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
 	var senderMsgs SenderMessagesMap
 
-	if roundMsgs, ok := m[view.Height]; !ok {
+	if roundMsgs, ok := m.content[view.Height]; !ok {
 		roundMsgs = make(map[uint64]SenderMessagesMap)
-		m[view.Height] = roundMsgs
+		m.content[view.Height] = roundMsgs
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
 	} else if senderMsgs, ok = roundMsgs[view.Round]; !ok {
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
+	}
+
+	msgs := m.getSenderMsgs(msg.View, sender)
+	if msgs == nil {
+		msgs = []*ibftProto.Message{msg}
+	} else {
+		msgs = append(msgs, msg)
 	}
 
 	senderMsgs[sender] = msgs
@@ -66,10 +92,10 @@ type DoubleSigningTracker interface {
 }
 
 type DoubleSigningTrackerImpl struct {
-	preprepare  MessagesMap
-	prepare     MessagesMap
-	commit      MessagesMap
-	roundChange MessagesMap
+	preprepare  *Messages
+	prepare     *Messages
+	commit      *Messages
+	roundChange *Messages
 
 	logger hclog.Logger
 }
@@ -77,55 +103,38 @@ type DoubleSigningTrackerImpl struct {
 func NewDoubleSigningTracker(logger hclog.Logger) *DoubleSigningTrackerImpl {
 	return &DoubleSigningTrackerImpl{
 		logger:      logger,
-		preprepare:  make(MessagesMap),
-		prepare:     make(MessagesMap),
-		commit:      make(MessagesMap),
-		roundChange: make(MessagesMap),
+		preprepare:  &Messages{content: make(MessagesMap)},
+		prepare:     &Messages{content: make(MessagesMap)},
+		commit:      &Messages{content: make(MessagesMap)},
+		roundChange: &Messages{content: make(MessagesMap)},
 	}
 }
 
 // Handle is implementation of IBFTMessageHandler interface, which handles IBFT consensus messages
 func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
-	signer, err := wallet.RecoverSignerFromIBFTMessage(msg)
-	if err != nil {
-		t.logger.Debug("[ERROR] failed to recover signer upon message receive",
-			"message", msg)
+	if err := t.validateMsg(msg); err != nil {
+		t.logger.Debug("[ERROR] invalid IBFT message retrieved", "error", err, "message", msg)
 
 		return
 	}
 
 	sender := types.BytesToAddress(msg.From)
-	// ignore messages where signer and sender are not the same
-	if signer != sender {
-		t.logger.Debug("[ERROR] signer and sender of IBFT message are not the same, ignoring it...",
-			"message", msg)
 
-		return
-	}
-
-	msgMap := t.resolveMsgMap(msg.GetType())
-
-	senderMsgs := msgMap.getSenderMsgs(msg.View, sender)
-	if senderMsgs == nil {
-		senderMsgs = []*ibftProto.Message{msg}
-	} else {
-		senderMsgs = append(senderMsgs, msg)
-	}
-
-	msgMap.registerSenderMsgs(msg.View, sender, senderMsgs)
+	msgMap := t.resolveMessagesStorage(msg.GetType())
+	msgMap.addMessage(msg.View, sender, msg)
 }
 
 // PruneMsgsUntil deletes all messages maps until the specified height
 func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 	for _, msgType := range ibftProto.MessageType_value {
-		msgsMap := t.resolveMsgMap(ibftProto.MessageType(msgType))
-		if msgsMap == nil {
+		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
+		if msgs == nil {
 			continue
 		}
 
-		for msgHeight := range msgsMap {
+		for msgHeight := range msgs.content {
 			if msgHeight < height {
-				delete(msgsMap, msgHeight)
+				delete(msgs.content, msgHeight)
 			}
 		}
 	}
@@ -139,12 +148,12 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 	)
 
 	for _, msgType := range ibftProto.MessageType_value {
-		msgsMap := t.resolveMsgMap(ibftProto.MessageType(msgType))
-		if msgsMap == nil {
+		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
+		if msgs == nil {
 			continue
 		}
 
-		roundMsgs, ok := msgsMap[height]
+		roundMsgs, ok := msgs.content[height]
 		if !ok {
 			continue
 		}
@@ -155,8 +164,9 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 					continue
 				}
 
+				firstSig := msgs[0].Signature
 				for _, msg := range msgs[1:] {
-					if bytes.Equal(msgs[0].Signature, msg.Signature) {
+					if !bytes.Equal(firstSig, msg.Signature) {
 						if evidence == nil {
 							evidence = newDoubleSignEvidence(address, round, []*ibftProto.Message{})
 							evidences = append(evidences, evidence)
@@ -172,8 +182,31 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 	return evidences
 }
 
-// resolveMsgMap resolves proper messages map based on the provided message type
-func (t *DoubleSigningTrackerImpl) resolveMsgMap(msgType ibftProto.MessageType) MessagesMap {
+// validateMsg validates provided IBFT message
+func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
+	if msg.View == nil {
+		return errViewUndefined
+	}
+
+	if _, ok := ibftProto.MessageType_name[int32(msg.Type)]; !ok {
+		return errInvalidMsgType
+	}
+
+	signer, err := wallet.RecoverSignerFromIBFTMessage(msg)
+	if err != nil {
+		return fmt.Errorf("failed to recover signer from IBFT message: %w", err)
+	}
+
+	// ignore messages where signer and sender are not the same
+	if signer != types.BytesToAddress(msg.From) {
+		return errSignerAndSenderMismatch
+	}
+
+	return nil
+}
+
+// resolveMessagesStorage resolves proper messages storage based on the provided message type
+func (t *DoubleSigningTrackerImpl) resolveMessagesStorage(msgType ibftProto.MessageType) *Messages {
 	switch msgType {
 	case ibftProto.MessageType_PREPREPARE:
 		return t.preprepare
