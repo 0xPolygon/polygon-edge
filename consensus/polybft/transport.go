@@ -28,7 +28,7 @@ func (p *Polybft) subscribeToIbftTopic() error {
 			return
 		}
 
-		for _, handler := range p.msgHandlers {
+		for _, handler := range p.ibftMsgHandlers {
 			handler.Handle(msg)
 		}
 

@@ -88,7 +88,7 @@ func NewDoubleSigningTracker(logger hclog.Logger) *DoubleSigningTrackerImpl {
 func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 	signer, err := wallet.RecoverSignerFromIBFTMessage(msg)
 	if err != nil {
-		t.logger.Warn("failed to recover signer upon message receive",
+		t.logger.Debug("[ERROR] failed to recover signer upon message receive",
 			"message", msg)
 
 		return
@@ -97,7 +97,7 @@ func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 	sender := types.BytesToAddress(msg.From)
 	// ignore messages where signer and sender are not the same
 	if signer != sender {
-		t.logger.Warn("signer and sender of IBFT message are not the same, ignoring it...",
+		t.logger.Debug("[ERROR] signer and sender of IBFT message are not the same, ignoring it...",
 			"message", msg)
 
 		return
