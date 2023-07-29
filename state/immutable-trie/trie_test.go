@@ -19,37 +19,36 @@ import (
 
 type traceStore struct {
 	// trace is the object that holds the traces
-	trace *types.Trace
+	tr *tracer
 }
 
-func NewTraceStore(trace *types.Trace) Storage {
+func NewTraceStore(tr *tracer) Storage {
 	return &traceStore{
-		trace: trace,
+		tr: tr,
 	}
 }
 
-func (traceStore) Put(k, v []byte) {
-}
-
 func (ts *traceStore) Get(k []byte) ([]byte, bool) {
-	return nil, false
+	var v string
+	if ts.tr.isAccountTrie {
+		v = ts.tr.trace.AccountTrie[hex.EncodeToString(k)]
+	} else {
+		v = ts.tr.trace.StorageTrie[hex.EncodeToString(k)]
+	}
+	val, _ := hex.DecodeString(v)
+
+	if len(val) == 0 {
+		return nil, false
+	}
+
+	return val, true
 }
 
-func (traceStore) Batch() Batch {
-	return nil
-}
-
-func (traceStore) SetCode(hash types.Hash, code []byte) {
-
-}
-
-func (traceStore) GetCode(hash types.Hash) ([]byte, bool) {
-	return nil, false
-}
-
-func (traceStore) Close() error {
-	return nil
-}
+func (traceStore) Put(k, v []byte)                        {}
+func (traceStore) Batch() Batch                           { return nil }
+func (traceStore) SetCode(hash types.Hash, code []byte)   {}
+func (traceStore) GetCode(hash types.Hash) ([]byte, bool) { return nil, false }
+func (traceStore) Close() error                           { return nil }
 
 func LoadTrace() (*types.Trace, error) {
 	// Load Trace structure from JSON file.
@@ -132,38 +131,44 @@ func TestTrie_Proof(t *testing.T) {
 }
 
 func TestTrie_Load(t *testing.T) {
-	tt := NewTrie()
-
-	ldbStorage := ldbstorage.NewMemStorage()
-	ldb, err := leveldb.Open(ldbStorage, nil)
-	require.NoError(t, err)
-
-	defer ldb.Close()
-
-	kv := NewKV(ldb)
+	//tt := NewTrie()
 
 	ltr, err := LoadTrace()
 	require.NoError(t, err)
-	// ts := NewTraceStore(ltr)
+
+	accountTracer := &tracer{
+		isAccountTrie: true,
+		trace:         ltr,
+	}
+	ts := NewTraceStore(accountTracer)
+	s := NewState(ts)
+	sn, err := s.NewSnapshotAt(ltr.ParentStateRoot)
+	require.NoError(t, err)
+
+	acc, err := sn.GetAccount(types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429"))
+	require.NoError(t, err)
+
+	storageTracer := &tracer{
+		isAccountTrie: false,
+		trace:         ltr,
+	}
+	ts = NewTraceStore(storageTracer)
+	s = NewState(ts)
+	tt, err := s.newTrieAt(acc.Root)
+	require.NoError(t, err)
 
 	// Load the trie from the trace.
-	// txn := tt.Txn(ts)
-	txn := tt.Txn(kv)
-	for k, v := range ltr.StorageTrie {
-		tk, _ := hex.DecodeString(k)
-		tv, _ := hex.DecodeString(v)
-
-		txn.Insert(tk, tv)
-	}
-	tt = txn.Commit()
+	txn := tt.Txn(ts)
 
 	for _, txt := range ltr.TxnTraces {
 		je := txt.Delta[types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429")]
-		for slot, _ := range je.Storage {
+		for slot, val := range je.Storage {
 			v := txn.Lookup(slot.Bytes())
 			if v == nil {
 				t.Logf("slot %s not found", slot)
 			}
+
+			assert.Equal(t, val.Bytes(), v)
 		}
 	}
 }
