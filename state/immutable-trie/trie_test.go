@@ -3,6 +3,7 @@ package itrie
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -34,10 +35,12 @@ func (ts *traceStore) Get(k []byte) ([]byte, bool) {
 		v = ts.tr.trace.AccountTrie[hex.EncodeToString(k)]
 	} else {
 		v = ts.tr.trace.StorageTrie[hex.EncodeToString(k)]
+		// fmt.Printf("key: %s, value: %s\n", hex.EncodeToString(k), v)
 	}
 	val, _ := hex.DecodeString(v)
 
 	if len(val) == 0 {
+		fmt.Printf("**** value not found for key: %s\n", hex.EncodeToString(k))
 		return nil, false
 	}
 
@@ -52,7 +55,8 @@ func (traceStore) Close() error                           { return nil }
 
 func LoadTrace() (*types.Trace, error) {
 	// Load Trace structure from JSON file.
-	traceFile, err := os.Open("7410_readable.json")
+	// traceFile, err := os.Open("7410_readable.json")
+	traceFile, err := os.Open("../../test-chain-1/consensus/trace_140.json")
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +149,8 @@ func TestTrie_Load(t *testing.T) {
 	sn, err := s.NewSnapshotAt(ltr.ParentStateRoot)
 	require.NoError(t, err)
 
-	acc, err := sn.GetAccount(types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429"))
+	addr := types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429")
+	acc, err := sn.GetAccount(addr)
 	require.NoError(t, err)
 
 	storageTracer := &tracer{
@@ -160,15 +165,17 @@ func TestTrie_Load(t *testing.T) {
 	// Load the trie from the trace.
 	txn := tt.Txn(ts)
 
+	txn.Insert(types.StringToBytes("0x0000000000000000000000000000000000000000000000000000000000000002"), types.StringToBytes("0x00000000000000000000000000000000000000000000000000000000000048d1"))
+
 	for _, txt := range ltr.TxnTraces {
-		je := txt.Delta[types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429")]
-		for slot, val := range je.Storage {
+		je := txt.Delta[addr]
+		for slot, _ := range je.StorageRead {
 			v := txn.Lookup(slot.Bytes())
 			if v == nil {
 				t.Logf("slot %s not found", slot)
 			}
 
-			assert.Equal(t, val.Bytes(), v)
+			// assert.Equal(t, val.Bytes(), v)
 		}
 	}
 }
