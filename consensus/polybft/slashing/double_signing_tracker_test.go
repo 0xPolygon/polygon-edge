@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func TestDoubleSigningTracker_Handle(t *testing.T) {
+func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	t.Parallel()
 
 	acc, err := wallet.GenerateAccount()
@@ -30,19 +30,15 @@ func TestDoubleSigningTracker_Handle(t *testing.T) {
 	tracker.Handle(prePrepareMsg)
 	tracker.Handle(prepareMsg)
 
-	prePrepareMsgs := tracker.preprepare.getSenderMsgsLocked(prePrepareView, types.Address(key.Address()))
-	require.Len(t, prePrepareMsgs, 1)
-	require.Equal(t, prePrepareMsg, prePrepareMsgs[0])
-	require.Empty(t, tracker.prepare.getSenderMsgsLocked(prePrepareView, types.Address(key.Address())))
-	require.Empty(t, tracker.commit.getSenderMsgsLocked(prePrepareView, types.Address(key.Address())))
-	require.Empty(t, tracker.roundChange.getSenderMsgsLocked(prePrepareView, types.Address(key.Address())))
+	sender := types.Address(key.Address())
 
-	prepareMsgs := tracker.prepare.getSenderMsgsLocked(view, types.Address(key.Address()))
-	require.Len(t, prepareMsgs, 1)
+	prePrepareMsgs := tracker.preprepare.getSenderMsgsLocked(prePrepareView, sender)
+	assertSenderMessageMapsSize(t, tracker, 1, 0, 0, 0, prePrepareView, sender)
+	require.Equal(t, prePrepareMsg, prePrepareMsgs[0])
+
+	prepareMsgs := tracker.prepare.getSenderMsgsLocked(view, sender)
+	assertSenderMessageMapsSize(t, tracker, 0, 1, 0, 0, view, sender)
 	require.Equal(t, prepareMsg, prepareMsgs[0])
-	require.Empty(t, tracker.preprepare.getSenderMsgsLocked(view, types.Address(key.Address())))
-	require.Empty(t, tracker.commit.getSenderMsgsLocked(view, types.Address(key.Address())))
-	require.Empty(t, tracker.roundChange.getSenderMsgsLocked(view, types.Address(key.Address())))
 
 	view.Round++
 	prepareMsg = buildPrepareMessage(t, view, key, proposalHash)
@@ -54,18 +50,16 @@ func TestDoubleSigningTracker_Handle(t *testing.T) {
 	tracker.Handle(commitMsg)
 	tracker.Handle(roundChangeMsg)
 
-	prepareMsgs = tracker.prepare.getSenderMsgsLocked(view, types.Address(key.Address()))
-	commitMsgs := tracker.commit.getSenderMsgsLocked(view, types.Address(key.Address()))
-	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, types.Address(key.Address()))
+	prepareMsgs = tracker.prepare.getSenderMsgsLocked(view, sender)
+	commitMsgs := tracker.commit.getSenderMsgsLocked(view, sender)
+	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, sender)
 
-	require.Len(t, prepareMsgs, 2)
+	assertSenderMessageMapsSize(t, tracker, 0, 2, 1, 1, view, sender)
+
 	require.Equal(t, prepareMsg, prepareMsgs[0])
 	require.Equal(t, prepareMsg, prepareMsgs[1])
-	require.Len(t, commitMsgs, 1)
 	require.Equal(t, commitMsg, commitMsgs[0])
-	require.Len(t, roundChangeMsgs, 1)
 	require.Equal(t, roundChangeMsg, roundChangeMsgs[0])
-	require.Empty(t, tracker.preprepare.getSenderMsgsLocked(view, types.Address(key.Address())))
 }
 
 func TestDoubleSigningTracker_validateMessage(t *testing.T) {
@@ -168,95 +162,43 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 	}
 }
 
-func buildPrePrepareMessage(t *testing.T, view *ibftProto.View,
-	key *wallet.Key, proposalHash types.Hash) *ibftProto.Message {
-	t.Helper()
+func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
+	t.Parallel()
 
-	prePrepareMsg := &ibftProto.Message{
-		View: view,
-		From: key.Address().Bytes(),
-		Type: ibftProto.MessageType_PREPREPARE,
-		Payload: &ibftProto.Message_PreprepareData{
-			PreprepareData: &ibftProto.PrePrepareMessage{
-				Proposal: &ibftProto.Proposal{
-					RawProposal: proposalHash.Bytes(),
-					Round:       1,
-				},
-				ProposalHash: proposalHash.Bytes(),
-				Certificate:  &ibftProto.RoundChangeCertificate{},
-			},
-		},
+	acc, err := wallet.GenerateAccount()
+	require.NoError(t, err)
+
+	key := wallet.NewKey(acc)
+
+	proposalHash := types.StringToHash("dummy proposal")
+	view := &ibftProto.View{Height: 1, Round: 1}
+
+	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
+	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+
+	view.Height = 3
+	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
+	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+
+	view = &ibftProto.View{Height: 5, Round: 1}
+	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
+	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+
+	view.Round = 4
+	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+
+	tracker.PruneMsgsUntil(5)
+
+	sender := types.Address(key.Address())
+
+	for height := uint64(0); height < view.Height; height++ {
+		for round := uint64(0); round < view.Round; round++ {
+			currentView := &ibftProto.View{Height: height, Round: round}
+			assertSenderMessageMapsSize(t, tracker, 0, 0, 0, 0, currentView, sender)
+		}
 	}
-
-	prePrepareMsg, err := key.SignIBFTMessage(prePrepareMsg)
-	require.NoError(t, err)
-
-	return prePrepareMsg
-}
-
-func buildPrepareMessage(t *testing.T, view *ibftProto.View,
-	key *wallet.Key, proposalHash types.Hash) *ibftProto.Message {
-	t.Helper()
-
-	prepareMsg := &ibftProto.Message{
-		View: view,
-		From: key.Address().Bytes(),
-		Type: ibftProto.MessageType_PREPARE,
-		Payload: &ibftProto.Message_PrepareData{
-			PrepareData: &ibftProto.PrepareMessage{
-				ProposalHash: proposalHash.Bytes(),
-			},
-		},
-	}
-
-	prepareMsg, err := key.SignIBFTMessage(prepareMsg)
-	require.NoError(t, err)
-
-	return prepareMsg
-}
-
-func buildCommitMessage(t *testing.T, view *ibftProto.View,
-	key *wallet.Key, proposalHash types.Hash) *ibftProto.Message {
-	t.Helper()
-
-	seal, err := key.Sign(proposalHash.Bytes())
-	require.NoError(t, err)
-
-	commitMsg := &ibftProto.Message{
-		View: view,
-		From: key.Address().Bytes(),
-		Type: ibftProto.MessageType_COMMIT,
-		Payload: &ibftProto.Message_CommitData{
-			CommitData: &ibftProto.CommitMessage{
-				ProposalHash:  proposalHash.Bytes(),
-				CommittedSeal: seal,
-			},
-		},
-	}
-
-	commitMsg, err = key.SignIBFTMessage(commitMsg)
-	require.NoError(t, err)
-
-	return commitMsg
-}
-
-func buildRoundChangeMessage(t *testing.T, view *ibftProto.View, key *wallet.Key) *ibftProto.Message {
-	t.Helper()
-
-	roundChangeMsg := &ibftProto.Message{
-		View: view,
-		From: key.Address().Bytes(),
-		Type: ibftProto.MessageType_ROUND_CHANGE,
-		Payload: &ibftProto.Message_RoundChangeData{
-			RoundChangeData: &ibftProto.RoundChangeMessage{
-				LastPreparedProposal:      &ibftProto.Proposal{},
-				LatestPreparedCertificate: &ibftProto.PreparedCertificate{},
-			},
-		},
-	}
-
-	roundChangeMsg, err := key.SignIBFTMessage(roundChangeMsg)
-	require.NoError(t, err)
-
-	return roundChangeMsg
 }
