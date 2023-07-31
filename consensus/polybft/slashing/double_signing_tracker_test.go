@@ -1,6 +1,7 @@
 package slashing
 
 import (
+	"fmt"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -46,7 +47,6 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	roundChangeMsg := buildRoundChangeMessage(t, view, key)
 
 	tracker.Handle(prepareMsg)
-	tracker.Handle(prepareMsg)
 	tracker.Handle(commitMsg)
 	tracker.Handle(roundChangeMsg)
 
@@ -54,10 +54,9 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	commitMsgs := tracker.commit.getSenderMsgsLocked(view, sender)
 	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, sender)
 
-	assertSenderMessageMapsSize(t, tracker, 0, 2, 1, 1, view, sender)
+	assertSenderMessageMapsSize(t, tracker, 0, 1, 1, 1, view, sender)
 
 	require.Equal(t, prepareMsg, prepareMsgs[0])
-	require.Equal(t, prepareMsg, prepareMsgs[1])
 	require.Equal(t, commitMsg, commitMsgs[0])
 	require.Equal(t, roundChangeMsg, roundChangeMsgs[0])
 }
@@ -144,9 +143,10 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 	key := wallet.NewKey(acc)
 
 	cases := []struct {
-		name       string
-		msgBuilder func() *ibftProto.Message
-		errMsg     string
+		name        string
+		initHandler func(tracker *DoubleSigningTrackerImpl)
+		msgBuilder  func() *ibftProto.Message
+		errMsg      string
 	}{
 		{
 			name: "invalid message view undefined",
@@ -189,6 +189,18 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 			errMsg: errSignerAndSenderMismatch.Error(),
 		},
 		{
+			name: "invalid message spammer",
+			msgBuilder: func() *ibftProto.Message {
+				return buildCommitMessage(t, &ibftProto.View{Height: 1, Round: 4}, key, types.ZeroHash)
+			},
+			initHandler: func(tracker *DoubleSigningTrackerImpl) {
+				view := &ibftProto.View{Height: 1, Round: 4}
+				tracker.commit.addMessage(view, types.Address(key.Address()),
+					buildCommitMessage(t, view, key, types.ZeroHash))
+			},
+			errMsg: fmt.Sprintf("sender %s is detected as a spammer", key.Address()),
+		},
+		{
 			name: "valid message",
 			msgBuilder: func() *ibftProto.Message {
 				proposalHash := generateRandomProposalHash(t)
@@ -223,6 +235,9 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 			t.Parallel()
 
 			tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+			if c.initHandler != nil {
+				c.initHandler(tracker)
+			}
 			msg := c.msgBuilder()
 
 			err := tracker.validateMsg(msg)

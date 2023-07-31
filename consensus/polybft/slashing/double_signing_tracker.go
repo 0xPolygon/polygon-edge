@@ -3,6 +3,7 @@ package slashing
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -201,9 +202,22 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 		return err
 	}
 
+	sender := types.BytesToAddress(msg.From)
+
 	// ignore messages where signer and sender are not the same
-	if signer != types.BytesToAddress(msg.From) {
+	if signer != sender {
 		return errSignerAndSenderMismatch
+	}
+
+	msgsMap := t.resolveMessagesStorage(msg.Type)
+	msgsMap.mux.RLock()
+	defer msgsMap.mux.RUnlock()
+
+	senderMsgs := msgsMap.getSenderMsgsLocked(msg.View, sender)
+	for _, senderMsg := range senderMsgs {
+		if bytes.Equal(senderMsg.Signature, msg.Signature) {
+			return fmt.Errorf("sender %s is detected as a spammer", sender)
+		}
 	}
 
 	return nil
