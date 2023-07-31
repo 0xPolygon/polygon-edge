@@ -107,22 +107,18 @@ func createTestPolybftConfig() *PolyBFTConfig {
 			{
 				Address: types.BytesToAddress([]byte{0, 1, 2}),
 				Stake:   big.NewInt(100),
-				Balance: bigZero,
 			},
 			{
 				Address: types.BytesToAddress([]byte{3, 4, 5}),
 				Stake:   big.NewInt(100),
-				Balance: bigZero,
 			},
 			{
 				Address: types.BytesToAddress([]byte{6, 7, 8}),
 				Stake:   big.NewInt(100),
-				Balance: bigZero,
 			},
 			{
 				Address: types.BytesToAddress([]byte{9, 10, 11}),
 				Stake:   big.NewInt(100),
-				Balance: bigZero,
 			},
 		},
 		Bridge: &BridgeConfig{
