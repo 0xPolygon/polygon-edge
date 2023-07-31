@@ -283,6 +283,7 @@ func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) 
 		InitParams: &contractsapi.InitParams{
 			NewOwner:                   cfg.GovernanceConfig.GovernorAdmin,
 			NewCheckpointBlockInterval: new(big.Int).SetUint64(cfg.CheckpointInterval),
+			NewSprintSize:              new(big.Int).SetUint64(cfg.SprintSize),
 			NewEpochSize:               new(big.Int).SetUint64(cfg.EpochSize),
 			NewEpochReward:             new(big.Int).SetUint64(cfg.EpochReward),
 			NewMinValidatorSetSize:     new(big.Int).SetUint64(cfg.MinValidatorSetSize),
