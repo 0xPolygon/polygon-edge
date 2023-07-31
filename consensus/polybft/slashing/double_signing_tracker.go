@@ -114,10 +114,8 @@ func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 		return
 	}
 
-	sender := types.BytesToAddress(msg.From)
-
 	msgMap := t.resolveMessagesStorage(msg.GetType())
-	msgMap.addMessage(msg.View, sender, msg)
+	msgMap.addMessage(msg.View, types.BytesToAddress(msg.From), msg)
 }
 
 // PruneMsgsUntil deletes all messages maps until the specified height
