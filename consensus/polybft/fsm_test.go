@@ -548,10 +548,6 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 	})
 }
 
-func TestBre(t *testing.T) {
-	fmt.Println(types.StringToAddress("0x105"))
-}
-
 func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 	t.Parallel()
 
