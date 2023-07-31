@@ -1,6 +1,7 @@
 package slashing
 
 import (
+	"fmt"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -60,6 +61,79 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	require.Equal(t, prepareMsg, prepareMsgs[1])
 	require.Equal(t, commitMsg, commitMsgs[0])
 	require.Equal(t, roundChangeMsg, roundChangeMsgs[0])
+}
+
+func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
+	t.Parallel()
+
+	const (
+		heightsCount = 5
+		sendersCount = 4
+	)
+
+	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+
+	keys := make([]*wallet.Key, sendersCount)
+	for i := 0; i < len(keys); i++ {
+		acc, err := wallet.GenerateAccount()
+		require.NoError(t, err)
+
+		keys[i] = wallet.NewKey(acc)
+	}
+
+	expectedPrePrepare := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
+	expectedPrepare := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
+	expectedCommit := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
+	expectedRoundChange := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
+
+	for _, k := range keys {
+		expectedPrePrepare[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
+		expectedPrepare[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
+		expectedCommit[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
+		expectedRoundChange[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
+
+		for i := uint64(1); i <= heightsCount; i++ {
+			proposalHash := types.StringToHash(fmt.Sprintf("Proposal#%d", i))
+			view := &ibftProto.View{Height: i, Round: 1}
+
+			prePrepare := buildPrePrepareMessage(t, view, k, proposalHash)
+			prepare := buildPrepareMessage(t, view, k, proposalHash)
+			commit := buildCommitMessage(t, view, k, proposalHash)
+			roundChange := buildRoundChangeMessage(t, view, k)
+
+			expectedPrePrepare[types.Address(k.Address())] = append(expectedPrePrepare[types.Address(k.Address())], prePrepare)
+			expectedPrepare[types.Address(k.Address())] = append(expectedPrepare[types.Address(k.Address())], prepare)
+			expectedCommit[types.Address(k.Address())] = append(expectedCommit[types.Address(k.Address())], commit)
+			expectedRoundChange[types.Address(k.Address())] = append(expectedRoundChange[types.Address(k.Address())], roundChange)
+
+			tracker.Handle(prePrepare)
+			tracker.Handle(prepare)
+			tracker.Handle(commit)
+			tracker.Handle(roundChange)
+		}
+	}
+
+	for _, k := range keys {
+		sender := types.Address(k.Address())
+		expPrePrepares := expectedPrePrepare[sender]
+		expPrepares := expectedPrepare[sender]
+		expCommits := expectedCommit[sender]
+		expRoundChanges := expectedRoundChange[sender]
+
+		for i := uint64(0); i < heightsCount; i++ {
+			view := &ibftProto.View{Height: i + 1, Round: 1}
+			actualPrePrepares := tracker.preprepare.getSenderMsgsLocked(view, sender)
+			actualPrepares := tracker.prepare.getSenderMsgsLocked(view, sender)
+			actualCommits := tracker.commit.getSenderMsgsLocked(view, sender)
+			actualRoundChanges := tracker.roundChange.getSenderMsgsLocked(view, sender)
+
+			assertSenderMessageMapsSize(t, tracker, 1, 1, 1, 1, view, sender)
+			require.Equal(t, expPrePrepares[i], actualPrePrepares[0])
+			require.Equal(t, expPrepares[i], actualPrepares[0])
+			require.Equal(t, expCommits[i], actualCommits[0])
+			require.Equal(t, expRoundChanges[i], actualRoundChanges[0])
+		}
+	}
 }
 
 func TestDoubleSigningTracker_validateMessage(t *testing.T) {
