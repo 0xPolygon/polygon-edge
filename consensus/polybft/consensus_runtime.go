@@ -57,6 +57,10 @@ type epochMetadata struct {
 
 	// Validators is the set of validators for the epoch
 	Validators validator.AccountSet
+
+	// CurrentClientConfig is the current client configuration for current epoch
+	// that is updated by governance proposals
+	CurrentClientConfig *PolyBFTConfig
 }
 
 type guardedDataDTO struct {
@@ -72,7 +76,7 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	PolyBFTConfig         *PolyBFTConfig
+	GenesisPolyBFTConfig  *PolyBFTConfig
 	DataDir               string
 	Key                   *wallet.Key
 	State                 *State
@@ -118,6 +122,10 @@ type consensusRuntime struct {
 	// manager for handling validator stake change and updating validator set
 	stakeManager StakeManager
 
+	// manager for handling governance events gotten from proposals execution
+	// also handles updating client configuration based on governance proposals
+	governanceManager GovernanceManager
+
 	// logger instance
 	logger hcf.Logger
 }
@@ -149,6 +157,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, err
 	}
 
+	if err := runtime.initGovernanceManager(log); err != nil {
+		return nil, err
+	}
+
 	// we need to call restart epoch on runtime to initialize epoch state
 	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock)
 	if err != nil {
@@ -167,15 +179,15 @@ func (c *consensusRuntime) close() {
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
-		stateSenderAddr := c.config.PolyBFTConfig.Bridge.StateSenderAddr
+		stateSenderAddr := c.config.GenesisPolyBFTConfig.Bridge.StateSenderAddr
 		stateSyncManager := newStateSyncManager(
 			logger.Named("state-sync-manager"),
 			c.config.State,
 			&stateSyncConfig{
 				key:                   c.config.Key,
 				stateSenderAddr:       stateSenderAddr,
-				stateSenderStartBlock: c.config.PolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
-				jsonrpcAddr:           c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint,
+				stateSenderStartBlock: c.config.GenesisPolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
+				jsonrpcAddr:           c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint,
 				dataDir:               c.config.DataDir,
 				topic:                 c.config.bridgeTopic,
 				maxCommitmentSize:     maxCommitmentSize,
@@ -198,7 +210,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		// enable checkpoint manager
 		txRelayer, err := txrelayer.NewTxRelayer(
-			txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint),
+			txrelayer.WithIPAddress(c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint),
 			txrelayer.WithWriter(logger.StandardWriter(&hcf.StandardLoggerOptions{})))
 		if err != nil {
 			return err
@@ -207,7 +219,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 		c.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(c.config.Key),
 			defaultCheckpointsOffset,
-			c.config.PolyBFTConfig.Bridge.CheckpointManagerAddr,
+			c.config.GenesisPolyBFTConfig.Bridge.CheckpointManagerAddr,
 			txRelayer,
 			c.config.blockchain,
 			c.config.polybftBackend,
@@ -222,7 +234,8 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
-	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(
+		c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
 	}
@@ -233,10 +246,27 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.ValidatorSetContract,
-		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
+		c.config.GenesisPolyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		c.config.blockchain,
-		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
 	)
+
+	return nil
+}
+
+// initGovernanceManager initializes governance manager
+func (c *consensusRuntime) initGovernanceManager(logger hcf.Logger) error {
+	governanceManager, err := newGovernanceManager(
+		c.config.GenesisPolyBFTConfig,
+		logger.Named("governance-manager"),
+		c.state,
+		c.config.blockchain,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	c.governanceManager = governanceManager
 
 	return nil
 }
@@ -263,7 +293,9 @@ func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 }
 
 func (c *consensusRuntime) IsBridgeEnabled() bool {
-	return c.config.PolyBFTConfig.IsBridgeEnabled()
+	// this is enough to check, because bridge config is not something
+	// that can be changed through governance
+	return c.config.GenesisPolyBFTConfig.IsBridgeEnabled()
 }
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
@@ -315,6 +347,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		c.logger.Error("failed to post block in stake manager", "err", err)
 	}
 
+	// handle governance events that happened in block
+	if err := c.governanceManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in governance manager", "err", err)
+	}
+
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
@@ -345,7 +382,7 @@ func (c *consensusRuntime) FSM() error {
 		parent,
 		types.Address(c.config.Key.Address()),
 		c.config.txPool,
-		c.config.PolyBFTConfig.BlockTime.Duration,
+		epoch.CurrentClientConfig.BlockTime.Duration,
 		c.logger,
 	)
 
@@ -367,7 +404,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	ff := &fsm{
-		config:              c.config.PolyBFTConfig,
+		config:              epoch.CurrentClientConfig,
 		parent:              parent,
 		backend:             c.config.blockchain,
 		polybftBackend:      c.config.polybftBackend,
@@ -394,7 +431,8 @@ func (c *consensusRuntime) FSM() error {
 	if isEndOfEpoch {
 		ff.commitEpochInput = createCommitEpochInput(parent, epoch)
 
-		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number, epoch.Validators.Copy())
+		ff.newValidatorsDelta, err = c.stakeManager.UpdateValidatorSet(epoch.Number,
+			epoch.CurrentClientConfig.MaxValidatorSetSize, epoch.Validators.Copy())
 		if err != nil {
 			return fmt.Errorf("cannot update validator set on epoch ending: %w", err)
 		}
@@ -489,10 +527,20 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
+	if err := c.governanceManager.PostEpoch(reqObj); err != nil {
+		return nil, err
+	}
+
+	currentConfig, err := c.governanceManager.GetClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &epochMetadata{
-		Number:            epochNumber,
-		Validators:        validatorSet,
-		FirstBlockInEpoch: firstBlockInEpoch,
+		Number:              epochNumber,
+		Validators:          validatorSet,
+		FirstBlockInEpoch:   firstBlockInEpoch,
+		CurrentClientConfig: currentConfig,
 	}, nil
 }
 
@@ -506,6 +554,7 @@ func createCommitEpochInput(
 			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
+		EpochSize: new(big.Int).SetUint64(epoch.CurrentClientConfig.EpochSize),
 	}
 }
 
@@ -522,6 +571,9 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 	}
 
 	var (
+		// epoch size is the number of blocks that really happened
+		// because of slashing, epochs might not have the configured number of blocks
+		epochSize     = uint64(0)
 		uptimeCounter = map[types.Address]int64{}
 		blockHeader   = lastFinalizedBlock // start calculating from this block
 	)
@@ -541,6 +593,8 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 		for _, a := range signers.GetAddresses() {
 			uptimeCounter[a]++
 		}
+
+		epochSize++
 
 		return nil
 	}
@@ -620,8 +674,9 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 	}
 
 	distributeRewards := &contractsapi.DistributeRewardForRewardPoolFn{
-		EpochID: new(big.Int).SetUint64(epochID),
-		Uptime:  uptime,
+		EpochID:   new(big.Int).SetUint64(epochID),
+		Uptime:    uptime,
+		EpochSize: new(big.Int).SetUint64(epochSize),
 	}
 
 	return distributeRewards, nil
@@ -650,12 +705,12 @@ func (c *consensusRuntime) IsActiveValidator() bool {
 // isFixedSizeOfEpochMet checks if epoch reached its end that was configured by its default size
 // this is only true if no slashing occurred in the given epoch
 func (c *consensusRuntime) isFixedSizeOfEpochMet(blockNumber uint64, epoch *epochMetadata) bool {
-	return epoch.FirstBlockInEpoch+c.config.PolyBFTConfig.EpochSize-1 == blockNumber
+	return epoch.FirstBlockInEpoch+epoch.CurrentClientConfig.EpochSize-1 == blockNumber
 }
 
 // isFixedSizeOfSprintMet checks if an end of an sprint is reached with the current block
 func (c *consensusRuntime) isFixedSizeOfSprintMet(blockNumber uint64, epoch *epochMetadata) bool {
-	return (blockNumber-epoch.FirstBlockInEpoch+1)%c.config.PolyBFTConfig.SprintSize == 0
+	return (blockNumber-epoch.FirstBlockInEpoch+1)%epoch.CurrentClientConfig.SprintSize == 0
 }
 
 // getSystemState builds SystemState instance for the most current block header
@@ -990,6 +1045,14 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	}
 
 	return firstBlockInEpoch, nil
+}
+
+// getCurrentBlockTimeDrift returns current block time drift
+func (c *consensusRuntime) getCurrentBlockTimeDrift() uint64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.epoch.CurrentClientConfig.BlockTimeDrift
 }
 
 // getSealersForBlock checks who sealed a given block and updates the counter

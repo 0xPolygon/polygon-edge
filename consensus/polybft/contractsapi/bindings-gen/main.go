@@ -411,7 +411,20 @@ func main() {
 			[]string{
 				"initialize",
 			},
-			[]string{},
+			[]string{
+				"NewCheckpointBlockInterval",
+				"NewEpochSize",
+				"NewEpochReward",
+				"NewMinValidatorSetSize",
+				"NewMaxValidatorSetSize",
+				"NewWithdrawalWaitPeriod",
+				"NewBlockTime",
+				"NewBlockTimeDrift",
+				"NewVotingDelay",
+				"NewVotingPeriod",
+				"NewProposalThreshold",
+				"NewSprintSize",
+			},
 		},
 		{
 			"ForkParams",
