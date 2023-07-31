@@ -39,6 +39,7 @@ func TestEncoding_Method(t *testing.T) {
 				StartBlock: big.NewInt(1),
 				EndBlock:   big.NewInt(1),
 			},
+			EpochSize: big.NewInt(10),
 		},
 	}
 

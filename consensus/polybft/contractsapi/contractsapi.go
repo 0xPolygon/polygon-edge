@@ -1454,8 +1454,9 @@ func (e *Epoch) DecodeAbi(buf []byte) error {
 }
 
 type CommitEpochValidatorSetFn struct {
-	ID    *big.Int `abi:"id"`
-	Epoch *Epoch   `abi:"epoch"`
+	ID        *big.Int `abi:"id"`
+	Epoch     *Epoch   `abi:"epoch"`
+	EpochSize *big.Int `abi:"epochSize"`
 }
 
 func (c *CommitEpochValidatorSetFn) Sig() []byte {
@@ -1620,8 +1621,9 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 }
 
 type DistributeRewardForRewardPoolFn struct {
-	EpochID *big.Int  `abi:"epochId"`
-	Uptime  []*Uptime `abi:"uptime"`
+	EpochID   *big.Int  `abi:"epochId"`
+	Uptime    []*Uptime `abi:"uptime"`
+	EpochSize *big.Int  `abi:"epochSize"`
 }
 
 func (d *DistributeRewardForRewardPoolFn) Sig() []byte {
@@ -1658,6 +1660,7 @@ type InitParams struct {
 	NewCheckpointBlockInterval *big.Int      `abi:"newCheckpointBlockInterval"`
 	NewEpochSize               *big.Int      `abi:"newEpochSize"`
 	NewEpochReward             *big.Int      `abi:"newEpochReward"`
+	NewSprintSize              *big.Int      `abi:"newSprintSize"`
 	NewMinValidatorSetSize     *big.Int      `abi:"newMinValidatorSetSize"`
 	NewMaxValidatorSetSize     *big.Int      `abi:"newMaxValidatorSetSize"`
 	NewWithdrawalWaitPeriod    *big.Int      `abi:"newWithdrawalWaitPeriod"`
@@ -1668,7 +1671,7 @@ type InitParams struct {
 	NewProposalThreshold       *big.Int      `abi:"newProposalThreshold"`
 }
 
-var InitParamsABIType = abi.MustNewType("tuple(address newOwner,uint256 newCheckpointBlockInterval,uint256 newEpochSize,uint256 newEpochReward,uint256 newMinValidatorSetSize,uint256 newMaxValidatorSetSize,uint256 newWithdrawalWaitPeriod,uint256 newBlockTime,uint256 newBlockTimeDrift,uint256 newVotingDelay,uint256 newVotingPeriod,uint256 newProposalThreshold)")
+var InitParamsABIType = abi.MustNewType("tuple(address newOwner,uint256 newCheckpointBlockInterval,uint256 newEpochSize,uint256 newEpochReward,uint256 newSprintSize,uint256 newMinValidatorSetSize,uint256 newMaxValidatorSetSize,uint256 newWithdrawalWaitPeriod,uint256 newBlockTime,uint256 newBlockTimeDrift,uint256 newVotingDelay,uint256 newVotingPeriod,uint256 newProposalThreshold)")
 
 func (i *InitParams) EncodeAbi() ([]byte, error) {
 	return InitParamsABIType.Encode(i)
@@ -1692,6 +1695,246 @@ func (i *InitializeNetworkParamsFn) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeNetworkParamsFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NetworkParams.Abi.Methods["initialize"], buf, i)
+}
+
+type NewCheckpointBlockIntervalEvent struct {
+	CheckpointInterval *big.Int `abi:"checkpointInterval"`
+}
+
+func (*NewCheckpointBlockIntervalEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewCheckpointBlockInterval"].ID()
+}
+
+func (*NewCheckpointBlockIntervalEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewCheckpointBlockInterval"].Inputs.Encode(inputs)
+}
+
+func (n *NewCheckpointBlockIntervalEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewCheckpointBlockInterval"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewCheckpointBlockInterval"], log, n)
+}
+
+type NewEpochSizeEvent struct {
+	Size *big.Int `abi:"size"`
+}
+
+func (*NewEpochSizeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewEpochSize"].ID()
+}
+
+func (*NewEpochSizeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewEpochSize"].Inputs.Encode(inputs)
+}
+
+func (n *NewEpochSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewEpochSize"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewEpochSize"], log, n)
+}
+
+type NewEpochRewardEvent struct {
+	Reward *big.Int `abi:"reward"`
+}
+
+func (*NewEpochRewardEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewEpochReward"].ID()
+}
+
+func (*NewEpochRewardEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewEpochReward"].Inputs.Encode(inputs)
+}
+
+func (n *NewEpochRewardEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewEpochReward"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewEpochReward"], log, n)
+}
+
+type NewMinValidatorSetSizeEvent struct {
+	MinValidatorSet *big.Int `abi:"minValidatorSet"`
+}
+
+func (*NewMinValidatorSetSizeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewMinValidatorSetSize"].ID()
+}
+
+func (*NewMinValidatorSetSizeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewMinValidatorSetSize"].Inputs.Encode(inputs)
+}
+
+func (n *NewMinValidatorSetSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewMinValidatorSetSize"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewMinValidatorSetSize"], log, n)
+}
+
+type NewMaxValidatorSetSizeEvent struct {
+	MaxValidatorSet *big.Int `abi:"maxValidatorSet"`
+}
+
+func (*NewMaxValidatorSetSizeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewMaxValidatorSetSize"].ID()
+}
+
+func (*NewMaxValidatorSetSizeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewMaxValidatorSetSize"].Inputs.Encode(inputs)
+}
+
+func (n *NewMaxValidatorSetSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewMaxValidatorSetSize"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewMaxValidatorSetSize"], log, n)
+}
+
+type NewWithdrawalWaitPeriodEvent struct {
+	WithdrawalPeriod *big.Int `abi:"withdrawalPeriod"`
+}
+
+func (*NewWithdrawalWaitPeriodEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewWithdrawalWaitPeriod"].ID()
+}
+
+func (*NewWithdrawalWaitPeriodEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewWithdrawalWaitPeriod"].Inputs.Encode(inputs)
+}
+
+func (n *NewWithdrawalWaitPeriodEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewWithdrawalWaitPeriod"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewWithdrawalWaitPeriod"], log, n)
+}
+
+type NewBlockTimeEvent struct {
+	BlockTime *big.Int `abi:"blockTime"`
+}
+
+func (*NewBlockTimeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewBlockTime"].ID()
+}
+
+func (*NewBlockTimeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewBlockTime"].Inputs.Encode(inputs)
+}
+
+func (n *NewBlockTimeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewBlockTime"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewBlockTime"], log, n)
+}
+
+type NewBlockTimeDriftEvent struct {
+	BlockTimeDrift *big.Int `abi:"blockTimeDrift"`
+}
+
+func (*NewBlockTimeDriftEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewBlockTimeDrift"].ID()
+}
+
+func (*NewBlockTimeDriftEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewBlockTimeDrift"].Inputs.Encode(inputs)
+}
+
+func (n *NewBlockTimeDriftEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewBlockTimeDrift"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewBlockTimeDrift"], log, n)
+}
+
+type NewVotingDelayEvent struct {
+	VotingDelay *big.Int `abi:"votingDelay"`
+}
+
+func (*NewVotingDelayEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewVotingDelay"].ID()
+}
+
+func (*NewVotingDelayEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewVotingDelay"].Inputs.Encode(inputs)
+}
+
+func (n *NewVotingDelayEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewVotingDelay"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewVotingDelay"], log, n)
+}
+
+type NewVotingPeriodEvent struct {
+	VotingPeriod *big.Int `abi:"votingPeriod"`
+}
+
+func (*NewVotingPeriodEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewVotingPeriod"].ID()
+}
+
+func (*NewVotingPeriodEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewVotingPeriod"].Inputs.Encode(inputs)
+}
+
+func (n *NewVotingPeriodEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewVotingPeriod"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewVotingPeriod"], log, n)
+}
+
+type NewProposalThresholdEvent struct {
+	ProposalThreshold *big.Int `abi:"proposalThreshold"`
+}
+
+func (*NewProposalThresholdEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewProposalThreshold"].ID()
+}
+
+func (*NewProposalThresholdEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewProposalThreshold"].Inputs.Encode(inputs)
+}
+
+func (n *NewProposalThresholdEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewProposalThreshold"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewProposalThreshold"], log, n)
+}
+
+type NewSprintSizeEvent struct {
+	Size *big.Int `abi:"size"`
+}
+
+func (*NewSprintSizeEvent) Sig() ethgo.Hash {
+	return NetworkParams.Abi.Events["NewSprintSize"].ID()
+}
+
+func (*NewSprintSizeEvent) Encode(inputs interface{}) ([]byte, error) {
+	return NetworkParams.Abi.Events["NewSprintSize"].Inputs.Encode(inputs)
+}
+
+func (n *NewSprintSizeEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !NetworkParams.Abi.Events["NewSprintSize"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(NetworkParams.Abi.Events["NewSprintSize"], log, n)
 }
 
 type InitializeForkParamsFn struct {
