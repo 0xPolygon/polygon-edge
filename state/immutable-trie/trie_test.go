@@ -55,8 +55,7 @@ func (traceStore) Close() error                           { return nil }
 
 func LoadTrace() (*types.Trace, error) {
 	// Load Trace structure from JSON file.
-	// traceFile, err := os.Open("7410_readable.json")
-	traceFile, err := os.Open("../../test-chain-1/consensus/trace_140.json")
+	traceFile, err := os.Open("7410_readable.json")
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +164,10 @@ func TestTrie_Load(t *testing.T) {
 	// Load the trie from the trace.
 	txn := tt.Txn(ts)
 
-	txn.Insert(types.StringToBytes("0x0000000000000000000000000000000000000000000000000000000000000002"), types.StringToBytes("0x00000000000000000000000000000000000000000000000000000000000048d1"))
+	// txn.Insert(types.StringToBytes("0x0000000000000000000000000000000000000000000000000000000000000002"), types.StringToBytes("0x00000000000000000000000000000000000000000000000000000000000048d1"))
+
+	b := txn.Lookup(types.StringToBytes("0x04e2f49b914b2b5972f4e339e6dc75455852ed61bac5676f58a2b7036def7b18"))
+	t.Logf("value: %s\n", hex.EncodeToString(b))
 
 	for _, txt := range ltr.TxnTraces {
 		je := txt.Delta[addr]

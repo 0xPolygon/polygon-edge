@@ -261,7 +261,7 @@ type JournalEntry struct {
 	Addr Address `json:"address"`
 
 	// Balance tracks changes in the account Balance
-	Balance *big.Int `json:"balance,omitempty"`
+	Balance *big.Int `json:"-"`
 
 	// Nonce tracks changes in the account Nonce
 	Nonce *uint64 `json:"nonce,omitempty"`
