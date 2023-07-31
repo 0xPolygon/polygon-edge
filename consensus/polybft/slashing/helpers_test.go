@@ -1,6 +1,7 @@
 package slashing
 
 import (
+	"crypto/rand"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -117,4 +118,14 @@ func assertSenderMessageMapsSize(t *testing.T, tracker *DoubleSigningTrackerImpl
 	require.Len(t, prepareMsgs, prepareCount)
 	require.Len(t, commitMsgs, commitCount)
 	require.Len(t, roundChangeMsgs, roundChangeCount)
+}
+
+func generateRandomProposalHash(t *testing.T) types.Hash {
+	t.Helper()
+
+	result := make([]byte, types.HashLength)
+	_, err := rand.Reader.Read(result)
+	require.NoError(t, err, "failed to generate random hash")
+
+	return types.BytesToHash(result)
 }

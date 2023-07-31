@@ -169,11 +169,11 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 							evidences = append(evidences, evidence)
 						}
 
-						evidence.messages = append([]*ibftProto.Message{firstMsg}, evidence.messages...)
+						evidence.messages = append(evidence.messages, msg)
 					}
 				}
 
-				evidence.messages = append(evidence.messages, firstMsg)
+				evidence.messages = append([]*ibftProto.Message{firstMsg}, evidence.messages...)
 			}
 		}
 	}

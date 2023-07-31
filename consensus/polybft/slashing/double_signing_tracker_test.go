@@ -1,7 +1,6 @@
 package slashing
 
 import (
-	"fmt"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -20,7 +19,7 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 
 	key := wallet.NewKey(acc)
 
-	proposalHash := types.StringToHash("Hello World.")
+	proposalHash := generateRandomProposalHash(t)
 	prePrepareView := &ibftProto.View{Height: 6, Round: 1}
 	view := &ibftProto.View{Height: 8, Round: 1}
 
@@ -93,7 +92,7 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 		expectedRoundChange[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
 
 		for i := uint64(1); i <= heightsCount; i++ {
-			proposalHash := types.StringToHash(fmt.Sprintf("Proposal#%d", i))
+			proposalHash := generateRandomProposalHash(t)
 			view := &ibftProto.View{Height: i, Round: 1}
 
 			prePrepare := buildPrePrepareMessage(t, view, k, proposalHash)
@@ -192,7 +191,7 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 		{
 			name: "valid message",
 			msgBuilder: func() *ibftProto.Message {
-				proposalHash := types.StringToHash("Lorem Ipsum")
+				proposalHash := generateRandomProposalHash(t)
 				committedSeal, err := key.Sign(proposalHash.Bytes())
 				require.NoError(t, err)
 
@@ -244,7 +243,7 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 
 	key := wallet.NewKey(acc)
 
-	proposalHash := types.StringToHash("dummy proposal")
+	proposalHash := generateRandomProposalHash(t)
 	view := &ibftProto.View{Height: 1, Round: 1}
 
 	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
@@ -274,5 +273,57 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 			currentView := &ibftProto.View{Height: height, Round: round}
 			assertSenderMessageMapsSize(t, tracker, 0, 0, 0, 0, currentView, sender)
 		}
+	}
+}
+
+func TestDoubleSigningTracker_GetEvidences(t *testing.T) {
+	t.Parallel()
+
+	const (
+		prepareMsgsCount = 2
+		commitMsgsCount  = 3
+	)
+
+	acc, err := wallet.GenerateAccount()
+	require.NoError(t, err)
+
+	key := wallet.NewKey(acc)
+	view := &ibftProto.View{Height: 6, Round: 2}
+	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+
+	tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
+
+	prepareMessages := make([]*ibftProto.Message, 0, prepareMsgsCount)
+	commitMessages := make([]*ibftProto.Message, 0, commitMsgsCount)
+
+	for i := 0; i < prepareMsgsCount; i++ {
+		msg := buildPrepareMessage(t, view, key, generateRandomProposalHash(t))
+		prepareMessages = append(prepareMessages, msg)
+		tracker.Handle(msg)
+	}
+
+	for i := 0; i < commitMsgsCount; i++ {
+		msg := buildCommitMessage(t, view, key, generateRandomProposalHash(t))
+		commitMessages = append(commitMessages, msg)
+		tracker.Handle(msg)
+	}
+
+	evidences := tracker.GetEvidences(view.Height)
+	require.Len(t, evidences, 2)
+
+	prepareEvidence := evidences[0]
+	require.Len(t, prepareEvidence.messages, len(prepareMessages))
+
+	commitEvidence := evidences[1]
+	require.Len(t, commitEvidence.messages, len(commitMessages))
+
+	for i, msg := range prepareMessages {
+		t.Log("Index", i)
+		require.Equal(t, msg, prepareEvidence.messages[i])
+	}
+
+	for i, msg := range commitMessages {
+		t.Log("Index", i)
+		require.Equal(t, msg, commitEvidence.messages[i])
 	}
 }
