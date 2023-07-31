@@ -128,20 +128,19 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 			continue
 		}
 
+		msgs.mux.Lock()
 		for msgHeight := range msgs.content {
 			if msgHeight < height {
 				delete(msgs.content, msgHeight)
 			}
 		}
+		msgs.mux.Unlock()
 	}
 }
 
 // GetEvidences returns double signing evidences for the given height
 func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvidence {
-	var (
-		evidences = []*DoubleSignEvidence{}
-		evidence  *DoubleSignEvidence
-	)
+	evidences := []*DoubleSignEvidence{}
 
 	for _, msgType := range ibftProto.MessageType_value {
 		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
@@ -160,17 +159,20 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 					continue
 				}
 
-				firstSig := msgs[0].Signature
+				var evidence *DoubleSignEvidence
+
+				firstMsg := msgs[0]
 				for _, msg := range msgs[1:] {
-					if !bytes.Equal(firstSig, msg.Signature) {
+					if !bytes.Equal(firstMsg.Signature, msg.Signature) {
 						if evidence == nil {
 							evidence = newDoubleSignEvidence(address, round, []*ibftProto.Message{})
 							evidences = append(evidences, evidence)
 						}
 
-						evidence.messages = append(evidence.messages, msg)
+						evidence.messages = append([]*ibftProto.Message{firstMsg}, evidence.messages...)
 					}
 				}
+				evidence.messages = append(evidence.messages, firstMsg)
 			}
 		}
 	}
