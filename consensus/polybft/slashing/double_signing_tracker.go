@@ -37,7 +37,8 @@ type Messages struct {
 	mux     sync.RWMutex
 }
 
-// getSenderMsgsLocked returns messages for given height, round and sender
+// getSenderMsgsLocked returns messages for given height, round and sender.
+// Remark: calling context must have mutex acquired.
 func (m *Messages) getSenderMsgsLocked(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
 	if roundMsgs, ok := m.content[view.Height]; ok {
 		if senderMsgsMap, ok := roundMsgs[view.Round]; ok {
@@ -127,11 +128,13 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 		}
 
 		msgs.mux.Lock()
+
 		for msgHeight := range msgs.content {
 			if msgHeight < height {
 				delete(msgs.content, msgHeight)
 			}
 		}
+
 		msgs.mux.Unlock()
 	}
 }
@@ -145,6 +148,8 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 		if msgs == nil {
 			continue
 		}
+
+		msgs.mux.RLock()
 
 		roundMsgs, ok := msgs.content[height]
 		if !ok {
@@ -174,6 +179,8 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 				evidence.messages = append([]*ibftProto.Message{firstMsg}, evidence.messages...)
 			}
 		}
+
+		msgs.mux.RUnlock()
 	}
 
 	return evidences
