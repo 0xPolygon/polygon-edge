@@ -5,6 +5,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -158,6 +159,11 @@ func FuzzDispatcherBatchRequest(f *testing.F) {
 				{"id":11,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
 				{"id":12,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`,
 		},
+		{
+			batchLimit: 5,
+			blockLimit: 30,
+			body:       "invalid request",
+		},
 	}
 
 	for _, seed := range seeds {
@@ -176,8 +182,10 @@ func FuzzDispatcherBatchRequest(f *testing.F) {
 			},
 		)
 
-		_, _ = dispatcher.HandleWs([]byte(body), mock)
-		_, _ = dispatcher.Handle([]byte(body))
+		_, err := dispatcher.HandleWs([]byte(body), mock)
+		assert.NoError(t, err)
+		_, err = dispatcher.Handle([]byte(body))
+		assert.NoError(t, err)
 	})
 }
 
@@ -214,6 +222,65 @@ func FuzzDispatcherWebsocketConnectionUnsubscribe(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, request string) {
-		_, _ = dispatcher.HandleWs([]byte(request), mockConn)
+		_, err := dispatcher.HandleWs([]byte(request), mockConn)
+		assert.NoError(t, err)
+	})
+}
+
+func FuzzDispatcherWebSocketConnectionRequestFormats(f *testing.F) {
+	store := newMockStore()
+	dispatcher := newTestDispatcher(f,
+		hclog.NewNullLogger(),
+		store,
+		&dispatcherParams{
+			chainID:                 0,
+			priceLimit:              0,
+			jsonRPCBatchLengthLimit: 20,
+			blockRangeLimit:         1000,
+		},
+	)
+	mockConnection, _ := newMockWsConnWithMsgCh()
+
+	seeds := []string{
+		`{
+			"method": "eth_subscribe",
+			"params": ["newHeads"],
+			"id": "abc"
+		}`,
+		`{
+			"method": "eth_subscribe",
+			"params": ["newHeads"],
+			"id": null
+		}`,
+		`{
+			"method": "eth_subscribe",
+			"params": ["newHeads"],
+			"id": 2.1
+		}`,
+		`{
+			"method": "eth_subscribe",
+			"params": ["newHeads"]
+		}`,
+		`{
+			"method": "eth_subscribe",
+			"params": ["newHeads"],
+			"id": 2.0
+		}`,
+		`{
+
+		}`,
+		`{
+			"x": "x",
+			"y": "y",
+			"z": "z",
+		}`,
+	}
+
+	for _, seed := range seeds {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, request string) {
+		_, _ = dispatcher.HandleWs([]byte(request), mockConnection)
 	})
 }
