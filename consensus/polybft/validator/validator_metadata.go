@@ -19,6 +19,11 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
+type ValidatorsProvider interface {
+	// GetValidators returns AccountSet ([]*ValidatorMetadata)
+	GetValidators() (AccountSet, error)
+}
+
 var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4] blsKey, uint256 votingPower)[])`)
 
 // ValidatorMetadata represents a validator metadata (its public identity)

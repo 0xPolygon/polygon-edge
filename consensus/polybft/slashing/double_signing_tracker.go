@@ -9,6 +9,8 @@ import (
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -16,6 +18,7 @@ import (
 var (
 	errViewUndefined           = errors.New("view is undefined")
 	errInvalidMsgType          = errors.New("message type is invalid")
+	errUnknownSender           = errors.New("message sender is not a known validator")
 	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
 )
 
@@ -83,10 +86,13 @@ func createSenderMsgsMap(round uint64, roundMsgs map[uint64]SenderMessagesMap) S
 	return sendersMsgs
 }
 
+var _ DoubleSigningTracker = (*DoubleSigningTrackerImpl)(nil)
+
 type DoubleSigningTracker interface {
 	Handle(msg *ibftProto.Message)
 	GetEvidences(height uint64) []*DoubleSignEvidence
 	PruneMsgsUntil(height uint64)
+	PostBlock(req *common.PostBlockRequest) error
 }
 
 type DoubleSigningTrackerImpl struct {
@@ -95,17 +101,30 @@ type DoubleSigningTrackerImpl struct {
 	commit      *Messages
 	roundChange *Messages
 
-	logger hclog.Logger
+	mux                sync.RWMutex
+	validatorsProvider validator.ValidatorsProvider
+	validators         validator.AccountSet
+	logger             hclog.Logger
 }
 
-func NewDoubleSigningTracker(logger hclog.Logger) *DoubleSigningTrackerImpl {
-	return &DoubleSigningTrackerImpl{
-		logger:      logger,
-		preprepare:  &Messages{content: make(MessagesMap)},
-		prepare:     &Messages{content: make(MessagesMap)},
-		commit:      &Messages{content: make(MessagesMap)},
-		roundChange: &Messages{content: make(MessagesMap)},
+func NewDoubleSigningTracker(logger hclog.Logger,
+	validatorsProvider validator.ValidatorsProvider) (*DoubleSigningTrackerImpl, error) {
+	initialValidators, err := validatorsProvider.GetValidators()
+	if err != nil {
+		return nil, err
 	}
+
+	t := &DoubleSigningTrackerImpl{
+		logger:             logger,
+		validatorsProvider: validatorsProvider,
+		validators:         initialValidators,
+		preprepare:         &Messages{content: make(MessagesMap)},
+		prepare:            &Messages{content: make(MessagesMap)},
+		commit:             &Messages{content: make(MessagesMap)},
+		roundChange:        &Messages{content: make(MessagesMap)},
+	}
+
+	return t, nil
 }
 
 // Handle is implementation of IBFTMessageHandler interface, which handles IBFT consensus messages
@@ -187,6 +206,21 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 	return evidences
 }
 
+// PostBlock is used to populate all known validators
+func (t *DoubleSigningTrackerImpl) PostBlock(_ *common.PostBlockRequest) error {
+	validators, err := t.validatorsProvider.GetValidators()
+	if err != nil {
+		return err
+	}
+
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
+	t.validators = validators
+
+	return nil
+}
+
 // validateMsg validates provided IBFT message
 func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 	if msg.View == nil {
@@ -204,12 +238,21 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 
 	sender := types.BytesToAddress(msg.From)
 
+	t.mux.RLock()
+	defer t.mux.RUnlock()
+
+	// ignore messages which originate from unknown validator
+	if !t.validators.ContainsAddress(sender) {
+		return errUnknownSender
+	}
+
 	// ignore messages where signer and sender are not the same
 	if signer != sender {
 		return errSignerAndSenderMismatch
 	}
 
 	msgsMap := t.resolveMessagesStorage(msg.Type)
+
 	msgsMap.mux.RLock()
 	defer msgsMap.mux.RUnlock()
 
