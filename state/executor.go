@@ -523,7 +523,7 @@ var (
 	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
 	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
 	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
-	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
+	ErrNotEnoughIntrinsicGas = errors.New("not enough gas supplied for intrinsic gas costs")
 
 	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
 	// transaction with a tip higher than the total fee cap.
