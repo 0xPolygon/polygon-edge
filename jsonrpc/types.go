@@ -33,7 +33,7 @@ type transaction struct {
 	BlockHash   *types.Hash    `json:"blockHash"`
 	BlockNumber *argUint64     `json:"blockNumber"`
 	TxIndex     *argUint64     `json:"transactionIndex"`
-	ChainID     *argBig        `json:"chainID,omitempty"`
+	ChainID     *argBig        `json:"chainId,omitempty"`
 	Type        argUint64      `json:"type"`
 }
 
