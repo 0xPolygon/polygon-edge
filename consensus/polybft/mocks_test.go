@@ -380,3 +380,11 @@ func init() {
 	// setup custom hash header func
 	setupHeaderHashFunc()
 }
+
+type dummyValidatorsProvider struct {
+}
+
+// GetValidators returns AccountSet ([]*ValidatorMetadata)
+func (d dummyValidatorsProvider) GetValidators() (validator.AccountSet, error) {
+	return nil, nil
+}
