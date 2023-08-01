@@ -169,7 +169,7 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 		return 0, err
 	}
 
-	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
+	actualCheckpointBlock, err := common.ParseUint64orHex(&checkpointBlockNumRaw)
 	if err != nil {
 		return 0, err
 	}

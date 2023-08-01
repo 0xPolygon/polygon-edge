@@ -3,31 +3,10 @@ package types
 import (
 	"fmt"
 	"math/big"
-	"strconv"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
-
-// ParseUint64orHex parses the given string as uint64 in hex
-// It should go to the common package from the logical perspective
-// as well as avoiding cycle imports.
-// DEPRECATED. Use common.ParseUint64orHex.
-func ParseUint64orHex(val *string) (uint64, error) {
-	if val == nil {
-		return 0, nil
-	}
-
-	str := *val
-	base := 10
-
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-		base = 16
-	}
-
-	return strconv.ParseUint(str, base, 64)
-}
 
 func ParseUint256orHex(val *string) (*big.Int, error) {
 	if val == nil {

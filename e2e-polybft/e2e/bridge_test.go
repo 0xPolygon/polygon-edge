@@ -22,6 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -218,7 +219,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		commitmentIDRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
 		require.NoError(t, err)
 
-		initialCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
+		initialCommittedID, err := helperCommon.ParseUint64orHex(&commitmentIDRaw)
 		require.NoError(t, err)
 
 		initialBlockNum, err := childEthEndpoint.BlockNumber()
@@ -252,7 +253,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 			ethgo.Address(contracts.StateReceiverContract), lastCommittedIDInput)
 		require.NoError(t, err)
 
-		lastCommittedID, err := types.ParseUint64orHex(&commitmentIDRaw)
+		lastCommittedID, err := helperCommon.ParseUint64orHex(&commitmentIDRaw)
 		require.NoError(t, err)
 		require.Equal(t, initialCommittedID+depositsSubset, lastCommittedID)
 
@@ -279,7 +280,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		require.NoError(t, err)
 
 		// check that the second (larger commitment) was also submitted in epoch
-		lastCommittedID, err = types.ParseUint64orHex(&commitmentIDRaw)
+		lastCommittedID, err = helperCommon.ParseUint64orHex(&commitmentIDRaw)
 		require.NoError(t, err)
 		require.Equal(t, initialCommittedID+uint64(transfersCount), lastCommittedID)
 
