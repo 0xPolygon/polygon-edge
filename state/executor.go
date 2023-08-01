@@ -558,16 +558,6 @@ func NewTransitionApplicationError(err error, isRecoverable bool) *TransitionApp
 	}
 }
 
-func IsTransitionApplicationError(err error) bool {
-	var expected *TransitionApplicationError
-
-	if err == nil {
-		return false
-	}
-
-	return errors.As(err, &expected)
-}
-
 type GasLimitReachedTransitionApplicationError struct {
 	TransitionApplicationError
 }
