@@ -578,8 +578,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 			return true
 		}
 
-		transitionErr, ok := err.(*state.TransitionApplicationError)
-		return ok && errors.Is(transitionErr.Err, state.ErrNotEnoughIntrinsicGas)
+		if !state.IsTransitionApplicationError(err) {
+			return false
+		}
+
+		return errors.Is(err.(*state.TransitionApplicationError).Err, state.ErrNotEnoughIntrinsicGas)
 	}
 
 	// Checks if EVM level valid gas errors occurred
