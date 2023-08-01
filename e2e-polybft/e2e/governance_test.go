@@ -40,9 +40,9 @@ const (
 
 func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 	var (
-		oldEpochSize = uint64(10)
-		newEpochSize = uint64(20)
-		votingPeriod = 2 * oldEpochSize
+		oldEpochSize = uint64(5)
+		newEpochSize = uint64(10)
+		votingPeriod = 3 * oldEpochSize
 	)
 
 	cluster := framework.NewTestCluster(t, 5, framework.WithEpochSize(int(oldEpochSize)),
@@ -74,13 +74,12 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		proposalID := sendProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
 			proposalInput, proposalDescription)
 
-		fmt.Println(proposalID)
+		// check that proposal delay finishes, and porposal becomes active (ready to for voting)
+		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+			proposalState := getProposalState(t, proposalID, l2Relayer)
 
-		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
-		require.NoError(t, err)
-
-		// wait couple of blocks until proposal delay finishes
-		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+5, time.Minute))
+			return proposalState == Active
+		}))
 
 		// vote for the proposal
 		for _, s := range cluster.Servers {
@@ -90,22 +89,29 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 			sendVoteTransaction(t, proposalID, For, l2Relayer, voterAcc.Ecdsa)
 		}
 
-		// wait for voting period to end
-		require.NoError(t, cluster.WaitForBlock(votingPeriod+15, 3*time.Minute))
-
 		// check if proposal has quorum (if it was accepted)
-		proposalState := getProposalState(t, proposalID, l2Relayer)
-		require.Equal(t, Succeeded, proposalState)
+		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+			proposalState := getProposalState(t, proposalID, l2Relayer)
+
+			return proposalState == Succeeded
+		}))
 
 		// queue proposal for execution
 		sendQueueProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
 			proposalInput, proposalDescription)
 
-		currentBlockNumber, err = l2Relayer.Client().Eth().BlockNumber()
+		// check if proposal has quorum (if it was accepted)
+		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+			proposalState := getProposalState(t, proposalID, l2Relayer)
+
+			return proposalState == Queued
+		}))
+
+		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
 		require.NoError(t, err)
 
-		// wait for couple of blocks until execution delay passes
-		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+3, 30*time.Second))
+		// wait for couple of more blocks because of execution delay
+		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+2, 10*time.Second))
 
 		// execute proposal
 		sendExecuteProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
@@ -148,7 +154,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		newEpoch := extra.Checkpoint.EpochNumber
 
 		// check that epochs are sequential
-		require.True(t, newEpoch-oldEpoch == 1)
+		require.Equal(t, newEpoch, oldEpoch+1)
 		// check that epoch size actually changed in our consensus
 		require.True(t, endOfNewEpoch-endOfPreviousEpoch == newEpochSize)
 	})
@@ -167,13 +173,12 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		proposalID := sendProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
 			proposalInput, proposalDescription)
 
-		fmt.Println(proposalID)
+		// check that proposal delay finishes, and porposal becomes active (ready to for voting)
+		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+			proposalState := getProposalState(t, proposalID, l2Relayer)
 
-		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
-		require.NoError(t, err)
-
-		// wait couple of blocks until proposal delay finishes
-		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+5, time.Minute))
+			return proposalState == Active
+		}))
 
 		// only the proposer votes for proposal and rest of them vote against
 		sendVoteTransaction(t, proposalID, For, l2Relayer, proposerAcc.Ecdsa)
@@ -184,6 +189,9 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 
 			sendVoteTransaction(t, proposalID, Against, l2Relayer, voterAcc.Ecdsa)
 		}
+
+		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
+		require.NoError(t, err)
 
 		// wait for voting period to end
 		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+votingPeriod+5, 3*time.Minute))
