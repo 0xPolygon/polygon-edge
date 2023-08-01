@@ -142,13 +142,6 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		logger:             logger,
 	}
 
-	tracker, err := slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker"), config.State.StakeStore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize double signing tracker: %w", err)
-	}
-
-	runtime.doubleSigningTracker = tracker
-
 	if err := runtime.initStateSyncManager(log); err != nil {
 		return nil, err
 	}
@@ -166,6 +159,13 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	if err != nil {
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
+
+	tracker, err := slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker"), config.State.StakeStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize double signing tracker: %w", err)
+	}
+
+	runtime.doubleSigningTracker = tracker
 
 	return runtime, nil
 }
