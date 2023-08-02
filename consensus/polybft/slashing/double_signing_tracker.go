@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -100,6 +101,7 @@ type DoubleSigningTrackerImpl struct {
 	commit      *Messages
 	roundChange *Messages
 
+	msgsTypes          []ibftProto.MessageType
 	mux                sync.RWMutex
 	validatorsProvider validator.ValidatorsProvider
 	validators         validator.AccountSet
@@ -123,6 +125,14 @@ func NewDoubleSigningTracker(logger hclog.Logger,
 		roundChange:        &Messages{content: make(MessagesMap)},
 	}
 
+	for _, msgType := range ibftProto.MessageType_value {
+		t.msgsTypes = append(t.msgsTypes, ibftProto.MessageType(msgType))
+	}
+
+	sort.Slice(t.msgsTypes, func(i, j int) bool {
+		return t.msgsTypes[i] < t.msgsTypes[j]
+	})
+
 	return t, nil
 }
 
@@ -140,7 +150,7 @@ func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 
 // PruneMsgsUntil deletes all messages maps until the specified height
 func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
-	for _, msgType := range ibftProto.MessageType_value {
+	for _, msgType := range t.msgsTypes {
 		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
 		if msgs == nil {
 			continue
@@ -162,7 +172,7 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvidence {
 	evidences := []*DoubleSignEvidence{}
 
-	for _, msgType := range ibftProto.MessageType_value {
+	for _, msgType := range t.msgsTypes {
 		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
 		if msgs == nil {
 			continue
