@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -19,9 +18,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
+	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -37,8 +36,8 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 
 	var aliases = []string{"A", "B", "C", "D", "E"}
 
-	validators := validator.NewTestValidatorsWithAliases(t, aliases)
-	validatorsMetadata := validators.GetPublicIdentities()
+	validators := newTestValidatorsWithAliases(t, aliases)
+	validatorsMetadata := validators.getPublicIdentities()
 	txRelayerMock := newDummyTxRelayer(t)
 	txRelayerMock.On("Call", mock.Anything, mock.Anything, mock.Anything).
 		Return("2", error(nil)).
@@ -60,9 +59,9 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 		signatures  bls.Signatures
 	)
 
-	validators.IterAcct(aliases, func(t *validator.TestValidator) {
+	validators.iterAcct(aliases, func(t *testValidator) {
 		bitmap.Set(idx)
-		signatures = append(signatures, t.MustSign(dummyMsg, bls.DomainCheckpointManager))
+		signatures = append(signatures, t.mustSign(dummyMsg, bls.DomainCheckpointManager))
 		idx++
 	})
 
@@ -81,7 +80,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 			extra.Checkpoint = checkpoint
 			extra.Committed = &Signature{Bitmap: bitmap, AggregatedSignature: signature}
 			header = &types.Header{
-				ExtraData: extra.MarshalRLPTo(nil),
+				ExtraData: append(make([]byte, ExtraVanity), extra.MarshalRLPTo(nil)...),
 			}
 			epochNumber++
 		} else {
@@ -97,7 +96,7 @@ func TestCheckpointManager_SubmitCheckpoint(t *testing.T) {
 	blockchainMock := new(blockchainMock)
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
-	validatorAcc := validators.GetValidator("A")
+	validatorAcc := validators.getValidator("A")
 	c := &checkpointManager{
 		key:              wallet.NewEcdsaSigner(validatorAcc.Key()),
 		rootChainRelayer: txRelayerMock,
@@ -123,8 +122,8 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 
 	const epochSize = uint64(10)
 
-	currentValidators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
-	nextValidators := validator.NewTestValidatorsWithAliases(t, []string{"E", "F", "G", "H"})
+	currentValidators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D"})
+	nextValidators := newTestValidatorsWithAliases(t, []string{"E", "F", "G", "H"})
 	header := &types.Header{Number: 50}
 	checkpoint := &CheckpointData{
 		BlockRound:  1,
@@ -139,8 +138,8 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 
 	var signatures bls.Signatures
 
-	currentValidators.IterAcct(nil, func(v *validator.TestValidator) {
-		signatures = append(signatures, v.MustSign(proposalHash, bls.DomainCheckpointManager))
+	currentValidators.iterAcct(nil, func(v *testValidator) {
+		signatures = append(signatures, v.mustSign(proposalHash, bls.DomainCheckpointManager))
 		bmp.Set(i)
 		i++
 	})
@@ -153,18 +152,18 @@ func TestCheckpointManager_abiEncodeCheckpointBlock(t *testing.T) {
 		AggregatedSignature: aggSignature,
 		Bitmap:              bmp,
 	}
-	header.ExtraData = extra.MarshalRLPTo(nil)
+	header.ExtraData = append(make([]byte, signer.IstanbulExtraVanity), extra.MarshalRLPTo(nil)...)
 	header.ComputeHash()
 
 	backendMock := new(polybftBackendMock)
-	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(currentValidators.GetPublicIdentities())
+	backendMock.On("GetValidators", mock.Anything, mock.Anything).Return(currentValidators.getPublicIdentities())
 
 	c := &checkpointManager{
 		blockchain:       &blockchainMock{},
 		consensusBackend: backendMock,
 		logger:           hclog.NewNullLogger(),
 	}
-	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextValidators.GetPublicIdentities())
+	checkpointDataEncoded, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextValidators.getPublicIdentities())
 	require.NoError(t, err)
 
 	submit := &contractsapi.SubmitCheckpointManagerFn{}
@@ -487,7 +486,7 @@ func newDummyTxRelayer(t *testing.T) *dummyTxRelayer {
 	return &dummyTxRelayer{test: t}
 }
 
-func (d *dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
+func (d dummyTxRelayer) Call(from ethgo.Address, to ethgo.Address, input []byte) (string, error) {
 	args := d.Called(from, to, input)
 
 	return args.String(0), args.Error(1)
@@ -506,10 +505,6 @@ func (d *dummyTxRelayer) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Re
 	args := d.Called(txn)
 
 	return args.Get(0).(*ethgo.Receipt), args.Error(1) //nolint:forcetypeassert
-}
-
-func (d *dummyTxRelayer) Client() *jsonrpc.Client {
-	return nil
 }
 
 func getBlockNumberCheckpointSubmitInput(t *testing.T, input []byte) uint64 {

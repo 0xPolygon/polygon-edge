@@ -43,14 +43,10 @@ func (m *mockSnapshot) GetAccount(addr types.Address) (*Account, error) {
 }
 
 func (m *mockSnapshot) GetCode(hash types.Hash) ([]byte, bool) {
-	return nil, true
+	return []byte{0x1}, true
 }
 
-func (m *mockSnapshot) Commit(objs []*Object) (Snapshot, *types.Trace, []byte) {
-	return nil, nil, nil
-}
-
-func newStateWithPreState(preState map[types.Address]*PreState) Snapshot {
+func newStateWithPreState(preState map[types.Address]*PreState) readSnapshot {
 	return &mockSnapshot{state: preState}
 }
 
@@ -68,7 +64,7 @@ func TestSnapshotUpdateData(t *testing.T) {
 	txn.SetState(addr1, hash1, hash2)
 	assert.Equal(t, hash2, txn.GetState(addr1, hash1))
 
-	assert.NoError(t, txn.RevertToSnapshot(ss))
+	txn.RevertToSnapshot(ss)
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 }
 
@@ -89,11 +85,10 @@ func TestTxn_TracesCompaction(t *testing.T) {
 	txn.SetState(addr, types.ZeroHash, oneHash) // updates
 	txn.SetState(addr, oneHash, types.ZeroHash)
 
-	txn.SetCode(addr, []byte{0x1})
 	txn.GetCode(addr)
 
 	txn.TouchAccount(addr)
-	require.Len(t, txn.journal, 20)
+	require.Len(t, txn.journal, 18)
 
 	trace := txn.getCompactJournal()
 	require.Len(t, trace, 1)
@@ -107,7 +102,6 @@ func TestTxn_TracesCompaction(t *testing.T) {
 			types.ZeroHash: oneHash,
 			oneHash:        types.ZeroHash,
 		},
-		Code:     []byte{0x1},
 		CodeRead: []byte{0x1},
 		Touched:  boolTruePtr(),
 		Read:     boolTruePtr(),

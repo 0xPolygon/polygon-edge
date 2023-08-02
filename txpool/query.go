@@ -1,10 +1,6 @@
 package txpool
 
-import (
-	"sync/atomic"
-
-	"github.com/0xPolygon/polygon-edge/types"
-)
+import "github.com/0xPolygon/polygon-edge/types"
 
 /* QUERY methods */
 // Used to query the pool for specific state info.
@@ -49,9 +45,4 @@ func (p *TxPool) GetTxs(inclQueued bool) (
 	allPromoted, allEnqueued = p.accounts.allTxs(inclQueued)
 
 	return
-}
-
-// GetBaseFee returns current base fee
-func (p *TxPool) GetBaseFee() uint64 {
-	return atomic.LoadUint64(&p.baseFee)
 }

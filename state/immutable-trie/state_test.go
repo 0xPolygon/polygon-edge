@@ -13,6 +13,7 @@ func TestState(t *testing.T) {
 func buildPreState(pre state.PreStates) state.Snapshot {
 	storage := NewMemoryStorage()
 	st := NewState(storage)
+	snap := st.NewSnapshot()
 
-	return st.NewSnapshot()
+	return snap
 }

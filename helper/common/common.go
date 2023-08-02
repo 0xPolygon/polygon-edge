@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -14,12 +13,10 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/sethvargo/go-retry"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -28,20 +25,7 @@ var (
 	// Our staking repo is written in JS, as are many other clients
 	// If we use higher value JS will not be able to parse it
 	MaxSafeJSInt = uint64(math.Pow(2, 53) - 2)
-
-	errInvalidDuration = errors.New("invalid duration")
 )
-
-// RetryForever will execute a function until it completes without error
-func RetryForever(ctx context.Context, interval time.Duration, fn func(context.Context) error) {
-	_ = retry.Do(ctx, retry.NewConstant(interval), func(context.Context) error {
-		if err := fn(ctx); err != nil {
-			return retry.RetryableError(err)
-		}
-
-		return nil
-	})
-}
 
 // Min returns the strictly lower number
 func Min(a, b uint64) uint64 {
@@ -61,21 +45,12 @@ func Max(a, b uint64) uint64 {
 	return b
 }
 
-// BigMin returns the smallest of x or y.
-func BigMin(x, y *big.Int) *big.Int {
-	if x.Cmp(y) > 0 {
-		return y
-	}
-
-	return x
-}
-
 func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	switch tx := x.(type) {
 	case float64:
 		return uint64(roundFloat(tx)), nil
 	case string:
-		v, err := ParseUint64orHex(&tx)
+		v, err := types.ParseUint64orHex(&tx)
 		if err != nil {
 			return 0, err
 		}
@@ -86,26 +61,14 @@ func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	}
 }
 
-// ParseUint64orHex parses the given uint64 hex string into the number.
-// It can parse the string with 0x prefix as well.
-func ParseUint64orHex(val *string) (uint64, error) {
-	if val == nil {
-		return 0, nil
-	}
-
-	str := *val
-	base := 10
-
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-		base = 16
-	}
-
-	return strconv.ParseUint(str, base, 64)
-}
-
 func roundFloat(num float64) int64 {
 	return int64(num + math.Copysign(0.5, num))
+}
+
+func ToFixedFloat(num float64, precision int) float64 {
+	output := math.Pow(10, float64(precision))
+
+	return float64(roundFloat(num*output)) / output
 }
 
 // SetupDataDir sets up the data directory and the corresponding sub-directories
@@ -274,42 +237,6 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Duration is a wrapper struct for time.Duration which implements json (un)marshaling
-type Duration struct {
-	time.Duration
-}
-
-func (d Duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.String())
-}
-
-func (d *Duration) UnmarshalJSON(b []byte) error {
-	var (
-		v   interface{}
-		err error
-	)
-
-	if err = json.Unmarshal(b, &v); err != nil {
-		return err
-	}
-
-	switch value := v.(type) {
-	case float64:
-		d.Duration = time.Duration(value)
-
-		return nil
-	case string:
-		d.Duration, err = time.ParseDuration(value)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
-
-	return errInvalidDuration
-}
-
 // GetTerminationSignalCh returns a channel to emit signals by ctrl + c
 func GetTerminationSignalCh() <-chan os.Signal {
 	// wait for the user to quit with ctrl-c
@@ -344,6 +271,8 @@ func PadLeftOrTrim(bb []byte, size int) []byte {
 
 // ExtendByteSlice extends given byte slice by needLength parameter and trims it
 func ExtendByteSlice(b []byte, needLength int) []byte {
+	b = b[:cap(b)]
+
 	if n := needLength - len(b); n > 0 {
 		b = append(b, make([]byte, n)...)
 	}

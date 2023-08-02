@@ -403,7 +403,6 @@ func appendIBFTForks(
 		Type:          ibftType,
 		ValidatorType: validatorType,
 		From:          common.JSONNumber{Value: from},
-		BlockTime:     lastFork.BlockTime,
 	}
 
 	switch ibftType {

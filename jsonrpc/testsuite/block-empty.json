@@ -18,6 +18,5 @@
     "nonce": "0x0a00000000000000",
     "hash": "0x0800000000000000000000000000000000000000000000000000000000000000",
     "transactions": null,
-    "uncles": null,
-    "baseFee": "0xf"
+    "uncles": null
 }

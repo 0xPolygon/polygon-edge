@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -9,7 +8,6 @@ import (
 	"github.com/umbracle/fastrlp"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type codec interface {
@@ -136,40 +134,35 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
 	originalTx := &Transaction{
-		Nonce:     0,
-		GasPrice:  big.NewInt(11),
-		GasFeeCap: big.NewInt(12),
-		GasTipCap: big.NewInt(13),
-		Gas:       11,
-		To:        &addrTo,
-		From:      addrFrom,
-		Value:     big.NewInt(1),
-		Input:     []byte{1, 2},
-		V:         big.NewInt(25),
-		S:         big.NewInt(26),
-		R:         big.NewInt(27),
+		Nonce:    0,
+		GasPrice: big.NewInt(11),
+		Gas:      11,
+		To:       &addrTo,
+		From:     addrFrom,
+		Value:    big.NewInt(1),
+		Input:    []byte{1, 2},
+		V:        big.NewInt(25),
+		S:        big.NewInt(26),
+		R:        big.NewInt(27),
 	}
 
 	txTypes := []TxType{
 		StateTx,
 		LegacyTx,
-		DynamicFeeTx,
 	}
 
 	for _, v := range txTypes {
-		t.Run(v.String(), func(t *testing.T) {
-			originalTx.Type = v
-			originalTx.ComputeHash()
+		originalTx.Type = v
+		originalTx.ComputeHash()
 
-			txRLP := originalTx.MarshalRLP()
+		txRLP := originalTx.MarshalRLP()
 
-			unmarshalledTx := new(Transaction)
-			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
+		unmarshalledTx := new(Transaction)
+		assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
-			unmarshalledTx.ComputeHash()
-			assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
-			assert.Equal(t, originalTx.Hash, unmarshalledTx.Hash)
-		})
+		unmarshalledTx.ComputeHash()
+		assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
+		assert.Equal(t, originalTx.Hash, unmarshalledTx.Hash)
 	}
 }
 
@@ -179,7 +172,6 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 	txTypes := []TxType{
 		StateTx,
 		LegacyTx,
-		DynamicFeeTx,
 	}
 
 	for _, txType := range txTypes {
@@ -187,54 +179,41 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 		testTable := []struct {
 			name          string
 			expectedErr   bool
-			omittedValues map[string]bool
+			ommitedValues map[string]bool
 			fromAddrSet   bool
 		}{
 			{
-				name:        fmt.Sprintf("[%s] Insuficient params", txType),
+				name:        "Insuficient params",
 				expectedErr: true,
-				omittedValues: map[string]bool{
+				ommitedValues: map[string]bool{
 					"Nonce":    true,
 					"GasPrice": true,
 				},
 			},
 			{
-				name:        fmt.Sprintf("[%s] Missing From", txType),
+				name:        "Missing From",
 				expectedErr: false,
-				omittedValues: map[string]bool{
-					"ChainID":    txType != DynamicFeeTx,
-					"GasTipCap":  txType != DynamicFeeTx,
-					"GasFeeCap":  txType != DynamicFeeTx,
-					"GasPrice":   txType == DynamicFeeTx,
-					"AccessList": txType != DynamicFeeTx,
-					"From":       txType != StateTx,
+				ommitedValues: map[string]bool{
+					"From": true,
 				},
-				fromAddrSet: txType == StateTx,
+				fromAddrSet: false,
 			},
 			{
-				name:        fmt.Sprintf("[%s] Address set for state tx only", txType),
-				expectedErr: false,
-				omittedValues: map[string]bool{
-					"ChainID":    txType != DynamicFeeTx,
-					"GasTipCap":  txType != DynamicFeeTx,
-					"GasFeeCap":  txType != DynamicFeeTx,
-					"GasPrice":   txType == DynamicFeeTx,
-					"AccessList": txType != DynamicFeeTx,
-					"From":       txType != StateTx,
-				},
-				fromAddrSet: txType == StateTx,
+				name:          "Address set for state tx only",
+				expectedErr:   false,
+				ommitedValues: map[string]bool{},
+				fromAddrSet:   txType == StateTx,
 			},
 		}
 
 		for _, tt := range testTable {
 			tt := tt
-
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
 				arena := fastrlp.DefaultArenaPool.Get()
 				parser := fastrlp.DefaultParserPool.Get()
-				testData := testRLPData(arena, tt.omittedValues)
+				testData := testRLPData(arena, tt.ommitedValues)
 				v, err := parser.Parse(testData)
 				assert.Nil(t, err)
 
@@ -269,10 +248,6 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 			txType: LegacyTx,
 		},
 		{
-			name:   "DynamicFeeTx",
-			txType: DynamicFeeTx,
-		},
-		{
 			name:        "undefined type",
 			txType:      TxType(0x09),
 			expectedErr: true,
@@ -294,62 +269,56 @@ func TestRLPMarshall_And_Unmarshall_TxType(t *testing.T) {
 	}
 }
 
-func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
+func testRLPData(arena *fastrlp.Arena, ommitValues map[string]bool) []byte {
 	vv := arena.NewArray()
 
-	if omit, _ := omitValues["ChainID"]; !omit {
-		vv.Set(arena.NewBigInt(big.NewInt(0)))
-	}
-
-	if omit, _ := omitValues["Nonce"]; !omit {
+	_, ommit := ommitValues["Nonce"]
+	if !ommit {
 		vv.Set(arena.NewUint(10))
 	}
 
-	if omit, _ := omitValues["GasTipCap"]; !omit {
+	_, ommit = ommitValues["GasPrice"]
+	if !ommit {
 		vv.Set(arena.NewBigInt(big.NewInt(11)))
 	}
 
-	if omit, _ := omitValues["GasFeeCap"]; !omit {
-		vv.Set(arena.NewBigInt(big.NewInt(11)))
-	}
-
-	if omit, _ := omitValues["GasPrice"]; !omit {
-		vv.Set(arena.NewBigInt(big.NewInt(11)))
-	}
-
-	if omit, _ := omitValues["Gas"]; !omit {
+	_, ommit = ommitValues["Gas"]
+	if !ommit {
 		vv.Set(arena.NewUint(12))
 	}
 
-	if omit, _ := omitValues["To"]; !omit {
+	_, ommit = ommitValues["To"]
+	if !ommit {
 		vv.Set(arena.NewBytes((StringToAddress("13")).Bytes()))
 	}
 
-	if omit, _ := omitValues["Value"]; !omit {
+	_, ommit = ommitValues["Value"]
+	if !ommit {
 		vv.Set(arena.NewBigInt(big.NewInt(14)))
 	}
 
-	if omit, _ := omitValues["Input"]; !omit {
+	_, ommit = ommitValues["Input"]
+	if !ommit {
 		vv.Set(arena.NewCopyBytes([]byte{1, 2}))
 	}
 
-	if omit, _ := omitValues["AccessList"]; !omit {
-		vv.Set(arena.NewArray())
-	}
-
-	if omit, _ := omitValues["V"]; !omit {
+	_, ommit = ommitValues["V"]
+	if !ommit {
 		vv.Set(arena.NewBigInt(big.NewInt(15)))
 	}
 
-	if omit, _ := omitValues["R"]; !omit {
+	_, ommit = ommitValues["R"]
+	if !ommit {
 		vv.Set(arena.NewBigInt(big.NewInt(16)))
 	}
 
-	if omit, _ := omitValues["S"]; !omit {
+	_, ommit = ommitValues["S"]
+	if !ommit {
 		vv.Set(arena.NewBigInt(big.NewInt(17)))
 	}
 
-	if omit, _ := omitValues["From"]; !omit {
+	_, ommit = ommitValues["From"]
+	if !ommit {
 		vv.Set(arena.NewBytes((StringToAddress("18")).Bytes()))
 	}
 
@@ -357,36 +326,4 @@ func testRLPData(arena *fastrlp.Arena, omitValues map[string]bool) []byte {
 	testData = vv.MarshalTo(testData)
 
 	return testData
-}
-
-func Test_MarshalCorruptedBytesArray(t *testing.T) {
-	t.Parallel()
-
-	marshal := func(obj func(*fastrlp.Arena) *fastrlp.Value) []byte {
-		ar := fastrlp.DefaultArenaPool.Get()
-		defer fastrlp.DefaultArenaPool.Put(ar)
-
-		return obj(ar).MarshalTo(nil)
-	}
-
-	emptyArray := [8]byte{}
-	corruptedSlice := make([]byte, 32)
-	corruptedSlice[29], corruptedSlice[30], corruptedSlice[31] = 5, 126, 64
-	intOfCorruption := uint64(18_446_744_073_709_551_615) // 2^64-1
-
-	marshalOne := func(ar *fastrlp.Arena) *fastrlp.Value {
-		return ar.NewBytes(corruptedSlice)
-	}
-
-	marshalTwo := func(ar *fastrlp.Arena) *fastrlp.Value {
-		return ar.NewUint(intOfCorruption)
-	}
-
-	marshal(marshalOne)
-
-	require.Equal(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
-
-	marshal(marshalTwo) // without fixing this, marshaling will cause corruption of the corrupted slice
-
-	require.Equal(t, emptyArray[:], corruptedSlice[:len(emptyArray)])
 }

@@ -8,6 +8,7 @@ import (
 	iradix "github.com/hashicorp/go-immutable-radix"
 	"github.com/umbracle/fastrlp"
 
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -101,6 +102,8 @@ func (a *Account) Copy() *Account {
 	return aa
 }
 
+var emptyCodeHash = crypto.Keccak256(nil)
+
 // StateObject is the internal representation of the account
 type StateObject struct {
 	Account   *Account
@@ -109,16 +112,10 @@ type StateObject struct {
 	Deleted   bool
 	DirtyCode bool
 	Txn       *iradix.Txn
-
-	// withFakeStorage signals whether the state object
-	// is using the override full state
-	withFakeStorage bool
 }
 
 func (s *StateObject) Empty() bool {
-	return s.Account.Nonce == 0 &&
-		s.Account.Balance.Sign() == 0 &&
-		bytes.Equal(s.Account.CodeHash, types.EmptyCodeHash.Bytes())
+	return s.Account.Nonce == 0 && s.Account.Balance.Sign() == 0 && bytes.Equal(s.Account.CodeHash, emptyCodeHash)
 }
 
 // Copy makes a copy of the state object
@@ -132,7 +129,6 @@ func (s *StateObject) Copy() *StateObject {
 	ss.Deleted = s.Deleted
 	ss.DirtyCode = s.DirtyCode
 	ss.Code = s.Code
-	ss.withFakeStorage = s.withFakeStorage
 
 	if s.Txn != nil {
 		ss.Txn = s.Txn.CommitOnly().Txn()

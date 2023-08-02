@@ -34,15 +34,16 @@ const (
 )
 
 var (
-	ErrInvalidHookParam           = errors.New("invalid IBFT hook param passed in")
-	ErrProposerSealByNonValidator = errors.New("proposer seal by non-validator")
-	ErrInvalidMixHash             = errors.New("invalid mixhash")
-	ErrInvalidSha3Uncles          = errors.New("invalid sha3 uncles")
-	ErrWrongDifficulty            = errors.New("wrong difficulty")
+	ErrInvalidHookParam             = errors.New("invalid IBFT hook param passed in")
+	ErrProposerSealByNonValidator   = errors.New("proposer seal by non-validator")
+	ErrInvalidMixHash               = errors.New("invalid mixhash")
+	ErrInvalidSha3Uncles            = errors.New("invalid sha3 uncles")
+	ErrWrongDifficulty              = errors.New("wrong difficulty")
+	ErrParentCommittedSealsNotFound = errors.New("parent committed seals not found")
 )
 
 type txPoolInterface interface {
-	Prepare(uint64)
+	Prepare()
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
@@ -490,10 +491,10 @@ func (i *backendIBFT) GetBlockCreator(header *types.Header) (types.Address, erro
 }
 
 // PreCommitState a hook to be called before finalizing state transition on inserting block
-func (i *backendIBFT) PreCommitState(block *types.Block, txn *state.Transition) error {
-	hooks := i.forkManager.GetHooks(block.Number())
+func (i *backendIBFT) PreCommitState(header *types.Header, txn *state.Transition) error {
+	hooks := i.forkManager.GetHooks(header.Number)
 
-	return hooks.PreCommitState(block.Header, txn)
+	return hooks.PreCommitState(header, txn)
 }
 
 // GetEpoch returns the current epoch
@@ -549,11 +550,6 @@ func (i *backendIBFT) SetHeaderHash() {
 // GetBridgeProvider returns an instance of BridgeDataProvider
 func (i *backendIBFT) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
-}
-
-// FilterExtra is the implementation of Consensus interface
-func (i *backendIBFT) FilterExtra(extra []byte) ([]byte, error) {
-	return extra, nil
 }
 
 // updateCurrentModules updates Signer, Hooks, and Validators

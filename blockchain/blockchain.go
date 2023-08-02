@@ -22,14 +22,8 @@ import (
 )
 
 const (
-	// defaultBaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks.
-	defaultBaseFeeChangeDenom = 8
-
-	// blockGasTargetDivisor is the bound divisor of the gas limit, used in update calculations
-	blockGasTargetDivisor uint64 = 1024
-
-	// defaultCacheSize is the default size for Blockchain LRU cache structures
-	defaultCacheSize int = 100
+	BlockGasTargetDivisor uint64 = 1024 // The bound divisor of the gas limit, used in update calculations
+	defaultCacheSize      int    = 100  // The default size for Blockchain LRU cache structures
 )
 
 var (
@@ -72,8 +66,8 @@ type Blockchain struct {
 	// any new fields from being added
 	receiptsCache *lru.Cache // LRU cache for the block receipts
 
-	currentHeader     atomic.Pointer[types.Header] // The current header
-	currentDifficulty atomic.Pointer[big.Int]      // The current difficulty of the chain (total difficulty)
+	currentHeader     atomic.Value // The current header
+	currentDifficulty atomic.Value // The current difficulty of the chain (total difficulty)
 
 	stream *eventStream // Event subscriptions
 
@@ -94,7 +88,7 @@ type Verifier interface {
 	VerifyHeader(header *types.Header) error
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
-	PreCommitState(block *types.Block, txn *state.Transition) error
+	PreCommitState(header *types.Header, txn *state.Transition) error
 }
 
 type Executor interface {
@@ -316,12 +310,22 @@ func (b *Blockchain) setCurrentHeader(h *types.Header, diff *big.Int) {
 
 // Header returns the current header (atomic)
 func (b *Blockchain) Header() *types.Header {
-	return b.currentHeader.Load()
+	header, ok := b.currentHeader.Load().(*types.Header)
+	if !ok {
+		return nil
+	}
+
+	return header
 }
 
 // CurrentTD returns the current total difficulty (atomic)
 func (b *Blockchain) CurrentTD() *big.Int {
-	return b.currentDifficulty.Load()
+	td, ok := b.currentDifficulty.Load().(*big.Int)
+	if !ok {
+		return nil
+	}
+
+	return td
 }
 
 // Config returns the blockchain configuration
@@ -378,7 +382,7 @@ func (b *Blockchain) calculateGasLimit(parentGasLimit uint64) uint64 {
 		return blockGasTarget
 	}
 
-	delta := parentGasLimit * 1 / blockGasTargetDivisor
+	delta := parentGasLimit * 1 / BlockGasTargetDivisor
 	if parentGasLimit < blockGasTarget {
 		// The gas limit is lower than the gas target, so it should
 		// increase towards the target
@@ -693,7 +697,12 @@ func (b *Blockchain) verifyBlock(block *types.Block) (*BlockResult, error) {
 	}
 
 	// Make sure the block body data is valid
-	return b.verifyBlockBody(block)
+	blockResult, err := b.verifyBlockBody(block)
+	if err != nil {
+		return nil, err
+	}
+
+	return blockResult, nil
 }
 
 // verifyBlockParent makes sure that the child block is in line
@@ -835,16 +844,12 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	if err := b.consensus.PreCommitState(block, txn); err != nil {
+	if err := b.consensus.PreCommitState(header, txn); err != nil {
 		return nil, err
 	}
 
-	_, trace, root, err := txn.Commit()
+	_, trace, root := txn.Commit()
 	trace.ParentStateRoot = parent.StateRoot
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
-	}
 
 	// Append the receipts to the receipts cache
 	b.receiptsCache.Add(header.Hash, txn.Receipts())
@@ -1039,7 +1044,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 	gasPrices := make([]*big.Int, len(block.Transactions))
 	for i, transaction := range block.Transactions {
-		gasPrices[i] = transaction.GetGasPrice(block.Header.BaseFee)
+		gasPrices[i] = transaction.GasPrice
 	}
 
 	b.updateGasPriceAvg(gasPrices)
@@ -1141,7 +1146,7 @@ func (b *Blockchain) verifyGasLimit(header *types.Header, parentHeader *types.He
 		diff *= -1
 	}
 
-	limit := parentHeader.GasLimit / blockGasTargetDivisor
+	limit := parentHeader.GasLimit / BlockGasTargetDivisor
 	if uint64(diff) > limit {
 		return fmt.Errorf(
 			"invalid gas limit, limit = %d, want %d +- %d",
@@ -1435,38 +1440,4 @@ func (b *Blockchain) GetBlockByNumber(blockNumber uint64, full bool) (*types.Blo
 // Close closes the DB connection
 func (b *Blockchain) Close() error {
 	return b.db.Close()
-}
-
-// CalculateBaseFee calculates the basefee of the header.
-func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
-	if !b.config.Chain.Params.Forks.IsActive(chain.London, parent.Number) {
-		return chain.GenesisBaseFee
-	}
-
-	parentGasTarget := parent.GasLimit / b.config.Chain.Genesis.BaseFeeEM
-
-	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
-	if parent.GasUsed == parentGasTarget {
-		return parent.BaseFee
-	}
-
-	// If the parent block used more gas than its target, the baseFee should increase.
-	if parent.GasUsed > parentGasTarget {
-		gasUsedDelta := parent.GasUsed - parentGasTarget
-		baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
-
-		return parent.BaseFee + common.Max(baseFeeDelta, 1)
-	}
-
-	// Otherwise, if the parent block used less gas than its target, the baseFee should decrease.
-	gasUsedDelta := parentGasTarget - parent.GasUsed
-	baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
-
-	return common.Max(parent.BaseFee-baseFeeDelta, 0)
-}
-
-func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
-	y := baseFee * gasUsedDelta / parentGasTarget
-
-	return y / defaultBaseFeeChangeDenom
 }

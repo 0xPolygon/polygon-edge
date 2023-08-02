@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -39,10 +38,7 @@ type syncPeerClient struct {
 
 	shouldEmitBlocks bool // flag for emitting blocks in the topic
 	closeCh          chan struct{}
-	closed           atomic.Bool
-
-	peerStatusUpdateChLock   sync.Mutex
-	peerStatusUpdateChClosed bool
+	closed           *uint64 // ACTIVE == 0, CLOSED == non-zero.
 }
 
 func NewSyncPeerClient(
@@ -59,16 +55,14 @@ func NewSyncPeerClient(
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
 		shouldEmitBlocks:       true,
 		closeCh:                make(chan struct{}),
-
-		peerStatusUpdateChLock:   sync.Mutex{},
-		peerStatusUpdateChClosed: false,
+		closed:                 new(uint64),
 	}
 }
 
 // Start processes for SyncPeerClient
 func (m *syncPeerClient) Start() error {
 	// Mark client active.
-	m.closed.Store(false)
+	atomic.StoreUint64(m.closed, 0)
 
 	go m.startNewBlockProcess()
 	go m.startPeerEventProcess()
@@ -82,7 +76,7 @@ func (m *syncPeerClient) Start() error {
 
 // Close terminates running processes for SyncPeerClient
 func (m *syncPeerClient) Close() {
-	if m.closed.Swap(true) {
+	if atomic.SwapUint64(m.closed, 1) > 0 {
 		// Already closed.
 		return
 	}
@@ -101,10 +95,7 @@ func (m *syncPeerClient) Close() {
 		close(m.closeCh)
 	}
 
-	m.peerStatusUpdateChLock.Lock()
-	m.peerStatusUpdateChClosed = true
 	close(m.peerStatusUpdateCh)
-	m.peerStatusUpdateChLock.Unlock()
 }
 
 // DisablePublishingPeerStatus disables publishing own status via gossip
@@ -219,15 +210,16 @@ func (m *syncPeerClient) handleStatusUpdate(obj interface{}, from peer.ID) {
 		return
 	}
 
-	m.peerStatusUpdateChLock.Lock()
-	defer m.peerStatusUpdateChLock.Unlock()
+	if atomic.LoadUint64(m.closed) > 0 {
+		m.logger.Debug("received status from peer after client was closed, ignoring", "id", from)
 
-	if !m.peerStatusUpdateChClosed {
-		m.peerStatusUpdateCh <- &NoForkPeer{
-			ID:       from,
-			Number:   status.Number,
-			Distance: m.network.GetPeerDistance(from),
-		}
+		return
+	}
+
+	m.peerStatusUpdateCh <- &NoForkPeer{
+		ID:       from,
+		Number:   status.Number,
+		Distance: m.network.GetPeerDistance(from),
 	}
 }
 
@@ -381,7 +373,6 @@ func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.
 			}
 
 			if err != nil {
-				metrics.IncrCounter([]string{syncerMetrics, "bad_message"}, 1)
 				errorCh <- err
 
 				break
@@ -389,13 +380,10 @@ func blockStreamToChannel(stream proto.SyncPeer_GetBlocksClient) (<-chan *types.
 
 			block, err := fromProto(protoBlock)
 			if err != nil {
-				metrics.IncrCounter([]string{syncerMetrics, "bad_block"}, 1)
 				errorCh <- err
 
 				break
 			}
-
-			metrics.SetGauge([]string{syncerMetrics, "ingress_bytes"}, float32(len(protoBlock.Block)))
 
 			blockCh <- block
 		}

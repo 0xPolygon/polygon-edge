@@ -6,15 +6,14 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 )
 
 type validatorSnapshot struct {
-	Epoch            uint64               `json:"epoch"`
-	EpochEndingBlock uint64               `json:"epochEndingBlock"`
-	Snapshot         validator.AccountSet `json:"snapshot"`
+	Epoch            uint64     `json:"epoch"`
+	EpochEndingBlock uint64     `json:"epochEndingBlock"`
+	Snapshot         AccountSet `json:"snapshot"`
 }
 
 func (vs *validatorSnapshot) copy() *validatorSnapshot {
@@ -50,8 +49,7 @@ func newValidatorsSnapshotCache(
 // GetSnapshot tries to retrieve the most recent cached snapshot (if any) and
 // applies pending validator set deltas to it.
 // Otherwise, it builds a snapshot from scratch and applies pending validator set deltas.
-func (v *validatorsSnapshotCache) GetSnapshot(
-	blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
+func (v *validatorsSnapshotCache) GetSnapshot(blockNumber uint64, parents []*types.Header) (AccountSet, error) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
@@ -180,12 +178,12 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 	}
 
 	var (
-		snapshot      validator.AccountSet
+		snapshot      AccountSet
 		snapshotEpoch uint64
 	)
 
 	if existingSnapshot == nil {
-		snapshot = validator.AccountSet{}
+		snapshot = AccountSet{}
 	} else {
 		snapshot = existingSnapshot.Snapshot
 		snapshotEpoch = existingSnapshot.Epoch + 1

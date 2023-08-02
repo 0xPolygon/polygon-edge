@@ -45,6 +45,7 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
+		closed:                 new(uint64),
 	}
 
 	// need to register protocol
@@ -230,7 +231,6 @@ func TestStatusPubSub(t *testing.T) {
 }
 
 func TestPeerConnectionUpdateEventCh(t *testing.T) {
-	t.Skip()
 	t.Parallel()
 
 	var (
@@ -354,7 +354,7 @@ func TestPeerConnectionUpdateEventCh(t *testing.T) {
 	wgForGossip.Wait()
 
 	// close to terminate goroutine
-	client.Close()
+	close(client.peerStatusUpdateCh)
 
 	// wait until collecting routine is done
 	wgForConnectingStatus.Wait()
@@ -577,12 +577,10 @@ func Test_EmitMultipleBlocks(t *testing.T) {
 
 	waitForGossip := func(wg *sync.WaitGroup) bool {
 		c := make(chan struct{})
-
 		go func() {
 			defer close(c)
 			wg.Wait()
 		}()
-
 		select {
 		case <-c:
 			return true

@@ -131,18 +131,16 @@ func TestStructTracerClear(t *testing.T) {
 		consumedGas: 512,
 		output:      []byte("output example"),
 		err:         runtime.ErrInsufficientBalance,
-		storage: []map[types.Address]map[types.Hash]types.Hash{
-			{
-				types.StringToAddress("1"): {
-					types.StringToHash("2"): types.StringToHash("3"),
-				},
+		storage: map[types.Address]map[types.Hash]types.Hash{
+			types.StringToAddress("1"): {
+				types.StringToHash("2"): types.StringToHash("3"),
 			},
 		},
-		currentMemory: [][]byte{[]byte("memory example")},
-		currentStack: []([]*big.Int){[]*big.Int{
+		currentMemory: []byte("memory example"),
+		currentStack: []*big.Int{
 			new(big.Int).SetUint64(1),
 			new(big.Int).SetUint64(2),
-		}},
+		},
 	}
 
 	tracer.Clear()
@@ -156,18 +154,16 @@ func TestStructTracerClear(t *testing.T) {
 				EnableStorage:    true,
 				EnableReturnData: true,
 			},
-			reason:      nil,
-			interrupt:   false,
-			logs:        []StructLog{},
-			gasLimit:    0,
-			consumedGas: 0,
-			output:      []byte{},
-			err:         nil,
-			storage: []map[types.Address]map[types.Hash]types.Hash{
-				make(map[types.Address]map[types.Hash]types.Hash),
-			},
-			currentMemory: make([]([]byte), 1),
-			currentStack:  make([]([]*big.Int), 1),
+			reason:        nil,
+			interrupt:     false,
+			logs:          []StructLog{},
+			gasLimit:      0,
+			consumedGas:   0,
+			output:        []byte{},
+			err:           nil,
+			storage:       map[types.Address]map[types.Hash]types.Hash{},
+			currentMemory: []byte{},
+			currentStack:  []*big.Int{},
 		},
 		tracer,
 	)
@@ -187,13 +183,9 @@ func TestStructTracerTxStart(t *testing.T) {
 	assert.Equal(
 		t,
 		&StructTracer{
-			Config: testEmptyConfig,
-			storage: []map[types.Address]map[types.Hash]types.Hash{
-				make(map[types.Address]map[types.Hash]types.Hash),
-			},
-			gasLimit:      gasLimit,
-			currentMemory: make([]([]byte), 1),
-			currentStack:  make([]([]*big.Int), 1),
+			Config:   testEmptyConfig,
+			storage:  make(map[types.Address]map[types.Hash]types.Hash),
+			gasLimit: gasLimit,
 		},
 		tracer,
 	)
@@ -215,14 +207,10 @@ func TestStructTracerTxEnd(t *testing.T) {
 	assert.Equal(
 		t,
 		&StructTracer{
-			Config: testEmptyConfig,
-			storage: []map[types.Address]map[types.Hash]types.Hash{
-				make(map[types.Address]map[types.Hash]types.Hash),
-			},
-			gasLimit:      gasLimit,
-			consumedGas:   gasLimit - gasLeft,
-			currentMemory: make([]([]byte), 1),
-			currentStack:  make([]([]*big.Int), 1),
+			Config:      testEmptyConfig,
+			storage:     make(map[types.Address]map[types.Hash]types.Hash),
+			gasLimit:    gasLimit,
+			consumedGas: gasLimit - gasLeft,
 		},
 		tracer,
 	)
@@ -272,14 +260,10 @@ func TestStructTracerCallEnd(t *testing.T) {
 			output: output,
 			err:    err,
 			expected: &StructTracer{
-				Config: testEmptyConfig,
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
-				output:        output,
-				err:           err,
-				currentMemory: make([]([]byte), 1),
-				currentStack:  make([]([]*big.Int), 1),
+				Config:  testEmptyConfig,
+				storage: make(map[types.Address]map[types.Hash]types.Hash),
+				output:  output,
+				err:     err,
 			},
 		},
 		{
@@ -288,12 +272,8 @@ func TestStructTracerCallEnd(t *testing.T) {
 			output: output,
 			err:    err,
 			expected: &StructTracer{
-				Config: testEmptyConfig,
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
-				currentMemory: make([]([]byte), 1),
-				currentStack:  make([]([]*big.Int), 1),
+				Config:  testEmptyConfig,
+				storage: make(map[types.Address]map[types.Hash]types.Hash),
 			},
 		},
 	}
@@ -321,11 +301,11 @@ func TestStructTracerCaptureState(t *testing.T) {
 	t.Parallel()
 
 	var (
-		memory = [][]byte{[]byte("memory")}
-		stack  = []([]*big.Int){[]*big.Int{
-			big.NewInt(1), /* value */
-			big.NewInt(2), /* key */
-		}}
+		memory = []byte("memory")
+		stack  = []*big.Int{
+			big.NewInt(1),
+			big.NewInt(2),
+		}
 		contractAddress = types.StringToAddress("3")
 		storageValue    = types.StringToHash("4")
 	)
@@ -337,8 +317,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 		tracer *StructTracer
 
 		// input
-		memory          [][]byte
-		stack           [][]*big.Int
+		memory          []byte
+		stack           []*big.Int
 		opCode          int
 		contractAddress types.Address
 		sp              int
@@ -355,7 +335,6 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableMemory: true,
 				},
-				currentMemory: make([]([]byte), 1),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -380,7 +359,6 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStack: true,
 				},
-				currentStack: make([]([]*big.Int), 1),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -405,9 +383,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
+				storage: make(map[types.Address]map[types.Hash]types.Hash),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -429,11 +405,9 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: [](map[types.Address]map[types.Hash]types.Hash){
-					map[types.Address]map[types.Hash]types.Hash{
-						contractAddress: {
-							types.BytesToHash(big.NewInt(2).Bytes()): storageValue,
-						},
+				storage: map[types.Address]map[types.Hash]types.Hash{
+					contractAddress: {
+						types.BytesToHash(big.NewInt(2).Bytes()): storageValue,
 					},
 				},
 			},
@@ -445,9 +419,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
+				storage: make(map[types.Address]map[types.Hash]types.Hash),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -462,13 +434,12 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					{
-						contractAddress: {
-							types.BytesToHash(big.NewInt(2).Bytes()): types.BytesToHash(big.NewInt(1).Bytes()),
-						},
+				storage: map[types.Address]map[types.Hash]types.Hash{
+					contractAddress: {
+						types.BytesToHash(big.NewInt(1).Bytes()): types.BytesToHash(big.NewInt(2).Bytes()),
 					},
-				}},
+				},
+			},
 			expectedVMState: &mockState{},
 		},
 		{
@@ -500,9 +471,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
+				storage: make(map[types.Address]map[types.Hash]types.Hash),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -517,9 +486,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
+				storage: map[types.Address]map[types.Hash]types.Hash{},
 			},
 			expectedVMState: &mockState{},
 		},
@@ -529,9 +496,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
+				storage: make(map[types.Address]map[types.Hash]types.Hash),
 			},
 			memory:          memory,
 			stack:           stack,
@@ -546,9 +511,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				Config: Config{
 					EnableStorage: true,
 				},
-				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
-				},
+				storage: map[types.Address]map[types.Hash]types.Hash{},
 			},
 			expectedVMState: &mockState{},
 		},
@@ -561,8 +524,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			t.Parallel()
 
 			test.tracer.CaptureState(
-				test.memory[0],
-				test.stack[0],
+				test.memory,
+				test.stack,
 				test.opCode,
 				test.contractAddress,
 				test.sp,
@@ -599,8 +562,8 @@ func TestStructTracerExecuteState(t *testing.T) {
 		err             = errors.New("err")
 		refund          = uint64(10000)
 
-		memory  = [][]byte{[]byte("memory sample")}
-		storage = []map[types.Address]map[types.Hash]types.Hash{{
+		memory  = []byte("memory sample")
+		storage = map[types.Address]map[types.Hash]types.Hash{
 			contractAddress: {
 				types.StringToHash("1"): types.StringToHash("2"),
 				types.StringToHash("3"): types.StringToHash("4"),
@@ -609,7 +572,6 @@ func TestStructTracerExecuteState(t *testing.T) {
 				types.StringToHash("5"): types.StringToHash("6"),
 				types.StringToHash("7"): types.StringToHash("8"),
 			},
-		},
 		}
 	)
 
@@ -695,8 +657,8 @@ func TestStructTracerExecuteState(t *testing.T) {
 					Op:            opCode,
 					Gas:           availableGas,
 					GasCost:       cost,
-					Memory:        memory[0],
-					MemorySize:    len(memory[0]),
+					Memory:        memory,
+					MemorySize:    len(memory),
 					Stack:         nil,
 					ReturnData:    nil,
 					Storage:       nil,
@@ -712,10 +674,10 @@ func TestStructTracerExecuteState(t *testing.T) {
 				Config: Config{
 					EnableStack: true,
 				},
-				currentStack: [][]*big.Int{{
+				currentStack: []*big.Int{
 					big.NewInt(1),
 					big.NewInt(2),
-				}},
+				},
 			},
 			contractAddress: contractAddress,
 			ip:              ip,

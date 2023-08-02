@@ -13,12 +13,10 @@ const (
 	KeyType          = "type"
 	KeyTypes         = "types"
 	KeyValidatorType = "validator_type"
-	KeyBlockTime     = "blockTime"
 )
 
 var (
 	ErrUndefinedIBFTConfig = errors.New("IBFT config is not defined")
-	errInvalidBlockTime    = errors.New("invalid block time provided")
 )
 
 // IBFT Fork represents setting in params.engine.ibft of genesis.json
@@ -28,7 +26,6 @@ type IBFTFork struct {
 	Deployment    *common.JSONNumber       `json:"deployment,omitempty"`
 	From          common.JSONNumber        `json:"from"`
 	To            *common.JSONNumber       `json:"to,omitempty"`
-	BlockTime     *common.Duration         `json:"blockTime,omitempty"`
 
 	// PoA
 	Validators validators.Validators `json:"validators,omitempty"`
@@ -45,7 +42,6 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 		Deployment        *common.JSONNumber        `json:"deployment,omitempty"`
 		From              common.JSONNumber         `json:"from"`
 		To                *common.JSONNumber        `json:"to,omitempty"`
-		BlockTime         *common.Duration          `json:"blockTime,omitempty"`
 		Validators        interface{}               `json:"validators,omitempty"`
 		MaxValidatorCount *common.JSONNumber        `json:"maxValidatorCount,omitempty"`
 		MinValidatorCount *common.JSONNumber        `json:"minValidatorCount,omitempty"`
@@ -59,7 +55,6 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 	f.Deployment = raw.Deployment
 	f.From = raw.From
 	f.To = raw.To
-	f.BlockTime = raw.BlockTime
 	f.MaxValidatorCount = raw.MaxValidatorCount
 	f.MinValidatorCount = raw.MinValidatorCount
 
@@ -79,7 +74,11 @@ func (f *IBFTFork) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	return json.Unmarshal(validatorsBytes, f.Validators)
+	if err := json.Unmarshal(validatorsBytes, f.Validators); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // GetIBFTForks returns IBFT fork configurations from chain config
@@ -99,20 +98,6 @@ func GetIBFTForks(ibftConfig map[string]interface{}) (IBFTForks, error) {
 			}
 		}
 
-		var blockTime *common.Duration = nil
-
-		blockTimeGeneric, ok := ibftConfig[KeyBlockTime]
-		if ok {
-			blockTimeRaw, err := json.Marshal(blockTimeGeneric)
-			if err != nil {
-				return nil, errInvalidBlockTime
-			}
-
-			if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
-				return nil, errInvalidBlockTime
-			}
-		}
-
 		return IBFTForks{
 			{
 				Type:          typ,
@@ -120,7 +105,6 @@ func GetIBFTForks(ibftConfig map[string]interface{}) (IBFTForks, error) {
 				ValidatorType: validatorType,
 				From:          common.JSONNumber{Value: 0},
 				To:            nil,
-				BlockTime:     blockTime,
 			},
 		}, nil
 	}

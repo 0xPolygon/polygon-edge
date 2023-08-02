@@ -19,14 +19,10 @@ type GenesisFactoryHook func(config *chain.Chain, engineName string) func(*state
 
 type ConsensusType string
 
-type ForkManagerFactory func(forks *chain.Forks) error
-
-type ForkManagerInitialParamsFactory func(config *chain.Chain) (*chain.ForkParams, error)
-
 const (
 	DevConsensus     ConsensusType = "dev"
 	IBFTConsensus    ConsensusType = "ibft"
-	PolyBFTConsensus ConsensusType = consensusPolyBFT.ConsensusName
+	PolyBFTConsensus ConsensusType = "polybft"
 	DummyConsensus   ConsensusType = "dummy"
 )
 
@@ -48,14 +44,6 @@ var secretsManagerBackends = map[secrets.SecretsManagerType]secrets.SecretsManag
 
 var genesisCreationFactory = map[ConsensusType]GenesisFactoryHook{
 	PolyBFTConsensus: consensusPolyBFT.GenesisPostHookFactory,
-}
-
-var forkManagerFactory = map[ConsensusType]ForkManagerFactory{
-	PolyBFTConsensus: consensusPolyBFT.ForkManagerFactory,
-}
-
-var forkManagerInitialParamsFactory = map[ConsensusType]ForkManagerInitialParamsFactory{
-	PolyBFTConsensus: consensusPolyBFT.ForkManagerInitialParamsFactory,
 }
 
 func ConsensusSupported(value string) bool {

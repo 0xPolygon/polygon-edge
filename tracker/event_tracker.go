@@ -2,17 +2,13 @@ package tracker
 
 import (
 	"context"
-	"time"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/blocktracker"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
 )
-
-const minBlockMaxBacklog = 96
 
 type eventSubscription interface {
 	AddLog(log *ethgo.Log)
@@ -65,41 +61,8 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 
-	blockMaxBacklog := e.numBlockConfirmations * 2
-	if blockMaxBacklog < minBlockMaxBacklog {
-		blockMaxBacklog = minBlockMaxBacklog
-	}
-
+	blockMaxBacklog := e.numBlockConfirmations*2 + 1
 	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
-
-	go func() {
-		<-ctx.Done()
-		blockTracker.Close()
-		store.Close()
-	}()
-
-	// Init and start block tracker concurrently, retrying indefinitely
-	go common.RetryForever(ctx, time.Second, func(context.Context) error {
-		start := time.Now().UTC()
-
-		if err := blockTracker.Init(); err != nil {
-			e.logger.Error("failed to init blocktracker", "error", err)
-
-			return err
-		}
-
-		elapsed := time.Now().UTC().Sub(start) // Calculate the elapsed time
-
-		if err := blockTracker.Start(); err != nil {
-			e.logger.Error("failed to start blocktracker", "error", err)
-
-			return err
-		}
-
-		e.logger.Info("Block tracker has been started", "max backlog", blockMaxBacklog, "init time", elapsed)
-
-		return nil
-	})
 
 	tt, err := tracker.NewTracker(provider.Eth(),
 		tracker.WithBatchSize(10),
@@ -116,16 +79,30 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	// Sync concurrently, retrying indefinitely
-	go common.RetryForever(ctx, time.Second, func(context.Context) error {
-		if err := tt.Sync(ctx); err != nil {
-			e.logger.Error("failed to sync", "error", err)
 
-			return err
+	go func() {
+		if err := blockTracker.Init(); err != nil {
+			e.logger.Error("failed to init blocktracker", "error", err)
+
+			return
 		}
 
-		return nil
-	})
+		if err := blockTracker.Start(); err != nil {
+			e.logger.Error("failed to start blocktracker", "error", err)
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+		blockTracker.Close()
+		store.Close()
+	}()
+
+	go func() {
+		if err := tt.Sync(ctx); err != nil {
+			e.logger.Error("failed to sync", "error", err)
+		}
+	}()
 
 	return nil
 }

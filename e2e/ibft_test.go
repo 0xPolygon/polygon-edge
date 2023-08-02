@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/command/server/config"
 	ibftSigner "github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -18,8 +19,6 @@ import (
 // TestIbft_Transfer sends a transfer transaction (EOA -> EOA)
 // and verifies it was mined
 func TestIbft_Transfer(t *testing.T) {
-	const defaultBlockTime uint64 = 2
-
 	testCases := []struct {
 		name            string
 		blockTime       uint64
@@ -28,7 +27,7 @@ func TestIbft_Transfer(t *testing.T) {
 	}{
 		{
 			name:            "default block time",
-			blockTime:       defaultBlockTime,
+			blockTime:       config.DefaultBlockTime,
 			ibftBaseTimeout: 0, // use default value
 			validatorType:   validators.ECDSAValidatorType,
 		},
@@ -40,7 +39,7 @@ func TestIbft_Transfer(t *testing.T) {
 		},
 		{
 			name:            "with BLS",
-			blockTime:       defaultBlockTime,
+			blockTime:       config.DefaultBlockTime,
 			ibftBaseTimeout: 0, // use default value
 			validatorType:   validators.BLSValidatorType,
 		},

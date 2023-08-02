@@ -12,6 +12,5 @@
     "from": "0x0300000000000000000000000000000000000000",
     "blockHash": null,
     "blockNumber": null,
-    "transactionIndex": null,
-    "type": "0x0"
+    "transactionIndex": null
 }

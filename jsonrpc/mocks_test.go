@@ -196,7 +196,3 @@ func (m *mockStore) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 
 	return ssp, nil
 }
-
-func (m *mockStore) FilterExtra(extra []byte) ([]byte, error) {
-	return extra, nil
-}

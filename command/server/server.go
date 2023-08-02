@@ -57,7 +57,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.configPath,
 		configFlag,
 		"",
-		"the path to the CLI config. Supports .json, .hcl, .yaml, .yml",
+		"the path to the CLI config. Supports .json and .hcl",
 	)
 
 	cmd.Flags().StringVar(
@@ -185,8 +185,15 @@ func setFlags(cmd *cobra.Command) {
 		"maximum number of enqueued transactions per account",
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.BlockTime,
+		blockTimeFlag,
+		defaultConfig.BlockTime,
+		"minimum block time in seconds (at least 1s)",
+	)
+
 	cmd.Flags().StringArrayVar(
-		&params.rawConfig.CorsAllowedOrigins,
+		&params.corsAllowedOrigins,
 		corsOriginFlag,
 		defaultConfig.Headers.AccessControlAllowOrigins,
 		"the CORS header indicating whether any JSON-RPC response can be shared with the specified origin",

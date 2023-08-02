@@ -33,9 +33,6 @@ epochs/
 |--> epochNumber
 	|--> hash -> []*MessageSignatures (json marshalled)
 
-epochs/
-|--> epochNumber -> []*TransferEvent (json marshalled)
-
 validatorSnapshots/
 |--> epochNumber -> *AccountSet (json marshalled)
 */
@@ -113,9 +110,6 @@ func (s *EpochStore) insertEpoch(epoch uint64) error {
 			return err
 		}
 		_, err = epochBucket.CreateBucketIfNotExists(messageVotesBucket)
-		if err != nil {
-			return err
-		}
 
 		return err
 	})
@@ -222,19 +216,4 @@ func (s *EpochStore) epochsDBStats() (*bolt.BucketStats, error) {
 // validatorSnapshotsDBStats returns stats of validators snapshot bucket in db
 func (s *EpochStore) validatorSnapshotsDBStats() (*bolt.BucketStats, error) {
 	return bucketStats(validatorSnapshotsBucket, s.db)
-}
-
-// getNestedBucketInEpoch returns a nested (child) bucket from db associated with given epoch
-func getNestedBucketInEpoch(tx *bolt.Tx, epoch uint64, bucketKey []byte) (*bolt.Bucket, error) {
-	epochBucket, err := getEpochBucket(tx, epoch)
-	if err != nil {
-		return nil, err
-	}
-
-	bucket := epochBucket.Bucket(bucketKey)
-	if bucket == nil {
-		return nil, fmt.Errorf("could not find %v bucket for epoch: %v", string(bucketKey), epoch)
-	}
-
-	return bucket, nil
 }

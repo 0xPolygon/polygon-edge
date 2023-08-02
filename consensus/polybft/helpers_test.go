@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -59,47 +58,39 @@ func createSignature(t *testing.T, accounts []*wallet.Account, hash types.Hash, 
 }
 
 func createTestCommitEpochInput(t *testing.T, epochID uint64,
-	epochSize uint64) *contractsapi.CommitEpochValidatorSetFn {
+	validatorSet AccountSet, epochSize uint64) *contractsapi.CommitEpochChildValidatorSetFn {
 	t.Helper()
+
+	if validatorSet == nil {
+		validatorSet = newTestValidators(t, 5).getPublicIdentities()
+	}
 
 	var startBlock uint64 = 0
 	if epochID > 1 {
 		startBlock = (epochID - 1) * epochSize
 	}
 
-	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
-		ID: new(big.Int).SetUint64(epochID),
+	uptime := &contractsapi.Uptime{
+		EpochID:     new(big.Int).SetUint64(epochID),
+		UptimeData:  []*contractsapi.UptimeData{},
+		TotalBlocks: new(big.Int).SetUint64(epochSize),
+	}
+
+	commitEpoch := &contractsapi.CommitEpochChildValidatorSetFn{
+		ID: uptime.EpochID,
 		Epoch: &contractsapi.Epoch{
 			StartBlock: new(big.Int).SetUint64(startBlock + 1),
 			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
 			EpochRoot:  types.Hash{},
 		},
+		Uptime: uptime,
+	}
+
+	for i := range validatorSet {
+		uptime.AddValidatorUptime(validatorSet[i].Address, int64(epochSize))
 	}
 
 	return commitEpoch
-}
-
-func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
-	validatorSet validator.AccountSet, epochSize uint64) *contractsapi.DistributeRewardForRewardPoolFn {
-	t.Helper()
-
-	if validatorSet == nil {
-		validatorSet = validator.NewTestValidators(t, 5).GetPublicIdentities()
-	}
-
-	uptime := make([]*contractsapi.Uptime, len(validatorSet))
-
-	for i, v := range validatorSet {
-		uptime[i] = &contractsapi.Uptime{
-			Validator:    v.Address,
-			SignedBlocks: new(big.Int).SetUint64(epochSize),
-		}
-	}
-
-	return &contractsapi.DistributeRewardForRewardPoolFn{
-		EpochID: new(big.Int).SetUint64(epochID),
-		Uptime:  uptime,
-	}
 }
 
 func generateStateSyncEvents(t *testing.T, eventsCount int, startIdx uint64) []*contractsapi.StateSyncedEvent {
@@ -143,54 +134,35 @@ func getEpochNumber(t *testing.T, blockNumber, epochSize uint64) uint64 {
 }
 
 // newTestState creates new instance of state used by tests.
-func newTestState(tb testing.TB) *State {
-	tb.Helper()
+func newTestState(t *testing.T) *State {
+	t.Helper()
 
 	dir := fmt.Sprintf("/tmp/consensus-temp_%v", time.Now().UTC().Format(time.RFC3339Nano))
 	err := os.Mkdir(dir, 0775)
 
 	if err != nil {
-		tb.Fatal(err)
+		t.Fatal(err)
 	}
 
 	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
-		tb.Fatal(err)
+		t.Fatal(err)
 	}
 
-	tb.Cleanup(func() {
+	t.Cleanup(func() {
 		if err := os.RemoveAll(dir); err != nil {
-			tb.Fatal(err)
+			t.Fatal(err)
 		}
 	})
 
 	return state
 }
 
-func generateTestAccount(tb testing.TB) *wallet.Account {
-	tb.Helper()
+func generateTestAccount(t *testing.T) *wallet.Account {
+	t.Helper()
 
 	acc, err := wallet.GenerateAccount()
-	require.NoError(tb, err)
+	require.NoError(t, err)
 
 	return acc
-}
-
-// createTestBridgeConfig creates test bridge configuration with hard-coded addresses
-func createTestBridgeConfig() *BridgeConfig {
-	return &BridgeConfig{
-		StateSenderAddr:                   types.StringToAddress("1"),
-		CheckpointManagerAddr:             types.StringToAddress("2"),
-		ExitHelperAddr:                    types.StringToAddress("3"),
-		RootERC20PredicateAddr:            types.StringToAddress("4"),
-		ChildMintableERC20PredicateAddr:   types.StringToAddress("5"),
-		RootNativeERC20Addr:               types.StringToAddress("6"),
-		RootERC721PredicateAddr:           types.StringToAddress("8"),
-		ChildMintableERC721PredicateAddr:  types.StringToAddress("9"),
-		RootERC1155PredicateAddr:          types.StringToAddress("11"),
-		ChildMintableERC1155PredicateAddr: types.StringToAddress("12"),
-		CustomSupernetManagerAddr:         types.StringToAddress("13"),
-		StakeManagerAddr:                  types.StringToAddress("14"),
-		JSONRPCEndpoint:                   "http://localhost:8545",
-	}
 }

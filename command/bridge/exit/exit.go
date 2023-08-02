@@ -79,7 +79,7 @@ func GetCommand() *cobra.Command {
 	exitCmd.Flags().StringVar(
 		&ep.rootJSONRPCAddr,
 		rootJSONRPCFlag,
-		txrelayer.DefaultRPCAddress,
+		"http://127.0.0.1:8545",
 		"the JSON RPC root chain endpoint",
 	)
 
@@ -107,7 +107,7 @@ func run(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	senderKey, err := helper.DecodePrivateKey(ep.senderKey)
+	senderKey, err := helper.GetRootchainPrivateKey(ep.senderKey)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create wallet from private key: %w", err))
 
@@ -218,7 +218,6 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 		From:  sender,
 		To:    &exitHelperAddr,
 		Input: input,
-		Gas:   txrelayer.DefaultGasLimit,
 	}
 
 	return txn, exitEvent, err

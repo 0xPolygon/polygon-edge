@@ -21,19 +21,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
-	"github.com/umbracle/ethgo/wallet"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	empty "google.golang.org/protobuf/types/known/emptypb"
-
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	ibftSwitch "github.com/0xPolygon/polygon-edge/command/ibft/switch"
 	initCmd "github.com/0xPolygon/polygon-edge/command/secrets/init"
 	"github.com/0xPolygon/polygon-edge/command/server"
@@ -49,6 +41,14 @@ import (
 	txpoolProto "github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
+	"github.com/umbracle/ethgo/wallet"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	empty "google.golang.org/protobuf/types/known/emptypb"
 )
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -83,7 +83,7 @@ func NewTestServer(t *testing.T, rootDir string, callback TestServerConfigCallba
 		LibP2PPort:    ports[1].Port(),
 		JSONRPCPort:   ports[2].Port(),
 		RootDir:       rootDir,
-		Signer:        crypto.NewSigner(chain.AllForksEnabled.At(0), 100),
+		Signer:        crypto.NewEIP155Signer(chain.AllForksEnabled.At(0), 100),
 		ValidatorType: validators.ECDSAValidatorType,
 	}
 
@@ -277,13 +277,6 @@ func (t *TestServer) GenerateGenesis() error {
 		args = append(args, "--premine", acct.Addr.String()+":0x"+acct.Balance.Text(16))
 	}
 
-	// provide block time flag
-	// (e2e framework expects BlockTime parameter to be provided in seconds)
-	if t.Config.BlockTime != 0 {
-		args = append(args, "--block-time",
-			(time.Duration(t.Config.BlockTime) * time.Second).String())
-	}
-
 	// add consensus flags
 	switch t.Config.Consensus {
 	case ConsensusIBFT:
@@ -345,21 +338,6 @@ func (t *TestServer) GenerateGenesis() error {
 
 	blockGasLimit := strconv.FormatUint(t.Config.BlockGasLimit, 10)
 	args = append(args, "--block-gas-limit", blockGasLimit)
-
-	// add base fee
-	if t.Config.BaseFee != 0 {
-		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
-	}
-
-	// add burn contracts
-	if len(t.Config.BurnContracts) != 0 {
-		for block, addr := range t.Config.BurnContracts {
-			args = append(args, "--burn-contract", fmt.Sprintf("%d:%s", block, addr))
-		}
-	} else {
-		// london hardfork is enabled by default so there must be a default burn contract
-		args = append(args, "--burn-contract", "0:0x0000000000000000000000000000000000000000")
-	}
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
@@ -449,6 +427,10 @@ func (t *TestServer) Start(ctx context.Context) error {
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
 		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
+	}
+
+	if t.Config.BlockTime != 0 {
+		args = append(args, "--block-time", strconv.FormatUint(t.Config.BlockTime, 10))
 	}
 
 	if t.Config.IBFTBaseTimeout != 0 {
@@ -626,6 +608,12 @@ func (t *Txn) GasLimit(gas uint64) *Txn {
 	return t
 }
 
+func (t *Txn) GasPrice(price uint64) *Txn {
+	t.raw.GasPrice = price
+
+	return t
+}
+
 func (t *Txn) Nonce(nonce uint64) *Txn {
 	t.raw.Nonce = nonce
 
@@ -634,18 +622,8 @@ func (t *Txn) Nonce(nonce uint64) *Txn {
 
 func (t *Txn) sendImpl() error {
 	// populate default values
-	if t.raw.Gas == 0 {
-		t.raw.Gas = 1048576
-	}
-
-	if t.raw.GasPrice == 0 {
-		gasPrice, err := t.client.GasPrice()
-		if err != nil {
-			return fmt.Errorf("failed to get gas price: %w", err)
-		}
-
-		t.raw.GasPrice = gasPrice
-	}
+	t.raw.Gas = 1048576
+	t.raw.GasPrice = 1048576
 
 	if t.raw.Nonce == 0 {
 		nextNonce, err := t.client.GetNonce(t.key.Address(), ethgo.Latest)

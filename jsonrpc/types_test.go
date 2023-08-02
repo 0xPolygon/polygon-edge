@@ -143,62 +143,62 @@ func TestBlock_Copy(t *testing.T) {
 var testsuite embed.FS
 
 func TestBlock_Encoding(t *testing.T) {
-	getBlock := func() block {
-		return block{
-			ParentHash:   types.Hash{0x1},
-			Sha3Uncles:   types.Hash{0x2},
-			Miner:        types.Address{0x1}.Bytes(),
-			StateRoot:    types.Hash{0x4},
-			TxRoot:       types.Hash{0x5},
-			ReceiptsRoot: types.Hash{0x6},
-			LogsBloom:    types.Bloom{0x0},
-			Difficulty:   10,
-			Number:       11,
-			GasLimit:     12,
-			GasUsed:      13,
-			Timestamp:    14,
-			ExtraData:    []byte{97, 98, 99, 100, 101, 102},
-			MixHash:      types.Hash{0x7},
-			Nonce:        types.Nonce{10},
-			Hash:         types.Hash{0x8},
-			BaseFee:      15,
-		}
+	b := block{
+		ParentHash:   types.Hash{0x1},
+		Sha3Uncles:   types.Hash{0x2},
+		Miner:        types.Address{0x1}.Bytes(),
+		StateRoot:    types.Hash{0x4},
+		TxRoot:       types.Hash{0x5},
+		ReceiptsRoot: types.Hash{0x6},
+		LogsBloom:    types.Bloom{0x0},
+		Difficulty:   10,
+		Number:       11,
+		GasLimit:     12,
+		GasUsed:      13,
+		Timestamp:    14,
+		ExtraData:    []byte{97, 98, 99, 100, 101, 102},
+		MixHash:      types.Hash{0x7},
+		Nonce:        types.Nonce{10},
+		Hash:         types.Hash{0x8},
 	}
 
-	testBlock := func(name string, b block) {
+	testBlock := func(name string) {
 		res, err := json.Marshal(b)
 		require.NoError(t, err)
 
 		data, err := testsuite.ReadFile(name)
 		require.NoError(t, err)
-		require.JSONEq(t, string(data), string(res))
+
+		data = removeWhiteSpace(data)
+		require.Equal(t, res, data)
 	}
 
 	t.Run("empty block", func(t *testing.T) {
-		testBlock("testsuite/block-empty.json", getBlock())
-	})
-
-	t.Run("block with no base fee", func(t *testing.T) {
-		b := getBlock()
-		b.BaseFee = 0
-		testBlock("testsuite/block-with-no-basefee.json", b)
+		testBlock("testsuite/block-empty.json")
 	})
 
 	t.Run("block with transaction hashes", func(t *testing.T) {
-		b := getBlock()
 		b.Transactions = []transactionOrHash{
 			transactionHash{0x8},
 		}
-		testBlock("testsuite/block-with-txn-hashes.json", b)
+		testBlock("testsuite/block-with-txn-hashes.json")
 	})
 
 	t.Run("block with transaction bodies", func(t *testing.T) {
-		b := getBlock()
 		b.Transactions = []transactionOrHash{
 			mockTxn(),
 		}
-		testBlock("testsuite/block-with-txn-bodies.json", b)
+		testBlock("testsuite/block-with-txn-bodies.json")
 	})
+}
+
+func removeWhiteSpace(d []byte) []byte {
+	s := string(d)
+	s = strings.Replace(s, "\n", "", -1)
+	s = strings.Replace(s, "\t", "", -1)
+	s = strings.Replace(s, " ", "", -1)
+
+	return []byte(s)
 }
 
 func mockTxn() *transaction {
@@ -219,46 +219,34 @@ func mockTxn() *transaction {
 		BlockHash:   &types.ZeroHash,
 		BlockNumber: argUintPtr(1),
 		TxIndex:     argUintPtr(2),
-		Type:        argUint64(types.LegacyTx),
 	}
 
 	return tt
 }
 
 func TestTransaction_Encoding(t *testing.T) {
-	testTransaction := func(name string, tt *transaction) {
+	tt := mockTxn()
+
+	testTransaction := func(name string) {
 		res, err := json.Marshal(tt)
 		require.NoError(t, err)
 
 		data, err := testsuite.ReadFile(name)
 		require.NoError(t, err)
-		require.JSONEq(t, string(data), string(res))
+
+		data = removeWhiteSpace(data)
+		require.Equal(t, res, data)
 	}
 
 	t.Run("sealed", func(t *testing.T) {
-		tt := mockTxn()
-
-		testTransaction("testsuite/transaction-sealed.json", tt)
+		testTransaction("testsuite/transaction-sealed.json")
 	})
 
 	t.Run("pending", func(t *testing.T) {
-		tt := mockTxn()
 		tt.BlockHash = nil
 		tt.BlockNumber = nil
 		tt.TxIndex = nil
 
-		testTransaction("testsuite/transaction-pending.json", tt)
-	})
-
-	t.Run("eip-1559", func(t *testing.T) {
-		gasTipCap := argBig(*big.NewInt(10))
-		gasFeeCap := argBig(*big.NewInt(10))
-
-		tt := mockTxn()
-		tt.GasTipCap = &gasTipCap
-		tt.GasFeeCap = &gasFeeCap
-		tt.Type = argUint64(types.DynamicFeeTx)
-
-		testTransaction("testsuite/transaction-eip1559.json", tt)
+		testTransaction("testsuite/transaction-pending.json")
 	})
 }

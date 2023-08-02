@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
 )
 
 var (
@@ -554,7 +555,10 @@ func TestEth_State_GetStorageAt(t *testing.T) {
 				}
 				account := store.account
 				for index, data := range storage {
-					account.Storage(index, data.Bytes())
+					a := &fastrlp.Arena{}
+					value := a.NewBytes(data.Bytes())
+					newData := value.MarshalTo(nil)
+					account.Storage(index, newData)
 				}
 			}
 
@@ -612,7 +616,10 @@ func getExampleStore() *mockSpecialStore {
 // the latest block gas limit for the upper bound, or the specified
 // gas limit in the transaction
 func TestEth_EstimateGas_GasLimit(t *testing.T) {
-	t.Parallel()
+	//nolint:godox
+	// TODO Make this test run in parallel when the race condition is fixed in gas estimation (to be fixed in EVM-523)
+	store := getExampleStore()
+	ethEndpoint := newTestEthEndpoint(store)
 
 	testTable := []struct {
 		name             string
@@ -647,14 +654,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 	}
 
 	for _, testCase := range testTable {
-		testCase := testCase
-
 		t.Run(testCase.name, func(t *testing.T) {
-			t.Parallel()
-
-			store := getExampleStore()
-			ethEndpoint := newTestEthEndpoint(store)
-
 			// Set up the apply hook
 			if errors.Is(testCase.expectedError, state.ErrNotEnoughIntrinsicGas) {
 				// We want to trigger a situation where no value in the gas range is correct
@@ -840,7 +840,7 @@ func (m *mockSpecialStore) GetForksInTime(blockNumber uint64) chain.ForksInTime 
 	return chain.ForksInTime{}
 }
 
-func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction, overrides types.StateOverride) (*runtime.ExecutionResult, error) {
+func (m *mockSpecialStore) ApplyTxn(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error) {
 	if m.applyTxnHook != nil {
 		return m.applyTxnHook(header, txn)
 	}

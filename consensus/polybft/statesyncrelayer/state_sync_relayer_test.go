@@ -5,17 +5,13 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
-
-var _ txrelayer.TxRelayer = (*txRelayerMock)(nil)
 
 type txRelayerMock struct {
 	mock.Mock
@@ -37,10 +33,6 @@ func (t *txRelayerMock) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Rec
 	args := t.Called(txn)
 
 	return nil, args.Error(1)
-}
-
-func (t *txRelayerMock) Client() *jsonrpc.Client {
-	return nil
 }
 
 func Test_executeStateSync(t *testing.T) {
@@ -101,7 +93,7 @@ func Test_sanitizeRPCEndpoint(t *testing.T) {
 		{
 			"empty endpoint",
 			"",
-			txrelayer.DefaultRPCAddress,
+			"http://127.0.0.1:8545",
 		},
 	}
 
@@ -123,7 +115,7 @@ func TestStateSyncRelayer_Stop(t *testing.T) {
 	key, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	r := NewRelayer("test-chain-1", txrelayer.DefaultRPCAddress, ethgo.Address(contracts.StateReceiverContract), 0, hclog.NewNullLogger(), key)
+	r := NewRelayer("test-chain-1", "http://127.0.0.1:8545", ethgo.Address(contracts.StateReceiverContract), 0, hclog.NewNullLogger(), key)
 
 	require.NotPanics(t, func() { r.Stop() })
 }

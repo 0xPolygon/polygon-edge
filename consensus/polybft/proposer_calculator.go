@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -20,7 +19,7 @@ var (
 
 // PrioritizedValidator holds ValidatorMetadata together with priority
 type PrioritizedValidator struct {
-	Metadata         *validator.ValidatorMetadata
+	Metadata         *ValidatorMetadata
 	ProposerPriority *big.Int
 }
 
@@ -53,7 +52,7 @@ func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, err
 }
 
 // NewProposerSnapshot creates ProposerSnapshot with height and validators with all priorities set to zero
-func NewProposerSnapshot(height uint64, validators []*validator.ValidatorMetadata) *ProposerSnapshot {
+func NewProposerSnapshot(height uint64, validators []*ValidatorMetadata) *ProposerSnapshot {
 	validatorsSnap := make([]*PrioritizedValidator, len(validators))
 
 	for i, x := range validators {
@@ -236,7 +235,7 @@ func (pc *ProposerCalculator) updatePerBlock(blockNumber uint64) error {
 		return fmt.Errorf("cannot get block header and extra while updating proposers snapshot %d: %w", blockNumber, err)
 	}
 
-	var newValidatorSet validator.AccountSet = nil
+	var newValidatorSet AccountSet = nil
 
 	if extra.Validators != nil && !extra.Validators.IsEmpty() {
 		newValidatorSet, err = pc.config.polybftBackend.GetValidators(blockNumber, nil)
@@ -295,7 +294,7 @@ func incrementProposerPriorityNTimes(snapshot *ProposerSnapshot, times uint64) (
 	return proposer, nil
 }
 
-func updateValidators(snapshot *ProposerSnapshot, newValidatorSet validator.AccountSet) error {
+func updateValidators(snapshot *ProposerSnapshot, newValidatorSet AccountSet) error {
 	if newValidatorSet.Len() == 0 {
 		return nil
 	}

@@ -4,10 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -18,6 +14,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
+	"github.com/hashicorp/go-hclog"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -83,9 +82,6 @@ func newTestTransition(
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
-		BurnContract: map[uint64]types.Address{
-			0: types.ZeroAddress,
-		},
 	}, st, hclog.NewNullLogger())
 
 	rootHash, err := ex.WriteGenesis(nil, types.Hash{})

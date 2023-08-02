@@ -1,26 +1,22 @@
 package command
 
 import (
-	"github.com/umbracle/ethgo"
-
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/server"
+	"github.com/umbracle/ethgo"
 )
 
 const (
-	DefaultGenesisFileName  = "genesis.json"
-	DefaultChainName        = "polygon-edge"
-	DefaultChainID          = 100
-	DefaultConsensus        = server.PolyBFTConsensus
-	DefaultGenesisGasUsed   = 458752  // 0x70000
-	DefaultGenesisGasLimit  = 5242880 // 0x500000
-	DefaultGenesisBaseFeeEM = chain.GenesisBaseFeeEM
+	DefaultGenesisFileName = "genesis.json"
+	DefaultChainName       = "polygon-edge"
+	DefaultChainID         = 100
+	DefaultConsensus       = server.PolyBFTConsensus
+	DefaultGenesisGasUsed  = 458752  // 0x70000
+	DefaultGenesisGasLimit = 5242880 // 0x500000
 )
 
 var (
 	DefaultStake          = ethgo.Ether(1e6)
 	DefaultPremineBalance = ethgo.Ether(1e6)
-	DefaultGenesisBaseFee = chain.GenesisBaseFee
 )
 
 const (

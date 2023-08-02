@@ -3,8 +3,6 @@ package evm
 import (
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/state/runtime"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,7 +68,7 @@ func TestStackOverflow(t *testing.T) {
 	s.host = &mockHost{}
 
 	_, err = s.Run()
-	assert.Equal(t, &runtime.StackOverflowError{StackLen: stackSize + 1, Limit: stackSize}, err)
+	assert.Equal(t, errStackOverflow, err)
 }
 
 func TestStackUnderflow(t *testing.T) {
@@ -101,8 +99,7 @@ func TestStackUnderflow(t *testing.T) {
 	s.host = &mockHost{}
 
 	_, err = s.Run()
-	// need at least one operation on the stack
-	assert.Equal(t, &runtime.StackUnderflowError{StackLen: 0, Required: 1}, err)
+	assert.Equal(t, errStackUnderflow, err)
 }
 
 func TestOpcodeNotFound(t *testing.T) {

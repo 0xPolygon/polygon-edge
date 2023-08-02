@@ -5,34 +5,30 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var (
-	addr1 = types.StringToAddress("1")
-	addr2 = types.StringToAddress("2")
+var addr1 = types.StringToAddress("1")
+var addr2 = types.StringToAddress("2")
 
-	hash0 = types.StringToHash("0")
-	hash1 = types.StringToHash("1")
-	hash2 = types.StringToHash("2")
+var hash0 = types.StringToHash("0")
+var hash1 = types.StringToHash("1")
+var hash2 = types.StringToHash("2")
 
-	defaultPreState = map[types.Address]*PreState{
-		addr1: {
-			State: map[types.Hash]types.Hash{
-				hash1: hash1,
-			},
+var defaultPreState = map[types.Address]*PreState{
+	addr1: {
+		State: map[types.Hash]types.Hash{
+			hash1: hash1,
 		},
-	}
-)
+	},
+}
 
 // PreState is the account prestate
 type PreState struct {
-	Nonce    uint64
-	Balance  uint64
-	State    map[types.Hash]types.Hash
-	CodeHash []byte
+	Nonce   uint64
+	Balance uint64
+	State   map[types.Hash]types.Hash
 }
 
 // PreStates is a set of pre states
@@ -45,80 +41,65 @@ func TestState(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 	t.Parallel()
 
-	t.Run("write state", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testWriteState(t, buildPreState)
 	})
-	t.Run("write empty state", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testWriteEmptyState(t, buildPreState)
 	})
-	t.Run("update state with empty - delete empty objects", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
-		testUpdateStateWithEmpty(t, buildPreState, true)
+		testUpdateStateWithEmpty(t, buildPreState)
 	})
-	t.Run("update state with empty - do not delete empty objects", func(t *testing.T) {
-		t.Parallel()
-
-		testUpdateStateWithEmpty(t, buildPreState, false)
-	})
-	t.Run("suicide account in pre-state", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideAccountInPreState(t, buildPreState)
 	})
-	t.Run("suicide account", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideAccount(t, buildPreState)
 	})
-	t.Run("suicide account with data", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideAccountWithData(t, buildPreState)
 	})
-	t.Run("suicide coinbase", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideCoinbase(t, buildPreState)
 	})
-	t.Run("suicide with intermediate commit", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testSuicideWithIntermediateCommit(t, buildPreState)
 	})
-	t.Run("restart refunds", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testRestartRefunds(t, buildPreState)
 	})
-	t.Run("change pre-state account balance to zero", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testChangePrestateAccountBalanceToZero(t, buildPreState)
 	})
-	t.Run("change account balance to zero", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testChangeAccountBalanceToZero(t, buildPreState)
 	})
-	t.Run("delete common state root", func(t *testing.T) {
+	t.Run("", func(t *testing.T) {
 		t.Parallel()
 
 		testDeleteCommonStateRoot(t, buildPreState)
-	})
-	t.Run("get code empty code hash", func(t *testing.T) {
-		t.Parallel()
-
-		testGetCodeEmptyCodeHash(t, buildPreState)
-	})
-	t.Run("set and get code", func(t *testing.T) {
-		t.Parallel()
-
-		testSetAndGetCode(t, buildPreState)
 	})
 }
 
@@ -138,19 +119,13 @@ func testDeleteCommonStateRoot(t *testing.T, buildPreState buildPreState) {
 	txn.SetState(addr2, hash1, hash1)
 	txn.SetState(addr2, hash2, hash1)
 
-	objs, err := txn.Commit(false)
-	require.NoError(t, err)
-
-	snap2, _, _ := snap.Commit(objs)
+	snap2, _, _ := snap.Commit(txn.Commit(false))
 	txn2 := newTxn(snap2)
 
 	txn2.SetState(addr1, hash0, hash0)
 	txn2.SetState(addr1, hash1, hash0)
 
-	objs, err = txn2.Commit(false)
-	require.NoError(t, err)
-
-	snap3, _, _ := snap2.Commit(objs)
+	snap3, _, _ := snap2.Commit(txn2.Commit(false))
 
 	txn3 := newTxn(snap3)
 	assert.Equal(t, hash1, txn3.GetState(addr1, hash2))
@@ -171,10 +146,7 @@ func testWriteState(t *testing.T, buildPreState buildPreState) {
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
 	assert.Equal(t, hash2, txn.GetState(addr1, hash2))
 
-	objs, err := txn.Commit(false)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(false))
 
 	txn = newTxn(snap)
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
@@ -189,11 +161,7 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 
 	// Without EIP150 the data is added
 	txn.SetState(addr1, hash1, hash0)
-
-	objs, err := txn.Commit(false)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(false))
 
 	txn = newTxn(snap)
 	assert.True(t, txn.Exist(addr1))
@@ -203,17 +171,13 @@ func testWriteEmptyState(t *testing.T, buildPreState buildPreState) {
 
 	// With EIP150 the empty data is removed
 	txn.SetState(addr1, hash1, hash0)
-
-	objs, err = txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 	assert.False(t, txn.Exist(addr1))
 }
 
-func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState, deleteEmptyObjects bool) {
+func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState) {
 	t.Helper()
 
 	// If the state (in prestate) is updated to empty it should be removed
@@ -222,38 +186,13 @@ func testUpdateStateWithEmpty(t *testing.T, buildPreState buildPreState, deleteE
 	txn := newTxn(snap)
 	txn.SetState(addr1, hash1, hash0)
 
-	objs, err := txn.Commit(deleteEmptyObjects)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
-
-	txn = newTxn(snap)
-	assert.Equal(t, !deleteEmptyObjects, txn.Exist(addr1))
-
-	// if balance is set, no matter what is passed to deleteEmptyObjects,
-	// addr1 should exist in state objects of txn
-	txn.SetBalance(addr1, big.NewInt(100))
-
-	objs, err = txn.Commit(deleteEmptyObjects)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	//nolint:godox
+	// TODO, test with false (should not be deleted) (to be fixed in EVM-528)
+	// TODO, test with balance on the account and nonce (to be fixed in EVM-528)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
-	assert.Equal(t, true, txn.Exist(addr1))
-
-	// if nonce is set, no matter what is passed to deleteEmptyObjects,
-	// addr1 should exist in state objects of txn
-	txn.SetBalance(addr1, big.NewInt(0))
-	txn.SetNonce(addr1, 1)
-
-	objs, err = txn.Commit(deleteEmptyObjects)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
-
-	txn = newTxn(snap)
-	assert.Equal(t, true, txn.Exist(addr1))
+	assert.False(t, txn.Exist(addr1))
 }
 
 func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
@@ -264,11 +203,7 @@ func testSuicideAccountInPreState(t *testing.T, buildPreState buildPreState) {
 
 	txn := newTxn(snap)
 	txn.Suicide(addr1)
-
-	objs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 	assert.False(t, txn.Exist(addr1))
@@ -286,10 +221,7 @@ func testSuicideAccount(t *testing.T, buildPreState buildPreState) {
 	// Note, even if has commit suicide it still exists in the current txn
 	assert.True(t, txn.Exist(addr1))
 
-	objs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 	assert.False(t, txn.Exist(addr1))
@@ -310,11 +242,7 @@ func testSuicideAccountWithData(t *testing.T, buildPreState buildPreState) {
 	txn.SetState(addr1, hash1, hash1)
 
 	txn.Suicide(addr1)
-
-	objs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 
@@ -337,10 +265,7 @@ func testSuicideCoinbase(t *testing.T, buildPreState buildPreState) {
 	txn := newTxn(snap)
 	txn.Suicide(addr1)
 	txn.AddSealingReward(addr1, big.NewInt(10))
-	objs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 	assert.Equal(t, big.NewInt(10), txn.GetBalance(addr1))
@@ -357,11 +282,10 @@ func testSuicideWithIntermediateCommit(t *testing.T, buildPreState buildPreState
 
 	assert.Equal(t, uint64(10), txn.GetNonce(addr1))
 
-	assert.NoError(t, txn.CleanDeleteObjects(true))
+	txn.CleanDeleteObjects(true)
 	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
 
-	_, err := txn.Commit(true)
-	assert.NoError(t, err)
+	txn.Commit(true)
 	assert.Equal(t, uint64(0), txn.GetNonce(addr1))
 }
 
@@ -376,8 +300,7 @@ func testRestartRefunds(t *testing.T, buildPreState buildPreState) {
 	txn.AddRefund(1000)
 	assert.Equal(t, uint64(1000), txn.GetRefund())
 
-	_, err := txn.Commit(false)
-	assert.NoError(t, err)
+	txn.Commit(false)
 
 	// refund should be empty after the commit
 	assert.Equal(t, uint64(0), txn.GetRefund())
@@ -396,11 +319,7 @@ func testChangePrestateAccountBalanceToZero(t *testing.T, buildPreState buildPre
 
 	txn := newTxn(snap)
 	txn.SetBalance(addr1, big.NewInt(0))
-
-	objs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 	assert.False(t, txn.Exist(addr1))
@@ -415,43 +334,8 @@ func testChangeAccountBalanceToZero(t *testing.T, buildPreState buildPreState) {
 	txn.SetBalance(addr1, big.NewInt(10))
 	txn.SetBalance(addr1, big.NewInt(0))
 
-	objs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(objs)
+	snap, _, _ = snap.Commit(txn.Commit(true))
 
 	txn = newTxn(snap)
 	assert.False(t, txn.Exist(addr1))
-}
-
-func testGetCodeEmptyCodeHash(t *testing.T, buildPreState buildPreState) {
-	t.Helper()
-
-	// If empty code hash is passed, it is considered as a valid case,
-	// and in that case we are not retrieving it from the storage.
-	snap := buildPreState(nil)
-
-	code, ok := snap.GetCode(types.EmptyCodeHash)
-	assert.True(t, ok)
-	assert.Empty(t, code)
-}
-
-func testSetAndGetCode(t *testing.T, buildPreState buildPreState) {
-	t.Helper()
-
-	testCode := []byte{0x2, 0x4, 0x6, 0x8}
-	snap := buildPreState(nil)
-
-	txn := newTxn(snap)
-	txn.SetCode(addr1, testCode)
-
-	affectedObjs, err := txn.Commit(true)
-	require.NoError(t, err)
-
-	snap, _, _ = snap.Commit(affectedObjs)
-	assert.Len(t, affectedObjs, 1)
-
-	code, ok := snap.GetCode(affectedObjs[0].CodeHash)
-	assert.True(t, ok)
-	assert.Equal(t, testCode, code)
 }

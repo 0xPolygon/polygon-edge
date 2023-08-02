@@ -12,18 +12,15 @@ import (
 const (
 	AccountDirFlag    = "data-dir"
 	AccountConfigFlag = "config"
-	PrivateKeyFlag    = "private-key"
-	ChainIDFlag       = "chain-id"
 
 	AccountDirFlagDesc    = "the directory for the Polygon Edge data if the local FS is used"
 	AccountConfigFlagDesc = "the path to the SecretsManager config file, if omitted, the local FS secrets manager is used"
-	PrivateKeyFlagDesc    = "hex-encoded private key of the account which executes rootchain commands"
-	ChainIDFlagDesc       = "ID of child chain"
 )
 
 // common errors for all polybft commands
 var (
 	ErrInvalidNum                     = fmt.Errorf("num flag value should be between 1 and %d", maxInitNum)
+	ErrInvalidConfig                  = errors.New("invalid secrets configuration")
 	ErrInvalidParams                  = errors.New("no config file or data directory passed in")
 	ErrUnsupportedType                = errors.New("unsupported secrets manager")
 	ErrSecureLocalStoreNotImplemented = errors.New(
@@ -38,7 +35,9 @@ func GetSecretsManager(dataPath, configPath string, insecureLocalStore bool) (se
 	if configPath != "" {
 		secretsConfig, readErr := secrets.ReadConfig(configPath)
 		if readErr != nil {
-			return nil, fmt.Errorf("invalid secrets configuration: %w", readErr)
+			invalidConfigErr := ErrInvalidConfig.Error()
+
+			return nil, fmt.Errorf("%s: %w", invalidConfigErr, readErr)
 		}
 
 		if !secrets.SupportedServiceManager(secretsConfig.Type) {

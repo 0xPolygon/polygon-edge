@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -12,17 +11,15 @@ import (
 
 // TxContext is the context of the transaction
 type TxContext struct {
-	GasPrice     types.Hash
-	Origin       types.Address
-	Coinbase     types.Address
-	Number       int64
-	Timestamp    int64
-	GasLimit     int64
-	ChainID      int64
-	Difficulty   types.Hash
-	Tracer       tracer.Tracer
-	BaseFee      *big.Int
-	BurnContract types.Address
+	GasPrice   types.Hash
+	Origin     types.Address
+	Coinbase   types.Address
+	Number     int64
+	Timestamp  int64
+	GasLimit   int64
+	ChainID    int64
+	Difficulty types.Hash
+	Tracer     tracer.Tracer
 }
 
 // StorageStatus is the status of the storage access
@@ -131,39 +128,19 @@ func (r *ExecutionResult) UpdateGasUsed(gasLimit uint64, refund uint64) {
 
 var (
 	ErrOutOfGas                 = errors.New("out of gas")
+	ErrStackOverflow            = errors.New("stack overflow")
+	ErrStackUnderflow           = errors.New("stack underflow")
 	ErrNotEnoughFunds           = errors.New("not enough funds")
 	ErrInsufficientBalance      = errors.New("insufficient balance for transfer")
-	ErrMaxCodeSizeExceeded      = errors.New("max code size exceeded")
+	ErrMaxCodeSizeExceeded      = errors.New("evm: max code size exceeded")
 	ErrContractAddressCollision = errors.New("contract address collision")
 	ErrDepth                    = errors.New("max call depth exceeded")
-	ErrExecutionReverted        = errors.New("execution reverted")
+	ErrExecutionReverted        = errors.New("execution was reverted")
 	ErrCodeStoreOutOfGas        = errors.New("contract creation code storage out of gas")
 	ErrUnauthorizedCaller       = errors.New("unauthorized caller")
 	ErrInvalidInputData         = errors.New("invalid input data")
 	ErrNotAuth                  = errors.New("not in allow list")
 )
-
-// StackUnderflowError wraps an evm error when the items on the stack less
-// than the minimal requirement.
-type StackUnderflowError struct {
-	StackLen int
-	Required int
-}
-
-func (e *StackUnderflowError) Error() string {
-	return fmt.Sprintf("stack underflow (%d <=> %d)", e.StackLen, e.Required)
-}
-
-// StackOverflowError wraps an evm error when the items on the stack exceeds
-// the maximum allowance.
-type StackOverflowError struct {
-	StackLen int
-	Limit    int
-}
-
-func (e *StackOverflowError) Error() string {
-	return fmt.Sprintf("stack limit reached %d (%d)", e.StackLen, e.Limit)
-}
 
 type CallType int
 

@@ -21,7 +21,7 @@ import (
 	"github.com/umbracle/ethgo/wallet"
 )
 
-func TestE2E_Migration(t *testing.T) {
+func TestMigration(t *testing.T) {
 	userKey, _ := wallet.GenerateKey()
 	userAddr := userKey.Address()
 	userKey2, _ := wallet.GenerateKey()
@@ -60,18 +60,20 @@ func TestE2E_Migration(t *testing.T) {
 	//send transaction to user2
 	sendAmount := ethgo.Gwei(10000)
 	receipt, err := relayer.SendTransaction(&ethgo.Transaction{
-		From:  userAddr,
-		To:    &userAddr2,
-		Gas:   1000000,
-		Value: sendAmount,
+		From:     userAddr,
+		To:       &userAddr2,
+		GasPrice: 1048576,
+		Gas:      1000000,
+		Value:    sendAmount,
 	}, userKey)
 	assert.NoError(t, err)
 	assert.NotNil(t, receipt)
 
 	receipt, err = relayer.SendTransaction(&ethgo.Transaction{
-		From:  userAddr,
-		Gas:   1000000,
-		Input: contractsapi.TestWriteBlockMetadata.Bytecode,
+		From:     userAddr,
+		GasPrice: 1048576,
+		Gas:      1000000,
+		Input:    contractsapi.TestWriteBlockMetadata.Bytecode,
 	}, userKey)
 	require.NoError(t, err)
 	require.NotNil(t, receipt)
@@ -202,6 +204,6 @@ func TestE2E_Migration(t *testing.T) {
 	_, err = cluster.InitSecrets("test-chain-8", 1)
 	require.NoError(t, err)
 
-	cluster.InitTestServer(t, "test-chain-8", cluster.Bridge.JSONRPCAddr(), false, false)
+	cluster.InitTestServer(t, 8, false, false)
 	require.NoError(t, cluster.WaitForBlock(33, time.Minute))
 }

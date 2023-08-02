@@ -12,4 +12,6 @@ updates:
     pull-request-branch-name:
       separator: "-"
     reviewers:
-      - "0xPolygon/core-edge"
+      - "lazartravica"
+      - "Kourin1996"
+      - "zivkovicmilos"

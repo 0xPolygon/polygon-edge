@@ -24,6 +24,7 @@ type Config struct {
 	PriceLimit         uint64
 	MaxAccountEnqueued uint64
 	MaxSlots           uint64
+	BlockTime          uint64
 
 	Telemetry *Telemetry
 	Network   *network.Config

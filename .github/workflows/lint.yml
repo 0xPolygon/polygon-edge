@@ -2,18 +2,13 @@
 name: Lint
 on:  # yamllint disable-line rule:truthy
   push:
-    branches:
-      - '*'
+    branches-ignore:
+      - 'develop'
+      - 'release/**'
     tags-ignore:
       - 'v*'
     paths:
       - '**.go'
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-
   workflow_call: {}
   workflow_dispatch: {}
 
@@ -24,12 +19,10 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.20.x
+          go-version: 1.18.x
 
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Lint
         uses: golangci/golangci-lint-action@v3
-        with:
-          args: --timeout 10m --verbose

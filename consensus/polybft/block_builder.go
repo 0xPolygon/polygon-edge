@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -36,9 +35,6 @@ type BlockBuilderParams struct {
 
 	// txPoolInterface implementation
 	TxPool txPoolInterface
-
-	// BaseFee is the base fee
-	BaseFee uint64
 }
 
 func NewBlockBuilder(params *BlockBuilderParams) *BlockBuilder {
@@ -86,7 +82,6 @@ func (b *BlockBuilder) Reset() error {
 		ReceiptsRoot: types.EmptyRootHash, // this avoids needing state for now
 		Sha3Uncles:   types.EmptyUncleHash,
 		GasLimit:     b.params.GasLimit,
-		BaseFee:      b.params.BaseFee,
 		Timestamp:    uint64(headerTime.Unix()),
 	}
 
@@ -113,15 +108,10 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 		handler(b.header)
 	}
 
-	_, trace, stateRoot, err := b.state.Commit()
-	if err != nil {
-		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
-	}
-
+	_, trace, root := b.state.Commit()
 	trace.ParentStateRoot = b.params.Parent.StateRoot
-	b.header.StateRoot = stateRoot
+	b.header.StateRoot = root
 	b.header.GasUsed = b.state.TotalGas()
-	b.header.LogsBloom = types.CreateBloom(b.Receipts())
 
 	// build the block
 	b.block = consensus.BuildBlock(consensus.BuildBlockParams{
@@ -141,9 +131,10 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 
 // WriteTx applies given transaction to the state. If transaction apply fails, it reverts the saved snapshot.
 func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
-	if tx.Gas > b.params.GasLimit {
-		b.params.Logger.Info("Transaction gas limit exceedes block gas limit", "hash", tx.Hash,
-			"tx gas limit", tx.Gas, "block gas limt", b.params.GasLimit)
+	if tx.ExceedsBlockGasLimit(b.params.GasLimit) {
+		if err := b.state.WriteFailedReceipt(tx); err != nil {
+			return err
+		}
 
 		return txpool.ErrBlockLimitExceeded
 	}
@@ -161,7 +152,7 @@ func (b *BlockBuilder) WriteTx(tx *types.Transaction) error {
 func (b *BlockBuilder) Fill() {
 	blockTimer := time.NewTimer(b.params.BlockTime)
 
-	b.params.TxPool.Prepare(b.params.BaseFee)
+	b.params.TxPool.Prepare()
 write:
 	for {
 		select {
@@ -196,7 +187,8 @@ func (b *BlockBuilder) writeTxPoolTransaction(tx *types.Transaction) (bool, erro
 		return true, nil
 	}
 
-	if err := b.WriteTx(tx); err != nil {
+	err := b.WriteTx(tx)
+	if err != nil {
 		if _, ok := err.(*state.GasLimitReachedTransitionApplicationError); ok { //nolint:errorlint
 			// stop processing
 			return true, err

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -16,10 +15,10 @@ import (
 func TestProposerCalculator_SetIndex(t *testing.T) {
 	t.Parallel()
 
-	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"}, []uint64{10, 100, 1, 50, 30})
-	metadata := validators.GetPublicIdentities()
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"}, []uint64{10, 100, 1, 50, 30})
+	metadata := validators.getPublicIdentities()
 
-	vs := validators.ToValidatorSet()
+	vs := validators.toValidatorSet()
 
 	snapshot := NewProposerSnapshot(1, metadata)
 
@@ -40,8 +39,8 @@ func TestProposerCalculator_SetIndex(t *testing.T) {
 func TestProposerCalculator_RegularFlow(t *testing.T) {
 	t.Parallel()
 
-	validators := validator.NewTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"}, []uint64{1, 2, 3, 4, 5})
-	metadata := validators.GetPublicIdentities()
+	validators := newTestValidatorsWithAliases(t, []string{"A", "B", "C", "D", "E"}, []uint64{1, 2, 3, 4, 5})
+	metadata := validators.getPublicIdentities()
 
 	snapshot := NewProposerSnapshot(0, metadata)
 
@@ -81,7 +80,7 @@ func TestProposerCalculator_SamePriority(t *testing.T) {
 	require.NoError(t, err)
 
 	// at some point priorities will be the same and bytes address will be compared
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{
+	vs := NewValidatorSet([]*ValidatorMetadata{
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
@@ -127,7 +126,7 @@ func TestProposerCalculator_InversePriorityOrderWithExpectedListOfSelection(t *t
 	require.NoError(t, err)
 
 	// priorities are from high to low vp in validator set
-	vset := validator.NewValidatorSet([]*validator.ValidatorMetadata{
+	vset := NewValidatorSet([]*ValidatorMetadata{
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
@@ -176,7 +175,7 @@ func TestProposerCalculator_IncrementProposerPrioritySameVotingPower(t *testing.
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{
+	vs := NewValidatorSet([]*ValidatorMetadata{
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
@@ -232,7 +231,7 @@ func TestProposerCalculator_AveragingInIncrementProposerPriorityWithVotingPower(
 	vp2 := int64(1)
 	total := vp0 + vp1 + vp2
 	avg := (vp0 + vp1 + vp2 - total) / 3
-	valz := []*validator.ValidatorMetadata{
+	valz := []*ValidatorMetadata{
 		{
 			BlsKey:      keys[0].PublicKey(),
 			Address:     types.Address{0x1},
@@ -376,11 +375,11 @@ func TestProposerCalculator_UpdatesForNewValidatorSet(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(2)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(100)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(100)}
 
-	accountSet := []*validator.ValidatorMetadata{v1, v2}
-	vs := validator.NewValidatorSet(accountSet, hclog.NewNullLogger())
+	accountSet := []*ValidatorMetadata{v1, v2}
+	vs := NewValidatorSet(accountSet, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 
@@ -403,8 +402,7 @@ func TestProposerCalculator_UpdatesForNewValidatorSet(t *testing.T) {
 
 	// verify that priorities are scaled
 	diff := computeMaxMinPriorityDiff(snapshot.Validators)
-	totalVotingPower := vs.TotalVotingPower()
-	diffMax := new(big.Int).Mul(priorityWindowSizeFactor, &totalVotingPower)
+	diffMax := new(big.Int).Mul(priorityWindowSizeFactor, vs.totalVotingPower)
 	assert.True(t, diff.Cmp(diffMax) <= 0, "expected priority distance < %d. Got %d", diffMax, diff)
 }
 
@@ -416,7 +414,7 @@ func TestProposerCalculator_GetLatestProposer(t *testing.T) {
 		count   = 10
 	)
 
-	validatorSet := validator.NewTestValidators(t, count).GetPublicIdentities()
+	validatorSet := newTestValidators(t, count).getPublicIdentities()
 	snapshot := NewProposerSnapshot(0, validatorSet)
 	snapshot.Validators[bestIdx].ProposerPriority = big.NewInt(1000000)
 
@@ -449,13 +447,13 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 	keys, err := bls.CreateRandomBlsKeys(8)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(100)}
-	v3 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(100)}
-	v4 := &validator.ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: big.NewInt(100)}
-	v5 := &validator.ValidatorMetadata{Address: types.Address{0x5}, BlsKey: keys[4].PublicKey(), VotingPower: big.NewInt(100)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(100)}
+	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(100)}
+	v4 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: big.NewInt(100)}
+	v5 := &ValidatorMetadata{Address: types.Address{0x5}, BlsKey: keys[4].PublicKey(), VotingPower: big.NewInt(100)}
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{v1, v2, v3, v4, v5}, hclog.NewNullLogger())
+	vs := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3, v4, v5}, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 
@@ -468,12 +466,12 @@ func TestProposerCalculator_UpdateValidatorsSameVpUpdatedAndNewAdded(t *testing.
 	}
 
 	// updated old validators
-	u1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(10)}
-	u2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(10)}
+	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(10)}
+	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(10)}
 	// added new validator
-	a1 := &validator.ValidatorMetadata{Address: types.Address{0x9}, BlsKey: keys[7].PublicKey(), VotingPower: big.NewInt(100)}
+	a1 := &ValidatorMetadata{Address: types.Address{0x9}, BlsKey: keys[7].PublicKey(), VotingPower: big.NewInt(100)}
 
-	newAccountSet := []*validator.ValidatorMetadata{u1, u2, a1}
+	newAccountSet := []*ValidatorMetadata{u1, u2, a1}
 
 	require.NoError(t, updateValidators(snapshot, newAccountSet))
 	assert.Equal(t, 3, len(snapshot.Validators))
@@ -514,11 +512,11 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(4)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(10)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(20)}
-	v3 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(30)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(10)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(20)}
+	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(30)}
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
+	vs := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 	require.Equal(t, big.NewInt(60), snapshot.GetTotalVotingPower())
@@ -536,13 +534,13 @@ func TestProposerCalculator_UpdateValidators(t *testing.T) {
 	require.NoError(t, err)
 
 	// updated
-	u1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
-	u2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(200)}
-	u3 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(300)}
+	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(100)}
+	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(200)}
+	u3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(300)}
 	// added
-	a1 := &validator.ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: big.NewInt(400)}
+	a1 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[3].PublicKey(), VotingPower: big.NewInt(400)}
 
-	require.NoError(t, updateValidators(snapshot, []*validator.ValidatorMetadata{u1, u2, u3, a1}))
+	require.NoError(t, updateValidators(snapshot, []*ValidatorMetadata{u1, u2, u3, a1}))
 
 	require.Equal(t, 4, len(snapshot.Validators))
 	// priorities are from previous iteration
@@ -562,11 +560,11 @@ func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(10)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(10)}
-	v3 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(80000)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(10)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(10)}
+	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(80000)}
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
+	vs := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 	assert.Equal(t, big.NewInt(80020), snapshot.GetTotalVotingPower())
@@ -586,13 +584,13 @@ func TestProposerCalculator_ScaleAfterDelete(t *testing.T) {
 	assert.Equal(t, types.Address{0x3}, proposer.Metadata.Address)
 
 	// 	reduce validator voting power from 8k to 1
-	u1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(10)}
-	u2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(10)}
+	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(10)}
+	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(10)}
 
 	require.Equal(t, big.NewInt(-40010), snapshot.Validators[0].ProposerPriority)
 	require.Equal(t, big.NewInt(40010), snapshot.Validators[1].ProposerPriority)
 
-	require.NoError(t, updateValidators(snapshot, []*validator.ValidatorMetadata{u1, u2}))
+	require.NoError(t, updateValidators(snapshot, []*ValidatorMetadata{u1, u2}))
 
 	// maxdiff = 2*tvp = 40
 	// diff(min,max) (-40010, 40010) = 80020
@@ -609,11 +607,11 @@ func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(50)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(80)}
-	v3 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(100000)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(50)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(80)}
+	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(100000)}
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
+	vs := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 	assert.Equal(t, big.NewInt(100130), snapshot.GetTotalVotingPower())
@@ -622,10 +620,10 @@ func TestProposerCalculator_ShiftAfterUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// updates
-	u1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(5)}
-	u2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
+	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(5)}
+	u2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
 
-	require.NoError(t, updateValidators(snapshot, []*validator.ValidatorMetadata{u1, u2}))
+	require.NoError(t, updateValidators(snapshot, []*ValidatorMetadata{u1, u2}))
 
 	// maxdiff = 2*tvp = 26
 	// diff(min,max) (-260, 19610) = 19870
@@ -643,11 +641,11 @@ func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(1)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
-	v3 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(15)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(1)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
+	v3 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(15)}
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
+	vs := NewValidatorSet([]*ValidatorMetadata{v1, v2, v3}, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 	assert.Equal(t, big.NewInt(24), snapshot.GetTotalVotingPower())
@@ -656,11 +654,11 @@ func TestProposerCalculator_UpdateValidatorSet(t *testing.T) {
 	require.NoError(t, err)
 
 	// modified validator
-	u1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(5)}
+	u1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(5)}
 	// added validator
-	a1 := &validator.ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
+	a1 := &ValidatorMetadata{Address: types.Address{0x4}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(8)}
 
-	require.NoError(t, updateValidators(snapshot, []*validator.ValidatorMetadata{u1, a1}))
+	require.NoError(t, updateValidators(snapshot, []*ValidatorMetadata{u1, a1}))
 	// expecting 2 validators with updated voting power and total voting power
 	require.Equal(t, 2, len(snapshot.Validators))
 	require.Equal(t, types.Address{0x1}, snapshot.Validators[0].Metadata.Address)
@@ -679,10 +677,10 @@ func TestProposerCalculator_AddValidator(t *testing.T) {
 	keys, err := bls.CreateRandomBlsKeys(3)
 	require.NoError(t, err)
 
-	v1 := &validator.ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(3)}
-	v2 := &validator.ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(1)}
+	v1 := &ValidatorMetadata{Address: types.Address{0x1}, BlsKey: keys[0].PublicKey(), VotingPower: big.NewInt(3)}
+	v2 := &ValidatorMetadata{Address: types.Address{0x2}, BlsKey: keys[1].PublicKey(), VotingPower: big.NewInt(1)}
 
-	vs := validator.NewValidatorSet([]*validator.ValidatorMetadata{v1, v2}, hclog.NewNullLogger())
+	vs := NewValidatorSet([]*ValidatorMetadata{v1, v2}, hclog.NewNullLogger())
 
 	snapshot := NewProposerSnapshot(0, vs.Accounts())
 	assert.Equal(t, big.NewInt(4), snapshot.GetTotalVotingPower())
@@ -698,9 +696,9 @@ func TestProposerCalculator_AddValidator(t *testing.T) {
 	require.Equal(t, big.NewInt(-2), snapshot.Validators[0].ProposerPriority)
 	require.Equal(t, big.NewInt(2), snapshot.Validators[1].ProposerPriority)
 
-	a1 := &validator.ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(8)}
+	a1 := &ValidatorMetadata{Address: types.Address{0x3}, BlsKey: keys[2].PublicKey(), VotingPower: big.NewInt(8)}
 
-	require.NoError(t, updateValidators(snapshot, []*validator.ValidatorMetadata{v1, v2, a1}))
+	require.NoError(t, updateValidators(snapshot, []*ValidatorMetadata{v1, v2, a1}))
 
 	// updated vp: 8+3+1 = 12
 	// added validator priority = -1.125*8 ~ -13

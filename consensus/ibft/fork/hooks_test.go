@@ -279,9 +279,6 @@ func newTestTransition(
 
 	ex := state.NewExecutor(&chain.Params{
 		Forks: chain.AllForksEnabled,
-		BurnContract: map[uint64]types.Address{
-			0: types.ZeroAddress,
-		},
 	}, st, hclog.NewNullLogger())
 
 	rootHash, err := ex.WriteGenesis(nil, types.Hash{})

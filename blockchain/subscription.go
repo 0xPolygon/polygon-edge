@@ -42,7 +42,19 @@ type subscription struct {
 
 // GetEventCh creates a new event channel, and returns it
 func (s *subscription) GetEventCh() chan *Event {
-	return s.updateCh
+	eventCh := make(chan *Event)
+
+	go func() {
+		for {
+			evnt := s.GetEvent()
+			if evnt == nil {
+				return
+			}
+			eventCh <- evnt
+		}
+	}()
+
+	return eventCh
 }
 
 // GetEvent returns the event from the subscription (BLOCKING)
@@ -149,7 +161,11 @@ func (e *eventStream) newUpdateCh() chan *Event {
 	e.Lock()
 	defer e.Unlock()
 
-	ch := make(chan *Event, 5)
+	ch := make(chan *Event, 1)
+
+	if e.updateCh == nil {
+		e.updateCh = make([]chan *Event, 0)
+	}
 
 	e.updateCh = append(e.updateCh, ch)
 
@@ -163,6 +179,9 @@ func (e *eventStream) push(event *Event) {
 
 	// Notify the listeners
 	for _, update := range e.updateCh {
-		update <- event
+		select {
+		case update <- event:
+		default:
+		}
 	}
 }
