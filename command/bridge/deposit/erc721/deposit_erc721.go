@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -98,7 +99,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i, tokenIDRaw := range dp.TokenIDs {
 		tokenIDRaw := tokenIDRaw
 
-		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
+		tokenID, err := helperCommon.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided token id %s: %w", tokenIDRaw, err))
 

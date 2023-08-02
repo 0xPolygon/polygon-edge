@@ -169,7 +169,7 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 		return 0, err
 	}
 
-	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
+	actualCheckpointBlock, err := common.ParseUint64orHex(&checkpointBlockNumRaw)
 	if err != nil {
 		return 0, err
 	}
@@ -274,7 +274,7 @@ func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address
 
 	balanceRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(tokenAddr), balanceOfInput)
 	require.NoError(t, err)
-	balance, err := types.ParseUint256orHex(&balanceRaw)
+	balance, err := common.ParseUint256orHex(&balanceRaw)
 	require.NoError(t, err)
 
 	return balance
