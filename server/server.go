@@ -347,7 +347,7 @@ func NewServer(config *Config) (*Server, error) {
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
-			m.chain.Params.Forks.At(0),
+			m.chain.Params.Forks,
 			hub,
 			m.grpcServer,
 			m.network,
