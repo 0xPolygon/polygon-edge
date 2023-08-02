@@ -151,7 +151,7 @@ func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 // PruneMsgsUntil deletes all messages maps until the specified height
 func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 	for _, msgType := range t.msgsTypes {
-		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
+		msgs := t.resolveMessagesStorage(msgType)
 		if msgs == nil {
 			continue
 		}
@@ -173,7 +173,7 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 	evidences := []*DoubleSignEvidence{}
 
 	for _, msgType := range t.msgsTypes {
-		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
+		msgs := t.resolveMessagesStorage(msgType)
 		if msgs == nil {
 			continue
 		}
