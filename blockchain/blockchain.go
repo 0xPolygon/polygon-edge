@@ -1387,11 +1387,11 @@ func (b *Blockchain) Close() error {
 
 // CalculateBaseFee calculates the basefee of the header.
 func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
-	if !b.config.Params.Forks.IsActive(chain.London, parent.Number) {
+	if !b.config.Chain.Params.Forks.IsActive(chain.London, parent.Number) {
 		return chain.GenesisBaseFee
 	}
 
-	parentGasTarget := parent.GasLimit / b.config.Genesis.BaseFeeEM
+	parentGasTarget := parent.GasLimit / b.config.Chain.Genesis.BaseFeeEM
 
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
 	if parent.GasUsed == parentGasTarget {

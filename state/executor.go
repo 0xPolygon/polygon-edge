@@ -404,10 +404,10 @@ func (t *Transition) Write(txn *types.Transaction) error {
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash) {
+func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash, error) {
 	objs, err := t.state.Commit(t.config.EIP155)
 	if err != nil {
-		return nil, nil, types.Hash{}
+		return nil, nil, types.Hash{}, err
 	}
 
 	s2, snapTrace, root := t.snap.Commit(objs)
@@ -415,7 +415,7 @@ func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash) {
 	t.trace.AccountTrie = snapTrace.AccountTrie
 	t.trace.StorageTrie = snapTrace.StorageTrie
 
-	return s2, t.trace, types.BytesToHash(root)
+	return s2, t.trace, types.BytesToHash(root), nil
 }
 
 func (t *Transition) subGasPool(amount uint64) error {
