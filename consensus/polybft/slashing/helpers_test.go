@@ -111,10 +111,10 @@ func assertSenderMessageMapsSize(t *testing.T, tracker *DoubleSigningTrackerImpl
 	view *ibftProto.View, sender types.Address) {
 	t.Helper()
 
-	prePrepareMsgs := tracker.preprepare.getSenderMsgsLocked(view, sender)
-	prepareMsgs := tracker.prepare.getSenderMsgsLocked(view, sender)
-	commitMsgs := tracker.commit.getSenderMsgsLocked(view, sender)
-	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, sender)
+	prePrepareMsgs := tracker.preprepare.getSenderMsgs(view, sender)
+	prepareMsgs := tracker.prepare.getSenderMsgs(view, sender)
+	commitMsgs := tracker.commit.getSenderMsgs(view, sender)
+	roundChangeMsgs := tracker.roundChange.getSenderMsgs(view, sender)
 
 	require.Len(t, prePrepareMsgs, prePrepareCount)
 	require.Len(t, prepareMsgs, prepareCount)

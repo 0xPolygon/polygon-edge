@@ -36,11 +36,11 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 
 	sender := types.Address(key.Address())
 
-	prePrepareMsgs := tracker.preprepare.getSenderMsgsLocked(prePrepareView, sender)
+	prePrepareMsgs := tracker.preprepare.getSenderMsgs(prePrepareView, sender)
 	assertSenderMessageMapsSize(t, tracker, 1, 0, 0, 0, prePrepareView, sender)
 	require.Equal(t, prePrepareMsg, prePrepareMsgs[0])
 
-	prepareMsgs := tracker.prepare.getSenderMsgsLocked(view, sender)
+	prepareMsgs := tracker.prepare.getSenderMsgs(view, sender)
 	assertSenderMessageMapsSize(t, tracker, 0, 1, 0, 0, view, sender)
 	require.Equal(t, prepareMsg, prepareMsgs[0])
 
@@ -53,9 +53,9 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	tracker.Handle(commitMsg)
 	tracker.Handle(roundChangeMsg)
 
-	prepareMsgs = tracker.prepare.getSenderMsgsLocked(view, sender)
-	commitMsgs := tracker.commit.getSenderMsgsLocked(view, sender)
-	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, sender)
+	prepareMsgs = tracker.prepare.getSenderMsgs(view, sender)
+	commitMsgs := tracker.commit.getSenderMsgs(view, sender)
+	roundChangeMsgs := tracker.roundChange.getSenderMsgs(view, sender)
 
 	assertSenderMessageMapsSize(t, tracker, 0, 1, 1, 1, view, sender)
 
@@ -127,10 +127,10 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 
 		for i := uint64(0); i < heightsCount; i++ {
 			view := &ibftProto.View{Height: i + 1, Round: 1}
-			actualPrePrepares := tracker.preprepare.getSenderMsgsLocked(view, sender)
-			actualPrepares := tracker.prepare.getSenderMsgsLocked(view, sender)
-			actualCommits := tracker.commit.getSenderMsgsLocked(view, sender)
-			actualRoundChanges := tracker.roundChange.getSenderMsgsLocked(view, sender)
+			actualPrePrepares := tracker.preprepare.getSenderMsgs(view, sender)
+			actualPrepares := tracker.prepare.getSenderMsgs(view, sender)
+			actualCommits := tracker.commit.getSenderMsgs(view, sender)
+			actualRoundChanges := tracker.roundChange.getSenderMsgs(view, sender)
 
 			assertSenderMessageMapsSize(t, tracker, 1, 1, 1, 1, view, sender)
 			require.Equal(t, expPrePrepares[i], actualPrePrepares[0])

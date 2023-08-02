@@ -41,9 +41,11 @@ type Messages struct {
 	mux     sync.RWMutex
 }
 
-// getSenderMsgsLocked returns messages for given height, round and sender.
-// Remark: calling context must have mutex acquired.
-func (m *Messages) getSenderMsgsLocked(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
+// getSenderMsgs returns messages for given height, round and sender.
+func (m *Messages) getSenderMsgs(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
+	m.mux.RLock()
+	defer m.mux.RUnlock()
+
 	if roundMsgs, ok := m.content[view.Height]; ok {
 		if senderMsgsMap, ok := roundMsgs[view.Round]; ok {
 			return senderMsgsMap[sender]
@@ -68,14 +70,11 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
 	}
 
-	msgs := m.getSenderMsgsLocked(msg.View, sender)
-	if msgs == nil {
-		msgs = []*ibftProto.Message{msg}
+	if _, ok := senderMsgs[sender]; ok {
+		senderMsgs[sender] = append(senderMsgs[sender], msg)
 	} else {
-		msgs = append(msgs, msg)
+		senderMsgs[sender] = []*ibftProto.Message{msg}
 	}
-
-	senderMsgs[sender] = msgs
 }
 
 // createSenderMsgsMap initializes senders message map for the given round
@@ -253,10 +252,7 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 
 	msgsMap := t.resolveMessagesStorage(msg.Type)
 
-	msgsMap.mux.RLock()
-	defer msgsMap.mux.RUnlock()
-
-	senderMsgs := msgsMap.getSenderMsgsLocked(msg.View, sender)
+	senderMsgs := msgsMap.getSenderMsgs(msg.View, sender)
 	for _, senderMsg := range senderMsgs {
 		if bytes.Equal(senderMsg.Signature, msg.Signature) {
 			return fmt.Errorf("sender %s is detected as a spammer", sender)
