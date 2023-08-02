@@ -222,14 +222,17 @@ func (t *DoubleSigningTrackerImpl) PostBlock(_ *common.PostBlockRequest) error {
 
 // validateMsg validates provided IBFT message
 func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
+	// check is view defined
 	if msg.View == nil {
 		return errViewUndefined
 	}
 
+	// check message type
 	if _, ok := ibftProto.MessageType_name[int32(msg.Type)]; !ok {
 		return errInvalidMsgType
 	}
 
+	// recover message signer
 	signer, err := wallet.RecoverSignerFromIBFTMessage(msg)
 	if err != nil {
 		return err
@@ -252,6 +255,7 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 
 	msgsMap := t.resolveMessagesStorage(msg.Type)
 
+	// ignore messages which are already present in the storage in order to prevent DDOS attack
 	senderMsgs := msgsMap.getSenderMsgs(msg.View, sender)
 	for _, senderMsg := range senderMsgs {
 		if bytes.Equal(senderMsg.Signature, msg.Signature) {
