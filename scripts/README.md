@@ -31,11 +31,6 @@ The servers are run in foreground, meaning that the terminal console that is run
 To stop the servers - `Ctrl/Cmd + C`.
 To interact with the chain use another terminal or run a dockerized environment by following the instructions in `docker/README.md`.
 
-### Submodules
-
-Before deploying `polybft` environment, `core-contracts` submodule needs to be downloaded.  
-To do that simply run `make download-submodules`.
-
 ### Production
 
 This is **NOT** a production ready deployment. It is to be used in *development* / *test* environments only.

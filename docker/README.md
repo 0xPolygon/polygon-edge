@@ -57,11 +57,6 @@ Primarily, the `--premine` parameter needs to be edited to include the accounts 
 
 ## Considerations
 
-### Submodules
-
-Before deploying `polybft` environment, `core-contracts` submodule needs to be downloaded.  
-To do that, simply run `make download-submodules`.
-
 ### Build times
 
 When building containers for the first time (or after purging docker build cache),
