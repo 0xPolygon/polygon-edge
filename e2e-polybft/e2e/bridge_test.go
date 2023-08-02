@@ -693,7 +693,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		balanceRaw, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(l2ChildTokenAddr), balanceInput)
 		require.NoError(t, err)
 
-		balance, err := types.ParseUint256orHex(&balanceRaw)
+		balance, err := helperCommon.ParseUint256orHex(&balanceRaw)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(int64(amount)), balance)
 	}
@@ -755,7 +755,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		balanceRaw, err := rootchainTxRelayer.Call(ethgo.ZeroAddress, rootERC1155Addr, balanceInput)
 		require.NoError(t, err)
 
-		balance, err := types.ParseUint256orHex(&balanceRaw)
+		balance, err := helperCommon.ParseUint256orHex(&balanceRaw)
 		require.NoError(t, err)
 		require.Equal(t, big.NewInt(amount), balance)
 	}

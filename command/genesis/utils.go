@@ -82,7 +82,7 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 		// <addr>:<balance>
 		valueRaw := premineInfoRaw[delimiterIdx+1:]
 
-		amount, err = types.ParseUint256orHex(&valueRaw)
+		amount, err = common.ParseUint256orHex(&valueRaw)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse amount %s: %w", valueRaw, err)
 		}

@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -101,7 +102,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i, amountRaw := range dp.Amounts {
 		amountRaw := amountRaw
 
-		amount, err := types.ParseUint256orHex(&amountRaw)
+		amount, err := helperCommon.ParseUint256orHex(&amountRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amountRaw, err))
 
