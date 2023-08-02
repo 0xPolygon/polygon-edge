@@ -169,7 +169,7 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 			continue
 		}
 
-		msgs.mux.RLock()
+		msgs.mux.Lock()
 
 		roundMsgs, ok := msgs.content[height]
 		if !ok {
@@ -200,7 +200,7 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 			}
 		}
 
-		msgs.mux.RUnlock()
+		msgs.mux.Unlock()
 	}
 
 	return evidences
