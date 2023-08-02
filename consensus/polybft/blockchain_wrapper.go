@@ -98,10 +98,11 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		}
 	}
 
-	_, root, err := transition.Commit()
+	_, trace, root, err := transition.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}
+	trace.ParentStateRoot = parent.StateRoot
 
 	updateBlockExecutionMetric(start)
 
@@ -124,6 +125,7 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 	return &types.FullBlock{
 		Block:    builtBlock,
 		Receipts: transition.Receipts(),
+		Trace:    trace,
 	}, nil
 }
 

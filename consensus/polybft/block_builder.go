@@ -113,11 +113,11 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 		handler(b.header)
 	}
 
-	_, stateRoot, err := b.state.Commit()
+	_, trace, stateRoot, err := b.state.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}
-
+	trace.ParentStateRoot = b.params.Parent.StateRoot
 	b.header.StateRoot = stateRoot
 	b.header.GasUsed = b.state.TotalGas()
 	b.header.LogsBloom = types.CreateBloom(b.Receipts())
@@ -134,6 +134,7 @@ func (b *BlockBuilder) Build(handler func(h *types.Header)) (*types.FullBlock, e
 	return &types.FullBlock{
 		Block:    b.block,
 		Receipts: b.state.Receipts(),
+		Trace:    trace,
 	}, nil
 }
 

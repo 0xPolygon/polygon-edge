@@ -20,7 +20,7 @@ type State interface {
 type Snapshot interface {
 	readSnapshot
 
-	Commit(objs []*Object) (Snapshot, []byte)
+	Commit(objs []*Object) (Snapshot, *types.Trace, []byte)
 }
 
 // Account is the account reference in the ethereum state

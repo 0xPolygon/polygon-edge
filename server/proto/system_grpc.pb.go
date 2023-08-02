@@ -25,6 +25,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SystemClient interface {
 	// GetInfo returns info about the client
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerStatus, error)
+	GetTrace(ctx context.Context, in *GetTraceRequest, opts ...grpc.CallOption) (*GetTraceResponse, error)
 	// PeersAdd adds a new peer
 	PeersAdd(ctx context.Context, in *PeersAddRequest, opts ...grpc.CallOption) (*PeersAddResponse, error)
 	// PeersList returns the list of peers
@@ -50,6 +51,15 @@ func NewSystemClient(cc grpc.ClientConnInterface) SystemClient {
 func (c *systemClient) GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ServerStatus, error) {
 	out := new(ServerStatus)
 	err := c.cc.Invoke(ctx, "/v1.System/GetStatus", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *systemClient) GetTrace(ctx context.Context, in *GetTraceRequest, opts ...grpc.CallOption) (*GetTraceResponse, error) {
+	out := new(GetTraceResponse)
+	err := c.cc.Invoke(ctx, "/v1.System/GetTrace", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -162,6 +172,7 @@ func (x *systemExportClient) Recv() (*ExportEvent, error) {
 type SystemServer interface {
 	// GetInfo returns info about the client
 	GetStatus(context.Context, *emptypb.Empty) (*ServerStatus, error)
+	GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error)
 	// PeersAdd adds a new peer
 	PeersAdd(context.Context, *PeersAddRequest) (*PeersAddResponse, error)
 	// PeersList returns the list of peers
@@ -183,6 +194,9 @@ type UnimplementedSystemServer struct {
 
 func (UnimplementedSystemServer) GetStatus(context.Context, *emptypb.Empty) (*ServerStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
+}
+func (UnimplementedSystemServer) GetTrace(context.Context, *GetTraceRequest) (*GetTraceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTrace not implemented")
 }
 func (UnimplementedSystemServer) PeersAdd(context.Context, *PeersAddRequest) (*PeersAddResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PeersAdd not implemented")
@@ -229,6 +243,24 @@ func _System_GetStatus_Handler(srv interface{}, ctx context.Context, dec func(in
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SystemServer).GetStatus(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _System_GetTrace_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTraceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SystemServer).GetTrace(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/v1.System/GetTrace",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SystemServer).GetTrace(ctx, req.(*GetTraceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -357,6 +389,10 @@ var System_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStatus",
 			Handler:    _System_GetStatus_Handler,
+		},
+		{
+			MethodName: "GetTrace",
+			Handler:    _System_GetTrace_Handler,
 		},
 		{
 			MethodName: "PeersAdd",

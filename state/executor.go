@@ -117,7 +117,7 @@ func (e *Executor) WriteGenesis(
 		return types.Hash{}, err
 	}
 
-	_, root := snap.Commit(objs)
+	_, _, root := snap.Commit(objs)
 
 	return types.BytesToHash(root), nil
 }
@@ -216,6 +216,9 @@ func (e *Executor) BeginTxn(
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 
 	// enable contract deployment allow list (if any)
@@ -267,6 +270,8 @@ type Transition struct {
 
 	PostHook func(t *Transition)
 
+	trace *types.Trace
+
 	// runtimes
 	evm         *evm.EVM
 	precompiles *precompiled.Precompiled
@@ -287,6 +292,9 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 }
 
@@ -387,19 +395,27 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
+	t.trace.TxnTraces = append(t.trace.TxnTraces, &types.TxnTrace{
+		Transaction: txn.MarshalRLP(),
+		Delta:       t.Txn().getCompactJournal(),
+	})
+
 	return nil
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash, error) {
+func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash) {
 	objs, err := t.state.Commit(t.config.EIP155)
 	if err != nil {
-		return nil, types.ZeroHash, err
+		return nil, nil, types.Hash{}
 	}
 
-	s2, root := t.snap.Commit(objs)
+	s2, snapTrace, root := t.snap.Commit(objs)
 
-	return s2, types.BytesToHash(root), nil
+	t.trace.AccountTrie = snapTrace.AccountTrie
+	t.trace.StorageTrie = snapTrace.StorageTrie
+
+	return s2, t.trace, types.BytesToHash(root)
 }
 
 func (t *Transition) subGasPool(amount uint64) error {

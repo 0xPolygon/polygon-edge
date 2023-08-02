@@ -94,7 +94,7 @@ func RunSpecificTest(t *testing.T, file string, c testCase, name, fork string, i
 	objs, err := txn.Commit(forks.EIP155)
 	require.NoError(t, err)
 
-	_, root := snapshot.Commit(objs)
+	_, _, root := snapshot.Commit(objs)
 
 	// Check block root
 	if !bytes.Equal(root, p.Root.Bytes()) {
