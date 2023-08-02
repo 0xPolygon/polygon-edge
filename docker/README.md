@@ -63,4 +63,4 @@ it might take a while to complete, depending on the hardware that the build oper
 ### Production
 
 This is **NOT** a production ready deployment. It is to be used in *development* / *test* environments only.
-For production usage, please check out the official [docs](https://wiki.polygon.technology/docs/edge/overview/).
+For production usage, please check out the official [docs](https://wiki.polygon.technology/docs/supernets).

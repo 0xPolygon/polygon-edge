@@ -34,4 +34,4 @@ To interact with the chain use another terminal or run a dockerized environment 
 ### Production
 
 This is **NOT** a production ready deployment. It is to be used in *development* / *test* environments only.
-For production usage, please check out the official [docs](https://wiki.polygon.technology/docs/edge/overview/).
+For production usage, please check out the official [docs](https://wiki.polygon.technology/docs/supernets).
