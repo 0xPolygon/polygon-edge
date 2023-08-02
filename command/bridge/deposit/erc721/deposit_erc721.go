@@ -127,7 +127,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 			receipt, err := txRelayer.SendTransaction(mintTxn, minterKey)
 			if err != nil {
-				outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
+				outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s: %w",
+					depositorAddr, err))
 
 				return
 			}
@@ -150,7 +151,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send root erc 721 approve transaction"))
+		outputter.SetError(fmt.Errorf("failed to send root erc 721 approve transaction: %w", err))
 
 		return
 	}
