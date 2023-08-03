@@ -466,13 +466,13 @@ func (p *genesisParams) validateRewardWallet() error {
 		return errors.New("reward wallet address must be defined")
 	}
 
-	if p.rewardWallet == types.AddressToString(types.ZeroAddress) {
-		return errors.New("reward wallet address must not be zero address")
-	}
-
 	premineInfo, err := parsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return err
+	}
+
+	if premineInfo.address == types.ZeroAddress {
+		return errors.New("reward wallet address must not be zero address")
 	}
 
 	// If epoch rewards are enabled, reward wallet must have some amount of premine
