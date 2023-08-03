@@ -2,6 +2,7 @@ package slashing
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
@@ -91,6 +92,19 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 	expectedCommit := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
 	expectedRoundChange := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
 
+	msgCh := make(chan *ibftProto.Message, 4)
+
+	var wg sync.WaitGroup
+
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+
+		for msg := range msgCh {
+			tracker.Handle(msg)
+		}
+	}()
+
 	for _, k := range keys {
 		expectedPrePrepare[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
 		expectedPrepare[types.Address(k.Address())] = make([]*ibftProto.Message, 0, heightsCount)
@@ -111,12 +125,15 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 			expectedCommit[types.Address(k.Address())] = append(expectedCommit[types.Address(k.Address())], commit)
 			expectedRoundChange[types.Address(k.Address())] = append(expectedRoundChange[types.Address(k.Address())], roundChange)
 
-			tracker.Handle(prePrepare)
-			tracker.Handle(prepare)
-			tracker.Handle(commit)
-			tracker.Handle(roundChange)
+			msgCh <- prePrepare
+			msgCh <- prepare
+			msgCh <- commit
+			msgCh <- roundChange
 		}
 	}
+
+	close(msgCh)
+	wg.Wait()
 
 	for _, k := range keys {
 		sender := types.Address(k.Address())
