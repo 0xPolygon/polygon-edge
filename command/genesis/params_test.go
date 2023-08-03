@@ -185,3 +185,40 @@ func Test_validatePremineInfo(t *testing.T) {
 		})
 	}
 }
+
+func Test_validateRewardWallet(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name              string
+		rewardWallet      string
+		epochReward       uint64
+		expectValidateErr error
+	}{
+		{
+			name:              "invalid reward wallet: no premine + reward",
+			rewardWallet:      types.StringToAddress("1").String() + ":0",
+			epochReward:       10,
+			expectValidateErr: errRewardWalletAmountZero,
+		},
+		{
+			name:              "valid reward wallet: no premine + no reward",
+			rewardWallet:      types.StringToAddress("1").String() + ":0",
+			epochReward:       0,
+			expectValidateErr: nil,
+		},
+	}
+	for _, c := range cases {
+		c := c
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+
+			p := &genesisParams{
+				rewardWallet: c.rewardWallet,
+				epochReward:  c.epochReward,
+			}
+			err := p.validateRewardWallet()
+			require.ErrorIs(t, err, c.expectValidateErr)
+		})
+	}
+}
