@@ -139,7 +139,7 @@ func NewDoubleSigningTracker(logger hclog.Logger,
 // Handle is implementation of IBFTMessageHandler interface, which handles IBFT consensus messages
 func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 	if err := t.validateMsg(msg); err != nil {
-		t.logger.Debug("[ERROR] invalid IBFT message retrieved", "error", err, "message", msg)
+		t.logger.Debug("[ERROR] invalid IBFT message retrieved, ignoring it.", "error", err, "message", msg)
 
 		return
 	}
@@ -191,21 +191,12 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 					continue
 				}
 
-				var evidence *DoubleSignEvidence
+				evidence := newDoubleSignEvidence(address, round, []*ibftProto.Message{msgs[0]})
+				evidences = append(evidences, evidence)
 
-				firstMsg := msgs[0]
 				for _, msg := range msgs[1:] {
-					if !bytes.Equal(firstMsg.Signature, msg.Signature) {
-						if evidence == nil {
-							evidence = newDoubleSignEvidence(address, round, []*ibftProto.Message{})
-							evidences = append(evidences, evidence)
-						}
-
-						evidence.messages = append(evidence.messages, msg)
-					}
+					evidence.messages = append(evidence.messages, msg)
 				}
-
-				evidence.messages = append([]*ibftProto.Message{firstMsg}, evidence.messages...)
 			}
 		}
 
