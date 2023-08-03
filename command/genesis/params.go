@@ -475,7 +475,8 @@ func (p *genesisParams) validateRewardWallet() error {
 		return err
 	}
 
-	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
+	// If epoch rewards are enabled, reward wallet must have some amount of premine
+	if p.epochReward > 0 && premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
 		return errRewardWalletAmountZero
 	}
 

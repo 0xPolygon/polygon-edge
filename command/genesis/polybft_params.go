@@ -98,7 +98,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		rewardTokenAddr     = contracts.NativeERC20TokenContract
 	)
 
-	if p.rewardTokenCode == "" {
+	if p.rewardTokenCode == "" && p.epochReward > 0 {
 		// native token is used as a reward token, and reward wallet is not a zero address
 		// so we need to add that address to premine map
 		premineBalances[walletPremineInfo.address] = walletPremineInfo
