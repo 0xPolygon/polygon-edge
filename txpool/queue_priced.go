@@ -101,7 +101,7 @@ func (q *maxPriceQueue) Less(i, j int) bool {
 	case 1:
 		return true
 	default:
-		return q.txs[i].Nonce < q.txs[j].Nonce
+		return q.txs[i].Nonce() < q.txs[j].Nonce()
 	}
 }
 

@@ -12,10 +12,14 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	eth := newTestEthEndpoint(store)
 
-	txn := &types.Transaction{
+	// txn := &types.Transaction{
+	// 	From: addr0,
+	// 	V:    big.NewInt(1),
+	// }
+	txn := types.NewTx(&types.MixedTx{
 		From: addr0,
 		V:    big.NewInt(1),
-	}
+	})
 	txn.ComputeHash(1)
 
 	data := txn.MarshalRLP()
@@ -24,7 +28,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
 
 	// the hash in the txn pool should match the one we send
-	if txn.Hash != store.txn.Hash {
+	if txn.Hash() != store.txn.Hash() {
 		t.Fatal("bad")
 	}
 }
@@ -34,12 +38,18 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)
 
-	txToSend := &types.Transaction{
+	// txToSend := &types.Transaction{
+	// 	From:     addr0,
+	// 	To:       argAddrPtr(addr0),
+	// 	Nonce:    uint64(0),
+	// 	GasPrice: big.NewInt(int64(1)),
+	// }
+	txToSend := types.NewTx(&types.MixedTx{
 		From:     addr0,
 		To:       argAddrPtr(addr0),
 		Nonce:    uint64(0),
 		GasPrice: big.NewInt(int64(1)),
-	}
+	})
 
 	_, err := eth.SendRawTransaction(txToSend.MarshalRLP())
 	assert.NoError(t, err)

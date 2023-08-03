@@ -422,11 +422,11 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 	)
 
 	for _, tx := range transactions {
-		if tx.Type != types.StateTx {
+		if tx.Type() != types.StateTx {
 			continue
 		}
 
-		decodedStateTx, err := decodeStateTransaction(tx.Input)
+		decodedStateTx, err := decodeStateTransaction(tx.Input())
 		if err != nil {
 			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
 		}
@@ -443,7 +443,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			commitmentTxExists = true
 
-			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash, stateTxData, f.validators); err != nil {
+			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash(), stateTxData, f.validators); err != nil {
 				return err
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
@@ -585,7 +585,7 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 			return err
 		}
 
-		if commitEpochTx.Hash != localCommitEpochTx.Hash {
+		if commitEpochTx.Hash() != localCommitEpochTx.Hash() {
 			return fmt.Errorf(
 				"invalid commit epoch transaction. Expected '%s', but got '%s' commit epoch transaction hash",
 				localCommitEpochTx.Hash,
@@ -608,7 +608,7 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 			return err
 		}
 
-		if distributeRewardsTx.Hash != localDistributeRewardsTx.Hash {
+		if distributeRewardsTx.Hash() != localDistributeRewardsTx.Hash() {
 			return fmt.Errorf(
 				"invalid distribute rewards transaction. Expected '%s', but got '%s' distribute rewards hash",
 				localDistributeRewardsTx.Hash,
@@ -702,14 +702,22 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(blockNumber uint64, target types.Address, inputData []byte) *types.Transaction {
-	tx := &types.Transaction{
+	// tx := &types.Transaction{
+	// 	From:     contracts.SystemCaller,
+	// 	To:       &target,
+	// 	Type:     types.StateTx,
+	// 	Input:    inputData,
+	// 	Gas:      types.StateTransactionGasLimit,
+	// 	GasPrice: big.NewInt(0),
+	// }
+	tx := types.NewTx(&types.MixedTx{
 		From:     contracts.SystemCaller,
 		To:       &target,
 		Type:     types.StateTx,
 		Input:    inputData,
 		Gas:      types.StateTransactionGasLimit,
 		GasPrice: big.NewInt(0),
-	}
+	})
 
 	tx.ComputeHash(blockNumber)
 

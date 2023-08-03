@@ -367,7 +367,16 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	clt := srv.TxnPoolOperator()
 
 	generateTx := func(i int) *types.Transaction {
-		unsignedTx := &types.Transaction{
+		// unsignedTx := &types.Transaction{
+		// 	Nonce: uint64(currentNonce),
+		// 	From:  types.ZeroAddress,
+		// 	To:    &stakingContractAddr,
+		// 	Gas:   framework.DefaultGasLimit,
+		// 	Value: big.NewInt(0),
+		// 	V:     big.NewInt(1), // it is necessary to encode in rlp,
+		// 	Input: framework.MethodSig("unstake"),
+		// }
+		unsignedTx := types.NewTx(&types.MixedTx{
 			Nonce: uint64(currentNonce),
 			From:  types.ZeroAddress,
 			To:    &stakingContractAddr,
@@ -375,16 +384,21 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 			Value: big.NewInt(0),
 			V:     big.NewInt(1), // it is necessary to encode in rlp,
 			Input: framework.MethodSig("unstake"),
-		}
+		})
 
 		// Just make very second transaction with dynamic gas fee
 		if i%2 == 0 {
-			unsignedTx.Type = types.DynamicFeeTx
-			unsignedTx.GasFeeCap = bigGasPrice
-			unsignedTx.GasTipCap = bigGasPrice
+			// unsignedTx.Type = types.DynamicFeeTx
+			// unsignedTx.GasFeeCap = bigGasPrice
+			// unsignedTx.GasTipCap = bigGasPrice
+			unsignedTx.SetTransactionType(types.DynamicFeeTx)
+			unsignedTx.SetGasFeeCap(bigGasPrice)
+			unsignedTx.SetGasTipCap(bigGasPrice)
 		} else {
-			unsignedTx.Type = types.LegacyTx
-			unsignedTx.GasPrice = bigGasPrice
+			// unsignedTx.Type = types.LegacyTx
+			// unsignedTx.GasPrice = bigGasPrice
+			unsignedTx.SetTransactionType(types.LegacyTx)
+			unsignedTx.SetGasPrice(bigGasPrice)
 		}
 
 		signedTx, err := signer.SignTx(unsignedTx, senderKey)
@@ -517,7 +531,16 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(i int, value *big.Int, methodName string) *types.Transaction {
-		unsignedTx := &types.Transaction{
+		// unsignedTx := &types.Transaction{
+		// 	Nonce: uint64(currentNonce),
+		// 	From:  types.ZeroAddress,
+		// 	To:    &stakingContractAddr,
+		// 	Gas:   framework.DefaultGasLimit,
+		// 	Value: value,
+		// 	V:     big.NewInt(1), // it is necessary to encode in rlp
+		// 	Input: framework.MethodSig(methodName),
+		// }
+		unsignedTx := types.NewTx(&types.MixedTx{
 			Nonce: uint64(currentNonce),
 			From:  types.ZeroAddress,
 			To:    &stakingContractAddr,
@@ -525,16 +548,21 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 			Value: value,
 			V:     big.NewInt(1), // it is necessary to encode in rlp
 			Input: framework.MethodSig(methodName),
-		}
+		})
 
 		// Just make very second transaction with dynamic gas fee
 		if i%2 == 0 {
-			unsignedTx.Type = types.DynamicFeeTx
-			unsignedTx.GasFeeCap = bigGasPrice
-			unsignedTx.GasTipCap = bigGasPrice
+			// unsignedTx.Type = types.DynamicFeeTx
+			// unsignedTx.GasFeeCap = bigGasPrice
+			// unsignedTx.GasTipCap = bigGasPrice
+			unsignedTx.SetTransactionType(types.DynamicFeeTx)
+			unsignedTx.SetGasFeeCap(bigGasPrice)
+			unsignedTx.SetGasTipCap(bigGasPrice)
 		} else {
-			unsignedTx.Type = types.LegacyTx
-			unsignedTx.GasPrice = bigGasPrice
+			// unsignedTx.Type = types.LegacyTx
+			// unsignedTx.GasPrice = bigGasPrice
+			unsignedTx.SetTransactionType(types.LegacyTx)
+			unsignedTx.SetGasPrice(bigGasPrice)
 		}
 
 		signedTx, err := signer.SignTx(unsignedTx, senderKey)
@@ -656,7 +684,16 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 	txpoolClient := srv.TxnPoolOperator()
 
 	generateTx := func(dynamicTx bool, value *big.Int, methodName string) *types.Transaction {
-		unsignedTx := &types.Transaction{
+		// unsignedTx := &types.Transaction{
+		// 	Nonce: uint64(currentNonce),
+		// 	From:  types.ZeroAddress,
+		// 	To:    &stakingContractAddr,
+		// 	Gas:   framework.DefaultGasLimit,
+		// 	Value: value,
+		// 	V:     big.NewInt(1), // it is necessary to encode in rlp
+		// 	Input: framework.MethodSig(methodName),
+		// }
+		unsignedTx := types.NewTx(&types.MixedTx{
 			Nonce: uint64(currentNonce),
 			From:  types.ZeroAddress,
 			To:    &stakingContractAddr,
@@ -664,15 +701,21 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			Value: value,
 			V:     big.NewInt(1), // it is necessary to encode in rlp
 			Input: framework.MethodSig(methodName),
-		}
+		})
 
 		if dynamicTx {
-			unsignedTx.Type = types.DynamicFeeTx
-			unsignedTx.GasFeeCap = bigGasPrice
-			unsignedTx.GasTipCap = bigGasPrice
+			// unsignedTx.Type = types.DynamicFeeTx
+			// unsignedTx.GasFeeCap = bigGasPrice
+			// unsignedTx.GasTipCap = bigGasPrice
+			unsignedTx.SetTransactionType(types.DynamicFeeTx)
+			unsignedTx.SetGasFeeCap(bigGasPrice)
+			unsignedTx.SetGasTipCap(bigGasPrice)
+
 		} else {
-			unsignedTx.Type = types.LegacyTx
-			unsignedTx.GasPrice = bigGasPrice
+			// unsignedTx.Type = types.LegacyTx
+			// unsignedTx.GasPrice = bigGasPrice
+			unsignedTx.SetTransactionType(types.LegacyTx)
+			unsignedTx.SetGasPrice(bigGasPrice)
 		}
 
 		signedTx, err := signer.SignTx(unsignedTx, senderKey)

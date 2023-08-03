@@ -62,14 +62,22 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 		return nil
 	}
 
-	return &types.Transaction{
+	// return &types.Transaction{
+	// 	From:     addr,
+	// 	Nonce:    nonce,
+	// 	Value:    big.NewInt(1),
+	// 	GasPrice: big.NewInt(0).SetUint64(defaultPriceLimit),
+	// 	Gas:      validGasLimit,
+	// 	Input:    input,
+	// }
+	return types.NewTx(&types.MixedTx{
 		From:     addr,
 		Nonce:    nonce,
 		Value:    big.NewInt(1),
 		GasPrice: big.NewInt(0).SetUint64(defaultPriceLimit),
 		Gas:      validGasLimit,
 		Input:    input,
-	}
+	})
 }
 
 // returns a new txpool with default test config
@@ -147,7 +155,8 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.StateTx
+		//tx.Type = types.StateTx
+		tx.SetTransactionType(types.StateTx)
 
 		assert.ErrorIs(t,
 			pool.addTx(local, signTx(tx)),
@@ -160,7 +169,8 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Value = big.NewInt(-5)
+		//tx.Value = big.NewInt(-5)
+		tx.SetValue(big.NewInt(-5))
 
 		assert.ErrorIs(t,
 			pool.addTx(local, signTx(tx)),
@@ -173,8 +183,10 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Value = big.NewInt(1)
-		tx.Gas = 10000000000001
+		// tx.Value = big.NewInt(1)
+		// tx.Gas = 10000000000001
+		tx.SetValue(big.NewInt(1))
+		tx.SetGas(10000000000001)
 
 		tx = signTx(tx)
 
@@ -279,7 +291,8 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Gas = 1
+		//tx.Gas = 1
+		tx.SetGas(1)
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -310,7 +323,8 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.GasPrice = big.NewInt(200)
+		//tx.GasPrice = big.NewInt(200)
+		tx.SetGasPrice(big.NewInt(200))
 		tx = signTx(tx)
 
 		// send the tx beforehand
@@ -318,7 +332,8 @@ func TestAddTxErrors(t *testing.T) {
 		<-pool.promoteReqCh
 
 		tx = newTx(defaultAddr, 0, 1)
-		tx.GasPrice = big.NewInt(100)
+		//tx.GasPrice = big.NewInt(100)
+		tx.SetGasPrice(big.NewInt(100))
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -338,7 +353,8 @@ func TestAddTxErrors(t *testing.T) {
 		_, err := rand.Read(data)
 		assert.NoError(t, err)
 
-		tx.Input = data
+		// tx.Input = data
+		tx.SetInput(data)
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -367,7 +383,7 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.GasPrice.SetUint64(1000000000000)
+		tx.GasPrice().SetUint64(1000000000000)
 		tx = signTx(tx)
 
 		assert.ErrorIs(t,
@@ -547,7 +563,7 @@ func TestAddTxHighPressure(t *testing.T) {
 			tx := newTx(addr1, 5, 1)
 			assert.NoError(t, pool.addTx(local, tx))
 
-			_, exists := pool.index.get(tx.Hash)
+			_, exists := pool.index.get(tx.Hash())
 			assert.True(t, exists)
 
 			acc := pool.accounts.get(addr1)
@@ -629,7 +645,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 	// send tx as local
 	assert.NoError(t, pool.addTx(local, tx))
 
-	_, exists := pool.index.get(tx.Hash)
+	_, exists := pool.index.get(tx.Hash())
 	assert.True(t, exists)
 
 	// send tx as gossip (will be discarded)
@@ -786,7 +802,7 @@ func TestAddTx(t *testing.T) {
 				slots uint64,
 			) *types.Transaction {
 				tx := newTx(addr, nonce, slots)
-				tx.GasPrice.SetUint64(gasPrice)
+				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
 			}
@@ -801,7 +817,7 @@ func TestAddTx(t *testing.T) {
 			// add the transactions
 			assert.NoError(t, pool.addTx(local, tx2))
 
-			_, exists := pool.index.get(tx2.Hash)
+			_, exists := pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			// check the account nonce before promoting
@@ -813,7 +829,7 @@ func TestAddTx(t *testing.T) {
 			<-pool.promoteReqCh
 
 			// at this point the pointer of the first tx should be overwritten by the second pricier tx
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			assert.Len(t, pool.index.all, int(1))
@@ -847,7 +863,7 @@ func TestAddTx(t *testing.T) {
 				slots uint64,
 			) *types.Transaction {
 				tx := newTx(addr, nonce, slots)
-				tx.GasPrice.SetUint64(gasPrice)
+				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
 			}
@@ -862,7 +878,7 @@ func TestAddTx(t *testing.T) {
 			// add the transactions
 			assert.NoError(t, pool.addTx(local, tx2))
 
-			_, exists := pool.index.get(tx2.Hash)
+			_, exists := pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			// check the account nonce before promoting
@@ -903,7 +919,7 @@ func TestAddTx(t *testing.T) {
 				slots uint64,
 			) *types.Transaction {
 				tx := newTx(addr, nonce, slots)
-				tx.GasPrice.SetUint64(gasPrice)
+				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
 			}
@@ -919,10 +935,10 @@ func TestAddTx(t *testing.T) {
 			assert.NoError(t, pool.addTx(local, tx1))
 			assert.NoError(t, pool.addTx(local, tx2))
 
-			_, exists := pool.index.get(tx1.Hash)
+			_, exists := pool.index.get(tx1.Hash())
 			assert.False(t, exists)
 
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			// check the account nonce before promoting
@@ -933,7 +949,7 @@ func TestAddTx(t *testing.T) {
 			promReq2 := <-pool.promoteReqCh
 
 			// at this point the pointer of the first tx should be overwritten by the second pricier tx
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			assert.Len(t, pool.index.all, int(1))
@@ -954,7 +970,7 @@ func TestAddTx(t *testing.T) {
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length()) // should be empty
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			assert.Equal(t, len(pool.index.all), int(1))
@@ -973,7 +989,7 @@ func TestAddTx(t *testing.T) {
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 			// because the *tx1 and *tx2 now contain the same hash we only need to check for *tx2 existence
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			assert.Equal(t, len(pool.index.all), int(1))
@@ -1004,7 +1020,7 @@ func TestAddTx(t *testing.T) {
 				slots uint64,
 			) *types.Transaction {
 				tx := newTx(addr, nonce, slots)
-				tx.GasPrice.SetUint64(gasPrice)
+				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
 			}
@@ -1023,13 +1039,13 @@ func TestAddTx(t *testing.T) {
 			acc := pool.accounts.get(addr1)
 			assert.NotNil(t, acc)
 
-			_, exists := pool.index.get(tx1.Hash)
+			_, exists := pool.index.get(tx1.Hash())
 			assert.False(t, exists)
 
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
-			maptx2 := acc.nonceToTx.get(tx2.Nonce)
+			maptx2 := acc.nonceToTx.get(tx2.Nonce())
 			nonceMapLength := len(acc.nonceToTx.mapping)
 
 			assert.NotNil(t, maptx2)
@@ -1063,7 +1079,7 @@ func TestAddTx(t *testing.T) {
 				slots uint64,
 			) *types.Transaction {
 				tx := newTx(addr, nonce, slots)
-				tx.GasPrice.SetUint64(gasPrice)
+				tx.GasPrice().SetUint64(gasPrice)
 
 				return tx
 			}
@@ -1096,25 +1112,25 @@ func TestAddTx(t *testing.T) {
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
 			assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
-			_, exists := pool.index.get(tx1.Hash)
+			_, exists := pool.index.get(tx1.Hash())
 			assert.True(t, exists)
 
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.False(t, exists)
 
 			assert.NoError(t, pool.addTx(local, tx2))
 
-			maptx2 := acc.nonceToTx.get(tx2.Nonce)
+			maptx2 := acc.nonceToTx.get(tx2.Nonce())
 			nonceMapLength := len(acc.nonceToTx.mapping)
 
 			assert.NotNil(t, maptx2)
 			assert.Equal(t, tx2, maptx2)
 			assert.Equal(t, int(1), nonceMapLength)
 
-			_, exists = pool.index.get(tx1.Hash)
+			_, exists = pool.index.get(tx1.Hash())
 			assert.False(t, exists)
 
-			_, exists = pool.index.get(tx2.Hash)
+			_, exists = pool.index.get(tx2.Hash())
 			assert.True(t, exists)
 
 			assert.Equal(t, len(pool.index.all), int(1))
@@ -1169,7 +1185,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 		mapLen := len(acc.nonceToTx.mapping)
-		maptx := acc.nonceToTx.get(tx.Nonce)
+		maptx := acc.nonceToTx.get(tx.Nonce())
 
 		assert.Equal(t, int(1), mapLen)
 		assert.Equal(t, tx, maptx)
@@ -1181,7 +1197,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 		mapLen = len(acc.nonceToTx.mapping)
-		maptx = acc.nonceToTx.get(tx.Nonce)
+		maptx = acc.nonceToTx.get(tx.Nonce())
 
 		assert.Equal(t, int(1), mapLen)
 		assert.Equal(t, tx, maptx)
@@ -1202,7 +1218,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.NotNil(t, acc)
 
 		mapLen := len(acc.nonceToTx.mapping)
-		maptx := acc.nonceToTx.get(tx.Nonce)
+		maptx := acc.nonceToTx.get(tx.Nonce())
 
 		assert.Equal(t, int(1), mapLen)
 		assert.Equal(t, tx, maptx)
@@ -1217,7 +1233,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 		mapLen = len(acc.nonceToTx.mapping)
-		maptx = acc.nonceToTx.get(tx.Nonce)
+		maptx = acc.nonceToTx.get(tx.Nonce())
 
 		assert.Equal(t, int(1), mapLen)
 		assert.Equal(t, tx, maptx)
@@ -1256,7 +1272,7 @@ func TestPromoteHandler(t *testing.T) {
 		acc := pool.accounts.get(addr1)
 
 		for _, tx := range txs {
-			maptx := acc.nonceToTx.get(tx.Nonce)
+			maptx := acc.nonceToTx.get(tx.Nonce())
 			assert.Equal(t, tx, maptx)
 		}
 
@@ -1276,7 +1292,7 @@ func TestPromoteHandler(t *testing.T) {
 		assert.Equal(t, uint64(10), pool.accounts.get(addr1).promoted.length())
 
 		for _, tx := range txs {
-			maptx := acc.nonceToTx.get(tx.Nonce)
+			maptx := acc.nonceToTx.get(tx.Nonce())
 			assert.Equal(t, tx, maptx)
 		}
 
@@ -1307,7 +1323,7 @@ func TestPromoteHandler(t *testing.T) {
 		acc := pool.accounts.get(addr1)
 
 		for _, tx := range txs {
-			maptx := acc.nonceToTx.get(tx.Nonce)
+			maptx := acc.nonceToTx.get(tx.Nonce())
 			assert.Equal(t, tx, maptx)
 		}
 
@@ -1398,7 +1414,7 @@ func TestResetAccount(t *testing.T) {
 
 				// setup prestate
 				acc := pool.getOrCreateAccount(addr1)
-				acc.setNonce(test.txs[0].Nonce)
+				acc.setNonce(test.txs[0].Nonce())
 
 				err = pool.addTx(local, test.txs[0])
 				assert.NoError(t, err)
@@ -1694,7 +1710,7 @@ func TestResetAccount(t *testing.T) {
 
 				// setup prestate
 				acc := pool.getOrCreateAccount(addr1)
-				acc.setNonce(test.txs[0].Nonce)
+				acc.setNonce(test.txs[0].Nonce())
 
 				err = pool.addTx(local, test.txs[0])
 				assert.NoError(t, err)
@@ -1761,7 +1777,7 @@ func TestPop(t *testing.T) {
 	acc := pool.accounts.get(addr1)
 
 	assert.Equal(t, int(1), len(acc.nonceToTx.mapping))
-	assert.Equal(t, tx1, acc.nonceToTx.get(tx1.Nonce))
+	assert.Equal(t, tx1, acc.nonceToTx.get(tx1.Nonce()))
 
 	pool.handlePromoteRequest(<-pool.promoteReqCh)
 
@@ -1779,7 +1795,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 	assert.Equal(t, int(0), len(acc.nonceToTx.mapping))
-	assert.Equal(t, (*types.Transaction)(nil), acc.nonceToTx.get(tx1.Nonce))
+	assert.Equal(t, (*types.Transaction)(nil), acc.nonceToTx.get(tx1.Nonce()))
 }
 
 func TestDrop(t *testing.T) {
@@ -1813,7 +1829,7 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
 
 	assert.Equal(t, int(0), len(acc.nonceToTx.mapping))
-	assert.Equal(t, (*types.Transaction)(nil), acc.nonceToTx.get(tx1.Nonce))
+	assert.Equal(t, (*types.Transaction)(nil), acc.nonceToTx.get(tx1.Nonce()))
 }
 
 func TestDemote(t *testing.T) {
@@ -1931,7 +1947,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
 		assert.Zero(t, accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
-		checkTxExistence(t, pool, tx.Hash, true)
+		checkTxExistence(t, pool, tx.Hash(), true)
 
 		// set 9 to skips in order to drop transaction next
 		accountMap.skips = 9
@@ -1945,7 +1961,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Zero(t, accountMap.promoted.length())
 		assert.Zero(t, accountMap.skips)
 		assert.Zero(t, pool.gauge.read())
-		checkTxExistence(t, pool, tx.Hash, false)
+		checkTxExistence(t, pool, tx.Hash(), false)
 	})
 
 	t.Run("should drop the first transaction from enqueued queue", func(t *testing.T) {
@@ -1966,7 +1982,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Zero(t, accountMap.promoted.length())
 		assert.Zero(t, accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
-		checkTxExistence(t, pool, tx.Hash, true)
+		checkTxExistence(t, pool, tx.Hash(), true)
 
 		// set 9 to skips in order to drop transaction next
 		accountMap.skips = 9
@@ -1980,7 +1996,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Zero(t, accountMap.promoted.length())
 		assert.Zero(t, accountMap.skips)
 		assert.Zero(t, pool.gauge.read())
-		checkTxExistence(t, pool, tx.Hash, false)
+		checkTxExistence(t, pool, tx.Hash(), false)
 	})
 
 	t.Run("should not drop a transaction", func(t *testing.T) {
@@ -2001,7 +2017,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
 		assert.Zero(t, accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
-		checkTxExistence(t, pool, tx.Hash, true)
+		checkTxExistence(t, pool, tx.Hash(), true)
 
 		// set 9 to skips in order to drop transaction next
 		accountMap.skips = 5
@@ -2015,7 +2031,7 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Equal(t, uint64(1), accountMap.promoted.length())
 		assert.Equal(t, uint64(0), accountMap.skips)
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
-		checkTxExistence(t, pool, tx.Hash, true)
+		checkTxExistence(t, pool, tx.Hash(), true)
 	})
 }
 
@@ -2056,8 +2072,10 @@ func Test_TxPool_validateTx(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-		tx.Input = input
+		// tx.To = nil
+		// tx.Input = input
+		tx.SetTo(nil)
+		tx.SetInput(input)
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
@@ -2075,8 +2093,10 @@ func Test_TxPool_validateTx(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.To = nil
-		tx.Input = input
+		// tx.To = nil
+		// tx.Input = input
+		tx.SetTo(nil)
+		tx.SetInput(input)
 
 		assert.NoError(t,
 			pool.validateTx(signTx(tx)),
@@ -2091,9 +2111,12 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = big.NewInt(1100)
-		tx.GasTipCap = big.NewInt(10)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasFeeCap = big.NewInt(1100)
+		// tx.GasTipCap = big.NewInt(10)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasFeeCap(big.NewInt(1100))
+		tx.SetGasTipCap(big.NewInt(10))
 
 		assert.NoError(t, pool.validateTx(signTx(tx)))
 	})
@@ -2105,9 +2128,12 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = big.NewInt(100)
-		tx.GasTipCap = big.NewInt(10)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasFeeCap = big.NewInt(100)
+		// tx.GasTipCap = big.NewInt(10)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasFeeCap(big.NewInt(100))
+		tx.SetGasTipCap(big.NewInt(10))
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
@@ -2122,9 +2148,12 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = big.NewInt(10000)
-		tx.GasTipCap = big.NewInt(100000)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasFeeCap = big.NewInt(10000)
+		// tx.GasTipCap = big.NewInt(100000)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasFeeCap(big.NewInt(10000))
+		tx.SetGasTipCap(big.NewInt(100000))
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
@@ -2140,11 +2169,14 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// undefined gas tip cap
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = big.NewInt(10000)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasFeeCap = big.NewInt(10000)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasFeeCap(big.NewInt(10000))
 
 		signedTx := signTx(tx)
-		signedTx.GasTipCap = nil
+		//signedTx.GasTipCap = nil
+		signedTx.SetGasTipCap(nil)
 
 		assert.ErrorIs(t,
 			pool.validateTx(signedTx),
@@ -2153,10 +2185,13 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// undefined gas fee cap
 		tx = newTx(defaultAddr, 1, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasTipCap = big.NewInt(1000)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasTipCap = big.NewInt(1000)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasTipCap(big.NewInt(1000))
 		signedTx = signTx(tx)
-		signedTx.GasFeeCap = nil
+		//signedTx.GasFeeCap = nil
+		signedTx.SetGasFeeCap(nil)
 
 		assert.ErrorIs(t,
 			pool.validateTx(signedTx),
@@ -2174,8 +2209,10 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// very high gas fee cap
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasFeeCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasFeeCap(new(big.Int).SetBit(new(big.Int), bitLength, 1))
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
@@ -2184,8 +2221,10 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// very high gas tip cap
 		tx = newTx(defaultAddr, 1, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasTipCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasTipCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasTipCap(new(big.Int).SetBit(new(big.Int), bitLength, 1))
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
@@ -2199,9 +2238,12 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.forks.London = false
 
 		tx := newTx(defaultAddr, 0, 1)
-		tx.Type = types.DynamicFeeTx
-		tx.GasFeeCap = big.NewInt(10000)
-		tx.GasTipCap = big.NewInt(100000)
+		// tx.Type = types.DynamicFeeTx
+		// tx.GasFeeCap = big.NewInt(10000)
+		// tx.GasTipCap = big.NewInt(100000)
+		tx.SetTransactionType(types.DynamicFeeTx)
+		tx.SetGasFeeCap(big.NewInt(10000))
+		tx.SetGasTipCap(big.NewInt(100000))
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
@@ -2615,16 +2657,23 @@ func TestExecutablesOrder(t *testing.T) {
 	newPricedTx := func(
 		addr types.Address, nonce, gasPrice uint64, gasFeeCap uint64, value uint64) *types.Transaction {
 		tx := newTx(addr, nonce, 1)
-		tx.Value = new(big.Int).SetUint64(value)
+		// tx.Value = new(big.Int).SetUint64(value)
+		tx.SetValue(new(big.Int).SetUint64(value))
 
 		if gasPrice == 0 {
-			tx.Type = types.DynamicFeeTx
-			tx.GasFeeCap = new(big.Int).SetUint64(gasFeeCap)
-			tx.GasTipCap = new(big.Int).SetUint64(2)
-			tx.GasPrice = big.NewInt(0)
+			// tx.Type = types.DynamicFeeTx
+			// tx.GasFeeCap = new(big.Int).SetUint64(gasFeeCap)
+			// tx.GasTipCap = new(big.Int).SetUint64(2)
+			// tx.GasPrice = big.NewInt(0)
+			tx.SetTransactionType(types.DynamicFeeTx)
+			tx.SetGasFeeCap(new(big.Int).SetUint64(gasFeeCap))
+			tx.SetGasTipCap(new(big.Int).SetUint64(2))
+			tx.SetGasPrice(big.NewInt(0))
 		} else {
-			tx.Type = types.LegacyTx
-			tx.GasPrice = new(big.Int).SetUint64(gasPrice)
+			// tx.Type = types.LegacyTx
+			// tx.GasPrice = new(big.Int).SetUint64(gasPrice)
+			tx.SetTransactionType(types.LegacyTx)
+			tx.SetGasPrice(new(big.Int).SetUint64(gasPrice))
 		}
 
 		return tx
@@ -2799,8 +2848,8 @@ func TestExecutablesOrder(t *testing.T) {
 			// verify the highest priced transactions
 			// were processed first
 			for i, tx := range successful {
-				require.Equal(t, test.expectedPriceOrder[i][0], tx.GasPrice.Uint64())
-				require.Equal(t, test.expectedPriceOrder[i][1], tx.Value.Uint64())
+				require.Equal(t, test.expectedPriceOrder[i][0], tx.GasPrice().Uint64())
+				require.Equal(t, test.expectedPriceOrder[i][1], tx.Value().Uint64())
 			}
 		})
 	}
@@ -2938,9 +2987,9 @@ func TestRecovery(t *testing.T) {
 
 			// helper callback for transition errors
 			status := func(tx *types.Transaction) (s status) {
-				txs := test.allTxs[tx.From]
+				txs := test.allTxs[tx.From()]
 				for _, sTx := range txs {
-					if tx.Nonce == sTx.tx.Nonce {
+					if tx.Nonce() == sTx.tx.Nonce() {
 						s = sTx.status
 					}
 				}
@@ -2966,7 +3015,7 @@ func TestRecovery(t *testing.T) {
 			for addr, txs := range test.allTxs {
 				// preset nonce so promotions can happen
 				acc := pool.getOrCreateAccount(addr)
-				acc.setNonce(txs[0].tx.Nonce)
+				acc.setNonce(txs[0].tx.Nonce())
 
 				expectedEnqueued += test.expected.accounts[addr].enqueued
 
@@ -3153,8 +3202,8 @@ func TestGetTxs(t *testing.T) {
 				tx *types.Transaction,
 				all map[types.Address][]*types.Transaction,
 			) bool {
-				for _, txx := range all[tx.From] {
-					if tx.Nonce == txx.Nonce {
+				for _, txx := range all[tx.From()] {
+					if tx.Nonce() == txx.Nonce() {
 						return true
 					}
 				}
@@ -3188,7 +3237,7 @@ func TestGetTxs(t *testing.T) {
 				promotable := uint64(0)
 				for _, tx := range txs {
 					// send all txs
-					if tx.Nonce == nonce+promotable {
+					if tx.Nonce() == nonce+promotable {
 						promotable++
 					}
 
@@ -3328,7 +3377,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 
 			// add transaction hash to map
 			mux.Lock()
-			txHashMap[tx.Hash] = struct{}{}
+			txHashMap[tx.Hash()] = struct{}{}
 			mux.Unlock()
 
 			// submit transaction to pool

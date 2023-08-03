@@ -296,7 +296,16 @@ func generateStressTestTx(
 		t.Fatalf("Unable to encode inputs, %v", encodeErr)
 	}
 
-	unsignedTx := &types.Transaction{
+	// unsignedTx := &types.Transaction{
+	// 	Nonce: currentNonce,
+	// 	From:  types.ZeroAddress,
+	// 	To:    &contractAddr,
+	// 	Gas:   framework.DefaultGasLimit,
+	// 	Value: big.NewInt(0),
+	// 	V:     big.NewInt(1), // it is necessary to encode in rlp,
+	// 	Input: append(setNameMethod.ID(), encodedInput...),
+	// }
+	unsignedTx := types.NewTx(&types.MixedTx{
 		Nonce: currentNonce,
 		From:  types.ZeroAddress,
 		To:    &contractAddr,
@@ -304,15 +313,21 @@ func generateStressTestTx(
 		Value: big.NewInt(0),
 		V:     big.NewInt(1), // it is necessary to encode in rlp,
 		Input: append(setNameMethod.ID(), encodedInput...),
-	}
+	})
 
 	if txNum%2 == 0 {
-		unsignedTx.Type = types.DynamicFeeTx
-		unsignedTx.GasFeeCap = bigGasPrice
-		unsignedTx.GasTipCap = bigGasPrice
+		// unsignedTx.Type = types.DynamicFeeTx
+		// unsignedTx.GasFeeCap = bigGasPrice
+		// unsignedTx.GasTipCap = bigGasPrice
+		unsignedTx.SetTransactionType(types.DynamicFeeTx)
+		unsignedTx.SetGasFeeCap(bigGasPrice)
+		unsignedTx.SetGasTipCap(bigGasPrice)
 	} else {
-		unsignedTx.Type = types.LegacyTx
-		unsignedTx.GasPrice = bigGasPrice
+		// unsignedTx.Type = types.LegacyTx
+		// unsignedTx.GasPrice = bigGasPrice
+		unsignedTx.SetTransactionType(types.LegacyTx)
+		unsignedTx.SetGasFeeCap(bigGasPrice)
+		unsignedTx.SetGasTipCap(bigGasPrice)
 	}
 
 	signedTx, err := signer.SignTx(unsignedTx, senderKey)

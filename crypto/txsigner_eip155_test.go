@@ -70,11 +70,16 @@ func TestEIP155Signer_Sender(t *testing.T) {
 				t.Fatalf("Unable to generate key")
 			}
 
-			txn := &types.Transaction{
+			// txn := &types.Transaction{
+			// 	To:       &toAddress,
+			// 	Value:    big.NewInt(1),
+			// 	GasPrice: big.NewInt(0),
+			// }
+			txn := types.NewTx(&types.MixedTx{
 				To:       &toAddress,
 				Value:    big.NewInt(1),
 				GasPrice: big.NewInt(0),
-			}
+			})
 
 			signer := NewEIP155Signer(
 				testCase.chainID.Uint64(),
@@ -106,11 +111,16 @@ func TestEIP155Signer_ChainIDMismatch(t *testing.T) {
 			t.Fatalf("Unable to generate key")
 		}
 
-		txn := &types.Transaction{
+		// txn := &types.Transaction{
+		// 	To:       &toAddress,
+		// 	Value:    big.NewInt(1),
+		// 	GasPrice: big.NewInt(0),
+		// }
+		txn := types.NewTx(&types.MixedTx{
 			To:       &toAddress,
 			Value:    big.NewInt(1),
 			GasPrice: big.NewInt(0),
-		}
+		})
 
 		signer := NewEIP155Signer(chainIDTop, true)
 

@@ -140,7 +140,7 @@ func (e *Executor) ProcessBlock(
 	}
 
 	for _, t := range block.Transactions {
-		if t.Gas > block.Header.GasLimit {
+		if t.Gas() > block.Header.GasLimit {
 			continue
 		}
 
@@ -332,14 +332,15 @@ var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	var err error
+	//var err error
 
-	if txn.From == emptyFrom &&
-		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
+	if txn.From() == emptyFrom &&
+		(txn.Type() == types.LegacyTx || txn.Type() == types.DynamicFeeTx) {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
-		txn.From, err = signer.Sender(txn)
+		from, err := signer.Sender(txn)
+		txn.SetFrom(from)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
@@ -361,8 +362,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
-		TxHash:            txn.Hash,
+		TransactionType:   txn.Type(),
+		TxHash:            txn.Hash(),
 		GasUsed:           result.GasUsed,
 	}
 
@@ -379,7 +380,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	// if the transaction created a contract, store the creation address in the receipt.
 	if msg.To == nil {
-		receipt.ContractAddress = crypto.CreateAddress(msg.From, txn.Nonce).Ptr()
+		receipt.ContractAddress = crypto.CreateAddress(msg.From(), txn.Nonce()).Ptr()
 	}
 
 	// Set the receipt logs and create a bloom for filtering
@@ -445,20 +446,20 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	upfrontGasCost := new(big.Int).SetUint64(msg.Gas)
+	upfrontGasCost := new(big.Int).SetUint64(msg.Gas())
 
 	factor := new(big.Int)
-	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
+	if msg.GasFeeCap() != nil && msg.GasFeeCap().BitLen() > 0 {
 		// Apply EIP-1559 tx cost calculation factor
-		factor = factor.Set(msg.GasFeeCap)
+		factor = factor.Set(msg.GasFeeCap())
 	} else {
 		// Apply legacy tx cost calculation factor
-		factor = factor.Set(msg.GasPrice)
+		factor = factor.Set(msg.GasPrice())
 	}
 
 	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, factor)
 
-	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
+	if err := t.state.SubBalance(msg.From(), upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
 			return ErrNotEnoughFundsForGas
 		}
@@ -470,9 +471,9 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 }
 
 func (t *Transition) nonceCheck(msg *types.Transaction) error {
-	nonce := t.state.GetNonce(msg.From)
+	nonce := t.state.GetNonce(msg.From())
 
-	if nonce != msg.Nonce {
+	if nonce != msg.Nonce() {
 		return ErrNonceIncorrect
 	}
 
@@ -482,34 +483,34 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 // checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
 // Basically, makes sure gas tip cap and gas fee cap are good.
 func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
-	if msg.Type != types.DynamicFeeTx {
+	if msg.Type() != types.DynamicFeeTx {
 		return nil
 	}
 
-	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
+	if msg.GasFeeCap().BitLen() == 0 && msg.GasTipCap().BitLen() == 0 {
 		return nil
 	}
 
-	if l := msg.GasFeeCap.BitLen(); l > 256 {
+	if l := msg.GasFeeCap().BitLen(); l > 256 {
 		return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
-			msg.From.String(), l)
+			msg.From().String(), l)
 	}
 
-	if l := msg.GasTipCap.BitLen(); l > 256 {
+	if l := msg.GasTipCap().BitLen(); l > 256 {
 		return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
-			msg.From.String(), l)
+			msg.From().String(), l)
 	}
 
-	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
+	if msg.GasFeeCap().Cmp(msg.GasTipCap()) < 0 {
 		return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
-			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
+			msg.From().String(), msg.GasTipCap(), msg.GasFeeCap())
 	}
 
 	// This will panic if baseFee is nil, but basefee presence is verified
 	// as part of header validation.
-	if msg.GasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
+	if msg.GasFeeCap().Cmp(t.ctx.BaseFee) < 0 {
 		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), msg.GasFeeCap, t.ctx.BaseFee)
+			msg.From().String(), msg.GasFeeCap(), t.ctx.BaseFee)
 	}
 
 	return nil
@@ -571,7 +572,7 @@ func NewGasLimitReachedTransitionApplicationError(err error) *GasLimitReachedTra
 func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, error) {
 	var err error
 
-	if msg.Type == types.StateTx {
+	if msg.Type() == types.StateTx {
 		err = checkAndProcessStateTx(msg)
 	} else {
 		err = checkAndProcessTx(msg, t)
@@ -582,12 +583,12 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the amount of gas required is available in the block
-	if err = t.subGasPool(msg.Gas); err != nil {
+	if err = t.subGasPool(msg.Gas()); err != nil {
 		return nil, NewGasLimitReachedTransitionApplicationError(err)
 	}
 
 	if t.ctx.Tracer != nil {
-		t.ctx.Tracer.TxStart(msg.Gas)
+		t.ctx.Tracer.TxStart(msg.Gas())
 	}
 
 	// 4. there is no overflow when calculating intrinsic gas
@@ -597,29 +598,29 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	}
 
 	// the purchased gas is enough to cover intrinsic usage
-	gasLeft := msg.Gas - intrinsicGasCost
+	gasLeft := msg.Gas() - intrinsicGasCost
 	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
-	if gasLeft > msg.Gas {
+	if gasLeft > msg.Gas() {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
 
 	gasPrice := msg.GetGasPrice(t.ctx.BaseFee.Uint64())
-	value := new(big.Int).Set(msg.Value)
+	value := new(big.Int).Set(msg.Value())
 
 	// set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
-	t.ctx.Origin = msg.From
+	t.ctx.Origin = msg.From()
 
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From, msg.Input, value, gasLeft)
+		result = t.Create2(msg.From(), msg.Input(), value, gasLeft)
 	} else {
-		t.state.IncrNonce(msg.From)
-		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
+		t.state.IncrNonce(msg.From())
+		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft)
 	}
 
 	refund := t.state.GetRefund()
-	result.UpdateGasUsed(msg.Gas, refund)
+	result.UpdateGasUsed(msg.Gas(), refund)
 
 	if t.ctx.Tracer != nil {
 		t.ctx.Tracer.TxEnd(result.GasLeft)
@@ -627,17 +628,17 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Refund the sender
 	remaining := new(big.Int).Mul(new(big.Int).SetUint64(result.GasLeft), gasPrice)
-	t.state.AddBalance(msg.From, remaining)
+	t.state.AddBalance(msg.From(), remaining)
 
 	// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 	// Define effective tip based on tx type.
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip became to be either gas tip cap or (gas fee cap - current base fee)
 	effectiveTip := new(big.Int).Set(gasPrice)
-	if t.config.London && msg.Type == types.DynamicFeeTx {
+	if t.config.London && msg.Type() == types.DynamicFeeTx {
 		effectiveTip = common.BigMin(
-			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
-			new(big.Int).Set(msg.GasTipCap),
+			new(big.Int).Sub(msg.GasFeeCap(), t.ctx.BaseFee),
+			new(big.Int).Set(msg.GasTipCap()),
 		)
 	}
 
@@ -647,7 +648,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 
 	// Burn some amount if the london hardfork is applied.
 	// Basically, burn amount is just transferred to the current burn contract.
-	if t.config.London && msg.Type != types.StateTx {
+	if t.config.London && msg.Type() != types.StateTx {
 		burnAmount := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), t.ctx.BaseFee)
 		t.state.AddBalance(t.ctx.BurnContract, burnAmount)
 	}
@@ -1135,7 +1136,7 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		cost += TxGas
 	}
 
-	payload := msg.Input
+	payload := msg.Input()
 	if len(payload) > 0 {
 		zeros := uint64(0)
 
@@ -1192,28 +1193,28 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 }
 
 func checkAndProcessStateTx(msg *types.Transaction) error {
-	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
+	if msg.GasPrice().Cmp(big.NewInt(0)) != 0 {
 		return NewTransitionApplicationError(
 			errors.New("gasPrice of state transaction must be zero"),
 			true,
 		)
 	}
 
-	if msg.Gas != types.StateTransactionGasLimit {
+	if msg.Gas() != types.StateTransactionGasLimit {
 		return NewTransitionApplicationError(
 			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
 			true,
 		)
 	}
 
-	if msg.From != contracts.SystemCaller {
+	if msg.From() != contracts.SystemCaller {
 		return NewTransitionApplicationError(
 			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
 			true,
 		)
 	}
 
-	if msg.To == nil || *msg.To == types.ZeroAddress {
+	if msg.To() == nil || *(msg.To()) == types.ZeroAddress {
 		return NewTransitionApplicationError(
 			errors.New("to of state transaction must be specified"),
 			true,

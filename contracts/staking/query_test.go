@@ -50,7 +50,7 @@ func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) 
 
 	tx.ComputeHash(1)
 
-	res, ok := m.hashToRes[tx.Hash]
+	res, ok := m.hashToRes[tx.Hash()]
 	if ok {
 		return res, nil
 	}
@@ -144,7 +144,16 @@ func TestQueryValidators(t *testing.T) {
 			from: addr1,
 			mockArgs: &MockArgs{
 				addr: addr1,
-				tx: &types.Transaction{
+				// tx: &types.Transaction{
+				// 	From:     addr1,
+				// 	To:       &AddrStakingContract,
+				// 	Value:    big.NewInt(0),
+				// 	Input:    method.ID(),
+				// 	GasPrice: big.NewInt(0),
+				// 	Gas:      100000000,
+				// 	Nonce:    10,
+				// },
+				tx: types.NewTx(&types.MixedTx{
 					From:     addr1,
 					To:       &AddrStakingContract,
 					Value:    big.NewInt(0),
@@ -152,7 +161,7 @@ func TestQueryValidators(t *testing.T) {
 					GasPrice: big.NewInt(0),
 					Gas:      100000000,
 					Nonce:    10,
-				},
+				}),
 			},
 			mockReturns: &MockReturns{
 				nonce: 10,
@@ -170,7 +179,16 @@ func TestQueryValidators(t *testing.T) {
 			from: addr1,
 			mockArgs: &MockArgs{
 				addr: addr1,
-				tx: &types.Transaction{
+				// tx: &types.Transaction{
+				// 	From:     addr1,
+				// 	To:       &AddrStakingContract,
+				// 	Value:    big.NewInt(0),
+				// 	Input:    method.ID(),
+				// 	GasPrice: big.NewInt(0),
+				// 	Gas:      queryGasLimit,
+				// 	Nonce:    10,
+				// },
+				tx: types.NewTx(&types.MixedTx{
 					From:     addr1,
 					To:       &AddrStakingContract,
 					Value:    big.NewInt(0),
@@ -178,7 +196,7 @@ func TestQueryValidators(t *testing.T) {
 					GasPrice: big.NewInt(0),
 					Gas:      queryGasLimit,
 					Nonce:    10,
-				},
+				}),
 			},
 			mockReturns: &MockReturns{
 				nonce: 10,
@@ -203,7 +221,7 @@ func TestQueryValidators(t *testing.T) {
 
 			mock := &TxMock{
 				hashToRes: map[types.Hash]*runtime.ExecutionResult{
-					tt.mockArgs.tx.ComputeHash(1).Hash: tt.mockReturns.res,
+					tt.mockArgs.tx.ComputeHash(1).Hash(): tt.mockReturns.res,
 				},
 				nonce: map[types.Address]uint64{
 					tt.mockArgs.addr: tt.mockReturns.nonce,

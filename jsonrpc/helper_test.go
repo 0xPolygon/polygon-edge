@@ -11,9 +11,12 @@ import (
 )
 
 func createTestTransaction(hash types.Hash) *types.Transaction {
-	return &types.Transaction{
+	// return &types.Transaction{
+	// 	Hash: hash,
+	// }
+	return types.NewTx(&types.MixedTx{
 		Hash: hash,
-	}
+	})
 }
 
 func createTestHeader(height uint64) *types.Header {
@@ -288,7 +291,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 	}{
 		{
 			name:   "should return tx and block",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -307,7 +310,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if ReadTxLookup returns nothing",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -320,7 +323,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if GetBlockByHash returns nothing",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -339,7 +342,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		},
 		{
 			name:   "should return nil if the block doesn't include the tx",
-			txHash: testTx1.Hash,
+			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
 					assert.Equal(t, testTx1.Hash, hash)
@@ -662,7 +665,18 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:     &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			// expected: &types.Transaction{
+			// 	From:      from,
+			// 	To:        &to,
+			// 	Gas:       uint64(gas),
+			// 	GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
+			// 	GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
+			// 	GasFeeCap: new(big.Int).SetBytes([]byte(gasFeeCap)),
+			// 	Value:     new(big.Int).SetBytes([]byte(value)),
+			// 	Input:     input,
+			// 	Nonce:     uint64(nonce),
+			// },
+			expected: types.NewTx(&types.MixedTx{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -672,7 +686,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     input,
 				Nonce:     uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -686,7 +700,18 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			// expected: &types.Transaction{
+			// 	From:      types.ZeroAddress,
+			// 	To:        &to,
+			// 	Gas:       uint64(gas),
+			// 	GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
+			// 	GasTipCap: new(big.Int),
+			// 	GasFeeCap: new(big.Int),
+			// 	Value:     new(big.Int).SetBytes([]byte(value)),
+			// 	Input:     input,
+			// 	Nonce:     uint64(0),
+			// },
+			expected: types.NewTx(&types.MixedTx{
 				From:      types.ZeroAddress,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -696,7 +721,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     input,
 				Nonce:     uint64(0),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -721,7 +746,18 @@ func TestDecodeTxn(t *testing.T) {
 					}, nil
 				},
 			},
-			expected: &types.Transaction{
+			// expected: &types.Transaction{
+			// 	From:      from,
+			// 	To:        &to,
+			// 	Gas:       uint64(gas),
+			// 	GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
+			// 	GasTipCap: new(big.Int),
+			// 	GasFeeCap: new(big.Int),
+			// 	Value:     new(big.Int).SetBytes([]byte(value)),
+			// 	Input:     input,
+			// 	Nonce:     uint64(stateNonce),
+			// },
+			expected: types.NewTx(&types.MixedTx{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -731,7 +767,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     input,
 				Nonce:     uint64(stateNonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -747,7 +783,18 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce:    &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			// expected: &types.Transaction{
+			// 	From:      from,
+			// 	To:        &to,
+			// 	Gas:       uint64(gas),
+			// 	GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
+			// 	GasTipCap: new(big.Int),
+			// 	GasFeeCap: new(big.Int),
+			// 	Value:     new(big.Int).SetBytes([]byte(value)),
+			// 	Input:     data,
+			// 	Nonce:     uint64(nonce),
+			// },
+			expected: types.NewTx(&types.MixedTx{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(gas),
@@ -757,7 +804,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int).SetBytes([]byte(value)),
 				Input:     data,
 				Nonce:     uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{
@@ -768,7 +815,18 @@ func TestDecodeTxn(t *testing.T) {
 				Nonce: &nonce,
 			},
 			store: &debugEndpointMockStore{},
-			expected: &types.Transaction{
+			// expected: &types.Transaction{
+			// 	From:      from,
+			// 	To:        &to,
+			// 	Gas:       uint64(0),
+			// 	GasPrice:  new(big.Int),
+			// 	GasTipCap: new(big.Int),
+			// 	GasFeeCap: new(big.Int),
+			// 	Value:     new(big.Int),
+			// 	Input:     []byte{},
+			// 	Nonce:     uint64(nonce),
+			// },
+			expected: types.NewTx(&types.MixedTx{
 				From:      from,
 				To:        &to,
 				Gas:       uint64(0),
@@ -778,7 +836,7 @@ func TestDecodeTxn(t *testing.T) {
 				Value:     new(big.Int),
 				Input:     []byte{},
 				Nonce:     uint64(nonce),
-			},
+			}),
 			err: false,
 		},
 		{

@@ -72,11 +72,16 @@ func TestLondonSignerSender(t *testing.T) {
 				t.Fatalf("Unable to generate key")
 			}
 
-			txn := &types.Transaction{
+			// txn := &types.Transaction{
+			// 	To:       &toAddress,
+			// 	Value:    big.NewInt(1),
+			// 	GasPrice: big.NewInt(0),
+			// }
+			txn := types.NewTx(&types.MixedTx{
 				To:       &toAddress,
 				Value:    big.NewInt(1),
 				GasPrice: big.NewInt(0),
-			}
+			})
 
 			chainID := testCase.chainID.Uint64()
 			signer := NewLondonSigner(chainID, true, NewEIP155Signer(chainID, true))
@@ -115,7 +120,19 @@ func Test_LondonSigner_Sender(t *testing.T) {
 	}{
 		{
 			name: "sender is 0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6",
-			tx: &types.Transaction{
+			// tx: &types.Transaction{
+			// 	Type:      types.DynamicFeeTx,
+			// 	GasPrice:  big.NewInt(1000000402),
+			// 	GasTipCap: big.NewInt(1000000000),
+			// 	GasFeeCap: big.NewInt(10000000000),
+			// 	Gas:       21000,
+			// 	To:        &to,
+			// 	Value:     big.NewInt(100000000000000),
+			// 	V:         big.NewInt(0),
+			// 	R:         r,
+			// 	S:         s,
+			// },
+			tx: types.NewTx(&types.MixedTx{
 				Type:      types.DynamicFeeTx,
 				GasPrice:  big.NewInt(1000000402),
 				GasTipCap: big.NewInt(1000000000),
@@ -126,7 +143,7 @@ func Test_LondonSigner_Sender(t *testing.T) {
 				V:         big.NewInt(0),
 				R:         r,
 				S:         s,
-			},
+			}),
 			sender: types.StringToAddress("0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6"),
 		},
 	}

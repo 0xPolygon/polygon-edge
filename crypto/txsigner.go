@@ -64,7 +64,7 @@ func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 // calcTxHash calculates the transaction hash (keccak256 hash of the RLP value)
 func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	a := signerPool.Get()
-	isDynamicFeeTx := tx.Type == types.DynamicFeeTx
+	isDynamicFeeTx := tx.Type() == types.DynamicFeeTx
 
 	v := a.NewArray()
 
@@ -72,29 +72,50 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 		v.Set(a.NewUint(chainID))
 	}
 
-	v.Set(a.NewUint(tx.Nonce))
+	v.Set(a.NewUint(tx.Nonce()))
 
 	if isDynamicFeeTx {
-		v.Set(a.NewBigInt(tx.GasTipCap))
-		v.Set(a.NewBigInt(tx.GasFeeCap))
+		v.Set(a.NewBigInt(tx.GasTipCap()))
+		v.Set(a.NewBigInt(tx.GasFeeCap()))
 	} else {
-		v.Set(a.NewBigInt(tx.GasPrice))
+		v.Set(a.NewBigInt(tx.GasPrice()))
 	}
 
-	v.Set(a.NewUint(tx.Gas))
+	v.Set(a.NewUint(tx.Gas()))
 
 	if tx.To == nil {
 		v.Set(a.NewNull())
 	} else {
-		v.Set(a.NewCopyBytes((*tx.To).Bytes()))
+		v.Set(a.NewCopyBytes((*(tx.To())).Bytes()))
 	}
 
-	v.Set(a.NewBigInt(tx.Value))
+	v.Set(a.NewBigInt(tx.Value()))
 
-	v.Set(a.NewCopyBytes(tx.Input))
+	v.Set(a.NewCopyBytes(tx.Input()))
 
 	if isDynamicFeeTx {
-		v.Set(a.NewArray())
+		//v.Set(a.NewArray())
+
+		// Convert TxAccessList to RLP format and add it to the vv array.
+		accessListVV := a.NewArray()
+
+		if tx.AccessList != nil {
+			for _, accessTuple := range tx.AccessList() {
+				accessTupleVV := a.NewArray()
+				accessTupleVV.Set(a.NewCopyBytes(accessTuple.Address.Bytes()))
+
+				storageKeysVV := a.NewArray()
+				for _, storageKey := range accessTuple.StorageKeys {
+					storageKeysVV.Set(a.NewCopyBytes(storageKey.Bytes()))
+				}
+
+				accessTupleVV.Set(storageKeysVV)
+				accessListVV.Set(accessTupleVV)
+			}
+		}
+
+		v.Set(accessListVV)
+
 	} else {
 		// EIP155
 		if chainID != 0 {
@@ -106,7 +127,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	var hash []byte
 	if isDynamicFeeTx {
-		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type)}, nil, v)
+		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type())}, nil, v)
 	} else {
 		hash = keccak.Keccak256Rlp(nil, v)
 	}

@@ -98,12 +98,18 @@ func TestFSM_verifyCommitEpochTx(t *testing.T) {
 	assert.NoError(t, fsm.verifyCommitEpochTx(commitEpochTx))
 
 	// submit tampered commit epoch transaction to the epoch ending block
-	alteredCommitEpochTx := &types.Transaction{
+	// alteredCommitEpochTx := &types.Transaction{
+	// 	To:    &contracts.ValidatorSetContract,
+	// 	Input: []byte{},
+	// 	Gas:   0,
+	// 	Type:  types.StateTx,
+	// }
+	alteredCommitEpochTx := types.NewTx(&types.MixedTx{
 		To:    &contracts.ValidatorSetContract,
 		Input: []byte{},
 		Gas:   0,
 		Type:  types.StateTx,
-	}
+	})
 	assert.ErrorContains(t, fsm.verifyCommitEpochTx(alteredCommitEpochTx), "invalid commit epoch transaction")
 
 	// submit validators commit epoch transaction to the non-epoch ending block
@@ -1291,7 +1297,7 @@ func TestFSM_DecodeCommitmentStateTxs(t *testing.T) {
 	bridgeCommitmentTx, err := f.createBridgeCommitmentTx()
 	require.NoError(t, err)
 
-	decodedData, err := decodeStateTransaction(bridgeCommitmentTx.Input)
+	decodedData, err := decodeStateTransaction(bridgeCommitmentTx.Input())
 	require.NoError(t, err)
 
 	decodedCommitmentMsg, ok := decodedData.(*CommitmentMessageSigned)
@@ -1308,7 +1314,7 @@ func TestFSM_DecodeCommitEpochStateTx(t *testing.T) {
 	require.NotNil(t, input)
 
 	tx := createStateTransactionWithData(1, contracts.ValidatorSetContract, input)
-	decodedInputData, err := decodeStateTransaction(tx.Input)
+	decodedInputData, err := decodeStateTransaction(tx.Input())
 	require.NoError(t, err)
 
 	decodedCommitEpoch, ok := decodedInputData.(*contractsapi.CommitEpochValidatorSetFn)

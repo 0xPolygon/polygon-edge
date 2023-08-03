@@ -587,7 +587,18 @@ func TestTraceCall(t *testing.T) {
 			Input:     &input,
 			Nonce:     &nonce,
 		}
-		decodedTx = &types.Transaction{
+		// decodedTx = &types.Transaction{
+		// 	Nonce:     uint64(nonce),
+		// 	GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
+		// 	GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
+		// 	GasFeeCap: new(big.Int).SetBytes([]byte(gasFeeCap)),
+		// 	Gas:       uint64(gas),
+		// 	To:        &to,
+		// 	Value:     new(big.Int).SetBytes([]byte(value)),
+		// 	Input:     data,
+		// 	From:      from,
+		// }
+		decodedTx = types.NewTx(&types.MixedTx{
 			Nonce:     uint64(nonce),
 			GasPrice:  new(big.Int).SetBytes([]byte(gasPrice)),
 			GasTipCap: new(big.Int).SetBytes([]byte(gasTipCap)),
@@ -597,7 +608,7 @@ func TestTraceCall(t *testing.T) {
 			Value:     new(big.Int).SetBytes([]byte(value)),
 			Input:     data,
 			From:      from,
-		}
+		})
 	)
 
 	decodedTx.ComputeHash(1)

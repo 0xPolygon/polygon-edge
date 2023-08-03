@@ -819,7 +819,7 @@ func (j *jsonRPCHub) TraceTxn(
 	var targetTx *types.Transaction
 
 	for _, tx := range block.Transactions {
-		if tx.Hash == targetTxHash {
+		if tx.Hash() == targetTxHash {
 			targetTx = tx
 
 			break

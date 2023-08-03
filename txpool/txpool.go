@@ -360,7 +360,7 @@ func (p *TxPool) Peek() *types.Transaction {
 // from that account (if any).
 func (p *TxPool) Pop(tx *types.Transaction) {
 	// fetch the associated account
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 
 	account.promoted.lock(true)
 	account.nonceToTx.lock()
@@ -395,7 +395,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
 	// fetch associated account
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
@@ -420,7 +420,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}
 
 	// rollback nonce
-	nextNonce := tx.Nonce
+	nextNonce := tx.Nonce()
 	account.setNonce(nextNonce)
 
 	// reset accounts nonce map
@@ -437,13 +437,13 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash())
 
 	if p.logger.IsDebug() {
 		p.logger.Debug("dropped account txs",
 			"num", droppedCount,
 			"next_nonce", nextNonce,
-			"address", tx.From.String(),
+			"address", tx.From().String(),
 		)
 	}
 }
@@ -452,12 +452,12 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 // due to a recoverable error. If an account has been demoted too many times (maxAccountDemotions),
 // it is Dropped instead.
 func (p *TxPool) Demote(tx *types.Transaction) {
-	account := p.accounts.get(tx.From)
+	account := p.accounts.get(tx.From())
 	if account.Demotions() >= maxAccountDemotions {
 		if p.logger.IsDebug() {
 			p.logger.Debug(
 				"Demote: threshold reached - dropping account",
-				"addr", tx.From.String(),
+				"addr", tx.From().String(),
 			)
 		}
 
@@ -471,7 +471,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 
 	account.incrementDemotions()
 
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash())
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -507,7 +507,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		for _, tx := range block.Transactions {
 			var err error
 
-			addr := tx.From
+			addr := tx.From()
 			if addr == types.ZeroAddress {
 				// From field is not set, extract the signer
 				if addr, err = p.signer.Sender(tx); err != nil {
@@ -545,7 +545,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 // constraints before entering the pool.
 func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Check the transaction type. State transactions are not expected to be added to the pool
-	if tx.Type == types.StateTx {
+	if tx.Type() == types.StateTx {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
 
 		return ErrInvalidTxType
@@ -559,7 +559,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Check if the transaction has a strictly positive value
-	if tx.Value.Sign() < 0 {
+	if tx.Value().Sign() < 0 {
 		metrics.IncrCounter([]string{txPoolMetrics, "negative_value_tx"}, 1)
 
 		return ErrNegativeValue
@@ -577,26 +577,27 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 	// If the from field is set, check that
 	// it matches the signer
-	if tx.From != types.ZeroAddress &&
-		tx.From != from {
+	if tx.From() != types.ZeroAddress &&
+		tx.From() != from {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_sender_txs"}, 1)
 
 		return ErrInvalidSender
 	}
 
 	// If no address was set, update it
-	if tx.From == types.ZeroAddress {
-		tx.From = from
+	if tx.From() == types.ZeroAddress {
+		//tx.From = from
+		tx.SetFrom(from)
 	}
 
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
+	if tx.IsContractCreation() && p.forks.EIP158 && len(tx.Input()) > state.TxPoolMaxInitCodeSize {
 		metrics.IncrCounter([]string{txPoolMetrics, "contract_deploy_too_large_txs"}, 1)
 
 		return runtime.ErrMaxCodeSizeExceeded
 	}
 
-	if tx.Type == types.DynamicFeeTx {
+	if tx.Type() == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
 		if !p.forks.London {
 			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
@@ -619,26 +620,26 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrUnderpriced
 		}
 
-		if tx.GasFeeCap.BitLen() > 256 {
+		if tx.GasFeeCap().BitLen() > 256 {
 			metrics.IncrCounter([]string{txPoolMetrics, "fee_cap_too_high_dynamic_tx"}, 1)
 
 			return ErrFeeCapVeryHigh
 		}
 
-		if tx.GasTipCap.BitLen() > 256 {
+		if tx.GasTipCap().BitLen() > 256 {
 			metrics.IncrCounter([]string{txPoolMetrics, "tip_too_high_dynamic_tx"}, 1)
 
 			return ErrTipVeryHigh
 		}
 
-		if tx.GasFeeCap.Cmp(tx.GasTipCap) < 0 {
+		if tx.GasFeeCap().Cmp(tx.GasTipCap()) < 0 {
 			metrics.IncrCounter([]string{txPoolMetrics, "tip_above_fee_cap_dynamic_tx"}, 1)
 
 			return ErrTipAboveFeeCap
 		}
 
 		// Reject underpriced transactions
-		if tx.GasFeeCap.Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
+		if tx.GasFeeCap().Cmp(new(big.Int).SetUint64(p.GetBaseFee())) < 0 {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
 			return ErrUnderpriced
@@ -656,13 +657,13 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	stateRoot := p.store.Header().StateRoot
 
 	// Check nonce ordering
-	if p.store.GetNonce(stateRoot, tx.From) > tx.Nonce {
+	if p.store.GetNonce(stateRoot, tx.From()) > tx.Nonce() {
 		metrics.IncrCounter([]string{txPoolMetrics, "nonce_too_low_tx"}, 1)
 
 		return ErrNonceTooLow
 	}
 
-	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From)
+	accountBalance, balanceErr := p.store.GetBalance(stateRoot, tx.From())
 	if balanceErr != nil {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_account_state_tx"}, 1)
 
@@ -684,7 +685,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return err
 	}
 
-	if tx.Gas < intrinsicGas {
+	if tx.Gas() < intrinsicGas {
 		metrics.IncrCounter([]string{txPoolMetrics, "intrinsic_gas_low_tx"}, 1)
 
 		return ErrIntrinsicGas
@@ -693,7 +694,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	// Grab the block gas limit for the latest block
 	latestBlockGasLimit := p.store.Header().GasLimit
 
-	if tx.Gas > latestBlockGasLimit {
+	if tx.Gas() > latestBlockGasLimit {
 		metrics.IncrCounter([]string{txPoolMetrics, "block_gas_limit_exceeded_tx"}, 1)
 
 		return ErrBlockLimitExceeded
@@ -726,7 +727,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 				return true
 			}
 
-			if firstTx.Nonce == account.getNonce() {
+			if firstTx.Nonce() == account.getNonce() {
 				return true
 			}
 
@@ -747,7 +748,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 // (only once) and an enqueueRequest is signaled.
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if p.logger.IsDebug() {
-		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash.String())
+		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash().String())
 	}
 
 	// validate incoming tx
@@ -756,15 +757,16 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// add chainID to the tx - only dynamic fee tx
-	if tx.Type == types.DynamicFeeTx {
-		tx.ChainID = p.chainID
+	if tx.Type() == types.DynamicFeeTx {
+		//tx.ChainID = p.chainID
+		tx.SetChainID(p.chainID)
 	}
 
 	// calculate tx hash
 	tx.ComputeHash(p.store.Header().Number)
 
 	// initialize account for this address once or retrieve existing one
-	account := p.getOrCreateAccount(tx.From)
+	account := p.getOrCreateAccount(tx.From())
 	// populate currently free slots
 	slotsFree := p.gauge.freeSlots()
 
@@ -784,7 +786,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if p.gauge.highPressure() {
 		p.signalPruning()
 
-		if tx.Nonce > accountNonce {
+		if tx.Nonce() > accountNonce {
 			metrics.IncrCounter([]string{txPoolMetrics, "rejected_future_tx"}, 1)
 
 			return ErrRejectFutureTx
@@ -792,13 +794,13 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// try to find if there is transaction with same nonce for this account
-	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce)
+	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce())
 	if oldTxWithSameNonce != nil {
-		if oldTxWithSameNonce.Hash == tx.Hash {
+		if oldTxWithSameNonce.Hash() == tx.Hash() {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
-		} else if oldTxWithSameNonce.GasPrice.Cmp(tx.GasPrice) >= 0 {
+		} else if oldTxWithSameNonce.GasPrice().Cmp(tx.GasPrice()) >= 0 {
 			// if tx with same nonce does exist and has same or better gas price -> return error
 			return ErrUnderpriced
 		}
@@ -810,7 +812,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		}
 
 		// reject low nonce tx
-		if tx.Nonce < accountNonce {
+		if tx.Nonce() < accountNonce {
 			return ErrNonceTooLow
 		}
 	}
@@ -837,24 +839,24 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	account.enqueue(tx, oldTxWithSameNonce != nil) // add or replace tx into account
 	p.gauge.increase(slotsRequired(tx))
 
-	go p.invokePromotion(tx, tx.Nonce <= accountNonce) // don't signal promotion for higher nonce txs
+	go p.invokePromotion(tx, tx.Nonce() <= accountNonce) // don't signal promotion for higher nonce txs
 
 	return nil
 }
 
 func (p *TxPool) invokePromotion(tx *types.Transaction, callPromote bool) {
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash())
 
 	if p.logger.IsDebug() {
-		p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+		p.logger.Debug("enqueue request", "hash", tx.Hash().String())
 	}
 
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash())
 
 	if callPromote {
 		select {
 		case <-p.shutdownCh:
-		case p.promoteReqCh <- promoteRequest{account: tx.From}: // BLOCKING
+		case p.promoteReqCh <- promoteRequest{account: tx.From()}: // BLOCKING
 		}
 	}
 }
@@ -915,13 +917,13 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if err := p.addTx(gossip, tx); err != nil {
 		if errors.Is(err, ErrAlreadyKnown) {
 			if p.logger.IsDebug() {
-				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash().String())
 			}
 
 			return
 		}
 
-		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash().String())
 	}
 }
 
@@ -1043,7 +1045,7 @@ func (p *TxPool) Length() uint64 {
 // toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
-		hashes = append(hashes, tx.Hash)
+		hashes = append(hashes, tx.Hash())
 	}
 
 	return

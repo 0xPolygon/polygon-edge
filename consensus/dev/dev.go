@@ -120,7 +120,7 @@ func (d *Dev) writeTransactions(baseFee, gasLimit uint64, transition transitionI
 			break
 		}
 
-		if tx.Gas > gasLimit {
+		if tx.Gas() > gasLimit {
 			d.txpool.Drop(tx)
 
 			continue

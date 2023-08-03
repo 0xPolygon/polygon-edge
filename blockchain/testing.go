@@ -316,7 +316,7 @@ type mockSigner struct {
 }
 
 func (m *mockSigner) Sender(tx *types.Transaction) (types.Address, error) {
-	if from, ok := m.txFromByTxHash[tx.Hash]; ok {
+	if from, ok := m.txFromByTxHash[tx.Hash()]; ok {
 		return from, nil
 	}
 

@@ -42,22 +42,35 @@ type generateTxReqParams struct {
 }
 
 func generateTx(params generateTxReqParams) *types.Transaction {
-	unsignedTx := &types.Transaction{
+	// unsignedTx := &types.Transaction{
+	// 	Nonce: params.nonce,
+	// 	From:  params.referenceAddr,
+	// 	To:    &params.toAddress,
+	// 	Gas:   1000000,
+	// 	Value: params.value,
+	// 	V:     big.NewInt(27), // it is necessary to encode in rlp
+	// }
+	unsignedTx := types.NewTx(&types.MixedTx{
 		Nonce: params.nonce,
 		From:  params.referenceAddr,
 		To:    &params.toAddress,
 		Gas:   1000000,
 		Value: params.value,
 		V:     big.NewInt(27), // it is necessary to encode in rlp
-	}
+	})
 
 	if params.gasPrice != nil {
-		unsignedTx.Type = types.LegacyTx
-		unsignedTx.GasPrice = params.gasPrice
+		// unsignedTx.Type = types.LegacyTx
+		// unsignedTx.GasPrice = params.gasPrice
+		unsignedTx.SetTransactionType(types.LegacyTx)
+		unsignedTx.SetGasPrice(params.gasPrice)
 	} else {
-		unsignedTx.Type = types.DynamicFeeTx
-		unsignedTx.GasFeeCap = params.gasFeeCap
-		unsignedTx.GasTipCap = params.gasTipCap
+		// unsignedTx.Type = types.DynamicFeeTx
+		// unsignedTx.GasFeeCap = params.gasFeeCap
+		// unsignedTx.GasTipCap = params.gasTipCap
+		unsignedTx.SetTransactionType(types.DynamicFeeTx)
+		unsignedTx.SetGasFeeCap(params.gasFeeCap)
+		unsignedTx.SetGasTipCap(params.gasTipCap)
 	}
 
 	signedTx, err := signer.SignTx(unsignedTx, params.referenceKey)
@@ -241,7 +254,17 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 	oneEth := framework.EthToWei(1)
 
 	generateTx := func(nonce uint64) *types.Transaction {
-		signedTx, signErr := signer.SignTx(&types.Transaction{
+		// signedTx, signErr := signer.SignTx(&types.Transaction{
+		// 	Nonce:    nonce,
+		// 	From:     referenceAddr,
+		// 	To:       &toAddress,
+		// 	GasPrice: gasPrice,
+		// 	Gas:      1000000,
+		// 	Value:    oneEth,
+		// 	V:        big.NewInt(1), // it is necessary to encode in rlp
+		// }, referenceKey)
+
+		signedTx, signErr := signer.SignTx(types.NewTx(&types.MixedTx{
 			Nonce:    nonce,
 			From:     referenceAddr,
 			To:       &toAddress,
@@ -249,7 +272,7 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 			Gas:      1000000,
 			Value:    oneEth,
 			V:        big.NewInt(1), // it is necessary to encode in rlp
-		}, referenceKey)
+		}), referenceKey)
 
 		if signErr != nil {
 			t.Fatalf("Unable to sign transaction, %v", signErr)
@@ -393,7 +416,36 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	_, receiverAddress := tests.GenerateKeyAndAddr(t)
 
 	transactions := []*types.Transaction{
-		{
+		// {
+		// 	Nonce:    0,
+		// 	GasPrice: big.NewInt(framework.DefaultGasPrice),
+		// 	Gas:      22000,
+		// 	To:       &receiverAddress,
+		// 	Value:    oneEth,
+		// 	V:        big.NewInt(27),
+		// 	From:     senderAddress,
+		// },
+		// {
+		// 	Nonce:    1,
+		// 	GasPrice: big.NewInt(framework.DefaultGasPrice),
+		// 	Gas:      22000,
+		// 	To:       &receiverAddress,
+		// 	Value:    oneEth,
+		// 	V:        big.NewInt(27),
+		// 	From:     senderAddress,
+		// },
+		// {
+		// 	Type:      types.DynamicFeeTx,
+		// 	Nonce:     2,
+		// 	GasFeeCap: big.NewInt(10000000000),
+		// 	GasTipCap: big.NewInt(1000000000),
+		// 	Gas:       22000,
+		// 	To:        &receiverAddress,
+		// 	Value:     oneEth,
+		// 	V:         big.NewInt(27),
+		// 	From:      senderAddress,
+		// },
+		types.NewTx(&types.MixedTx{
 			Nonce:    0,
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      22000,
@@ -401,8 +453,8 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			Value:    oneEth,
 			V:        big.NewInt(27),
 			From:     senderAddress,
-		},
-		{
+		}),
+		types.NewTx(&types.MixedTx{
 			Nonce:    1,
 			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      22000,
@@ -410,8 +462,8 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			Value:    oneEth,
 			V:        big.NewInt(27),
 			From:     senderAddress,
-		},
-		{
+		}),
+		types.NewTx(&types.MixedTx{
 			Type:      types.DynamicFeeTx,
 			Nonce:     2,
 			GasFeeCap: big.NewInt(10000000000),
@@ -421,7 +473,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			Value:     oneEth,
 			V:         big.NewInt(27),
 			From:      senderAddress,
-		},
+		}),
 	}
 
 	server := framework.NewTestServers(t, 1, func(config *framework.TestServerConfig) {
@@ -502,7 +554,16 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 	client := server.JSONRPC()
 
 	// Construct the transaction
-	signedTx, err := signer.SignTx(&types.Transaction{
+	// signedTx, err := signer.SignTx(&types.Transaction{
+	// 	Nonce:    0,
+	// 	GasPrice: big.NewInt(0),
+	// 	Gas:      framework.DefaultGasLimit - 1,
+	// 	To:       &receiverAddress,
+	// 	Value:    oneEth,
+	// 	V:        big.NewInt(1),
+	// 	From:     types.ZeroAddress,
+	// }, senderKey)
+	signedTx, err := signer.SignTx(types.NewTx(&types.MixedTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(0),
 		Gas:      framework.DefaultGasLimit - 1,
@@ -510,7 +571,7 @@ func TestTxPool_GetPendingTx(t *testing.T) {
 		Value:    oneEth,
 		V:        big.NewInt(1),
 		From:     types.ZeroAddress,
-	}, senderKey)
+	}), senderKey)
 	assert.NoError(t, err, "failed to sign transaction")
 
 	// Add the transaction

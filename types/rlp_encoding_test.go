@@ -43,7 +43,18 @@ func TestRLPEncoding(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	addrTo := StringToAddress("11")
-	txn := &Transaction{
+	// txn := &Transaction{
+	// 	Nonce:    0,
+	// 	GasPrice: big.NewInt(11),
+	// 	Gas:      11,
+	// 	To:       &addrTo,
+	// 	Value:    big.NewInt(1),
+	// 	Input:    []byte{1, 2},
+	// 	V:        big.NewInt(25),
+	// 	S:        big.NewInt(26),
+	// 	R:        big.NewInt(27),
+	// }
+	txn := NewTx(&MixedTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
 		Gas:      11,
@@ -53,7 +64,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 		V:        big.NewInt(25),
 		S:        big.NewInt(26),
 		R:        big.NewInt(27),
-	}
+	})
 
 	txn.ComputeHash(1)
 
@@ -137,7 +148,21 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
-	originalTx := &Transaction{
+	// originalTx := &Transaction{
+	// 	Nonce:     0,
+	// 	GasPrice:  big.NewInt(11),
+	// 	GasFeeCap: big.NewInt(12),
+	// 	GasTipCap: big.NewInt(13),
+	// 	Gas:       11,
+	// 	To:        &addrTo,
+	// 	From:      addrFrom,
+	// 	Value:     big.NewInt(1),
+	// 	Input:     []byte{1, 2},
+	// 	V:         big.NewInt(25),
+	// 	S:         big.NewInt(26),
+	// 	R:         big.NewInt(27),
+	// }
+	originalTx := NewTx(&MixedTx{
 		Nonce:     0,
 		GasPrice:  big.NewInt(11),
 		GasFeeCap: big.NewInt(12),
@@ -150,7 +175,7 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 		V:         big.NewInt(25),
 		S:         big.NewInt(26),
 		R:         big.NewInt(27),
-	}
+	})
 
 	txTypes := []TxType{
 		StateTx,
@@ -160,7 +185,8 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 
 	for _, v := range txTypes {
 		t.Run(v.String(), func(t *testing.T) {
-			originalTx.Type = v
+			//originalTx.Type = v
+			originalTx.SetTransactionType(v)
 			originalTx.ComputeHash(1)
 
 			txRLP := originalTx.MarshalRLP()
@@ -240,13 +266,16 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 				v, err := parser.Parse(testData)
 				assert.Nil(t, err)
 
-				unmarshalledTx := &Transaction{Type: txType}
+				//unmarshalledTx := &Transaction{Type: txType}
+				unmarshalledTx := NewTx(&MixedTx{
+					Type: txType,
+				})
 
 				if tt.expectedErr {
 					assert.Error(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
 				} else {
 					assert.NoError(t, unmarshalledTx.unmarshalRLPFrom(parser, v), tt.name)
-					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From) != 0 && unmarshalledTx.From != ZeroAddress, unmarshalledTx.Type.String(), unmarshalledTx.From)
+					assert.Equal(t, tt.fromAddrSet, len(unmarshalledTx.From()) != 0 && unmarshalledTx.From() != ZeroAddress, unmarshalledTx.Type().String(), unmarshalledTx.From())
 				}
 
 				fastrlp.DefaultParserPool.Put(parser)

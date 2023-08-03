@@ -83,17 +83,25 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 
 		require.NoError(t, err)
 
-		tx := &types.Transaction{
+		// tx := &types.Transaction{
+		// 	Value:    big.NewInt(amount),
+		// 	GasPrice: big.NewInt(gasPrice),
+		// 	Gas:      gasLimit,
+		// 	Nonce:    0,
+		// 	To:       &receiver,
+		// }
+		tx := types.NewTx(&types.MixedTx{
 			Value:    big.NewInt(amount),
 			GasPrice: big.NewInt(gasPrice),
 			Gas:      gasLimit,
 			Nonce:    0,
 			To:       &receiver,
-		}
+		})
 
 		// fifth tx will cause filling to stop
 		if i == 4 {
-			tx.Gas = blockGasLimit - 1
+			//tx.Gas = blockGasLimit - 1
+			tx.SetGas(blockGasLimit - 1)
 		}
 
 		tx, err = signer.SignTx(tx, privateKey)

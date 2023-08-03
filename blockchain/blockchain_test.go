@@ -581,11 +581,16 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should succeed if tx has from field", func(t *testing.T) {
 		t.Parallel()
 
-		tx := &types.Transaction{
+		// tx := &types.Transaction{
+		// 	Value: big.NewInt(10),
+		// 	V:     big.NewInt(1),
+		// 	From:  addr,
+		// }
+		tx := types.NewTx(&types.MixedTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
 			From:  addr,
-		}
+		})
 
 		block := &types.Block{
 			Header: &types.Header{},
@@ -613,10 +618,14 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
 		t.Parallel()
 
-		tx := &types.Transaction{
+		// tx := &types.Transaction{
+		// 	Value: big.NewInt(10),
+		// 	V:     big.NewInt(1),
+		// }
+		tx := types.NewTx(&types.MixedTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
-		}
+		})
 
 		block := &types.Block{
 			Header: &types.Header{},
@@ -645,10 +654,14 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should recover from address and store to storage", func(t *testing.T) {
 		t.Parallel()
 
-		tx := &types.Transaction{
+		// tx := &types.Transaction{
+		// 	Value: big.NewInt(10),
+		// 	V:     big.NewInt(1),
+		// }
+		tx := types.NewTx(&types.MixedTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
-		}
+		})
 
 		block := &types.Block{
 			Header: &types.Header{},
@@ -661,7 +674,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{
-			tx.Hash: addr,
+			tx.Hash(): addr,
 		}
 
 		chain := newChain(t, txFromByTxHash, "t3")
@@ -677,7 +690,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 		readBody, ok := chain.readBody(block.Hash())
 		assert.True(t, ok)
 
-		assert.Equal(t, addr, readBody.Transactions[0].From)
+		assert.Equal(t, addr, readBody.Transactions[0].From())
 	})
 }
 
@@ -706,12 +719,15 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		tx1 := &types.Transaction{Nonce: 0, From: addr1}
-		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+		// tx1 := &types.Transaction{Nonce: 0, From: addr1}
+		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+
+		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: addr1})
+		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2)
 
-		txFromByTxHash[tx2.Hash] = addr2
+		txFromByTxHash[tx2.Hash()] = addr2
 
 		block := &types.Block{
 			Transactions: []*types.Transaction{
@@ -736,15 +752,19 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
-		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
-		tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
+		// tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
+		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+		// tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
+
+		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: types.ZeroAddress})
+		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
+		tx3 := types.NewTx(&types.MixedTx{Nonce: 2, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2, tx3)
 
 		// returns only addresses for tx1 and tx3
-		txFromByTxHash[tx1.Hash] = addr1
-		txFromByTxHash[tx3.Hash] = addr3
+		txFromByTxHash[tx1.Hash()] = addr1
+		txFromByTxHash[tx3.Hash()] = addr3
 
 		block := &types.Block{
 			Transactions: []*types.Transaction{
@@ -760,9 +780,9 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			errRecoveryAddressFailed,
 		)
 
-		assert.Equal(t, addr1, tx1.From)
-		assert.Equal(t, types.ZeroAddress, tx2.From)
-		assert.Equal(t, types.ZeroAddress, tx3.From)
+		assert.Equal(t, addr1, tx1.From())
+		assert.Equal(t, types.ZeroAddress, tx2.From())
+		assert.Equal(t, types.ZeroAddress, tx3.From())
 	})
 }
 
@@ -792,12 +812,15 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := &types.Transaction{Nonce: 0, From: addr1}
-		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+		// tx1 := &types.Transaction{Nonce: 0, From: addr1}
+		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+
+		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: addr1})
+		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2)
 
-		txFromByTxHash[tx2.Hash] = addr2
+		txFromByTxHash[tx2.Hash()] = addr2
 
 		transactions := []*types.Transaction{
 			tx1,
@@ -821,15 +844,19 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
-		tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
-		tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
+		// tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
+		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
+		// tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
+
+		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: types.ZeroAddress})
+		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
+		tx3 := types.NewTx(&types.MixedTx{Nonce: 2, From: types.ZeroAddress})
 
 		computeTxHashes(tx1, tx2, tx3)
 
 		// returns only addresses for tx1 and tx3
-		txFromByTxHash[tx1.Hash] = addr1
-		txFromByTxHash[tx3.Hash] = addr3
+		txFromByTxHash[tx1.Hash()] = addr1
+		txFromByTxHash[tx3.Hash()] = addr3
 
 		transactions := []*types.Transaction{
 			tx1,
@@ -839,9 +866,9 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 
 		assert.True(t, chain.recoverFromFieldsInTransactions(transactions))
 
-		assert.Equal(t, addr1, tx1.From)
-		assert.Equal(t, types.ZeroAddress, tx2.From)
-		assert.Equal(t, addr3, tx3.From)
+		assert.Equal(t, addr1, tx1.From())
+		assert.Equal(t, types.ZeroAddress, tx2.From())
+		assert.Equal(t, addr3, tx3.From())
 	})
 
 	t.Run("should return false if all transactions has from field", func(t *testing.T) {
@@ -855,12 +882,15 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		tx1 := &types.Transaction{Nonce: 0, From: addr1}
-		tx2 := &types.Transaction{Nonce: 1, From: addr2}
+		// tx1 := &types.Transaction{Nonce: 0, From: addr1}
+		// tx2 := &types.Transaction{Nonce: 1, From: addr2}
+
+		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: addr1})
+		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: addr2})
 
 		computeTxHashes(tx1, tx2)
 
-		txFromByTxHash[tx2.Hash] = addr2
+		txFromByTxHash[tx2.Hash()] = addr2
 
 		transactions := []*types.Transaction{
 			tx1,
@@ -891,10 +921,14 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	batchWriter := storage.NewBatchWriter(b.db)
 
-	tx := &types.Transaction{
+	// tx := &types.Transaction{
+	// 	Value: big.NewInt(10),
+	// 	V:     big.NewInt(1),
+	// }
+	tx := types.NewTx(&types.MixedTx{
 		Value: big.NewInt(10),
 		V:     big.NewInt(1),
-	}
+	})
 
 	tx.ComputeHash(1)
 
@@ -907,7 +941,7 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	block.Header.ComputeHash()
 
-	txFromByTxHash[tx.Hash] = types.ZeroAddress
+	txFromByTxHash[tx.Hash()] = types.ZeroAddress
 
 	batchWriter.PutCanonicalHeader(block.Header, big.NewInt(0))
 
@@ -915,12 +949,12 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	assert.NoError(t, batchWriter.WriteBatch())
 
-	txFromByTxHash[tx.Hash] = addr
+	txFromByTxHash[tx.Hash()] = addr
 
 	readBody, found := b.readBody(block.Hash())
 
 	assert.True(t, found)
-	assert.Equal(t, addr, readBody.Transactions[0].From)
+	assert.Equal(t, addr, readBody.Transactions[0].From())
 }
 
 func TestCalculateGasLimit(t *testing.T) {
@@ -1468,9 +1502,12 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		{GasUsed: 100},
 		{GasUsed: 200},
 	}
-	tx := &types.Transaction{
+	// tx := &types.Transaction{
+	// 	Value: big.NewInt(1),
+	// }
+	tx := types.NewTx(&types.MixedTx{
 		Value: big.NewInt(1),
-	}
+	})
 
 	tx.ComputeHash(1)
 	header.ComputeHash()
@@ -1481,7 +1518,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	header.ParentHash = existingHeader.Hash
 	bc.txSigner = &mockSigner{
 		txFromByTxHash: map[types.Hash]types.Address{
-			tx.Hash: {1, 2},
+			tx.Hash(): {1, 2},
 		},
 	}
 
@@ -1511,7 +1548,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	require.Equal(t, 8, len(db))
 	require.Equal(t, uint64(2), bc.currentHeader.Load().Number)
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.BODY, header.Hash.Bytes()))])
-	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.TX_LOOKUP_PREFIX, tx.Hash.Bytes()))])
+	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.TX_LOOKUP_PREFIX, tx.Hash().Bytes()))])
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.HEADER, header.Hash.Bytes()))])
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.HEAD, storage.HASH))])
 	require.NotNil(t, db[hex.EncodeToHex(getKey(storage.CANONICAL, common.EncodeUint64ToBytes(header.Number)))])

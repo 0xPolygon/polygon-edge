@@ -372,7 +372,7 @@ func (i *backendIBFT) writeTransaction(
 		return nil, false
 	}
 
-	if tx.Gas > gasLimit {
+	if tx.Gas() > gasLimit {
 		i.txpool.Drop(tx)
 
 		// continue processing

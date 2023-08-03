@@ -243,9 +243,10 @@ func Test_registerTxInclusionGuardHooks(t *testing.T) {
 		blockWithTransactions = &types.Block{
 			Header: &types.Header{},
 			Transactions: []*types.Transaction{
-				{
-					Nonce: 0,
-				},
+				// {
+				// 	Nonce: 0,
+				// },
+				types.NewTx(&types.MixedTx{Nonce: 0}),
 			},
 		}
 	)

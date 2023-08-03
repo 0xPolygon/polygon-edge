@@ -205,7 +205,7 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 		return nil, err
 	}
 
-	return tx.Hash.String(), nil
+	return tx.Hash().String(), nil
 }
 
 // SendTransaction rejects eth_sendTransaction json-rpc call as we don't support wallet management
@@ -356,8 +356,8 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		BlockNumber:       argUint64(block.Number()),
 		GasUsed:           argUint64(raw.GasUsed),
 		ContractAddress:   raw.ContractAddress,
-		FromAddr:          txn.From,
-		ToAddr:            txn.To,
+		FromAddr:          txn.From(),
+		ToAddr:            txn.To(),
 		Logs:              logs,
 	}
 
@@ -447,8 +447,9 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-	if transaction.Gas == 0 {
-		transaction.Gas = header.GasLimit
+	if transaction.Gas() == 0 {
+		//transaction.Gas = header.GasLimit
+		transaction.SetGas(header.GasLimit)
 	}
 
 	var override types.StateOverride
@@ -510,26 +511,26 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	)
 
 	// If the gas limit was passed in, use it as a ceiling
-	if transaction.Gas != 0 && transaction.Gas >= standardGas {
-		highEnd = transaction.Gas
+	if transaction.Gas() != 0 && transaction.Gas() >= standardGas {
+		highEnd = transaction.Gas()
 	} else {
 		// If not, use the referenced block number
 		highEnd = header.GasLimit
 	}
 
-	gasPriceInt := new(big.Int).Set(transaction.GasPrice)
-	valueInt := new(big.Int).Set(transaction.Value)
+	gasPriceInt := new(big.Int).Set(transaction.GasPrice())
+	valueInt := new(big.Int).Set(transaction.Value())
 
 	var availableBalance *big.Int
 
 	// If the sender address is present, figure out how much available funds
 	// are we working with
-	if transaction.From != types.ZeroAddress {
+	if transaction.From() != types.ZeroAddress {
 		// Get the account balance
 		// If the account is not initialized yet in state,
 		// assume it's an empty account
 		accountBalance := big.NewInt(0)
-		acc, err := e.store.GetAccount(header.StateRoot, transaction.From)
+		acc, err := e.store.GetAccount(header.StateRoot, transaction.From())
 
 		if err != nil && !errors.Is(err, ErrStateNotFound) {
 			// An unrelated error occurred, return it
@@ -542,7 +543,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		availableBalance = new(big.Int).Set(accountBalance)
 
-		if transaction.Value != nil {
+		if transaction.Value() != nil {
 			if valueInt.Cmp(availableBalance) > 0 {
 				return 0, ErrInsufficientFunds
 			}
@@ -593,7 +594,8 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
-		txn.Gas = gas
+		//txn.Gas = gas
+		txn.SetGas(gas)
 
 		result, applyErr := e.store.ApplyTxn(header, txn, nil)
 

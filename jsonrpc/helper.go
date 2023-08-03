@@ -222,7 +222,19 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter) (*types.Tran
 		txType = types.TxType(*arg.Type)
 	}
 
-	txn := &types.Transaction{
+	// txn := &types.Transaction{
+	// 	From:      *arg.From,
+	// 	Gas:       uint64(*arg.Gas),
+	// 	GasPrice:  new(big.Int).SetBytes(*arg.GasPrice),
+	// 	GasTipCap: new(big.Int).SetBytes(*arg.GasTipCap),
+	// 	GasFeeCap: new(big.Int).SetBytes(*arg.GasFeeCap),
+	// 	Value:     new(big.Int).SetBytes(*arg.Value),
+	// 	Input:     input,
+	// 	Nonce:     uint64(*arg.Nonce),
+	// 	Type:      txType,
+	// }
+
+	txn := types.NewTx(&types.MixedTx{
 		From:      *arg.From,
 		Gas:       uint64(*arg.Gas),
 		GasPrice:  new(big.Int).SetBytes(*arg.GasPrice),
@@ -232,10 +244,11 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter) (*types.Tran
 		Input:     input,
 		Nonce:     uint64(*arg.Nonce),
 		Type:      txType,
-	}
+	})
 
 	if arg.To != nil {
-		txn.To = arg.To
+		//txn.To = arg.To
+		txn.SetTo(arg.To)
 	}
 
 	txn.ComputeHash(blockNumber)

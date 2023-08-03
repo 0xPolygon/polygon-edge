@@ -31,11 +31,12 @@ func (e *LondonSigner) Hash(tx *types.Transaction) types.Hash {
 // Sender returns the transaction sender
 func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
 	// Apply fallback signer for non-dynamic-fee-txs
-	if tx.Type != types.DynamicFeeTx {
+	if tx.Type() != types.DynamicFeeTx {
 		return e.fallbackSigner.Sender(tx)
 	}
 
-	sig, err := encodeSignature(tx.R, tx.S, tx.V, e.isHomestead)
+	v, r, s := tx.RawSignatureValues()
+	sig, err := encodeSignature(r, s, v, e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
 	}
@@ -53,7 +54,7 @@ func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
 // SignTx signs the transaction using the passed in private key
 func (e *LondonSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*types.Transaction, error) {
 	// Apply fallback signer for non-dynamic-fee-txs
-	if tx.Type != types.DynamicFeeTx {
+	if tx.Type() != types.DynamicFeeTx {
 		return e.fallbackSigner.SignTx(tx, pk)
 	}
 
@@ -66,9 +67,10 @@ func (e *LondonSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*typ
 		return nil, err
 	}
 
-	tx.R = new(big.Int).SetBytes(sig[:32])
-	tx.S = new(big.Int).SetBytes(sig[32:64])
-	tx.V = new(big.Int).SetBytes(e.calculateV(sig[64]))
+	r := new(big.Int).SetBytes(sig[:32])
+	s := new(big.Int).SetBytes(sig[32:64])
+	v := new(big.Int).SetBytes(e.calculateV(sig[64]))
+	tx.SetSignatureValues(v, r, s)
 
 	return tx, nil
 }

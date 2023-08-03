@@ -25,13 +25,15 @@ type TransactionHashForkV1 struct {
 
 func (th *TransactionHashForkV1) SerializeForRootCalculation(t *Transaction, ap *fastrlp.ArenaPool) []byte {
 	ar := ap.Get()
-	chainID := t.ChainID
-	t.ChainID = big.NewInt(0)
+	chainID := t.ChainID()
+	//t.ChainID = big.NewInt(0)
+	t.SetChainID(big.NewInt(0))
 
 	defer func() {
 		ap.Put(ar)
 
-		t.ChainID = chainID
+		//t.ChainID = chainID
+		t.SetChainID(chainID)
 	}()
 
 	ar.Reset()
@@ -43,13 +45,17 @@ func (th *TransactionHashForkV1) ComputeHash(t *Transaction) {
 	ar := marshalArenaPool.Get()
 	hash := keccak.DefaultKeccakPool.Get()
 
-	chainID := t.ChainID
-	t.ChainID = big.NewInt(0)
+	chainID := t.ChainID()
+	// t.ChainID = big.NewInt(0)
+	t.SetChainID(big.NewInt(0))
 
 	v := t.MarshalRLPWith(ar)
-	hash.WriteRlp(t.Hash[:0], v)
+	txHash := t.Hash()
+	// hash.WriteRlp(t.Hash[:0], v)
+	hash.WriteRlp(txHash[:0], v)
 
-	t.ChainID = chainID
+	// t.ChainID = chainID
+	t.SetChainID(chainID)
 
 	marshalArenaPool.Put(ar)
 	keccak.DefaultKeccakPool.Put(hash)
@@ -64,7 +70,9 @@ func (th *TransactionHashForkV2) SerializeForRootCalculation(t *Transaction, _ *
 
 func (th *TransactionHashForkV2) ComputeHash(t *Transaction) {
 	hash := keccak.DefaultKeccakPool.Get()
-	hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
+	// hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
+	txHash := t.Hash()
+	hash.WriteFn(txHash[:0], t.MarshalRLPTo)
 	keccak.DefaultKeccakPool.Put(hash)
 }
 
