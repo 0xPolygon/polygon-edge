@@ -20,8 +20,8 @@ import (
 )
 
 type ValidatorsProvider interface {
-	// GetValidators returns AccountSet ([]*ValidatorMetadata)
-	GetValidators() (AccountSet, error)
+	// GetAllValidators returns all validators ([]*ValidatorMetadata) regardless if they are active or not
+	GetAllValidators() (AccountSet, error)
 }
 
 var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4] blsKey, uint256 votingPower)[])`)

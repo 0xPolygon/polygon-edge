@@ -396,7 +396,7 @@ func TestDoubleSigningTracker_PostBlock(t *testing.T) {
 
 	require.NoError(t, tracker.PostBlock(nil))
 
-	validators, err := provider.GetValidators()
+	validators, err := provider.GetAllValidators()
 	require.NoError(t, err)
 
 	require.Equal(t, tracker.validators, validators)

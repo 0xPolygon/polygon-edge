@@ -381,10 +381,12 @@ func init() {
 	setupHeaderHashFunc()
 }
 
+var _ validator.ValidatorsProvider = (*dummyValidatorsProvider)(nil)
+
 type dummyValidatorsProvider struct {
 }
 
 // GetValidators returns AccountSet ([]*ValidatorMetadata)
-func (d dummyValidatorsProvider) GetValidators() (validator.AccountSet, error) {
+func (d dummyValidatorsProvider) GetAllValidators() (validator.AccountSet, error) {
 	return nil, nil
 }

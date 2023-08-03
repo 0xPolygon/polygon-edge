@@ -58,7 +58,8 @@ func (s *StakeStore) getFullValidatorSet() (validatorSetState, error) {
 	return fullValidatorSet, err
 }
 
-func (s *StakeStore) GetValidators() (validator.AccountSet, error) {
+// GetValidators returns all validators regardless if they are active or not
+func (s *StakeStore) GetAllValidators() (validator.AccountSet, error) {
 	fullValidatorSet, err := s.getFullValidatorSet()
 	if err != nil {
 		return nil, err

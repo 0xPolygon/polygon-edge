@@ -136,7 +136,7 @@ type dummyValidatorsProvider struct {
 	accounts []*wallet.Account
 }
 
-func (d *dummyValidatorsProvider) GetValidators() (validator.AccountSet, error) {
+func (d *dummyValidatorsProvider) GetAllValidators() (validator.AccountSet, error) {
 	validators := make(validator.AccountSet, len(d.accounts))
 	for i, a := range d.accounts {
 		validators[i] = &validator.ValidatorMetadata{

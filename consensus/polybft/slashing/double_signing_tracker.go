@@ -110,7 +110,7 @@ type DoubleSigningTrackerImpl struct {
 
 func NewDoubleSigningTracker(logger hclog.Logger,
 	validatorsProvider validator.ValidatorsProvider) (*DoubleSigningTrackerImpl, error) {
-	initialValidators, err := validatorsProvider.GetValidators()
+	initialValidators, err := validatorsProvider.GetAllValidators()
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 
 // PostBlock is used to populate all known validators
 func (t *DoubleSigningTrackerImpl) PostBlock(_ *common.PostBlockRequest) error {
-	validators, err := t.validatorsProvider.GetValidators()
+	validators, err := t.validatorsProvider.GetAllValidators()
 	if err != nil {
 		return err
 	}
