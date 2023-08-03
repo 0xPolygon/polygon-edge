@@ -9,6 +9,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/0xPolygon/go-ibft/messages"
+	"github.com/0xPolygon/go-ibft/messages/proto"
+	hcf "github.com/hashicorp/go-hclog"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
@@ -17,10 +22,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-
-	"github.com/0xPolygon/go-ibft/messages"
-	"github.com/0xPolygon/go-ibft/messages/proto"
-	hcf "github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -134,12 +135,11 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 
 	logger := log.Named("consensus_runtime")
 	runtime := &consensusRuntime{
-		state:                config.State,
-		config:               config,
-		lastBuiltBlock:       config.blockchain.CurrentHeader(),
-		proposerCalculator:   proposerCalculator,
-		logger:               logger,
-		doubleSigningTracker: slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker")),
+		state:              config.State,
+		config:             config,
+		lastBuiltBlock:     config.blockchain.CurrentHeader(),
+		proposerCalculator: proposerCalculator,
+		logger:             logger,
 	}
 
 	if err := runtime.initStateSyncManager(log); err != nil {
@@ -159,6 +159,13 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	if err != nil {
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
+
+	tracker, err := slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker"), config.State.StakeStore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize double signing tracker: %w", err)
+	}
+
+	runtime.doubleSigningTracker = tracker
 
 	return runtime, nil
 }
@@ -298,26 +305,31 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
-	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
+	postBlock := &common.PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
 
 	// handle commitment and proofs creation
 	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block state sync", "err", err)
+		c.logger.Error("post block callback failed in state sync manager", "err", err)
 	}
 
 	// handle exit events that happened in block
 	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+		c.logger.Error("post block callback failed in checkpoint manager", "err", err)
 	}
 
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
-		c.logger.Error("Could not update proposer calculator", "err", err)
+		c.logger.Error("could not update proposer calculator", "err", err)
 	}
 
 	// handle transfer events that happened in block
 	if err := c.stakeManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block in stake manager", "err", err)
+		c.logger.Error("post block callback failed in stake manager", "err", err)
+	}
+
+	// update double signing tracker internal state
+	if err := c.doubleSigningTracker.PostBlock(postBlock); err != nil {
+		c.logger.Error("post block callback failed in double signing tracker", "err", err)
 	}
 
 	if isEndOfEpoch {
@@ -474,7 +486,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		"firstBlockInEpoch", firstBlockInEpoch,
 	)
 
-	reqObj := &PostEpochRequest{
+	reqObj := &common.PostEpochRequest{
 		SystemState:       systemState,
 		NewEpochID:        epochNumber,
 		FirstBlockOfEpoch: firstBlockInEpoch,
@@ -629,7 +641,7 @@ func (c *consensusRuntime) isFixedSizeOfSprintMet(blockNumber uint64, epoch *epo
 }
 
 // getSystemState builds SystemState instance for the most current block header
-func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, error) {
+func (c *consensusRuntime) getSystemState(header *types.Header) (common.SystemState, error) {
 	provider, err := c.config.blockchain.GetStateProviderForBlock(header)
 	if err != nil {
 		return nil, err

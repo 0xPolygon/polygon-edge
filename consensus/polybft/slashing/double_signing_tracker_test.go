@@ -27,17 +27,20 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	prePrepareMsg := buildPrePrepareMessage(t, prePrepareView, key, proposalHash)
 	prepareMsg := buildPrepareMessage(t, view, key, proposalHash)
 
-	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(),
+		&dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
+	require.NoError(t, err)
+
 	tracker.Handle(prePrepareMsg)
 	tracker.Handle(prepareMsg)
 
 	sender := types.Address(key.Address())
 
-	prePrepareMsgs := tracker.preprepare.getSenderMsgsLocked(prePrepareView, sender)
+	prePrepareMsgs := tracker.preprepare.getSenderMsgs(prePrepareView, sender)
 	assertSenderMessageMapsSize(t, tracker, 1, 0, 0, 0, prePrepareView, sender)
 	require.Equal(t, prePrepareMsg, prePrepareMsgs[0])
 
-	prepareMsgs := tracker.prepare.getSenderMsgsLocked(view, sender)
+	prepareMsgs := tracker.prepare.getSenderMsgs(view, sender)
 	assertSenderMessageMapsSize(t, tracker, 0, 1, 0, 0, view, sender)
 	require.Equal(t, prepareMsg, prepareMsgs[0])
 
@@ -50,9 +53,9 @@ func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	tracker.Handle(commitMsg)
 	tracker.Handle(roundChangeMsg)
 
-	prepareMsgs = tracker.prepare.getSenderMsgsLocked(view, sender)
-	commitMsgs := tracker.commit.getSenderMsgsLocked(view, sender)
-	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, sender)
+	prepareMsgs = tracker.prepare.getSenderMsgs(view, sender)
+	commitMsgs := tracker.commit.getSenderMsgs(view, sender)
+	roundChangeMsgs := tracker.roundChange.getSenderMsgs(view, sender)
 
 	assertSenderMessageMapsSize(t, tracker, 0, 1, 1, 1, view, sender)
 
@@ -69,15 +72,19 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 		sendersCount = 4
 	)
 
-	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
-
 	keys := make([]*wallet.Key, sendersCount)
+	accounts := make([]*wallet.Account, sendersCount)
+
 	for i := 0; i < len(keys); i++ {
 		acc, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
 		keys[i] = wallet.NewKey(acc)
+		accounts[i] = acc
 	}
+
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: accounts})
+	require.NoError(t, err)
 
 	expectedPrePrepare := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
 	expectedPrepare := make(map[types.Address][]*ibftProto.Message, sendersCount*heightsCount)
@@ -120,10 +127,10 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 
 		for i := uint64(0); i < heightsCount; i++ {
 			view := &ibftProto.View{Height: i + 1, Round: 1}
-			actualPrePrepares := tracker.preprepare.getSenderMsgsLocked(view, sender)
-			actualPrepares := tracker.prepare.getSenderMsgsLocked(view, sender)
-			actualCommits := tracker.commit.getSenderMsgsLocked(view, sender)
-			actualRoundChanges := tracker.roundChange.getSenderMsgsLocked(view, sender)
+			actualPrePrepares := tracker.preprepare.getSenderMsgs(view, sender)
+			actualPrepares := tracker.prepare.getSenderMsgs(view, sender)
+			actualCommits := tracker.commit.getSenderMsgs(view, sender)
+			actualRoundChanges := tracker.roundChange.getSenderMsgs(view, sender)
 
 			assertSenderMessageMapsSize(t, tracker, 1, 1, 1, 1, view, sender)
 			require.Equal(t, expPrePrepares[i], actualPrePrepares[0])
@@ -137,33 +144,43 @@ func TestDoubleSigningTracker_Handle_MultipleSenders(t *testing.T) {
 func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 	t.Parallel()
 
-	acc, err := wallet.GenerateAccount()
-	require.NoError(t, err)
+	const keysCount = 2
 
-	key := wallet.NewKey(acc)
+	allAccounts := make([]*wallet.Account, keysCount)
+	allKeys := make([]*wallet.Key, keysCount)
+
+	for i := 0; i < keysCount; i++ {
+		acc, err := wallet.GenerateAccount()
+		require.NoError(t, err)
+
+		allAccounts[i] = acc
+		key := wallet.NewKey(acc)
+		allKeys[i] = key
+	}
 
 	cases := []struct {
 		name        string
 		initHandler func(tracker *DoubleSigningTrackerImpl)
 		msgBuilder  func() *ibftProto.Message
+		accounts    []*wallet.Account
 		errMsg      string
 	}{
 		{
-			name: "invalid message view undefined",
+			name: "invalid message (view undefined)",
 			msgBuilder: func() *ibftProto.Message {
 				return &ibftProto.Message{}
 			},
 			errMsg: errViewUndefined.Error(),
 		},
 		{
-			name: "invalid message invalid message type",
+			name: "invalid message (invalid message type)",
 			msgBuilder: func() *ibftProto.Message {
 				return &ibftProto.Message{View: &ibftProto.View{Height: 1, Round: 4}, Type: 6}
 			},
 			errMsg: errInvalidMsgType.Error(),
 		},
 		{
-			name: "invalid message invalid signature",
+			name: "invalid message (invalid signature)",
 			msgBuilder: func() *ibftProto.Message {
 				return &ibftProto.Message{
 					View: &ibftProto.View{Height: 1, Round: 4},
@@ -173,15 +190,15 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 			errMsg: "failed to recover address from signature",
 		},
 		{
-			name: "invalid message invalid signature",
+			name: "invalid message (signer and sender mismatch)",
 			msgBuilder: func() *ibftProto.Message {
 				msg := &ibftProto.Message{
 					View: &ibftProto.View{Height: 1, Round: 4},
 					Type: ibftProto.MessageType_COMMIT,
-					From: types.ZeroAddress.Bytes(),
+					From: allKeys[1].Address().Bytes(),
 				}
 
-				msg, err := key.SignIBFTMessage(msg)
+				msg, err := allKeys[0].SignIBFTMessage(msg)
 				require.NoError(t, err)
 
 				return msg
@@ -189,28 +206,36 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 			errMsg: errSignerAndSenderMismatch.Error(),
 		},
 		{
-			name: "invalid message spammer",
+			name: "invalid message (spammer detected)",
 			msgBuilder: func() *ibftProto.Message {
-				return buildCommitMessage(t, &ibftProto.View{Height: 1, Round: 4}, key, types.ZeroHash)
+				return buildCommitMessage(t, &ibftProto.View{Height: 1, Round: 4}, allKeys[0], types.ZeroHash)
 			},
 			initHandler: func(tracker *DoubleSigningTrackerImpl) {
 				view := &ibftProto.View{Height: 1, Round: 4}
-				tracker.commit.addMessage(view, types.Address(key.Address()),
-					buildCommitMessage(t, view, key, types.ZeroHash))
+				tracker.commit.addMessage(view, types.Address(allKeys[0].Address()),
+					buildCommitMessage(t, view, allKeys[0], types.ZeroHash))
 			},
-			errMsg: fmt.Sprintf("sender %s is detected as a spammer", key.Address()),
+			errMsg: fmt.Sprintf("sender %s is detected as a spammer", allKeys[0].Address()),
+		},
+		{
+			name: "invalid message (unknown sender)",
+			msgBuilder: func() *ibftProto.Message {
+				return buildCommitMessage(t, &ibftProto.View{Height: 1, Round: 4}, allKeys[0], types.ZeroHash)
+			},
+			accounts: allAccounts[1:],
+			errMsg:   errUnknownSender.Error(),
 		},
 		{
 			name: "valid message",
 			msgBuilder: func() *ibftProto.Message {
 				proposalHash := generateRandomProposalHash(t)
-				committedSeal, err := key.Sign(proposalHash.Bytes())
+				committedSeal, err := allKeys[0].Sign(proposalHash.Bytes())
 				require.NoError(t, err)
 
 				msg := &ibftProto.Message{
 					View: &ibftProto.View{Height: 1, Round: 4},
 					Type: ibftProto.MessageType_COMMIT,
-					From: key.Address().Bytes(),
+					From: allKeys[0].Address().Bytes(),
 					Payload: &ibftProto.Message_CommitData{
 						CommitData: &ibftProto.CommitMessage{
 							ProposalHash:  proposalHash.Bytes(),
@@ -219,7 +244,7 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 					},
 				}
 
-				msg, err = key.SignIBFTMessage(msg)
+				msg, err = allKeys[0].SignIBFTMessage(msg)
 				require.NoError(t, err)
 
 				return msg
@@ -234,13 +259,20 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+			accounts := allAccounts
+			if c.accounts != nil {
+				accounts = c.accounts
+			}
+
+			tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: accounts})
+			require.NoError(t, err)
+
 			if c.initHandler != nil {
 				c.initHandler(tracker)
 			}
 			msg := c.msgBuilder()
 
-			err := tracker.validateMsg(msg)
+			err = tracker.validateMsg(msg)
 			if c.errMsg != "" {
 				require.ErrorContains(t, err, c.errMsg)
 			} else {
@@ -261,7 +293,9 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 	proposalHash := generateRandomProposalHash(t)
 	view := &ibftProto.View{Height: 1, Round: 1}
 
-	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
+	require.NoError(t, err)
+
 	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
 	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
 	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
@@ -304,7 +338,8 @@ func TestDoubleSigningTracker_GetEvidences(t *testing.T) {
 
 	key := wallet.NewKey(acc)
 	view := &ibftProto.View{Height: 6, Round: 2}
-	tracker := NewDoubleSigningTracker(hclog.NewNullLogger())
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
+	require.NoError(t, err)
 
 	tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
 
@@ -333,12 +368,36 @@ func TestDoubleSigningTracker_GetEvidences(t *testing.T) {
 	require.Len(t, commitEvidence.messages, len(commitMessages))
 
 	for i, msg := range prepareMessages {
-		t.Log("Index", i)
 		require.Equal(t, msg, prepareEvidence.messages[i])
 	}
 
 	for i, msg := range commitMessages {
-		t.Log("Index", i)
 		require.Equal(t, msg, commitEvidence.messages[i])
 	}
+}
+
+func TestDoubleSigningTracker_PostBlock(t *testing.T) {
+	t.Parallel()
+
+	const validatorsCount = 4
+
+	validatorAccs := make([]*wallet.Account, validatorsCount)
+
+	for i := 0; i < validatorsCount; i++ {
+		acc, err := wallet.GenerateAccount()
+		require.NoError(t, err)
+
+		validatorAccs[i] = acc
+	}
+
+	provider := &dummyValidatorsProvider{accounts: validatorAccs}
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), provider)
+	require.NoError(t, err)
+
+	require.NoError(t, tracker.PostBlock(nil))
+
+	validators, err := provider.GetValidators()
+	require.NoError(t, err)
+
+	require.Equal(t, tracker.validators, validators)
 }

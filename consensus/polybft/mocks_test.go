@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -101,10 +102,10 @@ func (m *blockchainMock) GetHeaderByHash(hash types.Hash) (*types.Header, bool) 
 	panic("Unsupported mock for GetHeaderByHash") //nolint:gocritic
 }
 
-func (m *blockchainMock) GetSystemState(provider contract.Provider) SystemState {
+func (m *blockchainMock) GetSystemState(provider contract.Provider) common.SystemState {
 	args := m.Called(provider)
 
-	return args.Get(0).(SystemState) //nolint:forcetypeassert
+	return args.Get(0).(common.SystemState) //nolint:forcetypeassert
 }
 
 func (m *blockchainMock) SubscribeEvents() blockchain.Subscription {
@@ -197,7 +198,7 @@ func (m *blockBuilderMock) GetState() *state.Transition {
 	return args.Get(0).(*state.Transition) //nolint:forcetypeassert
 }
 
-var _ SystemState = (*systemStateMock)(nil)
+var _ common.SystemState = (*systemStateMock)(nil)
 
 type systemStateMock struct {
 	mock.Mock
@@ -378,4 +379,12 @@ func (tp *syncerMock) Sync(func(*types.FullBlock) bool) error {
 func init() {
 	// setup custom hash header func
 	setupHeaderHashFunc()
+}
+
+type dummyValidatorsProvider struct {
+}
+
+// GetValidators returns AccountSet ([]*ValidatorMetadata)
+func (d dummyValidatorsProvider) GetValidators() (validator.AccountSet, error) {
+	return nil, nil
 }

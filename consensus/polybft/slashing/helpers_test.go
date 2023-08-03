@@ -2,11 +2,13 @@ package slashing
 
 import (
 	"crypto/rand"
+	"math/big"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -109,10 +111,10 @@ func assertSenderMessageMapsSize(t *testing.T, tracker *DoubleSigningTrackerImpl
 	view *ibftProto.View, sender types.Address) {
 	t.Helper()
 
-	prePrepareMsgs := tracker.preprepare.getSenderMsgsLocked(view, sender)
-	prepareMsgs := tracker.prepare.getSenderMsgsLocked(view, sender)
-	commitMsgs := tracker.commit.getSenderMsgsLocked(view, sender)
-	roundChangeMsgs := tracker.roundChange.getSenderMsgsLocked(view, sender)
+	prePrepareMsgs := tracker.preprepare.getSenderMsgs(view, sender)
+	prepareMsgs := tracker.prepare.getSenderMsgs(view, sender)
+	commitMsgs := tracker.commit.getSenderMsgs(view, sender)
+	roundChangeMsgs := tracker.roundChange.getSenderMsgs(view, sender)
 
 	require.Len(t, prePrepareMsgs, prePrepareCount)
 	require.Len(t, prepareMsgs, prepareCount)
@@ -128,4 +130,22 @@ func generateRandomProposalHash(t *testing.T) types.Hash {
 	require.NoError(t, err, "failed to generate random hash")
 
 	return types.BytesToHash(result)
+}
+
+type dummyValidatorsProvider struct {
+	accounts []*wallet.Account
+}
+
+func (d *dummyValidatorsProvider) GetValidators() (validator.AccountSet, error) {
+	validators := make(validator.AccountSet, len(d.accounts))
+	for i, a := range d.accounts {
+		validators[i] = &validator.ValidatorMetadata{
+			Address:     a.Address(),
+			BlsKey:      a.Bls.PublicKey(),
+			VotingPower: big.NewInt(1),
+			IsActive:    true,
+		}
+	}
+
+	return validators, nil
 }

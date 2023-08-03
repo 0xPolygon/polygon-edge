@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -16,6 +19,7 @@ import (
 var (
 	errViewUndefined           = errors.New("view is undefined")
 	errInvalidMsgType          = errors.New("message type is invalid")
+	errUnknownSender           = errors.New("message sender is not a known validator")
 	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
 )
 
@@ -38,9 +42,11 @@ type Messages struct {
 	mux     sync.RWMutex
 }
 
-// getSenderMsgsLocked returns messages for given height, round and sender.
-// Remark: calling context must have mutex acquired.
-func (m *Messages) getSenderMsgsLocked(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
+// getSenderMsgs returns messages for given height, round and sender.
+func (m *Messages) getSenderMsgs(view *ibftProto.View, sender types.Address) []*ibftProto.Message {
+	m.mux.RLock()
+	defer m.mux.RUnlock()
+
 	if roundMsgs, ok := m.content[view.Height]; ok {
 		if senderMsgsMap, ok := roundMsgs[view.Round]; ok {
 			return senderMsgsMap[sender]
@@ -65,14 +71,11 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
 	}
 
-	msgs := m.getSenderMsgsLocked(msg.View, sender)
-	if msgs == nil {
-		msgs = []*ibftProto.Message{msg}
+	if _, ok := senderMsgs[sender]; ok {
+		senderMsgs[sender] = append(senderMsgs[sender], msg)
 	} else {
-		msgs = append(msgs, msg)
+		senderMsgs[sender] = []*ibftProto.Message{msg}
 	}
-
-	senderMsgs[sender] = msgs
 }
 
 // createSenderMsgsMap initializes senders message map for the given round
@@ -83,10 +86,13 @@ func createSenderMsgsMap(round uint64, roundMsgs map[uint64]SenderMessagesMap) S
 	return sendersMsgs
 }
 
+var _ DoubleSigningTracker = (*DoubleSigningTrackerImpl)(nil)
+
 type DoubleSigningTracker interface {
 	Handle(msg *ibftProto.Message)
 	GetEvidences(height uint64) []*DoubleSignEvidence
 	PruneMsgsUntil(height uint64)
+	PostBlock(req *common.PostBlockRequest) error
 }
 
 type DoubleSigningTrackerImpl struct {
@@ -95,17 +101,39 @@ type DoubleSigningTrackerImpl struct {
 	commit      *Messages
 	roundChange *Messages
 
-	logger hclog.Logger
+	msgsTypes          []ibftProto.MessageType
+	mux                sync.RWMutex
+	validatorsProvider validator.ValidatorsProvider
+	validators         validator.AccountSet
+	logger             hclog.Logger
 }
 
-func NewDoubleSigningTracker(logger hclog.Logger) *DoubleSigningTrackerImpl {
-	return &DoubleSigningTrackerImpl{
-		logger:      logger,
-		preprepare:  &Messages{content: make(MessagesMap)},
-		prepare:     &Messages{content: make(MessagesMap)},
-		commit:      &Messages{content: make(MessagesMap)},
-		roundChange: &Messages{content: make(MessagesMap)},
+func NewDoubleSigningTracker(logger hclog.Logger,
+	validatorsProvider validator.ValidatorsProvider) (*DoubleSigningTrackerImpl, error) {
+	initialValidators, err := validatorsProvider.GetValidators()
+	if err != nil {
+		return nil, err
 	}
+
+	t := &DoubleSigningTrackerImpl{
+		logger:             logger,
+		validatorsProvider: validatorsProvider,
+		validators:         initialValidators,
+		preprepare:         &Messages{content: make(MessagesMap)},
+		prepare:            &Messages{content: make(MessagesMap)},
+		commit:             &Messages{content: make(MessagesMap)},
+		roundChange:        &Messages{content: make(MessagesMap)},
+	}
+
+	for _, msgType := range ibftProto.MessageType_value {
+		t.msgsTypes = append(t.msgsTypes, ibftProto.MessageType(msgType))
+	}
+
+	sort.Slice(t.msgsTypes, func(i, j int) bool {
+		return t.msgsTypes[i] < t.msgsTypes[j]
+	})
+
+	return t, nil
 }
 
 // Handle is implementation of IBFTMessageHandler interface, which handles IBFT consensus messages
@@ -122,8 +150,8 @@ func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 
 // PruneMsgsUntil deletes all messages maps until the specified height
 func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
-	for _, msgType := range ibftProto.MessageType_value {
-		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
+	for _, msgType := range t.msgsTypes {
+		msgs := t.resolveMessagesStorage(msgType)
 		if msgs == nil {
 			continue
 		}
@@ -144,13 +172,13 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvidence {
 	evidences := []*DoubleSignEvidence{}
 
-	for _, msgType := range ibftProto.MessageType_value {
-		msgs := t.resolveMessagesStorage(ibftProto.MessageType(msgType))
+	for _, msgType := range t.msgsTypes {
+		msgs := t.resolveMessagesStorage(msgType)
 		if msgs == nil {
 			continue
 		}
 
-		msgs.mux.RLock()
+		msgs.mux.Lock()
 
 		roundMsgs, ok := msgs.content[height]
 		if !ok {
@@ -181,22 +209,40 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 			}
 		}
 
-		msgs.mux.RUnlock()
+		msgs.mux.Unlock()
 	}
 
 	return evidences
 }
 
+// PostBlock is used to populate all known validators
+func (t *DoubleSigningTrackerImpl) PostBlock(_ *common.PostBlockRequest) error {
+	validators, err := t.validatorsProvider.GetValidators()
+	if err != nil {
+		return err
+	}
+
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
+	t.validators = validators
+
+	return nil
+}
+
 // validateMsg validates provided IBFT message
 func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
+	// check is view defined
 	if msg.View == nil {
 		return errViewUndefined
 	}
 
+	// check message type
 	if _, ok := ibftProto.MessageType_name[int32(msg.Type)]; !ok {
 		return errInvalidMsgType
 	}
 
+	// recover message signer
 	signer, err := wallet.RecoverSignerFromIBFTMessage(msg)
 	if err != nil {
 		return err
@@ -204,16 +250,23 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 
 	sender := types.BytesToAddress(msg.From)
 
+	t.mux.RLock()
+	defer t.mux.RUnlock()
+
+	// ignore messages which originate from unknown validator
+	if !t.validators.ContainsAddress(sender) {
+		return errUnknownSender
+	}
+
 	// ignore messages where signer and sender are not the same
 	if signer != sender {
 		return errSignerAndSenderMismatch
 	}
 
 	msgsMap := t.resolveMessagesStorage(msg.Type)
-	msgsMap.mux.RLock()
-	defer msgsMap.mux.RUnlock()
 
-	senderMsgs := msgsMap.getSenderMsgsLocked(msg.View, sender)
+	// ignore messages which are already present in the storage in order to prevent DDOS attack
+	senderMsgs := msgsMap.getSenderMsgs(msg.View, sender)
 	for _, senderMsg := range senderMsgs {
 		if bytes.Equal(senderMsg.Signature, msg.Signature) {
 			return fmt.Errorf("sender %s is detected as a spammer", sender)
