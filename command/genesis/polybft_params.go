@@ -100,8 +100,10 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 	if p.rewardTokenCode == "" {
 		// native token is used as a reward token, and reward wallet is not a zero address
-		// so we need to add that address to premine map
-		premineBalances[walletPremineInfo.address] = walletPremineInfo
+		if p.epochReward > 0 {
+			// epoch reward is non zero so premine reward wallet
+			premineBalances[walletPremineInfo.address] = walletPremineInfo
+		}
 	} else {
 		bytes, err := hex.DecodeString(p.rewardTokenCode)
 		if err != nil {
