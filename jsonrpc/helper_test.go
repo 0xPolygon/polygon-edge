@@ -294,7 +294,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -313,7 +313,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return types.ZeroHash, false
 				},
@@ -326,7 +326,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},
@@ -345,7 +345,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 			txHash: testTx1.Hash(),
 			store: &debugEndpointMockStore{
 				readTxLookupFn: func(hash types.Hash) (types.Hash, bool) {
-					assert.Equal(t, testTx1.Hash, hash)
+					assert.Equal(t, testTx1.Hash(), hash)
 
 					return blockWithTx.Hash(), true
 				},

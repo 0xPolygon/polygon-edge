@@ -99,3 +99,7 @@ func (tx *MixedTx) setNonce(nonce uint64) {
 func (tx *MixedTx) setAccessList(accessList TxAccessList) {
 	tx.AccessList = accessList
 }
+
+func (tx *MixedTx) setHash(h Hash) {
+	tx.Hash = h
+}

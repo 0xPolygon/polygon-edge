@@ -95,6 +95,7 @@ type TxData interface {
 	setTo(address *Address)
 	setNonce(uint64)
 	setAccessList(TxAccessList)
+	setHash(Hash)
 }
 
 func (tx *Transaction) Type() TxType {
@@ -206,6 +207,10 @@ func (tx *Transaction) SetAccessList(accessList TxAccessList) {
 	tx.Inner.setAccessList(accessList)
 }
 
+func (tx *Transaction) SetHash(h Hash) {
+	tx.Inner.setHash(h)
+}
+
 // type Transaction struct {
 // 	Nonce     uint64
 // 	GasPrice  *big.Int
@@ -253,6 +258,37 @@ func (t *Transaction) Copy() *Transaction {
 	return newTx
 }
 
+// func DeepCopyTxData(data TxData) TxData {
+// 	if data == nil {
+// 		return nil
+// 	}
+
+// 	switch t := data.(type) {
+// 	case *MixedTx:
+// 		v, r, s := t.rawSignatureValues()
+// 		return &MixedTx{
+// 			Nonce:      t.nonce(),
+// 			GasPrice:   new(big.Int).Set(t.gasPrice()),
+// 			GasTipCap:  new(big.Int).Set(t.gasTipCap()),
+// 			GasFeeCap:  new(big.Int).Set(t.gasFeeCap()),
+// 			Gas:        t.gas(),
+// 			To:         t.to(),
+// 			Value:      new(big.Int).Set(t.value()),
+// 			Input:      append([]byte(nil), t.input()...),
+// 			V:          new(big.Int).Set(v),
+// 			R:          new(big.Int).Set(r),
+// 			S:          new(big.Int).Set(s),
+// 			Hash:       t.hash(),
+// 			From:       t.from(),
+// 			Type:       t.transactionType(),
+// 			ChainID:    t.chainID(),
+// 			AccessList: DeepCopyTxAccessList(t.accessList()),
+// 		}
+
+//		default:
+//			return nil
+//		}
+//	}
 func DeepCopyTxData(data TxData) TxData {
 	if data == nil {
 		return nil
@@ -260,25 +296,55 @@ func DeepCopyTxData(data TxData) TxData {
 
 	switch t := data.(type) {
 	case *MixedTx:
-		v, r, s := t.rawSignatureValues()
-		return &MixedTx{
-			Nonce:      t.nonce(),
-			GasPrice:   new(big.Int).Set(t.gasPrice()),
-			GasTipCap:  new(big.Int).Set(t.gasTipCap()),
-			GasFeeCap:  new(big.Int).Set(t.gasFeeCap()),
-			Gas:        t.gas(),
-			To:         t.to(),
-			Value:      new(big.Int).Set(t.value()),
-			Input:      append([]byte(nil), t.input()...),
-			V:          new(big.Int).Set(v),
-			R:          new(big.Int).Set(r),
-			S:          new(big.Int).Set(s),
-			Hash:       t.hash(),
-			From:       t.from(),
-			Type:       t.transactionType(),
-			ChainID:    t.chainID(),
-			AccessList: DeepCopyTxAccessList(t.accessList()),
+		// Initialize empty values for fields that may not be present in all TxData implementations
+		// var nonce uint64
+		// var gasPrice, gasTipCap, gasFeeCap, value, chainID *big.Int
+		// var gas uint64
+		// var to *Address
+		// var input []byte
+		// var v, r, s *big.Int
+		// var hash Hash
+		// var from Address
+		// var transactionType TxType
+		// var accessList TxAccessList
+
+		newMixedTx := &MixedTx{}
+		*newMixedTx = *t
+
+		newMixedTx.GasPrice = new(big.Int)
+		if t.GasPrice != nil {
+			newMixedTx.GasPrice.Set(t.GasPrice)
 		}
+
+		newMixedTx.GasTipCap = new(big.Int)
+		if t.GasTipCap != nil {
+			newMixedTx.GasTipCap.Set(t.GasTipCap)
+		}
+
+		newMixedTx.GasFeeCap = new(big.Int)
+		if t.GasFeeCap != nil {
+			newMixedTx.GasFeeCap.Set(t.GasFeeCap)
+		}
+
+		newMixedTx.Value = new(big.Int)
+		if t.Value != nil {
+			newMixedTx.Value.Set(t.Value)
+		}
+
+		if newMixedTx.R != nil {
+			newMixedTx.R = new(big.Int)
+			newMixedTx.R = big.NewInt(0).SetBits(t.R.Bits())
+		}
+
+		if newMixedTx.S != nil {
+			newMixedTx.S = new(big.Int)
+			newMixedTx.S = big.NewInt(0).SetBits(t.S.Bits())
+		}
+
+		newMixedTx.Input = make([]byte, len(t.Input))
+		copy(newMixedTx.Input[:], t.Input[:])
+
+		return newMixedTx
 
 	default:
 		return nil

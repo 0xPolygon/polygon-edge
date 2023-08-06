@@ -159,7 +159,7 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 
 			sender, err := signer.Sender(tx)
 			if err != nil {
-				return fmt.Errorf("could not get sender of transaction: %s. Error: %w", tx.Hash, err)
+				return fmt.Errorf("could not get sender of transaction: %s. Error: %w", tx.Hash(), err)
 			}
 
 			if sender != blockMiner {

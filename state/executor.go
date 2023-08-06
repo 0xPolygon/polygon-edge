@@ -379,7 +379,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	}
 
 	// if the transaction created a contract, store the creation address in the receipt.
-	if msg.To == nil {
+	if msg.To() == nil {
 		receipt.ContractAddress = crypto.CreateAddress(msg.From(), txn.Nonce()).Ptr()
 	}
 
@@ -1209,7 +1209,7 @@ func checkAndProcessStateTx(msg *types.Transaction) error {
 
 	if msg.From() != contracts.SystemCaller {
 		return NewTransitionApplicationError(
-			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
+			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From()),
 			true,
 		)
 	}

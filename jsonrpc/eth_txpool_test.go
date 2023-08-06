@@ -25,7 +25,7 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	data := txn.MarshalRLP()
 	_, err := eth.SendRawTransaction(data)
 	assert.NoError(t, err)
-	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
+	assert.NotEqual(t, store.txn.Hash(), types.ZeroHash)
 
 	// the hash in the txn pool should match the one we send
 	if txn.Hash() != store.txn.Hash() {
@@ -53,7 +53,7 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 
 	_, err := eth.SendRawTransaction(txToSend.MarshalRLP())
 	assert.NoError(t, err)
-	assert.NotEqual(t, store.txn.Hash, types.ZeroHash)
+	assert.NotEqual(t, store.txn.Hash(), types.ZeroHash)
 }
 
 type mockStoreTxn struct {

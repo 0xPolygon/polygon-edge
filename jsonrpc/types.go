@@ -76,22 +76,22 @@ func toTransaction(
 		BlockHash:   blockHash,
 	}
 
-	if t.GasPrice != nil {
+	if t.GasPrice() != nil {
 		gasPrice := argBig(*(t.GasPrice()))
 		res.GasPrice = &gasPrice
 	}
 
-	if t.GasTipCap != nil {
+	if t.GasTipCap() != nil {
 		gasTipCap := argBig(*(t.GasTipCap()))
 		res.GasTipCap = &gasTipCap
 	}
 
-	if t.GasFeeCap != nil {
+	if t.GasFeeCap() != nil {
 		gasFeeCap := argBig(*(t.GasFeeCap()))
 		res.GasFeeCap = &gasFeeCap
 	}
 
-	if t.ChainID != nil {
+	if t.ChainID() != nil {
 		chainID := argBig(*(t.ChainID()))
 		res.ChainID = &chainID
 	}

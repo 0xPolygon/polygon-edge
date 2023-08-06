@@ -119,7 +119,7 @@ func TestContentEndpoint(t *testing.T) {
 		assert.Equal(t, testTx2.From(), txData.From)
 		assert.Equal(t, *(testTx2.ChainID()), big.Int(*txData.ChainID))
 		assert.Equal(t, *(testTx2.Value()), big.Int(txData.Value))
-		assert.Equal(t, testTx2.Input, []byte(txData.Input))
+		assert.Equal(t, testTx2.Input(), []byte(txData.Input))
 		assert.Equal(t, (*argUint64)(nil), txData.BlockNumber)
 		assert.Equal(t, (*argUint64)(nil), txData.TxIndex)
 	})

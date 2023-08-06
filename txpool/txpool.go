@@ -614,7 +614,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 
 		// Check EIP-1559-related fields and make sure they are correct
-		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
+		if tx.GasFeeCap() == nil || tx.GasTipCap() == nil {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
 			return ErrUnderpriced
@@ -896,7 +896,6 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 
 		return
 	}
-
 	// Verify that the gossiped transaction message is not empty
 	if raw == nil || raw.Raw == nil {
 		p.logger.Error("malformed gossip transaction message received")
@@ -904,7 +903,8 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 		return
 	}
 
-	tx := new(types.Transaction)
+	// tx := new(types.Transaction)
+	tx := types.NewTx(&types.MixedTx{})
 
 	// decode tx
 	if err := tx.UnmarshalRLP(raw.Raw.Value); err != nil {

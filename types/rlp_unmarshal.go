@@ -385,7 +385,6 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 	if err := UnmarshalRlp(t.unmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -416,7 +415,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	case DynamicFeeTx:
 		num = 12
 	default:
-		return fmt.Errorf("transaction type %d not found", t.Type)
+		return fmt.Errorf("transaction type %d not found", t.Type())
 	}
 
 	if numElems := len(elems); numElems != num {
@@ -490,10 +489,11 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 	// input
 	var txInput []byte
-	_, err = getElem().GetBytes(txInput[:0])
+	txInput, err = getElem().GetBytes(txInput)
 	if err != nil {
 		return err
 	}
+	t.SetInput(txInput)
 
 	// Skipping Access List field since we don't support it.
 	// This is needed to be compatible with other EVM chains and have the same format.

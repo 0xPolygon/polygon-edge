@@ -428,17 +428,17 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 		decodedStateTx, err := decodeStateTransaction(tx.Input())
 		if err != nil {
-			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
+			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash(), err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if !f.isEndOfSprint {
-				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", tx.Hash)
+				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", tx.Hash())
 			}
 
 			if commitmentTxExists {
-				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", tx.Hash)
+				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", tx.Hash())
 			}
 
 			commitmentTxExists = true
@@ -588,8 +588,8 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 		if commitEpochTx.Hash() != localCommitEpochTx.Hash() {
 			return fmt.Errorf(
 				"invalid commit epoch transaction. Expected '%s', but got '%s' commit epoch transaction hash",
-				localCommitEpochTx.Hash,
-				commitEpochTx.Hash,
+				localCommitEpochTx.Hash(),
+				commitEpochTx.Hash(),
 			)
 		}
 
@@ -611,8 +611,8 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 		if distributeRewardsTx.Hash() != localDistributeRewardsTx.Hash() {
 			return fmt.Errorf(
 				"invalid distribute rewards transaction. Expected '%s', but got '%s' distribute rewards hash",
-				localDistributeRewardsTx.Hash,
-				distributeRewardsTx.Hash,
+				localDistributeRewardsTx.Hash(),
+				distributeRewardsTx.Hash(),
 			)
 		}
 

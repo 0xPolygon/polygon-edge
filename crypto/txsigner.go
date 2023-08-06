@@ -83,7 +83,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	v.Set(a.NewUint(tx.Gas()))
 
-	if tx.To == nil {
+	if tx.To() == nil {
 		v.Set(a.NewNull())
 	} else {
 		v.Set(a.NewCopyBytes((*(tx.To())).Bytes()))
@@ -99,7 +99,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 		// Convert TxAccessList to RLP format and add it to the vv array.
 		accessListVV := a.NewArray()
 
-		if tx.AccessList != nil {
+		if tx.AccessList() != nil {
 			for _, accessTuple := range tx.AccessList() {
 				accessTupleVV := a.NewArray()
 				accessTupleVV.Set(a.NewCopyBytes(accessTuple.Address.Bytes()))
