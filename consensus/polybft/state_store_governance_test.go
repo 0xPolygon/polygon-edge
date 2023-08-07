@@ -19,6 +19,7 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	block := uint64(111)
 	state := newTestState(t)
 
+	// NetworkParams events
 	checkpointIntervalEvent := &contractsapi.NewCheckpointBlockIntervalEvent{CheckpointInterval: big.NewInt(900)}
 	epochSizeEvent := &contractsapi.NewEpochSizeEvent{Size: big.NewInt(10)}
 	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(1000)}
@@ -31,8 +32,13 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	votingPeriodEvent := &contractsapi.NewVotingPeriodEvent{VotingPeriod: big.NewInt(10_000)}
 	proposalThresholdEvent := &contractsapi.NewProposalThresholdEvent{ProposalThreshold: big.NewInt(1000)}
 	sprintSizeEvent := &contractsapi.NewSprintSizeEvent{Size: big.NewInt(7)}
+	// ForkParams events
+	newFeatureEvent := &contractsapi.NewFeatureEvent{Feature: types.BytesToHash([]byte("OxSomeFeature1")),
+		Block: big.NewInt(100_000)}
+	updateFeatureEvent := &contractsapi.UpdatedFeatureEvent{Feature: types.BytesToHash([]byte("OxSomeFeature2")),
+		Block: big.NewInt(150_000)}
 
-	events := []contractsapi.EventAbi{
+	networkParamsEvents := []contractsapi.EventAbi{
 		checkpointIntervalEvent,
 		epochSizeEvent,
 		epochRewardEvent,
@@ -46,29 +52,50 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 		proposalThresholdEvent,
 	}
 
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(epoch, block, events))
+	forkParamsEvents := []contractsapi.EventAbi{newFeatureEvent, updateFeatureEvent}
+
+	allEvents := make([]contractsapi.EventAbi, 0)
+	allEvents = append(allEvents, networkParamsEvents...)
+	allEvents = append(allEvents, forkParamsEvents...)
+
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(epoch, block, allEvents))
 
 	// test for an epoch that didn't have any events
-	eventsRaw, err := state.GovernanceStore.getGovernanceEvents(10)
+	eventsRaw, err := state.GovernanceStore.getNetworkParamsEvents(10)
 	require.NoError(t, err)
 	require.Len(t, eventsRaw, 0)
 
-	// test for the epoch that had events
-	eventsRaw, err = state.GovernanceStore.getGovernanceEvents(epoch)
+	// fork events are not saved per epoch so we should have 2
+	forksInDB, err := state.GovernanceStore.getAllForkEvents()
 	require.NoError(t, err)
-	require.Len(t, eventsRaw, len(events))
+	require.Len(t, forksInDB, len(forkParamsEvents))
+
+	// test for the epoch that had events
+	eventsRaw, err = state.GovernanceStore.getNetworkParamsEvents(epoch)
+	require.NoError(t, err)
+	require.Len(t, eventsRaw, len(networkParamsEvents))
+
+	forksInDB, err = state.GovernanceStore.getAllForkEvents()
+	require.NoError(t, err)
+	require.Len(t, forksInDB, len(forkParamsEvents))
 
 	lastProcessedBlock, err := state.GovernanceStore.getLastProcessed()
 	require.NoError(t, err)
 	require.Equal(t, block, lastProcessedBlock)
 
 	// insert some more events for current epoch
+	newFeatureEventTwo := &contractsapi.UpdatedFeatureEvent{Feature: types.BytesToHash([]byte("OxSomeFeature3")),
+		Block: big.NewInt(130_000)}
 	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(epoch, block+1,
-		[]contractsapi.EventAbi{sprintSizeEvent}))
+		[]contractsapi.EventAbi{sprintSizeEvent, newFeatureEventTwo}))
 
-	eventsRaw, err = state.GovernanceStore.getGovernanceEvents(epoch)
+	eventsRaw, err = state.GovernanceStore.getNetworkParamsEvents(epoch)
 	require.NoError(t, err)
-	require.Len(t, eventsRaw, len(events)+1)
+	require.Len(t, eventsRaw, len(networkParamsEvents)+1)
+
+	forksInDB, err = state.GovernanceStore.getAllForkEvents()
+	require.NoError(t, err)
+	require.Len(t, forksInDB, len(forkParamsEvents)+1)
 
 	lastProcessedBlock, err = state.GovernanceStore.getLastProcessed()
 	require.NoError(t, err)
