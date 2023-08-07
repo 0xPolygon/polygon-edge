@@ -37,18 +37,18 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize                = uint64(10)
-	defaultSprintSize               = uint64(5)
+	defaultEpochSize                = uint64(10) // in blocks
+	defaultSprintSize               = uint64(5)  // in blocks
 	defaultValidatorSetSize         = 100
 	defaultBlockTime                = 2 * time.Second
-	defaultEpochReward              = 1
-	defaultBlockTimeDrift           = uint64(10)
-	defaultCheckpointInterval       = uint64(900)
-	defaultWithdrawalWaitPeriod     = uint64(1)
-	defaultVotingDelay              = "10"
-	defaultVotingPeriod             = "20"
-	defaultVoteProposalThreshold    = "1000"
-	defaultProposalQuorumPercentage = uint64(67)
+	defaultEpochReward              = 1           // in wei
+	defaultBlockTimeDrift           = uint64(10)  // in seconds
+	defaultCheckpointInterval       = uint64(900) // in blocks
+	defaultWithdrawalWaitPeriod     = uint64(1)   // in epochs
+	defaultVotingDelay              = "10"        // in blocks
+	defaultVotingPeriod             = "10000"     // in blocks
+	defaultVoteProposalThreshold    = "1000"      // in blocks
+	defaultProposalQuorumPercentage = uint64(67)  // percentage
 
 	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
