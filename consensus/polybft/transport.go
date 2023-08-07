@@ -29,7 +29,16 @@ func (p *Polybft) subscribeToIbftTopic() error {
 		}
 
 		for _, handler := range p.ibftMsgHandlers {
-			handler.Handle(msg)
+			handler := handler
+
+			go func() {
+				select {
+				case <-p.closeCh:
+					return
+				default:
+					handler.Handle(msg)
+				}
+			}()
 		}
 
 		p.logger.Debug(
