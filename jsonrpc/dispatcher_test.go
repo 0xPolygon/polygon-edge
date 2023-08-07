@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -60,20 +61,21 @@ func expectBatchJSONResult(data []byte, v interface{}) error {
 func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 	t.Parallel()
 
+	store := newMockStore()
+	dispatcher := newTestDispatcher(t,
+		hclog.NewNullLogger(),
+		store,
+		&dispatcherParams{
+			chainID:                 0,
+			priceLimit:              0,
+			jsonRPCBatchLengthLimit: 20,
+			blockRangeLimit:         1000,
+		},
+	)
+
 	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
 		t.Parallel()
 
-		store := newMockStore()
-		dispatcher := newTestDispatcher(t,
-			hclog.NewNullLogger(),
-			store,
-			&dispatcherParams{
-				chainID:                 0,
-				priceLimit:              0,
-				jsonRPCBatchLengthLimit: 20,
-				blockRangeLimit:         1000,
-			},
-		)
 		mockConnection, msgCh := newMockWsConnWithMsgCh()
 
 		req := []byte(`{
@@ -98,6 +100,28 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		case <-msgCh:
 		case <-time.After(2 * time.Second):
 			t.Fatal("\"newHeads\" event not received in 2 seconds")
+		}
+	})
+
+	t.Run("clients should be able to receive \"newPendingTransactions\" event thru eth_subscribe", func(t *testing.T) {
+		t.Parallel()
+
+		mockConnection, msgCh := newMockWsConnWithMsgCh()
+
+		req := []byte(`{
+		"method": "eth_subscribe",
+		"params": ["newPendingTransactions"]
+	}`)
+		if _, err := dispatcher.HandleWs(req, mockConnection); err != nil {
+			t.Fatal(err)
+		}
+
+		store.emitTxPoolEvent(proto.EventType_ADDED, "evt1")
+
+		select {
+		case <-msgCh:
+		case <-time.After(2 * time.Second):
+			t.Fatal("\"newPendingTransactions\" event not received in 2 seconds")
 		}
 	})
 }

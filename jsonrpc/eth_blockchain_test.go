@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -587,6 +588,10 @@ func (m *mockBlockStore) SubscribeEvents() blockchain.Subscription {
 
 func (m *mockBlockStore) FilterExtra(extra []byte) ([]byte, error) {
 	return extra, nil
+}
+
+func (m *mockBlockStore) TxPoolSubscribe(request *proto.SubscribeRequest) (<-chan *proto.TxPoolEvent, func(), error) {
+	return nil, nil, nil
 }
 
 func newTestBlock(number uint64, hash types.Hash) *types.Block {
