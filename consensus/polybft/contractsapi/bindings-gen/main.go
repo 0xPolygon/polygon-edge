@@ -409,6 +409,8 @@ func main() {
 			false,
 			[]string{
 				"initialize",
+				"setNewEpochSize",
+				"setNewSprintSize",
 			},
 			[]string{
 				"NewCheckpointBlockInterval",
@@ -440,8 +442,15 @@ func main() {
 			false,
 			[]string{
 				"initialize",
+				"propose",
+				"execute",
+				"castVote",
+				"state",
+				"queue",
 			},
-			[]string{},
+			[]string{
+				"ProposalCreated",
+			},
 		},
 		{
 			"ChildTimelock",

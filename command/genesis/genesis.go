@@ -140,7 +140,7 @@ func setFlags(cmd *cobra.Command) {
 		cmd.Flags().Uint64Var(
 			&params.minNumValidators,
 			minValidatorCount,
-			1,
+			4,
 			"the minimum number of validators in the validator set for PoS",
 		)
 
@@ -271,7 +271,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.proposalThreshold,
 			voteProposalThresholdFlag,
 			defaultVoteProposalThreshold,
-			"number of vote tokens required in order for a voter to become a proposer",
+			"number of vote tokens (in wei) required in order for a voter to submit a proposal",
 		)
 
 		cmd.Flags().StringVar(
