@@ -778,7 +778,7 @@ func TestEnqueueHandler(t *testing.T) {
 			assert.NoError(t, err)
 			pool.SetSigner(&mockSigner{})
 
-			//	mock full enqueued
+			// mock full enqueued
 			pool.accounts.maxEnqueuedLimit = 10
 
 			// add 10 transaction in txpool i.e. max enqueued transactions
