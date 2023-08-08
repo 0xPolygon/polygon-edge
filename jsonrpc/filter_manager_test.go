@@ -395,7 +395,7 @@ func TestFilterPendingTx(t *testing.T) {
 	go m.Run()
 
 	// add pending tx filter
-	id := m.NewTxFilter(nil)
+	id := m.NewPendingTxFilter(nil)
 
 	// emit two events
 	store.emitTxPoolEvent(proto.EventType_ADDED, "evt1")
@@ -609,7 +609,7 @@ func TestFilterPendingTxWebsocket(t *testing.T) {
 
 	go m.Run()
 
-	id := m.NewTxFilter(mock)
+	id := m.NewPendingTxFilter(mock)
 
 	// we cannot call get filter changes for a websocket filter
 	_, err := m.GetFilterChanges(id)

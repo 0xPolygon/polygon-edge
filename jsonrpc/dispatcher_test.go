@@ -73,7 +73,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		},
 	)
 
-	t.Run("clients should be able to receive \"newHeads\" event thru eth_subscribe", func(t *testing.T) {
+	t.Run("clients should be able to receive \"newHeads\" event through eth_subscribe", func(t *testing.T) {
 		t.Parallel()
 
 		mockConnection, msgCh := newMockWsConnWithMsgCh()
@@ -82,9 +82,8 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		"method": "eth_subscribe",
 		"params": ["newHeads"]
 	}`)
-		if _, err := dispatcher.HandleWs(req, mockConnection); err != nil {
-			t.Fatal(err)
-		}
+		_, err := dispatcher.HandleWs(req, mockConnection)
+		require.NoError(t, err)
 
 		store.emitEvent(&mockEvent{
 			NewChain: []*mockHeader{
@@ -103,7 +102,7 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		}
 	})
 
-	t.Run("clients should be able to receive \"newPendingTransactions\" event thru eth_subscribe", func(t *testing.T) {
+	t.Run("clients should be able to receive \"newPendingTransactions\" event through eth_subscribe", func(t *testing.T) {
 		t.Parallel()
 
 		mockConnection, msgCh := newMockWsConnWithMsgCh()
@@ -112,9 +111,8 @@ func TestDispatcher_HandleWebsocketConnection_EthSubscribe(t *testing.T) {
 		"method": "eth_subscribe",
 		"params": ["newPendingTransactions"]
 	}`)
-		if _, err := dispatcher.HandleWs(req, mockConnection); err != nil {
-			t.Fatal(err)
-		}
+		_, err := dispatcher.HandleWs(req, mockConnection)
+		require.NoError(t, err)
 
 		store.emitTxPoolEvent(proto.EventType_ADDED, "evt1")
 
@@ -313,7 +311,7 @@ func TestDispatcherFuncDecode(t *testing.T) {
 	for _, c := range cases {
 		res := handleReq(c.typ, c.msg)
 		if !reflect.DeepEqual(res, c.res) {
-			t.Fatal("bad")
+			t.Fatal("no tx pool events received in the predefined time slot")
 		}
 	}
 }

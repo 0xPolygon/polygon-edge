@@ -311,7 +311,7 @@ type filterManagerStore interface {
 	// GetBlockByNumber returns a block using the provided number
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
 
-	//TxPoolSubscribe subscribes for tx pool events
+	// TxPoolSubscribe subscribes for tx pool events
 	TxPoolSubscribe(request *proto.SubscribeRequest) (<-chan *proto.TxPoolEvent, func(), error)
 }
 
@@ -383,7 +383,7 @@ func (f *FilterManager) Run() {
 
 	txWatchCh, txPoolUnsubscribe, err := f.store.TxPoolSubscribe(txRequest)
 	if err != nil {
-		f.logger.Error("Unable to subcribe to tx pool")
+		f.logger.Error("Unable to subscribe to tx pool")
 
 		return
 	}
@@ -464,8 +464,8 @@ func (f *FilterManager) NewLogFilter(logQuery *LogQuery, ws wsConn) string {
 	return f.addFilter(filter)
 }
 
-// NewTxFilter adds new PendingTxFilter
-func (f *FilterManager) NewTxFilter(ws wsConn) string {
+// NewPendingTxFilter adds new PendingTxFilter
+func (f *FilterManager) NewPendingTxFilter(ws wsConn) string {
 	filter := &pendingTxFilter{
 		filterBase: newFilterBase(ws),
 		txHashes:   []string{},
