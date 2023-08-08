@@ -179,6 +179,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		txn := &ethgo.Transaction{
 			To:   &checkpointManagerAddr,
 			From: c.key.Address(),
+			Type: ethgo.TransactionDynamicFee,
 		}
 
 		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
