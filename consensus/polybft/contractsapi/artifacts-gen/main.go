@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
+	"go/format"
 	"log"
 	"os"
 	"path"
 	"runtime"
 	"strings"
-
-	"github.com/dave/jennifer/jen"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 )
@@ -21,9 +20,6 @@ func main() {
 	_, filename, _, _ := runtime.Caller(0) //nolint: dogsled
 	currentPath := path.Dir(filename)
 	scpath := path.Join(currentPath, "../../../../core-contracts/artifacts/contracts/")
-
-	f := jen.NewFile("contractsapi")
-	f.Comment("This is auto-generated file. DO NOT EDIT.")
 
 	readContracts := []struct {
 		Path string
@@ -191,22 +187,27 @@ func main() {
 		},
 	}
 
+	str := `// This is auto-generated file. DO NOT EDIT.
+package contractsapi
+
+`
+
 	for _, v := range readContracts {
 		artifactBytes, err := artifact.ReadArtifactData(scpath, v.Path, getContractName(v.Path))
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		f.Var().Id(v.Name + "Artifact").String().Op("=").Lit(string(artifactBytes))
+		str += fmt.Sprintf("var %sArtifact string = `%s`\n", v.Name, string(artifactBytes))
 	}
 
-	fl, err := os.Create(currentPath + "/../gen_sc_data.go")
+	output, err := format.Source([]byte(str))
 	if err != nil {
+		fmt.Println(str)
 		log.Fatal(err)
 	}
 
-	_, err = fmt.Fprintf(fl, "%#v", f)
-	if err != nil {
+	if err = os.WriteFile(currentPath+"/../gen_sc_data.go", output, 0600); err != nil {
 		log.Fatal(err)
 	}
 }

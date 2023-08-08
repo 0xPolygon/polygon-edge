@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"text/template"
@@ -447,7 +447,7 @@ import (
 		log.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
+	if err = os.WriteFile("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
 		log.Fatal(err)
 	}
 }
