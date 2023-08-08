@@ -1985,6 +1985,48 @@ func (i *InitializeForkParamsFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ForkParams.Abi.Methods["initialize"], buf, i)
 }
 
+type NewFeatureEvent struct {
+	Feature types.Hash `abi:"feature"`
+	Block   *big.Int   `abi:"block"`
+}
+
+func (*NewFeatureEvent) Sig() ethgo.Hash {
+	return ForkParams.Abi.Events["NewFeature"].ID()
+}
+
+func (*NewFeatureEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ForkParams.Abi.Events["NewFeature"].Inputs.Encode(inputs)
+}
+
+func (n *NewFeatureEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ForkParams.Abi.Events["NewFeature"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ForkParams.Abi.Events["NewFeature"], log, n)
+}
+
+type UpdatedFeatureEvent struct {
+	Feature types.Hash `abi:"feature"`
+	Block   *big.Int   `abi:"block"`
+}
+
+func (*UpdatedFeatureEvent) Sig() ethgo.Hash {
+	return ForkParams.Abi.Events["UpdatedFeature"].ID()
+}
+
+func (*UpdatedFeatureEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ForkParams.Abi.Events["UpdatedFeature"].Inputs.Encode(inputs)
+}
+
+func (u *UpdatedFeatureEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ForkParams.Abi.Events["UpdatedFeature"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ForkParams.Abi.Events["UpdatedFeature"], log, u)
+}
+
 type InitializeChildGovernorFn struct {
 	Token_           types.Address `abi:"token_"`
 	Timelock_        types.Address `abi:"timelock_"`
