@@ -122,7 +122,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		maxPriorityFee := txn.MaxPriorityFeePerGas
 		if maxPriorityFee == nil {
 			// retrieve the max priority fee per gas
-			if err = t.Client().Call("eth_maxPriorityFeePerGas", &maxPriorityFee); err != nil {
+			if maxPriorityFee, err = t.Client().Eth().MaxPriorityFeePerGas(); err != nil {
 				return ethgo.ZeroHash, fmt.Errorf("failed to get max priority fee per gas: %w", err)
 			}
 
@@ -131,7 +131,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 
 		if txn.MaxFeePerGas == nil {
 			// retrieve the latest base fee
-			feeHist, err := t.Client().Eth().FeeHistory(1, ethgo.Latest)
+			feeHist, err := t.Client().Eth().FeeHistory(1, ethgo.Latest, nil)
 			if err != nil {
 				return ethgo.ZeroHash, fmt.Errorf("failed to get fee history: %w", err)
 			}
