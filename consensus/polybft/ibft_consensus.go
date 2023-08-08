@@ -4,7 +4,13 @@ import (
 	"context"
 
 	"github.com/0xPolygon/go-ibft/core"
+	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 )
+
+// IBFTMessageHandler is handling IBFT consensus messages
+type IBFTMessageHandler interface {
+	Handle(msg *ibftProto.Message)
+}
 
 // IBFTConsensusWrapper is a convenience wrapper for the go-ibft package
 type IBFTConsensusWrapper struct {
@@ -40,4 +46,8 @@ func (c *IBFTConsensusWrapper) runSequence(height uint64) (<-chan struct{}, func
 		cancelSequence()
 		<-sequenceDone // waits until c.IBFT.RunSequenc routine finishes
 	}
+}
+
+func (c *IBFTConsensusWrapper) Handle(msg *ibftProto.Message) {
+	c.AddMessage(msg)
 }

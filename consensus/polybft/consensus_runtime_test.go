@@ -13,6 +13,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -217,6 +218,10 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		txPool:         txPool,
 		State:          newTestState(t),
 	}
+
+	tracker, err := slashing.NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{})
+	require.NoError(t, err)
+
 	runtime := &consensusRuntime{
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 		logger:             hclog.NewNullLogger(),
@@ -226,10 +231,11 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			Number:            currentEpochNumber,
 			FirstBlockInEpoch: header.Number - epochSize + 1,
 		},
-		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
-		stateSyncManager:  &dummyStateSyncManager{},
-		checkpointManager: &dummyCheckpointManager{},
-		stakeManager:      &dummyStakeManager{},
+		lastBuiltBlock:       &types.Header{Number: header.Number - 1},
+		stateSyncManager:     &dummyStateSyncManager{},
+		checkpointManager:    &dummyCheckpointManager{},
+		stakeManager:         &dummyStakeManager{},
+		doubleSigningTracker: tracker,
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 

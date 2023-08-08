@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -29,7 +30,7 @@ var (
 )
 
 type CheckpointManager interface {
-	PostBlock(req *PostBlockRequest) error
+	PostBlock(req *common.PostBlockRequest) error
 	BuildEventRoot(epoch uint64) (types.Hash, error)
 	GenerateExitProof(exitID uint64) (types.Proof, error)
 }
@@ -38,7 +39,7 @@ var _ CheckpointManager = (*dummyCheckpointManager)(nil)
 
 type dummyCheckpointManager struct{}
 
-func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyCheckpointManager) PostBlock(req *common.PostBlockRequest) error { return nil }
 func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return types.ZeroHash, nil
 }
@@ -288,7 +289,7 @@ func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingB
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
-func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
+func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 	block := req.FullBlock.Block.Number()
 
 	lastBlock, err := c.state.CheckpointStore.getLastSaved()
