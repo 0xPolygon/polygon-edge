@@ -55,11 +55,6 @@ func (g *GovernanceStore) initialize(tx *bolt.Tx) error {
 			string(clientConfigBucket), err)
 	}
 
-	if _, err := tx.CreateBucketIfNotExists(clientConfigBucket); err != nil {
-		return fmt.Errorf("failed to create bucket=%s: %w",
-			string(clientConfigBucket), err)
-	}
-
 	if _, err := tx.CreateBucketIfNotExists(lastProcessedGovernanceBlockBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w",
 			string(lastProcessedGovernanceBlockBucket), err)
