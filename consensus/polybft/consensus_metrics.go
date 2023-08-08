@@ -36,6 +36,9 @@ func updateBlockMetrics(currentBlock *types.Block, parentHeader *types.Header) e
 	metrics.IncrCounter([]string{consensusMetricsPrefix, "block_counter"}, float32(1))
 	metrics.SetGauge([]string{consensusMetricsPrefix, "block_space_used"}, float32(currentBlock.Header.GasUsed))
 
+	// Update the base fee metric
+	metrics.SetGauge([]string{consensusMetricsPrefix, "base_fee"}, float32(currentBlock.Header.BaseFee))
+
 	return nil
 }
 
