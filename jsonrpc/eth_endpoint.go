@@ -236,6 +236,8 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 		// Find the transaction within the block
 		if txn, idx := types.FindTxByHash(block.Transactions, hash); txn != nil {
+			txn.GasPrice = txn.GetGasPrice(block.Header.BaseFee)
+
 			return toTransaction(
 				txn,
 				argUintPtr(block.Number()),

@@ -814,7 +814,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 		slotsFree += slotsRequired(oldTxWithSameNonce) // add old tx slots
 	} else {
-		if account.enqueued.length() == account.maxEnqueued {
+		if account.enqueued.length() == account.maxEnqueued && tx.Nonce != accountNonce {
 			return ErrMaxEnqueuedLimitReached
 		}
 
