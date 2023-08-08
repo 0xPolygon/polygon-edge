@@ -6,7 +6,7 @@ When deploying with `polybft` consensus, there are some additional dependencies:
 
 * [go 1.20.x](https://go.dev/dl/)
 * [jq](https://jqlang.github.io/jq)
-* Netcat (nc)
+* [curl](https://everything.curl.dev/get)
 
 ## Local development
 
