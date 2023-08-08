@@ -434,7 +434,10 @@ func main() {
 			[]string{
 				"initialize",
 			},
-			[]string{},
+			[]string{
+				"NewFeature",
+				"UpdatedFeature",
+			},
 		},
 		{
 			"ChildGovernor",

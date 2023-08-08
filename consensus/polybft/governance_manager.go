@@ -4,16 +4,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -72,9 +75,10 @@ var _ GovernanceManager = (*governanceManager)(nil)
 // governanceManager is a struct that saves governance events
 // and updates the client configuration based on executed governance proposals
 type governanceManager struct {
-	logger       hclog.Logger
-	state        *State
-	eventsGetter *eventsGetter[contractsapi.EventAbi]
+	logger         hclog.Logger
+	state          *State
+	eventsGetter   *eventsGetter[contractsapi.EventAbi]
+	allForksHashes map[types.Hash]string
 }
 
 // newGovernanceManager is a constructor function for governance manager
@@ -85,7 +89,8 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 	eventsGetter := &eventsGetter[contractsapi.EventAbi]{
 		blockchain: blockhain,
 		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.NetworkParamsContract
+			return l.Address == contracts.NetworkParamsContract ||
+				l.Address == contracts.ForkParamsContract
 		},
 		parseEventFn: parseGovernanceEvent,
 	}
@@ -100,11 +105,41 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 		return nil, err
 	}
 
-	return &governanceManager{
-		logger:       logger,
-		state:        state,
-		eventsGetter: eventsGetter,
-	}, nil
+	// cache all fork name hashes that we have in code
+	allForkNameHashes := map[types.Hash]string{}
+
+	for name := range *chain.AllForksEnabled {
+		encoded, err := abi.Encode([]interface{}{name}, abi.MustNewType("tuple(string)"))
+		if err != nil {
+			return nil, fmt.Errorf("could not encode fork name: %s. Error: %w", name, err)
+		}
+
+		forkHash := crypto.Keccak256Hash(encoded)
+		allForkNameHashes[forkHash] = name
+	}
+
+	g := &governanceManager{
+		logger:         logger,
+		state:          state,
+		eventsGetter:   eventsGetter,
+		allForksHashes: allForkNameHashes,
+	}
+
+	// get all forks we already have in db and activate them on startup
+	forksInDB, err := state.GovernanceStore.getAllForkEvents()
+	if err != nil {
+		return nil, fmt.Errorf("could not activate forks from db on startup. Error: %w", err)
+	}
+
+	lastBuiltBlock := blockhain.CurrentHeader().Number
+
+	for fork, block := range forksInDB {
+		if err := g.activateSingleFork(lastBuiltBlock, fork, block); err != nil {
+			return nil, err
+		}
+	}
+
+	return g, nil
 }
 
 // GetClientConfig returns latest client configuration from boltdb
@@ -142,8 +177,16 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 		return err
 	}
 
+	// if last PostBlock failed to save events, and we gotten the ones we missed,
+	// check if there is some event for activation of a new fork, and activate it
+	if err := g.activateNewForks(lastInsertedBlock, missedEvents); err != nil {
+		g.logger.Error("Post epoch - Could not activate forks based on ForkParams events.", "err", err)
+
+		return err
+	}
+
 	// get events that happened in the previous epoch
-	eventsRaw, err := g.state.GovernanceStore.getGovernanceEvents(previousEpoch)
+	eventsRaw, err := g.state.GovernanceStore.getNetworkParamsEvents(previousEpoch)
 	if err != nil {
 		return fmt.Errorf("could not get governance events on start of epoch: %d. %w",
 			req.NewEpochID, err)
@@ -331,23 +374,102 @@ func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
+	currentBlock := req.FullBlock.Block.Number()
+
 	numOfEvents := len(governanceEvents)
 	if numOfEvents == 0 {
 		g.logger.Debug("Post block - Getting governance events finished, no events found.",
-			"epoch", req.Epoch, "block", req.FullBlock.Block.Number(), "lastGottenBlock", lastBlock)
+			"epoch", req.Epoch, "block", currentBlock, "lastGottenBlock", lastBlock)
 
 		// even if there were no governance events in block, mark it as last processed
-		return g.state.GovernanceStore.insertLastProcessed(req.FullBlock.Block.Number())
+		return g.state.GovernanceStore.insertLastProcessed(currentBlock)
 	}
 
 	g.logger.Debug("Post block - Getting governance events done.", "epoch", req.Epoch,
-		"block", req.FullBlock.Block.Number(), "eventsNum", numOfEvents)
+		"block", currentBlock, "eventsNum", numOfEvents)
+
+	if err := g.activateNewForks(currentBlock, governanceEvents); err != nil {
+		g.logger.Error("Post block - Could not activate forks based on ForkParams events.", "err", err)
+
+		return err
+	}
 
 	// this will also update the last processed block
 	return g.state.GovernanceStore.insertGovernanceEvents(
 		req.Epoch,
 		req.FullBlock.Block.Number(),
 		governanceEvents)
+}
+
+// activateNewForks activates forks based on the ForkParams contract events
+func (g *governanceManager) activateNewForks(currentBlock uint64,
+	governanceEvents []contractsapi.EventAbi) error {
+	for _, e := range governanceEvents {
+		if forkHash, block, isForkEvent := isForkParamsEvent(e); isForkEvent {
+			if err := g.activateSingleFork(currentBlock, forkHash, block); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// activateSingleFork registers (if not already registered) and activates fork from specified block
+// if given fork does not exist in code (the code version is not up to data to that fork), it will panic
+func (g *governanceManager) activateSingleFork(currentBlock uint64, forkHash types.Hash, block *big.Int) error {
+	forkManager := forkmanager.GetInstance()
+
+	// here we add registration and activation of forks
+	// based on ForkParams contract
+	forkName, exists := g.allForksHashes[forkHash]
+	if !exists {
+		// current code version does not have this fork
+		// so we stop the node
+		panic(fmt.Sprintf("current version of code does not have this fork: %v", forkHash)) //nolint:gocritic
+	}
+
+	g.logger.Debug("Gotten event for fork activation", "forkName", forkName,
+		"forkHash", forkHash, "block", block.Uint64())
+
+	if !forkManager.IsForkRegistered(forkName) {
+		// if fork is not already registered, register it
+		forkManager.RegisterFork(forkName, nil)
+	}
+
+	if forkManager.IsForkEnabled(forkName, currentBlock) {
+		// this fork is already enabled and up and running,
+		// if an event happens to activate it from some later block
+		// we will first deactivate it, and activate it again from the new specified block
+		if err := forkManager.DeactivateFork(forkName); err != nil {
+			return fmt.Errorf("could not deactivate fork: %s. Error: %w", forkName, err)
+		}
+	}
+
+	blockNum := block.Uint64()
+	if err := forkManager.ActivateFork(forkName, blockNum); err != nil {
+		// activate fork for given number
+		return fmt.Errorf("could not activate fork: %s for block: %d based on ForkParams event",
+			forkName, blockNum)
+	}
+
+	g.logger.Debug("Registered and activated fork", "forkName", forkName,
+		"forkHash", forkHash, "block", block.Uint64())
+
+	return nil
+}
+
+// isForkParamsEvent returns true if given contractsapi event is an event
+// from ForkParams contract, and returns its feature hash and blockNumber as well
+func isForkParamsEvent(event contractsapi.EventAbi) (types.Hash, *big.Int, bool) {
+	switch obj := event.(type) {
+	case *contractsapi.NewFeatureEvent:
+		return obj.Feature, obj.Block, true
+	case *contractsapi.UpdatedFeatureEvent:
+		return obj.Feature, obj.Block, true
+	default:
+		return types.ZeroHash, nil, false
+	}
 }
 
 // parseGovernanceEvent parses provided log to correct governance event
@@ -365,6 +487,8 @@ func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAb
 		votingPeriodEvent        contractsapi.NewVotingPeriodEvent
 		proposalThresholdEvent   contractsapi.NewProposalThresholdEvent
 		sprintSizeEvent          contractsapi.NewSprintSizeEvent
+		newFeatureEvent          contractsapi.NewFeatureEvent
+		updatedFeatureEvent      contractsapi.UpdatedFeatureEvent
 	)
 
 	parseEvent := func(event contractsapi.EventAbi) (contractsapi.EventAbi, bool, error) {
@@ -398,6 +522,10 @@ func parseGovernanceEvent(h *types.Header, log *ethgo.Log) (contractsapi.EventAb
 		return parseEvent(&proposalThresholdEvent)
 	case sprintSizeEvent.Sig():
 		return parseEvent(&sprintSizeEvent)
+	case newFeatureEvent.Sig():
+		return parseEvent(&newFeatureEvent)
+	case updatedFeatureEvent.Sig():
+		return parseEvent(&updatedFeatureEvent)
 	default:
 		return nil, false, errUnknownGovernanceEvent
 	}
