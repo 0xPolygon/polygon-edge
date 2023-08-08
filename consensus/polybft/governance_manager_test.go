@@ -68,13 +68,18 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Epoch: 1,
 		}
 
+		blockchainMock := new(blockchainMock)
+		blockchainMock.On("CurrentHeader").Return(&types.Header{
+			Number: 0,
+		})
+
 		governanceManager, err := newGovernanceManager(genesisPolybftConfig,
-			hclog.NewNullLogger(), state, nil)
+			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
 
 		require.NoError(t, governanceManager.PostBlock(req))
 
-		eventsRaw, err := state.GovernanceStore.getGovernanceEvents(1)
+		eventsRaw, err := state.GovernanceStore.getNetworkParamsEvents(1)
 		require.NoError(t, err)
 		require.Len(t, eventsRaw, 0)
 
@@ -107,14 +112,19 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Epoch: 1,
 		}
 
+		blockchainMock := new(blockchainMock)
+		blockchainMock.On("CurrentHeader").Return(&types.Header{
+			Number: 4,
+		})
+
 		governanceManager, err := newGovernanceManager(genesisPolybftConfig,
-			hclog.NewNullLogger(), state, nil)
+			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
 
 		require.NoError(t, governanceManager.PostBlock(req))
 
 		// we should have one governance event in current epoch
-		eventsRaw, err := state.GovernanceStore.getGovernanceEvents(1)
+		eventsRaw, err := state.GovernanceStore.getNetworkParamsEvents(1)
 		require.NoError(t, err)
 		require.Len(t, eventsRaw, 1)
 
