@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"go/format"
 	"log"
@@ -198,7 +200,12 @@ package contractsapi
 			log.Fatal(err)
 		}
 
-		str += fmt.Sprintf("var %sArtifact string = `%s`\n", v.Name, string(artifactBytes))
+		dst := &bytes.Buffer{}
+		if err = json.Compact(dst, []byte(artifactBytes)); err != nil {
+			log.Fatal(err)
+		}
+
+		str += fmt.Sprintf("var %sArtifact string = `%s`\n", v.Name, dst.String())
 	}
 
 	output, err := format.Source([]byte(str))
