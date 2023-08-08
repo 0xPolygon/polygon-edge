@@ -201,7 +201,7 @@ package contractsapi
 		}
 
 		dst := &bytes.Buffer{}
-		if err = json.Compact(dst, []byte(artifactBytes)); err != nil {
+		if err = json.Compact(dst, artifactBytes); err != nil {
 			log.Fatal(err)
 		}
 
