@@ -140,12 +140,12 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	voteDelay, err := types.ParseUint256orHex(&p.voteDelay)
+	voteDelay, err := common.ParseUint256orHex(&p.voteDelay)
 	if err != nil {
 		return err
 	}
 
-	votingPeriod, err := types.ParseUint256orHex(&p.votingPeriod)
+	votingPeriod, err := common.ParseUint256orHex(&p.votingPeriod)
 	if err != nil {
 		return err
 	}
@@ -154,7 +154,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		return errInvalidVotingPeriod
 	}
 
-	proposalThreshold, err := types.ParseUint256orHex(&p.proposalThreshold)
+	proposalThreshold, err := common.ParseUint256orHex(&p.proposalThreshold)
 	if err != nil {
 		return err
 	}
