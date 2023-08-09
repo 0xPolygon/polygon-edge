@@ -29,7 +29,7 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 		NewStateSender:      contracts.L2StateSenderContract,
 		NewStateReceiver:    contracts.StateReceiverContract,
 		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
-		NewNetworkParams:    contracts.NetworkParamsContract,
+		NewNetworkParams:    polyBFTConfig.GovernanceConfig.NetworkParamsAddr,
 		InitialValidators:   initialValidators,
 	}
 
@@ -48,7 +48,7 @@ func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) e
 		NewRewardToken:    polybftConfig.RewardConfig.TokenAddress,
 		NewRewardWallet:   polybftConfig.RewardConfig.WalletAddress,
 		NewValidatorSet:   contracts.ValidatorSetContract,
-		NetworkParamsAddr: contracts.NetworkParamsContract,
+		NetworkParamsAddr: polybftConfig.GovernanceConfig.NetworkParamsAddr,
 	}
 
 	input, err := initFn.EncodeAbi()
@@ -283,7 +283,7 @@ func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) 
 		InitParams: &contractsapi.InitParams{
 			// only timelock controller can execute transactions on network params
 			// so we set it as its owner
-			NewOwner:                   contracts.ChildTimelockContract,
+			NewOwner:                   cfg.GovernanceConfig.ChildTimelockAddr,
 			NewCheckpointBlockInterval: new(big.Int).SetUint64(cfg.CheckpointInterval),
 			NewSprintSize:              new(big.Int).SetUint64(cfg.SprintSize),
 			NewEpochSize:               new(big.Int).SetUint64(cfg.EpochSize),
@@ -305,13 +305,13 @@ func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) 
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.NetworkParamsContract, input, "NetworkParams.initialize", transition)
+		cfg.GovernanceConfig.NetworkParamsAddr, input, "NetworkParams.initialize", transition)
 }
 
 // initForkParamsContract initializes ForkParams contract on child chain
 func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeForkParamsFn{
-		NewOwner: contracts.ChildTimelockContract,
+		NewOwner: cfg.GovernanceConfig.ChildTimelockAddr,
 	}
 
 	input, err := initFn.EncodeAbi()
@@ -320,14 +320,14 @@ func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) err
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.ForkParamsContract, input, "ForkParams.initialize", transition)
+		cfg.GovernanceConfig.ForkParamsAddr, input, "ForkParams.initialize", transition)
 }
 
 // initChildTimelock initializes ChildTimelock contract on child chain
 func initChildTimelock(cfg PolyBFTConfig, transition *state.Transition) error {
 	addresses := make([]types.Address, len(cfg.InitialValidatorSet)+1)
 	// we need to add child governor to list of proposers and executors as well
-	addresses[0] = contracts.ChildGovernorContract
+	addresses[0] = cfg.GovernanceConfig.ChildGovernorAddr
 
 	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
 		addresses[i+1] = cfg.InitialValidatorSet[i].Address
@@ -346,7 +346,7 @@ func initChildTimelock(cfg PolyBFTConfig, transition *state.Transition) error {
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.ChildTimelockContract, input, "ChildTimelock.initialize", transition)
+		cfg.GovernanceConfig.ChildTimelockAddr, input, "ChildTimelock.initialize", transition)
 }
 
 // initChildGovernor initializes ChildGovernor contract on child chain
@@ -358,8 +358,8 @@ func initChildGovernor(cfg PolyBFTConfig, transition *state.Transition) error {
 
 	initFn := &contractsapi.InitializeChildGovernorFn{
 		Token_:           contracts.ValidatorSetContract,
-		Timelock_:        contracts.ChildTimelockContract,
-		NetworkParams_:   contracts.NetworkParamsContract,
+		Timelock_:        cfg.GovernanceConfig.ChildTimelockAddr,
+		NetworkParams_:   cfg.GovernanceConfig.NetworkParamsAddr,
 		QuorumNumerator_: new(big.Int).SetUint64(cfg.GovernanceConfig.ProposalQuorumPercentage),
 	}
 
@@ -369,5 +369,5 @@ func initChildGovernor(cfg PolyBFTConfig, transition *state.Transition) error {
 	}
 
 	return callContract(contracts.SystemCaller,
-		contracts.ChildGovernorContract, input, "ChildGovernor.initialize", transition)
+		cfg.GovernanceConfig.ChildGovernorAddr, input, "ChildGovernor.initialize", transition)
 }
