@@ -251,6 +251,14 @@ type GovernanceConfig struct {
 	// ProposalQuorumPercentage is the percentage of total validator stake needed for a
 	// governance proposal to be accepted
 	ProposalQuorumPercentage uint64
+	// ChildGovernorAddr is the address of ChildGovernor contract
+	ChildGovernorAddr types.Address
+	// ChildTimelockAddr is the address of ChildTimelock contract
+	ChildTimelockAddr types.Address
+	// NetworkParamsAddr is the address of NetworkParams contract
+	NetworkParamsAddr types.Address
+	// ForkParamsAddr is the address of ForkParams contract
+	ForkParamsAddr types.Address
 }
 
 func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
@@ -260,6 +268,10 @@ func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
 		ProposalThreshold:        types.EncodeBigInt(g.ProposalThreshold),
 		GovernorAdmin:            g.GovernorAdmin,
 		ProposalQuorumPercentage: g.ProposalQuorumPercentage,
+		ChildGovernorAddr:        g.ChildGovernorAddr,
+		ChildTimelockAddr:        g.ChildTimelockAddr,
+		NetworkParamsAddr:        g.NetworkParamsAddr,
+		ForkParamsAddr:           g.ForkParamsAddr,
 	}
 
 	return json.Marshal(raw)
@@ -292,6 +304,10 @@ func (g *GovernanceConfig) UnmarshalJSON(data []byte) error {
 
 	g.GovernorAdmin = raw.GovernorAdmin
 	g.ProposalQuorumPercentage = raw.ProposalQuorumPercentage
+	g.ChildGovernorAddr = raw.ChildGovernorAddr
+	g.ChildTimelockAddr = raw.ChildTimelockAddr
+	g.NetworkParamsAddr = raw.NetworkParamsAddr
+	g.ForkParamsAddr = raw.ForkParamsAddr
 
 	return nil
 }
@@ -302,4 +318,8 @@ type governanceConfigRaw struct {
 	ProposalThreshold        *string       `json:"proposalThreshold"`
 	GovernorAdmin            types.Address `json:"governorAdmin"`
 	ProposalQuorumPercentage uint64        `json:"proposalQuorumPercentage"`
+	ChildGovernorAddr        types.Address `json:"childGovernorAddr"`
+	ChildTimelockAddr        types.Address `json:"childTimelockAddr"`
+	NetworkParamsAddr        types.Address `json:"networkParamsAddr"`
+	ForkParamsAddr           types.Address `json:"forkParamsAddr"`
 }

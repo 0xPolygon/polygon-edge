@@ -199,6 +199,11 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			ProposalThreshold:        proposalThreshold,
 			ProposalQuorumPercentage: proposalQuorum,
 			GovernorAdmin:            governorAdminAddr,
+			// on genesis we deploy governance contracts on predefined addresses
+			ChildGovernorAddr: contracts.ChildGovernorContract,
+			ChildTimelockAddr: contracts.ChildTimelockContract,
+			NetworkParamsAddr: contracts.NetworkParamsContract,
+			ForkParamsAddr:    contracts.ForkParamsContract,
 		},
 	}
 

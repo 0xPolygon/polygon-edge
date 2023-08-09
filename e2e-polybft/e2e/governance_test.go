@@ -3,13 +3,13 @@ package e2e
 import (
 	"fmt"
 	"math/big"
+	"path"
 	"testing"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -60,6 +60,9 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 	l2Relayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(proposer.JSONRPC()))
 	require.NoError(t, err)
 
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
 	t.Run("successful change of epoch size", func(t *testing.T) {
 		// propose a new epoch size
 		setNewEpochSizeFn := &contractsapi.SetNewEpochSizeNetworkParamsFn{
@@ -72,11 +75,14 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		proposalDescription := fmt.Sprintf("Change epoch size from %d to %d", oldEpochSize, newEpochSize)
 
 		proposalID := sendProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			polybftCfg.GovernanceConfig.NetworkParamsAddr,
 			proposalInput, proposalDescription)
 
 		// check that proposal delay finishes, and porposal becomes active (ready to for voting)
 		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
-			proposalState := getProposalState(t, proposalID, l2Relayer)
+			proposalState := getProposalState(t, proposalID,
+				polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
 
 			return proposalState == Active
 		}))
@@ -86,23 +92,28 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 			voterAcc, err := sidechain.GetAccountFromDir(s.DataDir())
 			require.NoError(t, err)
 
-			sendVoteTransaction(t, proposalID, For, l2Relayer, voterAcc.Ecdsa)
+			sendVoteTransaction(t, proposalID, For, polybftCfg.GovernanceConfig.ChildGovernorAddr,
+				l2Relayer, voterAcc.Ecdsa)
 		}
 
 		// check if proposal has quorum (if it was accepted)
 		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
-			proposalState := getProposalState(t, proposalID, l2Relayer)
+			proposalState := getProposalState(t, proposalID,
+				polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
 
 			return proposalState == Succeeded
 		}))
 
 		// queue proposal for execution
 		sendQueueProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			polybftCfg.GovernanceConfig.NetworkParamsAddr,
 			proposalInput, proposalDescription)
 
 		// check if proposal has quorum (if it was accepted)
 		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
-			proposalState := getProposalState(t, proposalID, l2Relayer)
+			proposalState := getProposalState(t, proposalID,
+				polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
 
 			return proposalState == Queued
 		}))
@@ -115,6 +126,8 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 
 		// execute proposal
 		sendExecuteProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			polybftCfg.GovernanceConfig.NetworkParamsAddr,
 			proposalInput, proposalDescription)
 
 		currentBlockNumber, err = l2Relayer.Client().Eth().BlockNumber()
@@ -122,7 +135,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 
 		// check if epoch size changed on NetworkParams
 		networkParamsResponse, err := ABICall(l2Relayer, contractsapi.NetworkParams,
-			ethgo.Address(contracts.NetworkParamsContract), ethgo.ZeroAddress, "epochSize")
+			ethgo.Address(polybftCfg.GovernanceConfig.NetworkParamsAddr), ethgo.ZeroAddress, "epochSize")
 		require.NoError(t, err)
 
 		epochSizeOnNetworkParams, err := types.ParseUint256orHex(&networkParamsResponse)
@@ -171,23 +184,28 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		proposalDescription := fmt.Sprintf("Change sprint size from %d to %d", oldEpochSize, newEpochSize)
 
 		proposalID := sendProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			polybftCfg.GovernanceConfig.NetworkParamsAddr,
 			proposalInput, proposalDescription)
 
 		// check that proposal delay finishes, and porposal becomes active (ready to for voting)
 		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
-			proposalState := getProposalState(t, proposalID, l2Relayer)
+			proposalState := getProposalState(t, proposalID,
+				polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
 
 			return proposalState == Active
 		}))
 
 		// only the proposer votes for proposal and rest of them vote against
-		sendVoteTransaction(t, proposalID, For, l2Relayer, proposerAcc.Ecdsa)
+		sendVoteTransaction(t, proposalID, For, polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			l2Relayer, proposerAcc.Ecdsa)
 
 		for _, s := range cluster.Servers[1:] {
 			voterAcc, err := sidechain.GetAccountFromDir(s.DataDir())
 			require.NoError(t, err)
 
-			sendVoteTransaction(t, proposalID, Against, l2Relayer, voterAcc.Ecdsa)
+			sendVoteTransaction(t, proposalID, Against, polybftCfg.GovernanceConfig.ChildGovernorAddr,
+				l2Relayer, voterAcc.Ecdsa)
 		}
 
 		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
@@ -197,12 +215,14 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+votingPeriod+5, 3*time.Minute))
 
 		// check if proposal has quorum (if it was accepted), in this case it won't be
-		proposalState := getProposalState(t, proposalID, l2Relayer)
+		proposalState := getProposalState(t, proposalID,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
 		require.Equal(t, Defeated, proposalState)
 	})
 }
 
-func getProposalState(t *testing.T, proposalID *big.Int, txRelayer txrelayer.TxRelayer) ProposalState {
+func getProposalState(t *testing.T, proposalID *big.Int, childGovernorAddr types.Address,
+	txRelayer txrelayer.TxRelayer) ProposalState {
 	t.Helper()
 
 	stateFn := &contractsapi.StateChildGovernorFn{
@@ -212,7 +232,7 @@ func getProposalState(t *testing.T, proposalID *big.Int, txRelayer txrelayer.TxR
 	input, err := stateFn.EncodeAbi()
 	require.NoError(t, err)
 
-	response, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.ChildGovernorContract), input)
+	response, err := txRelayer.Call(ethgo.ZeroAddress, ethgo.Address(childGovernorAddr), input)
 	require.NoError(t, err)
 	require.NotEqual(t, "0x", response)
 
@@ -224,11 +244,12 @@ func getProposalState(t *testing.T, proposalID *big.Int, txRelayer txrelayer.TxR
 
 func sendQueueProposalTransaction(t *testing.T,
 	txRelayer txrelayer.TxRelayer, senderKey ethgo.Key,
+	childGovernorAddr, paramsContractAddr types.Address,
 	input []byte, description string) {
 	t.Helper()
 
 	queueFn := contractsapi.QueueChildGovernorFn{
-		Targets:         []types.Address{contracts.NetworkParamsContract},
+		Targets:         []types.Address{paramsContractAddr},
 		Calldatas:       [][]byte{input},
 		DescriptionHash: crypto.Keccak256Hash([]byte(description)),
 		Values:          []*big.Int{big.NewInt(0)},
@@ -237,9 +258,9 @@ func sendQueueProposalTransaction(t *testing.T,
 	input, err := queueFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernorAddr := ethgo.Address(contracts.ChildGovernorContract)
+	childGovernor := ethgo.Address(childGovernorAddr)
 	txn := &ethgo.Transaction{
-		To:    &childGovernorAddr,
+		To:    &childGovernor,
 		Input: input,
 	}
 
@@ -250,11 +271,12 @@ func sendQueueProposalTransaction(t *testing.T,
 
 func sendExecuteProposalTransaction(t *testing.T,
 	txRelayer txrelayer.TxRelayer, senderKey ethgo.Key,
+	childGovernorAddr, paramsContractAddr types.Address,
 	input []byte, description string) {
 	t.Helper()
 
 	executeFn := &contractsapi.ExecuteChildGovernorFn{
-		Targets:         []types.Address{contracts.NetworkParamsContract},
+		Targets:         []types.Address{paramsContractAddr},
 		Calldatas:       [][]byte{input},
 		DescriptionHash: crypto.Keccak256Hash([]byte(description)),
 		Values:          []*big.Int{big.NewInt(0)},
@@ -263,9 +285,9 @@ func sendExecuteProposalTransaction(t *testing.T,
 	input, err := executeFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernorAddr := ethgo.Address(contracts.ChildGovernorContract)
+	childGovernor := ethgo.Address(childGovernorAddr)
 	txn := &ethgo.Transaction{
-		To:    &childGovernorAddr,
+		To:    &childGovernor,
 		Input: input,
 	}
 
@@ -275,6 +297,7 @@ func sendExecuteProposalTransaction(t *testing.T,
 }
 
 func sendVoteTransaction(t *testing.T, proposalID *big.Int, vote VoteType,
+	childGovernorAddr types.Address,
 	txRelayer txrelayer.TxRelayer, senderKey ethgo.Key) {
 	t.Helper()
 
@@ -286,9 +309,9 @@ func sendVoteTransaction(t *testing.T, proposalID *big.Int, vote VoteType,
 	input, err := castVoteFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernorAddr := ethgo.Address(contracts.ChildGovernorContract)
+	childGovernor := ethgo.Address(childGovernorAddr)
 	txn := &ethgo.Transaction{
-		To:    &childGovernorAddr,
+		To:    &childGovernor,
 		Input: input,
 	}
 
@@ -299,11 +322,12 @@ func sendVoteTransaction(t *testing.T, proposalID *big.Int, vote VoteType,
 
 func sendProposalTransaction(t *testing.T, txRelayer txrelayer.TxRelayer,
 	senderKey ethgo.Key,
+	childGovernorAddr, paramsContractAddr types.Address,
 	input []byte, description string) *big.Int {
 	t.Helper()
 
 	proposeFn := &contractsapi.ProposeChildGovernorFn{
-		Targets:     []types.Address{contracts.NetworkParamsContract},
+		Targets:     []types.Address{paramsContractAddr},
 		Calldatas:   [][]byte{input},
 		Description: description,
 		Values:      []*big.Int{big.NewInt(0)},
@@ -312,9 +336,9 @@ func sendProposalTransaction(t *testing.T, txRelayer txrelayer.TxRelayer,
 	input, err := proposeFn.EncodeAbi()
 	require.NoError(t, err)
 
-	childGovernorAddr := ethgo.Address(contracts.ChildGovernorContract)
+	childGovernor := ethgo.Address(childGovernorAddr)
 	txn := &ethgo.Transaction{
-		To:    &childGovernorAddr,
+		To:    &childGovernor,
 		Input: input,
 	}
 
