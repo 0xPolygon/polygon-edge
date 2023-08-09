@@ -101,15 +101,15 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	txn.From = key.Address()
-
 	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
 	if err != nil {
 		return ethgo.ZeroHash, fmt.Errorf("failed to get nonce: %w", err)
 	}
 
 	txn.Nonce = nonce
-	txn.From = key.Address()
+	if txn.From == ethgo.ZeroAddress {
+		txn.From = key.Address()
+	}
 
 	if txn.Type != ethgo.TransactionDynamicFee && txn.GasPrice == 0 {
 		gasPrice, err := t.Client().Eth().GasPrice()
