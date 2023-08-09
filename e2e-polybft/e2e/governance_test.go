@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
@@ -138,7 +139,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 			ethgo.Address(polybftCfg.GovernanceConfig.NetworkParamsAddr), ethgo.ZeroAddress, "epochSize")
 		require.NoError(t, err)
 
-		epochSizeOnNetworkParams, err := types.ParseUint256orHex(&networkParamsResponse)
+		epochSizeOnNetworkParams, err := common.ParseUint256orHex(&networkParamsResponse)
 		require.NoError(t, err)
 		require.Equal(t, newEpochSize, epochSizeOnNetworkParams.Uint64())
 
@@ -236,7 +237,7 @@ func getProposalState(t *testing.T, proposalID *big.Int, childGovernorAddr types
 	require.NoError(t, err)
 	require.NotEqual(t, "0x", response)
 
-	converted, err := types.ParseUint8orHex(&response)
+	converted, err := common.ParseUint8orHex(&response)
 	require.NoError(t, err)
 
 	return ProposalState(converted)
