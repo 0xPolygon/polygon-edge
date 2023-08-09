@@ -1273,7 +1273,7 @@ func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeStakeManagerFn struct {
-	NewMatic types.Address `abi:"newMatic"`
+	NewStakingToken types.Address `abi:"newStakingToken"`
 }
 
 func (i *InitializeStakeManagerFn) Sig() []byte {
