@@ -7,6 +7,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
@@ -202,6 +203,10 @@ func createTestPolybftConfig() *PolyBFTConfig {
 			ProposalThreshold:        big.NewInt(1000),
 			GovernorAdmin:            types.StringToAddress("0xGovernorAdmin"),
 			ProposalQuorumPercentage: 67,
+			ChildGovernorAddr:        contracts.ChildGovernorContract,
+			ChildTimelockAddr:        contracts.ChildTimelockContract,
+			NetworkParamsAddr:        contracts.NetworkParamsContract,
+			ForkParamsAddr:           contracts.ForkParamsContract,
 		},
 	}
 }
