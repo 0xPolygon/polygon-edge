@@ -70,7 +70,6 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
-	errInvalidSlashPercentage   = errors.New("slash percentage can not be greater than 100")
 	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
 	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
 )
@@ -184,10 +183,6 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validatePremineInfo(); err != nil {
-			return err
-		}
-
-		if err := p.validateGovernorAdmin(); err != nil {
 			return err
 		}
 	}
@@ -534,15 +529,6 @@ func (p *genesisParams) validatePremineInfo() error {
 	}
 
 	return errReserveAccMustBePremined
-}
-
-// validateGovernorAdmin validates whether governor admin address was defined
-func (p *genesisParams) validateGovernorAdmin() error {
-	if p.governorAdmin == "" {
-		return errInvalidGovernorAdmin
-	}
-
-	return nil
 }
 
 // validateBurnContract validates burn contract. If native token is mintable,
