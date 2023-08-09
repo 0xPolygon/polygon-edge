@@ -106,9 +106,10 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 
 	// cache all fork name hashes that we have in code
 	allForkNameHashes := map[types.Hash]string{}
+	stringABIType := abi.MustNewType("tuple(string)")
 
 	for name := range *chain.AllForksEnabled {
-		encoded, err := abi.Encode([]interface{}{name}, abi.MustNewType("tuple(string)"))
+		encoded, err := stringABIType.Encode([]interface{}{name})
 		if err != nil {
 			return nil, fmt.Errorf("could not encode fork name: %s. Error: %w", name, err)
 		}
