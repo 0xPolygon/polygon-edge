@@ -281,12 +281,7 @@ func (f *pendingTxFilter) sendUpdates() error {
 	pendingTxHashes := f.takePendingTxsUpdates()
 
 	for _, txHash := range pendingTxHashes {
-		res, err := json.Marshal(txHash)
-		if err != nil {
-			return err
-		}
-
-		if err := f.writeMessageToWs(string(res)); err != nil {
+		if err := f.writeMessageToWs(txHash); err != nil {
 			return err
 		}
 	}
