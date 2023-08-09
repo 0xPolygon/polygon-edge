@@ -203,6 +203,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 	txn := &ethgo.Transaction{
 		To:   &checkpointManagerAddr,
 		From: c.key.Address(),
+		Type: ethgo.TransactionDynamicFee,
 	}
 
 	return c.encodeAndSendCheckpoint(txn, latestHeader, currentExtra, isEndOfEpoch)
