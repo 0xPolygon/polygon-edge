@@ -348,6 +348,10 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				ProposalThreshold:        big.NewInt(25),
 				GovernorAdmin:            types.BytesToAddress([]byte{0, 1, 2, 3}),
 				ProposalQuorumPercentage: 67,
+				ChildGovernorAddr:        contracts.ChildGovernorContract,
+				ChildTimelockAddr:        contracts.ChildTimelockContract,
+				NetworkParamsAddr:        contracts.NetworkParamsContract,
+				ForkParamsAddr:           contracts.ForkParamsContract,
 			},
 			Bridge: &BridgeConfig{
 				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),

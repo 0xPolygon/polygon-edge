@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -89,8 +88,8 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 	eventsGetter := &eventsGetter[contractsapi.EventAbi]{
 		blockchain: blockhain,
 		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.NetworkParamsContract ||
-				l.Address == contracts.ForkParamsContract
+			return l.Address == genesisConfig.GovernanceConfig.NetworkParamsAddr ||
+				l.Address == genesisConfig.GovernanceConfig.ForkParamsAddr
 		},
 		parseEventFn: parseGovernanceEvent,
 	}
