@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const (
@@ -214,7 +215,7 @@ package contractsapi
 		log.Fatal(err)
 	}
 
-	if err = os.WriteFile(currentPath+"/../gen_sc_data.go", output, 0600); err != nil {
+	if err = common.SaveFileSafe(currentPath+"/../gen_sc_data.go", output, 0600); err != nil {
 		log.Fatal(err)
 	}
 }
