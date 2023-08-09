@@ -263,9 +263,9 @@ type GovernanceConfig struct {
 
 func (g *GovernanceConfig) MarshalJSON() ([]byte, error) {
 	raw := &governanceConfigRaw{
-		VotingDelay:              types.EncodeBigInt(g.VotingDelay),
-		VotingPeriod:             types.EncodeBigInt(g.VotingPeriod),
-		ProposalThreshold:        types.EncodeBigInt(g.ProposalThreshold),
+		VotingDelay:              common.EncodeBigInt(g.VotingDelay),
+		VotingPeriod:             common.EncodeBigInt(g.VotingPeriod),
+		ProposalThreshold:        common.EncodeBigInt(g.ProposalThreshold),
 		GovernorAdmin:            g.GovernorAdmin,
 		ProposalQuorumPercentage: g.ProposalQuorumPercentage,
 		ChildGovernorAddr:        g.ChildGovernorAddr,
@@ -287,17 +287,17 @@ func (g *GovernanceConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	g.VotingDelay, err = types.ParseUint256orHex(raw.VotingDelay)
+	g.VotingDelay, err = common.ParseUint256orHex(raw.VotingDelay)
 	if err != nil {
 		return err
 	}
 
-	g.VotingPeriod, err = types.ParseUint256orHex(raw.VotingPeriod)
+	g.VotingPeriod, err = common.ParseUint256orHex(raw.VotingPeriod)
 	if err != nil {
 		return err
 	}
 
-	g.ProposalThreshold, err = types.ParseUint256orHex(raw.ProposalThreshold)
+	g.ProposalThreshold, err = common.ParseUint256orHex(raw.ProposalThreshold)
 	if err != nil {
 		return err
 	}
