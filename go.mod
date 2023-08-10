@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/hashicorp/golang-lru v1.0.2
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.9.2
 	github.com/libp2p/go-libp2p v0.27.7
