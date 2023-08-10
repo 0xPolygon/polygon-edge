@@ -218,7 +218,6 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 		c.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(c.config.Key),
-			defaultCheckpointsOffset,
 			c.config.GenesisPolyBFTConfig.Bridge.CheckpointManagerAddr,
 			txRelayer,
 			c.config.blockchain,
@@ -325,7 +324,12 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		isEndOfEpoch = c.isFixedSizeOfEpochMet(fullBlock.Block.Header.Number, epoch)
 	)
 
-	postBlock := &PostBlockRequest{FullBlock: fullBlock, Epoch: epoch.Number, IsEpochEndingBlock: isEndOfEpoch}
+	postBlock := &PostBlockRequest{
+		FullBlock:           fullBlock,
+		Epoch:               epoch.Number,
+		IsEpochEndingBlock:  isEndOfEpoch,
+		CurrentClientConfig: epoch.CurrentClientConfig,
+	}
 
 	// handle commitment and proofs creation
 	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
