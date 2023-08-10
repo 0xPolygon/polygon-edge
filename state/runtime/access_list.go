@@ -75,3 +75,41 @@ func (al *AccessList) AddSlot(address types.Address, slot types.Hash) (addrChang
 	// slot and address were already present in access list
 	return false, false
 }
+
+func (al *AccessList) AddSlots(address types.Address, slot []types.Hash) {
+	slotMap, addressExists := (*al)[address]
+	if !addressExists {
+		slotMap = make(map[types.Hash]struct{})
+		(*al)[address] = slotMap
+	}
+
+	for _, s := range slot {
+		_, slotPresent := slotMap[s]
+		if !slotPresent {
+			slotMap[s] = struct{}{}
+		}
+	}
+}
+
+func (al *AccessList) PrepareAccessList(from types.Address, to *types.Address, precompiles []types.Address, txAccessList types.TxAccessList) {
+	al.AddAddress(from)
+
+	if to != nil {
+		al.AddAddress(*to)
+	}
+
+	// add the precompiles
+	for _, addr := range precompiles {
+		al.AddAddress(addr)
+	}
+
+	// add accessList provided with access list and dynamic tx
+
+	for _, accessListTuple := range txAccessList {
+		//al.AddSlots(accessListTuple.Address, accessListTuple.StorageKeys)
+		al.AddAddress(accessListTuple.Address)
+		for _, slot := range accessListTuple.StorageKeys {
+			al.AddSlot(accessListTuple.Address, slot)
+		}
+	}
+}

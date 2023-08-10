@@ -237,7 +237,7 @@ func TestEth_GetTransactionReceipt(t *testing.T) {
 
 		//nolint:forcetypeassert
 		response := res.(*receipt)
-		assert.Equal(t, txn1.Hash, response.TxHash)
+		assert.Equal(t, txn1.Hash(), response.TxHash)
 		assert.Equal(t, block.Hash(), response.BlockHash)
 		assert.NotNil(t, response.Logs)
 		assert.Len(t, response.Logs, 1)

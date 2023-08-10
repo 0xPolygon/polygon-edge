@@ -21,13 +21,14 @@ const (
 	LegacyTx     TxType = 0x0
 	StateTx      TxType = 0x7f
 	DynamicFeeTx TxType = 0x02
+	AccessListTx TxType = 0x01
 )
 
 func txTypeFromByte(b byte) (TxType, error) {
 	tt := TxType(b)
 
 	switch tt {
-	case LegacyTx, StateTx, DynamicFeeTx:
+	case LegacyTx, StateTx, DynamicFeeTx, AccessListTx:
 		return tt, nil
 	default:
 		return tt, fmt.Errorf("unknown transaction type: %d", b)
@@ -43,6 +44,8 @@ func (t TxType) String() (s string) {
 		return "StateTx"
 	case DynamicFeeTx:
 		return "DynamicFeeTx"
+	case AccessListTx:
+		return "AccessListTx"
 	}
 
 	return
@@ -296,18 +299,6 @@ func DeepCopyTxData(data TxData) TxData {
 
 	switch t := data.(type) {
 	case *MixedTx:
-		// Initialize empty values for fields that may not be present in all TxData implementations
-		// var nonce uint64
-		// var gasPrice, gasTipCap, gasFeeCap, value, chainID *big.Int
-		// var gas uint64
-		// var to *Address
-		// var input []byte
-		// var v, r, s *big.Int
-		// var hash Hash
-		// var from Address
-		// var transactionType TxType
-		// var accessList TxAccessList
-
 		newMixedTx := &MixedTx{}
 		*newMixedTx = *t
 
@@ -344,7 +335,52 @@ func DeepCopyTxData(data TxData) TxData {
 		newMixedTx.Input = make([]byte, len(t.Input))
 		copy(newMixedTx.Input[:], t.Input[:])
 
+		//deep copy access list
+		newMixedTx.AccessList = DeepCopyTxAccessList(t.AccessList)
+
 		return newMixedTx
+
+	case *AccessListStruct:
+		newAccessListStruct := &AccessListStruct{}
+		*newAccessListStruct = *t
+
+		newAccessListStruct.GasPrice = new(big.Int)
+		if t.GasPrice != nil {
+			newAccessListStruct.GasPrice.Set(t.GasPrice)
+		}
+
+		// newMixedTx.GasTipCap = new(big.Int)
+		// if t.GasTipCap != nil {
+		// 	newMixedTx.GasTipCap.Set(t.GasTipCap)
+		// }
+
+		// newMixedTx.GasFeeCap = new(big.Int)
+		// if t.GasFeeCap != nil {
+		// 	newMixedTx.GasFeeCap.Set(t.GasFeeCap)
+		// }
+
+		newAccessListStruct.Value = new(big.Int)
+		if t.Value != nil {
+			newAccessListStruct.Value.Set(t.Value)
+		}
+
+		if newAccessListStruct.R != nil {
+			newAccessListStruct.R = new(big.Int)
+			newAccessListStruct.R = big.NewInt(0).SetBits(t.R.Bits())
+		}
+
+		if newAccessListStruct.S != nil {
+			newAccessListStruct.S = new(big.Int)
+			newAccessListStruct.S = big.NewInt(0).SetBits(t.S.Bits())
+		}
+
+		newAccessListStruct.Input = make([]byte, len(t.Input))
+		copy(newAccessListStruct.Input[:], t.Input[:])
+
+		//deep copy access list
+		newAccessListStruct.AccessList = DeepCopyTxAccessList(t.AccessList)
+
+		return newAccessListStruct
 
 	default:
 		return nil

@@ -32,9 +32,20 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		// bTxn := &Transaction{
 		// 	Type: txType,
 		// }
-		bTxn := NewTx(&MixedTx{
-			Type: txType,
-		})
+		// bTxn := NewTx(&MixedTx{
+		// 	Type: txType,
+		// })
+		var bTxn *Transaction
+		switch txType {
+		case AccessListTx:
+			bTxn = NewTx(&AccessListStruct{
+				Type: txType,
+			})
+		default:
+			bTxn = NewTx(&MixedTx{
+				Type: txType,
+			})
+		}
 
 		if err = bTxn.unmarshalStoreRLPFrom(p, v); err != nil {
 			return err

@@ -26,6 +26,9 @@ const (
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
+
+	TxAccessListAddressGas    uint64 = 2400 // Per address specified in EIP 2930 access list
+	TxAccessListStorageKeyGas uint64 = 1900 // Per storage key specified in EIP 2930 access list
 )
 
 // GetHashByNumber returns the hash function of a block number
@@ -611,12 +614,18 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From()
 
+	// set up initial access list
+	initialAccessList := runtime.NewAccessList()
+	if t.config.EIP2929 { // check if berlin fork is activated or not
+		initialAccessList.PrepareAccessList(msg.From(), msg.To(), precompiled.ActivePrecompiles, msg.AccessList())
+	}
+
 	var result *runtime.ExecutionResult
 	if msg.IsContractCreation() {
-		result = t.Create2(msg.From(), msg.Input(), value, gasLeft)
+		result = t.Create2(msg.From(), msg.Input(), value, gasLeft, initialAccessList)
 	} else {
 		t.state.IncrNonce(msg.From())
-		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft)
+		result = t.Call2(msg.From(), *(msg.To()), msg.Input(), value, gasLeft, initialAccessList)
 	}
 
 	refund := t.state.GetRefund()
@@ -664,17 +673,18 @@ func (t *Transition) Create2(
 	code []byte,
 	value *big.Int,
 	gas uint64,
+	initialAccessList *runtime.AccessList,
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
-	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, runtime.NewAccessList())
+	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, initialAccessList)
 
-	if t.config.EIP2929 {
-		contract.AccessList.AddAddress(caller)
-		// add all precompiles to access list
-		for _, addr := range precompiled.ActivePrecompiles {
-			contract.AccessList.AddAddress(addr)
-		}
-	}
+	// if t.config.EIP2929 {
+	// 	// contract.AccessList.AddAddress(caller)
+	// 	// // add all precompiles to access list
+	// 	// for _, addr := range precompiled.ActivePrecompiles {
+	// 	// 	contract.AccessList.AddAddress(addr)
+	// 	// }
+	// }
 
 	return t.applyCreate(contract, t)
 }
@@ -685,17 +695,19 @@ func (t *Transition) Call2(
 	input []byte,
 	value *big.Int,
 	gas uint64,
+	initialAccessList *runtime.AccessList,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, runtime.NewAccessList())
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, initialAccessList)
 
-	if t.config.EIP2929 {
-		c.AccessList.AddAddress(caller)
-		c.AccessList.AddAddress(to)
-		// add all precompiles to access list
-		for _, addr := range precompiled.ActivePrecompiles {
-			c.AccessList.AddAddress(addr)
-		}
-	}
+	// if t.config.EIP2929 {
+	// 	// c.AccessList.AddAddress(caller)
+	// 	// c.AccessList.AddAddress(to)
+	// 	// // add all precompiles to access list
+	// 	// for _, addr := range precompiled.ActivePrecompiles {
+	// 	// 	c.AccessList.AddAddress(addr)
+	// 	// }
+	// }
+	//c.AccessList.PrepareAccessList(caller, &to, precompiled.ActivePrecompiles, nil)
 
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -802,13 +814,13 @@ func (t *Transition) applyCall(
 	t.captureCallStart(c, callType)
 
 	// create a deep copy of access list for reverted transaction
-	al := c.AccessList.Copy()
+	//al := c.AccessList.Copy()
 
 	result = t.run(c, host)
 	if result.Failed() {
-		if result.Reverted() {
-			c.AccessList = al
-		}
+		// if result.Reverted() {
+		// 	c.AccessList = al
+		// }
 
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
@@ -1164,6 +1176,11 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 		}
 
 		cost += zeros * 4
+	}
+
+	if msg.AccessList() != nil {
+		cost += uint64(len(msg.AccessList())) * TxAccessListAddressGas
+		cost += uint64(msg.AccessList().StorageKeys()) * TxAccessListStorageKeyGas
 	}
 
 	return cost, nil
