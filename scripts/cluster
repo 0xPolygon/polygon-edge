@@ -9,9 +9,10 @@ if [[ "$1" == "polybft" ]] && ! command -v jq >/dev/null 2>&1; then
   dp_error_flag=1
 fi
 
-# Check if nc is installed
+# Check if curl is installed
 if [[ "$1" == "polybft" ]] && ! command -v curl >/dev/null 2>&1; then
   echo "curl is not installed."
+  echo "Manual installation instructions: Visit https://everything.curl.dev/get/ for more information."
   dp_error_flag=1
 fi
 
