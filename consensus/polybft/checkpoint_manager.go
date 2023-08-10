@@ -134,12 +134,11 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		"checkpoint block", latestHeader.Number)
 
 	var (
-		checkpointManagerAddr = ethgo.Address(c.checkpointManagerAddr)
-		initialBlockNumber    = lastCheckpointBlockNumber + 1
-		parentExtra           *Extra
-		parentHeader          *types.Header
-		currentExtra          *Extra
-		found                 bool
+		initialBlockNumber = lastCheckpointBlockNumber + 1
+		parentExtra        *Extra
+		parentHeader       *types.Header
+		currentExtra       *Extra
+		found              bool
 	)
 
 	if initialBlockNumber < latestHeader.Number {
@@ -176,13 +175,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			continue
 		}
 
-		txn := &ethgo.Transaction{
-			To:   &checkpointManagerAddr,
-			From: c.key.Address(),
-			Type: ethgo.TransactionDynamicFee,
-		}
-
-		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
+		if err = c.encodeAndSendCheckpoint(parentHeader, parentExtra, true); err != nil {
 			return err
 		}
 
@@ -200,21 +193,19 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		}
 	}
 
-	txn := &ethgo.Transaction{
-		To:   &checkpointManagerAddr,
-		From: c.key.Address(),
-		Type: ethgo.TransactionDynamicFee,
-	}
-
-	return c.encodeAndSendCheckpoint(txn, latestHeader, currentExtra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(latestHeader, currentExtra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
-func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
-	header *types.Header, extra *Extra, isEndOfEpoch bool) error {
+func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra *Extra, isEndOfEpoch bool) error {
 	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
 
+	checkpointManager := ethgo.Address(c.checkpointManagerAddr)
+	txn := &ethgo.Transaction{
+		Type: ethgo.TransactionDynamicFee,
+		To:   &checkpointManager,
+	}
 	nextEpochValidators := validator.AccountSet{}
 
 	if isEndOfEpoch {
