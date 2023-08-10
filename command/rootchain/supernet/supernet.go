@@ -132,6 +132,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			From:  ownerKey.Address(),
 			Input: encoded,
 			To:    &supernetAddr,
+			Type:  ethgo.TransactionDynamicFee,
 		}
 
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
@@ -213,6 +214,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			From:  ownerKey.Address(),
 			Input: encoded,
 			To:    &supernetAddr,
+			Type:  ethgo.TransactionDynamicFee,
 		}
 
 		receipt, err := txRelayer.SendTransaction(txn, ownerKey)

@@ -132,6 +132,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		From:  validatorAccount.Ecdsa.Address(),
 		Input: encoded,
 		To:    &stakeManagerAddr,
+		Type:  ethgo.TransactionDynamicFee,
 	}
 
 	receipt, err = txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)

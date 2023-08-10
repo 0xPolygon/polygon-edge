@@ -162,6 +162,7 @@ func registerValidator(sender txrelayer.TxRelayer, account *wallet.Account,
 	txn := &ethgo.Transaction{
 		Input: input,
 		To:    &supernetAddr,
+		Type:  ethgo.TransactionDynamicFee,
 	}
 
 	return sender.SendTransaction(txn, account.Ecdsa)

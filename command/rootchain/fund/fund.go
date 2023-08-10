@@ -121,6 +121,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				txn := &ethgo.Transaction{
 					To:    &fundAddr,
 					Value: params.amountValues[i],
+					Type:  ethgo.TransactionDynamicFee,
 				}
 
 				var receipt *ethgo.Receipt
