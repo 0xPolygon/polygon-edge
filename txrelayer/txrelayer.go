@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
@@ -86,6 +87,14 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	txnHash, err := t.sendTransactionLocked(txn, key)
 	if err != nil {
+		if txn.Type != ethgo.TransactionLegacy && errors.Is(err, types.ErrTxTypeNotSupported) {
+			// downgrade transaction to legacy tx type and resend it
+			txn.Type = ethgo.TransactionLegacy
+			txn.GasPrice = 0
+
+			return t.SendTransaction(txn, key)
+		}
+
 		return nil, err
 	}
 
@@ -110,9 +119,10 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	if err != nil {
 		return ethgo.ZeroHash, err
 	}
-	txn.ChainID = chainID
 
+	txn.ChainID = chainID
 	txn.Nonce = nonce
+
 	if txn.From == ethgo.ZeroAddress {
 		txn.From = key.Address()
 	}

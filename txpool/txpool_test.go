@@ -2242,7 +2242,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
-			ErrInvalidTxType,
+			ErrTxTypeNotSupported,
 		)
 	})
 }
