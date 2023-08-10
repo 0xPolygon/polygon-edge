@@ -106,6 +106,12 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		return ethgo.ZeroHash, fmt.Errorf("failed to get nonce: %w", err)
 	}
 
+	chainID, err := t.client.Eth().ChainID()
+	if err != nil {
+		return ethgo.ZeroHash, err
+	}
+	txn.ChainID = chainID
+
 	txn.Nonce = nonce
 	if txn.From == ethgo.ZeroAddress {
 		txn.From = key.Address()
@@ -149,11 +155,6 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		}
 
 		txn.Gas = gasLimit + (gasLimit * gasLimitPercent / 100)
-	}
-
-	chainID, err := t.client.Eth().ChainID()
-	if err != nil {
-		return ethgo.ZeroHash, err
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())
