@@ -219,6 +219,7 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 		To:    &exitHelperAddr,
 		Input: input,
 		Gas:   txrelayer.DefaultGasLimit,
+		Type:  ethgo.TransactionDynamicFee,
 	}
 
 	return txn, exitEvent, err
