@@ -15,12 +15,12 @@ import (
 )
 
 const (
-	defaultGasPrice   = 1879048192 // 0x70000000
-	DefaultGasLimit   = 5242880    // 0x500000
-	DefaultRPCAddress = "http://127.0.0.1:8545"
-	numRetries        = 1000
-	gasLimitPercent   = 100
-	gasPricePercent   = 20
+	defaultGasPrice       = 1879048192 // 0x70000000
+	DefaultGasLimit       = 5242880    // 0x500000
+	DefaultRPCAddress     = "http://127.0.0.1:8545"
+	numRetries            = 1000
+	gasLimitPercent       = 100
+	feeIncreasePercentage = 20
 )
 
 var (
@@ -135,7 +135,9 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 				return ethgo.ZeroHash, fmt.Errorf("failed to get max priority fee per gas: %w", err)
 			}
 
-			txn.MaxPriorityFeePerGas = maxPriorityFee
+			compensatedMaxPriorityFee := new(big.Int).Mul(maxPriorityFee, big.NewInt(feeIncreasePercentage))
+			compensatedMaxPriorityFee = compensatedMaxPriorityFee.Div(compensatedMaxPriorityFee, big.NewInt(100))
+			txn.MaxPriorityFeePerGas = compensatedMaxPriorityFee
 		}
 
 		if txn.MaxFeePerGas == nil {
@@ -147,7 +149,10 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 
 			baseFee := feeHist.BaseFee[len(feeHist.BaseFee)-1]
 			// set max fee per gas as sum of base fee and max priority fee
-			txn.MaxFeePerGas = new(big.Int).Add(baseFee, maxPriorityFee)
+			maxFeePerGas := new(big.Int).Add(baseFee, maxPriorityFee)
+			maxFeePerGas = maxFeePerGas.Mul(maxFeePerGas, big.NewInt(feeIncreasePercentage))
+			maxFeePerGas = maxFeePerGas.Div(maxFeePerGas, big.NewInt(100))
+			txn.MaxFeePerGas = maxFeePerGas
 		}
 	} else if txn.GasPrice == 0 {
 		gasPrice, err := t.Client().Eth().GasPrice()
@@ -155,7 +160,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			return ethgo.ZeroHash, fmt.Errorf("failed to get gas price: %w", err)
 		}
 
-		txn.GasPrice = gasPrice + (gasPrice * gasPricePercent / 100)
+		txn.GasPrice = gasPrice + (gasPrice * feeIncreasePercentage / 100)
 	}
 
 	if txn.Gas == 0 {
