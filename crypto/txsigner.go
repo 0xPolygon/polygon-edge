@@ -96,7 +96,6 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	}
 
 	v.Set(a.NewBigInt(tx.Value))
-
 	v.Set(a.NewCopyBytes(tx.Input))
 
 	if tx.Type == types.LegacyTx {
@@ -113,10 +112,10 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	}
 
 	var hash []byte
-	if tx.Type != types.LegacyTx {
-		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type)}, nil, v)
-	} else {
+	if tx.Type == types.LegacyTx {
 		hash = keccak.Keccak256Rlp(nil, v)
+	} else {
+		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type)}, nil, v)
 	}
 
 	return types.BytesToHash(hash)

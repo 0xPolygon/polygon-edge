@@ -127,14 +127,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		txn.From = key.Address()
 	}
 
-	if txn.Type != ethgo.TransactionDynamicFee && txn.GasPrice == 0 {
-		gasPrice, err := t.Client().Eth().GasPrice()
-		if err != nil {
-			return ethgo.ZeroHash, fmt.Errorf("failed to get gas price: %w", err)
-		}
-
-		txn.GasPrice = gasPrice + (gasPrice * gasPricePercent / 100)
-	} else if txn.Type == ethgo.TransactionDynamicFee {
+	if txn.Type == ethgo.TransactionDynamicFee {
 		maxPriorityFee := txn.MaxPriorityFeePerGas
 		if maxPriorityFee == nil {
 			// retrieve the max priority fee per gas
@@ -156,6 +149,13 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			// set max fee per gas as sum of base fee and max priority fee
 			txn.MaxFeePerGas = new(big.Int).Add(baseFee, maxPriorityFee)
 		}
+	} else if txn.GasPrice == 0 {
+		gasPrice, err := t.Client().Eth().GasPrice()
+		if err != nil {
+			return ethgo.ZeroHash, fmt.Errorf("failed to get gas price: %w", err)
+		}
+
+		txn.GasPrice = gasPrice + (gasPrice * gasPricePercent / 100)
 	}
 
 	if txn.Gas == 0 {
