@@ -282,7 +282,7 @@ func (txn *Txn) SetStorage(
 			}
 		} else { // reset to original existing slot (2.2.2.2)
 			if config.EIP2929 {
-				// Refund: SstoreResetGasEIP2200 - ColdSloadCostEIP2929 - WarmStorageReadCostEIP2929
+				// Refund: SstoreResetGasEIP2200 - ColdStorageReadCostEIP2929 - WarmStorageReadCostEIP2929
 				txn.AddRefund(2800)
 			} else if config.Istanbul {
 				txn.AddRefund(4200)

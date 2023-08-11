@@ -18,7 +18,7 @@ type instruction func(c *state)
 
 const (
 	ColdAccountAccessCostEIP2929 = uint64(2600) // COLD_ACCOUNT_ACCESS_COST
-	ColdSloadCostEIP2929         = uint64(2100) // COLD_SLOAD_COST
+	ColdStorageReadCostEIP2929   = uint64(2100) // COLD_SLOAD_COST_EIP2929
 	WarmStorageReadCostEIP2929   = uint64(100)  // WARM_STORAGE_READ_COST
 )
 
@@ -476,7 +476,7 @@ func opSload(c *state) {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, bigToHash(loc)); !slotPresent {
 			c.accessList.AddSlot(c.msg.Address, bigToHash(loc))
 
-			gas = ColdSloadCostEIP2929
+			gas = ColdStorageReadCostEIP2929
 		} else {
 			gas = WarmStorageReadCostEIP2929
 		}
@@ -520,7 +520,7 @@ func opSStore(c *state) {
 
 	if c.config.EIP2929 {
 		if _, slotPresent := c.accessList.Contains(c.msg.Address, key); !slotPresent {
-			cost = ColdSloadCostEIP2929
+			cost = ColdStorageReadCostEIP2929
 
 			c.accessList.AddSlot(c.msg.Address, key)
 		}
@@ -542,7 +542,7 @@ func opSStore(c *state) {
 	case runtime.StorageModified:
 		cost += 5000
 		if c.config.EIP2929 {
-			cost -= ColdSloadCostEIP2929
+			cost -= ColdStorageReadCostEIP2929
 		}
 
 	case runtime.StorageModifiedAgain:
@@ -563,7 +563,7 @@ func opSStore(c *state) {
 	case runtime.StorageDeleted:
 		cost += 5000
 		if c.config.EIP2929 {
-			cost -= ColdSloadCostEIP2929
+			cost -= ColdStorageReadCostEIP2929
 		}
 	}
 
