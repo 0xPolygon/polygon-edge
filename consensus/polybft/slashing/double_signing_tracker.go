@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/fastrlp"
+	protobuf "google.golang.org/protobuf/proto"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -28,7 +33,86 @@ type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSignEvidences []*DoubleSignEvidence
 
-// TODO RLP serialize/deserialize methods, Equals method for validation, etc.
+func (d *DoubleSignEvidences) EncodeAbi(height uint64) ([]byte, error) {
+	validators := make([]ethgo.Address, len(*d))
+
+	for i, evidence := range *d {
+		validators[i] = ethgo.Address(evidence.signer)
+	}
+
+	slashFn := &contractsapi.SlashValidatorSetFn{
+		Height:     new(big.Int).SetUint64(height),
+		Validators: validators,
+	}
+
+	return slashFn.EncodeAbi()
+}
+
+func (d *DoubleSignEvidences) Equals(second DoubleSignEvidences) bool {
+	if len(*d) != len(second) {
+		return false
+	}
+
+	for i, evidence := range *d {
+		if !evidence.Equals(second[i]) {
+			return false
+		}
+	}
+
+	return true
+}
+
+// MarshalRLPWith marshals DoubleSignEvidences to the RLP format
+func (d *DoubleSignEvidences) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+	vv := ar.NewArray()
+	evidencesRaw := ar.NewArray()
+
+	for _, evidence := range *d {
+		evidencesRaw.Set(evidence.MarshalRLPWith(ar))
+	}
+
+	vv.Set(evidencesRaw)
+
+	return vv
+}
+
+// UnmarshalRLPWith unmarshals DoubleSignEvidences from RLP format
+func (d *DoubleSignEvidences) UnmarshalRLPWith(v *fastrlp.Value) error {
+	elems, err := v.GetElems()
+	if err != nil {
+		return err
+	}
+
+	if len(elems) == 0 {
+		return nil
+	} else if num := len(elems); num != 1 {
+		return fmt.Errorf("incorrect elements count to decode double sign evidences, expected 1 but found %d", num)
+	}
+
+	evidencesRaw, err := elems[0].GetElems()
+	if err != nil {
+		return fmt.Errorf("array expected for double sign evidences")
+	}
+
+	if len(evidencesRaw) == 0 {
+		return nil
+	}
+
+	evidences := make([]*DoubleSignEvidence, len(evidencesRaw))
+
+	for i, evidenceRaw := range evidencesRaw {
+		evidence := &DoubleSignEvidence{}
+		if err := evidence.UnmarshalRLPWith(evidenceRaw); err != nil {
+			return err
+		}
+
+		evidences[i] = evidence
+	}
+
+	*d = evidences
+
+	return nil
+}
 
 type DoubleSignEvidence struct {
 	signer   types.Address
@@ -38,6 +122,100 @@ type DoubleSignEvidence struct {
 func newDoubleSignEvidence(signer types.Address,
 	messages []*ibftProto.Message) *DoubleSignEvidence {
 	return &DoubleSignEvidence{signer: signer, messages: messages}
+}
+
+func (d *DoubleSignEvidence) Equals(second *DoubleSignEvidence) bool {
+	if second == nil || d.signer != second.signer || len(d.messages) != len(second.messages) {
+		return false
+	}
+
+	for i, message := range d.messages {
+		msgToCheck := second.messages[i]
+
+		if msgToCheck == nil {
+			return false
+		}
+
+		if bytes.Compare(message.From, msgToCheck.From) != 0 {
+			return false
+		}
+
+		if bytes.Compare(message.Signature, msgToCheck.Signature) != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
+// MarshalRLPWith marshals DoubleSignEvidence to the RLP format
+func (d *DoubleSignEvidence) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
+	vv := ar.NewArray()
+	messagesRaw := ar.NewArray()
+
+	for _, message := range d.messages {
+		messageRaw, err := protobuf.Marshal(message)
+		if err != nil {
+			// TODO: what to do here? :)
+			continue
+		}
+
+		messagesRaw.Set(ar.NewBytes(messageRaw))
+	}
+
+	// Signer
+	vv.Set(ar.NewBytes(d.signer.Bytes()))
+
+	// Messages
+	vv.Set(messagesRaw)
+
+	return vv
+}
+
+// UnmarshalRLPWith unmarshals DoubleSignEvidence from the RLP format
+func (d *DoubleSignEvidence) UnmarshalRLPWith(val *fastrlp.Value) error {
+	elems, err := val.GetElems()
+	if err != nil {
+		return err
+	}
+
+	if num := len(elems); num != 2 {
+		return fmt.Errorf("incorrect elements count to decode double sign evidence, expected 2 but found %d", num)
+	}
+
+	// Signer
+	signerRaw, err := elems[0].GetBytes(nil)
+	if err != nil {
+		return fmt.Errorf("expected 'Signer' field encoded as bytes. Error: %w", err)
+	}
+
+	d.signer = types.BytesToAddress(signerRaw)
+
+	// Messages
+	messagesRLP, err := elems[1].GetElems()
+	if err != nil {
+		return fmt.Errorf("array expected for double sign evidence messages. Error: %w", err)
+	}
+
+	messages := make([]*ibftProto.Message, len(messagesRLP))
+
+	for i, messageRLP := range messagesRLP {
+		messageBytes, err := messageRLP.GetBytes(nil)
+		if err != nil {
+			return err
+		}
+
+		var message *ibftProto.Message
+		if err = protobuf.Unmarshal(messageBytes, message); err != nil {
+			return err
+		}
+
+		messages[i] = message
+	}
+
+	d.messages = messages
+
+	return nil
 }
 
 type Messages struct {

@@ -176,7 +176,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 		require.NoError(t, err)
 
 		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
@@ -394,7 +394,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 		require.NoError(t, err)
 
 		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
@@ -551,7 +551,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)
@@ -724,7 +724,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	currentEpoch := currentExtra.Checkpoint.EpochNumber
@@ -870,7 +870,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		latestBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		extra, err := polybft.GetIbftExtra(latestBlock.ExtraData)
+		extra, err := polybft.GetIbftExtra(latestBlock.ExtraData, latestBlock.Number)
 		require.NoError(t, err)
 
 		// wait for checkpoint to get submitted before invoking exit transactions
@@ -1004,7 +1004,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		childChainBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		childChainBlockExtra, err := polybft.GetIbftExtra(childChainBlock.ExtraData)
+		childChainBlockExtra, err := polybft.GetIbftExtra(childChainBlock.ExtraData, childChainBlock.Number)
 		require.NoError(t, err)
 
 		// wait for checkpoint to be submitted
@@ -1218,7 +1218,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	currentBlock, err := childRelayer.Client().Eth().GetBlockByNumber(ethgo.Latest, false)
 	require.NoError(t, err)
 
-	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+	currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	require.NoError(t, err)
 
 	targetEpoch := currentExtra.Checkpoint.EpochNumber + 2
@@ -1421,7 +1421,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		currentBlock, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, false)
 		require.NoError(t, err)
 
-		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData)
+		currentExtra, err := polybft.GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 		require.NoError(t, err)
 
 		t.Logf("Latest block number: %d, epoch number: %d\n", currentBlock.Number, currentExtra.Checkpoint.EpochNumber)

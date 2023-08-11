@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/gasprice"
 
 	"github.com/0xPolygon/polygon-edge/archive"
@@ -281,7 +280,10 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := initForkManager(engineName, config.Chain); err != nil {
+	if err := consensusPolyBFT.ForkManagerInit(
+		forkManagerInitialParamsFactory[ConsensusType(engineName)],
+		forkManagerFactory[ConsensusType(engineName)],
+		config.Chain); err != nil {
 		return nil, err
 	}
 
@@ -1020,58 +1022,4 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	}()
 
 	return srv
-}
-
-func initForkManager(engineName string, config *chain.Chain) error {
-	var initialParams *forkmanager.ForkParams
-
-	if factory := forkManagerInitialParamsFactory[ConsensusType(engineName)]; factory != nil {
-		params, err := factory(config)
-		if err != nil {
-			return err
-		}
-
-		initialParams = params
-	}
-
-	fm := forkmanager.GetInstance()
-
-	// clear everything in forkmanager (if there was something because of tests) and register initial fork
-	fm.Clear()
-	fm.RegisterFork(forkmanager.InitialFork, initialParams)
-
-	// Register forks
-	for name, f := range *config.Params.Forks {
-		// check if fork is not supported by current edge version
-		if _, found := (*chain.AllForksEnabled)[name]; !found {
-			return fmt.Errorf("fork is not available: %s", name)
-		}
-
-		fm.RegisterFork(name, f.Params)
-	}
-
-	// Register handlers and additional forks here
-	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
-		return err
-	}
-
-	if factory := forkManagerFactory[ConsensusType(engineName)]; factory != nil {
-		if err := factory(config.Params.Forks); err != nil {
-			return err
-		}
-	}
-
-	// Activate initial fork
-	if err := fm.ActivateFork(forkmanager.InitialFork, uint64(0)); err != nil {
-		return err
-	}
-
-	// Activate forks
-	for name, f := range *config.Params.Forks {
-		if err := fm.ActivateFork(name, f.Block); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

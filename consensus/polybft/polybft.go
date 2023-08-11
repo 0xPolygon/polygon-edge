@@ -411,6 +411,63 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 func ForkManagerFactory(forks *chain.Forks) error {
 	// place fork manager handler registration here
+	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
+		return err
+	}
+
+	if err := RegisterExtraDataForkHandlers(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ForkManagerInit(
+	forkManagerInitialParamsFn func(config *chain.Chain) (*forkmanager.ForkParams, error),
+	forkManagerHandlersFn func(*chain.Forks) error,
+	config *chain.Chain) error {
+	if forkManagerInitialParamsFn == nil || forkManagerHandlersFn == nil {
+		return nil
+	}
+
+	initialParams, err := forkManagerInitialParamsFn(config)
+	if err != nil {
+		return err
+	}
+
+	fm := forkmanager.GetInstance()
+
+	// clear everything in forkmanager (if there was something because of tests) and register initial fork
+	fm.Clear()
+	fm.RegisterFork(forkmanager.InitialFork, initialParams)
+
+	// Register forks
+	for name, f := range *config.Params.Forks {
+		// check if fork is not supported by current edge version
+		if _, found := (*chain.AllForksEnabled)[name]; !found {
+			return fmt.Errorf("fork is not available: %s", name)
+		}
+
+		fm.RegisterFork(name, f.Params)
+	}
+
+	// Register handlers and additional forks here
+	if err := forkManagerHandlersFn(config.Params.Forks); err != nil {
+		return err
+	}
+
+	// Activate initial fork
+	if err := fm.ActivateFork(forkmanager.InitialFork, uint64(0)); err != nil {
+		return err
+	}
+
+	// Activate forks
+	for name, f := range *config.Params.Forks {
+		if err := fm.ActivateFork(name, f.Block); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -708,9 +765,13 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 	}
 
 	// decode the extra data
-	extra, err := GetIbftExtra(header.ExtraData)
+	extra, err := GetIbftExtra(header.ExtraData, header.Number)
 	if err != nil {
 		return fmt.Errorf("failed to verify header for block %d. get extra error = %w", header.Number, err)
+	}
+
+	if err := extra.ValidateAdditional(header); err != nil {
+		return err
 	}
 
 	// validate extra data
@@ -781,6 +842,6 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 
 // GetBridgeProvider is an implementation of Consensus interface
 // Filters extra data to not contain Committed field
-func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
-	return GetIbftExtraClean(extra)
+func (p *Polybft) FilterExtra(header *types.Header) ([]byte, error) {
+	return GetIbftExtraClean(header.ExtraData, header.Number)
 }

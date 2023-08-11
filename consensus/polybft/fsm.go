@@ -9,12 +9,15 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/armon/go-metrics"
@@ -46,6 +49,10 @@ var (
 	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
 	errValidatorsUpdateInNonEpochEnding    = errors.New("trying to update validator set in a non epoch ending block")
 	errValidatorDeltaNilInEpochEndingBlock = errors.New("validator set delta is nil in epoch ending block")
+	errDoubleSignEvidencesMismatch         = errors.New("double sign evidences mismatch")
+	errSlashingTxSingleExpected            = errors.New("only one slashing transaction is allowed in block")
+	errSlashingTxNotExpected               = errors.New("didn't expect slashing transaction in block")
+	errSlashingTxDoesNotExist              = errors.New("slashing transaction is not found in the block")
 )
 
 type fsm struct {
@@ -102,6 +109,9 @@ type fsm struct {
 
 	// newValidatorsDelta carries the updates of validator set on epoch ending block
 	newValidatorsDelta *validator.ValidatorSetDelta
+
+	// doubleSignEvidences contains evidences of double signing for previous block
+	doubleSignEvidences slashing.DoubleSignEvidences
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -112,12 +122,15 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 	parent := f.parent
 
-	extraParent, err := GetIbftExtra(parent.ExtraData)
+	extraParent, err := GetIbftExtra(parent.ExtraData, parent.Number)
 	if err != nil {
 		return nil, err
 	}
 
-	extra := &Extra{Parent: extraParent.Committed}
+	extra := &Extra{
+		Parent:      extraParent.Committed,
+		BlockNumber: f.Height(),
+	}
 	// for non-epoch ending blocks, currentValidatorsHash is the same as the nextValidatorsHash
 	nextValidators := f.validators.Accounts()
 
@@ -147,6 +160,14 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 	if f.config.IsBridgeEnabled() {
 		if err := f.applyBridgeCommitmentTx(); err != nil {
+			return nil, err
+		}
+	}
+
+	if forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) {
+		extra.DoubleSignEvidences = f.doubleSignEvidences
+
+		if err := f.applySlashingTx(); err != nil {
 			return nil, err
 		}
 	}
@@ -235,6 +256,32 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
 }
 
+func (f *fsm) applySlashingTx() error {
+	if len(f.doubleSignEvidences) == 0 {
+		return nil
+	}
+
+	slashingTx, err := f.createSlashingTx()
+	if err != nil {
+		return fmt.Errorf("creation of slashing transaction failed: %w", err)
+	}
+
+	if err = f.blockBuilder.WriteTx(slashingTx); err != nil {
+		return fmt.Errorf("failed to apply slashing state transaction. Error: %w", err)
+	}
+
+	return nil
+}
+
+func (f *fsm) createSlashingTx() (*types.Transaction, error) {
+	inputData, err := f.doubleSignEvidences.EncodeAbi(f.parent.Number)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode input data for slashing: %w", err)
+	}
+
+	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, inputData), nil
+}
+
 // getValidatorsTransition applies delta to the current validators,
 func (f *fsm) getValidatorsTransition(delta *validator.ValidatorSetDelta) (validator.AccountSet, error) {
 	nextValidators, err := f.validators.Accounts().ApplyDelta(delta)
@@ -307,12 +354,12 @@ func (f *fsm) Validate(proposal []byte) error {
 		)
 	}
 
-	extra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(block.Header.ExtraData, block.Number())
 	if err != nil {
 		return fmt.Errorf("cannot get extra data:%w", err)
 	}
 
-	parentExtra, err := GetIbftExtra(f.parent.ExtraData)
+	parentExtra, err := GetIbftExtra(f.parent.ExtraData, f.parent.Number)
 	if err != nil {
 		return err
 	}
@@ -327,6 +374,10 @@ func (f *fsm) Validate(proposal []byte) error {
 
 	if err := extra.ValidateParentSignatures(block.Number(), f.polybftBackend, nil, f.parent, parentExtra,
 		f.backend.GetChainID(), bls.DomainCheckpointManager, f.logger); err != nil {
+		return err
+	}
+
+	if err := extra.ValidateAdditional(block.Header); err != nil {
 		return err
 	}
 
@@ -348,6 +399,12 @@ func (f *fsm) Validate(proposal []byte) error {
 	} else if extra.Validators != nil {
 		// delta should be nil in non epoch ending blocks
 		return errValidatorsUpdateInNonEpochEnding
+	}
+
+	if forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) {
+		if !f.doubleSignEvidences.Equals(extra.DoubleSignEvidences) {
+			return errDoubleSignEvidencesMismatch
+		}
 	}
 
 	nextValidators, err := f.getValidatorsTransition(extra.Validators)
@@ -414,6 +471,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		commitmentTxExists        bool
 		commitEpochTxExists       bool
 		distributeRewardsTxExists bool
+		slashTxExists             bool
 	)
 
 	for _, tx := range transactions {
@@ -467,6 +525,20 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			if err := f.verifyDistributeRewardsTx(tx); err != nil {
 				return fmt.Errorf("error while verifying distribute rewards transaction. error: %w", err)
 			}
+		case *contractsapi.SlashValidatorSetFn:
+			if !forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) {
+				return errSlashingTxNotExpected
+			}
+
+			if slashTxExists {
+				return errSlashingTxSingleExpected
+			}
+
+			slashTxExists = true
+
+			if err := f.verifySlashingTx(tx); err != nil {
+				return fmt.Errorf("error while verifying slashing transaction. error: %w", err)
+			}
 		default:
 			return fmt.Errorf("invalid state transaction data type: %v", stateTxData)
 		}
@@ -484,6 +556,11 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			// but it should be
 			return errDistributeRewardsTxDoesNotExist
 		}
+	}
+
+	if forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) &&
+		len(f.doubleSignEvidences) > 0 && !slashTxExists {
+		return errSlashingTxDoesNotExist
 	}
 
 	return nil
@@ -506,7 +583,7 @@ func (f *fsm) Insert(proposal []byte, committedSeals []*messages.CommittedSeal) 
 	// In this function we should try to return little to no errors since
 	// at this point everything we have to do is just commit something that
 	// we should have already computed beforehand.
-	extra, err := GetIbftExtra(newBlock.Block.Header.ExtraData)
+	extra, err := GetIbftExtra(newBlock.Block.Header.ExtraData, newBlock.Block.Number())
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert proposal, due to not being able to extract extra data: %w", err)
 	}
@@ -643,6 +720,28 @@ func verifyBridgeCommitmentTx(blockNumber uint64, txHash types.Hash,
 	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), bls.DomainStateReceiver)
 	if !verified {
 		return fmt.Errorf("invalid signature for state tx (%s)", txHash)
+	}
+
+	return nil
+}
+
+// verifySlashTx creates slash transaction and compares its hash with the one extracted from the block.
+func (f *fsm) verifySlashingTx(slashingTx *types.Transaction) error {
+	if len(f.doubleSignEvidences) == 0 {
+		return errSlashingTxNotExpected
+	}
+
+	localSlashingTx, err := f.createSlashingTx()
+	if err != nil {
+		return err
+	}
+
+	if slashingTx.Hash != localSlashingTx.Hash {
+		return fmt.Errorf(
+			"invalid slashing transaction. Expected '%s', but got '%s' hash",
+			localSlashingTx.Hash,
+			slashingTx.Hash,
+		)
 	}
 
 	return nil

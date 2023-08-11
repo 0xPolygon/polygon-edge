@@ -1521,6 +1521,23 @@ func (i *InitializeValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ValidatorSet.Abi.Methods["initialize"], buf, i)
 }
 
+type SlashValidatorSetFn struct {
+	Height     *big.Int        `abi:"height"`
+	Validators []ethgo.Address `abi:"validators"`
+}
+
+func (s *SlashValidatorSetFn) Sig() []byte {
+	return ValidatorSet.Abi.Methods["slash"].ID()
+}
+
+func (s *SlashValidatorSetFn) EncodeAbi() ([]byte, error) {
+	return ValidatorSet.Abi.Methods["slash"].Encode(s)
+}
+
+func (s *SlashValidatorSetFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(ValidatorSet.Abi.Methods["slash"], buf, s)
+}
+
 type TransferEvent struct {
 	From  types.Address `abi:"from"`
 	To    types.Address `abi:"to"`

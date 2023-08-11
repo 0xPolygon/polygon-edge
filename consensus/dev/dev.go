@@ -253,6 +253,6 @@ func (d *Dev) GetBridgeProvider() consensus.BridgeDataProvider {
 	return nil
 }
 
-func (d *Dev) FilterExtra(extra []byte) ([]byte, error) {
-	return extra, nil
+func (d *Dev) FilterExtra(header *types.Header) ([]byte, error) {
+	return header.ExtraData, nil
 }

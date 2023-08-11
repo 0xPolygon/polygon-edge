@@ -181,6 +181,14 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			validatorMetadata[i] = metadata
 		}
 
+		// properly initialize fork manager so that Extra is correctly RLP serialized
+		if err := polybft.ForkManagerInit(
+			polybft.ForkManagerInitialParamsFactory,
+			polybft.ForkManagerFactory,
+			chainConfig); err != nil {
+			return err
+		}
+
 		// update the voting power in genesis block extra
 		// based on finalized stake on rootchain
 		genesisExtraData, err := genesis.GenerateExtraDataPolyBft(validatorMetadata)

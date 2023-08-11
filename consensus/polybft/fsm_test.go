@@ -345,7 +345,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData, stateBlock.Block.Number())
 	assert.NoError(t, err)
 	assert.Len(t, blockExtra.Validators.Added, 2)
 	assert.False(t, blockExtra.Validators.IsEmpty())
@@ -395,7 +395,7 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaNil(t *testing.T) 
 	assert.NoError(t, err)
 	assert.NotNil(t, proposal)
 
-	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData)
+	blockExtra, err := GetIbftExtra(stateBlock.Block.Header.ExtraData, stateBlock.Block.Number())
 	assert.NoError(t, err)
 	assert.Nil(t, blockExtra.Validators)
 

@@ -382,19 +382,23 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("could not build exit root hash for fsm: %w", err)
 	}
 
+	// TODO: c.doubleSigningTracker.GetEvidences(parent.Number)
+	doubleSignEvidences := slashing.DoubleSignEvidences{}
+
 	ff := &fsm{
-		config:            c.config.PolyBFTConfig,
-		parent:            parent,
-		backend:           c.config.blockchain,
-		polybftBackend:    c.config.polybftBackend,
-		exitEventRootHash: exitRootHash,
-		epochNumber:       epoch.Number,
-		blockBuilder:      blockBuilder,
-		validators:        valSet,
-		isEndOfEpoch:      isEndOfEpoch,
-		isEndOfSprint:     isEndOfSprint,
-		proposerSnapshot:  proposerSnapshot,
-		logger:            c.logger.Named("fsm"),
+		config:              c.config.PolyBFTConfig,
+		parent:              parent,
+		backend:             c.config.blockchain,
+		polybftBackend:      c.config.polybftBackend,
+		exitEventRootHash:   exitRootHash,
+		epochNumber:         epoch.Number,
+		blockBuilder:        blockBuilder,
+		validators:          valSet,
+		doubleSignEvidences: doubleSignEvidences,
+		isEndOfEpoch:        isEndOfEpoch,
+		isEndOfSprint:       isEndOfSprint,
+		proposerSnapshot:    proposerSnapshot,
+		logger:              c.logger.Named("fsm"),
 	}
 
 	if isEndOfSprint {
@@ -535,7 +539,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		return nil
 	}
 
-	blockExtra, err := GetIbftExtra(currentBlock.ExtraData)
+	blockExtra, err := GetIbftExtra(currentBlock.ExtraData, currentBlock.Number)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -709,7 +713,7 @@ func (c *consensusRuntime) IsValidProposalHash(proposal *proto.Proposal, hash []
 		return false
 	}
 
-	extra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(block.Header.ExtraData, block.Number())
 	if err != nil {
 		c.logger.Error("failed to retrieve extra", "block number", block.Number(), "error", err)
 
@@ -815,7 +819,7 @@ func (c *consensusRuntime) BuildPrePrepareMessage(
 		return nil
 	}
 
-	extra, err := GetIbftExtra(block.Header.ExtraData)
+	extra, err := GetIbftExtra(block.Header.ExtraData, block.Number())
 	if err != nil {
 		c.logger.Error("failed to retrieve extra for block %d: %w", block.Number(), err)
 
@@ -947,7 +951,7 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 
 	blockHeader := latestHeader
 
-	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
+	blockExtra, err := GetIbftExtra(latestHeader.ExtraData, latestHeader.Number)
 	if err != nil {
 		return 0, err
 	}

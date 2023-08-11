@@ -174,7 +174,7 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		}
 	}
 
-	extra, err := GetIbftExtra(header.ExtraData)
+	extra, err := GetIbftExtra(header.ExtraData, header.Number)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode extra from the block#%d: %w", header.Number, err)
 	}

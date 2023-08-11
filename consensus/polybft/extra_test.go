@@ -517,7 +517,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 			ExtraData: extra.MarshalRLPTo(nil),
 		}
 
-		genesisExtra, err := GetIbftExtra(genesis.ExtraData)
+		genesisExtra, err := GetIbftExtra(genesis.ExtraData, genesis.Number)
 		assert.NoError(t, err)
 		assert.Len(t, genesisExtra.Validators.Added, validatorsCount)
 		assert.Empty(t, genesisExtra.Validators.Removed)
@@ -530,7 +530,7 @@ func TestExtra_InitGenesisValidatorsDelta(t *testing.T) {
 			ExtraData: append(make([]byte, ExtraVanity), []byte{0x2, 0x3}...),
 		}
 
-		_, err := GetIbftExtra(genesis.ExtraData)
+		_, err := GetIbftExtra(genesis.ExtraData, genesis.Number)
 
 		require.Error(t, err)
 	})
@@ -570,7 +570,7 @@ func Test_GetIbftExtraClean(t *testing.T) {
 		},
 	}
 
-	extraClean, err := GetIbftExtraClean(extra.MarshalRLPTo(nil))
+	extraClean, err := GetIbftExtraClean(extra.MarshalRLPTo(nil), extra.BlockNumber)
 	require.NoError(t, err)
 
 	extraTwo := &Extra{}
@@ -595,7 +595,7 @@ func Test_GetIbftExtraClean_Fail(t *testing.T) {
 	_, err := rand.Read(randomBytes[:])
 	require.NoError(t, err)
 
-	extra, err := GetIbftExtraClean(append(randomBytes[:], []byte{0x12, 0x6}...))
+	extra, err := GetIbftExtraClean(append(randomBytes[:], []byte{0x12, 0x6}...), 0)
 	require.Error(t, err)
 	require.Nil(t, extra)
 }

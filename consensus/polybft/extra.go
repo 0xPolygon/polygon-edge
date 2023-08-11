@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -26,10 +27,12 @@ var PolyBFTMixDigest = types.StringToHash("adce6e5230abe012342a44e4e9b6d05997d6f
 
 // Extra defines the structure of the extra field for Istanbul
 type Extra struct {
-	Validators *validator.ValidatorSetDelta
-	Parent     *Signature
-	Committed  *Signature
-	Checkpoint *CheckpointData
+	Validators          *validator.ValidatorSetDelta
+	Parent              *Signature
+	Committed           *Signature
+	Checkpoint          *CheckpointData
+	DoubleSignEvidences slashing.DoubleSignEvidences
+	BlockNumber         uint64
 }
 
 // MarshalRLPTo defines the marshal function wrapper for Extra
@@ -41,37 +44,7 @@ func (i *Extra) MarshalRLPTo(dst []byte) []byte {
 
 // MarshalRLPWith defines the marshal function implementation for Extra
 func (i *Extra) MarshalRLPWith(ar *fastrlp.Arena) *fastrlp.Value {
-	vv := ar.NewArray()
-
-	// Validators
-	if i.Validators == nil {
-		vv.Set(ar.NewNullArray())
-	} else {
-		vv.Set(i.Validators.MarshalRLPWith(ar))
-	}
-
-	// Parent Signatures
-	if i.Parent == nil {
-		vv.Set(ar.NewNullArray())
-	} else {
-		vv.Set(i.Parent.MarshalRLPWith(ar))
-	}
-
-	// Committed Signatures
-	if i.Committed == nil {
-		vv.Set(ar.NewNullArray())
-	} else {
-		vv.Set(i.Committed.MarshalRLPWith(ar))
-	}
-
-	// Checkpoint
-	if i.Checkpoint == nil {
-		vv.Set(ar.NewNullArray())
-	} else {
-		vv.Set(i.Checkpoint.MarshalRLPWith(ar))
-	}
-
-	return vv
+	return GetExtraHandler(i.BlockNumber).MarshalRLPWith(i, ar)
 }
 
 // UnmarshalRLP defines the unmarshal function wrapper for Extra
@@ -81,50 +54,7 @@ func (i *Extra) UnmarshalRLP(input []byte) error {
 
 // UnmarshalRLPWith defines the unmarshal implementation for Extra
 func (i *Extra) UnmarshalRLPWith(v *fastrlp.Value) error {
-	const expectedElements = 4
-
-	elems, err := v.GetElems()
-	if err != nil {
-		return err
-	}
-
-	if num := len(elems); num != expectedElements {
-		return fmt.Errorf("incorrect elements count to decode Extra, expected %d but found %d", expectedElements, num)
-	}
-
-	// Validators
-	if elems[0].Elems() > 0 {
-		i.Validators = &validator.ValidatorSetDelta{}
-		if err := i.Validators.UnmarshalRLPWith(elems[0]); err != nil {
-			return err
-		}
-	}
-
-	// Parent Signatures
-	if elems[1].Elems() > 0 {
-		i.Parent = &Signature{}
-		if err := i.Parent.UnmarshalRLPWith(elems[1]); err != nil {
-			return err
-		}
-	}
-
-	// Committed Signatures
-	if elems[2].Elems() > 0 {
-		i.Committed = &Signature{}
-		if err := i.Committed.UnmarshalRLPWith(elems[2]); err != nil {
-			return err
-		}
-	}
-
-	// Checkpoint
-	if elems[3].Elems() > 0 {
-		i.Checkpoint = &CheckpointData{}
-		if err := i.Checkpoint.UnmarshalRLPWith(elems[3]); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return GetExtraHandler(i.BlockNumber).UnmarshalRLPWith(i, v)
 }
 
 // ValidateFinalizedData contains extra data validations for finalized headers
@@ -156,7 +86,7 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 			blockNumber, checkpointHash, err)
 	}
 
-	parentExtra, err := GetIbftExtra(parent.ExtraData)
+	parentExtra, err := GetIbftExtra(parent.ExtraData, parent.Number)
 	if err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d: %w", blockNumber, err)
 	}
@@ -204,6 +134,10 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 	}
 
 	return nil
+}
+
+func (i *Extra) ValidateAdditional(header *types.Header) error {
+	return GetExtraHandler(i.BlockNumber).ValidateAdditional(i, header)
 }
 
 // Signature represents aggregated signatures of signers accompanied with a bitmap
@@ -473,29 +407,24 @@ func (c *CheckpointData) Validate(parentCheckpoint *CheckpointData,
 
 // GetIbftExtraClean returns unmarshaled extra field from the passed in header,
 // but without signatures for the given header (it only includes signatures for the parent block)
-func GetIbftExtraClean(extraRaw []byte) ([]byte, error) {
-	extra, err := GetIbftExtra(extraRaw)
+func GetIbftExtraClean(extraRaw []byte, blockNumber uint64) ([]byte, error) {
+	extra, err := GetIbftExtra(extraRaw, blockNumber)
 	if err != nil {
 		return nil, err
 	}
 
-	ibftExtra := &Extra{
-		Parent:     extra.Parent,
-		Validators: extra.Validators,
-		Checkpoint: extra.Checkpoint,
-		Committed:  &Signature{},
-	}
-
-	return ibftExtra.MarshalRLPTo(nil), nil
+	return GetExtraHandler(blockNumber).GetIbftExtraClean(extra).MarshalRLPTo(nil), nil
 }
 
 // GetIbftExtra returns the istanbul extra data field from the passed in header
-func GetIbftExtra(extraRaw []byte) (*Extra, error) {
+func GetIbftExtra(extraRaw []byte, blockNumber uint64) (*Extra, error) {
 	if len(extraRaw) < ExtraVanity {
 		return nil, fmt.Errorf("wrong extra size: %d", len(extraRaw))
 	}
 
-	extra := &Extra{}
+	extra := &Extra{
+		BlockNumber: blockNumber,
+	}
 
 	if err := extra.UnmarshalRLP(extraRaw); err != nil {
 		return nil, err

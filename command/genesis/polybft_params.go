@@ -227,6 +227,14 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	// properly initialize fork manager so that Extra is correctly RLP serialized
+	if err := polybft.ForkManagerInit(
+		polybft.ForkManagerInitialParamsFactory,
+		polybft.ForkManagerFactory,
+		chainConfig); err != nil {
+		return err
+	}
+
 	genesisExtraData, err := GenerateExtraDataPolyBft(validatorMetadata)
 	if err != nil {
 		return err
