@@ -123,7 +123,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		// mint tokens to depositor, so he is able to send them
 		mintTxn, err := helper.CreateMintTxn(types.Address(depositorAddr),
-			types.StringToAddress(dp.TokenAddr), aggregateAmount)
+			types.StringToAddress(dp.TokenAddr), aggregateAmount, !dp.ChildChainMintable)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
 
@@ -147,7 +147,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	// approve erc20 predicate
 	approveTxn, err := helper.CreateApproveERC20Txn(aggregateAmount,
 		types.StringToAddress(dp.PredicateAddr),
-		types.StringToAddress(dp.TokenAddr))
+		types.StringToAddress(dp.TokenAddr),
+		!dp.ChildChainMintable,
+	)
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create root erc 20 approve transaction: %w", err))
 
@@ -277,9 +279,6 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 
 	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.Address(sender), &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }

@@ -202,10 +202,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra 
 	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
 
 	checkpointManager := ethgo.Address(c.checkpointManagerAddr)
-	txn := &ethgo.Transaction{
-		Type: ethgo.TransactionDynamicFee,
-		To:   &checkpointManager,
-	}
+
 	nextEpochValidators := validator.AccountSet{}
 
 	if isEndOfEpoch {
@@ -222,7 +219,11 @@ func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra 
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
 
-	txn.Input = input
+	txn := &ethgo.Transaction{
+		To:    &checkpointManager,
+		Input: input,
+		Type:  ethgo.TransactionDynamicFee,
+	}
 
 	receipt, err := c.rootChainRelayer.SendTransaction(txn, c.key)
 	if err != nil {

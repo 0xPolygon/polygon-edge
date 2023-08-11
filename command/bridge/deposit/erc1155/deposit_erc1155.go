@@ -261,11 +261,8 @@ func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 
 	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		From:  sender,
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(sender, &addr, input,
+		nil, !dp.ChildChainMintable), nil
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
@@ -283,11 +280,8 @@ func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int)
 
 	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
 
-	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.Address(sender), &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }
 
 // createApproveERC1155PredicateTxn sends approve transaction
@@ -306,8 +300,6 @@ func createApproveERC1155PredicateTxn(rootERC1155Predicate,
 
 	addr := ethgo.Address(rootERC1155Token)
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.ZeroAddress, &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }
