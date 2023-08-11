@@ -670,9 +670,7 @@ func (t *Transition) Create2(
 	if t.config.EIP2929 {
 		contract.AccessList.AddAddress(caller)
 		// add all precompiles to access list
-		for _, addr := range t.precompiles.ContractAddr {
-			contract.AccessList.AddAddress(addr)
-		}
+		contract.AccessList.AddAddress(t.precompiles.ContractAddr...)
 	}
 
 	return t.applyCreate(contract, t)
@@ -691,9 +689,7 @@ func (t *Transition) Call2(
 		c.AccessList.AddAddress(caller)
 		c.AccessList.AddAddress(to)
 		// add all precompiles to access list
-		for _, addr := range t.precompiles.ContractAddr {
-			c.AccessList.AddAddress(addr)
-		}
+		c.AccessList.AddAddress(t.precompiles.ContractAddr...)
 	}
 
 	return t.applyCall(c, runtime.Call, t)

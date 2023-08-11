@@ -59,13 +59,10 @@ func TestAddAddress(t *testing.T) {
 	initialAccessList := createInitialAccessList()
 	finalAccessList := createInitialAccessList()
 
-	addr1Present := initialAccessList.AddAddress(address1)
-	assert.False(t, addr1Present)
+	initialAccessList.AddAddress(address1)
 	assert.Equal(t, finalAccessList, initialAccessList)
 
-	addr3Present := initialAccessList.AddAddress(address3)
-	assert.True(t, addr3Present)
-
+	initialAccessList.AddAddress(address3)
 	(*finalAccessList)[address3] = make(map[types.Hash]struct{})
 	assert.Equal(t, finalAccessList, initialAccessList)
 }
