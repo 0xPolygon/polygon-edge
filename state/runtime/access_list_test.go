@@ -63,6 +63,7 @@ func TestAddAddress(t *testing.T) {
 	assert.Equal(t, finalAccessList, initialAccessList)
 
 	initialAccessList.AddAddress(address3)
+
 	(*finalAccessList)[address3] = make(map[types.Hash]struct{})
 	assert.Equal(t, finalAccessList, initialAccessList)
 }
