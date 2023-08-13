@@ -597,7 +597,21 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		return runtime.ErrMaxCodeSizeExceeded
 	}
 
-	if tx.Type() == types.DynamicFeeTx {
+	if tx.Type() == types.AccessListTx {
+		// Reject access list tx if berlin hardfork(eip-2930) is not enabled
+		if !p.forks.EIP2930 {
+			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
+
+			return ErrInvalidTxType
+		}
+
+		// check if the given tx is not underpriced (same as Legacy approach)
+		if tx.GetGasPrice(p.GetBaseFee()).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+
+			return ErrUnderpriced
+		}
+	} else if tx.Type() == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
 		if !p.forks.London {
 			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
