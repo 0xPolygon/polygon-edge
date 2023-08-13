@@ -127,10 +127,12 @@ func (m *mockHostForInstructions) GetStorage(addr types.Address, key types.Hash)
 	if !ok {
 		return types.ZeroHash
 	}
+
 	res, ok := m.storages[idx][key]
 	if !ok {
 		return types.ZeroHash
 	}
+
 	return res
 }
 
@@ -139,6 +141,8 @@ var (
 )
 
 func Test_opSload(t *testing.T) {
+	t.Parallel()
+
 	type state struct {
 		gas        uint64
 		sp         int
@@ -148,6 +152,7 @@ func Test_opSload(t *testing.T) {
 		stop       bool
 		err        error
 	}
+
 	address1 := types.StringToAddress("address1")
 	key1 := types.StringToHash("1")
 	val1 := types.StringToHash("2")
@@ -294,6 +299,7 @@ func Test_opSload(t *testing.T) {
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
