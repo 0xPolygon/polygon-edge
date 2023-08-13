@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const minGasPrice = 200 // minimum gas price for the modexp precompiled contract
 type modExp struct {
 	p *Precompiled
 }
@@ -131,7 +132,7 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 		// def mult_complexity(x):
 		//    ceiling(x/8)^2
 		//
-		//where is x is max(length_of_MODULUS, length_of_BASE)
+		// where is x is max(length_of_MODULUS, length_of_BASE)
 		gasCost.Add(gasCost, big7)
 		gasCost.Div(gasCost, big8)
 		gasCost.Mul(gasCost, gasCost)
@@ -149,8 +150,8 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 			return math.MaxUint64
 		}
 		// 3. Minimum price of 200 gas
-		if gasCost.Uint64() < 200 {
-			return 200
+		if gasCost.Uint64() < minGasPrice {
+			return minGasPrice
 		}
 
 		return gasCost.Uint64()

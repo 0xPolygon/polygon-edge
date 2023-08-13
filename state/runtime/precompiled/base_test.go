@@ -26,7 +26,7 @@ func testPrecompiled(t *testing.T, p contract, cases []precompiledTest, enabledF
 
 			if c.Gas != 0 && len(enabledForks) > 0 {
 				gas := p.gas(h, enabledForks[0])
-				assert.Equal(t, c.Gas, gas, "Inncorrect gas estimation")
+				assert.Equal(t, c.Gas, gas, "Incorrect gas estimation")
 			}
 
 			found, err := p.run(h, types.ZeroAddress, nil)
