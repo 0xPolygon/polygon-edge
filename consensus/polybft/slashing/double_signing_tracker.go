@@ -28,6 +28,7 @@ type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
+//nolint:godox
 // TODO RLP serialize/deserialize methods, Equals method for validation, etc.
 
 type Messages struct {
