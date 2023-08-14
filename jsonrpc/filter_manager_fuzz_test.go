@@ -90,7 +90,7 @@ func FuzzGetLogsForQuery(f *testing.F) {
 		if len(hash) != types.HashLength {
 			t.Skip()
 		}
-		blockHash := types.Hash(hash)
+		blockHash := types.BytesToHash(hash)
 
 		logQuery := LogQuery{
 			BlockHash: &blockHash,
@@ -146,7 +146,7 @@ func FuzzGetLogFilterFromID(f *testing.F) {
 			t.Skip()
 		}
 		logFilter := &LogQuery{
-			Addresses: []types.Address{types.Address(address)},
+			Addresses: []types.Address{types.BytesToAddress(address)},
 			toBlock:   BlockNumber(toBlock),
 			fromBlock: BlockNumber(fromBlock),
 		}
