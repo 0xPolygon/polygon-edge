@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,7 +88,8 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	txnHash, err := t.sendTransactionLocked(txn, key)
 	if err != nil {
-		if txn.Type != ethgo.TransactionLegacy && errors.Is(err, types.ErrTxTypeNotSupported) {
+		if txn.Type != ethgo.TransactionLegacy &&
+			strings.Contains(err.Error(), types.ErrTxTypeNotSupported.Error()) {
 			// downgrade transaction to legacy tx type and resend it
 			txn.Type = ethgo.TransactionLegacy
 			txn.GasPrice = 0
