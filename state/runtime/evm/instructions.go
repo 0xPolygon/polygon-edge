@@ -28,6 +28,18 @@ var (
 	wordSize = big.NewInt(32)
 )
 
+func (c *state) calculateGasForEIP2929(addr types.Address) uint64 {
+	var gas uint64
+	if c.accessList.ContainsAddress(addr) {
+		gas = WarmStorageReadCostEIP2929
+	} else {
+		gas = ColdAccountAccessCostEIP2929
+		c.accessList.AddAddress(addr)
+	}
+
+	return gas
+}
+
 func opAdd(c *state) {
 	a := c.pop()
 	b := c.top()
@@ -610,12 +622,7 @@ func opBalance(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		if addressPresent := c.accessList.ContainsAddress(addr); addressPresent {
-			gas = WarmStorageReadCostEIP2929
-		} else {
-			gas = ColdAccountAccessCostEIP2929
-			c.accessList.AddAddress(addr)
-		}
+		c.calculateGasForEIP2929(addr)
 	} else if c.config.Istanbul {
 		// eip-1884
 		gas = 700
@@ -701,12 +708,7 @@ func opExtCodeSize(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		if addressPresent := c.accessList.ContainsAddress(addr); addressPresent {
-			gas = WarmStorageReadCostEIP2929
-		} else {
-			gas = ColdAccountAccessCostEIP2929
-			c.accessList.AddAddress(addr)
-		}
+		c.calculateGasForEIP2929(addr)
 	} else if c.config.EIP150 {
 		gas = 700
 	} else {
@@ -744,12 +746,7 @@ func opExtCodeHash(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		if addressPresent := c.accessList.ContainsAddress(address); addressPresent {
-			gas = WarmStorageReadCostEIP2929
-		} else {
-			gas = ColdAccountAccessCostEIP2929
-			c.accessList.AddAddress(address)
-		}
+		c.calculateGasForEIP2929(address)
 	} else if c.config.Istanbul {
 		gas = 700
 	} else {
@@ -826,12 +823,7 @@ func opExtCodeCopy(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		if addressPresent := c.accessList.ContainsAddress(address); addressPresent {
-			gas = WarmStorageReadCostEIP2929
-		} else {
-			gas = ColdAccountAccessCostEIP2929
-			c.accessList.AddAddress(address)
-		}
+		c.calculateGasForEIP2929(address)
 	} else if c.config.EIP150 {
 		gas = 700
 	} else {
@@ -1300,12 +1292,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	var gasCost uint64
 
 	if c.config.EIP2929 {
-		if addressPresent := c.accessList.ContainsAddress(addr); addressPresent {
-			gasCost = WarmStorageReadCostEIP2929
-		} else {
-			c.accessList.AddAddress(addr)
-			gasCost = ColdAccountAccessCostEIP2929
-		}
+		c.calculateGasForEIP2929(addr)
 	} else if c.config.EIP150 {
 		gasCost = 700
 	} else {
