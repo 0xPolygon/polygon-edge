@@ -23,46 +23,48 @@ var (
 	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
 )
 
-type MinAddressHeap []types.Address
+var _ sort.Interface = (*SortedAddresses)(nil)
 
-func (h MinAddressHeap) Len() int           { return len(h) }
-func (h MinAddressHeap) Less(i, j int) bool { return bytes.Compare(h[i].Bytes(), h[j].Bytes()) < 0 }
-func (h MinAddressHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+// SortedAddresses is a slice which holds addresses in an ascending order
+type SortedAddresses []types.Address
 
-func (h *MinAddressHeap) Push(x interface{}) {
-	*h = append(*h, x.(types.Address)) //nolint:forcetypeassert
+func (s SortedAddresses) Len() int           { return len(s) }
+func (s SortedAddresses) Less(i, j int) bool { return bytes.Compare(s[i].Bytes(), s[j].Bytes()) < 0 }
+func (s SortedAddresses) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func (s *SortedAddresses) Add(addr types.Address) {
+	addrRaw := addr.Bytes()
+	index := sort.Search(len(*s), func(i int) bool {
+		return bytes.Compare((*s)[i].Bytes(), addrRaw) >= 0
+	})
+
+	*s = append(*s, types.ZeroAddress)
+	copy((*s)[index+1:], (*s)[index:])
+	(*s)[index] = addr
 }
 
-func (h *MinAddressHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
+var _ sort.Interface = (*SortedRounds)(nil)
 
-	return x
-}
+// SortedRounds is a slice which holds rounds in an ascending order
+type SortedRounds []uint64
 
-type MinRoundsHeap []uint64
+func (s SortedRounds) Len() int           { return len(s) }
+func (s SortedRounds) Less(i, j int) bool { return s[i] < s[j] }
+func (s SortedRounds) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-func (h MinRoundsHeap) Len() int           { return len(h) }
-func (h MinRoundsHeap) Less(i, j int) bool { return h[i] < h[j] }
-func (h MinRoundsHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+func (s *SortedRounds) Add(round uint64) {
+	index := sort.Search(len(*s), func(i int) bool {
+		return (*s)[i] >= round
+	})
 
-func (h *MinRoundsHeap) Push(x interface{}) {
-	*h = append(*h, x.(uint64)) //nolint:forcetypeassert
-}
-
-func (h *MinRoundsHeap) Pop() interface{} {
-	old := *h
-	n := len(old)
-	x := old[n-1]
-	*h = old[0 : n-1]
-
-	return x
+	*s = append(*s, 0)
+	copy((*s)[index+1:], (*s)[index:])
+	(*s)[index] = round
 }
 
 var _ sort.Interface = (*SortedMessages)(nil)
 
+// SortedMessages is a slice which holds messages in an ascending order by its signatures
 type SortedMessages []*ibftProto.Message
 
 func (s SortedMessages) Len() int           { return len(s) }
@@ -109,8 +111,8 @@ func newDoubleSignEvidence(sender types.Address, messages []*ibftProto.Message) 
 
 type Messages struct {
 	content       MessagesMap
-	sortedSenders map[uint64]MinAddressHeap
-	sortedRounds  map[uint64]MinRoundsHeap
+	sortedSenders map[uint64]SortedAddresses
+	sortedRounds  map[uint64]SortedRounds
 	mux           sync.RWMutex
 }
 
@@ -155,19 +157,19 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 	// add sender into sorted sender heap
 	sendersHeap, ok := m.sortedSenders[view.Height]
 	if !ok {
-		sendersHeap = make(MinAddressHeap, 0, 1)
+		sendersHeap = make(SortedAddresses, 0, 1)
 	}
 
-	sendersHeap.Push(sender)
+	sendersHeap.Add(sender)
 	m.sortedSenders[view.Height] = sendersHeap
 
 	// add round into sorted rounds heap
 	roundsHeap, ok := m.sortedRounds[view.Height]
 	if !ok {
-		roundsHeap = make(MinRoundsHeap, 0, 1)
+		roundsHeap = make(SortedRounds, 0, 1)
 	}
 
-	roundsHeap.Push(view.Round)
+	roundsHeap.Add(view.Round)
 	m.sortedRounds[view.Height] = roundsHeap
 }
 
@@ -216,23 +218,23 @@ func NewDoubleSigningTracker(logger hclog.Logger,
 		validators:         initialValidators,
 		preprepare: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap),
-			sortedRounds:  make(map[uint64]MinRoundsHeap),
+			sortedSenders: make(map[uint64]SortedAddresses),
+			sortedRounds:  make(map[uint64]SortedRounds),
 		},
 		prepare: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap),
-			sortedRounds:  make(map[uint64]MinRoundsHeap),
+			sortedSenders: make(map[uint64]SortedAddresses),
+			sortedRounds:  make(map[uint64]SortedRounds),
 		},
 		commit: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap),
-			sortedRounds:  make(map[uint64]MinRoundsHeap),
+			sortedSenders: make(map[uint64]SortedAddresses),
+			sortedRounds:  make(map[uint64]SortedRounds),
 		},
 		roundChange: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap),
-			sortedRounds:  make(map[uint64]MinRoundsHeap),
+			sortedSenders: make(map[uint64]SortedAddresses),
+			sortedRounds:  make(map[uint64]SortedRounds),
 		},
 	}
 
@@ -307,20 +309,17 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 		msgs.mux.Lock()
 
 		roundMsgs, msgsMapExists := msgs.content[height]
-		sendersHeap, sendersHeapExists := msgs.sortedSenders[height]
-		roundsHeap, roundsHeapExists := msgs.sortedRounds[height]
+		senders, sendersHeapExists := msgs.sortedSenders[height]
+		rounds, roundsHeapExists := msgs.sortedRounds[height]
 
 		if !msgsMapExists || !sendersHeapExists || !roundsHeapExists {
 			continue
 		}
 
-		for roundsHeap.Len() > 0 {
-			round := roundsHeap.Pop().(uint64) //nolint:forcetypeassert
+		for _, round := range rounds {
 			msgsPerSenders := roundMsgs[round]
 
-			for sendersHeap.Len() > 0 {
-				sender := sendersHeap.Pop().(types.Address) //nolint:forcetypeassert
-
+			for _, sender := range senders {
 				msgs, ok := msgsPerSenders[sender]
 				if !ok || len(msgs) < 2 || doubleSigners.containsSender(sender) {
 					continue
