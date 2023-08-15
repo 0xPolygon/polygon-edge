@@ -300,6 +300,8 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 		rounds, sortedRoundsExist := msgs.sortedRounds[height]
 
 		if !msgsMapExists || !sortedSendersExist || !sortedRoundsExist {
+			msgs.mux.Unlock()
+
 			continue
 		}
 
