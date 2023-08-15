@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: maticnetwork/terraform-polygon-supernets
-          ref: jesse/nightly
+          ref: main
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -252,7 +252,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: maticnetwork/terraform-polygon-supernets
-          ref: jesse/nightly
+          ref: main
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:

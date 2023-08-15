@@ -33,7 +33,7 @@ type transaction struct {
 	BlockHash   *types.Hash    `json:"blockHash"`
 	BlockNumber *argUint64     `json:"blockNumber"`
 	TxIndex     *argUint64     `json:"transactionIndex"`
-	ChainID     *argBig        `json:"chainID,omitempty"`
+	ChainID     *argBig        `json:"chainId,omitempty"`
 	Type        argUint64      `json:"type"`
 }
 
@@ -166,6 +166,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 
 	for idx, txn := range b.Transactions {
 		if fullTx {
+			txn.GasPrice = txn.GetGasPrice(b.Header.BaseFee)
 			res.Transactions = append(
 				res.Transactions,
 				toTransaction(

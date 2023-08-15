@@ -10,6 +10,7 @@ import (
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -84,7 +85,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	amount, err := types.ParseUint256orHex(&response)
+	amount, err := common.ParseUint256orHex(&response)
 	if err != nil {
 		return err
 	}

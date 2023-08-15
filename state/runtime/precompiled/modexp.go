@@ -10,13 +10,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
+const minGasPrice = 200 // minimum gas price for the modexp precompiled contract
 type modExp struct {
 	p *Precompiled
 }
 
 var (
 	big1      = big.NewInt(1)
+	big3      = big.NewInt(3)
 	big4      = big.NewInt(4)
+	big7      = big.NewInt(7)
 	big8      = big.NewInt(8)
 	big16     = big.NewInt(16)
 	big32     = big.NewInt(32)
@@ -110,6 +113,8 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 		expHead.SetBytes(val)
 	}
 
+	adjExpLen := adjustedExponentLength(expLen, expHead)
+
 	// a := mult_complexity(max(length_of_MODULUS, length_of_BASE)
 	gasCost := new(big.Int)
 	if modLen.Cmp(baseLen) >= 0 {
@@ -118,10 +123,43 @@ func (m *modExp) gas(input []byte, config *chain.ForksInTime) uint64 {
 		gasCost.Set(baseLen)
 	}
 
+	//EIP-2565 gas cost calculation
+	if config.EIP2565 {
+		// EIP-2565 has three changes
+		// 1. Different multComplexity (inlined here)
+		// in EIP-2565 (https://eips.ethereum.org/EIPS/eip-2565):
+		//
+		// def mult_complexity(x):
+		//    ceiling(x/8)^2
+		//
+		// where is x is max(length_of_MODULUS, length_of_BASE)
+		gasCost.Add(gasCost, big7)
+		gasCost.Div(gasCost, big8)
+		gasCost.Mul(gasCost, gasCost)
+
+		// a = a * max(ADJUSTED_EXPONENT_LENGTH, 1)
+		if adjExpLen.Cmp(big1) >= 0 {
+			gasCost.Mul(gasCost, adjExpLen)
+		} else {
+			gasCost.Mul(gasCost, big1)
+		}
+		// 2. Different divisor (`GQUADDIVISOR`) (3)
+		gasCost.Div(gasCost, big3)
+		// cap to the max uint64
+		if !gasCost.IsUint64() {
+			return math.MaxUint64
+		}
+		// 3. Minimum price of 200 gas
+		if gasCost.Uint64() < minGasPrice {
+			return minGasPrice
+		}
+
+		return gasCost.Uint64()
+	}
+
 	gasCost = multComplexity(gasCost)
 
 	// a = a * max(ADJUSTED_EXPONENT_LENGTH, 1)
-	adjExpLen := adjustedExponentLength(expLen, expHead)
 	if adjExpLen.Cmp(big1) >= 0 {
 		gasCost.Mul(gasCost, adjExpLen)
 	} else {

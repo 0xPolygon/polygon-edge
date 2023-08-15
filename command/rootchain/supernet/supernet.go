@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -252,7 +253,7 @@ func getFinalizedStake(owner, validator, stakeManager types.Address, chainID int
 		return nil, err
 	}
 
-	return types.ParseUint256orHex(&response)
+	return common.ParseUint256orHex(&response)
 }
 
 // validatorSetToABISlice converts given validators to generic map
