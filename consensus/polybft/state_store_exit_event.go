@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
 )
@@ -33,7 +32,7 @@ func (e *exitEventNotFoundError) Error() string {
 	return fmt.Sprintf("could not find any exit event that has an id: %v and epoch: %v", e.exitID, e.epoch)
 }
 
-// ExitEvent is an event emitted by Exit contract
+// ExitEvent is an event emitted by L2StateSender contract
 type ExitEvent struct {
 	*contractsapi.L2StateSyncedEvent
 	// EpochNumber is the epoch number in which exit event was added
@@ -50,12 +49,12 @@ exit events/
 |--> (exitEventID) -> epochNumber
 |--> (lastProcessedBlockKey) -> block number
 */
-type CheckpointStore struct {
+type ExitEventStore struct {
 	db *bolt.DB
 }
 
 // initialize creates necessary buckets in DB if they don't already exist
-func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
+func (s *ExitEventStore) initialize(tx *bolt.Tx) error {
 	if _, err := tx.CreateBucketIfNotExists(exitEventsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventsBucket), err)
 	}
@@ -72,7 +71,7 @@ func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
-func (s *CheckpointStore) insertExitEvents(exitEvents []*ExitEvent) error {
+func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	if len(exitEvents) == 0 {
 		// small optimization
 		return nil
@@ -111,7 +110,7 @@ func insertExitEventToBucket(exitEventBucket, lookupBucket *bolt.Bucket, exitEve
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
-func (s *CheckpointStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
+func (s *ExitEventStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
 	var exitEvent *ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -143,7 +142,7 @@ func (s *CheckpointStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
 }
 
 // getExitEventsByEpoch returns all exit events that happened in the given epoch
-func (s *CheckpointStore) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
+func (s *ExitEventStore) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
 	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 		return exitEvent.EpochNumber == epoch
 	})
@@ -151,14 +150,14 @@ func (s *CheckpointStore) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, erro
 
 // getExitEventsForProof returns all exit events that happened in and prior to the given checkpoint block number
 // with respect to the epoch in which block is added
-func (s *CheckpointStore) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
+func (s *ExitEventStore) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
 	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 		return exitEvent.EpochNumber == epoch && exitEvent.BlockNumber <= checkpointBlock
 	})
 }
 
 // getExitEvents returns exit events for given epoch and provided filter
-func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
+func (s *ExitEventStore) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
 	var events []*ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -188,7 +187,7 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 }
 
 // updateLastSaved saves the last block processed for exit events
-func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
+func (s *ExitEventStore) updateLastSaved(blockNumber uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey,
 			common.EncodeUint64ToBytes(blockNumber))
@@ -196,7 +195,7 @@ func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
 }
 
 // updateLastSaved saves the last block processed for exit events
-func (s *CheckpointStore) getLastSaved() (uint64, error) {
+func (s *ExitEventStore) getLastSaved() (uint64, error) {
 	var lastSavedBlock uint64
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -231,21 +230,4 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 		EpochNumber:        epoch,
 		BlockNumber:        block,
 	}, nil
-}
-
-// convertLog converts types.Log to ethgo.Log
-func convertLog(log *types.Log) *ethgo.Log {
-	l := &ethgo.Log{
-		Address: ethgo.Address(log.Address),
-		Data:    make([]byte, len(log.Data)),
-		Topics:  make([]ethgo.Hash, len(log.Topics)),
-	}
-
-	copy(l.Data, log.Data)
-
-	for i, topic := range log.Topics {
-		l.Topics[i] = ethgo.Hash(topic)
-	}
-
-	return l
 }
