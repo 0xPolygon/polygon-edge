@@ -57,6 +57,7 @@ type TestServer struct {
 	clusterConfig *TestClusterConfig
 	config        *TestServerConfig
 	node          *node
+	byzantine     bool
 }
 
 func (t *TestServer) GrpcAddr() string {
@@ -103,7 +104,7 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 }
 
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
-	bridgeJSONRPC string, callback TestServerConfigCallback) *TestServer {
+	bridgeJSONRPC string, byzantine bool, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
 	config := &TestServerConfig{
@@ -136,6 +137,7 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 		clusterConfig: clusterConfig,
 		address:       types.Address(key.Address()),
 		config:        config,
+		byzantine:     byzantine,
 	}
 	srv.Start()
 
@@ -183,7 +185,12 @@ func (t *TestServer) Start() {
 	// Start the server
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
 
-	node, err := newNode(t.clusterConfig.Binary, args, stdout)
+	binary := t.clusterConfig.Binary
+	if t.byzantine && t.clusterConfig.ByzantineBinary != "" {
+		binary = t.clusterConfig.ByzantineBinary
+	}
+
+	node, err := newNode(binary, args, stdout)
 	if err != nil {
 		t.t.Fatal(err)
 	}

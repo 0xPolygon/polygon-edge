@@ -49,6 +49,9 @@ const (
 
 	// prefix for non validators directory
 	nonValidatorPrefix = "test-non-validator-"
+
+	// prefix for byzantine node directory
+	byzantineNodePrefix = "test-byzantine-node-"
 )
 
 var (
@@ -67,6 +70,15 @@ func resolveBinary() string {
 	}
 	// fallback
 	return "polygon-edge"
+}
+
+func resolveByzantineBynary() string {
+	bin := os.Getenv("BYZANTINE_BINARY")
+	if bin != "" {
+		return bin
+	}
+	// fallback
+	return "polygon-edge-byzantine"
 }
 
 type TestClusterConfig struct {
@@ -88,6 +100,8 @@ type TestClusterConfig struct {
 	ValidatorPrefix      string
 	Binary               string
 	ValidatorSetSize     uint64
+	ByzantineBinary      string
+	ByzantineNodeCount   uint64
 	EpochSize            int
 	EpochReward          int
 	NativeTokenConfigRaw string
@@ -356,6 +370,12 @@ func WithTestRewardToken() ClusterOption {
 	}
 }
 
+func WithByzantineNodes(num int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ByzantineNodeCount = uint64(num)
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -374,14 +394,15 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	var err error
 
 	config := &TestClusterConfig{
-		t:             t,
-		WithLogs:      isTrueEnv(envLogsEnabled),
-		WithStdout:    isTrueEnv(envStdoutEnabled),
-		Binary:        resolveBinary(),
-		EpochSize:     10,
-		EpochReward:   1,
-		BlockGasLimit: 1e7, // 10M
-		StakeAmounts:  []*big.Int{},
+		t:               t,
+		WithLogs:        isTrueEnv(envLogsEnabled),
+		WithStdout:      isTrueEnv(envStdoutEnabled),
+		Binary:          resolveBinary(),
+		ByzantineBinary: resolveByzantineBynary(),
+		EpochSize:       10,
+		EpochReward:     1,
+		BlockGasLimit:   1e7, // 10M
+		StakeAmounts:    []*big.Int{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -432,6 +453,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// we don't call secrets callback on non-validators,
 		// since we have nothing to premine nor stake for non validators
 		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
+		require.NoError(t, err)
+	}
+
+	if config.ByzantineNodeCount > 0 {
+		_, err := cluster.InitSecrets(byzantineNodePrefix, int(config.ByzantineNodeCount))
 		require.NoError(t, err)
 	}
 
@@ -594,20 +620,25 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
+			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */, false /* byzantine */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			false, false /* relayer */)
+			false, false /* relayer */, false /* byzantine */)
+	}
+
+	for i := 1; i <= int(cluster.Config.ByzantineNodeCount); i++ {
+		dir := byzantineNodePrefix + strconv.Itoa(i)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), false, false /* relayer */, true /* byzantine */)
 	}
 
 	return cluster
 }
 
 func (c *TestCluster) InitTestServer(t *testing.T,
-	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool) {
+	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool, byzantine bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -620,7 +651,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		}
 	}
 
-	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
+	srv := NewTestServer(t, c.Config, bridgeJSONRPC, byzantine, func(config *TestServerConfig) {
 		config.DataDir = dataDir
 		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
