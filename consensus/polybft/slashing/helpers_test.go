@@ -140,11 +140,9 @@ func enforceUniqueRandomNumber(existingNums map[uint64]struct{}, maxNum uint64, 
 	for {
 		num = numGenFn()
 		if _, ok := existingNums[num]; !ok {
-			break
+			return num
 		}
 	}
-
-	return num
 }
 
 type dummyValidatorsProvider struct {
