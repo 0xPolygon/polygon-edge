@@ -3,11 +3,9 @@ package slashing
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"sort"
 	"sync"
 	"testing"
-	"time"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
@@ -18,8 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-var r = rand.New(rand.NewSource(time.Now().UTC().Unix()))
 
 func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	t.Parallel()
@@ -455,10 +451,7 @@ func TestDoubleSigningTracker_GetDoubleSigners_Property(t *testing.T) {
 		existingHeights := make(map[uint64]struct{}, heightsNum)
 
 		for i := 0; i < heightsNum; i++ {
-			height := enforceUniqueRandomNumber(existingHeights, maxHeight, func() uint64 {
-				return rapid.Uint64Range(1, maxHeight).Draw(rapidT, fmt.Sprintf("generate height#%d", i+1))
-			})
-
+			height := enforceUniqueRandomNumber(rapidT, existingHeights, 1, maxHeight, fmt.Sprintf("generate height#%d", i+1))
 			existingHeights[height] = struct{}{}
 			shouldDoubleSign := rapid.Bool().Draw(rapidT, "double signing flag")
 			expectedDoubleSigning[height] = shouldDoubleSign
@@ -466,10 +459,7 @@ func TestDoubleSigningTracker_GetDoubleSigners_Property(t *testing.T) {
 			proposalHash := generateRandomProposalHash(t)
 
 			for j := 0; j < roundsNum; j++ {
-				round := enforceUniqueRandomNumber(existingRounds, uint64(maxRound), func() uint64 {
-					return rapid.Uint64Range(0, maxRound).Draw(rapidT, fmt.Sprintf("generate round#%d", j+1))
-				})
-
+				round := enforceUniqueRandomNumber(rapidT, existingRounds, 0, maxRound, fmt.Sprintf("round#%d", j+1))
 				existingRounds[round] = struct{}{}
 				heights[i] = height
 
