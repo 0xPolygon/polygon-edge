@@ -26,19 +26,10 @@ var (
 type SenderMessagesMap map[types.Address][]*ibftProto.Message
 type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
-type DoubleSignEvidences []*DoubleSignEvidence
+type DoubleSigners []types.Address
 
+//nolint:godox
 // TODO RLP serialize/deserialize methods, Equals method for validation, etc.
-
-type DoubleSignEvidence struct {
-	signer   types.Address
-	messages []*ibftProto.Message
-}
-
-func newDoubleSignEvidence(signer types.Address,
-	messages []*ibftProto.Message) *DoubleSignEvidence {
-	return &DoubleSignEvidence{signer: signer, messages: messages}
-}
 
 type Messages struct {
 	content MessagesMap
@@ -93,7 +84,7 @@ var _ DoubleSigningTracker = (*DoubleSigningTrackerImpl)(nil)
 
 type DoubleSigningTracker interface {
 	Handle(msg *ibftProto.Message)
-	GetEvidences(height uint64) []*DoubleSignEvidence
+	GetDoubleSigners(height uint64) DoubleSigners
 	PruneMsgsUntil(height uint64)
 	PostBlock(req *common.PostBlockRequest) error
 }
@@ -171,9 +162,9 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 	}
 }
 
-// GetEvidences returns double signing evidences for the given height
-func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvidence {
-	evidences := []*DoubleSignEvidence{}
+// GetEvidences returns double signers for the given height
+func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners {
+	doubleSigners := make(DoubleSigners, 0)
 
 	for _, msgType := range t.msgsTypes {
 		msgs := t.resolveMessagesStorage(msgType)
@@ -194,19 +185,14 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 					continue
 				}
 
-				evidence := newDoubleSignEvidence(address, []*ibftProto.Message{msgs[0]})
-				evidences = append(evidences, evidence)
-
-				for _, msg := range msgs[1:] {
-					evidence.messages = append(evidence.messages, msg)
-				}
+				doubleSigners = append(doubleSigners, address)
 			}
 		}
 
 		msgs.mux.Unlock()
 	}
 
-	return evidences
+	return doubleSigners
 }
 
 // PostBlock is used to populate all known validators

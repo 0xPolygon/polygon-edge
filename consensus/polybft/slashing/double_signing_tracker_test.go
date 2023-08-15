@@ -342,7 +342,7 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 	}
 }
 
-func TestDoubleSigningTracker_GetEvidences(t *testing.T) {
+func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -354,6 +354,7 @@ func TestDoubleSigningTracker_GetEvidences(t *testing.T) {
 	require.NoError(t, err)
 
 	key := wallet.NewKey(acc)
+	senderAddr := types.Address(key.Address())
 	view := &ibftProto.View{Height: 6, Round: 2}
 	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
 	require.NoError(t, err)
@@ -375,21 +376,11 @@ func TestDoubleSigningTracker_GetEvidences(t *testing.T) {
 		tracker.Handle(msg)
 	}
 
-	evidences := tracker.GetEvidences(view.Height)
-	require.Len(t, evidences, 2)
+	doubleSigners := tracker.GetDoubleSigners(view.Height)
+	require.Len(t, doubleSigners, 2)
 
-	prepareEvidence := evidences[0]
-	require.Len(t, prepareEvidence.messages, len(prepareMessages))
-
-	commitEvidence := evidences[1]
-	require.Len(t, commitEvidence.messages, len(commitMessages))
-
-	for i, msg := range prepareMessages {
-		require.Equal(t, msg, prepareEvidence.messages[i])
-	}
-
-	for i, msg := range commitMessages {
-		require.Equal(t, msg, commitEvidence.messages[i])
+	for _, doubleSigner := range doubleSigners {
+		require.Equal(t, senderAddr, doubleSigner)
 	}
 }
 
