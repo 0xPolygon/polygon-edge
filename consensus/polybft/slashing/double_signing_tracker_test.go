@@ -1,7 +1,9 @@
 package slashing
 
 import (
+	"bytes"
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 
@@ -346,7 +348,7 @@ func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
 	t.Parallel()
 
 	const (
-		prepareMsgsCount = 2
+		prepareMsgsCount = 5
 		commitMsgsCount  = 3
 	)
 
@@ -370,6 +372,10 @@ func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
 		tracker.Handle(msg)
 	}
 
+	sort.Slice(prepareMessages, func(i, j int) bool {
+		return bytes.Compare(prepareMessages[i].Signature, prepareMessages[j].Signature) < 0
+	})
+
 	for i := 0; i < commitMsgsCount; i++ {
 		msg := buildCommitMessage(t, view, key, generateRandomProposalHash(t))
 		commitMessages = append(commitMessages, msg)
@@ -377,11 +383,9 @@ func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
 	}
 
 	doubleSigners := tracker.GetDoubleSigners(view.Height)
-	require.Len(t, doubleSigners, 2)
+	require.Len(t, doubleSigners, 1)
 
-	for _, doubleSigner := range doubleSigners {
-		require.Equal(t, senderAddr, doubleSigner)
-	}
+	require.Equal(t, senderAddr, doubleSigners[0])
 }
 
 func TestDoubleSigningTracker_PostBlock(t *testing.T) {

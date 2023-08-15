@@ -23,13 +23,35 @@ var (
 	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
 )
 
+const msgsPerEvidence = 2
+
 type SenderMessagesMap map[types.Address][]*ibftProto.Message
 type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
+// containsSender checks whether provided sender is already present in the double sign evidences
+func (s *DoubleSigners) containsSender(sender types.Address) bool {
+	for _, addr := range *s {
+		if addr == sender {
+			return true
+		}
+	}
+
+	return false
+}
+
 //nolint:godox
-// TODO RLP serialize/deserialize methods, Equals method for validation, etc.
+// TODO: RLP serialize/deserialize methods, Equals method for validation, etc.
+
+type DoubleSignEvidence struct {
+	sender   types.Address
+	messages []*ibftProto.Message
+}
+
+func newDoubleSignEvidence(sender types.Address, messages []*ibftProto.Message) *DoubleSignEvidence {
+	return &DoubleSignEvidence{sender: sender, messages: messages}
+}
 
 type Messages struct {
 	content MessagesMap
@@ -179,9 +201,19 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 			continue
 		}
 
-		for _, senderMsgs := range roundMsgs {
+		rounds := make([]uint64, 0, len(roundMsgs))
+		for round := range roundMsgs {
+			rounds = append(rounds, round)
+		}
+
+		sort.Slice(rounds, func(i, j int) bool {
+			return rounds[i] < rounds[j]
+		})
+
+		for _, r := range rounds {
+			senderMsgs := roundMsgs[r]
 			for address, msgs := range senderMsgs {
-				if len(msgs) <= 1 {
+				if len(msgs) < 2 || doubleSigners.containsSender(address) {
 					continue
 				}
 
