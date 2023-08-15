@@ -19,7 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var r = rand.New(rand.NewSource(time.Now().Unix()))
+var r = rand.New(rand.NewSource(time.Now().UTC().Unix()))
 
 func TestDoubleSigningTracker_Handle_SingleSender(t *testing.T) {
 	t.Parallel()
@@ -426,12 +426,14 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 
 	doubleSigners := make([]types.Address, 0, doubleSignersCount)
 	keys := make([]*wallet.Key, accountsCount)
+
 	for i := 0; i < accountsCount; i++ {
 		acc, err := wallet.GenerateAccount()
 		require.NoError(t, err)
 
 		keys[i] = wallet.NewKey(acc)
 		provider.accounts[i] = acc
+
 		if len(doubleSigners) < doubleSignersCount {
 			doubleSigners = append(doubleSigners, types.Address(keys[i].Address()))
 		}
@@ -489,12 +491,14 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 			if len(doubleSigners) == 0 {
 				t.Log(tracker.prepare.String())
 			}
+
 			require.Len(t, doubleSigners, 1)
 			require.Equal(t, doubleSigners[0], types.Address(keys[0].Address()))
 		} else {
 			if len(doubleSigners) > 0 {
 				t.Log(tracker.prepare.String())
 			}
+
 			require.Empty(t, doubleSigners)
 		}
 	}
