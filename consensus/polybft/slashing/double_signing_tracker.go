@@ -23,9 +23,44 @@ var (
 	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
 )
 
-const msgsPerEvidence = 2
+type MinAddressHeap []types.Address
 
-type SenderMessagesMap map[types.Address][]*ibftProto.Message
+func (h MinAddressHeap) Len() int           { return len(h) }
+func (h MinAddressHeap) Less(i, j int) bool { return bytes.Compare(h[i].Bytes(), h[j].Bytes()) < 0 }
+func (h MinAddressHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *MinAddressHeap) Push(x interface{}) {
+	*h = append(*h, x.(types.Address)) //nolint:forcetypeassert
+}
+
+func (h *MinAddressHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+
+	return x
+}
+
+var _ sort.Interface = (*SortedMessages)(nil)
+
+type SortedMessages []*ibftProto.Message
+
+func (s SortedMessages) Len() int           { return len(s) }
+func (s SortedMessages) Less(i, j int) bool { return bytes.Compare(s[i].Signature, s[j].Signature) < 0 }
+func (s SortedMessages) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func (s *SortedMessages) Add(msg *ibftProto.Message) {
+	index := sort.Search(len(*s), func(i int) bool {
+		return bytes.Compare((*s)[i].Signature, msg.Signature) >= 0
+	})
+
+	*s = append(*s, &ibftProto.Message{})
+	copy((*s)[index+1:], (*s)[index:])
+	(*s)[index] = msg
+}
+
+type SenderMessagesMap map[types.Address]SortedMessages
 type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
@@ -54,8 +89,9 @@ func newDoubleSignEvidence(sender types.Address, messages []*ibftProto.Message) 
 }
 
 type Messages struct {
-	content MessagesMap
-	mux     sync.RWMutex
+	content       MessagesMap
+	sortedSenders map[uint64]MinAddressHeap
+	mux           sync.RWMutex
 }
 
 // getSenderMsgs returns messages for given height, round and sender.
@@ -87,11 +123,21 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
 	}
 
-	if _, ok := senderMsgs[sender]; ok {
-		senderMsgs[sender] = append(senderMsgs[sender], msg)
-	} else {
-		senderMsgs[sender] = []*ibftProto.Message{msg}
+	msgs, ok := senderMsgs[sender]
+	if !ok {
+		msgs = make([]*ibftProto.Message, 0, 1)
 	}
+
+	msgs.Add(msg)
+	senderMsgs[sender] = msgs
+
+	sendersHeap, ok := m.sortedSenders[view.Height]
+	if !ok {
+		sendersHeap = make(MinAddressHeap, 0, 1)
+	}
+
+	sendersHeap.Push(sender)
+	m.sortedSenders[view.Height] = sendersHeap
 }
 
 // createSenderMsgsMap initializes senders message map for the given round
@@ -104,6 +150,8 @@ func createSenderMsgsMap(round uint64, roundMsgs map[uint64]SenderMessagesMap) S
 
 var _ DoubleSigningTracker = (*DoubleSigningTrackerImpl)(nil)
 
+// DoubleSigningTracker is an abstraction for gathering IBFT messages,
+// storing them and providing double signing evidences
 type DoubleSigningTracker interface {
 	Handle(msg *ibftProto.Message)
 	GetDoubleSigners(height uint64) DoubleSigners
@@ -135,10 +183,18 @@ func NewDoubleSigningTracker(logger hclog.Logger,
 		logger:             logger,
 		validatorsProvider: validatorsProvider,
 		validators:         initialValidators,
-		preprepare:         &Messages{content: make(MessagesMap)},
-		prepare:            &Messages{content: make(MessagesMap)},
-		commit:             &Messages{content: make(MessagesMap)},
-		roundChange:        &Messages{content: make(MessagesMap)},
+		preprepare: &Messages{
+			content:       make(MessagesMap),
+			sortedSenders: make(map[uint64]MinAddressHeap)},
+		prepare: &Messages{
+			content:       make(MessagesMap),
+			sortedSenders: make(map[uint64]MinAddressHeap)},
+		commit: &Messages{
+			content:       make(MessagesMap),
+			sortedSenders: make(map[uint64]MinAddressHeap)},
+		roundChange: &Messages{
+			content:       make(MessagesMap),
+			sortedSenders: make(map[uint64]MinAddressHeap)},
 	}
 
 	for _, msgType := range ibftProto.MessageType_value {
@@ -160,6 +216,9 @@ func (t *DoubleSigningTrackerImpl) Handle(msg *ibftProto.Message) {
 		return
 	}
 
+	t.mux.Lock()
+	defer t.mux.Unlock()
+
 	msgMap := t.resolveMessagesStorage(msg.GetType())
 	msgMap.addMessage(msg.View, types.BytesToAddress(msg.From), msg)
 }
@@ -177,6 +236,12 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 		for msgHeight := range msgs.content {
 			if msgHeight < height {
 				delete(msgs.content, msgHeight)
+			}
+		}
+
+		for h := range msgs.sortedSenders {
+			if h < height {
+				delete(msgs.sortedSenders, h)
 			}
 		}
 
@@ -201,6 +266,13 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 			continue
 		}
 
+		sendersHeap, ok := msgs.sortedSenders[height]
+		if !ok {
+			continue
+		}
+
+		//nolint:godox
+		// TODO: make rounds heap
 		rounds := make([]uint64, 0, len(roundMsgs))
 		for round := range roundMsgs {
 			rounds = append(rounds, round)
@@ -212,12 +284,16 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 
 		for _, r := range rounds {
 			senderMsgs := roundMsgs[r]
-			for address, msgs := range senderMsgs {
-				if len(msgs) < 2 || doubleSigners.containsSender(address) {
+
+			for len(sendersHeap) > 0 {
+				sender := sendersHeap.Pop().(types.Address) //nolint:forcetypeassert
+
+				msgs, ok := senderMsgs[sender]
+				if !ok || len(msgs) < 2 || doubleSigners.containsSender(sender) {
 					continue
 				}
 
-				doubleSigners = append(doubleSigners, address)
+				doubleSigners = append(doubleSigners, sender)
 			}
 		}
 
