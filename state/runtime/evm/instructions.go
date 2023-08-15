@@ -622,7 +622,7 @@ func opBalance(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		c.calculateGasForEIP2929(addr)
+		gas = c.calculateGasForEIP2929(addr)
 	} else if c.config.Istanbul {
 		// eip-1884
 		gas = 700
@@ -708,7 +708,7 @@ func opExtCodeSize(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		c.calculateGasForEIP2929(addr)
+		gas = c.calculateGasForEIP2929(addr)
 	} else if c.config.EIP150 {
 		gas = 700
 	} else {
@@ -746,7 +746,7 @@ func opExtCodeHash(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		c.calculateGasForEIP2929(address)
+		gas = c.calculateGasForEIP2929(address)
 	} else if c.config.Istanbul {
 		gas = 700
 	} else {
@@ -823,7 +823,7 @@ func opExtCodeCopy(c *state) {
 	var gas uint64
 
 	if c.config.EIP2929 {
-		c.calculateGasForEIP2929(address)
+		gas = c.calculateGasForEIP2929(address)
 	} else if c.config.EIP150 {
 		gas = 700
 	} else {
@@ -1292,7 +1292,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	var gasCost uint64
 
 	if c.config.EIP2929 {
-		c.calculateGasForEIP2929(addr)
+		gasCost = c.calculateGasForEIP2929(addr)
 	} else if c.config.EIP150 {
 		gasCost = 700
 	} else {
