@@ -161,7 +161,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	outputter.SetCommandResult(&exitResult{
-		ID:       strconv.FormatUint(exitEvent.ID, 10),
+		ID:       strconv.FormatUint(exitEvent.ID.Uint64(), 10),
 		Sender:   exitEvent.Sender.String(),
 		Receiver: exitEvent.Receiver.String(),
 	})
@@ -186,7 +186,7 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 
 	var exitEventAPI contractsapi.L2StateSyncedEvent
 
-	exitEventEncoded, err := exitEventAPI.Encode(exitEvent)
+	exitEventEncoded, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to encode exit event: %w", err)
 	}

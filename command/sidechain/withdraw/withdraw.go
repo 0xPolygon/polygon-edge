@@ -122,10 +122,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 
 	outputter.WriteCommandResult(
 		&withdrawResult{
-			validatorAddress: validatorAccount.Ecdsa.Address().String(),
-			amount:           withdrawalEvent.Amount,
-			exitEventID:      exitEventID,
-			blockNumber:      receipt.BlockNumber,
+			ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
+			Amount:           withdrawalEvent.Amount,
+			ExitEventID:      exitEventID,
+			BlockNumber:      receipt.BlockNumber,
 		})
 
 	return nil

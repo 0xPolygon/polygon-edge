@@ -296,22 +296,37 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 
 	state := newTestState(t)
 
-	receipts := make([]*types.Receipt, numOfReceipts)
-	for i := 0; i < numOfReceipts; i++ {
-		receipts[i] = &types.Receipt{Logs: []*types.Log{
-			createTestLogForExitEvent(t, uint64(i)),
-		}}
-		receipts[i].SetStatus(types.ReceiptSuccess)
+	createReceipts := func(startID, endID uint64) []*types.Receipt {
+		receipts := make([]*types.Receipt, endID-startID)
+		for i := startID; i < endID; i++ {
+			receipts[i-startID] = &types.Receipt{Logs: []*types.Log{
+				createTestLogForExitEvent(t, i),
+			}}
+			receipts[i-startID].SetStatus(types.ReceiptSuccess)
+		}
+
+		return receipts
 	}
 
-	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}, Receipts: receipts},
+	extra := &Extra{
+		Checkpoint: &CheckpointData{
+			EpochNumber: epoch,
+		},
+	}
+
+	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}},
 		Epoch: epoch}
 
+	req.FullBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil)
+
+	blockchain := new(blockchainMock)
 	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), 5, types.ZeroAddress,
-		nil, nil, nil, hclog.NewNullLogger(), state)
+		nil, blockchain, nil, hclog.NewNullLogger(), state)
 
 	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
+		require.NoError(t, state.CheckpointStore.updateLastSaved(block-1)) // we got everything till the current block
 		req.IsEpochEndingBlock = false
+		req.FullBlock.Receipts = createReceipts(0, 5)
 		require.NoError(t, checkpointManager.PostBlock(req))
 
 		exitEvents, err := state.CheckpointStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
@@ -319,22 +334,78 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, exitEvents, numOfReceipts)
+		require.Len(t, exitEvents, 5)
 		require.Equal(t, uint64(epoch), exitEvents[0].EpochNumber)
 	})
 
 	t.Run("PostBlock - epoch ending block (exit events are saved to the next epoch)", func(t *testing.T) {
+		require.NoError(t, state.CheckpointStore.updateLastSaved(block)) // we got everything till the current block
 		req.IsEpochEndingBlock = true
+		req.FullBlock.Receipts = createReceipts(5, 10)
+		extra.Validators = &validator.ValidatorSetDelta{}
+		req.FullBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil)
+		req.FullBlock.Block.Header.Number = block + 1
+
 		require.NoError(t, checkpointManager.PostBlock(req))
 
 		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
-			return exitEvent.BlockNumber == block+1
+			return exitEvent.BlockNumber == block+2 // they should be saved in the next epoch and its first block
 		})
 
 		require.NoError(t, err)
-		require.Len(t, exitEvents, numOfReceipts)
-		require.Equal(t, uint64(block+1), exitEvents[0].BlockNumber)
+		require.Len(t, exitEvents, 5)
+		require.Equal(t, uint64(block+2), exitEvents[0].BlockNumber)
 		require.Equal(t, uint64(epoch+1), exitEvents[0].EpochNumber)
+	})
+
+	t.Run("PostBlock - there are missing events", func(t *testing.T) {
+		require.NoError(t, state.CheckpointStore.updateLastSaved(block)) // we are missing one block
+
+		missedReceipts := createReceipts(10, 13)
+		newReceipts := createReceipts(13, 15)
+
+		extra := &Extra{
+			Checkpoint: &CheckpointData{
+				EpochNumber: epoch + 1,
+			},
+		}
+
+		blockchain.On("GetHeaderByNumber", uint64(block+1)).Return(&types.Header{
+			Number:    block + 1,
+			ExtraData: extra.MarshalRLPTo(nil),
+			Hash:      types.BytesToHash([]byte{0, 1, 2, 3}),
+		}, true)
+		blockchain.On("GetReceiptsByHash", types.BytesToHash([]byte{0, 1, 2, 3})).Return([]*types.Receipt{}, nil)
+		blockchain.On("GetHeaderByNumber", uint64(block+2)).Return(&types.Header{
+			Number:    block + 2,
+			ExtraData: extra.MarshalRLPTo(nil),
+			Hash:      types.BytesToHash([]byte{4, 5, 6, 7}),
+		}, true)
+		blockchain.On("GetReceiptsByHash", types.BytesToHash([]byte{4, 5, 6, 7})).Return(missedReceipts, nil)
+
+		req.IsEpochEndingBlock = false
+		req.FullBlock.Block.Header.Number = block + 3                  // new block
+		req.FullBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil) // same epoch
+		req.FullBlock.Receipts = newReceipts
+		require.NoError(t, checkpointManager.PostBlock(req))
+
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+			return exitEvent.BlockNumber == block+2
+		})
+
+		require.NoError(t, err)
+		// receipts from missed block + events from previous test case that were saved in the next epoch
+		// since they were in epoch ending block
+		require.Len(t, exitEvents, len(missedReceipts)+5)
+		require.Equal(t, extra.Checkpoint.EpochNumber, exitEvents[0].EpochNumber)
+
+		exitEvents, err = state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+			return exitEvent.BlockNumber == block+3
+		})
+
+		require.NoError(t, err)
+		require.Len(t, exitEvents, len(newReceipts))
+		require.Equal(t, extra.Checkpoint.EpochNumber, exitEvents[0].EpochNumber)
 	})
 }
 

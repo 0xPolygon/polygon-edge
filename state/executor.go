@@ -519,11 +519,11 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 // surfacing of these errors reject the transaction thus not including it in the block
 
 var (
-	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
-	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
-	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
-	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
-	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
+	ErrNonceIncorrect        = errors.New("incorrect nonce")
+	ErrNotEnoughFundsForGas  = errors.New("not enough funds to cover gas costs")
+	ErrBlockLimitReached     = errors.New("gas limit reached in the pool")
+	ErrIntrinsicGasOverflow  = errors.New("overflow in intrinsic gas calculation")
+	ErrNotEnoughIntrinsicGas = errors.New("not enough gas supplied for intrinsic gas costs")
 
 	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
 	// transaction with a tip higher than the total fee cap.

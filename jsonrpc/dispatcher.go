@@ -209,6 +209,8 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 			return "", NewInternalError(err.Error())
 		}
 		filterID = d.filterManager.NewLogFilter(logQuery, conn)
+	} else if subscribeMethod == "newPendingTransactions" {
+		filterID = d.filterManager.NewPendingTxFilter(conn)
 	} else {
 		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}

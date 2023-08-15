@@ -21,6 +21,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
@@ -259,7 +260,7 @@ func getCount(
 		response = "0x0"
 	}
 
-	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+	bigResponse, decodeErr := common.ParseUint256orHex(&response)
 
 	if decodeErr != nil {
 		return nil, fmt.Errorf("wnable to decode hex response, %w", decodeErr)

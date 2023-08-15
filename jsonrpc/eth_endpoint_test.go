@@ -161,14 +161,14 @@ func TestEth_DecodeTxn(t *testing.T) {
 			t.Parallel()
 
 			if tt.res != nil {
-				tt.res.ComputeHash()
+				tt.res.ComputeHash(1)
 			}
 			store := newMockStore()
 			for addr, acc := range tt.accounts {
 				store.SetAccount(addr, acc)
 			}
 
-			res, err := DecodeTxn(tt.arg, store)
+			res, err := DecodeTxn(tt.arg, 1, store)
 			assert.Equal(t, tt.res, res)
 			assert.Equal(t, tt.err, err)
 		})
@@ -288,9 +288,9 @@ func TestEth_TxnType(t *testing.T) {
 		Nonce:     0,
 		Type:      types.DynamicFeeTx,
 	}
-	res, err := DecodeTxn(args, store)
+	res, err := DecodeTxn(args, 1, store)
 
-	expectedRes.ComputeHash()
+	expectedRes.ComputeHash(1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRes, res)
 }

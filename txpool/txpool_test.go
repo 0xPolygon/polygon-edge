@@ -89,7 +89,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 
 	return NewTxPool(
 		hclog.NewNullLogger(),
-		forks.At(0),
+		forks,
 		storeToUse,
 		nil,
 		nil,
@@ -602,7 +602,7 @@ func TestAddGossipTx(t *testing.T) {
 
 		signedTx, err := signer.SignTx(tx, key)
 		if err != nil {
-			t.Fatalf("cannot sign transction - err: %v", err)
+			t.Fatalf("cannot sign transaction - err: %v", err)
 		}
 
 		// send tx
@@ -766,6 +766,43 @@ func TestEnqueueHandler(t *testing.T) {
 			acc.nonceToTx.lock()
 			assert.Equal(t, int(1), len(acc.nonceToTx.mapping))
 			acc.nonceToTx.unlock()
+		},
+	)
+
+	t.Run(
+		"accept new tx with nextNonce when enqueued is full",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			// mock full enqueued
+			pool.accounts.maxEnqueuedLimit = 10
+
+			// add 10 transaction in txpool i.e. max enqueued transactions
+			for i := uint64(1); i <= 10; i++ {
+				err := pool.addTx(local, newTx(addr1, i, 1))
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, uint64(10), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			err = pool.addTx(local, newTx(addr1, 11, 1))
+			assert.True(t, errors.Is(err, ErrMaxEnqueuedLimitReached))
+
+			// add the transaction with nextNonce i.e. nonce=0
+			err = pool.addTx(local, newTx(addr1, uint64(0), 1))
+			assert.NoError(t, err)
+
+			pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(11), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(t, uint64(11), pool.accounts.get(addr1).getNonce())
 		},
 	)
 }
@@ -1769,7 +1806,7 @@ func TestPop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare(0)
+	pool.Prepare()
 	tx := pool.Peek()
 	pool.Pop(tx)
 
@@ -1803,7 +1840,7 @@ func TestDrop(t *testing.T) {
 	assert.Equal(t, uint64(1), pool.accounts.get(addr1).promoted.length())
 
 	// pop the tx
-	pool.Prepare(0)
+	pool.Prepare()
 	tx := pool.Peek()
 	pool.Drop(tx)
 	assert.Equal(t, tx1, tx)
@@ -1838,7 +1875,7 @@ func TestDemote(t *testing.T) {
 		assert.Equal(t, uint64(0), pool.accounts.get(addr1).Demotions())
 
 		// call demote
-		pool.Prepare(0)
+		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -1872,7 +1909,7 @@ func TestDemote(t *testing.T) {
 		pool.accounts.get(addr1).demotions = maxAccountDemotions
 
 		// call demote
-		pool.Prepare(0)
+		pool.Prepare()
 		tx := pool.Peek()
 		pool.Demote(tx)
 
@@ -2027,11 +2064,15 @@ func Test_TxPool_validateTx(t *testing.T) {
 	defaultKey, defaultAddr := tests.GenerateKeyAndAddr(t)
 
 	setupPool := func() *TxPool {
-		pool, err := newTestPool()
+		header := mockHeader.Copy()
+		header.BaseFee = 1000
+
+		pool, err := newTestPool(NewDefaultMockStore(header))
 		if err != nil {
 			t.Fatalf("cannot create txpool - err: %v\n", err)
 		}
 
+		pool.SetBaseFee(header)
 		pool.SetSigner(signer)
 
 		return pool
@@ -2049,7 +2090,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks.EIP158 = true
+		pool.forks = chain.AllForksEnabled
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize+1)
 		_, err := rand.Read(input)
@@ -2068,7 +2109,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks.EIP158 = true
+		pool.forks = chain.AllForksEnabled
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize)
 		_, err := rand.Read(input)
@@ -2088,7 +2129,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2102,7 +2142,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2119,7 +2158,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2136,7 +2174,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		t.Parallel()
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		// undefined gas tip cap
 		tx := newTx(defaultAddr, 0, 1)
@@ -2170,7 +2207,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		bitLength := 512
 
 		pool := setupPool()
-		pool.baseFee = 1000
 
 		// very high gas fee cap
 		tx := newTx(defaultAddr, 0, 1)
@@ -2196,7 +2232,8 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("eip-1559 tx placed without eip-1559 fork enabled", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks.London = false
+		pool.forks = chain.AllForksEnabled
+		pool.forks.RemoveFork(chain.London)
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2612,9 +2649,20 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 func TestExecutablesOrder(t *testing.T) {
 	t.Parallel()
 
-	newPricedTx := func(addr types.Address, nonce, gasPrice uint64) *types.Transaction {
+	newPricedTx := func(
+		addr types.Address, nonce, gasPrice uint64, gasFeeCap uint64, value uint64) *types.Transaction {
 		tx := newTx(addr, nonce, 1)
-		tx.GasPrice.SetUint64(gasPrice)
+		tx.Value = new(big.Int).SetUint64(value)
+
+		if gasPrice == 0 {
+			tx.Type = types.DynamicFeeTx
+			tx.GasFeeCap = new(big.Int).SetUint64(gasFeeCap)
+			tx.GasTipCap = new(big.Int).SetUint64(2)
+			tx.GasPrice = big.NewInt(0)
+		} else {
+			tx.Type = types.LegacyTx
+			tx.GasPrice = new(big.Int).SetUint64(gasPrice)
+		}
 
 		return tx
 	}
@@ -2622,87 +2670,118 @@ func TestExecutablesOrder(t *testing.T) {
 	testCases := []struct {
 		name               string
 		allTxs             map[types.Address][]*types.Transaction
-		expectedPriceOrder []uint64
+		expectedPriceOrder [][2]uint64
 	}{
 		{
 			name: "case #1",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					newPricedTx(addr1, 0, 1),
+					newPricedTx(addr1, 0, 1, 0, 400),
 				},
 				addr2: {
-					newPricedTx(addr2, 0, 2),
+					newPricedTx(addr2, 0, 2, 0, 500),
 				},
 				addr3: {
-					newPricedTx(addr3, 0, 3),
+					newPricedTx(addr3, 0, 3, 0, 200),
 				},
 				addr4: {
-					newPricedTx(addr4, 0, 4),
+					newPricedTx(addr4, 0, 4, 0, 300),
 				},
 				addr5: {
-					newPricedTx(addr5, 0, 5),
+					newPricedTx(addr5, 0, 5, 0, 100),
 				},
 			},
-			expectedPriceOrder: []uint64{
-				5,
-				4,
-				3,
-				2,
-				1,
+			expectedPriceOrder: [][2]uint64{
+				{5, 100},
+				{4, 300},
+				{3, 200},
+				{2, 500},
+				{1, 400},
 			},
 		},
 		{
 			name: "case #2",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					newPricedTx(addr1, 0, 3),
-					newPricedTx(addr1, 1, 3),
-					newPricedTx(addr1, 2, 3),
+					newPricedTx(addr1, 1, 3, 0, 200),
+					newPricedTx(addr1, 2, 3, 0, 500),
+					newPricedTx(addr1, 0, 3, 0, 300),
 				},
 				addr2: {
-					newPricedTx(addr2, 0, 2),
-					newPricedTx(addr2, 1, 2),
-					newPricedTx(addr2, 2, 2),
+					newPricedTx(addr2, 0, 2, 0, 700),
+					newPricedTx(addr2, 1, 2, 0, 900),
+					newPricedTx(addr2, 2, 2, 0, 800),
 				},
 				addr3: {
-					newPricedTx(addr3, 0, 1),
-					newPricedTx(addr3, 1, 1),
-					newPricedTx(addr3, 2, 1),
+					newPricedTx(addr3, 2, 1, 0, 100),
+					newPricedTx(addr3, 1, 1, 0, 50),
+					newPricedTx(addr3, 0, 1, 0, 75),
 				},
 			},
-			expectedPriceOrder: []uint64{
-				3,
-				3,
-				3,
-				2,
-				2,
-				2,
-				1,
-				1,
-				1,
+			expectedPriceOrder: [][2]uint64{
+				{3, 300},
+				{3, 200},
+				{3, 500},
+				{2, 700},
+				{2, 900},
+				{2, 800},
+				{1, 75},
+				{1, 50},
+				{1, 100},
 			},
 		},
 		{
 			name: "case #3",
 			allTxs: map[types.Address][]*types.Transaction{
 				addr1: {
-					newPricedTx(addr1, 0, 9),
-					newPricedTx(addr1, 1, 5),
-					newPricedTx(addr1, 2, 3),
+					newPricedTx(addr1, 1, 5, 0, 100),
+					newPricedTx(addr1, 0, 9, 0, 100),
+					newPricedTx(addr1, 2, 3, 0, 100),
 				},
 				addr2: {
-					newPricedTx(addr2, 0, 9),
-					newPricedTx(addr2, 1, 3),
-					newPricedTx(addr2, 2, 1),
+					newPricedTx(addr2, 0, 9, 0, 100),
+					newPricedTx(addr2, 1, 3, 0, 100),
+					newPricedTx(addr2, 2, 1, 0, 100),
 				},
 			},
-			expectedPriceOrder: []uint64{
-				9,
-				9,
-				5,
-				3,
-				3,
-				1,
+			expectedPriceOrder: [][2]uint64{
+				{9, 100},
+				{9, 100},
+				{5, 100},
+				{3, 100},
+				{3, 100},
+				{1, 100},
+			},
+		},
+		{
+			name: "case #4",
+			allTxs: map[types.Address][]*types.Transaction{
+				addr1: {
+					newPricedTx(addr1, 0, 0, 70, 1),
+					newPricedTx(addr1, 1, 0, 50, 2),
+					newPricedTx(addr1, 2, 0, 20, 3),
+				},
+				addr2: {
+					newPricedTx(addr2, 0, 0, 90, 4),
+					newPricedTx(addr2, 1, 0, 80, 5),
+					newPricedTx(addr2, 2, 0, 10, 6),
+				},
+				addr3: {
+					newPricedTx(addr3, 0, 0, 100, 7),
+					newPricedTx(addr3, 1, 0, 60, 8),
+					newPricedTx(addr3, 2, 0, 40, 9),
+				},
+			},
+			expectedPriceOrder: [][2]uint64{
+				{0, 7},
+				{0, 4},
+				{0, 5},
+				{0, 1},
+				{0, 8},
+				{0, 2},
+				{0, 9},
+				{0, 3},
+				{0, 6},
 			},
 		},
 	}
@@ -2736,8 +2815,10 @@ func TestExecutablesOrder(t *testing.T) {
 			defer cancelFn()
 
 			// All txns should get added
-			assert.Len(t, waitForEvents(ctx, subscription, expectedPromotedTx), expectedPromotedTx)
-			assert.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
+			require.Len(t, waitForEvents(ctx, subscription, expectedPromotedTx), expectedPromotedTx)
+			require.Equal(t, uint64(len(test.expectedPriceOrder)), pool.accounts.promoted())
+
+			pool.Prepare()
 
 			var successful []*types.Transaction
 			for {
@@ -2750,10 +2831,13 @@ func TestExecutablesOrder(t *testing.T) {
 				successful = append(successful, tx)
 			}
 
+			require.Len(t, successful, expectedPromotedTx)
+
 			// verify the highest priced transactions
 			// were processed first
 			for i, tx := range successful {
-				assert.Equal(t, test.expectedPriceOrder[i], tx.GasPrice.Uint64())
+				require.Equal(t, test.expectedPriceOrder[i][0], tx.GasPrice.Uint64())
+				require.Equal(t, test.expectedPriceOrder[i][1], tx.Value.Uint64())
 			}
 		})
 	}
@@ -2937,7 +3021,7 @@ func TestRecovery(t *testing.T) {
 			assert.Len(t, waitForEvents(ctx, promoteSubscription, totalTx), totalTx)
 
 			func() {
-				pool.Prepare(0)
+				pool.Prepare()
 				for {
 					tx := pool.Peek()
 					if tx == nil {
@@ -3277,7 +3361,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 		go func(i uint64) {
 			tx := newTx(addr, i, 1)
 
-			tx.ComputeHash()
+			tx.ComputeHash(1)
 
 			// add transaction hash to map
 			mux.Lock()
@@ -3406,6 +3490,53 @@ func TestAddTxsInOrder(t *testing.T) {
 		assert.Equal(t, uint64(0), acc.enqueued.length())
 		assert.Equal(t, len(acc.nonceToTx.mapping), int(acc.promoted.length()))
 	}
+}
+
+func TestResetWithHeadersSetsBaseFee(t *testing.T) {
+	t.Parallel()
+
+	blocks := []*types.Block{
+		{
+			Header: &types.Header{
+				BaseFee: 100,
+				Hash:    types.Hash{1},
+			},
+		},
+		{
+			Header: &types.Header{
+				BaseFee: 1000,
+				Hash:    types.Hash{1},
+			},
+		},
+		{
+			Header: &types.Header{
+				BaseFee: 2000,
+				Hash:    types.Hash{2},
+			},
+		},
+	}
+
+	store := NewDefaultMockStore(blocks[0].Header)
+	store.getBlockByHashFn = func(h types.Hash, b bool) (*types.Block, bool) {
+		for _, b := range blocks {
+			if b.Header.Hash == h {
+				return b, true
+			}
+		}
+
+		return nil, false
+	}
+
+	pool, err := newTestPool(store)
+	require.NoError(t, err)
+
+	pool.SetBaseFee(blocks[0].Header)
+
+	pool.ResetWithHeaders()
+	assert.Equal(t, blocks[0].Header.BaseFee, pool.GetBaseFee())
+
+	pool.ResetWithHeaders(blocks[len(blocks)-2].Header, blocks[len(blocks)-1].Header)
+	assert.Equal(t, blocks[len(blocks)-1].Header.BaseFee, pool.GetBaseFee())
 }
 
 func BenchmarkAddTxTime(b *testing.B) {

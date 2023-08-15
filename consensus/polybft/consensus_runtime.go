@@ -37,7 +37,7 @@ var (
 
 // txPoolInterface is an abstraction of transaction pool
 type txPoolInterface interface {
-	Prepare(uint64)
+	Prepare()
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(*types.Transaction)
@@ -196,7 +196,9 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		// enable checkpoint manager
-		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+		txRelayer, err := txrelayer.NewTxRelayer(
+			txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint),
+			txrelayer.WithWriter(logger.StandardWriter(&hcf.StandardLoggerOptions{})))
 		if err != nil {
 			return err
 		}
@@ -378,7 +380,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfSprint {
-		commitment, err := c.stateSyncManager.Commitment()
+		commitment, err := c.stateSyncManager.Commitment(pendingBlockNumber)
 		if err != nil {
 			return err
 		}

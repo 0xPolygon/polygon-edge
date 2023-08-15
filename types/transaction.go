@@ -6,7 +6,6 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 const (
@@ -64,6 +63,8 @@ type Transaction struct {
 
 	Type TxType
 
+	ChainID *big.Int
+
 	// Cache
 	size atomic.Pointer[uint64]
 }
@@ -74,15 +75,8 @@ func (t *Transaction) IsContractCreation() bool {
 }
 
 // ComputeHash computes the hash of the transaction
-func (t *Transaction) ComputeHash() *Transaction {
-	ar := marshalArenaPool.Get()
-	hash := keccak.DefaultKeccakPool.Get()
-
-	v := t.MarshalRLPWith(ar)
-	hash.WriteRlp(t.Hash[:0], v)
-
-	marshalArenaPool.Put(ar)
-	keccak.DefaultKeccakPool.Put(hash)
+func (t *Transaction) ComputeHash(blockNumber uint64) *Transaction {
+	GetTransactionHashHandler(blockNumber).ComputeHash(t)
 
 	return t
 }
@@ -153,7 +147,7 @@ func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 	if t.GasPrice != nil && t.GasPrice.BitLen() > 0 {
 		return new(big.Int).Set(t.GasPrice)
 	} else if baseFee == 0 {
-		return new(big.Int)
+		return big.NewInt(0)
 	}
 
 	gasFeeCap := new(big.Int)
@@ -166,18 +160,17 @@ func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 		gasTipCap = gasTipCap.Set(t.GasTipCap)
 	}
 
-	gasPrice := new(big.Int)
 	if gasFeeCap.BitLen() > 0 || gasTipCap.BitLen() > 0 {
-		gasPrice = common.BigMin(
-			new(big.Int).Add(
+		return common.BigMin(
+			gasTipCap.Add(
 				gasTipCap,
 				new(big.Int).SetUint64(baseFee),
 			),
-			new(big.Int).Set(gasFeeCap),
+			gasFeeCap,
 		)
 	}
 
-	return gasPrice
+	return big.NewInt(0)
 }
 
 func (t *Transaction) Size() uint64 {
@@ -191,17 +184,49 @@ func (t *Transaction) Size() uint64 {
 	return size
 }
 
-// EffectiveTip defines effective tip based on tx type.
+// EffectiveGasTip defines effective tip based on tx type.
 // Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
 // We use EIP-1559 fields of the tx if the london hardfork is enabled.
 // Effective tip be came to be either gas tip cap or (gas fee cap - current base fee)
-func (t *Transaction) EffectiveTip(baseFee uint64) *big.Int {
-	if t.GasFeeCap != nil && t.GasTipCap != nil {
-		return common.BigMin(
-			new(big.Int).Sub(t.GasFeeCap, new(big.Int).SetUint64(baseFee)),
-			new(big.Int).Set(t.GasTipCap),
-		)
+func (t *Transaction) EffectiveGasTip(baseFee *big.Int) *big.Int {
+	if baseFee == nil || baseFee.BitLen() == 0 {
+		return t.GetGasTipCap()
 	}
 
-	return t.GetGasPrice(baseFee)
+	return common.BigMin(
+		new(big.Int).Set(t.GetGasTipCap()),
+		new(big.Int).Sub(t.GetGasFeeCap(), baseFee))
+}
+
+// GetGasTipCap gets gas tip cap depending on tx type
+// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
+func (t *Transaction) GetGasTipCap() *big.Int {
+	switch t.Type {
+	case DynamicFeeTx:
+		return t.GasTipCap
+	default:
+		return t.GasPrice
+	}
+}
+
+// GetGasFeeCap gets gas fee cap depending on tx type
+// Spec: https://eips.ethereum.org/EIPS/eip-1559#specification
+func (t *Transaction) GetGasFeeCap() *big.Int {
+	switch t.Type {
+	case DynamicFeeTx:
+		return t.GasFeeCap
+	default:
+		return t.GasPrice
+	}
+}
+
+// FindTxByHash returns transaction and its index from a slice of transactions
+func FindTxByHash(txs []*Transaction, hash Hash) (*Transaction, int) {
+	for idx, txn := range txs {
+		if txn.Hash == hash {
+			return txn, idx
+		}
+	}
+
+	return nil, -1
 }

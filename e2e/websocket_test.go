@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 )
@@ -98,7 +98,7 @@ func TestWS_Response(t *testing.T) {
 			t.Fatalf("Unable to unmarshal WS result: %v", wsError)
 		}
 
-		foundBalance, parseError := types.ParseUint256orHex(&balanceHex)
+		foundBalance, parseError := common.ParseUint256orHex(&balanceHex)
 		if parseError != nil {
 			t.Fatalf("Unable to parse WS result balance: %v", parseError)
 		}
@@ -142,7 +142,7 @@ func TestWS_Response(t *testing.T) {
 			t.Fatalf("Unable to unmarshal WS result: %v", wsError)
 		}
 
-		blockNumInt, parseError := types.ParseUint256orHex(&blockNum)
+		blockNumInt, parseError := common.ParseUint256orHex(&blockNum)
 		if parseError != nil {
 			t.Fatalf("Unable to parse WS result balance: %v", parseError)
 		}

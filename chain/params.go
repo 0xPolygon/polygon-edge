@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -129,27 +129,9 @@ func (f *Forks) At(block uint64) ForksInTime {
 	}
 }
 
-// ForkParams hard-coded fork params
-type ForkParams struct {
-	// MaxValidatorSetSize indicates the maximum size of validator set
-	MaxValidatorSetSize *uint64 `json:"maxValidatorSetSize,omitempty"`
-
-	// EpochSize is size of epoch
-	EpochSize *uint64 `json:"epochSize,omitempty"`
-
-	// SprintSize is size of sprint
-	SprintSize *uint64 `json:"sprintSize,omitempty"`
-
-	// BlockTime is target frequency of blocks production
-	BlockTime *common.Duration `json:"blockTime,omitempty"`
-
-	// BlockTimeDrift defines the time slot in which a new block can be created
-	BlockTimeDrift *uint64 `json:"blockTimeDrift,omitempty"`
-}
-
 type Fork struct {
-	Block  uint64      `json:"block"`
-	Params *ForkParams `json:"params,omitempty"`
+	Block  uint64                  `json:"block"`
+	Params *forkmanager.ForkParams `json:"params,omitempty"`
 }
 
 func NewFork(n uint64) Fork {

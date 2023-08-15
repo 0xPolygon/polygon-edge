@@ -43,8 +43,9 @@ var (
 		"allowed in an epoch ending block")
 	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
-	errValidatorSetDeltaMismatch        = errors.New("validator set delta mismatch")
-	errValidatorsUpdateInNonEpochEnding = errors.New("trying to update validator set in a non epoch ending block")
+	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
+	errValidatorsUpdateInNonEpochEnding    = errors.New("trying to update validator set in a non epoch ending block")
+	errValidatorDeltaNilInEpochEndingBlock = errors.New("validator set delta is nil in epoch ending block")
 )
 
 type fsm struct {
@@ -231,7 +232,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
 	}
 
-	return createStateTransactionWithData(contracts.StateReceiverContract, inputData), nil
+	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
@@ -254,7 +255,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, input), nil
 }
 
 // createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
@@ -265,7 +266,7 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.RewardPoolContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.RewardPoolContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -337,11 +338,15 @@ func (f *fsm) Validate(proposal []byte) error {
 
 	// validate validators delta
 	if f.isEndOfEpoch {
+		if extra.Validators == nil {
+			return errValidatorDeltaNilInEpochEndingBlock
+		}
+
 		if !extra.Validators.Equals(f.newValidatorsDelta) {
 			return errValidatorSetDeltaMismatch
 		}
-	} else if !extra.Validators.IsEmpty() {
-		// delta should be empty in non epoch ending blocks
+	} else if extra.Validators != nil {
+		// delta should be nil in non epoch ending blocks
 		return errValidatorsUpdateInNonEpochEnding
 	}
 
@@ -438,7 +443,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 
 			commitmentTxExists = true
 
-			if err = verifyBridgeCommitmentTx(tx.Hash, stateTxData, f.validators); err != nil {
+			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash, stateTxData, f.validators); err != nil {
 				return err
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
@@ -618,7 +623,7 @@ func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) 
 }
 
 // verifyBridgeCommitmentTx validates bridge commitment transaction
-func verifyBridgeCommitmentTx(txHash types.Hash,
+func verifyBridgeCommitmentTx(blockNumber uint64, txHash types.Hash,
 	commitment *CommitmentMessageSigned,
 	validators validator.ValidatorSet) error {
 	signers, err := validators.Accounts().GetFilteredValidators(commitment.AggSignature.Bitmap)
@@ -626,7 +631,7 @@ func verifyBridgeCommitmentTx(txHash types.Hash,
 		return fmt.Errorf("failed to retrieve signers for state tx (%s): %w", txHash, err)
 	}
 
-	if !validators.HasQuorum(signers.GetAddressesAsSet()) {
+	if !validators.HasQuorum(blockNumber, signers.GetAddressesAsSet()) {
 		return fmt.Errorf("quorum size not reached for state tx (%s)", txHash)
 	}
 
@@ -696,7 +701,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
-func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
+func createStateTransactionWithData(blockNumber uint64, target types.Address, inputData []byte) *types.Transaction {
 	tx := &types.Transaction{
 		From:     contracts.SystemCaller,
 		To:       &target,
@@ -706,7 +711,7 @@ func createStateTransactionWithData(target types.Address, inputData []byte) *typ
 		GasPrice: big.NewInt(0),
 	}
 
-	tx.ComputeHash()
+	tx.ComputeHash(blockNumber)
 
 	return tx
 }

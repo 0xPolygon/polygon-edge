@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
-	"github.com/umbracle/ethgo/contract"
 	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
@@ -30,23 +29,6 @@ import (
 )
 
 const nativeTokenMintableTestCfg = "Mintable Edge Coin:MEC:18:true:%s"
-
-type e2eStateProvider struct {
-	txRelayer txrelayer.TxRelayer
-}
-
-func (s *e2eStateProvider) Call(contractAddr ethgo.Address, input []byte, opts *contract.CallOpts) ([]byte, error) {
-	response, err := s.txRelayer.Call(ethgo.Address(types.ZeroAddress), contractAddr, input)
-	if err != nil {
-		return nil, err
-	}
-
-	return hex.DecodeHex(response)
-}
-
-func (s *e2eStateProvider) Txn(ethgo.Address, ethgo.Key, []byte) (contract.Txn, error) {
-	return nil, errors.New("send txn is not supported")
-}
 
 // getCheckpointManagerValidators queries rootchain validator set on CheckpointManager contract
 func getCheckpointManagerValidators(relayer txrelayer.TxRelayer, checkpointManagerAddr ethgo.Address) ([]*polybft.ValidatorInfo, error) {
@@ -187,7 +169,7 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 		return 0, err
 	}
 
-	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
+	actualCheckpointBlock, err := common.ParseUint64orHex(&checkpointBlockNumRaw)
 	if err != nil {
 		return 0, err
 	}
@@ -217,7 +199,7 @@ func waitForRootchainEpoch(targetEpoch uint64, timeout time.Duration,
 			return err
 		}
 
-		rootchainEpoch, err := types.ParseUint64orHex(&rootchainEpochRaw)
+		rootchainEpoch, err := common.ParseUint64orHex(&rootchainEpochRaw)
 		if err != nil {
 			return err
 		}
@@ -292,7 +274,7 @@ func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address
 
 	balanceRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(tokenAddr), balanceOfInput)
 	require.NoError(t, err)
-	balance, err := types.ParseUint256orHex(&balanceRaw)
+	balance, err := common.ParseUint256orHex(&balanceRaw)
 	require.NoError(t, err)
 
 	return balance
@@ -347,4 +329,21 @@ func getChildToken(t *testing.T, predicateABI *abi.ABI, predicateAddr types.Addr
 	require.NoError(t, err)
 
 	return types.StringToAddress(childTokenRaw)
+}
+
+func getLastExitEventID(t *testing.T, relayer txrelayer.TxRelayer) uint64 {
+	t.Helper()
+
+	exitEventsCounterFn := contractsapi.L2StateSender.Abi.Methods["counter"]
+
+	input, err := exitEventsCounterFn.Encode([]interface{}{})
+	require.NoError(t, err)
+
+	exitEventIDRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(contracts.L2StateSenderContract), input)
+	require.NoError(t, err)
+
+	exitEventID, err := common.ParseUint64orHex(&exitEventIDRaw)
+	require.NoError(t, err)
+
+	return exitEventID
 }

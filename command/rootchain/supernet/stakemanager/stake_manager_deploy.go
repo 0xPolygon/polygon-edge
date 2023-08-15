@@ -21,16 +21,16 @@ import (
 var params stakeManagerDeployParams
 
 func GetCommand() *cobra.Command {
-	registerCmd := &cobra.Command{
+	stakeMgrDeployCmd := &cobra.Command{
 		Use:     "stake-manager-deploy",
 		Short:   "Command for deploying stake manager contract on rootchain",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	setFlags(registerCmd)
+	setFlags(stakeMgrDeployCmd)
 
-	return registerCmd
+	return stakeMgrDeployCmd
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -110,7 +110,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("faield to get deployer key: %w", err)
+		return fmt.Errorf("failed to get deployer key: %w", err)
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC))
@@ -124,7 +124,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return fmt.Errorf("faield to send local transaction: %w", err)
+			return fmt.Errorf("failed to send local transaction: %w", err)
 		}
 	}
 

@@ -14,7 +14,6 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -32,15 +31,25 @@ var (
 	errInvalidDuration = errors.New("invalid duration")
 )
 
-// RetryForever will execute a function until it completes without error
+// RetryForever will execute a function until it completes without error or
+// the context is cancelled or expired.
 func RetryForever(ctx context.Context, interval time.Duration, fn func(context.Context) error) {
 	_ = retry.Do(ctx, retry.NewConstant(interval), func(context.Context) error {
-		if err := fn(ctx); err != nil {
-			return retry.RetryableError(err)
+		// Execute function and end retries if no error or context done
+		err := fn(ctx)
+		if err == nil || IsContextDone(err) {
+			return nil
 		}
 
-		return nil
+		// Retry on all other errors
+		return retry.RetryableError(err)
 	})
+}
+
+// IsContextDone returns true if the error is due to the context being cancelled
+// or expired. This is useful for determining if a function should retry.
+func IsContextDone(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // Min returns the strictly lower number
@@ -84,24 +93,6 @@ func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
 	default:
 		return 0, errors.New("unsupported type for unmarshalled integer")
 	}
-}
-
-// ParseUint64orHex parses the given uint64 hex string into the number.
-// It can parse the string with 0x prefix as well.
-func ParseUint64orHex(val *string) (uint64, error) {
-	if val == nil {
-		return 0, nil
-	}
-
-	str := *val
-	base := 10
-
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-		base = 16
-	}
-
-	return strconv.ParseUint(str, base, 64)
 }
 
 func roundFloat(num float64) int64 {

@@ -466,16 +466,17 @@ func (p *genesisParams) validateRewardWallet() error {
 		return errors.New("reward wallet address must be defined")
 	}
 
-	if p.rewardWallet == types.AddressToString(types.ZeroAddress) {
-		return errors.New("reward wallet address must not be zero address")
-	}
-
 	premineInfo, err := parsePremineInfo(p.rewardWallet)
 	if err != nil {
 		return err
 	}
 
-	if premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
+	if premineInfo.address == types.ZeroAddress {
+		return errors.New("reward wallet address must not be zero address")
+	}
+
+	// If epoch rewards are enabled, reward wallet must have some amount of premine
+	if p.epochReward > 0 && premineInfo.amount.Cmp(big.NewInt(0)) < 1 {
 		return errRewardWalletAmountZero
 	}
 
@@ -500,8 +501,6 @@ func (p *genesisParams) parsePremineInfo() error {
 
 // validatePremineInfo validates whether reserve account (0x0 address) is premined
 func (p *genesisParams) validatePremineInfo() error {
-	isReserveAccPremined := false
-
 	for _, premineInfo := range p.premineInfos {
 		if premineInfo.address == types.ZeroAddress {
 			// we have premine of zero address, just return
@@ -509,11 +508,7 @@ func (p *genesisParams) validatePremineInfo() error {
 		}
 	}
 
-	if !isReserveAccPremined {
-		return errReserveAccMustBePremined
-	}
-
-	return nil
+	return errReserveAccMustBePremined
 }
 
 // validateBurnContract validates burn contract. If native token is mintable,

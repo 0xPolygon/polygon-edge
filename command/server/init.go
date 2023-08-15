@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/network/common"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -15,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -78,7 +78,7 @@ func (p *serverParams) initLogFileLocation() {
 func (p *serverParams) initBlockGasTarget() error {
 	var parseErr error
 
-	if p.blockGasTarget, parseErr = types.ParseUint64orHex(
+	if p.blockGasTarget, parseErr = helperCommon.ParseUint64orHex(
 		&p.rawConfig.BlockGasTarget,
 	); parseErr != nil {
 		return parseErr

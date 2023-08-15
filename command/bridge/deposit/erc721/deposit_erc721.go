@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -98,7 +99,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i, tokenIDRaw := range dp.TokenIDs {
 		tokenIDRaw := tokenIDRaw
 
-		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
+		tokenID, err := helperCommon.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided token id %s: %w", tokenIDRaw, err))
 
@@ -127,7 +128,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 			receipt, err := txRelayer.SendTransaction(mintTxn, minterKey)
 			if err != nil {
-				outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
+				outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s: %w",
+					depositorAddr, err))
 
 				return
 			}
@@ -150,7 +152,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send root erc 721 approve transaction"))
+		outputter.SetError(fmt.Errorf("failed to send root erc 721 approve transaction: %w", err))
 
 		return
 	}
@@ -216,7 +218,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter.SetCommandResult(res)
 }
 
-// createDepositTxn encodes parameters for deposit fnction on rootchain predicate contract
+// createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender ethgo.Address,
 	receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	depositToRoot := &contractsapi.DepositBatchRootERC721PredicateFn{

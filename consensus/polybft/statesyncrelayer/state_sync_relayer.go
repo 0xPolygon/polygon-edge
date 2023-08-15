@@ -107,20 +107,20 @@ func (r *StateSyncRelayer) Stop() {
 	close(r.closeCh)
 }
 
-func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
+func (r *StateSyncRelayer) AddLog(log *ethgo.Log) error {
 	r.logger.Debug("Received a log", "log", log)
 
 	var commitEvent contractsapi.NewCommitmentEvent
 
 	doesMatch, err := commitEvent.ParseLog(log)
 	if !doesMatch {
-		return
+		return nil
 	}
 
 	if err != nil {
 		r.logger.Error("Failed to parse log", "err", err)
 
-		return
+		return err
 	}
 
 	startID := commitEvent.StartID.Uint64()
@@ -128,6 +128,8 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 
 	r.logger.Info("Execute commitment", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
+	// we don't return errors if some client logic fails,
+	// only if event is not parsed
 	for i := startID; i <= endID; i++ {
 		// query the state sync proof
 		stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
@@ -145,6 +147,8 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 
 		r.logger.Info("State sync executed", "ID", i)
 	}
+
+	return nil
 }
 
 // queryStateSyncProof queries the state sync proof

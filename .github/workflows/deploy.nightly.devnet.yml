@@ -17,10 +17,10 @@ on:  # yamllint disable-line rule:truthy
     outputs:
       workflow_output_loadtest1:
         description: "Loadtest output"
-        value: ${{ jobs.loadtest1.outputs.loadtest_output_failure }} 
+        value: ${{ jobs.loadtest1.outputs.workflow_output }}
       workflow_output_loadtest2:
         description: "Loadtest output"
-        value: ${{ jobs.loadtest2.outputs.loadtest_output_failure }} 
+        value: ${{ jobs.loadtest2.outputs.workflow_output }}
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -97,8 +97,8 @@ jobs:
         run: |
           echo "${{ secrets.VAULT_PASSWORD_FILE }}" > password.txt
           sed 's/devnet13/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' inventory/aws_ec2.yml > inventory/aws_ec2.yml.tmp && mv inventory/aws_ec2.yml.tmp inventory/aws_ec2.yml
-          sed 's/devnet13/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' local-extra-vars.yml > local-extra-vars.yml.tmp && mv local-extra-vars.yml.tmp local-extra-vars.yml
-          sed 's/edge_tag: .*/edge_tag: HEAD/g' local-extra-vars.yml > local-extra-vars.yml.tmp && mv local-extra-vars.yml.tmp local-extra-vars.yml
+          sed 's/devnet13/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
+          sed 's/edge_tag: .*/edge_tag: HEAD/g' group_vars/all.yml > group_vars/all.yml.tmp && mv group_vars/all.yml.tmp group_vars/all.yml
       - name: Create script file
         working-directory: ansible
         run: |
@@ -203,7 +203,7 @@ jobs:
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
-          ansible-playbook --inventory inventory/aws_ec2.yml --vault-password-file=password.txt --extra-vars "@local-extra-vars.yml" site.yml
+          ansible-playbook site.yml
       - name: Set rpc url value
         id: url
         run: |

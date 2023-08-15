@@ -134,10 +134,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		result.newValidatorAddresses = append(result.newValidatorAddresses, whitelistEvent.Validator.String())
+		result.NewValidatorAddresses = append(result.NewValidatorAddresses, whitelistEvent.Validator.String())
 	}
 
-	if len(result.newValidatorAddresses) != len(params.newValidatorAddresses) {
+	if len(result.NewValidatorAddresses) != len(params.newValidatorAddresses) {
 		return fmt.Errorf("whitelist of validators did not pass successfully")
 	}
 
