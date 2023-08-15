@@ -50,10 +50,11 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	setupHeaderHashFunc()
 
 	polybft := &Polybft{
-		config:  params,
-		closeCh: make(chan struct{}),
-		logger:  logger,
-		txPool:  params.TxPool,
+		config:          params,
+		closeCh:         make(chan struct{}),
+		logger:          logger,
+		txPool:          params.TxPool,
+		ibftMsgHandlers: []IBFTMessageHandler{},
 	}
 
 	// initialize polybft consensus config
@@ -118,6 +119,9 @@ type Polybft struct {
 
 	// tx pool as interface
 	txPool txPoolInterface
+
+	// ibftMsgHandlers contains IBFT consensus messages handlers
+	ibftMsgHandlers []IBFTMessageHandler
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
@@ -466,6 +470,8 @@ func (p *Polybft) Initialize() error {
 	}
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
+	// register IBFTConsensusWrapper as IBFT message handler
+	p.ibftMsgHandlers = append(p.ibftMsgHandlers, p.ibft)
 
 	if err = p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("IBFT topic subscription failed: %w", err)
@@ -545,6 +551,8 @@ func (p *Polybft) initRuntime() error {
 	}
 
 	p.runtime = runtime
+	// register double signing tracker as IBFT messages handler
+	p.ibftMsgHandlers = append(p.ibftMsgHandlers, runtime.doubleSigningTracker)
 
 	return nil
 }

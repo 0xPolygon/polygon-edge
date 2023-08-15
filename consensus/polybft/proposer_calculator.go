@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/hashicorp/go-hclog"
+
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -197,7 +199,7 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will update priorities and save the updated snapshot to db
-func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
+func (pc *ProposerCalculator) PostBlock(req *polyCommon.PostBlockRequest) error {
 	blockNumber := req.FullBlock.Block.Number()
 	pc.logger.Debug("Update proposers snapshot started", "target block", blockNumber)
 
