@@ -42,6 +42,25 @@ func (h *MinAddressHeap) Pop() interface{} {
 	return x
 }
 
+type MinRoundsHeap []uint64
+
+func (h MinRoundsHeap) Len() int           { return len(h) }
+func (h MinRoundsHeap) Less(i, j int) bool { return h[i] < h[j] }
+func (h MinRoundsHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *MinRoundsHeap) Push(x interface{}) {
+	*h = append(*h, x.(uint64)) //nolint:forcetypeassert
+}
+
+func (h *MinRoundsHeap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+
+	return x
+}
+
 var _ sort.Interface = (*SortedMessages)(nil)
 
 type SortedMessages []*ibftProto.Message
@@ -91,6 +110,7 @@ func newDoubleSignEvidence(sender types.Address, messages []*ibftProto.Message) 
 type Messages struct {
 	content       MessagesMap
 	sortedSenders map[uint64]MinAddressHeap
+	sortedRounds  map[uint64]MinRoundsHeap
 	mux           sync.RWMutex
 }
 
@@ -113,6 +133,7 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
+	// add message
 	var senderMsgs SenderMessagesMap
 
 	if roundMsgs, ok := m.content[view.Height]; !ok {
@@ -131,6 +152,7 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 	msgs.Add(msg)
 	senderMsgs[sender] = msgs
 
+	// add sender into sorted sender heap
 	sendersHeap, ok := m.sortedSenders[view.Height]
 	if !ok {
 		sendersHeap = make(MinAddressHeap, 0, 1)
@@ -138,6 +160,15 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 
 	sendersHeap.Push(sender)
 	m.sortedSenders[view.Height] = sendersHeap
+
+	// add round into sorted rounds heap
+	roundsHeap, ok := m.sortedRounds[view.Height]
+	if !ok {
+		roundsHeap = make(MinRoundsHeap, 0, 1)
+	}
+
+	roundsHeap.Push(view.Round)
+	m.sortedRounds[view.Height] = roundsHeap
 }
 
 // createSenderMsgsMap initializes senders message map for the given round
@@ -185,16 +216,24 @@ func NewDoubleSigningTracker(logger hclog.Logger,
 		validators:         initialValidators,
 		preprepare: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap)},
+			sortedSenders: make(map[uint64]MinAddressHeap),
+			sortedRounds:  make(map[uint64]MinRoundsHeap),
+		},
 		prepare: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap)},
+			sortedSenders: make(map[uint64]MinAddressHeap),
+			sortedRounds:  make(map[uint64]MinRoundsHeap),
+		},
 		commit: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap)},
+			sortedSenders: make(map[uint64]MinAddressHeap),
+			sortedRounds:  make(map[uint64]MinRoundsHeap),
+		},
 		roundChange: &Messages{
 			content:       make(MessagesMap),
-			sortedSenders: make(map[uint64]MinAddressHeap)},
+			sortedSenders: make(map[uint64]MinAddressHeap),
+			sortedRounds:  make(map[uint64]MinRoundsHeap),
+		},
 	}
 
 	for _, msgType := range ibftProto.MessageType_value {
@@ -239,9 +278,15 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 			}
 		}
 
-		for h := range msgs.sortedSenders {
-			if h < height {
-				delete(msgs.sortedSenders, h)
+		for sendersHeight := range msgs.sortedSenders {
+			if sendersHeight < height {
+				delete(msgs.sortedSenders, sendersHeight)
+			}
+		}
+
+		for roundsHeight := range msgs.sortedRounds {
+			if roundsHeight < height {
+				delete(msgs.sortedRounds, roundsHeight)
 			}
 		}
 
@@ -261,34 +306,22 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 
 		msgs.mux.Lock()
 
-		roundMsgs, ok := msgs.content[height]
-		if !ok {
+		roundMsgs, msgsMapExists := msgs.content[height]
+		sendersHeap, sendersHeapExists := msgs.sortedSenders[height]
+		roundsHeap, roundsHeapExists := msgs.sortedRounds[height]
+
+		if !msgsMapExists || !sendersHeapExists || !roundsHeapExists {
 			continue
 		}
 
-		sendersHeap, ok := msgs.sortedSenders[height]
-		if !ok {
-			continue
-		}
+		for roundsHeap.Len() > 0 {
+			round := roundsHeap.Pop().(uint64) //nolint:forcetypeassert
+			msgsPerSenders := roundMsgs[round]
 
-		//nolint:godox
-		// TODO: make rounds heap
-		rounds := make([]uint64, 0, len(roundMsgs))
-		for round := range roundMsgs {
-			rounds = append(rounds, round)
-		}
-
-		sort.Slice(rounds, func(i, j int) bool {
-			return rounds[i] < rounds[j]
-		})
-
-		for _, r := range rounds {
-			senderMsgs := roundMsgs[r]
-
-			for len(sendersHeap) > 0 {
+			for sendersHeap.Len() > 0 {
 				sender := sendersHeap.Pop().(types.Address) //nolint:forcetypeassert
 
-				msgs, ok := senderMsgs[sender]
+				msgs, ok := msgsPerSenders[sender]
 				if !ok || len(msgs) < 2 || doubleSigners.containsSender(sender) {
 					continue
 				}
