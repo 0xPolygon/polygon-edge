@@ -710,7 +710,6 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 			unsignedTx.SetTransactionType(types.DynamicFeeTx)
 			unsignedTx.SetGasFeeCap(bigGasPrice)
 			unsignedTx.SetGasTipCap(bigGasPrice)
-
 		} else {
 			// unsignedTx.Type = types.LegacyTx
 			// unsignedTx.GasPrice = bigGasPrice

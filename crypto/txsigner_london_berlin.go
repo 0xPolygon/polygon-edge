@@ -7,46 +7,52 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// LondonSigner implements signer for EIP-1559
-type LondonSigner struct {
+// LondonOrBerlinSigner implements signer for london and berlin hard forks
+type LondonOrBerlinSigner struct {
 	chainID        uint64
 	isHomestead    bool
 	fallbackSigner TxSigner
 }
 
-// NewLondonSigner returns a new LondonSigner object
-func NewLondonSigner(chainID uint64, isHomestead bool, fallbackSigner TxSigner) *LondonSigner {
-	return &LondonSigner{
+// NewLondonSigner returns new LondonSigner object that accepts
+// - EIP-1559 dynamic fee transactions
+// - EIP-2930 access list transactions,
+// - EIP-155 replay protected transactions, and
+// - legacy Homestead transactions.
+func NewLondonSigner(chainID uint64, isHomestead bool, fallbackSigner TxSigner) *LondonOrBerlinSigner {
+	return &LondonOrBerlinSigner{
 		chainID:        chainID,
 		isHomestead:    isHomestead,
 		fallbackSigner: fallbackSigner,
 	}
 }
 
-// type LondonSigner struct{ eip2930Signer }
-
-// // NewLondonSigner returns a signer that accepts
-// // - EIP-1559 dynamic fee transactions
-// // - EIP-2930 access list transactions,
-// // - EIP-155 replay protected transactions, and
-// // - legacy Homestead transactions.
-// func NewLondonSigner(chainId *big.Int) *LondonSigner {
-// 	return LondonSigner{eip2930Signer{NewEIP155Signer(chainId)}}
-// }
+// NewBerlinSigner returns new BerlinSigner object that accepts
+// - EIP-2930 access list transactions,
+// - EIP-155 replay protected transactions, and
+// - legacy Homestead transactions.
+func NewBerlinSigner(chainID uint64, isHomestead bool, fallbackSigner TxSigner) *LondonOrBerlinSigner {
+	return &LondonOrBerlinSigner{
+		chainID:        chainID,
+		isHomestead:    isHomestead,
+		fallbackSigner: fallbackSigner,
+	}
+}
 
 // Hash is a wrapper function that calls calcTxHash with the LondonSigner's fields
-func (e *LondonSigner) Hash(tx *types.Transaction) types.Hash {
+func (e *LondonOrBerlinSigner) Hash(tx *types.Transaction) types.Hash {
 	return calcTxHash(tx, e.chainID)
 }
 
 // Sender returns the transaction sender
-func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
+func (e *LondonOrBerlinSigner) Sender(tx *types.Transaction) (types.Address, error) {
 	// Apply fallback signer for non-dynamic-fee-txs
 	if tx.Type() != types.DynamicFeeTx {
 		return e.fallbackSigner.Sender(tx)
 	}
 
 	v, r, s := tx.RawSignatureValues()
+
 	sig, err := encodeSignature(r, s, v, e.isHomestead)
 	if err != nil {
 		return types.Address{}, err
@@ -63,7 +69,7 @@ func (e *LondonSigner) Sender(tx *types.Transaction) (types.Address, error) {
 }
 
 // SignTx signs the transaction using the passed in private key
-func (e *LondonSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*types.Transaction, error) {
+func (e *LondonOrBerlinSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*types.Transaction, error) {
 	// Apply fallback signer for non-dynamic-fee-txs
 	if tx.Type() != types.DynamicFeeTx {
 		return e.fallbackSigner.SignTx(tx, pk)
@@ -87,6 +93,6 @@ func (e *LondonSigner) SignTx(tx *types.Transaction, pk *ecdsa.PrivateKey) (*typ
 }
 
 // calculateV returns the V value for transaction signatures. Based on EIP155
-func (e *LondonSigner) calculateV(parity byte) []byte {
+func (e *LondonOrBerlinSigner) calculateV(parity byte) []byte {
 	return big.NewInt(int64(parity)).Bytes()
 }

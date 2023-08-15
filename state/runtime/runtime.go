@@ -252,5 +252,6 @@ func NewContractCall(
 ) *Contract {
 	c := NewContract(depth, origin, from, to, value, gas, code, accessList)
 	c.Input = input
+
 	return c
 }

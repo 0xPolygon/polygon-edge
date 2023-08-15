@@ -112,7 +112,7 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		switch txType {
 		case AccessListTx:
 			bTxn = NewTx(&AccessListStruct{
-				Type: txType,
+				//Type: txType,
 			})
 		default:
 			bTxn = NewTx(&MixedTx{
@@ -377,12 +377,14 @@ func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 func (t *Transaction) UnmarshalRLP(input []byte) error {
 	//t.Type = LegacyTx
 	t.SetTransactionType(LegacyTx)
+
 	offset := 0
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
 		tType, err := txTypeFromByte(input[0])
 		t.SetTransactionType(tType)
+
 		if err != nil {
 			return err
 		}
@@ -393,6 +395,7 @@ func (t *Transaction) UnmarshalRLP(input []byte) error {
 	if err := UnmarshalRlp(t.unmarshalRLPFrom, input[offset:]); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -440,6 +443,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			if err = getElem().GetBigInt(txChainID); err != nil {
 				return err
 			}
+
 			t.SetChainID(txChainID)
 		}
 
@@ -448,6 +452,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err != nil {
 			return err
 		}
+
 		t.SetNonce(txNonce)
 
 		if t.Type() == DynamicFeeTx {
@@ -456,6 +461,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			if err = getElem().GetBigInt(txGasTipCap); err != nil {
 				return err
 			}
+
 			t.SetGasTipCap(txGasTipCap)
 
 			// gasFeeCap
@@ -463,6 +469,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			if err = getElem().GetBigInt(txGasFeeCap); err != nil {
 				return err
 			}
+
 			t.SetGasFeeCap(txGasFeeCap)
 		} else {
 			// gasPrice
@@ -478,6 +485,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err != nil {
 			return err
 		}
+
 		t.SetGas(txGas)
 
 		// to
@@ -497,14 +505,17 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err = getElem().GetBigInt(txValue); err != nil {
 			return err
 		}
+
 		t.SetValue(txValue)
 
 		// input
 		var txInput []byte
+
 		txInput, err = getElem().GetBytes(txInput)
 		if err != nil {
 			return err
 		}
+
 		t.SetInput(txInput)
 
 		// Skipping Access List field since we don't support it.
@@ -513,7 +524,6 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		// if t.Type == DynamicFeeTx {
 		// 	_ = getElem()
 		// }
-
 		if t.Type() == DynamicFeeTx {
 			accessListVV, err := getElem().GetElems()
 			if err != nil {
@@ -521,6 +531,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			}
 
 			txAccessList := make(TxAccessList, len(accessListVV))
+
 			for i, accessTupleVV := range accessListVV {
 				accessTupleElems, err := accessTupleVV.GetElems()
 				if err != nil {
@@ -529,20 +540,24 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 				// Read the address
 				addressVV := accessTupleElems[0]
+
 				addressBytes, err := addressVV.Bytes()
 				if err != nil {
 					return err
 				}
+
 				txAccessList[i].Address = BytesToAddress(addressBytes)
 
 				// Read the storage keys
 				storageKeysArrayVV := accessTupleElems[1]
+
 				storageKeysElems, err := storageKeysArrayVV.GetElems()
 				if err != nil {
 					return err
 				}
 
 				txAccessList[i].StorageKeys = make([]Hash, len(storageKeysElems))
+
 				for j, storageKeyVV := range storageKeysElems {
 					storageKeyBytes, err := storageKeyVV.Bytes()
 					if err != nil {
@@ -551,8 +566,8 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 					txAccessList[i].StorageKeys[j] = BytesToHash(storageKeyBytes)
 				}
-
 			}
+
 			t.SetAccessList(txAccessList)
 		}
 
@@ -573,6 +588,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err = getElem().GetBigInt(txS); err != nil {
 			return err
 		}
+
 		t.SetSignatureValues(txV, txR, txS)
 
 		if t.Type() == StateTx {
@@ -593,6 +609,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err = getElem().GetBigInt(txChainID); err != nil {
 			return err
 		}
+
 		t.SetChainID(txChainID)
 
 		// nonce
@@ -600,6 +617,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err != nil {
 			return err
 		}
+
 		t.SetNonce(txNonce)
 
 		// gasPrice
@@ -607,6 +625,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err = getElem().GetBigInt(txGasPrice); err != nil {
 			return err
 		}
+
 		t.SetGasPrice(txGasPrice)
 
 		// gas
@@ -614,6 +633,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err != nil {
 			return err
 		}
+
 		t.SetGas(txGas)
 
 		// to
@@ -631,14 +651,17 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err = getElem().GetBigInt(txValue); err != nil {
 			return err
 		}
+
 		t.SetValue(txValue)
 
 		// input
 		var txInput []byte
+
 		txInput, err = getElem().GetBytes(txInput)
 		if err != nil {
 			return err
 		}
+
 		t.SetInput(txInput)
 
 		//accessList
@@ -648,6 +671,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		}
 
 		txAccessList := make(TxAccessList, len(accessListVV))
+
 		for i, accessTupleVV := range accessListVV {
 			accessTupleElems, err := accessTupleVV.GetElems()
 			if err != nil {
@@ -656,20 +680,24 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 			// Read the address
 			addressVV := accessTupleElems[0]
+
 			addressBytes, err := addressVV.Bytes()
 			if err != nil {
 				return err
 			}
+
 			txAccessList[i].Address = BytesToAddress(addressBytes)
 
 			// Read the storage keys
 			storageKeysArrayVV := accessTupleElems[1]
+
 			storageKeysElems, err := storageKeysArrayVV.GetElems()
 			if err != nil {
 				return err
 			}
 
 			txAccessList[i].StorageKeys = make([]Hash, len(storageKeysElems))
+
 			for j, storageKeyVV := range storageKeysElems {
 				storageKeyBytes, err := storageKeyVV.Bytes()
 				if err != nil {
@@ -678,8 +706,8 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 				txAccessList[i].StorageKeys[j] = BytesToHash(storageKeyBytes)
 			}
-
 		}
+
 		t.SetAccessList(txAccessList)
 
 		// V
@@ -699,6 +727,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if err = getElem().GetBigInt(txS); err != nil {
 			return err
 		}
+
 		t.SetSignatureValues(txV, txR, txS)
 	}
 

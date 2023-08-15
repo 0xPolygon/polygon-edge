@@ -307,7 +307,6 @@ func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 	// 	R:        big.NewInt(1),
 	// 	S:        big.NewInt(1),
 	// }
-
 	txn := types.NewTx(&types.MixedTx{
 		Nonce:    nonce,
 		GasPrice: big.NewInt(1),
@@ -342,7 +341,6 @@ func newTestDynamicFeeTransaction(nonce uint64, from types.Address) *types.Trans
 	// 	R:         big.NewInt(1),
 	// 	S:         big.NewInt(1),
 	// }
-
 	txn := types.NewTx(&types.MixedTx{
 		Type:      types.DynamicFeeTx,
 		Nonce:     nonce,

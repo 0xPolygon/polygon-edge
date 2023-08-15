@@ -60,10 +60,11 @@ type Transaction struct {
 
 // NewTx creates a new transaction.
 func NewTx(inner TxData) *Transaction {
-	tx := new(Transaction)
-	//check: diff in geth with deep copy
-	tx.Inner = inner
-	return tx
+	t := new(Transaction)
+	//check EIP2930: diff in geth with deep copy
+	t.Inner = inner
+
+	return t
 }
 
 type TxData interface {
@@ -101,117 +102,117 @@ type TxData interface {
 	setHash(Hash)
 }
 
-func (tx *Transaction) Type() TxType {
-	return tx.Inner.transactionType()
+func (t *Transaction) Type() TxType {
+	return t.Inner.transactionType()
 }
 
-func (tx *Transaction) ChainID() *big.Int {
-	return tx.Inner.chainID()
+func (t *Transaction) ChainID() *big.Int {
+	return t.Inner.chainID()
 }
 
-func (tx *Transaction) Nonce() uint64 {
-	return tx.Inner.nonce()
+func (t *Transaction) Nonce() uint64 {
+	return t.Inner.nonce()
 }
 
-func (tx *Transaction) GasPrice() *big.Int {
-	return tx.Inner.gasPrice()
+func (t *Transaction) GasPrice() *big.Int {
+	return t.Inner.gasPrice()
 }
 
-func (tx *Transaction) GasTipCap() *big.Int {
-	return tx.Inner.gasTipCap()
+func (t *Transaction) GasTipCap() *big.Int {
+	return t.Inner.gasTipCap()
 }
 
-func (tx *Transaction) GasFeeCap() *big.Int {
-	return tx.Inner.gasFeeCap()
+func (t *Transaction) GasFeeCap() *big.Int {
+	return t.Inner.gasFeeCap()
 }
 
-func (tx *Transaction) Gas() uint64 {
-	return tx.Inner.gas()
+func (t *Transaction) Gas() uint64 {
+	return t.Inner.gas()
 }
 
-func (tx *Transaction) To() *Address {
-	return tx.Inner.to()
+func (t *Transaction) To() *Address {
+	return t.Inner.to()
 }
 
-func (tx *Transaction) Value() *big.Int {
-	return tx.Inner.value()
+func (t *Transaction) Value() *big.Int {
+	return t.Inner.value()
 }
 
-func (tx *Transaction) Input() []byte {
-	return tx.Inner.input()
+func (t *Transaction) Input() []byte {
+	return t.Inner.input()
 }
 
-func (tx *Transaction) AccessList() TxAccessList {
-	return tx.Inner.accessList()
+func (t *Transaction) AccessList() TxAccessList {
+	return t.Inner.accessList()
 }
 
-func (tx *Transaction) From() Address {
-	return tx.Inner.from()
+func (t *Transaction) From() Address {
+	return t.Inner.from()
 }
 
-func (tx *Transaction) Hash() Hash {
-	return tx.Inner.hash()
+func (t *Transaction) Hash() Hash {
+	return t.Inner.hash()
 }
 
-func (tx *Transaction) RawSignatureValues() (v, r, s *big.Int) {
-	return tx.Inner.rawSignatureValues()
+func (t *Transaction) RawSignatureValues() (v, r, s *big.Int) {
+	return t.Inner.rawSignatureValues()
 }
 
 // set methods for transaction fields
-func (tx *Transaction) SetSignatureValues(v, r, s *big.Int) {
-	tx.Inner.setSignatureValues(v, r, s)
+func (t *Transaction) SetSignatureValues(v, r, s *big.Int) {
+	t.Inner.setSignatureValues(v, r, s)
 }
 
-func (tx *Transaction) SetFrom(addr Address) {
-	tx.Inner.setFrom(addr)
+func (t *Transaction) SetFrom(addr Address) {
+	t.Inner.setFrom(addr)
 }
 
-func (tx *Transaction) SetGas(gas uint64) {
-	tx.Inner.setGas(gas)
+func (t *Transaction) SetGas(gas uint64) {
+	t.Inner.setGas(gas)
 }
 
-func (tx *Transaction) SetChainID(id *big.Int) {
-	tx.Inner.setChainID(id)
+func (t *Transaction) SetChainID(id *big.Int) {
+	t.Inner.setChainID(id)
 }
 
-func (tx *Transaction) SetGasPrice(gas *big.Int) {
-	tx.Inner.setGasPrice(gas)
+func (t *Transaction) SetGasPrice(gas *big.Int) {
+	t.Inner.setGasPrice(gas)
 }
 
-func (tx *Transaction) SetGasFeeCap(gas *big.Int) {
-	tx.Inner.setGasFeeCap(gas)
+func (t *Transaction) SetGasFeeCap(gas *big.Int) {
+	t.Inner.setGasFeeCap(gas)
 }
 
-func (tx *Transaction) SetGasTipCap(gas *big.Int) {
-	tx.Inner.setGasTipCap(gas)
+func (t *Transaction) SetGasTipCap(gas *big.Int) {
+	t.Inner.setGasTipCap(gas)
 }
 
-func (tx *Transaction) SetTransactionType(t TxType) {
-	tx.Inner.setTransactionType(t)
+func (t *Transaction) SetTransactionType(tType TxType) {
+	t.Inner.setTransactionType(tType)
 }
 
-func (tx *Transaction) SetValue(value *big.Int) {
-	tx.Inner.setValue(value)
+func (t *Transaction) SetValue(value *big.Int) {
+	t.Inner.setValue(value)
 }
 
-func (tx *Transaction) SetInput(input []byte) {
-	tx.Inner.setInput(input)
+func (t *Transaction) SetInput(input []byte) {
+	t.Inner.setInput(input)
 }
 
-func (tx *Transaction) SetTo(address *Address) {
-	tx.Inner.setTo(address)
+func (t *Transaction) SetTo(address *Address) {
+	t.Inner.setTo(address)
 }
 
-func (tx *Transaction) SetNonce(nonce uint64) {
-	tx.Inner.setNonce(nonce)
+func (t *Transaction) SetNonce(nonce uint64) {
+	t.Inner.setNonce(nonce)
 }
 
-func (tx *Transaction) SetAccessList(accessList TxAccessList) {
-	tx.Inner.setAccessList(accessList)
+func (t *Transaction) SetAccessList(accessList TxAccessList) {
+	t.Inner.setAccessList(accessList)
 }
 
-func (tx *Transaction) SetHash(h Hash) {
-	tx.Inner.setHash(h)
+func (t *Transaction) SetHash(h Hash) {
+	t.Inner.setHash(h)
 }
 
 // type Transaction struct {
@@ -333,6 +334,7 @@ func DeepCopyTxData(data TxData) TxData {
 		}
 
 		newMixedTx.Input = make([]byte, len(t.Input))
+
 		copy(newMixedTx.Input[:], t.Input[:])
 
 		//deep copy access list
@@ -393,8 +395,10 @@ func DeepCopyTxAccessList(accessList TxAccessList) TxAccessList {
 	}
 
 	accessListCopy := make(TxAccessList, len(accessList))
+
 	for i, item := range accessList {
 		var copiedAddress Address
+
 		copy(copiedAddress[:], item.Address[:])
 		accessListCopy[i] = AccessTuple{
 			Address:     copiedAddress,

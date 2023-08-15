@@ -263,7 +263,6 @@ func TestTxPool_TransactionCoalescing(t *testing.T) {
 		// 	Value:    oneEth,
 		// 	V:        big.NewInt(1), // it is necessary to encode in rlp
 		// }, referenceKey)
-
 		signedTx, signErr := signer.SignTx(types.NewTx(&types.MixedTx{
 			Nonce:    nonce,
 			From:     referenceAddr,

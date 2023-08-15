@@ -15,6 +15,7 @@ func (al TxAccessList) StorageKeys() int {
 	for _, tuple := range al {
 		sum += len(tuple.StorageKeys)
 	}
+
 	return sum
 }
 
@@ -30,7 +31,7 @@ type AccessListStruct struct {
 	Hash     Hash
 	From     Address
 
-	Type TxType
+	//Type TxType
 
 	ChainID    *big.Int
 	AccessList TxAccessList
@@ -88,7 +89,7 @@ func (tx *AccessListStruct) setGasTipCap(gas *big.Int) {
 }
 
 func (tx *AccessListStruct) setTransactionType(t TxType) {
-	tx.Type = t
+	// no need to set a transaction type for access list type of transaction
 }
 
 func (tx *AccessListStruct) setValue(value *big.Int) {

@@ -39,7 +39,7 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		switch txType {
 		case AccessListTx:
 			bTxn = NewTx(&AccessListStruct{
-				Type: txType,
+				//Type: txType,
 			})
 		default:
 			bTxn = NewTx(&MixedTx{
@@ -83,11 +83,13 @@ func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {
 		var err error
+
 		tType, err := txTypeFromByte(input[0])
-		t.SetTransactionType(tType)
 		if err != nil {
 			return err
 		}
+
+		t.SetTransactionType(tType)
 	}
 
 	return UnmarshalRlp(t.unmarshalStoreRLPFrom, input)

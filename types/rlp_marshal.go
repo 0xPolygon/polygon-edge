@@ -283,6 +283,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 
 		// add accessList
 		accessListVV := arena.NewArray()
+
 		if t.AccessList() != nil {
 			for _, accessTuple := range t.AccessList() {
 				accessTupleVV := arena.NewArray()

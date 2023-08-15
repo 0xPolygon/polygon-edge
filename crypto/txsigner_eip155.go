@@ -32,6 +32,7 @@ func (e *EIP155Signer) Sender(tx *types.Transaction) (types.Address, error) {
 
 	// Check if v value conforms to an earlier standard (before EIP155)
 	bigV := big.NewInt(0)
+
 	v, r, s := tx.RawSignatureValues()
 	if v != nil {
 		bigV.SetBytes(v.Bytes())

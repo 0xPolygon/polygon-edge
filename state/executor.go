@@ -336,7 +336,6 @@ var emptyFrom = types.Address{}
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
 	//var err error
-
 	if txn.From() == emptyFrom &&
 		(txn.Type() == types.LegacyTx || txn.Type() == types.DynamicFeeTx) {
 		// Decrypt the from address
@@ -344,6 +343,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 		from, err := signer.Sender(txn)
 		txn.SetFrom(from)
+
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
 		}
@@ -814,13 +814,13 @@ func (t *Transition) applyCall(
 	t.captureCallStart(c, callType)
 
 	// create a deep copy of access list for reverted transaction
-	//al := c.AccessList.Copy()
+	al := c.AccessList.Copy()
 
 	result = t.run(c, host)
 	if result.Failed() {
-		// if result.Reverted() {
-		// 	c.AccessList = al
-		// }
+		if result.Reverted() {
+			c.AccessList = al
+		}
 
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{

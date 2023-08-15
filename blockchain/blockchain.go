@@ -1057,6 +1057,7 @@ func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Trans
 
 		//tx.From = sender
 		tx.SetFrom(sender)
+
 		updated = true
 	}
 

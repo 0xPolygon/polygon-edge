@@ -41,35 +41,16 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 	// London signer requires a fallback signer that is defined above.
 	// This is the reason why the london signer check is separated.
 	if forks.London {
-		// return NewLondonSigner(chainID, forks.Homestead, signer)
-		return NewLondonSigner(chainID, forks.Homestead, NewEip2930Signer(chainID, forks.Homestead, signer))
-
+		return NewLondonSigner(chainID, forks.Homestead, NewBerlinSigner(chainID, forks.Homestead, signer))
 	}
 
 	// var eip2930Signer TxSigner
 	if forks.EIP2930 {
-		return NewEip2930Signer(chainID, forks.Homestead, signer)
+		return NewBerlinSigner(chainID, forks.Homestead, signer)
 	}
 
 	return signer
 }
-
-// func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
-// 	var signer TxSigner
-
-// 	switch {
-// 	case forks.London:
-// 		signer = NewLondonSigner()
-// 	case forks.EIP2930:
-// 		signer = NewEip2930Signer()
-// 	case forks.EIP155:
-// 		signer = NewEIP155Signer()
-// 	default:
-// 		signer = NewFrontierSigner()
-// 	}
-
-// 	return signer
-// }
 
 // encodeSignature generates a signature value based on the R, S and V value
 func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
@@ -87,6 +68,8 @@ func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 
 // calcTxHash calculates the transaction hash (keccak256 hash of the RLP value)
 func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
+	var hash []byte
+
 	switch tx.Type() {
 	case types.AccessListTx:
 		a := signerPool.Get()
@@ -108,6 +91,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 		// add accessList
 		accessListVV := a.NewArray()
+
 		if tx.AccessList() != nil {
 			for _, accessTuple := range tx.AccessList() {
 				accessTupleVV := a.NewArray()
@@ -122,14 +106,13 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 				accessListVV.Set(accessTupleVV)
 			}
 		}
+
 		v.Set(accessListVV)
 
-		hash := keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type())}, nil, v)
+		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type())}, nil, v)
+
 		signerPool.Put(a)
-
-		return types.BytesToHash(hash)
-
-	default:
+	case types.DynamicFeeTx, types.LegacyTx, types.StateTx:
 		a := signerPool.Get()
 		isDynamicFeeTx := tx.Type() == types.DynamicFeeTx
 
@@ -162,7 +145,6 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 		if isDynamicFeeTx {
 			//v.Set(a.NewArray())
-
 			// Convert TxAccessList to RLP format and add it to the vv array.
 			accessListVV := a.NewArray()
 
@@ -182,7 +164,6 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 			}
 
 			v.Set(accessListVV)
-
 		} else {
 			// EIP155
 			if chainID != 0 {
@@ -192,14 +173,14 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 			}
 		}
 
-		var hash []byte
 		if isDynamicFeeTx {
 			hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type())}, nil, v)
 		} else {
 			hash = keccak.Keccak256Rlp(nil, v)
 		}
-		signerPool.Put(a)
 
-		return types.BytesToHash(hash)
+		signerPool.Put(a)
 	}
+
+	return types.BytesToHash(hash)
 }
