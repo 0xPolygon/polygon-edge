@@ -581,11 +581,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should succeed if tx has from field", func(t *testing.T) {
 		t.Parallel()
 
-		// tx := &types.Transaction{
-		// 	Value: big.NewInt(10),
-		// 	V:     big.NewInt(1),
-		// 	From:  addr,
-		// }
 		tx := types.NewTx(&types.MixedTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
@@ -618,10 +613,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should return error if tx doesn't have from and recovering address fails", func(t *testing.T) {
 		t.Parallel()
 
-		// tx := &types.Transaction{
-		// 	Value: big.NewInt(10),
-		// 	V:     big.NewInt(1),
-		// }
 		tx := types.NewTx(&types.MixedTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
@@ -654,10 +645,6 @@ func TestBlockchainWriteBody(t *testing.T) {
 	t.Run("should recover from address and store to storage", func(t *testing.T) {
 		t.Parallel()
 
-		// tx := &types.Transaction{
-		// 	Value: big.NewInt(10),
-		// 	V:     big.NewInt(1),
-		// }
 		tx := types.NewTx(&types.MixedTx{
 			Value: big.NewInt(10),
 			V:     big.NewInt(1),
@@ -719,9 +706,6 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 			},
 		}
 
-		// tx1 := &types.Transaction{Nonce: 0, From: addr1}
-		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
-
 		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: addr1})
 		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
 
@@ -751,10 +735,6 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 				txFromByTxHash: txFromByTxHash,
 			},
 		}
-
-		// tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
-		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
-		// tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
 
 		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: types.ZeroAddress})
 		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
@@ -812,9 +792,6 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 			},
 		}
 
-		// tx1 := &types.Transaction{Nonce: 0, From: addr1}
-		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
-
 		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: addr1})
 		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
 
@@ -843,10 +820,6 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 				txFromByTxHash: txFromByTxHash,
 			},
 		}
-
-		// tx1 := &types.Transaction{Nonce: 0, From: types.ZeroAddress}
-		// tx2 := &types.Transaction{Nonce: 1, From: types.ZeroAddress}
-		// tx3 := &types.Transaction{Nonce: 2, From: types.ZeroAddress}
 
 		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: types.ZeroAddress})
 		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: types.ZeroAddress})
@@ -881,9 +854,6 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 				txFromByTxHash: txFromByTxHash,
 			},
 		}
-
-		// tx1 := &types.Transaction{Nonce: 0, From: addr1}
-		// tx2 := &types.Transaction{Nonce: 1, From: addr2}
 
 		tx1 := types.NewTx(&types.MixedTx{Nonce: 0, From: addr1})
 		tx2 := types.NewTx(&types.MixedTx{Nonce: 1, From: addr2})
@@ -921,10 +891,6 @@ func TestBlockchainReadBody(t *testing.T) {
 
 	batchWriter := storage.NewBatchWriter(b.db)
 
-	// tx := &types.Transaction{
-	// 	Value: big.NewInt(10),
-	// 	V:     big.NewInt(1),
-	// }
 	tx := types.NewTx(&types.MixedTx{
 		Value: big.NewInt(10),
 		V:     big.NewInt(1),
@@ -1502,9 +1468,6 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		{GasUsed: 100},
 		{GasUsed: 200},
 	}
-	// tx := &types.Transaction{
-	// 	Value: big.NewInt(1),
-	// }
 	tx := types.NewTx(&types.MixedTx{
 		Value: big.NewInt(1),
 	})

@@ -296,38 +296,32 @@ func generateStressTestTx(
 		t.Fatalf("Unable to encode inputs, %v", encodeErr)
 	}
 
-	// unsignedTx := &types.Transaction{
-	// 	Nonce: currentNonce,
-	// 	From:  types.ZeroAddress,
-	// 	To:    &contractAddr,
-	// 	Gas:   framework.DefaultGasLimit,
-	// 	Value: big.NewInt(0),
-	// 	V:     big.NewInt(1), // it is necessary to encode in rlp,
-	// 	Input: append(setNameMethod.ID(), encodedInput...),
-	// }
-	unsignedTx := types.NewTx(&types.MixedTx{
-		Nonce: currentNonce,
-		From:  types.ZeroAddress,
-		To:    &contractAddr,
-		Gas:   framework.DefaultGasLimit,
-		Value: big.NewInt(0),
-		V:     big.NewInt(1), // it is necessary to encode in rlp,
-		Input: append(setNameMethod.ID(), encodedInput...),
-	})
-
+	var unsignedTx *types.Transaction
 	if txNum%2 == 0 {
-		// unsignedTx.Type = types.DynamicFeeTx
-		// unsignedTx.GasFeeCap = bigGasPrice
-		// unsignedTx.GasTipCap = bigGasPrice
-		unsignedTx.SetTransactionType(types.DynamicFeeTx)
-		unsignedTx.SetGasFeeCap(bigGasPrice)
-		unsignedTx.SetGasTipCap(bigGasPrice)
+		unsignedTx = types.NewTx(&types.MixedTx{
+			Type:      types.DynamicFeeTx,
+			Nonce:     currentNonce,
+			From:      types.ZeroAddress,
+			To:        &contractAddr,
+			Gas:       framework.DefaultGasLimit,
+			GasFeeCap: bigGasPrice,
+			GasTipCap: bigGasPrice,
+			Value:     big.NewInt(0),
+			V:         big.NewInt(1), // it is necessary to encode in rlp,
+			Input:     append(setNameMethod.ID(), encodedInput...),
+		})
 	} else {
-		// unsignedTx.Type = types.LegacyTx
-		// unsignedTx.GasPrice = bigGasPrice
-		unsignedTx.SetTransactionType(types.LegacyTx)
-		unsignedTx.SetGasFeeCap(bigGasPrice)
-		unsignedTx.SetGasTipCap(bigGasPrice)
+		unsignedTx = types.NewTx(&types.MixedTx{
+			Type:     types.LegacyTx,
+			Nonce:    currentNonce,
+			From:     types.ZeroAddress,
+			To:       &contractAddr,
+			Gas:      framework.DefaultGasLimit,
+			GasPrice: bigGasPrice,
+			Value:    big.NewInt(0),
+			V:        big.NewInt(1), // it is necessary to encode in rlp,
+			Input:    append(setNameMethod.ID(), encodedInput...),
+		})
 	}
 
 	signedTx, err := signer.SignTx(unsignedTx, senderKey)

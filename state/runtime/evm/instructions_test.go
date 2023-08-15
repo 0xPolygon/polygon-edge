@@ -682,7 +682,7 @@ func Test_opCall(t *testing.T) {
 			},
 			config: &allEnabledForks,
 			initState: &state{
-				gas: 2600, //EIP2929: check gas increased to remove error, org gas 1000
+				gas: 2600,
 				sp:  6,
 				stack: []*big.Int{
 					big.NewInt(0x00), // outSize

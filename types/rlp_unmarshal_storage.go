@@ -29,18 +29,10 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// transactions
 	if err = unmarshalRLPFrom(p, tuple[0], func(txType TxType, p *fastrlp.Parser, v *fastrlp.Value) error {
-		// bTxn := &Transaction{
-		// 	Type: txType,
-		// }
-		// bTxn := NewTx(&MixedTx{
-		// 	Type: txType,
-		// })
 		var bTxn *Transaction
 		switch txType {
 		case AccessListTx:
-			bTxn = NewTx(&AccessListStruct{
-				//Type: txType,
-			})
+			bTxn = NewTx(&AccessListStruct{})
 		default:
 			bTxn = NewTx(&MixedTx{
 				Type: txType,
@@ -78,7 +70,6 @@ func (b *Body) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 // UnmarshalStoreRLP unmarshals transaction from byte slice. Hash must be computed manually after!
 func (t *Transaction) UnmarshalStoreRLP(input []byte) error {
-	// t.Type = LegacyTx
 	t.SetTransactionType(LegacyTx)
 
 	if len(input) > 0 && input[0] <= RLPSingleByteUpperLimit {

@@ -68,11 +68,6 @@ func TestSubGasLimitPrice(t *testing.T) {
 			t.Parallel()
 
 			transition := newTestTransition(tt.preState)
-			// msg := &types.Transaction{
-			// 	From:     tt.from,
-			// 	Gas:      tt.gas,
-			// 	GasPrice: big.NewInt(tt.gasPrice),
-			// }
 			msg := types.NewTx(&types.MixedTx{
 				From:     tt.from,
 				Gas:      tt.gas,

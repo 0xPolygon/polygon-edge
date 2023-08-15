@@ -44,7 +44,6 @@ func NewSigner(forks chain.ForksInTime, chainID uint64) TxSigner {
 		return NewLondonSigner(chainID, forks.Homestead, NewBerlinSigner(chainID, forks.Homestead, signer))
 	}
 
-	// var eip2930Signer TxSigner
 	if forks.EIP2930 {
 		return NewBerlinSigner(chainID, forks.Homestead, signer)
 	}
@@ -144,7 +143,6 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 		v.Set(a.NewCopyBytes(tx.Input()))
 
 		if isDynamicFeeTx {
-			//v.Set(a.NewArray())
 			// Convert TxAccessList to RLP format and add it to the vv array.
 			accessListVV := a.NewArray()
 

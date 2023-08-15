@@ -35,7 +35,6 @@ func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 			return nil, err
 		}
 
-		//txn.From = from
 		txn.SetFrom(from)
 	}
 

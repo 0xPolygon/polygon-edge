@@ -62,14 +62,6 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 		return nil
 	}
 
-	// return &types.Transaction{
-	// 	From:     addr,
-	// 	Nonce:    nonce,
-	// 	Value:    big.NewInt(1),
-	// 	GasPrice: big.NewInt(0).SetUint64(defaultPriceLimit),
-	// 	Gas:      validGasLimit,
-	// 	Input:    input,
-	// }
 	return types.NewTx(&types.MixedTx{
 		From:     addr,
 		Nonce:    nonce,
@@ -155,7 +147,6 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		//tx.Type = types.StateTx
 		tx.SetTransactionType(types.StateTx)
 
 		assert.ErrorIs(t,
@@ -169,7 +160,6 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		//tx.Value = big.NewInt(-5)
 		tx.SetValue(big.NewInt(-5))
 
 		assert.ErrorIs(t,
@@ -183,8 +173,6 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Value = big.NewInt(1)
-		// tx.Gas = 10000000000001
 		tx.SetValue(big.NewInt(1))
 		tx.SetGas(10000000000001)
 
@@ -291,7 +279,6 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		//tx.Gas = 1
 		tx.SetGas(1)
 		tx = signTx(tx)
 
@@ -323,7 +310,6 @@ func TestAddTxErrors(t *testing.T) {
 		pool := setupPool()
 
 		tx := newTx(defaultAddr, 0, 1)
-		//tx.GasPrice = big.NewInt(200)
 		tx.SetGasPrice(big.NewInt(200))
 		tx = signTx(tx)
 
@@ -332,7 +318,6 @@ func TestAddTxErrors(t *testing.T) {
 		<-pool.promoteReqCh
 
 		tx = newTx(defaultAddr, 0, 1)
-		//tx.GasPrice = big.NewInt(100)
 		tx.SetGasPrice(big.NewInt(100))
 		tx = signTx(tx)
 
@@ -353,7 +338,6 @@ func TestAddTxErrors(t *testing.T) {
 		_, err := rand.Read(data)
 		assert.NoError(t, err)
 
-		// tx.Input = data
 		tx.SetInput(data)
 		tx = signTx(tx)
 
@@ -2072,8 +2056,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.To = nil
-		// tx.Input = input
 		tx.SetTo(nil)
 		tx.SetInput(input)
 
@@ -2093,8 +2075,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		require.NoError(t, err)
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.To = nil
-		// tx.Input = input
 		tx.SetTo(nil)
 		tx.SetInput(input)
 
@@ -2111,9 +2091,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasFeeCap = big.NewInt(1100)
-		// tx.GasTipCap = big.NewInt(10)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasFeeCap(big.NewInt(1100))
 		tx.SetGasTipCap(big.NewInt(10))
@@ -2128,9 +2105,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasFeeCap = big.NewInt(100)
-		// tx.GasTipCap = big.NewInt(10)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasFeeCap(big.NewInt(100))
 		tx.SetGasTipCap(big.NewInt(10))
@@ -2148,9 +2122,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.baseFee = 1000
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasFeeCap = big.NewInt(10000)
-		// tx.GasTipCap = big.NewInt(100000)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasFeeCap(big.NewInt(10000))
 		tx.SetGasTipCap(big.NewInt(100000))
@@ -2169,13 +2140,10 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// undefined gas tip cap
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasFeeCap = big.NewInt(10000)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasFeeCap(big.NewInt(10000))
 
 		signedTx := signTx(tx)
-		//signedTx.GasTipCap = nil
 		signedTx.SetGasTipCap(nil)
 
 		assert.ErrorIs(t,
@@ -2185,12 +2153,9 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// undefined gas fee cap
 		tx = newTx(defaultAddr, 1, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasTipCap = big.NewInt(1000)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasTipCap(big.NewInt(1000))
 		signedTx = signTx(tx)
-		//signedTx.GasFeeCap = nil
 		signedTx.SetGasFeeCap(nil)
 
 		assert.ErrorIs(t,
@@ -2209,8 +2174,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// very high gas fee cap
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasFeeCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasFeeCap(new(big.Int).SetBit(new(big.Int), bitLength, 1))
 
@@ -2221,8 +2184,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		// very high gas tip cap
 		tx = newTx(defaultAddr, 1, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasTipCap = new(big.Int).SetBit(new(big.Int), bitLength, 1)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasTipCap(new(big.Int).SetBit(new(big.Int), bitLength, 1))
 
@@ -2238,9 +2199,6 @@ func Test_TxPool_validateTx(t *testing.T) {
 		pool.forks.London = false
 
 		tx := newTx(defaultAddr, 0, 1)
-		// tx.Type = types.DynamicFeeTx
-		// tx.GasFeeCap = big.NewInt(10000)
-		// tx.GasTipCap = big.NewInt(100000)
 		tx.SetTransactionType(types.DynamicFeeTx)
 		tx.SetGasFeeCap(big.NewInt(10000))
 		tx.SetGasTipCap(big.NewInt(100000))
@@ -2657,21 +2615,14 @@ func TestExecutablesOrder(t *testing.T) {
 	newPricedTx := func(
 		addr types.Address, nonce, gasPrice uint64, gasFeeCap uint64, value uint64) *types.Transaction {
 		tx := newTx(addr, nonce, 1)
-		// tx.Value = new(big.Int).SetUint64(value)
 		tx.SetValue(new(big.Int).SetUint64(value))
 
 		if gasPrice == 0 {
-			// tx.Type = types.DynamicFeeTx
-			// tx.GasFeeCap = new(big.Int).SetUint64(gasFeeCap)
-			// tx.GasTipCap = new(big.Int).SetUint64(2)
-			// tx.GasPrice = big.NewInt(0)
 			tx.SetTransactionType(types.DynamicFeeTx)
 			tx.SetGasFeeCap(new(big.Int).SetUint64(gasFeeCap))
 			tx.SetGasTipCap(new(big.Int).SetUint64(2))
 			tx.SetGasPrice(big.NewInt(0))
 		} else {
-			// tx.Type = types.LegacyTx
-			// tx.GasPrice = new(big.Int).SetUint64(gasPrice)
 			tx.SetTransactionType(types.LegacyTx)
 			tx.SetGasPrice(new(big.Int).SetUint64(gasPrice))
 		}

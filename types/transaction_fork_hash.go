@@ -26,13 +26,11 @@ type TransactionHashForkV1 struct {
 func (th *TransactionHashForkV1) SerializeForRootCalculation(t *Transaction, ap *fastrlp.ArenaPool) []byte {
 	ar := ap.Get()
 	chainID := t.ChainID()
-	//t.ChainID = big.NewInt(0)
 	t.SetChainID(big.NewInt(0))
 
 	defer func() {
 		ap.Put(ar)
 
-		//t.ChainID = chainID
 		t.SetChainID(chainID)
 	}()
 
@@ -46,7 +44,6 @@ func (th *TransactionHashForkV1) ComputeHash(t *Transaction) {
 	hash := keccak.DefaultKeccakPool.Get()
 
 	chainID := t.ChainID()
-	// t.ChainID = big.NewInt(0)
 	t.SetChainID(big.NewInt(0))
 
 	v := t.MarshalRLPWith(ar)
@@ -56,7 +53,6 @@ func (th *TransactionHashForkV1) ComputeHash(t *Transaction) {
 	hash.WriteRlp(txHash[:0], v)
 	t.SetHash(txHash)
 
-	// t.ChainID = chainID
 	t.SetChainID(chainID)
 
 	marshalArenaPool.Put(ar)

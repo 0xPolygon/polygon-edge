@@ -105,15 +105,10 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 
 	// transactions
 	if err = unmarshalRLPFrom(p, elems[1], func(txType TxType, p *fastrlp.Parser, v *fastrlp.Value) error {
-		// bTxn := &Transaction{
-		// 	Type: txType,
-		// }
 		var bTxn *Transaction
 		switch txType {
 		case AccessListTx:
-			bTxn = NewTx(&AccessListStruct{
-				//Type: txType,
-			})
+			bTxn = NewTx(&AccessListStruct{})
 		default:
 			bTxn = NewTx(&MixedTx{
 				Type: txType,
@@ -375,7 +370,6 @@ func (l *Log) unmarshalRLPFrom(_ *fastrlp.Parser, v *fastrlp.Value) error {
 // UnmarshalRLP unmarshals transaction from byte slice
 // Caution: Hash calculation should be done from the outside!
 func (t *Transaction) UnmarshalRLP(input []byte) error {
-	//t.Type = LegacyTx
 	t.SetTransactionType(LegacyTx)
 
 	offset := 0
@@ -492,11 +486,9 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		if vv, _ := getElem().Bytes(); len(vv) == 20 {
 			// address
 			addr := BytesToAddress(vv)
-			// t.To = &addr
 			t.SetTo(&addr)
 		} else {
 			// reset To
-			// t.To = nil
 			t.SetTo(nil)
 		}
 
@@ -518,12 +510,6 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 
 		t.SetInput(txInput)
 
-		// Skipping Access List field since we don't support it.
-		// This is needed to be compatible with other EVM chains and have the same format.
-		// Since we don't have access list, just skip it here.
-		// if t.Type == DynamicFeeTx {
-		// 	_ = getElem()
-		// }
 		if t.Type() == DynamicFeeTx {
 			accessListVV, err := getElem().GetElems()
 			if err != nil {
@@ -592,14 +578,12 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		t.SetSignatureValues(txV, txR, txS)
 
 		if t.Type() == StateTx {
-			//t.From = ZeroAddress
 			t.SetFrom(ZeroAddress)
 
 			// We need to set From field for state transaction,
 			// because we are using unique, predefined address, for sending such transactions
 			if vv, err := getElem().Bytes(); err == nil && len(vv) == AddressLength {
 				// address
-				//t.From = BytesToAddress(vv)
 				t.SetFrom(BytesToAddress(vv))
 			}
 		}

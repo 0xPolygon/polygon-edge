@@ -702,14 +702,6 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
 func createStateTransactionWithData(blockNumber uint64, target types.Address, inputData []byte) *types.Transaction {
-	// tx := &types.Transaction{
-	// 	From:     contracts.SystemCaller,
-	// 	To:       &target,
-	// 	Type:     types.StateTx,
-	// 	Input:    inputData,
-	// 	Gas:      types.StateTransactionGasLimit,
-	// 	GasPrice: big.NewInt(0),
-	// }
 	tx := types.NewTx(&types.MixedTx{
 		From:     contracts.SystemCaller,
 		To:       &target,

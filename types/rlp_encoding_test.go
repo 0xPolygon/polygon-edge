@@ -43,17 +43,6 @@ func TestRLPEncoding(t *testing.T) {
 
 func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	addrTo := StringToAddress("11")
-	// txn := &Transaction{
-	// 	Nonce:    0,
-	// 	GasPrice: big.NewInt(11),
-	// 	Gas:      11,
-	// 	To:       &addrTo,
-	// 	Value:    big.NewInt(1),
-	// 	Input:    []byte{1, 2},
-	// 	V:        big.NewInt(25),
-	// 	S:        big.NewInt(26),
-	// 	R:        big.NewInt(27),
-	// }
 	txn := NewTx(&MixedTx{
 		Nonce:    0,
 		GasPrice: big.NewInt(11),
@@ -68,7 +57,6 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 
 	txn.ComputeHash(1)
 
-	//unmarshalledTxn := new(Transaction)
 	unmarshalledTxn := NewTx(&MixedTx{})
 	marshaledRlp := txn.MarshalRLP()
 
@@ -149,20 +137,6 @@ func TestRLPUnmarshal_Header_ComputeHash(t *testing.T) {
 func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	addrTo := StringToAddress("11")
 	addrFrom := StringToAddress("22")
-	// originalTx := &Transaction{
-	// 	Nonce:     0,
-	// 	GasPrice:  big.NewInt(11),
-	// 	GasFeeCap: big.NewInt(12),
-	// 	GasTipCap: big.NewInt(13),
-	// 	Gas:       11,
-	// 	To:        &addrTo,
-	// 	From:      addrFrom,
-	// 	Value:     big.NewInt(1),
-	// 	Input:     []byte{1, 2},
-	// 	V:         big.NewInt(25),
-	// 	S:         big.NewInt(26),
-	// 	R:         big.NewInt(27),
-	// }
 	originalTx := NewTx(&MixedTx{
 		Nonce:     0,
 		GasPrice:  big.NewInt(11),
@@ -186,13 +160,11 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 
 	for _, v := range txTypes {
 		t.Run(v.String(), func(t *testing.T) {
-			//originalTx.Type = v
 			originalTx.SetTransactionType(v)
 			originalTx.ComputeHash(1)
 
 			txRLP := originalTx.MarshalRLP()
 
-			//unmarshalledTx := new(Transaction)
 			unmarshalledTx := NewTx(&MixedTx{})
 			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
@@ -268,7 +240,6 @@ func TestRLPMarshall_Unmarshall_Missing_Data(t *testing.T) {
 				v, err := parser.Parse(testData)
 				assert.Nil(t, err)
 
-				//unmarshalledTx := &Transaction{Type: txType}
 				unmarshalledTx := NewTx(&MixedTx{
 					Type: txType,
 				})

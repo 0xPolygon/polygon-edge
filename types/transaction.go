@@ -215,29 +215,6 @@ func (t *Transaction) SetHash(h Hash) {
 	t.Inner.setHash(h)
 }
 
-// type Transaction struct {
-// 	Nonce     uint64
-// 	GasPrice  *big.Int
-// 	GasTipCap *big.Int
-// 	GasFeeCap *big.Int
-// 	Gas       uint64
-// 	To        *Address
-// 	Value     *big.Int
-// 	Input     []byte
-// 	V, R, S   *big.Int
-// 	Hash      Hash
-// 	From      Address
-
-// 	Type TxType
-
-// 	ChainID *big.Int
-
-// 	// Cache
-// 	size atomic.Pointer[uint64]
-
-// 	AccessList TxAccessList
-// }
-
 // IsContractCreation checks if tx is contract creation
 func (t *Transaction) IsContractCreation() bool {
 	return t.To() == nil
@@ -262,37 +239,6 @@ func (t *Transaction) Copy() *Transaction {
 	return newTx
 }
 
-// func DeepCopyTxData(data TxData) TxData {
-// 	if data == nil {
-// 		return nil
-// 	}
-
-// 	switch t := data.(type) {
-// 	case *MixedTx:
-// 		v, r, s := t.rawSignatureValues()
-// 		return &MixedTx{
-// 			Nonce:      t.nonce(),
-// 			GasPrice:   new(big.Int).Set(t.gasPrice()),
-// 			GasTipCap:  new(big.Int).Set(t.gasTipCap()),
-// 			GasFeeCap:  new(big.Int).Set(t.gasFeeCap()),
-// 			Gas:        t.gas(),
-// 			To:         t.to(),
-// 			Value:      new(big.Int).Set(t.value()),
-// 			Input:      append([]byte(nil), t.input()...),
-// 			V:          new(big.Int).Set(v),
-// 			R:          new(big.Int).Set(r),
-// 			S:          new(big.Int).Set(s),
-// 			Hash:       t.hash(),
-// 			From:       t.from(),
-// 			Type:       t.transactionType(),
-// 			ChainID:    t.chainID(),
-// 			AccessList: DeepCopyTxAccessList(t.accessList()),
-// 		}
-
-//		default:
-//			return nil
-//		}
-//	}
 func DeepCopyTxData(data TxData) TxData {
 	if data == nil {
 		return nil
@@ -351,16 +297,6 @@ func DeepCopyTxData(data TxData) TxData {
 			newAccessListStruct.GasPrice.Set(t.GasPrice)
 		}
 
-		// newMixedTx.GasTipCap = new(big.Int)
-		// if t.GasTipCap != nil {
-		// 	newMixedTx.GasTipCap.Set(t.GasTipCap)
-		// }
-
-		// newMixedTx.GasFeeCap = new(big.Int)
-		// if t.GasFeeCap != nil {
-		// 	newMixedTx.GasFeeCap.Set(t.GasFeeCap)
-		// }
-
 		newAccessListStruct.Value = new(big.Int)
 		if t.Value != nil {
 			newAccessListStruct.Value.Set(t.Value)
@@ -408,46 +344,6 @@ func DeepCopyTxAccessList(accessList TxAccessList) TxAccessList {
 
 	return accessListCopy
 }
-
-// func (t *Transaction) Copy() *Transaction {
-// 	tt := new(Transaction)
-// 	*tt = *t
-
-// 	tt.GasPrice = new(big.Int)
-// 	if t.GasPrice != nil {
-// 		tt.GasPrice.Set(t.GasPrice)
-// 	}
-
-// 	tt.GasTipCap = new(big.Int)
-// 	if t.GasTipCap != nil {
-// 		tt.GasTipCap.Set(t.GasTipCap)
-// 	}
-
-// 	tt.GasFeeCap = new(big.Int)
-// 	if t.GasFeeCap != nil {
-// 		tt.GasFeeCap.Set(t.GasFeeCap)
-// 	}
-
-// 	tt.Value = new(big.Int)
-// 	if t.Value != nil {
-// 		tt.Value.Set(t.Value)
-// 	}
-
-// 	if t.R != nil {
-// 		tt.R = new(big.Int)
-// 		tt.R = big.NewInt(0).SetBits(t.R.Bits())
-// 	}
-
-// 	if t.S != nil {
-// 		tt.S = new(big.Int)
-// 		tt.S = big.NewInt(0).SetBits(t.S.Bits())
-// 	}
-
-// 	tt.Input = make([]byte, len(t.Input))
-// 	copy(tt.Input[:], t.Input[:])
-
-// 	return tt
-// }
 
 // Cost returns gas * gasPrice + value
 func (t *Transaction) Cost() *big.Int {

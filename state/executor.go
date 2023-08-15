@@ -335,7 +335,6 @@ var emptyFrom = types.Address{}
 
 // Write writes another transaction to the executor
 func (t *Transition) Write(txn *types.Transaction) error {
-	//var err error
 	if txn.From() == emptyFrom &&
 		(txn.Type() == types.LegacyTx || txn.Type() == types.DynamicFeeTx) {
 		// Decrypt the from address
@@ -678,14 +677,6 @@ func (t *Transition) Create2(
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
 	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, initialAccessList)
 
-	// if t.config.EIP2929 {
-	// 	// contract.AccessList.AddAddress(caller)
-	// 	// // add all precompiles to access list
-	// 	// for _, addr := range precompiled.ActivePrecompiles {
-	// 	// 	contract.AccessList.AddAddress(addr)
-	// 	// }
-	// }
-
 	return t.applyCreate(contract, t)
 }
 
@@ -698,16 +689,6 @@ func (t *Transition) Call2(
 	initialAccessList *runtime.AccessList,
 ) *runtime.ExecutionResult {
 	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, initialAccessList)
-
-	// if t.config.EIP2929 {
-	// 	// c.AccessList.AddAddress(caller)
-	// 	// c.AccessList.AddAddress(to)
-	// 	// // add all precompiles to access list
-	// 	// for _, addr := range precompiled.ActivePrecompiles {
-	// 	// 	c.AccessList.AddAddress(addr)
-	// 	// }
-	// }
-	//c.AccessList.PrepareAccessList(caller, &to, precompiled.ActivePrecompiles, nil)
 
 	return t.applyCall(c, runtime.Call, t)
 }

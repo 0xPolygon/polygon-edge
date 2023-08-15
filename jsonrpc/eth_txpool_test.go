@@ -12,10 +12,6 @@ func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
 	store := &mockStoreTxn{}
 	eth := newTestEthEndpoint(store)
 
-	// txn := &types.Transaction{
-	// 	From: addr0,
-	// 	V:    big.NewInt(1),
-	// }
 	txn := types.NewTx(&types.MixedTx{
 		From: addr0,
 		V:    big.NewInt(1),
@@ -38,12 +34,6 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 	store.AddAccount(addr0)
 	eth := newTestEthEndpoint(store)
 
-	// txToSend := &types.Transaction{
-	// 	From:     addr0,
-	// 	To:       argAddrPtr(addr0),
-	// 	Nonce:    uint64(0),
-	// 	GasPrice: big.NewInt(int64(1)),
-	// }
 	txToSend := types.NewTx(&types.MixedTx{
 		From:     addr0,
 		To:       argAddrPtr(addr0),

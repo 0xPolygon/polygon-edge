@@ -162,7 +162,6 @@ func (d *Debug) TraceCall(
 
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
 	if tx.Gas() == 0 {
-		//tx.Gas = header.GasLimit
 		tx.SetGas(header.GasLimit)
 	}
 

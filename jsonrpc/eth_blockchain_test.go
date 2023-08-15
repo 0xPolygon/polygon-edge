@@ -87,7 +87,6 @@ func TestEth_Block_GetBlockTransactionCountByNumber(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		block.Transactions = append(block.Transactions, []*types.Transaction{
-			//	{Nonce: 0, From: addr0}}...)
 			types.NewTx(&types.MixedTx{Nonce: 0, From: addr0})}...)
 	}
 	store.add(block)

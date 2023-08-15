@@ -45,17 +45,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:      nil,
 				Nonce:     toArgUint64Ptr(0),
 			},
-			// res: &types.Transaction{
-			// 	From:      addr1,
-			// 	To:        &addr2,
-			// 	Gas:       21000,
-			// 	GasPrice:  big.NewInt(10000),
-			// 	GasTipCap: big.NewInt(10000),
-			// 	GasFeeCap: big.NewInt(10000),
-			// 	Value:     oneEther,
-			// 	Input:     []byte{},
-			// 	Nonce:     0,
-			// },
 			res: types.NewTx(&types.MixedTx{
 				From:      addr1,
 				To:        &addr2,
@@ -78,17 +67,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			// res: &types.Transaction{
-			// 	From:      types.ZeroAddress,
-			// 	To:        &addr2,
-			// 	Gas:       21000,
-			// 	GasPrice:  big.NewInt(10000),
-			// 	GasTipCap: new(big.Int),
-			// 	GasFeeCap: new(big.Int),
-			// 	Value:     oneEther,
-			// 	Input:     []byte{},
-			// 	Nonce:     0,
-			// },
 			res: types.NewTx(&types.MixedTx{
 				From:      types.ZeroAddress,
 				To:        &addr2,
@@ -117,17 +95,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Value:    toArgBytesPtr(oneEther.Bytes()),
 				Data:     nil,
 			},
-			// res: &types.Transaction{
-			// 	From:      addr1,
-			// 	To:        &addr2,
-			// 	Gas:       21000,
-			// 	GasPrice:  big.NewInt(10000),
-			// 	GasTipCap: new(big.Int),
-			// 	GasFeeCap: new(big.Int),
-			// 	Value:     oneEther,
-			// 	Input:     []byte{},
-			// 	Nonce:     10,
-			// },
 			res: types.NewTx(&types.MixedTx{
 				From:      addr1,
 				To:        &addr2,
@@ -151,17 +118,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			// res: &types.Transaction{
-			// 	From:      addr1,
-			// 	To:        &addr2,
-			// 	Gas:       21000,
-			// 	GasPrice:  big.NewInt(10000),
-			// 	GasTipCap: new(big.Int),
-			// 	GasFeeCap: new(big.Int),
-			// 	Value:     new(big.Int).SetBytes([]byte{}),
-			// 	Input:     []byte{},
-			// 	Nonce:     1,
-			// },
 			res: types.NewTx(&types.MixedTx{
 				From:      addr1,
 				To:        &addr2,
@@ -184,17 +140,6 @@ func TestEth_DecodeTxn(t *testing.T) {
 				Data:     nil,
 				Nonce:    toArgUint64Ptr(1),
 			},
-			// res: &types.Transaction{
-			// 	From:      addr1,
-			// 	To:        &addr2,
-			// 	Gas:       0,
-			// 	GasPrice:  big.NewInt(10000),
-			// 	GasTipCap: new(big.Int),
-			// 	GasFeeCap: new(big.Int),
-			// 	Value:     new(big.Int).SetBytes([]byte{}),
-			// 	Input:     []byte{},
-			// 	Nonce:     1,
-			// },
 			res: types.NewTx(&types.MixedTx{
 				From:      addr1,
 				To:        &addr2,
@@ -331,18 +276,6 @@ func TestEth_TxnType(t *testing.T) {
 		Type:      toArgUint64Ptr(uint64(types.DynamicFeeTx)),
 	}
 
-	// expectedRes := &types.Transaction{
-	// 	From:      addr1,
-	// 	To:        &addr2,
-	// 	Gas:       21000,
-	// 	GasPrice:  big.NewInt(10000),
-	// 	GasTipCap: big.NewInt(10000),
-	// 	GasFeeCap: big.NewInt(10000),
-	// 	Value:     oneEther,
-	// 	Input:     []byte{},
-	// 	Nonce:     0,
-	// 	Type:      types.DynamicFeeTx,
-	// }
 	expectedRes := types.NewTx(&types.MixedTx{
 		From:      addr1,
 		To:        &addr2,

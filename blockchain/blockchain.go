@@ -1031,7 +1031,6 @@ func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 			return err
 		}
 
-		//tx.From = sender
 		tx.SetFrom(sender)
 	}
 
@@ -1055,7 +1054,6 @@ func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Trans
 			continue
 		}
 
-		//tx.From = sender
 		tx.SetFrom(sender)
 
 		updated = true

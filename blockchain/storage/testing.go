@@ -270,15 +270,6 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	require.NoError(t, batch.WriteBatch())
 
 	addr1 := types.StringToAddress("11")
-	// t0 := &types.Transaction{
-	// 	Nonce:    0,
-	// 	To:       &addr1,
-	// 	Value:    big.NewInt(1),
-	// 	Gas:      11,
-	// 	GasPrice: big.NewInt(11),
-	// 	Input:    []byte{1, 2},
-	// 	V:        big.NewInt(1),
-	// }
 	t0 := types.NewTx(&types.MixedTx{
 		Nonce:    0,
 		To:       &addr1,
@@ -291,15 +282,6 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 	t0.ComputeHash(1)
 
 	addr2 := types.StringToAddress("22")
-	// t1 := &types.Transaction{
-	// 	Nonce:    0,
-	// 	To:       &addr2,
-	// 	Value:    big.NewInt(1),
-	// 	Gas:      22,
-	// 	GasPrice: big.NewInt(11),
-	// 	Input:    []byte{4, 5},
-	// 	V:        big.NewInt(2),
-	// }
 	t1 := types.NewTx(&types.MixedTx{
 		Nonce:    0,
 		To:       &addr2,
@@ -356,12 +338,6 @@ func testReceipts(t *testing.T, m PlaceholderStorage) {
 
 	body := &types.Body{
 		Transactions: []*types.Transaction{
-			// {
-			// 	Nonce:    1000,
-			// 	Gas:      50,
-			// 	GasPrice: new(big.Int).SetUint64(100),
-			// 	V:        big.NewInt(11),
-			// },
 			types.NewTx(&types.MixedTx{
 				Nonce:    1000,
 				Gas:      50,

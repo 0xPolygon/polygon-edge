@@ -195,7 +195,6 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 
 // SendRawTransaction sends a raw transaction
 func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
-	// tx := &types.Transaction{}
 	tx := types.NewTx(&types.MixedTx{})
 	if err := tx.UnmarshalRLP(buf); err != nil {
 		return nil, err
@@ -449,7 +448,6 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 	}
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
 	if transaction.Gas() == 0 {
-		//transaction.Gas = header.GasLimit
 		transaction.SetGas(header.GasLimit)
 	}
 
@@ -595,7 +593,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
-		//txn.Gas = gas
 		txn.SetGas(gas)
 
 		result, applyErr := e.store.ApplyTxn(header, txn, nil)

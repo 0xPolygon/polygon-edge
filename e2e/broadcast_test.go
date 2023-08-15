@@ -101,15 +101,6 @@ func TestBroadcast(t *testing.T) {
 			// (https://github.com/libp2p/specs/blob/master/pubsub/gossipsub/gossipsub-v1.0.md)
 			time.Sleep(time.Second * 2)
 
-			// tx, err := signer.SignTx(&types.Transaction{
-			// 	Nonce:    0,
-			// 	From:     senderAddr,
-			// 	To:       &receiverAddr,
-			// 	Value:    framework.EthToWei(1),
-			// 	Gas:      1000000,
-			// 	GasPrice: big.NewInt(10000),
-			// 	Input:    []byte{},
-			// }, senderKey)
 			tx, err := signer.SignTx(types.NewTx(&types.MixedTx{
 				Nonce:    0,
 				From:     senderAddr,

@@ -296,18 +296,6 @@ func (t *stTransaction) At(i indexes, baseFee *big.Int) (*types.Transaction, err
 		gasPrice = common.BigMin(new(big.Int).Add(t.MaxPriorityFeePerGas, baseFee), t.MaxFeePerGas)
 	}
 
-	// return &types.Transaction{
-	// 	From:      t.From,
-	// 	To:        t.To,
-	// 	Nonce:     t.Nonce,
-	// 	Value:     new(big.Int).Set(t.Value[i.Value]),
-	// 	Gas:       t.GasLimit[i.Gas],
-	// 	GasPrice:  new(big.Int).Set(gasPrice),
-	// 	GasFeeCap: t.MaxFeePerGas,
-	// 	GasTipCap: t.MaxPriorityFeePerGas,
-	// 	Input:     hex.MustDecodeHex(t.Data[i.Data]),
-	// }, nil
-
 	return types.NewTx(&types.MixedTx{
 		From:      t.From,
 		To:        t.To,

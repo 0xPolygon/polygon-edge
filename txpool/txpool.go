@@ -586,7 +586,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 	// If no address was set, update it
 	if tx.From() == types.ZeroAddress {
-		//tx.From = from
 		tx.SetFrom(from)
 	}
 
@@ -772,7 +771,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// add chainID to the tx - only dynamic fee tx
 	if tx.Type() == types.DynamicFeeTx {
-		//tx.ChainID = p.chainID
 		tx.SetChainID(p.chainID)
 	}
 
@@ -917,7 +915,6 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 		return
 	}
 
-	// tx := new(types.Transaction)
 	tx := types.NewTx(&types.MixedTx{})
 
 	// decode tx
