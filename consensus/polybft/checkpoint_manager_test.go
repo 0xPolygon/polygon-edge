@@ -325,12 +325,12 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		nil, blockchain, nil, hclog.NewNullLogger(), state)
 
 	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
-		require.NoError(t, state.CheckpointStore.updateLastSaved(block-1)) // we got everything till the current block
+		require.NoError(t, state.ExitEventStore.updateLastSaved(block-1)) // we got everything till the current block
 		req.IsEpochEndingBlock = false
 		req.FullBlock.Receipts = createReceipts(0, 5)
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.CheckpointStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.ExitEventStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -340,7 +340,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	})
 
 	t.Run("PostBlock - epoch ending block (exit events are saved to the next epoch)", func(t *testing.T) {
-		require.NoError(t, state.CheckpointStore.updateLastSaved(block)) // we got everything till the current block
+		require.NoError(t, state.ExitEventStore.updateLastSaved(block)) // we got everything till the current block
 		req.IsEpochEndingBlock = true
 		req.FullBlock.Receipts = createReceipts(5, 10)
 		extra.Validators = &validator.ValidatorSetDelta{}
@@ -349,7 +349,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.ExitEventStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block+2 // they should be saved in the next epoch and its first block
 		})
 
@@ -360,7 +360,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	})
 
 	t.Run("PostBlock - there are missing events", func(t *testing.T) {
-		require.NoError(t, state.CheckpointStore.updateLastSaved(block)) // we are missing one block
+		require.NoError(t, state.ExitEventStore.updateLastSaved(block)) // we are missing one block
 
 		missedReceipts := createReceipts(10, 13)
 		newReceipts := createReceipts(13, 15)
@@ -390,7 +390,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.FullBlock.Receipts = newReceipts
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.ExitEventStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block+2
 		})
 
@@ -400,7 +400,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		require.Len(t, exitEvents, len(missedReceipts)+5)
 		require.Equal(t, extra.Checkpoint.EpochNumber, exitEvents[0].EpochNumber)
 
-		exitEvents, err = state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err = state.ExitEventStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block+3
 		})
 

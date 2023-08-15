@@ -33,7 +33,7 @@ type State struct {
 	close chan struct{}
 
 	StateSyncStore        *StateSyncStore
-	CheckpointStore       *CheckpointStore
+	ExitEventStore        *ExitEventStore
 	EpochStore            *EpochStore
 	ProposerSnapshotStore *ProposerSnapshotStore
 	StakeStore            *StakeStore
@@ -50,7 +50,7 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 		db:                    db,
 		close:                 closeCh,
 		StateSyncStore:        &StateSyncStore{db: db},
-		CheckpointStore:       &CheckpointStore{db: db},
+		ExitEventStore:        &ExitEventStore{db: db},
 		EpochStore:            &EpochStore{db: db},
 		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
 		StakeStore:            &StakeStore{db: db},
@@ -70,7 +70,7 @@ func (s *State) initStorages() error {
 		if err := s.StateSyncStore.initialize(tx); err != nil {
 			return err
 		}
-		if err := s.CheckpointStore.initialize(tx); err != nil {
+		if err := s.ExitEventStore.initialize(tx); err != nil {
 			return err
 		}
 		if err := s.EpochStore.initialize(tx); err != nil {

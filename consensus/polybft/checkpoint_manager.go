@@ -292,7 +292,7 @@ func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingB
 func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 	block := req.FullBlock.Block.Number()
 
-	lastBlock, err := c.state.CheckpointStore.getLastSaved()
+	lastBlock, err := c.state.ExitEventStore.getLastSaved()
 	if err != nil {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
@@ -307,11 +307,11 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 		return exitEvents[i].ID.Cmp(exitEvents[j].ID) < 0
 	})
 
-	if err := c.state.CheckpointStore.insertExitEvents(exitEvents); err != nil {
+	if err := c.state.ExitEventStore.insertExitEvents(exitEvents); err != nil {
 		return err
 	}
 
-	if err := c.state.CheckpointStore.updateLastSaved(block); err != nil {
+	if err := c.state.ExitEventStore.updateLastSaved(block); err != nil {
 		return err
 	}
 
@@ -334,7 +334,7 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 
 // BuildEventRoot returns an exit event root hash for exit tree of given epoch
 func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
-	exitEvents, err := c.state.CheckpointStore.getExitEventsByEpoch(epoch)
+	exitEvents, err := c.state.ExitEventStore.getExitEventsByEpoch(epoch)
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -355,7 +355,7 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
 	c.logger.Debug("Generating proof for exit", "exitID", exitID)
 
-	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID)
+	exitEvent, err := c.state.ExitEventStore.getExitEvent(exitID)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -419,7 +419,7 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock.Uint64())
+	exitEvents, err := c.state.ExitEventStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock.Uint64())
 	if err != nil {
 		return types.Proof{}, err
 	}
