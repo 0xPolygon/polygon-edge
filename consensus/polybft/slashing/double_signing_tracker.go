@@ -26,15 +26,18 @@ var (
 type SenderMessagesMap map[types.Address][]*ibftProto.Message
 type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
+type DoubleSignEvidences []*DoubleSignEvidence
+
+// TODO RLP serialize/deserialize methods, Equals method for validation, etc.
+
 type DoubleSignEvidence struct {
 	signer   types.Address
-	round    uint64
 	messages []*ibftProto.Message
 }
 
-func newDoubleSignEvidence(signer types.Address, round uint64,
+func newDoubleSignEvidence(signer types.Address,
 	messages []*ibftProto.Message) *DoubleSignEvidence {
-	return &DoubleSignEvidence{signer: signer, round: round, messages: messages}
+	return &DoubleSignEvidence{signer: signer, messages: messages}
 }
 
 type Messages struct {
@@ -185,13 +188,13 @@ func (t *DoubleSigningTrackerImpl) GetEvidences(height uint64) []*DoubleSignEvid
 			continue
 		}
 
-		for round, senderMsgs := range roundMsgs {
+		for _, senderMsgs := range roundMsgs {
 			for address, msgs := range senderMsgs {
 				if len(msgs) <= 1 {
 					continue
 				}
 
-				evidence := newDoubleSignEvidence(address, round, []*ibftProto.Message{msgs[0]})
+				evidence := newDoubleSignEvidence(address, []*ibftProto.Message{msgs[0]})
 				evidences = append(evidences, evidence)
 
 				for _, msg := range msgs[1:] {
