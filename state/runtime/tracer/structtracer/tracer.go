@@ -21,26 +21,17 @@ type Config struct {
 }
 
 type StructLog struct {
-	Pc            uint64                    `json:"pc"`
-	Op            string                    `json:"op"`
-	Gas           uint64                    `json:"gas"`
-	GasCost       uint64                    `json:"gasCost"`
-	Memory        []byte                    `json:"memory,omitempty"`
-	MemorySize    int                       `json:"memSize"`
-	Stack         []*big.Int                `json:"stack"`
-	ReturnData    []byte                    `json:"returnData,omitempty"`
-	Storage       map[types.Hash]types.Hash `json:"storage"`
-	Depth         int                       `json:"depth"`
-	RefundCounter uint64                    `json:"refund"`
-	Err           error                     `json:"err"`
-}
-
-func (l *StructLog) ErrorString() string {
-	if l.Err != nil {
-		return l.Err.Error()
-	}
-
-	return ""
+	Pc            uint64            `json:"pc"`
+	Op            string            `json:"op"`
+	Gas           uint64            `json:"gas"`
+	GasCost       uint64            `json:"gasCost"`
+	Depth         int               `json:"depth"`
+	Error         string            `json:"error,omitempty"`
+	Stack         []string          `json:"stack,omitempty"`
+	Memory        []string          `json:"memory,omitempty"`
+	Storage       map[string]string `json:"storage,omitempty"`
+	RefundCounter uint64            `json:"refund,omitempty"`
+	ReturnData    string            `json:"returnData,omitempty"`
 }
 
 type StructTracer struct {
@@ -57,20 +48,19 @@ type StructTracer struct {
 	err         error
 
 	storage       []map[types.Address]map[types.Hash]types.Hash
-	currentMemory []([]byte)
-	currentStack  []([]*big.Int)
+	currentMemory [][]byte
+	currentStack  [][]*big.Int
 }
 
 func NewStructTracer(config Config) *StructTracer {
-	storage := make([](map[types.Address]map[types.Hash]types.Hash), 1)
-	storage[0] = make(map[types.Address]map[types.Hash]types.Hash)
-
 	return &StructTracer{
-		Config:        config,
-		cancelLock:    sync.RWMutex{},
-		storage:       storage,
-		currentMemory: make([]([]byte), 1),
-		currentStack:  make([]([]*big.Int), 1),
+		Config:     config,
+		cancelLock: sync.RWMutex{},
+		storage: []map[types.Address]map[types.Hash]types.Hash{
+			{},
+		},
+		currentMemory: make([][]byte, 1),
+		currentStack:  make([][]*big.Int, 1),
 	}
 }
 
@@ -97,10 +87,11 @@ func (t *StructTracer) Clear() {
 	t.consumedGas = 0
 	t.output = t.output[:0]
 	t.err = nil
-	t.storage = make([](map[types.Address]map[types.Hash]types.Hash), 1)
-	t.storage[0] = make(map[types.Address]map[types.Hash]types.Hash)
-	t.currentMemory = make([]([]byte), 1)
-	t.currentStack = make([]([]*big.Int), 1)
+	t.storage = []map[types.Address]map[types.Hash]types.Hash{
+		{},
+	}
+	t.currentMemory = make([][]byte, 1)
+	t.currentStack = make([][]*big.Int, 1)
 }
 
 func (t *StructTracer) TxStart(gasLimit uint64) {
@@ -148,9 +139,7 @@ func (t *StructTracer) CaptureState(
 	}
 
 	t.captureMemory(memory, opCode)
-
 	t.captureStack(stack, sp, opCode)
-
 	t.captureStorage(
 		stack,
 		opCode,
@@ -175,7 +164,7 @@ func (t *StructTracer) captureMemory(
 	t.currentMemory[len(t.currentMemory)-1] = currentMemory
 
 	if opCode == evm.CALL || opCode == evm.STATICCALL {
-		t.currentMemory = append(t.currentMemory, make([]byte, len(memory)))
+		t.currentMemory = append(t.currentMemory, nil)
 	}
 }
 
@@ -190,18 +179,14 @@ func (t *StructTracer) captureStack(
 
 	currentStack := make([]*big.Int, sp)
 
-	for i, v := range stack {
-		if i >= sp {
-			break
-		}
-
+	for i, v := range stack[:sp] {
 		currentStack[i] = new(big.Int).Set(v)
 	}
 
 	t.currentStack[len(t.currentStack)-1] = currentStack
 
 	if opCode == evm.CALL || opCode == evm.STATICCALL {
-		t.currentStack = append(t.currentStack, make([]*big.Int, sp))
+		t.currentStack = append(t.currentStack, nil)
 	}
 }
 
@@ -212,45 +197,39 @@ func (t *StructTracer) captureStorage(
 	sp int,
 	host tracer.RuntimeHost,
 ) {
-	if opCode == evm.CALL || opCode == evm.STATICCALL {
-		t.storage = append(t.storage, make(map[types.Address]map[types.Hash]types.Hash))
-	}
-
-	if !t.Config.EnableStorage || (opCode != evm.SLOAD && opCode != evm.SSTORE) {
+	if !t.Config.EnableStorage {
 		return
 	}
 
-	storage := &t.storage[len(t.storage)-1]
-	_, initialized := (*storage)[contractAddress]
+	addToStorage := func(key, value types.Hash) {
+		if submap, initialized := t.storage[len(t.storage)-1][contractAddress]; !initialized {
+			t.storage[len(t.storage)-1][contractAddress] = map[types.Hash]types.Hash{
+				key: value,
+			}
+		} else {
+			submap[key] = value
+		}
+	}
 
 	switch opCode {
 	case evm.SLOAD:
-		if sp < 1 {
-			return
+		if sp >= 1 {
+			slot := types.BytesToHash(stack[sp-1].Bytes())
+			value := host.GetStorage(contractAddress, slot)
+
+			addToStorage(slot, value)
 		}
-
-		if !initialized {
-			(*storage)[contractAddress] = make(map[types.Hash]types.Hash)
-		}
-
-		slot := types.BytesToHash(stack[sp-1].Bytes())
-		value := host.GetStorage(contractAddress, slot)
-
-		(*storage)[contractAddress][slot] = value
 
 	case evm.SSTORE:
-		if sp < 2 {
-			return
+		if sp >= 2 {
+			slot := types.BytesToHash(stack[sp-1].Bytes())
+			value := types.BytesToHash(stack[sp-2].Bytes())
+
+			addToStorage(slot, value)
 		}
 
-		if !initialized {
-			(*storage)[contractAddress] = make(map[types.Hash]types.Hash)
-		}
-
-		slot := types.BytesToHash(stack[sp-1].Bytes())
-		value := types.BytesToHash(stack[sp-2].Bytes())
-
-		(*storage)[contractAddress][slot] = value
+	case evm.CALL, evm.STATICCALL:
+		t.storage = append(t.storage, map[types.Address]map[types.Hash]types.Hash{})
 	}
 }
 
@@ -266,54 +245,61 @@ func (t *StructTracer) ExecuteState(
 	host tracer.RuntimeHost,
 ) {
 	var (
-		memory     []byte
-		memorySize int
-		stack      []*big.Int
-		returnData []byte
-		storage    map[types.Hash]types.Hash
+		errStr     string
+		memory     []string
+		stack      []string
+		returnData string
+		storage    map[string]string
+		isCallOp   bool = opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String()
 	)
 
 	if t.Config.EnableMemory {
-		if opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String() {
+		if isCallOp {
 			t.currentMemory = t.currentMemory[:len(t.currentMemory)-1]
 		}
 
-		memorySize = len(t.currentMemory[len(t.currentMemory)-1])
-		memory = make([]byte, memorySize)
-		copy(memory, t.currentMemory[len(t.currentMemory)-1])
+		size := 32
+		currMemory := t.currentMemory[len(t.currentMemory)-1]
+		memory = make([]string, 0, len(currMemory)/size)
+
+		for i := 0; i+size <= len(currMemory); i += size {
+			memory = append(memory, hex.EncodeToString(currMemory[i:i+size]))
+		}
 	}
 
 	if t.Config.EnableStack {
-		if opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String() {
+		if isCallOp {
 			t.currentStack = t.currentStack[:len(t.currentStack)-1]
 		}
 
-		stack = make([]*big.Int, len(t.currentStack[len(t.currentStack)-1]))
-		for i, v := range t.currentStack[len(t.currentStack)-1] {
-			stack[i] = new(big.Int).Set(v)
+		currStack := t.currentStack[len(t.currentStack)-1]
+		stack = make([]string, len(currStack))
+
+		for i, v := range currStack {
+			stack[i] = hex.EncodeBig(v)
 		}
-	}
-
-	if t.Config.EnableReturnData {
-		returnData = make([]byte, len(lastReturnData))
-
-		copy(returnData, lastReturnData)
 	}
 
 	if t.Config.EnableStorage {
-		if opCode == evm.OpCode(evm.CALL).String() || opCode == evm.OpCode(evm.STATICCALL).String() {
+		if isCallOp {
 			t.storage = t.storage[:len(t.storage)-1]
 		}
 
-		contractStorage, ok := t.storage[len(t.storage)-1][contractAddress]
-
-		if ok {
-			storage = make(map[types.Hash]types.Hash, len(contractStorage))
+		if contractStorage, ok := t.storage[len(t.storage)-1][contractAddress]; ok {
+			storage = make(map[string]string, len(contractStorage))
 
 			for k, v := range contractStorage {
-				storage[k] = v
+				storage[hex.EncodeToString(k.Bytes())] = hex.EncodeToString(v.Bytes())
 			}
 		}
+	}
+
+	if t.Config.EnableReturnData && len(lastReturnData) > 0 {
+		returnData = hex.EncodeToString(lastReturnData)
+	}
+
+	if err != nil {
+		errStr = err.Error()
 	}
 
 	t.logs = append(
@@ -324,35 +310,21 @@ func (t *StructTracer) ExecuteState(
 			Gas:           availableGas,
 			GasCost:       cost,
 			Memory:        memory,
-			MemorySize:    memorySize,
 			Stack:         stack,
 			ReturnData:    returnData,
 			Storage:       storage,
 			Depth:         depth,
 			RefundCounter: host.GetRefund(),
-			Err:           err,
+			Error:         errStr,
 		},
 	)
 }
 
 type StructTraceResult struct {
-	Failed      bool           `json:"failed"`
-	Gas         uint64         `json:"gas"`
-	ReturnValue string         `json:"returnValue"`
-	StructLogs  []StructLogRes `json:"structLogs"`
-}
-
-type StructLogRes struct {
-	Pc            uint64            `json:"pc"`
-	Op            string            `json:"op"`
-	Gas           uint64            `json:"gas"`
-	GasCost       uint64            `json:"gasCost"`
-	Depth         int               `json:"depth"`
-	Error         string            `json:"error,omitempty"`
-	Stack         []string          `json:"stack"`
-	Memory        []string          `json:"memory"`
-	Storage       map[string]string `json:"storage"`
-	RefundCounter uint64            `json:"refund,omitempty"`
+	Failed      bool        `json:"failed"`
+	Gas         uint64      `json:"gas"`
+	ReturnValue string      `json:"returnValue"`
+	StructLogs  []StructLog `json:"structLogs"`
 }
 
 func (t *StructTracer) GetResult() (interface{}, error) {
@@ -372,47 +344,6 @@ func (t *StructTracer) GetResult() (interface{}, error) {
 		Failed:      t.err != nil,
 		Gas:         t.consumedGas,
 		ReturnValue: returnValue,
-		StructLogs:  formatStructLogs(t.logs),
+		StructLogs:  t.logs,
 	}, nil
-}
-
-func formatStructLogs(originalLogs []StructLog) []StructLogRes {
-	res := make([]StructLogRes, len(originalLogs))
-
-	for index, log := range originalLogs {
-		res[index] = StructLogRes{
-			Pc:            log.Pc,
-			Op:            log.Op,
-			Gas:           log.Gas,
-			GasCost:       log.GasCost,
-			Depth:         log.Depth,
-			Error:         log.ErrorString(),
-			RefundCounter: log.RefundCounter,
-		}
-
-		res[index].Stack = make([]string, len(log.Stack))
-
-		for i, value := range log.Stack {
-			res[index].Stack[i] = hex.EncodeBig(value)
-		}
-
-		res[index].Memory = make([]string, 0, (len(log.Memory)+31)/32)
-
-		if log.Memory != nil {
-			for i := 0; i+32 <= len(log.Memory); i += 32 {
-				res[index].Memory = append(
-					res[index].Memory,
-					hex.EncodeToString(log.Memory[i:i+32]),
-				)
-			}
-		}
-
-		res[index].Storage = make(map[string]string)
-
-		for key, value := range log.Storage {
-			res[index].Storage[hex.EncodeToString(key.Bytes())] = hex.EncodeToString(value.Bytes())
-		}
-	}
-
-	return res
 }

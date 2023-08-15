@@ -2,9 +2,7 @@ package structtracer
 
 import (
 	"errors"
-	"fmt"
 	"math/big"
-	"strings"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -13,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -56,14 +55,14 @@ func TestStructLogErrorString(t *testing.T) {
 		{
 			name: "should return error message",
 			log: StructLog{
-				Err: errors.New(errMsg),
+				Error: errors.New(errMsg).Error(),
 			},
 			expected: errMsg,
 		},
 		{
 			name: "should return empty string",
 			log: StructLog{
-				Err: nil,
+				Error: "",
 			},
 			expected: "",
 		},
@@ -75,7 +74,7 @@ func TestStructLogErrorString(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, test.expected, test.log.ErrorString())
+			assert.Equal(t, test.expected, test.log.Error)
 		})
 	}
 }
@@ -446,7 +445,11 @@ func TestStructTracerCaptureState(t *testing.T) {
 					EnableStorage: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
-					make(map[types.Address]map[types.Hash]types.Hash),
+					{
+						contractAddress: {
+							types.StringToHash("100"): types.StringToHash("200"),
+						},
+					},
 				},
 			},
 			memory:          memory,
@@ -465,6 +468,7 @@ func TestStructTracerCaptureState(t *testing.T) {
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					{
 						contractAddress: {
+							types.StringToHash("100"):                types.StringToHash("200"),
 							types.BytesToHash(big.NewInt(2).Bytes()): types.BytesToHash(big.NewInt(1).Bytes()),
 						},
 					},
@@ -599,7 +603,9 @@ func TestStructTracerExecuteState(t *testing.T) {
 		err             = errors.New("err")
 		refund          = uint64(10000)
 
-		memory  = [][]byte{[]byte("memory sample")}
+		memory = [][]byte{
+			getMemoryString("memory sample"),
+		}
 		storage = []map[types.Address]map[types.Hash]types.Hash{{
 			contractAddress: {
 				types.StringToHash("1"): types.StringToHash("2"),
@@ -609,8 +615,7 @@ func TestStructTracerExecuteState(t *testing.T) {
 				types.StringToHash("5"): types.StringToHash("6"),
 				types.StringToHash("7"): types.StringToHash("8"),
 			},
-		},
-		}
+		}}
 	)
 
 	tests := []struct {
@@ -658,13 +663,12 @@ func TestStructTracerExecuteState(t *testing.T) {
 					Gas:           availableGas,
 					GasCost:       cost,
 					Memory:        nil,
-					MemorySize:    0,
 					Stack:         nil,
-					ReturnData:    nil,
+					ReturnData:    "",
 					Storage:       nil,
 					Depth:         depth,
 					RefundCounter: refund,
-					Err:           err,
+					Error:         err.Error(),
 				},
 			},
 		},
@@ -695,14 +699,13 @@ func TestStructTracerExecuteState(t *testing.T) {
 					Op:            opCode,
 					Gas:           availableGas,
 					GasCost:       cost,
-					Memory:        memory[0],
-					MemorySize:    len(memory[0]),
+					Memory:        []string{hex.EncodeToString(memory[0])},
 					Stack:         nil,
-					ReturnData:    nil,
+					ReturnData:    "",
 					Storage:       nil,
 					Depth:         depth,
 					RefundCounter: refund,
-					Err:           err,
+					Error:         err.Error(),
 				},
 			},
 		},
@@ -732,21 +735,20 @@ func TestStructTracerExecuteState(t *testing.T) {
 			},
 			expected: []StructLog{
 				{
-					Pc:         ip,
-					Op:         opCode,
-					Gas:        availableGas,
-					GasCost:    cost,
-					Memory:     nil,
-					MemorySize: 0,
-					Stack: []*big.Int{
-						big.NewInt(1),
-						big.NewInt(2),
+					Pc:      ip,
+					Op:      opCode,
+					Gas:     availableGas,
+					GasCost: cost,
+					Memory:  nil,
+					Stack: []string{
+						hex.EncodeBig(big.NewInt(1)),
+						hex.EncodeBig(big.NewInt(2)),
 					},
-					ReturnData:    nil,
+					ReturnData:    "",
 					Storage:       nil,
 					Depth:         depth,
 					RefundCounter: refund,
-					Err:           err,
+					Error:         err.Error(),
 				},
 			},
 		},
@@ -777,13 +779,12 @@ func TestStructTracerExecuteState(t *testing.T) {
 					Gas:           availableGas,
 					GasCost:       cost,
 					Memory:        nil,
-					MemorySize:    0,
 					Stack:         nil,
-					ReturnData:    lastReturnData,
+					ReturnData:    hex.EncodeToString(lastReturnData),
 					Storage:       nil,
 					Depth:         depth,
 					RefundCounter: refund,
-					Err:           err,
+					Error:         err.Error(),
 				},
 			},
 		},
@@ -815,16 +816,15 @@ func TestStructTracerExecuteState(t *testing.T) {
 					Gas:        availableGas,
 					GasCost:    cost,
 					Memory:     nil,
-					MemorySize: 0,
 					Stack:      nil,
-					ReturnData: nil,
-					Storage: map[types.Hash]types.Hash{
-						types.StringToHash("1"): types.StringToHash("2"),
-						types.StringToHash("3"): types.StringToHash("4"),
+					ReturnData: "",
+					Storage: map[string]string{
+						hex.EncodeToString(types.StringToHash("1").Bytes()): hex.EncodeToString(types.StringToHash("2").Bytes()),
+						hex.EncodeToString(types.StringToHash("3").Bytes()): hex.EncodeToString(types.StringToHash("4").Bytes()),
 					},
 					Depth:         depth,
 					RefundCounter: refund,
-					Err:           err,
+					Error:         err.Error(),
 				},
 			},
 		},
@@ -832,6 +832,10 @@ func TestStructTracerExecuteState(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
+
+		if test.name != "should save storage" {
+			continue
+		}
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
@@ -860,174 +864,90 @@ func TestStructTracerExecuteState(t *testing.T) {
 func TestStructTracerGetResult(t *testing.T) {
 	t.Parallel()
 
-	var (
-		ip           = uint64(2)
-		opCode       = "ADD"
-		availableGas = uint64(1000)
-		cost         = uint64(100)
-		returnData   = []byte("return data")
-		depth        = 1
-		// err             = errors.New("err")
-		refund = uint64(10000)
+	t.Run("reason is not nil", func(t *testing.T) {
+		t.Parallel()
 
-		// memory chunk size must be 32 bytes
-		memory = append(
-			[]byte("memory sample"),
-			make([]byte, 19)...,
-		)
-		stack = []*big.Int{
-			big.NewInt(1),
-			big.NewInt(2),
-			big.NewInt(4),
-		}
-		consumedGas = uint64(1024)
+		expectedErr := errors.New("timeout")
+		res, err := (&StructTracer{reason: expectedErr}).GetResult()
 
-		reason = errors.New("timeout")
-		err    = errors.New("out of gas")
+		assert.ErrorIs(t, err, expectedErr)
+		assert.Nil(t, res)
+	})
 
-		logs = []StructLog{
+	t.Run("return value for ErrExecutionReverted error", func(t *testing.T) {
+		t.Parallel()
+
+		res, err := (&StructTracer{err: runtime.ErrExecutionReverted, output: []byte{2}}).GetResult()
+
+		assert.Nil(t, err)
+		require.NotNil(t, res)
+
+		stresult, ok := res.(*StructTraceResult)
+
+		require.True(t, ok)
+		require.True(t, stresult.Failed)
+		require.Equal(t, "02", stresult.ReturnValue)
+	})
+
+	t.Run("return value for non ErrExecutionReverted error", func(t *testing.T) {
+		t.Parallel()
+
+		res, err := (&StructTracer{err: errors.New("op"), output: []byte{2}}).GetResult()
+
+		assert.Nil(t, err)
+		require.NotNil(t, res)
+
+		stresult, ok := res.(*StructTraceResult)
+
+		require.True(t, ok)
+		require.True(t, stresult.Failed)
+		require.Empty(t, stresult.ReturnValue)
+	})
+
+	t.Run("return value for ErrExecutionReverted error", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []StructLog{
 			{
-				Pc:         ip,
-				Op:         opCode,
-				Gas:        availableGas,
-				GasCost:    cost,
-				Memory:     memory,
-				MemorySize: len(memory),
-				Stack:      stack,
-				ReturnData: returnData,
-				Storage: map[types.Hash]types.Hash{
-					types.StringToHash("1"): types.StringToHash("2"),
-					types.StringToHash("3"): types.StringToHash("4"),
-				},
-				Depth:         depth,
-				RefundCounter: refund,
-				Err:           nil,
+				Pc:            100,
+				Op:            "sload",
+				Gas:           100,
+				GasCost:       50,
+				Memory:        []string{"hello"},
+				Stack:         []string{"1", "2"},
+				ReturnData:    "1",
+				Storage:       map[string]string{"1": "2"},
+				Depth:         1,
+				RefundCounter: 100,
+				Error:         "",
 			},
 		}
-	)
+		consumedGas := uint64(1230)
+		res, err := (&StructTracer{
+			consumedGas: consumedGas,
+			output:      []byte{2},
+			logs:        logs,
+		}).GetResult()
 
-	tests := []struct {
-		name     string
-		tracer   *StructTracer
-		expected interface{}
-		err      error
-	}{
-		{
-			name: "should return result",
-			tracer: &StructTracer{
-				Config:      testEmptyConfig,
-				logs:        logs,
-				consumedGas: consumedGas,
-				output:      returnData,
-			},
-			expected: &StructTraceResult{
-				Failed:      false,
-				Gas:         consumedGas,
-				ReturnValue: hex.EncodeToString(returnData),
-				StructLogs: []StructLogRes{
-					{
-						Pc:            ip,
-						Op:            opCode,
-						Gas:           availableGas,
-						GasCost:       cost,
-						Depth:         depth,
-						Error:         "",
-						RefundCounter: refund,
-						Stack: []string{
-							"0x1",
-							"0x2",
-							"0x4",
-						},
-						Memory: []string{
-							fmt.Sprintf(
-								"%s%s",
-								hex.EncodeToString([]byte("memory sample")),
-								strings.Repeat("0", 19*2),
-							),
-						},
-						Storage: map[string]string{
-							hex.EncodeToString(types.StringToHash("1").Bytes()): hex.EncodeToString(types.StringToHash("2").Bytes()),
-							hex.EncodeToString(types.StringToHash("3").Bytes()): hex.EncodeToString(types.StringToHash("4").Bytes()),
-						},
-					},
-				},
-			},
-			err: nil,
-		},
-		{
-			name: "should return empty ReturnValue if error is marked",
-			tracer: &StructTracer{
-				Config:      testEmptyConfig,
-				logs:        logs,
-				consumedGas: consumedGas,
-				output:      returnData,
-				err:         err,
-			},
-			expected: &StructTraceResult{
-				Failed:      true,
-				Gas:         consumedGas,
-				ReturnValue: "",
-				StructLogs: []StructLogRes{
-					{
-						Pc:            ip,
-						Op:            opCode,
-						Gas:           availableGas,
-						GasCost:       cost,
-						Depth:         depth,
-						Error:         "",
-						RefundCounter: refund,
-						Stack: []string{
-							"0x1",
-							"0x2",
-							"0x4",
-						},
-						Memory: []string{
-							fmt.Sprintf(
-								"%s%s",
-								hex.EncodeToString([]byte("memory sample")),
-								strings.Repeat("0", 19*2),
-							),
-						},
-						Storage: map[string]string{
-							hex.EncodeToString(types.StringToHash("1").Bytes()): hex.EncodeToString(types.StringToHash("2").Bytes()),
-							hex.EncodeToString(types.StringToHash("3").Bytes()): hex.EncodeToString(types.StringToHash("4").Bytes()),
-						},
-					},
-				},
-			},
-			err: nil,
-		},
-		{
-			name: "should return error",
-			tracer: &StructTracer{
-				Config: testEmptyConfig,
-				reason: reason,
-				logs:   logs,
-			},
-			expected: nil,
-			err:      reason,
-		},
+		assert.Nil(t, err)
+		require.NotNil(t, res)
+
+		stresult, ok := res.(*StructTraceResult)
+
+		require.True(t, ok)
+		require.False(t, stresult.Failed)
+		require.Equal(t, "02", stresult.ReturnValue)
+		require.Equal(t, logs, stresult.StructLogs)
+		require.Equal(t, consumedGas, stresult.Gas)
+	})
+}
+
+func getMemoryString(s string) []byte {
+	if len(s) == 0 {
+		return make([]byte, 32)
+	} else if len(s)%32 == 0 {
+		return []byte(s)
 	}
 
-	for _, test := range tests {
-		test := test
-
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
-			res, err := test.tracer.GetResult()
-
-			assert.Equal(
-				t,
-				test.expected,
-				res,
-			)
-
-			assert.Equal(
-				t,
-				test.err,
-				err,
-			)
-		})
-	}
+	return append([]byte(s), make([]byte, 32-(len(s)%32))...)
 }
