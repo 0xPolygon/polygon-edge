@@ -350,7 +350,7 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 	}
 }
 
-func TestDoubleSigningTracker_GetDoubleSigners_Simple(t *testing.T) {
+func TestDoubleSigningTracker_GetDoubleSigners_SingleDoubleSigner(t *testing.T) {
 	t.Parallel()
 
 	const (
