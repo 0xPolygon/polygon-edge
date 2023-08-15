@@ -89,15 +89,6 @@ func (s *DoubleSigners) contains(sender types.Address) bool {
 //nolint:godox
 // TODO: RLP serialize/deserialize methods, Equals method for validation, etc.
 
-type DoubleSignEvidence struct {
-	sender   types.Address
-	messages []*ibftProto.Message
-}
-
-func newDoubleSignEvidence(sender types.Address, messages []*ibftProto.Message) *DoubleSignEvidence {
-	return &DoubleSignEvidence{sender: sender, messages: messages}
-}
-
 type Messages struct {
 	content       MessagesMap
 	sortedSenders map[uint64]SortedAddresses
