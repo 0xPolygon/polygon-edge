@@ -132,6 +132,21 @@ func generateRandomProposalHash(t *testing.T) types.Hash {
 	return types.BytesToHash(result)
 }
 
+// enforceUniqueRandomNumber enforces that generated number is a unique,
+// by checking if generated number is among provided existingNums
+func enforceUniqueRandomNumber(existingNums map[uint64]struct{}, maxNum uint64, numGenFn func() uint64) uint64 {
+	var num uint64
+
+	for {
+		num = numGenFn()
+		if _, ok := existingNums[num]; !ok {
+			break
+		}
+	}
+
+	return num
+}
+
 type dummyValidatorsProvider struct {
 	accounts []*wallet.Account
 }

@@ -350,7 +350,7 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 	}
 }
 
-func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
+func TestDoubleSigningTracker_GetDoubleSigners_Simple(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -415,7 +415,7 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 	t.Parallel()
 
 	const (
-		maxRound      = 10
+		maxRound      = 100
 		maxHeight     = 1000
 		maxMsgs       = 4
 		accountsCount = 5
@@ -424,7 +424,7 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 	doubleSignersCount := r.Intn(accountsCount + 1)
 	provider := &dummyValidatorsProvider{accounts: make([]*wallet.Account, accountsCount)}
 
-	doubleSigners := make([]types.Address, 0, doubleSignersCount)
+	doubleSignerAddrs := make([]types.Address, 0, doubleSignersCount)
 	keys := make([]*wallet.Key, accountsCount)
 
 	for i := 0; i < accountsCount; i++ {
@@ -434,13 +434,13 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 		keys[i] = wallet.NewKey(acc)
 		provider.accounts[i] = acc
 
-		if len(doubleSigners) < doubleSignersCount {
-			doubleSigners = append(doubleSigners, types.Address(keys[i].Address()))
+		if len(doubleSignerAddrs) < doubleSignersCount {
+			doubleSignerAddrs = append(doubleSignerAddrs, types.Address(keys[i].Address()))
 		}
 	}
 
-	sort.Slice(doubleSigners, func(i, j int) bool {
-		return bytes.Compare(doubleSigners[i].Bytes(), doubleSigners[j].Bytes()) < 0
+	sort.Slice(doubleSignerAddrs, func(i, j int) bool {
+		return bytes.Compare(doubleSignerAddrs[i].Bytes(), doubleSignerAddrs[j].Bytes()) < 0
 	})
 
 	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), provider)
@@ -458,6 +458,7 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 
 	views := make([]*ibftProto.View, heightsNum)
 	expectedDoubleSigning := make(map[uint64]bool, heightsNum)
+	existingRounds := make(map[uint64]struct{}, roundsNum)
 
 	for i := 0; i < heightsNum; i++ {
 		height := uint64(r.Int63n(maxHeight))
@@ -466,7 +467,10 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 		proposalHash := generateRandomProposalHash(t)
 
 		for j := 0; j < roundsNum; j++ {
-			round := uint64(r.Int63n(maxRound))
+			round := enforceUniqueRandomNumber(existingRounds, maxRound, func() uint64 {
+				return uint64(r.Int63n(int64(maxRound)))
+			})
+			existingRounds[round] = struct{}{}
 			view := &ibftProto.View{Height: height, Round: round}
 			views[i] = view
 
@@ -476,11 +480,19 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 					messagesCount = 2
 				}
 
-				for i := 0; i < messagesCount; i++ {
-					tracker.Handle(buildPrepareMessage(t, view, keys[0], generateRandomProposalHash(t)))
+				for i, key := range keys {
+					if i < len(doubleSignerAddrs) {
+						for msgsCount := 0; msgsCount < messagesCount; msgsCount++ {
+							tracker.Handle(buildPrepareMessage(t, view, key, generateRandomProposalHash(t)))
+						}
+					} else {
+						tracker.Handle(buildPrepareMessage(t, view, key, generateRandomProposalHash(t)))
+					}
 				}
 			} else {
-				tracker.Handle(buildPrepareMessage(t, view, keys[0], proposalHash))
+				for _, key := range keys {
+					tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+				}
 			}
 		}
 	}
@@ -488,12 +500,12 @@ func TestDoubleSigningTracker_GetEvidences_Randomized(t *testing.T) {
 	for _, view := range views {
 		doubleSigners := tracker.GetDoubleSigners(view.Height)
 		if expectedDoubleSigning[view.Height] {
-			if len(doubleSigners) == 0 {
+			if len(doubleSigners) != len(doubleSignerAddrs) {
 				t.Log(tracker.prepare.String())
 			}
 
-			require.Len(t, doubleSigners, 1)
-			require.Equal(t, doubleSigners[0], types.Address(keys[0].Address()))
+			require.Len(t, doubleSigners, len(doubleSignerAddrs))
+			require.Equal(t, doubleSigners, DoubleSigners(doubleSignerAddrs))
 		} else {
 			if len(doubleSigners) > 0 {
 				t.Log(tracker.prepare.String())
