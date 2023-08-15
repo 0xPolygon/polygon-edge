@@ -4,13 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"sync"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -75,6 +78,21 @@ type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
+func (d DoubleSigners) EncodeAbi(height uint64) ([]byte, error) {
+	validators := make([]ethgo.Address, len(d))
+
+	for i, address := range d {
+		validators[i] = ethgo.Address(address)
+	}
+
+	slashFn := &contractsapi.SlashValidatorSetFn{
+		Height:     new(big.Int).SetUint64(height),
+		Validators: validators,
+	}
+
+	return slashFn.EncodeAbi()
+}
+
 // contains checks whether provided sender is already present among the double signers
 func (s *DoubleSigners) contains(sender types.Address) bool {
 	for _, addr := range *s {
@@ -85,9 +103,6 @@ func (s *DoubleSigners) contains(sender types.Address) bool {
 
 	return false
 }
-
-//nolint:godox
-// TODO: RLP serialize/deserialize methods, Equals method for validation, etc.
 
 type Messages struct {
 	content       MessagesMap

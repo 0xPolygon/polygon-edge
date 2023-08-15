@@ -382,6 +382,8 @@ func (c *consensusRuntime) FSM() error {
 		return fmt.Errorf("could not build exit root hash for fsm: %w", err)
 	}
 
+	doubleSigners := c.doubleSigningTracker.GetDoubleSigners(parent.Number)
+
 	ff := &fsm{
 		config:            c.config.PolyBFTConfig,
 		parent:            parent,
@@ -391,6 +393,7 @@ func (c *consensusRuntime) FSM() error {
 		epochNumber:       epoch.Number,
 		blockBuilder:      blockBuilder,
 		validators:        valSet,
+		doubleSigners:     doubleSigners,
 		isEndOfEpoch:      isEndOfEpoch,
 		isEndOfSprint:     isEndOfSprint,
 		proposerSnapshot:  proposerSnapshot,
