@@ -96,6 +96,19 @@ type Messages struct {
 	mux           sync.RWMutex
 }
 
+func (m *Messages) String() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("senders")
+	buf.WriteString(fmt.Sprintf("\t%v\n", m.sortedSenders))
+	buf.WriteString("rounds")
+	buf.WriteString(fmt.Sprintf("\t%v\n", m.sortedRounds))
+	buf.WriteString("messages")
+	buf.WriteString(fmt.Sprintf("\t%v\n", m.content))
+
+	return buf.String()
+}
+
 // newMessages is a constructor function for Messages struct
 func newMessages() *Messages {
 	return &Messages{
