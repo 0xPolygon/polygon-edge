@@ -70,32 +70,13 @@ func (s *SortedRounds) Add(round uint64) {
 	(*s)[insertIdx] = round
 }
 
-var _ sort.Interface = (*SortedMessages)(nil)
-
-// SortedMessages is a slice which holds messages in an ascending order by its signatures
-type SortedMessages []*ibftProto.Message
-
-func (s SortedMessages) Len() int           { return len(s) }
-func (s SortedMessages) Less(i, j int) bool { return bytes.Compare(s[i].Signature, s[j].Signature) < 0 }
-func (s SortedMessages) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-
-func (s *SortedMessages) Add(msg *ibftProto.Message) {
-	index := sort.Search(len(*s), func(i int) bool {
-		return bytes.Compare((*s)[i].Signature, msg.Signature) >= 0
-	})
-
-	*s = append(*s, &ibftProto.Message{})
-	copy((*s)[index+1:], (*s)[index:])
-	(*s)[index] = msg
-}
-
-type SenderMessagesMap map[types.Address]SortedMessages
+type SenderMessagesMap map[types.Address][]*ibftProto.Message
 type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
-// containsSender checks whether provided sender is already present in the double sign evidences
-func (s *DoubleSigners) containsSender(sender types.Address) bool {
+// contains checks whether provided sender is already present among the double signers
+func (s *DoubleSigners) contains(sender types.Address) bool {
 	for _, addr := range *s {
 		if addr == sender {
 			return true
@@ -172,7 +153,7 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 		msgs = make([]*ibftProto.Message, 0, 1)
 	}
 
-	msgs.Add(msg)
+	msgs = append(msgs, msg)
 	senderMsgs[sender] = msgs
 
 	// add sender into sorted sender slice
@@ -298,7 +279,7 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 	}
 }
 
-// GetEvidences returns double signers for the given height
+// GetDoubleSigners returns double signers for the given height
 func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners {
 	doubleSigners := make(DoubleSigners, 0)
 
@@ -323,7 +304,7 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 
 			for _, sender := range senders {
 				msgs, ok := msgsPerSenders[sender]
-				if !ok || len(msgs) < 2 || doubleSigners.containsSender(sender) {
+				if !ok || len(msgs) < 2 || doubleSigners.contains(sender) {
 					continue
 				}
 

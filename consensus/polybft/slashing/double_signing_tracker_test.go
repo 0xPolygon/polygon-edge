@@ -1,15 +1,14 @@
 package slashing
 
 import (
-	"bytes"
 	"fmt"
-	"sort"
 	"sync"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -350,42 +349,59 @@ func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
 	const (
 		prepareMsgsCount = 5
 		commitMsgsCount  = 3
+		sendersCount     = 3
+		height           = 4
 	)
 
-	acc, err := wallet.GenerateAccount()
-	require.NoError(t, err)
+	keys := make([]*wallet.Key, 0, sendersCount)
+	rounds := []uint64{1, 3, 2}
+	validatorsProvider := &dummyValidatorsProvider{accounts: make([]*wallet.Account, 0, sendersCount)}
 
-	key := wallet.NewKey(acc)
-	senderAddr := types.Address(key.Address())
-	view := &ibftProto.View{Height: 6, Round: 2}
-	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
-	require.NoError(t, err)
+	for i := 0; i < sendersCount; i++ {
+		acc, err := wallet.GenerateAccount()
+		require.NoError(t, err)
 
-	tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
-
-	prepareMessages := make([]*ibftProto.Message, 0, prepareMsgsCount)
-	commitMessages := make([]*ibftProto.Message, 0, commitMsgsCount)
-
-	for i := 0; i < prepareMsgsCount; i++ {
-		msg := buildPrepareMessage(t, view, key, generateRandomProposalHash(t))
-		prepareMessages = append(prepareMessages, msg)
-		tracker.Handle(msg)
+		validatorsProvider.accounts = append(validatorsProvider.accounts, acc)
+		keys = append(keys, wallet.NewKey(acc))
 	}
 
-	sort.Slice(prepareMessages, func(i, j int) bool {
-		return bytes.Compare(prepareMessages[i].Signature, prepareMessages[j].Signature) < 0
-	})
+	doubleSignerAddr := types.Address(keys[0].Address())
 
-	for i := 0; i < commitMsgsCount; i++ {
-		msg := buildCommitMessage(t, view, key, generateRandomProposalHash(t))
-		commitMessages = append(commitMessages, msg)
-		tracker.Handle(msg)
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), validatorsProvider)
+	require.NoError(t, err)
+
+	for _, r := range rounds {
+		for _, key := range keys {
+			view := &ibftProto.View{Height: height, Round: r}
+
+			if key.Address() == ethgo.Address(doubleSignerAddr) {
+				tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
+
+				prepareMessages := make([]*ibftProto.Message, 0, prepareMsgsCount)
+				commitMessages := make([]*ibftProto.Message, 0, commitMsgsCount)
+
+				for i := 0; i < prepareMsgsCount; i++ {
+					msg := buildPrepareMessage(t, view, key, generateRandomProposalHash(t))
+					prepareMessages = append(prepareMessages, msg)
+					tracker.Handle(msg)
+				}
+
+				for i := 0; i < commitMsgsCount; i++ {
+					msg := buildCommitMessage(t, view, key, generateRandomProposalHash(t))
+					commitMessages = append(commitMessages, msg)
+					tracker.Handle(msg)
+				}
+			} else {
+				tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
+				tracker.Handle(buildPrepareMessage(t, view, key, generateRandomProposalHash(t)))
+				tracker.Handle(buildCommitMessage(t, view, key, generateRandomProposalHash(t)))
+			}
+		}
 	}
 
-	doubleSigners := tracker.GetDoubleSigners(view.Height)
+	doubleSigners := tracker.GetDoubleSigners(height)
 	require.Len(t, doubleSigners, 1)
-
-	require.Equal(t, senderAddr, doubleSigners[0])
+	require.Equal(t, doubleSignerAddr, doubleSigners[0])
 }
 
 func TestDoubleSigningTracker_PostBlock(t *testing.T) {
