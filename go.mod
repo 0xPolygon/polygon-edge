@@ -48,7 +48,7 @@ require (
 	github.com/klauspost/compress v1.16.4 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/umbracle/ethgo v0.1.4-0.20230803064119-3fac12f547db
+	github.com/umbracle/ethgo v0.1.4-0.20230810113823-c9c19bcd8a1e
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect

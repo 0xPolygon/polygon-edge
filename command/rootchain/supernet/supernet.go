@@ -128,11 +128,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		txn := &ethgo.Transaction{
-			From:  ownerKey.Address(),
-			Input: encoded,
-			To:    &supernetAddr,
-		}
+		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
 
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
 			receipt, err := txRelayer.SendTransaction(txn, ownerKey)
@@ -209,11 +205,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		txn := &ethgo.Transaction{
-			From:  ownerKey.Address(),
-			Input: encoded,
-			To:    &supernetAddr,
-		}
+		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
 
 		receipt, err := txRelayer.SendTransaction(txn, ownerKey)
 		if err != nil {

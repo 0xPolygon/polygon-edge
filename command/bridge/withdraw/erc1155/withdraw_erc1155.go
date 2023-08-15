@@ -12,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
@@ -187,8 +188,6 @@ func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) 
 
 	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.ZeroAddress, &addr, input,
+		nil, wp.ChildChainMintable), nil
 }

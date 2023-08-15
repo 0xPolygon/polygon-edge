@@ -411,8 +411,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 
 	if params.isTestMode {
 		deployerAddr := deployerKey.Address()
-		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
+		txn := helper.CreateTransaction(ethgo.ZeroAddress, &deployerAddr, nil, ethgo.Ether(1), true)
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
 			return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
 		}
@@ -524,10 +524,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn := &ethgo.Transaction{
-					To:    nil, // contract deployment
-					Input: contract.artifact.Bytecode,
-				}
+				txn := helper.CreateTransaction(ethgo.ZeroAddress, nil, contract.artifact.Bytecode, nil, true)
 
 				receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 				if err != nil {

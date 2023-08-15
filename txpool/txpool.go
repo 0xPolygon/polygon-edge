@@ -57,6 +57,7 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrInvalidTxType           = errors.New("invalid tx type")
+	ErrTxTypeNotSupported      = types.ErrTxTypeNotSupported
 	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
 	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
@@ -614,9 +615,9 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	if tx.Type == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
 		if !forks.London {
-			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
+			metrics.IncrCounter([]string{txPoolMetrics, "tx_type"}, 1)
 
-			return ErrInvalidTxType
+			return ErrTxTypeNotSupported
 		}
 
 		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
