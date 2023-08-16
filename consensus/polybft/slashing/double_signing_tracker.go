@@ -340,7 +340,9 @@ func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners
 }
 
 // PostBlock is used to populate all known validators
-func (t *DoubleSigningTrackerImpl) PostBlock(_ *common.PostBlockRequest) error {
+func (t *DoubleSigningTrackerImpl) PostBlock(req *common.PostBlockRequest) error {
+	t.PruneMsgsUntil(req.FullBlock.Block.Number())
+
 	validators, err := t.validatorsProvider.GetAllValidators()
 	if err != nil {
 		return err
