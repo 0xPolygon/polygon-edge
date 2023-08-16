@@ -104,7 +104,7 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 }
 
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
-	bridgeJSONRPC string, byzantine bool, callback TestServerConfigCallback) *TestServer {
+	bridgeJSONRPC string, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
 
 	config := &TestServerConfig{
@@ -113,7 +113,6 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 		GRPCPort:      getOpenPortForServer(),
 		P2PPort:       getOpenPortForServer(),
 		BridgeJSONRPC: bridgeJSONRPC,
-		Byzantine:     byzantine,
 	}
 
 	if callback != nil {

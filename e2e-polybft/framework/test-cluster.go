@@ -651,7 +651,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		}
 	}
 
-	srv := NewTestServer(t, c.Config, bridgeJSONRPC, byzantine, func(config *TestServerConfig) {
+	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
 		config.DataDir = dataDir
 		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
@@ -660,6 +660,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
+		config.Byzantine = byzantine
 	})
 
 	// watch the server for stop signals. It is important to fix the specific
