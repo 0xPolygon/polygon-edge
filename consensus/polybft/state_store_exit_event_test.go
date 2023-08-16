@@ -4,7 +4,9 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +15,8 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	bolt "go.etcd.io/bbolt"
 )
+
+var dataWithSigABIType = abi.MustNewType("tuple(bytes32 signature, bytes data)")
 
 func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
 	const (
@@ -147,7 +151,7 @@ func TestState_decodeExitEvent(t *testing.T) {
 	require.Equal(t, uint64(epoch), event.EpochNumber)
 	require.Equal(t, uint64(blockNumber), event.BlockNumber)
 
-	require.NoError(t, state.ExitEventStore.insertExitEvents([]*ExitEvent{event}))
+	require.NoError(t, state.ExitEventStore.insertExitEvents([]*ExitEvent{event}, 0))
 }
 
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
@@ -168,26 +172,69 @@ func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	require.Nil(t, event)
 }
 
-func insertTestExitEvents(t *testing.T, state *State,
-	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
+func Test_getExitEventsByIds(t *testing.T) {
+	t.Parallel()
+
+	state := newTestState(t)
+	exitEvents := insertTestExitEvents(t, state, 2, 4, 2)
+
+	ids := make([]uint64, len(exitEvents))
+	for i, e := range exitEvents {
+		ids[i] = e.ID.Uint64()
+	}
+
+	resExitEvents, err := state.ExitEventStore.getExitEventsByIds(ids...)
+	require.NoError(t, err)
+
+	require.Len(t, resExitEvents, len(exitEvents))
+	require.Equal(t, exitEvents, resExitEvents)
+}
+
+func Test_getPendingSlashExitIDs(t *testing.T) {
+	t.Parallel()
+
+	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, nil)
+	require.NoError(t, forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0))
+
+	defer forkmanager.GetInstance().Clear()
+
+	state := newTestState(t)
+	exitEvents := generateTestExitEvents(t, 2, 4, 2)
+
+	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents, 0))
+
+	exitEventIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
+	require.NoError(t, err)
+	require.Len(t, exitEventIDs, len(exitEvents))
+
+	for i, event := range exitEvents {
+		require.Equal(t, event.ID.Uint64(), exitEventIDs[i])
+	}
+}
+
+func generateTestExitEvents(t *testing.T, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
 	t.Helper()
 
-	var (
-		index      = uint64(0)
-		block      = uint64(1)
-		exitEvents = make([]*ExitEvent, numOfEpochs*numOfBlocksPerEpoch*numOfEventsPerBlock)
-	)
+	index := uint64(0)
+	block := uint64(1)
+	exitEvents := make([]*ExitEvent, numOfEpochs*numOfBlocksPerEpoch*numOfEventsPerBlock)
 
 	for i := uint64(1); i <= uint64(numOfEpochs); i++ {
 		for j := 1; j <= numOfBlocksPerEpoch; j++ {
 			for k := 1; k <= numOfEventsPerBlock; k++ {
+				abiData, err := dataWithSigABIType.Encode(map[string]interface{}{
+					"signature": slashSignature,
+					"data":      generateRandomBytes(t),
+				})
+				require.NoError(t, err)
+
 				exitEvents[index] =
 					&ExitEvent{
 						L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
 							ID:       new(big.Int).SetUint64(index),
 							Sender:   types.ZeroAddress,
 							Receiver: types.ZeroAddress,
-							Data:     generateRandomBytes(t),
+							Data:     abiData,
 						},
 						EpochNumber: i,
 						BlockNumber: block,
@@ -197,7 +244,16 @@ func insertTestExitEvents(t *testing.T, state *State,
 			block++
 		}
 	}
-	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
+
+	return exitEvents
+}
+
+func insertTestExitEvents(t *testing.T, state *State,
+	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
+	t.Helper()
+
+	exitEvents := generateTestExitEvents(t, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
+	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents, 0))
 
 	return exitEvents
 }

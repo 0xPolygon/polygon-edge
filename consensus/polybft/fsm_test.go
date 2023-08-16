@@ -539,6 +539,7 @@ func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
 		logger:        hclog.NewNullLogger(),
 	}
 
+	forkmanager.GetInstance().Clear()
 	// slashing transaction is not expected since the fork isn't activated yet
 	slashingTx1, err := fsm.createSlashingTx()
 	require.NoError(t, err)

@@ -456,7 +456,8 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName),
+		p.logger, p.closeCh, p.blockchain.CurrentHeader().Number)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
