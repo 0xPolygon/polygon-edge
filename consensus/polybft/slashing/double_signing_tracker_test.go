@@ -13,6 +13,7 @@ import (
 	"github.com/umbracle/ethgo"
 	"pgregory.net/rapid"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -306,42 +307,44 @@ func TestDoubleSigningTracker_validateMessage(t *testing.T) {
 func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 	t.Parallel()
 
+	const (
+		heightsNum = 4
+		roundsNum  = 2
+	)
+
 	acc, err := wallet.GenerateAccount()
 	require.NoError(t, err)
 
 	key := wallet.NewKey(acc)
 
 	proposalHash := generateRandomProposalHash(t)
-	view := &ibftProto.View{Height: 1, Round: 1}
 
-	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(),
+		&dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
 	require.NoError(t, err)
 
-	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
-	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
-	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+	views := make([]*ibftProto.View, 0, heightsNum*roundsNum)
 
-	view.Height = 3
-	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
-	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
-	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+	for height := uint64(0); height < heightsNum; height++ {
+		for round := uint64(0); round < roundsNum; round++ {
+			view := &ibftProto.View{Height: height + 1, Round: round + 1}
+			views = append(views, view)
+			tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
+			tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+			tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
+			tracker.Handle(buildRoundChangeMessage(t, view, key))
+		}
+	}
 
-	view = &ibftProto.View{Height: 5, Round: 1}
-	tracker.Handle(buildPrePrepareMessage(t, view, key, proposalHash))
-	tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
-	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
-
-	view.Round = 4
-	tracker.Handle(buildCommitMessage(t, view, key, proposalHash))
-
-	tracker.PruneMsgsUntil(5)
+	tracker.PruneMsgsUntil(heightsNum)
 
 	sender := types.Address(key.Address())
 
-	for height := uint64(0); height < view.Height; height++ {
-		for round := uint64(0); round < view.Round; round++ {
-			currentView := &ibftProto.View{Height: height, Round: round}
-			assertSenderMessageMapsSize(t, tracker, 0, 0, 0, 0, currentView, sender)
+	for _, view := range views {
+		if view.Height < heightsNum {
+			assertSenderMessageMapsSize(t, tracker, 0, 0, 0, 0, view, sender)
+		} else {
+			assertSenderMessageMapsSize(t, tracker, 1, 1, 1, 1, view, sender)
 		}
 	}
 }
@@ -525,7 +528,14 @@ func TestDoubleSigningTracker_PostBlock(t *testing.T) {
 	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), provider)
 	require.NoError(t, err)
 
-	require.NoError(t, tracker.PostBlock(nil))
+	require.NoError(t, tracker.PostBlock(
+		&common.PostBlockRequest{
+			FullBlock: &types.FullBlock{
+				Block: &types.Block{
+					Header: &types.Header{Number: 1},
+				},
+			},
+		}))
 
 	validators, err := provider.GetAllValidators()
 	require.NoError(t, err)
