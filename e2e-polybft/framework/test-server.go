@@ -38,6 +38,7 @@ type TestServerConfig struct {
 	Relayer               bool
 	NumBlockConfirmations uint64
 	BridgeJSONRPC         string
+	Byzantine             bool
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -57,7 +58,6 @@ type TestServer struct {
 	clusterConfig *TestClusterConfig
 	config        *TestServerConfig
 	node          *node
-	byzantine     bool
 }
 
 func (t *TestServer) GrpcAddr() string {
@@ -113,6 +113,7 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 		GRPCPort:      getOpenPortForServer(),
 		P2PPort:       getOpenPortForServer(),
 		BridgeJSONRPC: bridgeJSONRPC,
+		Byzantine:     byzantine,
 	}
 
 	if callback != nil {
@@ -137,7 +138,6 @@ func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 		clusterConfig: clusterConfig,
 		address:       types.Address(key.Address()),
 		config:        config,
-		byzantine:     byzantine,
 	}
 	srv.Start()
 
@@ -186,7 +186,9 @@ func (t *TestServer) Start() {
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
 
 	binary := t.clusterConfig.Binary
-	if t.byzantine && t.clusterConfig.ByzantineBinary != "" {
+	if config.Byzantine && t.clusterConfig.ByzantineBinary == "" {
+		t.t.Fatal("no byzantine binary")
+	} else if config.Byzantine {
 		binary = t.clusterConfig.ByzantineBinary
 	}
 
