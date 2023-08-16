@@ -10,13 +10,16 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -468,7 +471,11 @@ func TestFSM_VerifyStateTransactions_MiddleOfEpochWithoutTransaction(t *testing.
 func TestFSM_VerifyStateTransactions_EndOfEpochWithoutTransaction(t *testing.T) {
 	t.Parallel()
 
-	fsm := &fsm{isEndOfEpoch: true, commitEpochInput: createTestCommitEpochInput(t, 0, 10)}
+	fsm := &fsm{
+		isEndOfEpoch:     true,
+		commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+		parent:           &types.Header{Number: 1},
+	}
 	assert.EqualError(t, fsm.VerifyStateTransactions([]*types.Transaction{}),
 		"commit epoch transaction is not found in the epoch ending block")
 }
@@ -523,6 +530,52 @@ func TestFSM_VerifyStateTransactions_EndOfEpochMoreThanOneCommitEpochTx(t *testi
 	txs[1] = createStateTransactionWithData(1, types.ZeroAddress, input)
 
 	assert.ErrorIs(t, fsm.VerifyStateTransactions(txs), errCommitEpochTxSingleExpected)
+}
+
+func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
+	fsm := &fsm{
+		parent:        &types.Header{Number: 1},
+		doubleSigners: []types.Address{types.StringToAddress("0x1"), types.StringToAddress("0x2")},
+		logger:        hclog.NewNullLogger(),
+	}
+
+	// slashing transaction is not expected since the fork isn't activated yet
+	slashingTx1, err := fsm.createSlashingTx()
+	require.NoError(t, err)
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
+	assert.ErrorIs(t, err, errSlashingTxNotExpected)
+
+	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, nil)
+	_ = forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0)
+
+	// no slashing transaction, but it was expected
+	err = fsm.VerifyStateTransactions([]*types.Transaction{})
+	assert.ErrorIs(t, err, errSlashingTxDoesNotExist)
+
+	// multiple slashing transactions
+	slashingTx1, err = fsm.createSlashingTx()
+	require.NoError(t, err)
+	slashingTx2, err := fsm.createSlashingTx()
+	require.NoError(t, err)
+
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1, slashingTx2})
+	assert.ErrorIs(t, err, errSlashingTxSingleExpected)
+
+	// slashing transaction that doesn't match the expected one
+	var differentDoubleSigners slashing.DoubleSigners = []types.Address{types.StringToAddress("0x3"), types.StringToAddress("0x4")}
+	inputData, err := differentDoubleSigners.EncodeAbi(fsm.parent.Number)
+	require.NoError(t, err)
+
+	slashingTx3 := createStateTransactionWithData(fsm.Height(), contracts.ValidatorSetContract, inputData)
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx3})
+	assert.ErrorContains(t, err, "invalid slashing transaction")
+
+	// slashing transaction found, but it wasn't expected
+	fsm.doubleSigners = slashing.DoubleSigners{}
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
+	assert.ErrorIs(t, err, errSlashingTxNotExpected)
+
+	_ = forkmanager.GetInstance().DeactivateFork(chain.DoubleSignSlashing)
 }
 
 func TestFSM_VerifyStateTransactions_StateTransactionPass(t *testing.T) {

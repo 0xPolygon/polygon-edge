@@ -356,10 +356,11 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 			Validators:        validators.GetPublicIdentities(),
 			FirstBlockInEpoch: 1,
 		},
-		lastBuiltBlock:    lastBlock,
-		state:             newTestState(t),
-		stateSyncManager:  &dummyStateSyncManager{},
-		checkpointManager: &dummyCheckpointManager{},
+		lastBuiltBlock:       lastBlock,
+		state:                newTestState(t),
+		stateSyncManager:     &dummyStateSyncManager{},
+		checkpointManager:    &dummyCheckpointManager{},
+		doubleSigningTracker: &slashing.DoubleSigningTrackerImpl{},
 	}
 	runtime.setIsActiveValidator(true)
 
@@ -421,15 +422,16 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 
 	snapshot := NewProposerSnapshot(1, nil)
 	runtime := &consensusRuntime{
-		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
-		logger:             hclog.NewNullLogger(),
-		state:              state,
-		epoch:              metadata,
-		config:             config,
-		lastBuiltBlock:     lastBuiltBlock,
-		stateSyncManager:   &dummyStateSyncManager{},
-		checkpointManager:  &dummyCheckpointManager{},
-		stakeManager:       &dummyStakeManager{},
+		proposerCalculator:   NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
+		logger:               hclog.NewNullLogger(),
+		state:                state,
+		epoch:                metadata,
+		config:               config,
+		lastBuiltBlock:       lastBuiltBlock,
+		stateSyncManager:     &dummyStateSyncManager{},
+		checkpointManager:    &dummyCheckpointManager{},
+		stakeManager:         &dummyStakeManager{},
+		doubleSigningTracker: &slashing.DoubleSigningTrackerImpl{},
 	}
 
 	err := runtime.FSM()
