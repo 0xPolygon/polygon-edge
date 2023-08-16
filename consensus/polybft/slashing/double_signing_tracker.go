@@ -78,10 +78,10 @@ type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
-func (d DoubleSigners) EncodeAbi(height uint64) ([]byte, error) {
-	validators := make([]ethgo.Address, len(d))
+func (s *DoubleSigners) EncodeAbi(height uint64) ([]byte, error) {
+	validators := make([]ethgo.Address, len(*s))
 
-	for i, address := range d {
+	for i, address := range *s {
 		validators[i] = ethgo.Address(address)
 	}
 
