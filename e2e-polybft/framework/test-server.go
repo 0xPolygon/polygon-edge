@@ -38,6 +38,7 @@ type TestServerConfig struct {
 	Relayer               bool
 	NumBlockConfirmations uint64
 	BridgeJSONRPC         string
+	Byzantine             bool
 }
 
 type TestServerConfigCallback func(*TestServerConfig)
@@ -182,8 +183,15 @@ func (t *TestServer) Start() {
 
 	// Start the server
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
+	binary := t.clusterConfig.Binary
 
-	node, err := newNode(t.clusterConfig.Binary, args, stdout)
+	if config.Byzantine && t.clusterConfig.ByzantineBinary == "" {
+		t.t.Fatal("no byzantine binary")
+	} else if config.Byzantine {
+		binary = t.clusterConfig.ByzantineBinary
+	}
+
+	node, err := newNode(binary, args, stdout)
 	if err != nil {
 		t.t.Fatal(err)
 	}

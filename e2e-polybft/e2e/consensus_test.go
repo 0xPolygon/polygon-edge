@@ -221,10 +221,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	// start the first and the second validator
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+1),
-		cluster.Bridge.JSONRPCAddr(), true, false)
+		cluster.Bridge.JSONRPCAddr(), true, false, false)
 
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+2),
-		cluster.Bridge.JSONRPCAddr(), true, false)
+		cluster.Bridge.JSONRPCAddr(), true, false, false)
 
 	// collect the first and the second validator from the cluster
 	firstValidator := cluster.Servers[validatorSetSize]
@@ -617,4 +617,24 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, validatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+}
+
+func TestE2E_Consensus_WithByzantineNode(t *testing.T) {
+	const (
+		epochSize      = 4
+		validatorCount = 4
+		byzantineCount = 2
+	)
+
+	cluster := framework.NewTestCluster(t, validatorCount,
+		framework.WithEpochSize(epochSize),
+		framework.WithByzantineNodes(byzantineCount),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	t.Run("consensus protocol", func(t *testing.T) {
+		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+	})
 }
