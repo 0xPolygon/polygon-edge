@@ -420,7 +420,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	case DynamicFeeTx:
 		num = 12
 	case AccessListTx:
-		num = 10
+		num = 11
 	default:
 		return fmt.Errorf("transaction type %d not found", t.Type())
 	}
@@ -654,7 +654,10 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 			return err
 		}
 
-		txAccessList := make(TxAccessList, len(accessListVV))
+		var txAccessList TxAccessList
+		if len(accessListVV) != 0 {
+			txAccessList = make(TxAccessList, len(accessListVV))
+		}
 
 		for i, accessTupleVV := range accessListVV {
 			accessTupleElems, err := accessTupleVV.GetElems()
