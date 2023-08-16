@@ -40,6 +40,8 @@ const (
 
 	relayerFlag               = "relayer"
 	numBlockConfirmationsFlag = "num-block-confirmations"
+
+	requestsPerSecondDebugFlag = "requests-per-second-debug"
 )
 
 // Flags that are deprecated, but need to be preserved for
@@ -152,6 +154,7 @@ func (p *serverParams) generateConfig() *server.Config {
 			AccessControlAllowOrigin: p.rawConfig.CorsAllowedOrigins,
 			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
 			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
+			RequestsPerSecondDebug:   p.rawConfig.RequestsPerSecondDebug,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,

@@ -65,7 +65,15 @@ type debugStore interface {
 
 // Debug is the debug jsonrpc endpoint
 type Debug struct {
-	store debugStore
+	store      debugStore
+	throttling *Throttling
+}
+
+func NewDebug(store debugStore, requestsPerSecond int) *Debug {
+	return &Debug{
+		store:      store,
+		throttling: NewThrottling(requestsPerSecond),
+	}
 }
 
 type TraceConfig struct {
@@ -80,6 +88,10 @@ func (d *Debug) TraceBlockByNumber(
 	blockNumber BlockNumber,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if err := d.throttling.AttemptRequest(); err != nil {
+		return nil, err
+	}
+
 	num, err := GetNumericBlockNumber(blockNumber, d.store)
 	if err != nil {
 		return nil, err
@@ -97,6 +109,10 @@ func (d *Debug) TraceBlockByHash(
 	blockHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if err := d.throttling.AttemptRequest(); err != nil {
+		return nil, err
+	}
+
 	block, ok := d.store.GetBlockByHash(blockHash, true)
 	if !ok {
 		return nil, fmt.Errorf("block %s not found", blockHash)
@@ -109,6 +125,10 @@ func (d *Debug) TraceBlock(
 	input string,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if err := d.throttling.AttemptRequest(); err != nil {
+		return nil, err
+	}
+
 	blockByte, decodeErr := hex.DecodeHex(input)
 	if decodeErr != nil {
 		return nil, fmt.Errorf("unable to decode block, %w", decodeErr)
@@ -126,6 +146,10 @@ func (d *Debug) TraceTransaction(
 	txHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if err := d.throttling.AttemptRequest(); err != nil {
+		return nil, err
+	}
+
 	tx, block := GetTxAndBlockByTxHash(txHash, d.store)
 	if tx == nil {
 		return nil, fmt.Errorf("tx %s not found", txHash.String())
@@ -150,6 +174,10 @@ func (d *Debug) TraceCall(
 	filter BlockNumberOrHash,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if err := d.throttling.AttemptRequest(); err != nil {
+		return nil, err
+	}
+
 	header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
 	if err != nil {
 		return nil, ErrHeaderNotFound
