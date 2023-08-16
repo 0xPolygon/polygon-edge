@@ -271,7 +271,7 @@ func (f *fsm) applySlashingTx() error {
 // createSlashingTx creates a state transaction which invokes the ValidatorSet smart contract
 // to slash the double signing validators for the provided height
 func (f *fsm) createSlashingTx() (*types.Transaction, error) {
-	inputData, err := f.doubleSigners.EncodeAbi(f.parent.Number)
+	inputData, err := f.doubleSigners.EncodeAbi()
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode input data for slashing: %w", err)
 	}

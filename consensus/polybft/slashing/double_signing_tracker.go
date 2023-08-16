@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math/big"
 	"sort"
 	"sync"
 
@@ -78,7 +77,7 @@ type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
-func (s *DoubleSigners) EncodeAbi(height uint64) ([]byte, error) {
+func (s *DoubleSigners) EncodeAbi() ([]byte, error) {
 	validators := make([]ethgo.Address, len(*s))
 
 	for i, address := range *s {
@@ -86,7 +85,6 @@ func (s *DoubleSigners) EncodeAbi(height uint64) ([]byte, error) {
 	}
 
 	slashFn := &contractsapi.SlashValidatorSetFn{
-		Height:     new(big.Int).SetUint64(height),
 		Validators: validators,
 	}
 
