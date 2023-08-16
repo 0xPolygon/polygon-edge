@@ -16,6 +16,7 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 
 	blockNumberZero := BlockNumber(0x0)
 	blockNumberLatest := LatestBlockNumber
+	blockNumberPending := PendingBlockNumber
 
 	tests := []struct {
 		name        string
@@ -56,6 +57,14 @@ func TestBlockNumberOrHash_UnmarshalJSON(t *testing.T) {
 			false,
 			BlockNumberOrHash{
 				BlockNumber: &blockNumberLatest,
+			},
+		},
+		{
+			"should unmarshal pending block number properly",
+			`"pending"`,
+			false,
+			BlockNumberOrHash{
+				BlockNumber: &blockNumberPending,
 			},
 		},
 		{

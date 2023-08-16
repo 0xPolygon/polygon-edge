@@ -176,7 +176,9 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 
 	str = strings.Trim(str, "\"")
 	switch str {
-	case pending, latest:
+	case pending:
+		return PendingBlockNumber, nil
+	case latest:
 		return LatestBlockNumber, nil
 	case earliest:
 		return EarliestBlockNumber, nil
