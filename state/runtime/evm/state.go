@@ -236,7 +236,7 @@ func (c *state) Run() ([]byte, error) {
 		inst := dispatchTable[op]
 		if inst.inst == nil {
 			c.exit(errOpCodeNotFound)
-			c.captureExecutionError(op.String(), c.ip, gasCopy, 0)
+			c.captureExecution(op.String(), uint64(c.ip), gasCopy, 0)
 
 			break
 		}
@@ -244,7 +244,7 @@ func (c *state) Run() ([]byte, error) {
 		// check if the depth of the stack is enough for the instruction
 		if c.sp < inst.stack {
 			c.exit(&runtime.StackUnderflowError{StackLen: c.sp, Required: inst.stack})
-			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
+			c.captureExecution(op.String(), uint64(c.ip), gasCopy, inst.gas)
 
 			break
 		}
@@ -252,7 +252,7 @@ func (c *state) Run() ([]byte, error) {
 		// consume the gas of the instruction
 		if !c.consumeGas(inst.gas) {
 			c.exit(errOutOfGas)
-			c.captureExecutionError(op.String(), c.ip, gasCopy, inst.gas)
+			c.captureExecution(op.String(), uint64(c.ip), gasCopy, inst.gas)
 
 			break
 		}
@@ -260,7 +260,7 @@ func (c *state) Run() ([]byte, error) {
 		// execute the instruction
 		inst.inst(c)
 
-		c.captureSuccessfulExecution(op.String(), ipCopy, gasCopy, gasCopy-c.gas)
+		c.captureExecution(op.String(), ipCopy, gasCopy, gasCopy-c.gas)
 
 		// check if stack size exceeds the max size
 		if c.sp > stackSize {
@@ -390,14 +390,13 @@ func (c *state) captureState(opCode int) {
 	)
 }
 
-func (c *state) captureSuccessfulExecution(
+func (c *state) captureExecution(
 	opCode string,
 	ip uint64,
 	gas uint64,
 	consumedGas uint64,
 ) {
 	tracer := c.host.GetTracer()
-
 	if tracer == nil {
 		return
 	}
@@ -405,31 +404,6 @@ func (c *state) captureSuccessfulExecution(
 	tracer.ExecuteState(
 		c.msg.Address,
 		ip,
-		opCode,
-		gas,
-		consumedGas,
-		c.returnData,
-		c.msg.Depth,
-		c.err,
-		c.host,
-	)
-}
-
-func (c *state) captureExecutionError(
-	opCode string,
-	ip int,
-	gas uint64,
-	consumedGas uint64,
-) {
-	tracer := c.host.GetTracer()
-
-	if tracer == nil {
-		return
-	}
-
-	tracer.ExecuteState(
-		c.msg.Address,
-		uint64(ip),
 		opCode,
 		gas,
 		consumedGas,
