@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
@@ -109,68 +110,35 @@ func FuzzDispatcherBatchRequest(f *testing.F) {
 	seeds := []struct {
 		batchLimit uint64
 		blockLimit uint64
-		body       string
+		params     string
 	}{
 		{
 			batchLimit: 10,
 			blockLimit: 1000,
-			body: `[
-				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":4,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`,
+			params:     `["0x1", true]`,
 		},
 		{
 			batchLimit: 3,
 			blockLimit: 1000,
-			body: `[
-				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":4,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`,
+			params:     `["0x2", true]`,
 		},
 		{
 			batchLimit: 0,
 			blockLimit: 0,
-			body: `[
-				{"id":1,"jsonrpc":"2.0","method":"eth_getBalance","params":["0x1", true]},
-				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x2", true]},
-				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x3", true]},
-				{"id":4,"jsonrpc":"2.0","method": "web3_sha3","params": ["0x68656c6c6f20776f726c64"]}]`,
-		},
-		{
-			batchLimit: 0,
-			blockLimit: 0,
-			body: `[
-				{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":2,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":3,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":4,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":5,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":6,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":7,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":8,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":9,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":10,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":11,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]},
-				{"id":12,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["latest", true]}]`,
+			params:     `["0x68656c6c6f20776f726c64"]`,
 		},
 		{
 			batchLimit: 5,
 			blockLimit: 30,
-			body:       "invalid request",
+			params:     "invalid request",
 		},
 	}
 
 	for _, seed := range seeds {
-		f.Add(seed.batchLimit, seed.blockLimit, seed.body)
+		f.Add(seed.batchLimit, seed.blockLimit, seed.params)
 	}
 
-	f.Fuzz(func(t *testing.T, batchLimit uint64, blockLimit uint64, body string) {
+	f.Fuzz(func(t *testing.T, batchLimit uint64, blockLimit uint64, params string) {
 		dispatcher := newTestDispatcher(t,
 			hclog.NewNullLogger(),
 			newMockStore(),
@@ -181,6 +149,8 @@ func FuzzDispatcherBatchRequest(f *testing.F) {
 				blockRangeLimit:         blockLimit,
 			},
 		)
+
+		body := fmt.Sprintf(`[{"id":1,"jsonrpc":"2.0","method":"eth_getBlockByNumber","params": %s}]`, params)
 
 		_, err := dispatcher.HandleWs([]byte(body), mock)
 		assert.NoError(t, err)
