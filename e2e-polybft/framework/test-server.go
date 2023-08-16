@@ -184,8 +184,8 @@ func (t *TestServer) Start() {
 
 	// Start the server
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
-
 	binary := t.clusterConfig.Binary
+
 	if config.Byzantine && t.clusterConfig.ByzantineBinary == "" {
 		t.t.Fatal("no byzantine binary")
 	} else if config.Byzantine {
