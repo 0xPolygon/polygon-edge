@@ -23,17 +23,103 @@ var (
 	errSignerAndSenderMismatch = errors.New("signer and sender of IBFT message are not the same")
 )
 
+var _ sort.Interface = (*SortedAddresses)(nil)
+
+// SortedAddresses is a slice which holds addresses in an ascending order
+type SortedAddresses []types.Address
+
+func (s SortedAddresses) Len() int           { return len(s) }
+func (s SortedAddresses) Less(i, j int) bool { return bytes.Compare(s[i].Bytes(), s[j].Bytes()) < 0 }
+func (s SortedAddresses) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func (s *SortedAddresses) Add(addr types.Address) {
+	addrRaw := addr.Bytes()
+	insertIdx := sort.Search(len(*s), func(i int) bool {
+		return bytes.Compare((*s)[i].Bytes(), addrRaw) >= 0
+	})
+
+	if insertIdx < len(*s) && (*s)[insertIdx] == addr {
+		return
+	}
+
+	*s = append(*s, types.ZeroAddress)
+	copy((*s)[insertIdx+1:], (*s)[insertIdx:])
+	(*s)[insertIdx] = addr
+}
+
+var _ sort.Interface = (*SortedRounds)(nil)
+
+// SortedRounds is a slice which holds rounds in an ascending order
+type SortedRounds []uint64
+
+func (s SortedRounds) Len() int           { return len(s) }
+func (s SortedRounds) Less(i, j int) bool { return s[i] < s[j] }
+func (s SortedRounds) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+
+func (s *SortedRounds) Add(round uint64) {
+	insertIdx := sort.Search(len(*s), func(i int) bool {
+		return (*s)[i] >= round
+	})
+
+	if insertIdx < len(*s) && (*s)[insertIdx] == round {
+		return
+	}
+
+	*s = append(*s, 0)
+	copy((*s)[insertIdx+1:], (*s)[insertIdx:])
+	(*s)[insertIdx] = round
+}
+
 type SenderMessagesMap map[types.Address][]*ibftProto.Message
 type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 
 type DoubleSigners []types.Address
 
+// contains checks whether provided sender is already present among the double signers
+func (s *DoubleSigners) contains(sender types.Address) bool {
+	for _, addr := range *s {
+		if addr == sender {
+			return true
+		}
+	}
+
+	return false
+}
+
 //nolint:godox
-// TODO RLP serialize/deserialize methods, Equals method for validation, etc.
+// TODO: RLP serialize/deserialize methods, Equals method for validation, etc.
 
 type Messages struct {
-	content MessagesMap
-	mux     sync.RWMutex
+	content       MessagesMap
+	sortedSenders map[uint64]SortedAddresses
+	sortedRounds  map[uint64]SortedRounds
+	mux           sync.RWMutex
+}
+
+func (m *Messages) String() string {
+	var buf bytes.Buffer
+
+	buf.WriteString("senders")
+	buf.WriteString(fmt.Sprintf("\t%v\n", m.sortedSenders))
+	buf.WriteString("rounds")
+	buf.WriteString(fmt.Sprintf("\t%v\n", m.sortedRounds))
+	buf.WriteString("messages")
+	buf.WriteString(fmt.Sprintf("\t%v\n", m.content))
+
+	return buf.String()
+}
+
+// newMessages is a constructor function for Messages struct
+func newMessages() *Messages {
+	return &Messages{
+		content:       make(MessagesMap),
+		sortedSenders: make(map[uint64]SortedAddresses),
+		sortedRounds:  make(map[uint64]SortedRounds),
+	}
+}
+
+func (m *Messages) Len() int {
+	return len(m.content)
 }
 
 // getSenderMsgs returns messages for given height, round and sender.
@@ -55,6 +141,7 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
+	// add message
 	var senderMsgs SenderMessagesMap
 
 	if roundMsgs, ok := m.content[view.Height]; !ok {
@@ -65,11 +152,31 @@ func (m *Messages) addMessage(view *ibftProto.View, sender types.Address, msg *i
 		senderMsgs = createSenderMsgsMap(view.Round, roundMsgs)
 	}
 
-	if _, ok := senderMsgs[sender]; ok {
-		senderMsgs[sender] = append(senderMsgs[sender], msg)
-	} else {
-		senderMsgs[sender] = []*ibftProto.Message{msg}
+	msgs, ok := senderMsgs[sender]
+	if !ok {
+		msgs = make([]*ibftProto.Message, 0, 1)
 	}
+
+	msgs = append(msgs, msg)
+	senderMsgs[sender] = msgs
+
+	// add sender into sorted sender slice
+	senders, ok := m.sortedSenders[view.Height]
+	if !ok {
+		senders = make(SortedAddresses, 0, 1)
+	}
+
+	senders.Add(sender)
+	m.sortedSenders[view.Height] = senders
+
+	// add round into sorted rounds slice
+	rounds, ok := m.sortedRounds[view.Height]
+	if !ok {
+		rounds = make(SortedRounds, 0, 1)
+	}
+
+	rounds.Add(view.Round)
+	m.sortedRounds[view.Height] = rounds
 }
 
 // createSenderMsgsMap initializes senders message map for the given round
@@ -82,6 +189,8 @@ func createSenderMsgsMap(round uint64, roundMsgs map[uint64]SenderMessagesMap) S
 
 var _ DoubleSigningTracker = (*DoubleSigningTrackerImpl)(nil)
 
+// DoubleSigningTracker is an abstraction for gathering IBFT messages,
+// storing them and providing double signing evidences
 type DoubleSigningTracker interface {
 	Handle(msg *ibftProto.Message)
 	GetDoubleSigners(height uint64) DoubleSigners
@@ -113,10 +222,10 @@ func NewDoubleSigningTracker(logger hclog.Logger,
 		logger:             logger,
 		validatorsProvider: validatorsProvider,
 		validators:         initialValidators,
-		preprepare:         &Messages{content: make(MessagesMap)},
-		prepare:            &Messages{content: make(MessagesMap)},
-		commit:             &Messages{content: make(MessagesMap)},
-		roundChange:        &Messages{content: make(MessagesMap)},
+		preprepare:         newMessages(),
+		prepare:            newMessages(),
+		commit:             newMessages(),
+		roundChange:        newMessages(),
 	}
 
 	for _, msgType := range ibftProto.MessageType_value {
@@ -158,34 +267,54 @@ func (t *DoubleSigningTrackerImpl) PruneMsgsUntil(height uint64) {
 			}
 		}
 
+		for sendersHeight := range msgs.sortedSenders {
+			if sendersHeight < height {
+				delete(msgs.sortedSenders, sendersHeight)
+			}
+		}
+
+		for roundsHeight := range msgs.sortedRounds {
+			if roundsHeight < height {
+				delete(msgs.sortedRounds, roundsHeight)
+			}
+		}
+
 		msgs.mux.Unlock()
 	}
 }
 
-// GetEvidences returns double signers for the given height
+// GetDoubleSigners returns double signers for the given height
 func (t *DoubleSigningTrackerImpl) GetDoubleSigners(height uint64) DoubleSigners {
 	doubleSigners := make(DoubleSigners, 0)
 
 	for _, msgType := range t.msgsTypes {
 		msgs := t.resolveMessagesStorage(msgType)
-		if msgs == nil {
+		if msgs == nil || msgs.Len() == 0 {
 			continue
 		}
 
 		msgs.mux.Lock()
 
-		roundMsgs, ok := msgs.content[height]
-		if !ok {
+		roundMsgs, msgsMapExists := msgs.content[height]
+		senders, sortedSendersExist := msgs.sortedSenders[height]
+		rounds, sortedRoundsExist := msgs.sortedRounds[height]
+
+		if !msgsMapExists || !sortedSendersExist || !sortedRoundsExist {
+			msgs.mux.Unlock()
+
 			continue
 		}
 
-		for _, senderMsgs := range roundMsgs {
-			for address, msgs := range senderMsgs {
-				if len(msgs) <= 1 {
+		for _, round := range rounds {
+			msgsPerSenders := roundMsgs[round]
+
+			for _, sender := range senders {
+				msgs, ok := msgsPerSenders[sender]
+				if !ok || len(msgs) < 2 || doubleSigners.contains(sender) {
 					continue
 				}
 
-				doubleSigners = append(doubleSigners, address)
+				doubleSigners = append(doubleSigners, sender)
 			}
 		}
 
@@ -249,7 +378,7 @@ func (t *DoubleSigningTrackerImpl) validateMsg(msg *ibftProto.Message) error {
 	senderMsgs := msgsMap.getSenderMsgs(msg.View, sender)
 	for _, senderMsg := range senderMsgs {
 		if bytes.Equal(senderMsg.Signature, msg.Signature) {
-			return fmt.Errorf("sender %s is detected as a spammer", sender)
+			return fmt.Errorf("sender %s is detected as a spammer (same message was already sent)", sender)
 		}
 	}
 

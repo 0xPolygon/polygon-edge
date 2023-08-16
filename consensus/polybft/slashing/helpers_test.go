@@ -7,6 +7,7 @@ import (
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/stretchr/testify/require"
+	"pgregory.net/rapid"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -130,6 +131,20 @@ func generateRandomProposalHash(t *testing.T) types.Hash {
 	require.NoError(t, err, "failed to generate random hash")
 
 	return types.BytesToHash(result)
+}
+
+// enforceUniqueRandomNumber enforces that generated number is a unique,
+// by checking if generated number is among provided existingNums
+func enforceUniqueRandomNumber(rapidT *rapid.T, existingNums map[uint64]struct{},
+	minNum, maxNum uint64, label string) uint64 {
+	var num uint64
+
+	for {
+		num = rapid.Uint64Range(minNum, maxNum).Draw(rapidT, label)
+		if _, ok := existingNums[num]; !ok {
+			return num
+		}
+	}
 }
 
 type dummyValidatorsProvider struct {

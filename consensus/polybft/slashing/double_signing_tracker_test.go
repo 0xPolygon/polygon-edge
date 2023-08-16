@@ -1,13 +1,17 @@
 package slashing
 
 import (
+	"bytes"
 	"fmt"
+	"sort"
 	"sync"
 	"testing"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+	"pgregory.net/rapid"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -342,46 +346,165 @@ func TestDoubleSigningTracker_PruneMsgsUntil(t *testing.T) {
 	}
 }
 
-func TestDoubleSigningTracker_GetDoubleSigners(t *testing.T) {
+func TestDoubleSigningTracker_GetDoubleSigners_SingleDoubleSigner(t *testing.T) {
 	t.Parallel()
 
 	const (
-		prepareMsgsCount = 2
+		prepareMsgsCount = 5
 		commitMsgsCount  = 3
+		sendersCount     = 3
+		height           = 4
 	)
 
-	acc, err := wallet.GenerateAccount()
+	keys := make([]*wallet.Key, 0, sendersCount)
+	rounds := []uint64{1, 3, 2}
+	validatorsProvider := &dummyValidatorsProvider{accounts: make([]*wallet.Account, 0, sendersCount)}
+
+	for i := 0; i < sendersCount; i++ {
+		acc, err := wallet.GenerateAccount()
+		require.NoError(t, err)
+
+		validatorsProvider.accounts = append(validatorsProvider.accounts, acc)
+		keys = append(keys, wallet.NewKey(acc))
+	}
+
+	doubleSignerAddr := types.Address(keys[0].Address())
+
+	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), validatorsProvider)
 	require.NoError(t, err)
 
-	key := wallet.NewKey(acc)
-	senderAddr := types.Address(key.Address())
-	view := &ibftProto.View{Height: 6, Round: 2}
-	tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), &dummyValidatorsProvider{accounts: []*wallet.Account{acc}})
-	require.NoError(t, err)
+	for _, r := range rounds {
+		for _, key := range keys {
+			view := &ibftProto.View{Height: height, Round: r}
 
-	tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
+			if key.Address() == ethgo.Address(doubleSignerAddr) {
+				tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
 
-	prepareMessages := make([]*ibftProto.Message, 0, prepareMsgsCount)
-	commitMessages := make([]*ibftProto.Message, 0, commitMsgsCount)
+				prepareMessages := make([]*ibftProto.Message, 0, prepareMsgsCount)
+				commitMessages := make([]*ibftProto.Message, 0, commitMsgsCount)
 
-	for i := 0; i < prepareMsgsCount; i++ {
-		msg := buildPrepareMessage(t, view, key, generateRandomProposalHash(t))
-		prepareMessages = append(prepareMessages, msg)
-		tracker.Handle(msg)
+				for i := 0; i < prepareMsgsCount; i++ {
+					msg := buildPrepareMessage(t, view, key, generateRandomProposalHash(t))
+					prepareMessages = append(prepareMessages, msg)
+					tracker.Handle(msg)
+				}
+
+				for i := 0; i < commitMsgsCount; i++ {
+					msg := buildCommitMessage(t, view, key, generateRandomProposalHash(t))
+					commitMessages = append(commitMessages, msg)
+					tracker.Handle(msg)
+				}
+			} else {
+				tracker.Handle(buildPrePrepareMessage(t, view, key, generateRandomProposalHash(t)))
+				tracker.Handle(buildPrepareMessage(t, view, key, generateRandomProposalHash(t)))
+				tracker.Handle(buildCommitMessage(t, view, key, generateRandomProposalHash(t)))
+			}
+		}
 	}
 
-	for i := 0; i < commitMsgsCount; i++ {
-		msg := buildCommitMessage(t, view, key, generateRandomProposalHash(t))
-		commitMessages = append(commitMessages, msg)
-		tracker.Handle(msg)
-	}
+	doubleSigners := tracker.GetDoubleSigners(height)
+	require.Len(t, doubleSigners, 1)
+	require.Equal(t, doubleSignerAddr, doubleSigners[0])
+}
 
-	doubleSigners := tracker.GetDoubleSigners(view.Height)
-	require.Len(t, doubleSigners, 2)
+func TestDoubleSigningTracker_GetDoubleSigners_Property(t *testing.T) {
+	t.Parallel()
 
-	for _, doubleSigner := range doubleSigners {
-		require.Equal(t, senderAddr, doubleSigner)
-	}
+	const (
+		maxRound      = 100
+		maxHeight     = 1000
+		maxMsgs       = 4
+		accountsCount = 5
+	)
+
+	rapid.Check(t, func(rapidT *rapid.T) {
+		doubleSignersCount := rapid.IntRange(0, accountsCount).Draw(rapidT, "double signers count")
+		provider := &dummyValidatorsProvider{accounts: make([]*wallet.Account, accountsCount)}
+
+		doubleSignerAddrs := make([]types.Address, 0, doubleSignersCount)
+		keys := make([]*wallet.Key, accountsCount)
+
+		for i := 0; i < accountsCount; i++ {
+			acc, err := wallet.GenerateAccount()
+			require.NoError(t, err)
+
+			keys[i] = wallet.NewKey(acc)
+			provider.accounts[i] = acc
+
+			if len(doubleSignerAddrs) < doubleSignersCount {
+				doubleSignerAddrs = append(doubleSignerAddrs, types.Address(keys[i].Address()))
+			}
+		}
+
+		sort.Slice(doubleSignerAddrs, func(i, j int) bool {
+			return bytes.Compare(doubleSignerAddrs[i].Bytes(), doubleSignerAddrs[j].Bytes()) < 0
+		})
+
+		tracker, err := NewDoubleSigningTracker(hclog.NewNullLogger(), provider)
+		require.NoError(t, err)
+
+		heightsNum := rapid.IntRange(1, 5).Draw(rapidT, "number of heights")
+		roundsNum := rapid.IntRange(1, 4).Draw(rapidT, "number of rounds")
+
+		heights := make([]uint64, heightsNum)
+		expectedDoubleSigning := make(map[uint64]bool, heightsNum)
+		existingHeights := make(map[uint64]struct{}, heightsNum)
+
+		for i := 0; i < heightsNum; i++ {
+			height := enforceUniqueRandomNumber(rapidT, existingHeights, 1, maxHeight, fmt.Sprintf("generate height#%d", i+1))
+			existingHeights[height] = struct{}{}
+			shouldDoubleSign := rapid.Bool().Draw(rapidT, "double signing flag")
+			expectedDoubleSigning[height] = shouldDoubleSign
+			existingRounds := make(map[uint64]struct{}, roundsNum)
+			proposalHash := generateRandomProposalHash(t)
+
+			for j := 0; j < roundsNum; j++ {
+				round := enforceUniqueRandomNumber(rapidT, existingRounds, 0, maxRound, fmt.Sprintf("round#%d", j+1))
+				existingRounds[round] = struct{}{}
+				heights[i] = height
+
+				view := &ibftProto.View{Height: height, Round: round}
+
+				if shouldDoubleSign {
+					messagesCount := rapid.IntRange(2, maxMsgs).Draw(rapidT, "messages count")
+
+					for i, key := range keys {
+						if i < len(doubleSignerAddrs) {
+							for msgsCount := 0; msgsCount < messagesCount; msgsCount++ {
+								tracker.Handle(buildPrepareMessage(t, view, key, generateRandomProposalHash(t)))
+							}
+						} else {
+							tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+						}
+					}
+				} else {
+					for _, key := range keys {
+						tracker.Handle(buildPrepareMessage(t, view, key, proposalHash))
+					}
+				}
+			}
+		}
+
+		for _, height := range heights {
+			doubleSigners := tracker.GetDoubleSigners(height)
+			if expectedDoubleSigning[height] {
+				if len(doubleSigners) != len(doubleSignerAddrs) {
+					t.Log("failed at height", height)
+					t.Log(tracker.prepare.String())
+				}
+
+				require.Len(t, doubleSigners, len(doubleSignerAddrs))
+				require.Equal(t, doubleSigners, DoubleSigners(doubleSignerAddrs))
+			} else {
+				if len(doubleSigners) > 0 {
+					t.Log("failed at height", height)
+					t.Log(tracker.prepare.String())
+				}
+
+				require.Empty(t, doubleSigners)
+			}
+		}
+	})
 }
 
 func TestDoubleSigningTracker_PostBlock(t *testing.T) {
