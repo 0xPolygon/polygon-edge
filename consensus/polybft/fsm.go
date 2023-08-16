@@ -250,6 +250,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
 }
 
+// applySlashingTx adds state transaction to the block to slash the double signing validators
 func (f *fsm) applySlashingTx() error {
 	if len(f.doubleSigners) == 0 {
 		return nil
@@ -261,12 +262,14 @@ func (f *fsm) applySlashingTx() error {
 	}
 
 	if err = f.blockBuilder.WriteTx(slashingTx); err != nil {
-		return fmt.Errorf("failed to apply slashing state transaction. Error: %w", err)
+		return fmt.Errorf("failed to apply slashing state transaction: %w", err)
 	}
 
 	return nil
 }
 
+// createSlashingTx creates a state transaction which invokes the ValidatorSet smart contract
+// to slash the double signing validators for the provided height
 func (f *fsm) createSlashingTx() (*types.Transaction, error) {
 	inputData, err := f.doubleSigners.EncodeAbi(f.parent.Number)
 	if err != nil {
@@ -494,7 +497,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			commitEpochTxExists = true
 
 			if err := f.verifyCommitEpochTx(tx); err != nil {
-				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
+				return fmt.Errorf("error while verifying commit epoch transaction: %w", err)
 			}
 		case *contractsapi.DistributeRewardForRewardPoolFn:
 			if distributeRewardsTxExists {
@@ -507,7 +510,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			distributeRewardsTxExists = true
 
 			if err := f.verifyDistributeRewardsTx(tx); err != nil {
-				return fmt.Errorf("error while verifying distribute rewards transaction. error: %w", err)
+				return fmt.Errorf("error while verifying distribute rewards transaction: %w", err)
 			}
 		case *contractsapi.SlashValidatorSetFn:
 			if !forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) {
@@ -521,7 +524,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			slashingTxExists = true
 
 			if err := f.verifySlashingTx(tx); err != nil {
-				return fmt.Errorf("error while verifying slashing transaction. error: %w", err)
+				return fmt.Errorf("error while verifying slashing transaction: %w", err)
 			}
 		default:
 			return fmt.Errorf("invalid state transaction data type: %v", stateTxData)
