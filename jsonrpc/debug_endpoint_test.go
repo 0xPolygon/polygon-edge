@@ -600,8 +600,6 @@ func TestTraceCall(t *testing.T) {
 		}
 	)
 
-	decodedTx.ComputeHash(1)
-
 	tests := []struct {
 		name   string
 		arg    *txnArgs
@@ -630,6 +628,12 @@ func TestTraceCall(t *testing.T) {
 
 					return testTraceResult, nil
 				},
+				headerFn: func() *types.Header {
+					return testLatestHeader
+				},
+				getAccountFn: func(h types.Hash, a types.Address) (*Account, error) {
+					return &Account{Nonce: 1}, nil
+				},
 			},
 			result: testTraceResult,
 			err:    false,
@@ -647,6 +651,12 @@ func TestTraceCall(t *testing.T) {
 					assert.False(t, full)
 
 					return nil, false
+				},
+				headerFn: func() *types.Header {
+					return testLatestHeader
+				},
+				getAccountFn: func(h types.Hash, a types.Address) (*Account, error) {
+					return &Account{Nonce: 1}, nil
 				},
 			},
 			result: nil,
@@ -666,6 +676,9 @@ func TestTraceCall(t *testing.T) {
 			store: &debugEndpointMockStore{
 				headerFn: func() *types.Header {
 					return testLatestHeader
+				},
+				getAccountFn: func(h types.Hash, a types.Address) (*Account, error) {
+					return &Account{Nonce: 1}, nil
 				},
 			},
 			result: nil,
