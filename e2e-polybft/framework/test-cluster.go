@@ -72,7 +72,7 @@ func resolveBinary() string {
 	return "polygon-edge"
 }
 
-func resolveByzantineBynary() string {
+func resolveByzantineBinary() string {
 	bin := os.Getenv("BYZANTINE_BINARY")
 	if bin != "" {
 		return bin
@@ -398,7 +398,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		WithLogs:        isTrueEnv(envLogsEnabled),
 		WithStdout:      isTrueEnv(envStdoutEnabled),
 		Binary:          resolveBinary(),
-		ByzantineBinary: resolveByzantineBynary(),
+		ByzantineBinary: resolveByzantineBinary(),
 		EpochSize:       10,
 		EpochReward:     1,
 		BlockGasLimit:   1e7, // 10M
