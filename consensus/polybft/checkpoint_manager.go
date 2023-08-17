@@ -455,22 +455,24 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 	}, nil
 }
 
-// GenerateSlashExitProofs generates proofs per each
+// GenerateSlashExitProofs generates proofs per each slash exit event found in the exit events store
 func (c *checkpointManager) GenerateSlashExitProofs() ([]types.Proof, error) {
 	slashExitIDs, err := c.state.ExitEventStore.getPendingSlashExitIDs()
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve pending slash exit ids: %w", err)
 	}
 
-	proofs := make([]types.Proof, len(slashExitIDs))
+	proofs := make([]types.Proof, 0, len(slashExitIDs))
 
-	for i, slashExitID := range slashExitIDs {
+	for _, slashExitID := range slashExitIDs {
 		proof, err := c.GenerateExitProof(slashExitID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create a proof for slash exit event (ID=%d): %w", slashExitID, err)
+			c.logger.Info(fmt.Sprintf("failed to create a proof for slash exit event (ID=%d): %v", slashExitID, err))
+
+			continue
 		}
 
-		proofs[i] = proof
+		proofs = append(proofs, proof)
 	}
 
 	return proofs, nil
