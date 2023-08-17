@@ -552,6 +552,79 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	})
 }
 
+func TestCheckpointManager_GenerateSlashExitProofs(t *testing.T) {
+	t.Parallel()
+
+	const (
+		numOfBlocks           = 10
+		numOfEventsPerBlock   = 2
+		correctBlockToGetExit = 1
+		futureBlockToGetExit  = 2
+	)
+
+	state := newTestState(t)
+
+	// setup mocks for valid case
+	foundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
+		"isFound":         true,
+		"checkpointBlock": 1,
+	})
+	require.NoError(t, err)
+
+	dummyTxRelayer := newDummyTxRelayer(t)
+	dummyTxRelayer.On("Call", mock.Anything, mock.Anything, mock.Anything).
+		Return(hex.EncodeToString(foundCheckpointReturn), error(nil))
+
+	// create checkpoint manager and insert exit events
+	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
+		createTestKey(t)),
+		types.ZeroAddress,
+		dummyTxRelayer,
+		nil,
+		nil,
+		hclog.NewNullLogger(),
+		state)
+
+	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
+	encodedEvents := encodeExitEvents(t, exitEvents)
+	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
+
+	// manually create merkle tree for a desired checkpoint to verify the generated proof
+	tree, err := merkle.NewMerkleTree(checkpointEvents)
+	require.NoError(t, err)
+
+	proofs, err := checkpointMgr.GenerateSlashExitProofs()
+	require.NoError(t, err)
+	require.Len(t, proofs, len(checkpointEvents))
+
+	t.Run("Generate and validate exit proof", func(t *testing.T) {
+		t.Parallel()
+		// verify generated proof on desired tree
+		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], proofs[1].Data, tree.Hash()))
+	})
+
+	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
+		t.Parallel()
+
+		proof := proofs[0]
+		// copy and make proof invalid
+		invalidProof := make([]types.Hash, len(proof.Data))
+		copy(invalidProof, proof.Data)
+		invalidProof[0][0]++
+
+		// verify generated proof on desired tree
+		require.ErrorContains(t, merkle.VerifyProof(correctBlockToGetExit,
+			encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
+	})
+
+	t.Run("Generate exit proof - no event", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := checkpointMgr.GenerateExitProof(21)
+		require.ErrorContains(t, err, "could not find any exit event that has an id")
+	})
+}
+
 var _ txrelayer.TxRelayer = (*dummyTxRelayer)(nil)
 
 type dummyTxRelayer struct {
