@@ -315,8 +315,14 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		},
 	}
 
-	req := &polyCommon.PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}},
-		Epoch: epoch}
+	req := &polyCommon.PostBlockRequest{
+		FullBlock: &types.FullBlock{
+			Block: &types.Block{
+				Header: &types.Header{Number: block},
+			},
+		},
+		Epoch: epoch,
+	}
 
 	req.FullBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil)
 
@@ -599,12 +605,12 @@ func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	var exitEvent contractsapi.L2StateSyncedEvent
 
 	topics := make([]types.Hash, 4)
-	topics[0] = types.Hash(exitEvent.Sig())
-	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
-	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
-	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
-	someType := abi.MustNewType("tuple(string firstName, string lastName)")
-	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
+	topics[0] = types.Hash(exitEvent.Sig())                                // function signature
+	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID)) // ID
+	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes()) // Sender
+	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes()) // Receiver
+	sigType := abi.MustNewType("tuple(bytes signature)")                   // Data
+	encodedData, err := sigType.Encode(map[string]interface{}{"signature": slashSignature})
 	require.NoError(t, err)
 
 	return &types.Log{

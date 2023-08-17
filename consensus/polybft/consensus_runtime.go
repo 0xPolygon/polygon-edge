@@ -622,6 +622,11 @@ func (c *consensusRuntime) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 	return c.stateSyncManager.GetStateSyncProof(stateSyncID)
 }
 
+// GetPendingSlashProofs retrieves executable slashing exit event proofs
+func (c *consensusRuntime) GetPendingSlashProofs() ([]types.Proof, error) {
+	return c.checkpointManager.GenerateSlashExitProofs()
+}
+
 // setIsActiveValidator updates the activeValidatorFlag field
 func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 	c.activeValidatorFlag.Store(isActiveValidator)

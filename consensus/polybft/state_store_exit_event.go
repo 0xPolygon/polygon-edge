@@ -7,20 +7,26 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
-	// bucket to store exit contract events
 	exitEventsBucket                  = []byte("exitEvent")
+	slashingExitEventsBucket          = []byte("slashingExitEvent")
 	exitEventToEpochLookupBucket      = []byte("exitIdToEpochLookup")
 	exitEventLastProcessedBlockBucket = []byte("lastProcessedBlock")
 
 	lastProcessedBlockKey = []byte("lastProcessedBlock")
 	errNoLastSavedEntry   = errors.New("there is no last saved block in last saved bucket")
+
+	slashSignature = crypto.Keccak256([]byte("SLASH"))
 )
 
 type exitEventNotFoundError struct {
@@ -45,18 +51,24 @@ type ExitEvent struct {
 Bolt DB schema:
 
 exit events/
-|--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
+|--> (epoch+exit event id+blockNumber) -> *ExitEvent (json marshalled)
+|--> (exit event id) -> nil (slashing exit events)
 |--> (exitEventID) -> epochNumber
 |--> (lastProcessedBlockKey) -> block number
 */
 type ExitEventStore struct {
-	db *bolt.DB
+	db     *bolt.DB
+	logger hclog.Logger
 }
 
 // initialize creates necessary buckets in DB if they don't already exist
 func (s *ExitEventStore) initialize(tx *bolt.Tx) error {
 	if _, err := tx.CreateBucketIfNotExists(exitEventsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventsBucket), err)
+	}
+
+	if _, err := tx.CreateBucketIfNotExists(slashingExitEventsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(slashingExitEventsBucket), err)
 	}
 
 	if _, err := tx.CreateBucketIfNotExists(exitEventToEpochLookupBucket); err != nil {
@@ -80,8 +92,28 @@ func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		exitEventBucket := tx.Bucket(exitEventsBucket)
 		lookupBucket := tx.Bucket(exitEventToEpochLookupBucket)
-		for i := 0; i < len(exitEvents); i++ {
-			if err := insertExitEventToBucket(exitEventBucket, lookupBucket, exitEvents[i]); err != nil {
+
+		var slashExitEventBucket *bolt.Bucket
+		for _, exitEvent := range exitEvents {
+			exitIDRaw := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
+
+			if len(exitEvent.Data) >= types.HashLength {
+				signature := exitEvent.Data[:types.HashLength]
+				if bytes.Equal(signature, slashSignature) {
+					// access to the slash exit events bucket lazily
+					if slashExitEventBucket == nil {
+						slashExitEventBucket = tx.Bucket(slashingExitEventsBucket)
+					}
+
+					if err := slashExitEventBucket.Put(exitIDRaw, nil); err != nil {
+						return err
+					}
+				}
+			} else {
+				s.logger.Info(fmt.Sprintf("invalid exit event (ID=%d), it does not contain signature encoded", exitEvent.ID))
+			}
+
+			if err := insertExitEvent(exitEventBucket, lookupBucket, exitIDRaw, exitEvent); err != nil {
 				return err
 			}
 		}
@@ -90,23 +122,21 @@ func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	})
 }
 
-// insertExitEventToBucket inserts exit event to exit event bucket
-func insertExitEventToBucket(exitEventBucket, lookupBucket *bolt.Bucket, exitEvent *ExitEvent) error {
+// insertExitEvent inserts exit event to exit event bucket
+func insertExitEvent(exitEventBucket, lookupBucket *bolt.Bucket, exitIDRaw []byte, exitEvent *ExitEvent) error {
 	raw, err := json.Marshal(exitEvent)
 	if err != nil {
 		return err
 	}
 
-	epochBytes := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
-	exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
+	epochRaw := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
+	blockNumRaw := common.EncodeUint64ToBytes(exitEvent.BlockNumber)
 
-	err = exitEventBucket.Put(bytes.Join([][]byte{epochBytes,
-		exitIDBytes, common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
-	if err != nil {
+	if err = exitEventBucket.Put(bytes.Join([][]byte{epochRaw, exitIDRaw, blockNumRaw}, nil), raw); err != nil {
 		return err
 	}
 
-	return lookupBucket.Put(exitIDBytes, epochBytes)
+	return lookupBucket.Put(exitIDRaw, epochRaw)
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
@@ -181,6 +211,54 @@ func (s *ExitEventStore) getExitEvents(epoch uint64, filter func(exitEvent *Exit
 	// enforce sequential order
 	sort.Slice(events, func(i, j int) bool {
 		return events[i].ID.Cmp(events[j].ID) < 0
+	})
+
+	return events, err
+}
+
+// getPendingSlashExitIDs returns pending slash exit event ids
+func (s *ExitEventStore) getPendingSlashExitIDs() ([]uint64, error) {
+	var exitIds []uint64
+
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		slashingEventsBucket := tx.Bucket(slashingExitEventsBucket)
+
+		return slashingEventsBucket.ForEach(func(k, _ []byte) error {
+			exitIds = append(exitIds, common.EncodeBytesToUint64(k))
+
+			return nil
+		})
+	}); err != nil {
+		return nil, err
+	}
+
+	sort.Slice(exitIds, func(i, j int) bool {
+		return exitIds[i] < exitIds[j]
+	})
+
+	return exitIds, nil
+}
+
+// getExitEventsByIds returns exit events by its ids
+func (s *ExitEventStore) getExitEventsByIds(exitEventIDs ...uint64) ([]*ExitEvent, error) {
+	events := make([]*ExitEvent, 0, len(exitEventIDs))
+
+	err := s.db.View(func(tx *bolt.Tx) error {
+		c := tx.Bucket(exitEventsBucket).Cursor()
+		for _, id := range exitEventIDs {
+			prefix := common.EncodeUint64ToBytes(id)
+
+			for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
+				var event *ExitEvent
+				if err := json.Unmarshal(v, &event); err != nil {
+					return err
+				}
+
+				events = append(events, event)
+			}
+		}
+
+		return nil
 	})
 
 	return events, err

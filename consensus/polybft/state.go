@@ -29,8 +29,9 @@ type TransportMessage struct {
 
 // State represents a persistence layer which persists consensus data off-chain
 type State struct {
-	db    *bolt.DB
-	close chan struct{}
+	db     *bolt.DB
+	close  chan struct{}
+	logger hclog.Logger
 
 	StateSyncStore        *StateSyncStore
 	ExitEventStore        *ExitEventStore
@@ -49,8 +50,9 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 	s := &State{
 		db:                    db,
 		close:                 closeCh,
+		logger:                logger,
 		StateSyncStore:        &StateSyncStore{db: db},
-		ExitEventStore:        &ExitEventStore{db: db},
+		ExitEventStore:        &ExitEventStore{db: db, logger: logger},
 		EpochStore:            &EpochStore{db: db},
 		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
 		StakeStore:            &StakeStore{db: db},
