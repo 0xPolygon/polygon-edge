@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"path"
@@ -637,4 +638,43 @@ func TestE2E_Consensus_WithByzantineNode(t *testing.T) {
 	t.Run("consensus protocol", func(t *testing.T) {
 		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
 	})
+}
+
+func TestE2E_BridgeSlashing(t *testing.T) {
+	const (
+		validatorNumber     = 5
+		byzantineNodesCount = 2
+		epochSize           = 10
+		abiMethodIDLength   = 4
+	)
+
+	var slashFn contractsapi.SlashValidatorSetFn
+
+	cluster := framework.NewTestCluster(t, validatorNumber,
+		framework.WithEpochSize(epochSize), framework.WithByzantineNodes(byzantineNodesCount))
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	cluster.WaitForBlock(1, 20*time.Second)
+
+	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+
+	blockWithSlashTxs, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, true)
+	require.NoError(t, err)
+
+	transactions := blockWithSlashTxs.Transactions
+	var hasSlashStateTx = false
+	t.Log("transactions number", len(blockWithSlashTxs.Transactions))
+	for _, tx := range transactions {
+		sig := tx.Input[:abiMethodIDLength]
+		t.Log("Sig is", sig, "Slashfn.sig", slashFn.Sig())
+		if bytes.Equal(sig, slashFn.Sig()) {
+
+			hasSlashStateTx = true
+		}
+	}
+
+	require.True(t, hasSlashStateTx)
+
 }
