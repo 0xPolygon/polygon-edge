@@ -6,9 +6,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -16,11 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 // the test initializes polybft and chain mock (map of headers) after which a new header is verified
@@ -300,7 +300,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 	}{
 		{
 			name: "non-mintable native token; access lists disabled",
-			config: &common.PolyBFTConfig{
+			config: &polyCommon.PolyBFTConfig{
 				InitialValidatorSet: validators.GetParamValidators(),
 				Bridge:              bridgeCfg,
 				EpochSize:           epochSize,
@@ -318,7 +318,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 		},
 		{
 			name: "mintable native token; access lists enabled",
-			config: &common.PolyBFTConfig{
+			config: &polyCommon.PolyBFTConfig{
 				InitialValidatorSet: validators.GetParamValidators(),
 				Bridge:              bridgeCfg,
 				EpochSize:           epochSize,
@@ -340,7 +340,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 		},
 		{
 			name:        "missing bridge configuration",
-			config:      &common.PolyBFTConfig{},
+			config:      &polyCommon.PolyBFTConfig{},
 			expectedErr: errMissingBridgeConfig,
 		},
 	}
