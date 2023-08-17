@@ -215,7 +215,8 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 }
 
 // CreateMintTxn encodes parameters for mint function on rootchain token contract
-func CreateMintTxn(receiver, erc20TokenAddr types.Address, amount *big.Int) (*ethgo.Transaction, error) {
+func CreateMintTxn(receiver, erc20TokenAddr types.Address,
+	amount *big.Int, rootchainTx bool) (*ethgo.Transaction, error) {
 	mintFn := &contractsapi.MintRootERC20Fn{
 		To:     receiver,
 		Amount: amount,
@@ -227,17 +228,15 @@ func CreateMintTxn(receiver, erc20TokenAddr types.Address, amount *big.Int) (*et
 	}
 
 	addr := ethgo.Address(erc20TokenAddr)
+	txn := CreateTransaction(ethgo.ZeroAddress, &addr, input, nil, rootchainTx)
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return txn, nil
 }
 
 // CreateApproveERC20Txn sends approve transaction
 // to ERC20 token for spender so that it is able to spend given tokens
 func CreateApproveERC20Txn(amount *big.Int,
-	spender, erc20TokenAddr types.Address) (*ethgo.Transaction, error) {
+	spender, erc20TokenAddr types.Address, rootchainTx bool) (*ethgo.Transaction, error) {
 	approveFnParams := &contractsapi.ApproveRootERC20Fn{
 		Spender: spender,
 		Amount:  amount,
@@ -250,19 +249,13 @@ func CreateApproveERC20Txn(amount *big.Int,
 
 	addr := ethgo.Address(erc20TokenAddr)
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return CreateTransaction(ethgo.ZeroAddress, &addr, input, nil, rootchainTx), nil
 }
 
 // SendTransaction sends provided transaction
 func SendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []byte, contractName string,
 	deployerKey ethgo.Key) (*ethgo.Receipt, error) {
-	txn := &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}
+	txn := CreateTransaction(ethgo.ZeroAddress, &addr, input, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {
@@ -275,4 +268,23 @@ func SendTransaction(txRelayer txrelayer.TxRelayer, addr ethgo.Address, input []
 	}
 
 	return receipt, nil
+}
+
+// CreateTransaction is a helper function that creates either dynamic fee or legacy transaction based on provided flag
+func CreateTransaction(sender ethgo.Address, receiver *ethgo.Address,
+	input []byte, value *big.Int, isDynamicFee bool) *ethgo.Transaction {
+	txn := &ethgo.Transaction{
+		From:  sender,
+		To:    receiver,
+		Input: input,
+		Value: value,
+	}
+
+	if isDynamicFee {
+		txn.Type = ethgo.TransactionDynamicFee
+	} else {
+		txn.Type = ethgo.TransactionLegacy
+	}
+
+	return txn
 }

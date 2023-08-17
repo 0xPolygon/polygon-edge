@@ -183,9 +183,9 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	receivers := make([]ethgo.Address, len(dp.Receivers))
+	receivers := make([]types.Address, len(dp.Receivers))
 	for i, receiverRaw := range dp.Receivers {
-		receivers[i] = ethgo.Address(types.StringToAddress(receiverRaw))
+		receivers[i] = types.StringToAddress(receiverRaw)
 	}
 
 	// deposit tokens
@@ -245,7 +245,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 }
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
-func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
+func createDepositTxn(sender ethgo.Address, receivers []types.Address,
 	amounts, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	depositBatchFn := &contractsapi.DepositBatchRootERC1155PredicateFn{
 		RootToken: types.StringToAddress(dp.TokenAddr),
@@ -261,11 +261,8 @@ func createDepositTxn(sender ethgo.Address, receivers []ethgo.Address,
 
 	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		From:  sender,
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(sender, &addr, input,
+		nil, !dp.ChildChainMintable), nil
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
@@ -283,11 +280,8 @@ func createMintTxn(sender, receiver types.Address, amounts, tokenIDs []*big.Int)
 
 	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
 
-	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.Address(sender), &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }
 
 // createApproveERC1155PredicateTxn sends approve transaction
@@ -306,8 +300,6 @@ func createApproveERC1155PredicateTxn(rootERC1155Predicate,
 
 	addr := ethgo.Address(rootERC1155Token)
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.ZeroAddress, &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }

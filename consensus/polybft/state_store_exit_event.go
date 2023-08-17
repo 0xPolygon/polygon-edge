@@ -79,7 +79,11 @@ func (s *ExitEventStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventLastProcessedBlockBucket), err)
 	}
 
-	return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
+	if val := tx.Bucket(exitEventLastProcessedBlockBucket).Get(lastProcessedBlockKey); val == nil {
+		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
+	}
+
+	return nil
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db

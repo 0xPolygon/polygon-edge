@@ -2,6 +2,7 @@ package polybft
 
 import (
 	"errors"
+	"math/big"
 	"testing"
 	"time"
 
@@ -113,15 +114,20 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create polybft with appropriate mocks
 	polybft := &Polybft{
-		closeCh:         make(chan struct{}),
-		logger:          hclog.NewNullLogger(),
-		consensusConfig: &polyBftConfig,
-		blockchain:      blockchainMock,
+		closeCh:             make(chan struct{}),
+		logger:              hclog.NewNullLogger(),
+		genesisClientConfig: &polyBftConfig,
+		blockchain:          blockchainMock,
 		validatorsCache: newValidatorsSnapshotCache(
 			hclog.NewNullLogger(),
 			newTestState(t),
 			blockchainMock,
 		),
+		runtime: &consensusRuntime{
+			epoch: &epochMetadata{
+				CurrentClientConfig: &polyBftConfig,
+			},
+		},
 	}
 
 	// create parent header (block 10)
@@ -270,7 +276,7 @@ func Test_Factory(t *testing.T) {
 	require.True(t, ok)
 
 	assert.Equal(t, txPool, polybft.txPool)
-	assert.Equal(t, epochSize, polybft.consensusConfig.EpochSize)
+	assert.Equal(t, epochSize, polybft.genesisClientConfig.EpochSize)
 	assert.Equal(t, params, polybft.config)
 }
 
@@ -299,6 +305,13 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
+				GovernanceConfig: &GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					GovernorAdmin:            types.ZeroAddress,
+					ProposalQuorumPercentage: 67,
+				},
 			},
 		},
 		{
@@ -310,6 +323,13 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
 				MaxValidatorSetSize: maxValidators,
+				GovernanceConfig: &GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					GovernorAdmin:            types.ZeroAddress,
+					ProposalQuorumPercentage: 67,
+				},
 			},
 			bridgeAllowList: &chain.AddressListConfig{
 				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},

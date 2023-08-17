@@ -103,11 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	stakeManagerAddr := ethgo.Address(types.StringToAddress(params.stakeManagerAddr))
-	txn := &ethgo.Transaction{
-		From:  validatorAccount.Ecdsa.Address(),
-		Input: encoded,
-		To:    &stakeManagerAddr,
-	}
+	txn := rootHelper.CreateTransaction(validatorAccount.Ecdsa.Address(), &stakeManagerAddr, encoded, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {

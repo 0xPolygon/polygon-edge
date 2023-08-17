@@ -38,6 +38,7 @@ type State struct {
 	EpochStore            *EpochStore
 	ProposerSnapshotStore *ProposerSnapshotStore
 	StakeStore            *StakeStore
+	GovernanceStore       *GovernanceStore
 }
 
 // newState creates new instance of State
@@ -56,6 +57,7 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 		EpochStore:            &EpochStore{db: db},
 		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
 		StakeStore:            &StakeStore{db: db},
+		GovernanceStore:       &GovernanceStore{db: db},
 	}
 
 	if err = s.initStorages(); err != nil {
@@ -81,8 +83,11 @@ func (s *State) initStorages() error {
 		if err := s.ProposerSnapshotStore.initialize(tx); err != nil {
 			return err
 		}
+		if err := s.StakeStore.initialize(tx); err != nil {
+			return err
+		}
 
-		return s.StakeStore.initialize(tx)
+		return s.GovernanceStore.initialize(tx)
 	})
 }
 

@@ -93,7 +93,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	receivers := make([]ethgo.Address, len(dp.Receivers))
+	receivers := make([]types.Address, len(dp.Receivers))
 	tokenIDs := make([]*big.Int, len(dp.Receivers))
 
 	for i, tokenIDRaw := range dp.TokenIDs {
@@ -106,7 +106,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		receivers[i] = ethgo.Address(types.StringToAddress(dp.Receivers[i]))
+		receivers[i] = types.StringToAddress(dp.Receivers[i])
 		tokenIDs[i] = tokenID
 	}
 
@@ -220,7 +220,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 // createDepositTxn encodes parameters for deposit function on rootchain predicate contract
 func createDepositTxn(sender ethgo.Address,
-	receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
+	receivers []types.Address, tokenIDs []*big.Int) (*ethgo.Transaction, error) {
 	depositToRoot := &contractsapi.DepositBatchRootERC721PredicateFn{
 		RootToken: types.StringToAddress(dp.TokenAddr),
 		Receivers: receivers,
@@ -234,11 +234,7 @@ func createDepositTxn(sender ethgo.Address,
 
 	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		From:  sender,
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(sender, &addr, input, nil, !dp.ChildChainMintable), nil
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
@@ -254,11 +250,8 @@ func createMintTxn(sender, receiver types.Address) (*ethgo.Transaction, error) {
 
 	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
 
-	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.Address(sender), &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }
 
 // createApproveERC721PredicateTxn sends approve transaction
@@ -275,8 +268,6 @@ func createApproveERC721PredicateTxn(rootERC721Predicate, rootERC721Token types.
 
 	addr := ethgo.Address(rootERC721Token)
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.ZeroAddress, &addr, input,
+		nil, !dp.ChildChainMintable), nil
 }

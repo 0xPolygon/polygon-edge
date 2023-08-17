@@ -25,8 +25,6 @@ var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
-	// frequency at which checkpoints are sent to the rootchain (in blocks count)
-	defaultCheckpointsOffset = uint64(900)
 )
 
 type CheckpointManager interface {
@@ -63,8 +61,6 @@ type checkpointManager struct {
 	consensusBackend polybftBackend
 	// rootChainRelayer abstracts rootchain interaction logic (Call and SendTransaction invocations to the rootchain)
 	rootChainRelayer txrelayer.TxRelayer
-	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
-	checkpointsOffset uint64
 	// checkpointManagerAddr is address of CheckpointManager smart contract
 	checkpointManagerAddr types.Address
 	// lastSentBlock represents the last block on which a checkpoint transaction was sent
@@ -78,7 +74,7 @@ type checkpointManager struct {
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
+func newCheckpointManager(key ethgo.Key,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
@@ -95,7 +91,6 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		blockchain:            blockchain,
 		consensusBackend:      backend,
 		rootChainRelayer:      txRelayer,
-		checkpointsOffset:     checkpointOffset,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
 		state:                 state,
@@ -139,12 +134,11 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		"checkpoint block", latestHeader.Number)
 
 	var (
-		checkpointManagerAddr = ethgo.Address(c.checkpointManagerAddr)
-		initialBlockNumber    = lastCheckpointBlockNumber + 1
-		parentExtra           *Extra
-		parentHeader          *types.Header
-		currentExtra          *Extra
-		found                 bool
+		initialBlockNumber = lastCheckpointBlockNumber + 1
+		parentExtra        *Extra
+		parentHeader       *types.Header
+		currentExtra       *Extra
+		found              bool
 	)
 
 	if initialBlockNumber < latestHeader.Number {
@@ -181,12 +175,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			continue
 		}
 
-		txn := &ethgo.Transaction{
-			To:   &checkpointManagerAddr,
-			From: c.key.Address(),
-		}
-
-		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
+		if err = c.encodeAndSendCheckpoint(parentHeader, parentExtra, true); err != nil {
 			return err
 		}
 
@@ -204,19 +193,15 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		}
 	}
 
-	txn := &ethgo.Transaction{
-		To:   &checkpointManagerAddr,
-		From: c.key.Address(),
-	}
-
-	return c.encodeAndSendCheckpoint(txn, latestHeader, currentExtra, isEndOfEpoch)
+	return c.encodeAndSendCheckpoint(latestHeader, currentExtra, isEndOfEpoch)
 }
 
 // encodeAndSendCheckpoint encodes checkpoint data for the given block and
 // sends a transaction to the CheckpointManager rootchain contract
-func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
-	header *types.Header, extra *Extra, isEndOfEpoch bool) error {
+func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra *Extra, isEndOfEpoch bool) error {
 	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
+
+	checkpointManager := ethgo.Address(c.checkpointManagerAddr)
 
 	nextEpochValidators := validator.AccountSet{}
 
@@ -234,7 +219,11 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 		return fmt.Errorf("failed to encode checkpoint data to ABI for block %d: %w", header.Number, err)
 	}
 
-	txn.Input = input
+	txn := &ethgo.Transaction{
+		To:    &checkpointManager,
+		Input: input,
+		Type:  ethgo.TransactionDynamicFee,
+	}
 
 	receipt, err := c.rootChainRelayer.SendTransaction(txn, c.key)
 	if err != nil {
@@ -287,8 +276,8 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 // isCheckpointBlock returns true for blocks in the middle of the epoch
 // which are offset by predefined count of blocks
 // or if given block is an epoch ending block
-func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
-	return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
+func (c *checkpointManager) isCheckpointBlock(blockNumber, checkpointsOffset uint64, isEpochEndingBlock bool) bool {
+	return isEpochEndingBlock || blockNumber == c.lastSentBlock+checkpointsOffset
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
@@ -319,7 +308,8 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 		return err
 	}
 
-	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock) &&
+	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number,
+		req.CurrentClientConfig.CheckpointInterval, req.IsEpochEndingBlock) &&
 		bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner) {
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {

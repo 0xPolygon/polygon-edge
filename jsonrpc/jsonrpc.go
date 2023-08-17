@@ -68,6 +68,8 @@ type Config struct {
 	PriceLimit               uint64
 	BatchLengthLimit         uint64
 	BlockRangeLimit          uint64
+
+	RequestsPerSecondDebug uint64
 }
 
 // NewJSONRPC returns the JSONRPC http server
@@ -81,6 +83,7 @@ func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 			priceLimit:              config.PriceLimit,
 			jsonRPCBatchLengthLimit: config.BatchLengthLimit,
 			blockRangeLimit:         config.BlockRangeLimit,
+			requestsPerSecondDebug:  config.RequestsPerSecondDebug,
 		},
 	)
 

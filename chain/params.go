@@ -90,6 +90,7 @@ const (
 	QuorumCalcAlignment = "quorumcalcalignment"
 	TxHashWithType      = "txHashWithType"
 	DoubleSignSlashing  = "doubleSignSlashing"
+	Governance          = "governance"
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
@@ -125,6 +126,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		EIP155:              f.IsActive(EIP155, block),
 		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
 		TxHashWithType:      f.IsActive(TxHashWithType, block),
+		Governance:          f.IsActive(Governance, block),
 		DoubleSignSlashing:  f.IsActive(DoubleSignSlashing, block),
 	}
 }
@@ -155,6 +157,7 @@ type ForksInTime struct {
 	EIP155,
 	QuorumCalcAlignment,
 	TxHashWithType,
+	Governance,
 	DoubleSignSlashing bool
 }
 
@@ -171,5 +174,6 @@ var AllForksEnabled = &Forks{
 	London:              NewFork(0),
 	QuorumCalcAlignment: NewFork(0),
 	TxHashWithType:      NewFork(0),
+	Governance:          NewFork(0),
 	DoubleSignSlashing:  NewFork(0),
 }

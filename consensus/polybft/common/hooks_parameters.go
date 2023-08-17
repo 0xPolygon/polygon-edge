@@ -23,6 +23,9 @@ type PostBlockRequest struct {
 
 	// IsEpochEndingBlock indicates if this was the last block of given epoch
 	IsEpochEndingBlock bool
+
+	// CurrentClientConfig is the latest client configuration
+	CurrentClientConfig *PolyBFTConfig
 }
 
 type PostEpochRequest struct {

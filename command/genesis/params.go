@@ -25,20 +25,27 @@ import (
 )
 
 const (
-	dirFlag               = "dir"
-	nameFlag              = "name"
-	premineFlag           = "premine"
-	chainIDFlag           = "chain-id"
-	epochSizeFlag         = "epoch-size"
-	epochRewardFlag       = "epoch-reward"
-	blockGasLimitFlag     = "block-gas-limit"
-	burnContractFlag      = "burn-contract"
-	posFlag               = "pos"
-	minValidatorCount     = "min-validator-count"
-	maxValidatorCount     = "max-validator-count"
-	nativeTokenConfigFlag = "native-token-config"
-	rewardTokenCodeFlag   = "reward-token-code"
-	rewardWalletFlag      = "reward-wallet"
+	dirFlag                   = "dir"
+	nameFlag                  = "name"
+	premineFlag               = "premine"
+	chainIDFlag               = "chain-id"
+	epochSizeFlag             = "epoch-size"
+	epochRewardFlag           = "epoch-reward"
+	blockGasLimitFlag         = "block-gas-limit"
+	burnContractFlag          = "burn-contract"
+	posFlag                   = "pos"
+	minValidatorCount         = "min-validator-count"
+	maxValidatorCount         = "max-validator-count"
+	nativeTokenConfigFlag     = "native-token-config"
+	rewardTokenCodeFlag       = "reward-token-code"
+	rewardWalletFlag          = "reward-wallet"
+	checkpointIntervalFlag    = "checkpoint-interval"
+	withdrawalWaitPeriodFlag  = "withdrawal-wait-period"
+	voteDelayFlag             = "vote-delay"
+	votePeriodFlag            = "vote-period"
+	voteProposalThresholdFlag = "vote-proposal-threshold"
+	governorAdminFlag         = "governor-admin"
+	proposalQuorumFlag        = "proposal-quorum"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -63,6 +70,8 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
+	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
+	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
 )
 
 type genesisParams struct {
@@ -130,6 +139,16 @@ type genesisParams struct {
 	// rewards
 	rewardTokenCode string
 	rewardWallet    string
+
+	checkpointInterval   uint64
+	withdrawalWaitPeriod uint64
+
+	// governance
+	voteDelay         string
+	votingPeriod      string
+	proposalThreshold string
+	proposalQuorum    uint64
+	governorAdmin     string
 }
 
 func (p *genesisParams) validateFlags() error {
