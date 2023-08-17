@@ -628,7 +628,7 @@ func TestE2E_Consensus_WithByzantineNode(t *testing.T) {
 
 	cluster := framework.NewTestCluster(t, validatorCount,
 		framework.WithEpochSize(epochSize),
-		framework.WithByzantineNodes(byzantineCount),
+		framework.WithByzantineValidators(byzantineCount),
 	)
 	defer cluster.Stop()
 
