@@ -35,7 +35,7 @@ type Config struct {
 	Relayer               bool   `json:"relayer" yaml:"relayer"`
 	NumBlockConfirmations uint64 `json:"num_block_confirmations" yaml:"num_block_confirmations"`
 
-	ConcurrentRequestsDebug uint64 `json:"requests_per_second_debug" yaml:"requests_per_second_debug"`
+	ConcurrentRequestsDebug uint64 `json:"concurrent_requests_debug" yaml:"concurrent_requests_debug"`
 }
 
 // Telemetry holds the config details for metric services.
