@@ -367,7 +367,7 @@ func WithTestRewardToken() ClusterOption {
 	}
 }
 
-func WithByzantineNodes(num int) ClusterOption {
+func WithByzantineValidators(num int) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.ByzantineValidatorsCount = uint64(num)
 	}
