@@ -31,7 +31,7 @@ func TestThrottling(t *testing.T) {
 		res, err := th.AttemptRequest(context.Background(), sfn(100, time.Millisecond*1200))
 
 		require.NoError(t, err)
-		assert.Equal(t, 100, res.(int)) // nolint
+		assert.Equal(t, 100, res.(int)) //nolint
 	}()
 
 	time.Sleep(time.Millisecond * 200)
@@ -43,7 +43,7 @@ func TestThrottling(t *testing.T) {
 			res, err := th.AttemptRequest(context.Background(), sfn(100, time.Millisecond*1000))
 
 			require.NoError(t, err)
-			assert.Equal(t, 100, res.(int)) // nolint
+			assert.Equal(t, 100, res.(int)) //nolint
 		}()
 	}
 
@@ -66,7 +66,7 @@ func TestThrottling(t *testing.T) {
 		res, err := th.AttemptRequest(context.Background(), sfn(10, time.Millisecond))
 
 		require.NoError(t, err)
-		assert.Equal(t, 10, res.(int)) // nolint
+		assert.Equal(t, 10, res.(int)) //nolint
 	}()
 
 	wg.Wait()
