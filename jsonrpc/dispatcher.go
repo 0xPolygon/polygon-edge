@@ -60,7 +60,7 @@ type dispatcherParams struct {
 	jsonRPCBatchLengthLimit uint64
 	blockRangeLimit         uint64
 
-	requestsPerSecondDebug uint64
+	concurrentRequestsDebug uint64
 }
 
 func (dp dispatcherParams) isExceedingBatchLengthLimit(value uint64) bool {
@@ -111,7 +111,7 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) error {
 	d.endpoints.Bridge = &Bridge{
 		store,
 	}
-	d.endpoints.Debug = NewDebug(store, int(d.params.requestsPerSecondDebug))
+	d.endpoints.Debug = NewDebug(store, d.params.concurrentRequestsDebug)
 
 	var err error
 

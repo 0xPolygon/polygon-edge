@@ -229,10 +229,10 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().Uint64Var(
-		&params.rawConfig.RequestsPerSecondDebug,
-		requestsPerSecondDebugFlag,
-		defaultConfig.RequestsPerSecondDebug,
-		"maximal number of requests per second for debug endpoints",
+		&params.rawConfig.ConcurrentRequestsDebug,
+		concurrentRequestsDebugFlag,
+		defaultConfig.ConcurrentRequestsDebug,
+		"maximal number of concurrent requests for debug endpoints",
 	)
 
 	setLegacyFlags(cmd)

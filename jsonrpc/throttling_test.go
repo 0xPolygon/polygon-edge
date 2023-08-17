@@ -1,41 +1,71 @@
 package jsonrpc
 
 import (
+	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestThrottling(t *testing.T) {
 	t.Parallel()
 
-	th := NewThrottling(5)
+	th := NewThrottling(5, time.Millisecond*100)
+	sfn := func(value int, sleep time.Duration) func() (interface{}, error) {
+		return func() (interface{}, error) {
+			time.Sleep(sleep)
 
-	assert.NoError(t, th.AttemptRequest())
-	assert.NoError(t, th.AttemptRequest())
+			return value, nil
+		}
+	}
 
-	time.Sleep(time.Millisecond * 100)
+	wg := sync.WaitGroup{}
+	wg.Add(7)
 
-	assert.NoError(t, th.AttemptRequest())
-	assert.NoError(t, th.AttemptRequest())
+	go func() {
+		defer wg.Done()
 
-	time.Sleep(time.Millisecond * 100)
+		res, err := th.AttemptRequest(context.Background(), sfn(100, time.Millisecond*1200))
 
-	assert.NoError(t, th.AttemptRequest())
-	assert.ErrorIs(t, th.AttemptRequest(), errRequestLimitExceeded)
+		require.NoError(t, err)
+		assert.Equal(t, 100, res.(int)) // nolint
+	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 200)
 
-	assert.ErrorIs(t, th.AttemptRequest(), errRequestLimitExceeded)
+	for i := 2; i <= 5; i++ {
+		go func() {
+			wg.Done()
 
-	time.Sleep(time.Millisecond * 701)
+			res, err := th.AttemptRequest(context.Background(), sfn(100, time.Millisecond*1000))
 
-	assert.NoError(t, th.AttemptRequest())
-	assert.Equal(t, 4, th.requests.Len())
+			require.NoError(t, err)
+			assert.Equal(t, 100, res.(int)) // nolint
+		}()
+	}
 
-	time.Sleep(time.Millisecond * 1002)
+	go func() {
+		defer wg.Done()
 
-	assert.NoError(t, th.AttemptRequest())
-	assert.Equal(t, 1, th.requests.Len())
+		res, err := th.AttemptRequest(context.Background(), sfn(100, time.Millisecond))
+
+		require.ErrorIs(t, err, errRequestLimitExceeded)
+		assert.Nil(t, res)
+	}()
+
+	time.Sleep(time.Millisecond * 200)
+
+	go func() {
+		wg.Done()
+
+		res, err := th.AttemptRequest(context.Background(), sfn(10, time.Millisecond))
+
+		require.NoError(t, err)
+		assert.Equal(t, 10, res.(int)) // nolint
+	}()
+
+	wg.Wait()
 }
