@@ -49,9 +49,6 @@ const (
 
 	// prefix for non validators directory
 	nonValidatorPrefix = "test-non-validator-"
-
-	// prefix for byzantine node directory
-	byzantineNodePrefix = "test-byzantine-node-"
 )
 
 var (
@@ -84,28 +81,28 @@ func resolveByzantineBinary() string {
 type TestClusterConfig struct {
 	t *testing.T
 
-	Name                 string
-	Premine              []string // address[:amount]
-	PremineValidators    []string // address[:amount]
-	StakeAmounts         []*big.Int
-	WithoutBridge        bool
-	BootnodeCount        int
-	NonValidatorCount    int
-	WithLogs             bool
-	WithStdout           bool
-	LogsDir              string
-	TmpDir               string
-	BlockGasLimit        uint64
-	BurnContract         *polybft.BurnContractInfo
-	ValidatorPrefix      string
-	Binary               string
-	ValidatorSetSize     uint64
-	ByzantineBinary      string
-	ByzantineNodeCount   uint64
-	EpochSize            int
-	EpochReward          int
-	NativeTokenConfigRaw string
-	SecretsCallback      func([]types.Address, *TestClusterConfig)
+	Name                     string
+	Premine                  []string // address[:amount]
+	PremineValidators        []string // address[:amount]
+	StakeAmounts             []*big.Int
+	WithoutBridge            bool
+	BootnodeCount            int
+	NonValidatorCount        int
+	WithLogs                 bool
+	WithStdout               bool
+	LogsDir                  string
+	TmpDir                   string
+	BlockGasLimit            uint64
+	BurnContract             *polybft.BurnContractInfo
+	ValidatorPrefix          string
+	Binary                   string
+	ValidatorSetSize         uint64
+	ByzantineBinary          string
+	ByzantineValidatorsCount uint64
+	EpochSize                int
+	EpochReward              int
+	NativeTokenConfigRaw     string
+	SecretsCallback          func([]types.Address, *TestClusterConfig)
 
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
@@ -372,7 +369,7 @@ func WithTestRewardToken() ClusterOption {
 
 func WithByzantineNodes(num int) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.ByzantineNodeCount = uint64(num)
+		h.ByzantineValidatorsCount = uint64(num)
 	}
 }
 
@@ -441,7 +438,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	// run init accounts for validators
-	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix,
+		int(cluster.Config.ValidatorSetSize)+int(config.ByzantineValidatorsCount))
 	require.NoError(t, err)
 
 	if cluster.Config.SecretsCallback != nil {
@@ -453,11 +451,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		// we don't call secrets callback on non-validators,
 		// since we have nothing to premine nor stake for non validators
 		_, err = cluster.InitSecrets(nonValidatorPrefix, config.NonValidatorCount)
-		require.NoError(t, err)
-	}
-
-	if config.ByzantineNodeCount > 0 {
-		_, err := cluster.InitSecrets(byzantineNodePrefix, int(config.ByzantineNodeCount))
 		require.NoError(t, err)
 	}
 
@@ -629,9 +622,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			false, false /* relayer */, false /* byzantine */)
 	}
 
-	for i := 1; i <= int(cluster.Config.ByzantineNodeCount); i++ {
-		dir := byzantineNodePrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), false, false /* relayer */, true /* byzantine */)
+	allValidatorSetSize := int(cluster.Config.ValidatorSetSize) + int(cluster.Config.ByzantineValidatorsCount)
+	for i := 1 + int(cluster.Config.ValidatorSetSize); i <= allValidatorSetSize; i++ {
+		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), true, false /* relayer */, true /* byzantine */)
 	}
 
 	return cluster
