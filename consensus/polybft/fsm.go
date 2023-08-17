@@ -9,8 +9,12 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/armon/go-metrics"
+	hcf "github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
@@ -20,8 +24,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	hcf "github.com/hashicorp/go-hclog"
 )
 
 type blockBuilder interface {
@@ -56,7 +58,7 @@ var (
 
 type fsm struct {
 	// PolyBFT consensus protocol configuration
-	config *PolyBFTConfig
+	config *common.PolyBFTConfig
 
 	// parent block header
 	parent *types.Header

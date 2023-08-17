@@ -16,7 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -132,7 +132,7 @@ type genesisParams struct {
 	bridgeBlockListEnabled           []string
 
 	nativeTokenConfigRaw string
-	nativeTokenConfig    *polybft.TokenConfig
+	nativeTokenConfig    *common.TokenConfig
 
 	premineInfos []*premineInfo
 
@@ -562,7 +562,7 @@ func (p *genesisParams) isBurnContractEnabled() bool {
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
 func (p *genesisParams) extractNativeTokenMetadata() error {
 	if p.nativeTokenConfigRaw == "" {
-		p.nativeTokenConfig = &polybft.TokenConfig{
+		p.nativeTokenConfig = &common.TokenConfig{
 			Name:       defaultNativeTokenName,
 			Symbol:     defaultNativeTokenSymbol,
 			Decimals:   defaultNativeTokenDecimals,
@@ -613,7 +613,7 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		owner = types.StringToAddress(strings.TrimSpace(params[4]))
 	}
 
-	p.nativeTokenConfig = &polybft.TokenConfig{
+	p.nativeTokenConfig = &common.TokenConfig{
 		Name:       name,
 		Symbol:     symbol,
 		Decimals:   uint8(decimals),

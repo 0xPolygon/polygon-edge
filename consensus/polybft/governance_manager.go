@@ -7,15 +7,17 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -52,9 +54,9 @@ func getLookbackSizeForRewardDistribution(blockNumber uint64) uint64 {
 // GovernanceManager interface provides functions for handling governance events
 // and updating client configuration based on executed governance proposals
 type GovernanceManager interface {
-	PostBlock(req *PostBlockRequest) error
-	PostEpoch(req *PostEpochRequest) error
-	GetClientConfig() (*PolyBFTConfig, error)
+	PostBlock(req *polyCommon.PostBlockRequest) error
+	PostEpoch(req *polyCommon.PostEpochRequest) error
+	GetClientConfig() (*polyCommon.PolyBFTConfig, error)
 }
 
 var _ GovernanceManager = (*dummyGovernanceManager)(nil)
@@ -63,9 +65,9 @@ var _ GovernanceManager = (*dummyGovernanceManager)(nil)
 // used only for unit testing
 type dummyGovernanceManager struct{}
 
-func (d *dummyGovernanceManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (d *dummyGovernanceManager) PostEpoch(req *PostEpochRequest) error { return nil }
-func (d *dummyGovernanceManager) GetClientConfig() (*PolyBFTConfig, error) {
+func (d *dummyGovernanceManager) PostBlock(req *polyCommon.PostBlockRequest) error { return nil }
+func (d *dummyGovernanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error { return nil }
+func (d *dummyGovernanceManager) GetClientConfig() (*polyCommon.PolyBFTConfig, error) {
 	return nil, nil
 }
 
@@ -81,7 +83,7 @@ type governanceManager struct {
 }
 
 // newGovernanceManager is a constructor function for governance manager
-func newGovernanceManager(genesisConfig *PolyBFTConfig,
+func newGovernanceManager(genesisConfig *polyCommon.PolyBFTConfig,
 	logger hclog.Logger,
 	state *State,
 	blockhain blockchainBackend) (*governanceManager, error) {
@@ -143,12 +145,12 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 }
 
 // GetClientConfig returns latest client configuration from boltdb
-func (g *governanceManager) GetClientConfig() (*PolyBFTConfig, error) {
+func (g *governanceManager) GetClientConfig() (*polyCommon.PolyBFTConfig, error) {
 	return g.state.GovernanceStore.getClientConfig()
 }
 
 // PostEpoch notifies the governance manager that an epoch has changed
-func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
+func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 	if !forkmanager.GetInstance().IsForkEnabled(chain.Governance, req.FirstBlockOfEpoch) {
 		// if governance fork is not enabled, do nothing
 		return nil
@@ -355,7 +357,7 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 
 // PostBlock notifies governance manager that a block was finalized
 // so that he can extract governance events and save them to bolt db
-func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
+func (g *governanceManager) PostBlock(req *polyCommon.PostBlockRequest) error {
 	if !forkmanager.GetInstance().IsForkEnabled(chain.Governance, req.FullBlock.Block.Number()) {
 		// if governance fork is not enabled, do nothing
 		return nil

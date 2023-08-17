@@ -1,4 +1,4 @@
-package polybft
+package common
 
 import (
 	"encoding/json"

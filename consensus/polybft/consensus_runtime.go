@@ -62,7 +62,7 @@ type epochMetadata struct {
 
 	// CurrentClientConfig is the current client configuration for current epoch
 	// that is updated by governance proposals
-	CurrentClientConfig *PolyBFTConfig
+	CurrentClientConfig *common.PolyBFTConfig
 }
 
 type guardedDataDTO struct {
@@ -78,7 +78,7 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	GenesisPolyBFTConfig  *PolyBFTConfig
+	GenesisPolyBFTConfig  *common.PolyBFTConfig
 	DataDir               string
 	Key                   *wallet.Key
 	State                 *State

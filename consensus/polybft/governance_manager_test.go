@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -29,7 +30,7 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	require.NoError(t, state.GovernanceStore.insertLastProcessed(20))
 
 	// no initial config was saved, so we expect an error
-	require.ErrorIs(t, governanceManager.PostEpoch(&PostEpochRequest{
+	require.ErrorIs(t, governanceManager.PostEpoch(&common.PostEpochRequest{
 		NewEpochID:        2,
 		FirstBlockOfEpoch: 21,
 	}),
@@ -39,7 +40,7 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	require.NoError(t, state.GovernanceStore.insertClientConfig(createTestPolybftConfig()))
 
 	// PostEpoch will now update config with new epoch reward value
-	require.NoError(t, governanceManager.PostEpoch(&PostEpochRequest{
+	require.NoError(t, governanceManager.PostEpoch(&common.PostEpochRequest{
 		NewEpochID:        2,
 		FirstBlockOfEpoch: 21,
 	}))
@@ -61,7 +62,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		require.NoError(t, state.GovernanceStore.insertLastProcessed(4))
 
 		// no governance events in receipts
-		req := &PostBlockRequest{
+		req := &common.PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: 5}},
 				Receipts: []*types.Receipt{},
 			},
@@ -105,7 +106,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		}
 		receipt.SetStatus(types.ReceiptSuccess)
 
-		req := &PostBlockRequest{
+		req := &common.PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: 5}},
 				Receipts: []*types.Receipt{receipt},
 			},

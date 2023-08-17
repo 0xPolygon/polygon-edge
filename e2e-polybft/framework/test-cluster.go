@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -93,7 +93,7 @@ type TestClusterConfig struct {
 	LogsDir                  string
 	TmpDir                   string
 	BlockGasLimit            uint64
-	BurnContract             *polybft.BurnContractInfo
+	BurnContract             *polyCommon.BurnContractInfo
 	ValidatorPrefix          string
 	Binary                   string
 	ValidatorSetSize         uint64
@@ -268,7 +268,7 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
+func WithBurnContract(burnContract *polyCommon.BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BurnContract = burnContract
 	}
@@ -608,7 +608,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err = cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
-		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+		polybftConfig, err := polyCommon.LoadPolyBFTConfig(genesisPath)
 		require.NoError(t, err)
 
 		// fund validators on the rootchain

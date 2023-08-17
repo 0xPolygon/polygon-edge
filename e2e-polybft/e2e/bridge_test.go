@@ -19,6 +19,7 @@ import (
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -69,7 +70,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
@@ -462,7 +463,7 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
@@ -617,7 +618,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
@@ -806,7 +807,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 		framework.WithPremine(append(depositors, adminAddr)...)) //nolint:makezero
 	defer cluster.Stop()
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]
@@ -1083,7 +1084,7 @@ func TestE2E_CheckpointSubmission(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	checkpointManagerAddr := ethgo.Address(polybftCfg.Bridge.CheckpointManagerAddr)
@@ -1136,7 +1137,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	defer cluster.Stop()
 
 	// load polybft config
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSecretFiles, err := genesis.GetValidatorKeyFiles(cluster.Config.TmpDir, cluster.Config.ValidatorPrefix)
@@ -1274,7 +1275,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorSrv := cluster.Servers[0]

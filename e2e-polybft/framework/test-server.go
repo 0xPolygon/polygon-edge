@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/server/proto"
@@ -244,7 +245,7 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int) error {
+func (t *TestServer) Stake(polybftConfig common.PolyBFTConfig, amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"stake",

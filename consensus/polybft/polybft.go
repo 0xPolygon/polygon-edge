@@ -12,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -85,7 +86,7 @@ type Polybft struct {
 	config *consensus.Params
 
 	// genesisClientConfig is genesis configuration for polybft consensus protocol
-	genesisClientConfig *PolyBFTConfig
+	genesisClientConfig *polyCommon.PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -126,7 +127,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := GetPolyBFTConfig(config)
+		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
@@ -501,7 +502,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
-	pbftConfig, err := GetPolyBFTConfig(config)
+	pbftConfig, err := polyCommon.GetPolyBFTConfig(config)
 	if err != nil {
 		return nil, err
 	}
