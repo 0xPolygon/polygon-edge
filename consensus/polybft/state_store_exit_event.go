@@ -52,7 +52,8 @@ type ExitEvent struct {
 Bolt DB schema:
 
 exit events/
-|--> (epoch+id+blockNumber) -> *ExitEvent (json marshalled)
+|--> (epoch+exit event id+blockNumber) -> *ExitEvent (json marshalled)
+|--> (exit event id) -> nil (slashing exit events)
 |--> (exitEventID) -> epochNumber
 |--> (lastProcessedBlockKey) -> block number
 */
