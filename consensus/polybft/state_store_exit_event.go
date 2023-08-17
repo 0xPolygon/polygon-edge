@@ -10,10 +10,8 @@ import (
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -62,15 +60,13 @@ type ExitEventStore struct {
 }
 
 // initialize creates necessary buckets in DB if they don't already exist
-func (s *ExitEventStore) initialize(tx *bolt.Tx, blockNumber uint64) error {
+func (s *ExitEventStore) initialize(tx *bolt.Tx) error {
 	if _, err := tx.CreateBucketIfNotExists(exitEventsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventsBucket), err)
 	}
 
-	if forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, blockNumber) {
-		if _, err := tx.CreateBucketIfNotExists(slashingExitEventsBucket); err != nil {
-			return fmt.Errorf("failed to create bucket=%s: %w", string(slashingExitEventsBucket), err)
-		}
+	if _, err := tx.CreateBucketIfNotExists(slashingExitEventsBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(slashingExitEventsBucket), err)
 	}
 
 	if _, err := tx.CreateBucketIfNotExists(exitEventToEpochLookupBucket); err != nil {
@@ -85,7 +81,7 @@ func (s *ExitEventStore) initialize(tx *bolt.Tx, blockNumber uint64) error {
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
-func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent, blockNumber uint64) error {
+func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	if len(exitEvents) == 0 {
 		// small optimization
 		return nil
@@ -95,16 +91,14 @@ func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent, blockNumber u
 		exitEventBucket := tx.Bucket(exitEventsBucket)
 		lookupBucket := tx.Bucket(exitEventToEpochLookupBucket)
 
-		doubleSlashingEnabled := forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, blockNumber)
-
 		var slashExitEventBucket *bolt.Bucket
 		for _, exitEvent := range exitEvents {
 			exitIDRaw := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
 
-			if doubleSlashingEnabled {
+			if len(exitEvent.Data) >= types.HashLength {
 				signature := exitEvent.Data[:types.HashLength]
 				if bytes.Equal(signature, slashSignature) {
-					// create slash exit events bucket lazily
+					// access to the slash exit events bucket lazily
 					if slashExitEventBucket == nil {
 						slashExitEventBucket = tx.Bucket(slashingExitEventsBucket)
 					}

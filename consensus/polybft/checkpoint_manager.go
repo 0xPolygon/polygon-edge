@@ -311,7 +311,7 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 		return exitEvents[i].ID.Cmp(exitEvents[j].ID) < 0
 	})
 
-	if err := c.state.ExitEventStore.insertExitEvents(exitEvents, req.FullBlock.Block.Number()); err != nil {
+	if err := c.state.ExitEventStore.insertExitEvents(exitEvents); err != nil {
 		return err
 	}
 

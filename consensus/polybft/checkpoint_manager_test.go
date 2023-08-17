@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -23,7 +22,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -296,11 +294,6 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		block         = 5
 		epoch         = 1
 	)
-
-	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, &forkmanager.ForkParams{})
-	require.NoError(t, forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0))
-
-	defer forkmanager.GetInstance().Clear()
 
 	state := newTestState(t)
 

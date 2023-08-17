@@ -40,7 +40,7 @@ type State struct {
 }
 
 // newState creates new instance of State
-func newState(path string, logger hclog.Logger, closeCh chan struct{}, blockNumber uint64) (*State, error) {
+func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, error) {
 	db, err := bolt.Open(path, 0666, nil)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}, blockNumb
 		StakeStore:            &StakeStore{db: db},
 	}
 
-	if err = s.initStorages(blockNumber); err != nil {
+	if err = s.initStorages(); err != nil {
 		return nil, err
 	}
 
@@ -64,13 +64,13 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}, blockNumb
 }
 
 // initStorages initializes data storages
-func (s *State) initStorages(blockNumber uint64) error {
+func (s *State) initStorages() error {
 	// init the buckets
 	return s.db.Update(func(tx *bolt.Tx) error {
 		if err := s.StateSyncStore.initialize(tx); err != nil {
 			return err
 		}
-		if err := s.ExitEventStore.initialize(tx, blockNumber); err != nil {
+		if err := s.ExitEventStore.initialize(tx); err != nil {
 			return err
 		}
 		if err := s.EpochStore.initialize(tx); err != nil {

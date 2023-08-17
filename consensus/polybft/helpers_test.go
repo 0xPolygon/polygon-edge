@@ -153,7 +153,7 @@ func newTestState(tb testing.TB) *State {
 		tb.Fatal(err)
 	}
 
-	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}), 0)
+	state, err := newState(path.Join(dir, "my.db"), hclog.NewNullLogger(), make(chan struct{}))
 	if err != nil {
 		tb.Fatal(err)
 	}

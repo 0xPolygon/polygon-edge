@@ -4,9 +4,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
@@ -151,7 +149,7 @@ func TestState_decodeExitEvent(t *testing.T) {
 	require.Equal(t, uint64(epoch), event.EpochNumber)
 	require.Equal(t, uint64(blockNumber), event.BlockNumber)
 
-	require.NoError(t, state.ExitEventStore.insertExitEvents([]*ExitEvent{event}, 0))
+	require.NoError(t, state.ExitEventStore.insertExitEvents([]*ExitEvent{event}))
 }
 
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
@@ -193,15 +191,10 @@ func Test_getExitEventsByIds(t *testing.T) {
 func Test_getPendingSlashExitIDs(t *testing.T) {
 	t.Parallel()
 
-	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, nil)
-	require.NoError(t, forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0))
-
-	defer forkmanager.GetInstance().Clear()
-
 	state := newTestState(t)
 	exitEvents := generateTestExitEvents(t, 2, 4, 2)
 
-	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents, 0))
+	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
 
 	exitEventIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
 	require.NoError(t, err)
@@ -253,7 +246,7 @@ func insertTestExitEvents(t *testing.T, state *State,
 	t.Helper()
 
 	exitEvents := generateTestExitEvents(t, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
-	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents, 0))
+	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
 
 	return exitEvents
 }
