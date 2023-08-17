@@ -9,7 +9,6 @@ import (
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -78,10 +77,10 @@ type MessagesMap map[uint64]map[uint64]SenderMessagesMap
 type DoubleSigners []types.Address
 
 func (s *DoubleSigners) EncodeAbi() ([]byte, error) {
-	validators := make([]ethgo.Address, len(*s))
+	validators := make([]types.Address, len(*s))
 
 	for i, address := range *s {
-		validators[i] = ethgo.Address(address)
+		validators[i] = address
 	}
 
 	slashFn := &contractsapi.SlashValidatorSetFn{
