@@ -38,7 +38,7 @@ func TestThrottling(t *testing.T) {
 
 	for i := 2; i <= 5; i++ {
 		go func() {
-			wg.Done()
+			defer wg.Done()
 
 			res, err := th.AttemptRequest(context.Background(), sfn(100, time.Millisecond*1000))
 
@@ -46,6 +46,8 @@ func TestThrottling(t *testing.T) {
 			assert.Equal(t, 100, res.(int)) // nolint
 		}()
 	}
+
+	time.Sleep(time.Millisecond * 200)
 
 	go func() {
 		defer wg.Done()
@@ -56,10 +58,10 @@ func TestThrottling(t *testing.T) {
 		assert.Nil(t, res)
 	}()
 
-	time.Sleep(time.Millisecond * 200)
+	time.Sleep(time.Millisecond * 1000)
 
 	go func() {
-		wg.Done()
+		defer wg.Done()
 
 		res, err := th.AttemptRequest(context.Background(), sfn(10, time.Millisecond))
 
