@@ -96,10 +96,6 @@ func (g *Genesis) GenesisHeader() *types.Header {
 		head.Difficulty = GenesisDifficulty
 	}
 
-	if g.BaseFee == 0 {
-		head.BaseFee = GenesisBaseFee
-	}
-
 	return head
 }
 

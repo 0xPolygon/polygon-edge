@@ -1356,7 +1356,18 @@ func (b *Blockchain) Close() error {
 
 // CalculateBaseFee calculates the basefee of the header.
 func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
+	// Return zero base fee is a london hardfork is not enabled
 	if !b.config.Params.Forks.IsActive(chain.London, parent.Number) {
+		return 0
+	}
+
+	// Check if this is the first London hardfork block.
+	// Should return chain.GenesisBaseFee ins this case.
+	if parent.BaseFee == 0 {
+		if b.config.Genesis.BaseFee > 0 {
+			return b.config.Genesis.BaseFee
+		}
+
 		return chain.GenesisBaseFee
 	}
 

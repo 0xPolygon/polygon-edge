@@ -121,7 +121,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	if params.isTestMode {
 		// fund deployer so that he can deploy contracts
 		deployerAddr := deployerKey.Address()
-		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
+		txn := rootHelper.CreateTransaction(ethgo.ZeroAddress, &deployerAddr, nil, ethgo.Ether(1), true)
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
 			return fmt.Errorf("failed to send local transaction: %w", err)
@@ -247,10 +247,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 
 func deployContract(txRelayer txrelayer.TxRelayer, deployerKey ethgo.Key,
 	artifact *artifact.Artifact, contractName string) (types.Address, error) {
-	txn := &ethgo.Transaction{
-		To:    nil, // contract deployment
-		Input: artifact.Bytecode,
-	}
+	txn := rootHelper.CreateTransaction(ethgo.ZeroAddress, nil, artifact.Bytecode, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {

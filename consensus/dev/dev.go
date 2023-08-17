@@ -167,10 +167,8 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	baseFee := d.blockchain.CalculateBaseFee(parent)
-
 	header.GasLimit = gasLimit
-	header.BaseFee = baseFee
+	header.BaseFee = d.blockchain.CalculateBaseFee(parent)
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
