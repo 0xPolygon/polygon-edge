@@ -366,9 +366,6 @@ type InitializeChildERC20PredicateACLFn struct {
 	NewRootERC20Predicate     types.Address `abi:"newRootERC20Predicate"`
 	NewChildTokenTemplate     types.Address `abi:"newChildTokenTemplate"`
 	NewNativeTokenRootAddress types.Address `abi:"newNativeTokenRootAddress"`
-	NewUseAllowList           bool          `abi:"newUseAllowList"`
-	NewUseBlockList           bool          `abi:"newUseBlockList"`
-	NewOwner                  types.Address `abi:"newOwner"`
 }
 
 func (i *InitializeChildERC20PredicateACLFn) Sig() []byte {
@@ -1523,7 +1520,7 @@ func (i *InitializeValidatorSetFn) DecodeAbi(buf []byte) error {
 }
 
 type SlashValidatorSetFn struct {
-	Validators []ethgo.Address `abi:"validators"`
+	Validators []types.Address `abi:"validators"`
 }
 
 func (s *SlashValidatorSetFn) Sig() []byte {
