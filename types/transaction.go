@@ -105,6 +105,11 @@ func (t *Transaction) Copy() *Transaction {
 		tt.Value.Set(t.Value)
 	}
 
+	if t.V != nil {
+		tt.V = new(big.Int)
+		tt.V = big.NewInt(0).SetBits(t.V.Bits())
+	}
+
 	if t.R != nil {
 		tt.R = new(big.Int)
 		tt.R = big.NewInt(0).SetBits(t.R.Bits())
