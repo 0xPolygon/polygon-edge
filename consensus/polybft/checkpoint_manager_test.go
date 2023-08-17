@@ -300,6 +300,8 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, &forkmanager.ForkParams{})
 	require.NoError(t, forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0))
 
+	defer forkmanager.GetInstance().Clear()
+
 	state := newTestState(t)
 
 	createReceipts := func(startID, endID uint64) []*types.Receipt {
