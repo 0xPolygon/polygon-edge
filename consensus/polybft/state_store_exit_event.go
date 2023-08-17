@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
 
@@ -56,7 +57,8 @@ exit events/
 |--> (lastProcessedBlockKey) -> block number
 */
 type ExitEventStore struct {
-	db *bolt.DB
+	db     *bolt.DB
+	logger hclog.Logger
 }
 
 // initialize creates necessary buckets in DB if they don't already exist
@@ -107,6 +109,8 @@ func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 						return err
 					}
 				}
+			} else {
+				s.logger.Info(fmt.Sprintf("invalid exit event (ID=%d), it does not contain signature encoded", exitEvent.ID))
 			}
 
 			if err := insertExitEvent(exitEventBucket, lookupBucket, exitIDRaw, exitEvent); err != nil {
