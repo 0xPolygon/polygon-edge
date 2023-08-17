@@ -1522,7 +1522,6 @@ func (i *InitializeValidatorSetFn) DecodeAbi(buf []byte) error {
 }
 
 type SlashValidatorSetFn struct {
-	Height     *big.Int        `abi:"height"`
 	Validators []ethgo.Address `abi:"validators"`
 }
 

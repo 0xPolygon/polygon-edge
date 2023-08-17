@@ -563,7 +563,7 @@ func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
 
 	// slashing transaction that doesn't match the expected one
 	var differentDoubleSigners slashing.DoubleSigners = []types.Address{types.StringToAddress("0x3"), types.StringToAddress("0x4")}
-	inputData, err := differentDoubleSigners.EncodeAbi(fsm.parent.Number)
+	inputData, err := differentDoubleSigners.EncodeAbi()
 	require.NoError(t, err)
 
 	slashingTx3 := createStateTransactionWithData(fsm.Height(), contracts.ValidatorSetContract, inputData)
