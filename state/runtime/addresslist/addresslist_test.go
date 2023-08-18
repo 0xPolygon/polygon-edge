@@ -9,6 +9,8 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
+var superAdmin = types.StringToAddress("ffffffffffffffffffffffffffffffffffffffff")
+
 type mockState struct {
 	state map[types.Hash]types.Hash
 }
@@ -26,10 +28,15 @@ func newMockAddressList() *AddressList {
 		state: map[types.Hash]types.Hash{},
 	}
 
-	return NewAddressList(state, types.Address{})
+	al := NewAddressList(state, types.Address{}, &superAdmin)
+	al.SetEnabled(true)
+
+	return al
 }
 
 func TestAddressList_WrongInput(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 
 	input := []byte{}
@@ -52,6 +59,8 @@ func TestAddressList_WrongInput(t *testing.T) {
 }
 
 func TestAddressList_ReadOp_NotEnoughGas(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 
 	input, _ := ReadAddressListFunc.Encode([]interface{}{types.Address{}})
@@ -64,6 +73,8 @@ func TestAddressList_ReadOp_NotEnoughGas(t *testing.T) {
 }
 
 func TestAddressList_ReadOp_Full(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 	a.SetRole(types.Address{}, AdminRole)
 
@@ -93,6 +104,8 @@ func TestAddressList_ReadOp_Full(t *testing.T) {
 }
 
 func TestAddressList_WriteOp_NotEnoughGas(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 
 	input, _ := SetAdminFunc.Encode([]interface{}{types.Address{}})
@@ -105,6 +118,8 @@ func TestAddressList_WriteOp_NotEnoughGas(t *testing.T) {
 }
 
 func TestAddressList_WriteOp_CannotWriteInStaticCall(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 
 	input, _ := SetAdminFunc.Encode([]interface{}{types.Address{}})
@@ -115,6 +130,8 @@ func TestAddressList_WriteOp_CannotWriteInStaticCall(t *testing.T) {
 }
 
 func TestAddressList_WriteOp_OnlyAdminCanUpdate(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 
 	input, _ := SetAdminFunc.Encode([]interface{}{types.Address{}})
@@ -125,6 +142,8 @@ func TestAddressList_WriteOp_OnlyAdminCanUpdate(t *testing.T) {
 }
 
 func TestAddressList_WriteOp_Full(t *testing.T) {
+	t.Parallel()
+
 	a := newMockAddressList()
 	a.SetRole(types.Address{}, AdminRole)
 
@@ -154,6 +173,8 @@ func TestAddressList_WriteOp_Full(t *testing.T) {
 }
 
 func TestRole_ToUint(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		role Role
 		num  uint64
@@ -169,6 +190,8 @@ func TestRole_ToUint(t *testing.T) {
 }
 
 func TestRole_Enabled(t *testing.T) {
+	t.Parallel()
+
 	cases := []struct {
 		role    Role
 		enabled bool
@@ -180,5 +203,90 @@ func TestRole_Enabled(t *testing.T) {
 
 	for _, c := range cases {
 		require.Equal(t, c.enabled, c.role.Enabled())
+	}
+}
+
+func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
+	t.Parallel()
+
+	targetAddr := types.Address{0x99, 0xAA}
+	a := newMockAddressList()
+	a.SetRole(types.Address{}, AdminRole)
+
+	require.True(t, a.IsEnabled())
+
+	// try disabling list with non super admin
+	input, _ := SetEnabledListFunc.Encode([]interface{}{false})
+	_, gasCost, err := a.runInputCall(types.ZeroAddress, input, writeAddressListCost, false)
+
+	require.ErrorIs(t, err, runtime.ErrNotAuth)
+	require.Equal(t, writeAddressListCost, gasCost)
+	require.True(t, a.IsEnabled())
+
+	// disable list
+	input, _ = SetEnabledListFunc.Encode([]interface{}{false})
+	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
+
+	require.NoError(t, err)
+	require.Equal(t, writeAddressListCost, gasCost)
+	require.False(t, a.IsEnabled())
+
+	// try add some role while list is disabled
+	input, _ = SetEnabledFunc.Encode([]interface{}{targetAddr})
+	ret, gasCost, err := a.runInputCall(superAdmin, input, writeAddressListCost, false)
+
+	require.Equal(t, writeAddressListCost, gasCost)
+	require.ErrorIs(t, err, errListIsNotEnabled)
+	require.Empty(t, ret)
+	require.Equal(t, NoRole, a.GetRole(targetAddr))
+
+	// enable list
+	input, _ = SetEnabledListFunc.Encode([]interface{}{true})
+	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
+
+	require.NoError(t, err)
+	require.Equal(t, writeAddressListCost, gasCost)
+	require.True(t, a.IsEnabled())
+
+	// try add some role while list is enabled
+	input, _ = SetEnabledFunc.Encode([]interface{}{targetAddr})
+	ret, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
+
+	require.Equal(t, writeAddressListCost, gasCost)
+	require.NoError(t, err)
+	require.Empty(t, ret)
+	require.Equal(t, EnabledRole, a.GetRole(targetAddr))
+}
+
+func TestAddressList_WriteOp_NonAdmin(t *testing.T) {
+	adminAddress := types.Address{0x95}
+	enabledRoleAddress := types.Address{0x94}
+	noRoleAddress := types.Address{0x93}
+	randomAddress := types.Address{0x92}
+	targetAddr := types.Address{0x1}
+
+	a := newMockAddressList()
+	a.SetRole(adminAddress, AdminRole)
+	a.SetRole(enabledRoleAddress, EnabledRole)
+	a.SetRole(noRoleAddress, NoRole)
+
+	for _, callerAddress := range []types.Address{enabledRoleAddress, noRoleAddress, randomAddress} {
+		cases := []struct {
+			method *abi.Method
+			role   Role
+		}{
+			{SetAdminFunc, AdminRole},
+			{SetEnabledFunc, EnabledRole},
+			{SetNoneFunc, NoRole},
+		}
+
+		for _, c := range cases {
+			input, _ := c.method.Encode([]interface{}{targetAddr})
+
+			_, gasCost, err := a.runInputCall(callerAddress, input, writeAddressListCost, false)
+			require.Equal(t, writeAddressListCost, gasCost)
+			require.ErrorIs(t, err, runtime.ErrNotAuth)
+			require.Equal(t, NoRole, a.GetRole(targetAddr))
+		}
 	}
 }

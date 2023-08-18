@@ -16,6 +16,7 @@ var (
 	SetEnabledFunc      = abi.MustNewMethod("function setEnabled(address)")
 	SetNoneFunc         = abi.MustNewMethod("function setNone(address)")
 	ReadAddressListFunc = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
+	SetEnabledListFunc  = abi.MustNewMethod("function setEnabledList(bool)")
 )
 
 // list of gas costs for the operations
@@ -24,13 +25,19 @@ var (
 	readAddressListCost  = uint64(5000)
 )
 
+var (
+	// is list enabled or not key hash
+	enabledKeyHash = types.StringToHash("ffffffffffffffffffffffffffffffffffffffff")
+)
+
 type AddressList struct {
-	state stateRef
-	addr  types.Address
+	state      stateRef
+	addr       types.Address
+	superAdmin *types.Address
 }
 
-func NewAddressList(state stateRef, addr types.Address) *AddressList {
-	return &AddressList{state: state, addr: addr}
+func NewAddressList(state stateRef, addr types.Address, superAdmin *types.Address) *AddressList {
+	return &AddressList{state: state, addr: addr, superAdmin: superAdmin}
 }
 
 func (a *AddressList) Addr() types.Address {
@@ -56,6 +63,7 @@ var (
 	errFunctionNotFound    = fmt.Errorf("function not found")
 	errWriteProtection     = fmt.Errorf("write protection")
 	errAdminSelfRemove     = fmt.Errorf("cannot remove admin role from caller")
+	errListIsNotEnabled    = fmt.Errorf("list is not enabled")
 )
 
 func (a *AddressList) runInputCall(caller types.Address, input []byte,
@@ -67,7 +75,9 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 	sig, inputBytes := input[:4], input[4:]
 
-	// all the functions have the same input (i.e. tuple(address)) which
+	// SetEnabledList receives bool as input parameter which in abi get codified
+	// as a 32 bytes array
+	// all the other functions have the same input (i.e. tuple(address)) which
 	// in abi gets codified as a 32 bytes array with the first 20 bytes
 	// encoding the address
 	if len(inputBytes) != 32 {
@@ -86,11 +96,32 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 		return nil
 	}
 
+	if bytes.Equal(sig, SetEnabledListFunc.ID()) {
+		value := types.BytesToHash(input) != types.ZeroHash
+
+		if err := consumeGas(writeAddressListCost); err != nil {
+			return nil, 0, err
+		}
+
+		if a.superAdmin == nil || *a.superAdmin != caller {
+			return nil, gasUsed, runtime.ErrNotAuth
+		}
+
+		// any address different than zero address will be treated as true
+		a.SetEnabled(value)
+
+		return nil, gasUsed, nil
+	}
+
 	inputAddr := types.BytesToAddress(inputBytes)
 
 	if bytes.Equal(sig, ReadAddressListFunc.ID()) {
 		if err := consumeGas(readAddressListCost); err != nil {
 			return nil, 0, err
+		}
+
+		if !a.IsEnabled() {
+			return nil, gasUsed, errListIsNotEnabled
 		}
 
 		// read operation
@@ -115,14 +146,18 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 		return nil, gasUsed, err
 	}
 
+	if !a.IsEnabled() {
+		return nil, gasUsed, errListIsNotEnabled
+	}
+
 	// we cannot perform any write operation if the call is static
 	if isStatic {
 		return nil, gasUsed, errWriteProtection
 	}
 
-	// Only Admin accounts can modify the role of other accounts
+	// Only Admin or superadmin accounts can modify the role of other accounts
 	addrRole := a.GetRole(caller)
-	if addrRole != AdminRole {
+	if addrRole != AdminRole && (a.superAdmin == nil || *a.superAdmin != caller) {
 		return nil, gasUsed, runtime.ErrNotAuth
 	}
 
@@ -144,6 +179,17 @@ func (a *AddressList) GetRole(addr types.Address) Role {
 	res := a.state.GetStorage(a.addr, types.BytesToHash(addr.Bytes()))
 
 	return Role(res)
+}
+
+func (a *AddressList) IsEnabled() bool {
+	return a.state.GetStorage(a.addr, enabledKeyHash) != types.ZeroHash
+}
+
+func (a *AddressList) SetEnabled(value bool) {
+	vl, _ := abi.MustNewType("bool").Encode(value)
+	stateValue := types.BytesToHash(vl)
+
+	a.state.SetState(a.addr, enabledKeyHash, stateValue)
 }
 
 type Role types.Hash

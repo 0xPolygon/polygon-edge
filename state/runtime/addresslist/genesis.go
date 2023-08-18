@@ -13,6 +13,14 @@ func ApplyGenesisAllocs(chain *chain.Genesis, addressListAddr types.Address, con
 		state: &genesisState{chain},
 	}
 
+	if config == nil {
+		allocList.SetEnabled(false)
+
+		return
+	}
+
+	allocList.SetEnabled(true)
+
 	// enabled addr
 	for _, addr := range config.EnabledAddresses {
 		allocList.SetRole(addr, EnabledRole)

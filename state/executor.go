@@ -218,31 +218,37 @@ func (e *Executor) BeginTxn(
 		PostHook:    e.PostHook,
 	}
 
-	// enable contract deployment allow list (if any)
-	if e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
+	// allow/block list should be possible if
+	if e.config.SuperAdminAllowBlock != nil || e.config.ContractDeployerBlockList != nil {
+		txn.deploymentAllowList = addresslist.NewAddressList(
+			txn, contracts.AllowListContractsAddr, e.config.SuperAdminAllowBlock)
 	}
 
-	if e.config.ContractDeployerBlockList != nil {
-		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
-	}
-
-	// enable transactions allow list (if any)
-	if e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
-	}
-
-	if e.config.TransactionsBlockList != nil {
-		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
+	if e.config.SuperAdminAllowBlock != nil || e.config.ContractDeployerBlockList != nil {
+		txn.deploymentBlockList = addresslist.NewAddressList(
+			txn, contracts.BlockListContractsAddr, e.config.SuperAdminAllowBlock)
 	}
 
 	// enable transactions allow list (if any)
-	if e.config.BridgeAllowList != nil {
-		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
+	if e.config.SuperAdminAllowBlock != nil || e.config.TransactionsAllowList != nil {
+		txn.txnAllowList = addresslist.NewAddressList(
+			txn, contracts.AllowListTransactionsAddr, e.config.SuperAdminAllowBlock)
 	}
 
-	if e.config.BridgeBlockList != nil {
-		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
+	if e.config.SuperAdminAllowBlock != nil || e.config.TransactionsBlockList != nil {
+		txn.txnBlockList = addresslist.NewAddressList(
+			txn, contracts.BlockListTransactionsAddr, e.config.SuperAdminAllowBlock)
+	}
+
+	// enable transactions allow list (if any)
+	if e.config.SuperAdminAllowBlock != nil || e.config.BridgeAllowList != nil {
+		txn.bridgeAllowList = addresslist.NewAddressList(
+			txn, contracts.AllowListBridgeAddr, e.config.SuperAdminAllowBlock)
+	}
+
+	if e.config.SuperAdminAllowBlock != nil || e.config.BridgeBlockList != nil {
+		txn.bridgeBlockList = addresslist.NewAddressList(
+			txn, contracts.BlockListBridgeAddr, e.config.SuperAdminAllowBlock)
 	}
 
 	return txn, nil

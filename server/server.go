@@ -217,37 +217,37 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// apply allow list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+	if m.config.Chain.Params.SuperAdminAllowBlock != nil || m.config.Chain.Params.ContractDeployerAllowList != nil {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
 			m.config.Chain.Params.ContractDeployerAllowList)
 	}
 
 	// apply block list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerBlockList != nil {
+	if m.config.Chain.Params.SuperAdminAllowBlock != nil || m.config.Chain.Params.ContractDeployerBlockList != nil {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
 			m.config.Chain.Params.ContractDeployerBlockList)
 	}
 
 	// apply transactions execution allow list genesis data
-	if m.config.Chain.Params.TransactionsAllowList != nil {
+	if m.config.Chain.Params.SuperAdminAllowBlock != nil || m.config.Chain.Params.TransactionsAllowList != nil {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
 			m.config.Chain.Params.TransactionsAllowList)
 	}
 
 	// apply transactions execution block list genesis data
-	if m.config.Chain.Params.TransactionsBlockList != nil {
+	if m.config.Chain.Params.SuperAdminAllowBlock != nil || m.config.Chain.Params.TransactionsBlockList != nil {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
 			m.config.Chain.Params.TransactionsBlockList)
 	}
 
 	// apply bridge allow list genesis data
-	if m.config.Chain.Params.BridgeAllowList != nil {
+	if m.config.Chain.Params.SuperAdminAllowBlock != nil || m.config.Chain.Params.BridgeAllowList != nil {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
 			m.config.Chain.Params.BridgeAllowList)
 	}
 
 	// apply bridge block list genesis data
-	if m.config.Chain.Params.BridgeBlockList != nil {
+	if m.config.Chain.Params.SuperAdminAllowBlock != nil || m.config.Chain.Params.BridgeBlockList != nil {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
 			m.config.Chain.Params.BridgeBlockList)
 	}

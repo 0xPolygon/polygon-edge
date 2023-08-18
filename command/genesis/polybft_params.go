@@ -44,6 +44,7 @@ const (
 	defaultEpochReward      = 1
 	defaultBlockTimeDrift   = uint64(10)
 
+	superAdminAllowBlockFlag             = "super-admin-allow-block"
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
 	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
@@ -294,6 +295,11 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			AdminAddresses:   stringSliceToAddressSlice(p.bridgeBlockListAdmin),
 			EnabledAddresses: stringSliceToAddressSlice(p.bridgeBlockListEnabled),
 		}
+	}
+
+	if p.superAdminAllowBlock != "" {
+		value := types.StringToAddress(p.superAdminAllowBlock)
+		chainConfig.Params.SuperAdminAllowBlock = &value
 	}
 
 	if p.isBurnContractEnabled() {
