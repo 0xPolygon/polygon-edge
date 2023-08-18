@@ -1,15 +1,34 @@
-
 .PHONY: download-submodules
-download-submodules:
+download-submodules: check-git
 	git submodule init
 	git submodule update
 
+.PHONY: check-git
+check-git:
+	@which git > /dev/null || (echo "git is not installed. Please install and try again."; exit 1)
+
+.PHONY: check-go
+check-go:
+	@which go > /dev/null || (echo "Go is not installed.. Please install and try again."; exit 1)
+
+.PHONY: check-protoc
+check-protoc:
+	@which protoc > /dev/null || (echo "protoc is not installed. Please install and try again."; exit 1)
+
+.PHONY: check-lint
+check-lint:
+	@which golangci-lint > /dev/null || (echo "golangci-lint is not installed. Please install and try again."; exit 1)
+
+.PHONY: check-npm
+check-npm:
+	@which npm > /dev/null || (echo "npm is not installed. Please install and try again."; exit 1)
+
 .PHONY: bindata
-bindata:
+bindata: check-go
 	go-bindata -pkg chain -o ./chain/chain_bindata.go ./chain/chains
 
 .PHONY: protoc
-protoc:
+protoc: check-protoc
 	protoc --go_out=. --go-grpc_out=. -I . -I=./validate --validate_out="lang=go:." \
 	 ./server/proto/*.proto \
 	 ./network/proto/*.proto \
@@ -18,7 +37,7 @@ protoc:
 	 ./consensus/polybft/**/*.proto
 
 .PHONY: build
-build:
+build: check-go check-git
 	$(eval LATEST_VERSION = $(shell git describe --tags --abbrev=0))
 	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
@@ -31,50 +50,45 @@ build:
 	main.go
 
 .PHONY: lint
-lint:
+lint: check-lint
 	golangci-lint run --config .golangci.yml
 
 .PHONY: generate-bsd-licenses
-generate-bsd-licenses:
+generate-bsd-licenses: check-git
 	./generate_dependency_licenses.sh BSD-3-Clause,BSD-2-Clause > ./licenses/bsd_licenses.json
 
 .PHONY: test
-test:
+test: check-go
 	go test -coverprofile coverage.out -timeout 20m `go list ./... | grep -v e2e`
 
 .PHONY: fuzz-test
-fuzz-test:
+fuzz-test: check-go
 	./scripts/fuzzAll
 
 .PHONY: test-e2e
-test-e2e:
-    # We need to build the binary with the race flag enabled
-    # because it will get picked up and run during e2e tests
-    # and the e2e tests should error out if any kind of race is found
+test-e2e: check-go
 	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge go test -v -timeout=30m ./e2e/...
 
 .PHONY: test-e2e-polybft
-test-e2e-polybft:
-    # We can not build with race because of a bug in boltdb dependency
+test-e2e-polybft: check-go
 	go build -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
 	go test -v -timeout=1h10m ./e2e-polybft/e2e/...
 
 .PHONY: test-property-polybft
-test-property-polybft:
-    # We can not build with race because of a bug in boltdb dependency
+test-property-polybft: check-go
 	go build -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/... \
 	-rapid.checks=10
 
 .PHONY: compile-core-contracts
-compile-core-contracts:
+compile-core-contracts: check-npm
 	cd core-contracts && npm install && npm run compile
 	$(MAKE) generate-smart-contract-bindings
 
 .PHONY: generate-smart-contract-bindings
-generate-smart-contract-bindings:
+generate-smart-contract-bindings: check-go
 	go run ./consensus/polybft/contractsapi/artifacts-gen/main.go
 	go run ./consensus/polybft/contractsapi/bindings-gen/main.go
 
@@ -89,3 +103,23 @@ stop-docker:
 .PHONY: destroy-docker
 destroy-docker:
 	./scripts/cluster polybft --docker destroy
+
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@printf "  %-35s - %s\n" "download-submodules" "Initialize and update Git submodules"
+	@printf "  %-35s - %s\n" "bindata" "Generate Go binary data for chain"
+	@printf "  %-35s - %s\n" "protoc" "Compile Protocol Buffers files"
+	@printf "  %-35s - %s\n" "build" "Build the project"
+	@printf "  %-35s - %s\n" "lint" "Run linters on the codebase"
+	@printf "  %-35s - %s\n" "generate-bsd-licenses" "Generate BSD licenses"
+	@printf "  %-35s - %s\n" "test" "Run unit tests"
+	@printf "  %-35s - %s\n" "fuzz-test" "Run fuzz tests"
+	@printf "  %-35s - %s\n" "test-e2e" "Run end-to-end tests"
+	@printf "  %-35s - %s\n" "test-e2e-polybft" "Run end-to-end tests for PolyBFT"
+	@printf "  %-35s - %s\n" "test-property-polybft" "Run property tests for PolyBFT"
+	@printf "  %-35s - %s\n" "compile-core-contracts" "Compile core contracts"
+	@printf "  %-35s - %s\n" "generate-smart-contract-bindings" "Generate smart contract bindings"
+	@printf "  %-35s - %s\n" "run-docker" "Run Docker cluster for PolyBFT"
+	@printf "  %-35s - %s\n" "stop-docker" "Stop Docker cluster for PolyBFT"
+	@printf "  %-35s - %s\n" "destroy-docker" "Destroy Docker cluster for PolyBFT"
