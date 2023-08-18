@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"path"
 	"strings"
 	"testing"
@@ -16,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -1485,6 +1484,9 @@ func TestE2E_Bridge_Slashing(t *testing.T) {
 	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
+	childRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
 	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
 
 	byzantineServer := cluster.Servers[4]
@@ -1516,8 +1518,11 @@ func TestE2E_Bridge_Slashing(t *testing.T) {
 	require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
 		rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
-	// TODO: replace with something like: err = childClient.Call(generateExitProofFn, &proof, fmt.Sprintf("0x%x", ep.exitID))
-	proofs, err := getSlashingProofs(cluster.Servers[0].JSONRPCAddr())
+	var proofs []types.Proof
+
+	childClient, err := jsonrpc.NewClient(cluster.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
+	err = childClient.Call("bridge_getPendingSlashProofs", &proofs, "")
 	require.NoError(t, err)
 	require.True(t, len(proofs) > 0)
 
@@ -1545,8 +1550,19 @@ func TestE2E_Bridge_Slashing(t *testing.T) {
 
 	require.NotEqual(t, ourExitProof.Data, []byte{})
 
-	// get byzantine validator stake from root chain
-	t.Log("start stake: ", getValidatorRootchainStake(t, byzantineServer, polybftCfg, rootchainTxRelayer))
+	byzantineValidatorAcc, err := sidechain.GetAccountFromDir(byzantineServer.DataDir())
+
+	// get byzantine validator stake from root chain before executing slashing exit event
+	byzantineValidatorInfo, err := sidechain.GetValidatorInfo(
+		ethgo.Address(byzantineValidatorAcc.Address()),
+		polybftCfg.Bridge.CustomSupernetManagerAddr,
+		polybftCfg.Bridge.StakeManagerAddr,
+		polybftCfg.SupernetID,
+		rootchainTxRelayer,
+		childRelayer)
+	require.NoError(t, err)
+
+	t.Log("start stake: ", byzantineValidatorInfo.Stake)
 
 	// send exit event
 	var exitEventAPI contractsapi.L2StateSyncedEvent
@@ -1580,67 +1596,15 @@ func TestE2E_Bridge_Slashing(t *testing.T) {
 	_, err = rootchainTxRelayer.SendTransaction(exitTxn, rootchainDeployer)
 	require.NoError(t, err)
 
-	// get byzantine validator stake from root chain
-	t.Log("end stake: ", getValidatorRootchainStake(t, byzantineServer, polybftCfg, rootchainTxRelayer))
-}
-
-func getValidatorRootchainStake(t *testing.T, byzantineServer *framework.TestServer,
-	polybftCfg polyCommon.PolyBFTConfig, rootchainTxRelayer txrelayer.TxRelayer) *big.Int {
-	senderAccount, err := sidechain.GetAccountFromDir(byzantineServer.DataDir())
+	// get byzantine validator stake from root chain after executing slashing exit event
+	byzantineValidatorInfo, err = sidechain.GetValidatorInfo(
+		ethgo.Address(byzantineValidatorAcc.Address()),
+		polybftCfg.Bridge.CustomSupernetManagerAddr,
+		polybftCfg.Bridge.StakeManagerAddr,
+		polybftCfg.SupernetID,
+		rootchainTxRelayer,
+		childRelayer)
 	require.NoError(t, err)
 
-	totalStakeOfMethod := contractsapi.StakeManager.Abi.GetMethod("totalStakeOf")
-	totalStakeOfInput, err := totalStakeOfMethod.Encode([]interface{}{senderAccount.Address()})
-	require.NoError(t, err)
-
-	byzantineValidatorStakeRaw, err := rootchainTxRelayer.Call(
-		ethgo.ZeroAddress,
-		ethgo.Address(polybftCfg.Bridge.StakeManagerAddr),
-		totalStakeOfInput)
-	require.NoError(t, err)
-
-	byzantineValidatorStake, err := helperCommon.ParseUint256orHex(&byzantineValidatorStakeRaw)
-	require.NoError(t, err)
-
-	return byzantineValidatorStake
-}
-
-func getSlashingProofs(rpcAddress string) ([]types.Proof, error) {
-	query := struct {
-		Jsonrpc string   `json:"jsonrpc"`
-		Method  string   `json:"method"`
-		Params  []string `json:"params"`
-		ID      int      `json:"id"`
-	}{
-		"2.0",
-		"bridge_getPendingSlashProofs",
-		[]string{},
-		1,
-	}
-
-	d, err := json.Marshal(query)
-	if err != nil {
-		return []types.Proof{}, err
-	}
-
-	resp, err := http.Post(rpcAddress, "application/json", bytes.NewReader(d))
-	if err != nil {
-		return []types.Proof{}, err
-	}
-
-	s, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return []types.Proof{}, err
-	}
-
-	rspProof := struct {
-		Result []types.Proof `json:"result"`
-	}{}
-
-	err = json.Unmarshal(s, &rspProof)
-	if err != nil {
-		return []types.Proof{}, err
-	}
-
-	return rspProof.Result, nil
+	t.Log("end stake:    ", byzantineValidatorInfo.Stake)
 }
