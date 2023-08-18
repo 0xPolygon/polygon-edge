@@ -248,9 +248,9 @@ func Test_GetLogFilterFromID(t *testing.T) {
 		fromBlock: 0,
 	}
 
-	retrivedLogFilter, err := m.GetLogFilterFromID(
-		m.NewLogFilter(logFilter, &MockClosedWSConnection{}),
-	)
+	filterId := m.NewLogFilter(logFilter, &MockClosedWSConnection{})
+	filterId, _ = hexToUUID(filterId)
+	retrivedLogFilter, err := m.GetLogFilterFromID(filterId)
 	assert.NoError(t, err)
 	assert.Equal(t, logFilter, retrivedLogFilter.query)
 }
@@ -314,6 +314,7 @@ func TestFilterLog(t *testing.T) {
 
 	time.Sleep(500 * time.Millisecond)
 
+	id, _ = hexToUUID(id)
 	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
 		t.Fatalf("Unable to get filter changes, %v", fetchErr)
 	}
@@ -361,6 +362,7 @@ func TestFilterBlock(t *testing.T) {
 	// we need to wait for the manager to process the data
 	time.Sleep(500 * time.Millisecond)
 
+	id, _ = hexToUUID(id)
 	if _, fetchErr := m.GetFilterChanges(id); fetchErr != nil {
 		t.Fatalf("Unable to get filter changes, %v", fetchErr)
 	}
@@ -408,6 +410,7 @@ func TestFilterPendingTx(t *testing.T) {
 
 	var fetchErr error
 
+	id, _ = hexToUUID(id)
 	if res, fetchErr = m.GetFilterChanges(id); fetchErr != nil {
 		t.Fatalf("Unable to get filter changes, %v", fetchErr)
 	}
@@ -448,6 +451,7 @@ func TestFilterTimeout(t *testing.T) {
 
 	// add block filter
 	id := m.NewBlockFilter(nil)
+	id, _ = hexToUUID(id)
 
 	assert.True(t, m.Exists(id))
 	time.Sleep(3 * time.Second)
@@ -529,6 +533,7 @@ func Test_flushWsFilters(t *testing.T) {
 
 				return
 			default:
+				id, _ = hexToUUID(id)
 				if shouldExist == m.Exists(id) {
 					return
 				}
@@ -575,6 +580,7 @@ func TestFilterWebsocket(t *testing.T) {
 
 	id := m.NewBlockFilter(mock)
 
+	id, _ = hexToUUID(id)
 	// we cannot call get filter changes for a websocket filter
 	_, err := m.GetFilterChanges(id)
 	assert.Equal(t, err, ErrWSFilterDoesNotSupportGetChanges)
@@ -611,6 +617,7 @@ func TestFilterPendingTxWebsocket(t *testing.T) {
 
 	id := m.NewPendingTxFilter(mock)
 
+	id, _ = hexToUUID(id)
 	// we cannot call get filter changes for a websocket filter
 	_, err := m.GetFilterChanges(id)
 	assert.Equal(t, err, ErrWSFilterDoesNotSupportGetChanges)
@@ -777,6 +784,7 @@ func TestClosedFilterDeletion(t *testing.T) {
 	// add block filter
 	id := m.NewBlockFilter(&MockClosedWSConnection{})
 
+	id, _ = hexToUUID(id)
 	assert.True(t, m.Exists(id))
 
 	// event is sent to the filter but writing to connection should fail

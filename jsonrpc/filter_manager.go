@@ -390,6 +390,7 @@ func (f *FilterManager) Run() {
 	for {
 		// check for the next filter to be removed
 		filterID, filterExpiresAt := f.nextTimeoutFilter()
+		filterID, _ = hexToUUID(filterID)
 
 		// set timer to remove filter
 		if filterID != "" {
@@ -707,7 +708,8 @@ func (f *FilterManager) addFilter(filter filter) string {
 		f.addFilterTimeout(base)
 	}
 
-	return base.id
+	baseId, _ := uuidToHex(base.id)
+	return baseId
 }
 
 func (f *FilterManager) emitSignalToUpdateCh() {
