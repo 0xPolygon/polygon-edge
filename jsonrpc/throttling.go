@@ -1,70 +1,41 @@
 package jsonrpc
 
 import (
-	"container/heap"
+	"context"
 	"errors"
-	"sync"
 	"time"
+
+	"golang.org/x/sync/semaphore"
 )
 
 var errRequestLimitExceeded = errors.New("request limit exceeded")
 
+// Throttling provides functionality which limits number of concurrent requests
 type Throttling struct {
-	requestsPerSeconds int
-	requests           timeQueue
-	lock               sync.Mutex
+	sem     *semaphore.Weighted
+	timeout time.Duration
 }
 
-func NewThrottling(requestsPerSeconds int) *Throttling {
+// NewThrottling creates new throttling and limits number of concurrent requests to maximumConcurrentRequests
+func NewThrottling(maximumConcurrentRequests uint64, timeout time.Duration) *Throttling {
 	return &Throttling{
-		requestsPerSeconds: requestsPerSeconds,
+		sem:     semaphore.NewWeighted(int64(maximumConcurrentRequests)),
+		timeout: timeout,
 	}
 }
 
-func (t *Throttling) AttemptRequest() error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+// AttemptRequest returns an error if more than the maximum concurrent requests are currently being executed
+func (t *Throttling) AttemptRequest(
+	parentCtx context.Context,
+	requestHandler func() (interface{}, error)) (interface{}, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, t.timeout)
+	defer cancel()
 
-	currTime := time.Now().UTC()
-
-	// remove all old requests
-	for t.requests.Len() > 0 && currTime.Sub(t.requests[0]) > time.Second {
-		heap.Pop(&t.requests)
+	if err := t.sem.Acquire(ctx, 1); err != nil {
+		return nil, errRequestLimitExceeded
 	}
 
-	// if too many requests in one second return error
-	if t.requests.Len() == t.requestsPerSeconds {
-		return errRequestLimitExceeded
-	}
+	defer t.sem.Release(1)
 
-	heap.Push(&t.requests, currTime)
-
-	return nil
-}
-
-type timeQueue []time.Time
-
-func (t *timeQueue) Len() int {
-	return len(*t)
-}
-
-func (t *timeQueue) Swap(i, j int) {
-	(*t)[i], (*t)[j] = (*t)[j], (*t)[i]
-}
-
-func (t *timeQueue) Push(x interface{}) {
-	if time, ok := x.(time.Time); ok {
-		*t = append(*t, time)
-	}
-}
-
-func (t *timeQueue) Pop() interface{} {
-	x := (*t)[len(*t)-1]
-	*t = (*t)[0 : len(*t)-1]
-
-	return x
-}
-
-func (t *timeQueue) Less(i, j int) bool {
-	return (*t)[i].Compare((*t)[j]) < 0
+	return requestHandler()
 }

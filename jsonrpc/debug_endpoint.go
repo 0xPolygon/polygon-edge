@@ -69,10 +69,10 @@ type Debug struct {
 	throttling *Throttling
 }
 
-func NewDebug(store debugStore, requestsPerSecond int) *Debug {
+func NewDebug(store debugStore, requestsPerSecond uint64) *Debug {
 	return &Debug{
 		store:      store,
-		throttling: NewThrottling(requestsPerSecond),
+		throttling: NewThrottling(requestsPerSecond, time.Second),
 	}
 }
 
@@ -88,85 +88,89 @@ func (d *Debug) TraceBlockByNumber(
 	blockNumber BlockNumber,
 	config *TraceConfig,
 ) (interface{}, error) {
-	if err := d.throttling.AttemptRequest(); err != nil {
-		return nil, err
-	}
+	return d.throttling.AttemptRequest(
+		context.Background(),
+		func() (interface{}, error) {
+			num, err := GetNumericBlockNumber(blockNumber, d.store)
+			if err != nil {
+				return nil, err
+			}
 
-	num, err := GetNumericBlockNumber(blockNumber, d.store)
-	if err != nil {
-		return nil, err
-	}
+			block, ok := d.store.GetBlockByNumber(num, true)
+			if !ok {
+				return nil, fmt.Errorf("block %d not found", num)
+			}
 
-	block, ok := d.store.GetBlockByNumber(num, true)
-	if !ok {
-		return nil, fmt.Errorf("block %d not found", num)
-	}
-
-	return d.traceBlock(block, config)
+			return d.traceBlock(block, config)
+		},
+	)
 }
 
 func (d *Debug) TraceBlockByHash(
 	blockHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	if err := d.throttling.AttemptRequest(); err != nil {
-		return nil, err
-	}
+	return d.throttling.AttemptRequest(
+		context.Background(),
+		func() (interface{}, error) {
+			block, ok := d.store.GetBlockByHash(blockHash, true)
+			if !ok {
+				return nil, fmt.Errorf("block %s not found", blockHash)
+			}
 
-	block, ok := d.store.GetBlockByHash(blockHash, true)
-	if !ok {
-		return nil, fmt.Errorf("block %s not found", blockHash)
-	}
-
-	return d.traceBlock(block, config)
+			return d.traceBlock(block, config)
+		},
+	)
 }
 
 func (d *Debug) TraceBlock(
 	input string,
 	config *TraceConfig,
 ) (interface{}, error) {
-	if err := d.throttling.AttemptRequest(); err != nil {
-		return nil, err
-	}
+	return d.throttling.AttemptRequest(
+		context.Background(),
+		func() (interface{}, error) {
+			blockByte, decodeErr := hex.DecodeHex(input)
+			if decodeErr != nil {
+				return nil, fmt.Errorf("unable to decode block, %w", decodeErr)
+			}
 
-	blockByte, decodeErr := hex.DecodeHex(input)
-	if decodeErr != nil {
-		return nil, fmt.Errorf("unable to decode block, %w", decodeErr)
-	}
+			block := &types.Block{}
+			if err := block.UnmarshalRLP(blockByte); err != nil {
+				return nil, err
+			}
 
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(blockByte); err != nil {
-		return nil, err
-	}
-
-	return d.traceBlock(block, config)
+			return d.traceBlock(block, config)
+		},
+	)
 }
 
 func (d *Debug) TraceTransaction(
 	txHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	if err := d.throttling.AttemptRequest(); err != nil {
-		return nil, err
-	}
+	return d.throttling.AttemptRequest(
+		context.Background(),
+		func() (interface{}, error) {
+			tx, block := GetTxAndBlockByTxHash(txHash, d.store)
+			if tx == nil {
+				return nil, fmt.Errorf("tx %s not found", txHash.String())
+			}
 
-	tx, block := GetTxAndBlockByTxHash(txHash, d.store)
-	if tx == nil {
-		return nil, fmt.Errorf("tx %s not found", txHash.String())
-	}
+			if block.Number() == 0 {
+				return nil, ErrTraceGenesisBlock
+			}
 
-	if block.Number() == 0 {
-		return nil, ErrTraceGenesisBlock
-	}
+			tracer, cancel, err := newTracer(config)
+			if err != nil {
+				return nil, err
+			}
 
-	tracer, cancel, err := newTracer(config)
-	if err != nil {
-		return nil, err
-	}
+			defer cancel()
 
-	defer cancel()
-
-	return d.store.TraceTxn(block, tx.Hash, tracer)
+			return d.store.TraceTxn(block, tx.Hash, tracer)
+		},
+	)
 }
 
 func (d *Debug) TraceCall(
@@ -174,33 +178,34 @@ func (d *Debug) TraceCall(
 	filter BlockNumberOrHash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	if err := d.throttling.AttemptRequest(); err != nil {
-		return nil, err
-	}
+	return d.throttling.AttemptRequest(
+		context.Background(),
+		func() (interface{}, error) {
+			header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
+			if err != nil {
+				return nil, ErrHeaderNotFound
+			}
 
-	header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
-	if err != nil {
-		return nil, ErrHeaderNotFound
-	}
+			tx, err := DecodeTxn(arg, header.Number, d.store, true)
+			if err != nil {
+				return nil, err
+			}
 
-	tx, err := DecodeTxn(arg, header.Number, d.store, true)
-	if err != nil {
-		return nil, err
-	}
+			// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
+			if tx.Gas == 0 {
+				tx.Gas = header.GasLimit
+			}
 
-	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-	if tx.Gas == 0 {
-		tx.Gas = header.GasLimit
-	}
+			tracer, cancel, err := newTracer(config)
+			defer cancel()
 
-	tracer, cancel, err := newTracer(config)
-	defer cancel()
+			if err != nil {
+				return nil, err
+			}
 
-	if err != nil {
-		return nil, err
-	}
-
-	return d.store.TraceCall(tx, header, tracer)
+			return d.store.TraceCall(tx, header, tracer)
+		},
+	)
 }
 
 func (d *Debug) traceBlock(
