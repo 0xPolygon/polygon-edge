@@ -1,9 +1,14 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"path"
 	"strings"
 	"testing"
@@ -1454,4 +1459,188 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 				oldBalances[types.StringToAddress(receiver)], withdrawAmount), balance)
 		}
 	})
+}
+
+func TestE2E_Bridge_Slashing(t *testing.T) {
+	const (
+		validatorNumber     = 4
+		byzantineNodesCount = 1
+		epochSize           = 10
+		abiMethodIDLength   = 4
+	)
+
+	var slashFn contractsapi.SlashValidatorSetFn
+
+	cluster := framework.NewTestCluster(
+		t, validatorNumber,
+		framework.WithEpochSize(epochSize),
+		framework.WithByzantineValidators(byzantineNodesCount))
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+	cluster.WaitForBlock(1, 20*time.Second)
+
+	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+
+	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	require.NoError(t, err)
+
+	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
+
+	byzantineServer := cluster.Servers[4]
+
+	blockWithSlashTxs, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, true)
+	require.NoError(t, err)
+
+	transactions := blockWithSlashTxs.Transactions
+	var hasSlashStateTx = false
+	t.Log("transactions number", len(blockWithSlashTxs.Transactions))
+	for _, tx := range transactions {
+		sig := tx.Input[:abiMethodIDLength]
+		t.Log("Sig is", sig, "Slashfn.sig", slashFn.Sig())
+		if bytes.Equal(sig, slashFn.Sig()) {
+
+			hasSlashStateTx = true
+		}
+	}
+
+	require.True(t, hasSlashStateTx)
+
+	currentExtra, err := polybft.GetIbftExtra(blockWithSlashTxs.ExtraData)
+	require.NoError(t, err)
+
+	currentEpoch := currentExtra.Checkpoint.EpochNumber
+	t.Logf("Latest block number: %d, epoch number: %d\n", blockWithSlashTxs.Number, currentEpoch)
+
+	// wait for epoch checkpoint on the root chain
+	require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
+		rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
+
+	// TODO: replace with something like: err = childClient.Call(generateExitProofFn, &proof, fmt.Sprintf("0x%x", ep.exitID))
+	proofs, err := getSlashingProofs(cluster.Servers[0].JSONRPCAddr())
+	require.NoError(t, err)
+	require.True(t, len(proofs) > 0)
+
+	var ourExitProof types.Proof
+	var exitEvent *polybft.ExitEvent
+
+	for _, proof := range proofs {
+		exitEventMap, ok := proof.Metadata["ExitEvent"].(map[string]interface{})
+		if !ok {
+			t.Fatal(errors.New("could not get exit event from proof"))
+		}
+
+		raw, err := json.Marshal(exitEventMap)
+
+		if err = json.Unmarshal(raw, &exitEvent); err != nil {
+			t.Fatal(fmt.Errorf("failed to unmarshal exit event from JSON. Error: %w", err))
+		}
+
+		if exitEvent.BlockNumber == blockWithSlashTxs.Number {
+			ourExitProof = proof
+
+			break
+		}
+	}
+
+	require.NotEqual(t, ourExitProof.Data, []byte{})
+
+	// get byzantine validator stake from root chain
+	t.Log("start stake: ", getValidatorRootchainStake(t, byzantineServer, polybftCfg, rootchainTxRelayer))
+
+	// send exit event
+	var exitEventAPI contractsapi.L2StateSyncedEvent
+
+	exitEventEncoded, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
+	require.NoError(t, err)
+
+	leafIndex, ok := ourExitProof.Metadata["LeafIndex"].(float64)
+	if !ok {
+		t.Fatal("leafIndex")
+	}
+
+	checkpointBlock, ok := ourExitProof.Metadata["CheckpointBlock"].(float64)
+	require.NoError(t, err)
+
+	exitFn := &contractsapi.ExitExitHelperFn{
+		BlockNumber:  new(big.Int).SetUint64(uint64(checkpointBlock)),
+		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
+		UnhashedLeaf: exitEventEncoded,
+		Proof:        ourExitProof.Data,
+	}
+
+	exitFnInput, err := exitFn.EncodeAbi()
+	require.NoError(t, err)
+
+	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
+	require.NoError(t, err)
+
+	exitHelperContract := ethgo.Address(polybftCfg.Bridge.ExitHelperAddr)
+	exitTxn := &ethgo.Transaction{To: &exitHelperContract, Input: exitFnInput}
+	_, err = rootchainTxRelayer.SendTransaction(exitTxn, rootchainDeployer)
+	require.NoError(t, err)
+
+	// get byzantine validator stake from root chain
+	t.Log("end stake: ", getValidatorRootchainStake(t, byzantineServer, polybftCfg, rootchainTxRelayer))
+}
+
+func getValidatorRootchainStake(t *testing.T, byzantineServer *framework.TestServer,
+	polybftCfg polyCommon.PolyBFTConfig, rootchainTxRelayer txrelayer.TxRelayer) *big.Int {
+	senderAccount, err := sidechain.GetAccountFromDir(byzantineServer.DataDir())
+	require.NoError(t, err)
+
+	totalStakeOfMethod := contractsapi.StakeManager.Abi.GetMethod("totalStakeOf")
+	totalStakeOfInput, err := totalStakeOfMethod.Encode([]interface{}{senderAccount.Address()})
+	require.NoError(t, err)
+
+	byzantineValidatorStakeRaw, err := rootchainTxRelayer.Call(
+		ethgo.ZeroAddress,
+		ethgo.Address(polybftCfg.Bridge.StakeManagerAddr),
+		totalStakeOfInput)
+	require.NoError(t, err)
+
+	byzantineValidatorStake, err := helperCommon.ParseUint256orHex(&byzantineValidatorStakeRaw)
+	require.NoError(t, err)
+
+	return byzantineValidatorStake
+}
+
+func getSlashingProofs(rpcAddress string) ([]types.Proof, error) {
+	query := struct {
+		Jsonrpc string   `json:"jsonrpc"`
+		Method  string   `json:"method"`
+		Params  []string `json:"params"`
+		ID      int      `json:"id"`
+	}{
+		"2.0",
+		"bridge_getPendingSlashProofs",
+		[]string{},
+		1,
+	}
+
+	d, err := json.Marshal(query)
+	if err != nil {
+		return []types.Proof{}, err
+	}
+
+	resp, err := http.Post(rpcAddress, "application/json", bytes.NewReader(d))
+	if err != nil {
+		return []types.Proof{}, err
+	}
+
+	s, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return []types.Proof{}, err
+	}
+
+	rspProof := struct {
+		Result []types.Proof `json:"result"`
+	}{}
+
+	err = json.Unmarshal(s, &rspProof)
+	if err != nil {
+		return []types.Proof{}, err
+	}
+
+	return rspProof.Result, nil
 }
