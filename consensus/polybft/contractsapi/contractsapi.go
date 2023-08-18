@@ -1602,6 +1602,28 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
 }
 
+type SlashedEvent struct {
+	ExitID     *big.Int        `abi:"exitId"`
+	Validators []types.Address `abi:"validators"`
+	Amounts    []*big.Int      `abi:"amounts"`
+}
+
+func (*SlashedEvent) Sig() ethgo.Hash {
+	return ValidatorSet.Abi.Events["Slashed"].ID()
+}
+
+func (*SlashedEvent) Encode(inputs interface{}) ([]byte, error) {
+	return ValidatorSet.Abi.Events["Slashed"].Inputs.Encode(inputs)
+}
+
+func (s *SlashedEvent) ParseLog(log *ethgo.Log) (bool, error) {
+	if !ValidatorSet.Abi.Events["Slashed"].Match(log) {
+		return false, nil
+	}
+
+	return true, decodeEvent(ValidatorSet.Abi.Events["Slashed"], log, s)
+}
+
 type InitializeRewardPoolFn struct {
 	NewRewardToken    types.Address `abi:"newRewardToken"`
 	NewRewardWallet   types.Address `abi:"newRewardWallet"`

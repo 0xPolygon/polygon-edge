@@ -384,6 +384,7 @@ func main() {
 				"Transfer",
 				"WithdrawalRegistered",
 				"Withdrawal",
+				"Slashed",
 			},
 		},
 		{
