@@ -243,29 +243,23 @@ func (s *ExitEventStore) getPendingSlashExitIDs() ([]uint64, error) {
 	return exitIds, nil
 }
 
-// getExitEventsByIds returns exit events by its ids
-func (s *ExitEventStore) getExitEventsByIds(exitEventIDs ...uint64) ([]*ExitEvent, error) {
-	events := make([]*ExitEvent, 0, len(exitEventIDs))
+// removeSlashExitEvents removes exit events from slashing bucket for provided exit ids
+func (s *ExitEventStore) removeSlashExitEvents(exitIDs ...uint64) error {
+	err := s.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(slashingExitEventsBucket)
 
-	err := s.db.View(func(tx *bolt.Tx) error {
-		c := tx.Bucket(exitEventsBucket).Cursor()
-		for _, id := range exitEventIDs {
-			prefix := common.EncodeUint64ToBytes(id)
+		for _, exitID := range exitIDs {
+			if err := b.Delete(common.EncodeUint64ToBytes(exitID)); err != nil {
+				s.logger.Warn(fmt.Sprintf("failed to remove slash exit event (ID=%d): %v", exitID, err))
 
-			for k, v := c.Seek(prefix); bytes.HasPrefix(k, prefix); k, v = c.Next() {
-				var event *ExitEvent
-				if err := json.Unmarshal(v, &event); err != nil {
-					return err
-				}
-
-				events = append(events, event)
+				continue
 			}
 		}
 
 		return nil
 	})
 
-	return events, err
+	return err
 }
 
 // updateLastSaved saves the last block processed for exit events
