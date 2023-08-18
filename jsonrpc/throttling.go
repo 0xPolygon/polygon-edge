@@ -24,7 +24,7 @@ func NewThrottling(maximumConcurrentRequests uint64, timeout time.Duration) *Thr
 	}
 }
 
-// AttemptRequest returns an error if there is more thab
+// AttemptRequest returns an error if more than the maximum concurrent requests are currently being executed
 func (t *Throttling) AttemptRequest(
 	parentCtx context.Context,
 	requestHandler func() (interface{}, error)) (interface{}, error) {
