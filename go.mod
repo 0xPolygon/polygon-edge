@@ -68,6 +68,7 @@ require (
 	github.com/quasilyte/go-ruleguard v0.4.0
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/sethvargo/go-retry v0.2.4
+	github.com/topos-protocol/go-topos-sequencer-client v0.0.0-20230719150134-37636f549da4
 	golang.org/x/sync v0.3.0
 	google.golang.org/genproto v0.0.0-20230530153820-e85fd2cbaebc
 	gopkg.in/DataDog/dd-trace-go.v1 v1.54.0
@@ -97,7 +98,6 @@ require (
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0 // indirect
-	github.com/topos-protocol/go-topos-sequencer-client v0.0.0-20230719150134-37636f549da4 // indirect
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/fx v1.19.2 // indirect
 	golang.org/x/exp v0.0.0-20230725012225-302865e7556b // indirect

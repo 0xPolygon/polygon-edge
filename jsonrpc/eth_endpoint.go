@@ -10,8 +10,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/prover"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -109,7 +109,7 @@ var (
 	//Empty code hash is 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
 	EmptyCodeHashBytes = []byte{197, 210, 70, 1, 134, 247, 35, 60, 146, 126, 125,
 		178, 220, 199, 3, 192, 229, 0, 182, 83, 202, 130, 39, 59, 123, 250, 216, 4, 93, 133, 164, 112}
-	EmptyCodeHash = hex.EncodeToHex(EmptyCodeHashBytes)
+	EmptyCodeHash = "0x" + hex.EncodeToString(EmptyCodeHashBytes)
 )
 
 // ChainId returns the chain id of the client
@@ -939,7 +939,7 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 			Nonce:    acc.Nonce,
 			Balance:  acc.Balance,
 			Root:     acc.Root.String(),
-			CodeHash: hex.EncodeToHex(acc.CodeHash),
+			CodeHash: "0x" + hex.EncodeToString(acc.CodeHash),
 		}
 	}
 
@@ -967,7 +967,7 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 
 				ss := make([]string, len(storageMerkleProof))
 				for i, s := range storageMerkleProof {
-					ss[i] = hex.EncodeToHex(s)
+					ss[i] = "0x" + hex.EncodeToString(s)
 				}
 
 				storageAccesses = append(storageAccesses, prover.StorageAccess{
@@ -988,7 +988,7 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 
 	transactions := make([]string, 0)
 	for _, transaction := range fullBlock.Transactions {
-		transactions = append(transactions, hex.EncodeToHex(transaction.MarshalRLP()))
+		transactions = append(transactions, "0x"+hex.EncodeToString(transaction.MarshalRLP()))
 	}
 
 	// Receipts from this block
@@ -1008,7 +1008,7 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 			}
 
 			codeHash := crypto.Keccak256(contractCode)
-			contractCodes[hex.EncodeToHex(codeHash)] = hex.EncodeToHex(contractCode)
+			contractCodes["0x"+hex.EncodeToString(codeHash)] = "0x" + hex.EncodeToString(contractCode)
 		} else {
 			// Add empty code hash
 			contractCodes[EmptyCodeHash] = "0x"
@@ -1026,7 +1026,7 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 
 		aa := make([]string, 0)
 		for _, proof := range accountProof {
-			aa = append(aa, hex.EncodeToHex(proof))
+			aa = append(aa, "0x"+hex.EncodeToString(proof))
 		}
 
 		state = append(state, prover.ProverAccountProof{
@@ -1045,7 +1045,7 @@ func (e *Eth) GetProverData(block BlockNumberOrHash) (interface{}, error) {
 
 	zeroAccountProofArray := make([]string, 0)
 	for _, proof := range zeroAccountProof {
-		zeroAccountProofArray = append(zeroAccountProofArray, hex.EncodeToHex(proof))
+		zeroAccountProofArray = append(zeroAccountProofArray, "0x"+hex.EncodeToString(proof))
 	}
 
 	state = append(state, prover.ProverAccountProof{

@@ -55,14 +55,16 @@ type StructTracer struct {
 	currentMemory [][]byte
 	currentStack  [][]*big.Int
 
-	contractAddress       types.Address
+	contractAddress       string
 	storageAccess         []map[StorageAccess]bool
-	accountStorageUpdates map[types.Address]map[StorageAccess]bool
+	accountStorageUpdates map[string]map[StorageAccess]bool
 }
 
 func NewStructTracer(config Config) *StructTracer {
 	storage := make([](map[types.Address]map[types.Hash]types.Hash), 1)
 	storage[0] = make(map[types.Address]map[types.Hash]types.Hash)
+	storageAccess := make([]map[StorageAccess]bool, 1)
+	storageAccess[0] = make(map[StorageAccess]bool)
 
 	return &StructTracer{
 		Config:     config,
@@ -73,7 +75,7 @@ func NewStructTracer(config Config) *StructTracer {
 		currentMemory:         make([][]byte, 1),
 		currentStack:          make([][]*big.Int, 1),
 		storageAccess:         storageAccess,
-		accountStorageUpdates: make(map[types.Address]map[StorageAccess]bool),
+		accountStorageUpdates: make(map[string]map[StorageAccess]bool),
 	}
 }
 
@@ -301,7 +303,7 @@ func (t *StructTracer) ExecuteState(
 	if t.Config.EnableStorage {
 		if isCallOp {
 
-			contract := types.BytesToAddress(stack[len(stack)-2].Bytes())
+			contract := stack[len(stack)-2]
 			t.accountStorageUpdates[contract] = t.storageAccess[len(t.storageAccess)-1]
 
 			t.storage = t.storage[:len(t.storage)-1]
@@ -325,7 +327,7 @@ func (t *StructTracer) ExecuteState(
 		errStr = err.Error()
 	}
 
-	t.contractAddress = contractAddress
+	t.contractAddress = contractAddress.String()
 
 	t.logs = append(
 		t.logs,
@@ -346,25 +348,12 @@ func (t *StructTracer) ExecuteState(
 }
 
 type StructTraceResult struct {
-	Account        string                                   `json:"account"`
-	Failed         bool                                     `json:"failed"`
-	StorageUpdates map[types.Address]map[StorageAccess]bool `json:"storageUpdates"`
-	Gas            uint64                                   `json:"gas"`
-	ReturnValue    string                                   `json:"returnValue"`
-	StructLogs     []StructLogRes                           `json:"structLogs"`
-}
-
-type StructLogRes struct {
-	Pc            uint64            `json:"pc"`
-	Op            string            `json:"op"`
-	Gas           uint64            `json:"gas"`
-	GasCost       uint64            `json:"gasCost"`
-	Depth         int               `json:"depth"`
-	Error         string            `json:"error,omitempty"`
-	Stack         []string          `json:"stack"`
-	Memory        []string          `json:"memory"`
-	Storage       map[string]string `json:"storage"`
-	RefundCounter uint64            `json:"refund,omitempty"`
+	Failed         bool                              `json:"failed"`
+	Gas            uint64                            `json:"gas"`
+	ReturnValue    string                            `json:"returnValue"`
+	StructLogs     []StructLog                       `json:"structLogs"`
+	Account        string                            `json:"account"`
+	StorageUpdates map[string]map[StorageAccess]bool `json:"storageUpdates"`
 }
 
 func (t *StructTracer) GetResult() (interface{}, error) {
@@ -384,9 +373,11 @@ func (t *StructTracer) GetResult() (interface{}, error) {
 	storageUpdates := t.accountStorageUpdates
 
 	return &StructTraceResult{
-		Failed:      t.err != nil,
-		Gas:         t.consumedGas,
-		ReturnValue: returnValue,
-		StructLogs:  t.logs,
+		Failed:         t.err != nil,
+		Gas:            t.consumedGas,
+		ReturnValue:    returnValue,
+		StructLogs:     t.logs,
+		StorageUpdates: storageUpdates,
+		Account:        t.contractAddress,
 	}, nil
 }

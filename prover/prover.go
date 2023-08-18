@@ -91,7 +91,7 @@ func ParseTraceForStorageAccess(tracesJSON []interface{}) (map[string][]structtr
 
 		for account, storage := range trace.StorageUpdates {
 			for storageAccess := range storage {
-				storageChanges[account.String()] = append(storageChanges[account.String()], storageAccess)
+				storageChanges[account] = append(storageChanges[account], storageAccess)
 			}
 		}
 	}
