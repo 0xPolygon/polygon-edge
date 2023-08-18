@@ -3,8 +3,6 @@ package e2e
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"path"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/jsonrpc"
 	ethgow "github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/command"
@@ -1460,151 +1457,123 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	})
 }
 
-func TestE2E_Bridge_Slashing(t *testing.T) {
+func TestE2E_DoubleSign_Slashing(t *testing.T) {
 	const (
-		validatorNumber     = 4
-		byzantineNodesCount = 1
-		epochSize           = 10
-		abiMethodIDLength   = 4
+		validatorNumber          = 4
+		byzantineValidatorNumber = 1
+		epochSize                = 10
+		abiMethodIDLength        = 4
 	)
 
-	var slashFn contractsapi.SlashValidatorSetFn
+	var (
+		slashFn            contractsapi.SlashValidatorSetFn
+		slashingPercentage = new(big.Int).SetUint64(50)
+	)
 
 	cluster := framework.NewTestCluster(
 		t, validatorNumber,
 		framework.WithEpochSize(epochSize),
-		framework.WithByzantineValidators(byzantineNodesCount))
+		framework.WithByzantineValidators(byzantineValidatorNumber))
 	defer cluster.Stop()
 
-	cluster.WaitForReady(t)
-	cluster.WaitForBlock(1, 20*time.Second)
+	err := cluster.WaitForBlock(2, time.Minute)
+	require.NoError(t, err)
 
-	polybftCfg, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftConfig, err := polyCommon.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
 
-	rootchainTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
+	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
 	childRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
 	require.NoError(t, err)
 
-	childEthEndpoint := cluster.Servers[0].JSONRPC().Eth()
-
-	byzantineServer := cluster.Servers[4]
-
-	blockWithSlashTxs, err := childEthEndpoint.GetBlockByNumber(ethgo.Latest, true)
+	blockWithSlashTx, err := cluster.Servers[0].JSONRPC().Eth().GetBlockByNumber(ethgo.Latest, true)
 	require.NoError(t, err)
 
-	transactions := blockWithSlashTxs.Transactions
 	var hasSlashStateTx = false
-	t.Log("transactions number", len(blockWithSlashTxs.Transactions))
-	for _, tx := range transactions {
-		sig := tx.Input[:abiMethodIDLength]
-		t.Log("Sig is", sig, "Slashfn.sig", slashFn.Sig())
-		if bytes.Equal(sig, slashFn.Sig()) {
 
+	for _, tx := range blockWithSlashTx.Transactions {
+		txSignature := tx.Input[:abiMethodIDLength]
+
+		if bytes.Equal(txSignature, slashFn.Sig()) {
 			hasSlashStateTx = true
-		}
-	}
-
-	require.True(t, hasSlashStateTx)
-
-	currentExtra, err := polybft.GetIbftExtra(blockWithSlashTxs.ExtraData)
-	require.NoError(t, err)
-
-	currentEpoch := currentExtra.Checkpoint.EpochNumber
-	t.Logf("Latest block number: %d, epoch number: %d\n", blockWithSlashTxs.Number, currentEpoch)
-
-	// wait for epoch checkpoint on the root chain
-	require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
-		rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
-
-	var proofs []types.Proof
-
-	childClient, err := jsonrpc.NewClient(cluster.Servers[0].JSONRPCAddr())
-	require.NoError(t, err)
-	err = childClient.Call("bridge_getPendingSlashProofs", &proofs, "")
-	require.NoError(t, err)
-	require.True(t, len(proofs) > 0)
-
-	var ourExitProof types.Proof
-	var exitEvent *polybft.ExitEvent
-
-	for _, proof := range proofs {
-		exitEventMap, ok := proof.Metadata["ExitEvent"].(map[string]interface{})
-		if !ok {
-			t.Fatal(errors.New("could not get exit event from proof"))
-		}
-
-		raw, err := json.Marshal(exitEventMap)
-
-		if err = json.Unmarshal(raw, &exitEvent); err != nil {
-			t.Fatal(fmt.Errorf("failed to unmarshal exit event from JSON. Error: %w", err))
-		}
-
-		if exitEvent.BlockNumber == blockWithSlashTxs.Number {
-			ourExitProof = proof
 
 			break
 		}
 	}
 
-	require.NotEqual(t, ourExitProof.Data, []byte{})
+	require.True(t, hasSlashStateTx, fmt.Sprintf("slash transaction not found in block %v", blockWithSlashTx.Number))
 
-	byzantineValidatorAcc, err := sidechain.GetAccountFromDir(byzantineServer.DataDir())
+	currentExtra, err := polybft.GetIbftExtra(blockWithSlashTx.ExtraData)
+	require.NoError(t, err)
+
+	// wait for epoch checkpoint on the root chain
+	require.NoError(t, waitForRootchainEpoch(
+		currentExtra.Checkpoint.EpochNumber, 3*time.Minute,
+		rootRelayer, polybftConfig.Bridge.CheckpointManagerAddr))
+
+	exitEvent, exitEventProof, err := getSlashExitEventWithProof(
+		t, cluster.Servers[0].JSONRPCAddr(), blockWithSlashTx.Number)
+	require.NoError(t, err)
+
+	// for now, the cluster.Servers contains honest validators first, then byzantine ones
+	byzantineValidatorAcc, err := sidechain.GetAccountFromDir(cluster.Servers[validatorNumber].DataDir())
+	require.NoError(t, err)
 
 	// get byzantine validator stake from root chain before executing slashing exit event
 	byzantineValidatorInfo, err := sidechain.GetValidatorInfo(
 		ethgo.Address(byzantineValidatorAcc.Address()),
-		polybftCfg.Bridge.CustomSupernetManagerAddr,
-		polybftCfg.Bridge.StakeManagerAddr,
-		polybftCfg.SupernetID,
-		rootchainTxRelayer,
+		polybftConfig.Bridge.CustomSupernetManagerAddr,
+		polybftConfig.Bridge.StakeManagerAddr,
+		polybftConfig.SupernetID,
+		rootRelayer,
 		childRelayer)
 	require.NoError(t, err)
 
-	t.Log("start stake: ", byzantineValidatorInfo.Stake)
+	byzantineValStakeOnRootBefore := byzantineValidatorInfo.Stake
 
-	// send exit event
-	var exitEventAPI contractsapi.L2StateSyncedEvent
+	// get byzantine validator stake from child chain before executing slashing exit event
+	byzantineValStakeOnChildBefore := erc20BalanceOf(t, byzantineValidatorAcc.Address(),
+		contracts.ValidatorSetContract, childRelayer)
 
-	exitEventEncoded, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
-	require.NoError(t, err)
+	require.True(t, byzantineValStakeOnRootBefore.Cmp(byzantineValStakeOnChildBefore) == 0,
+		fmt.Sprintf("byzantine validator stake not equal on root and child chains before executing slashing exit event. "+
+			"root chain stake: %v, child chain stake: %v",
+			byzantineValStakeOnRootBefore, byzantineValStakeOnChildBefore))
 
-	leafIndex, ok := ourExitProof.Metadata["LeafIndex"].(float64)
-	if !ok {
-		t.Fatal("leafIndex")
-	}
-
-	checkpointBlock, ok := ourExitProof.Metadata["CheckpointBlock"].(float64)
-	require.NoError(t, err)
-
-	exitFn := &contractsapi.ExitExitHelperFn{
-		BlockNumber:  new(big.Int).SetUint64(uint64(checkpointBlock)),
-		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
-		UnhashedLeaf: exitEventEncoded,
-		Proof:        ourExitProof.Data,
-	}
-
-	exitFnInput, err := exitFn.EncodeAbi()
-	require.NoError(t, err)
-
-	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
-	require.NoError(t, err)
-
-	exitHelperContract := ethgo.Address(polybftCfg.Bridge.ExitHelperAddr)
-	exitTxn := &ethgo.Transaction{To: &exitHelperContract, Input: exitFnInput}
-	_, err = rootchainTxRelayer.SendTransaction(exitTxn, rootchainDeployer)
-	require.NoError(t, err)
+	// call ExitHelper and submit the slashing exit event proof
+	executeSlashingOnRootChain(t, polybftConfig, rootRelayer, exitEvent, exitEventProof)
 
 	// get byzantine validator stake from root chain after executing slashing exit event
 	byzantineValidatorInfo, err = sidechain.GetValidatorInfo(
 		ethgo.Address(byzantineValidatorAcc.Address()),
-		polybftCfg.Bridge.CustomSupernetManagerAddr,
-		polybftCfg.Bridge.StakeManagerAddr,
-		polybftCfg.SupernetID,
-		rootchainTxRelayer,
+		polybftConfig.Bridge.CustomSupernetManagerAddr,
+		polybftConfig.Bridge.StakeManagerAddr,
+		polybftConfig.SupernetID,
+		rootRelayer,
 		childRelayer)
 	require.NoError(t, err)
 
-	t.Log("end stake:    ", byzantineValidatorInfo.Stake)
+	byzantineValStakeOnRootAfter := byzantineValidatorInfo.Stake
+
+	// wait for state syncs to be executed on child chain
+	require.NoError(t, cluster.WaitForBlock(polybftConfig.SprintSize*4, time.Minute))
+
+	// get byzantine validator stake from child chain after state sync commitment is processed
+	byzantineValStakeOnChildAfter := erc20BalanceOf(t, byzantineValidatorAcc.Address(),
+		contracts.ValidatorSetContract, childRelayer)
+
+	expectedStakeOnRoot := new(big.Int)
+	expectedStakeOnRoot.Mul(byzantineValStakeOnRootBefore, slashingPercentage)
+	expectedStakeOnRoot.Div(expectedStakeOnRoot, new(big.Int).SetUint64(100))
+
+	require.True(t, expectedStakeOnRoot.Cmp(byzantineValStakeOnRootAfter) == 0,
+		fmt.Sprintf("byzantine validator stake on root chain doesn't match expected value after slashing. "+
+			"expected: %v, actual: %v", expectedStakeOnRoot, byzantineValStakeOnRootAfter))
+
+	require.True(t, byzantineValStakeOnRootAfter.Cmp(byzantineValStakeOnChildAfter) == 0,
+		fmt.Sprintf("byzantine validator stake on root and child chains doesn't match after slashing. "+
+			"root chain stake: %v, child chain stake: %v",
+			byzantineValStakeOnRootAfter, byzantineValStakeOnChildAfter))
 }
