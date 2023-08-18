@@ -428,19 +428,20 @@ func (c *consensusRuntime) FSM() error {
 	doubleSigners := c.doubleSigningTracker.GetDoubleSigners(parent.Number)
 
 	ff := &fsm{
-		config:            epoch.CurrentClientConfig,
-		parent:            parent,
-		backend:           c.config.blockchain,
-		polybftBackend:    c.config.polybftBackend,
-		exitEventRootHash: exitRootHash,
-		epochNumber:       epoch.Number,
-		blockBuilder:      blockBuilder,
-		validators:        valSet,
-		doubleSigners:     doubleSigners,
-		isEndOfEpoch:      isEndOfEpoch,
-		isEndOfSprint:     isEndOfSprint,
-		proposerSnapshot:  proposerSnapshot,
-		logger:            c.logger.Named("fsm"),
+		config:              epoch.CurrentClientConfig,
+		parent:              parent,
+		backend:             c.config.blockchain,
+		polybftBackend:      c.config.polybftBackend,
+		exitEventRootHash:   exitRootHash,
+		epochNumber:         epoch.Number,
+		blockBuilder:        blockBuilder,
+		validators:          valSet,
+		doubleSigners:       doubleSigners,
+		isFirstBlockOfEpoch: isFirstBlockOfEpoch,
+		isEndOfEpoch:        isEndOfEpoch,
+		isEndOfSprint:       isEndOfSprint,
+		proposerSnapshot:    proposerSnapshot,
+		logger:              c.logger.Named("fsm"),
 	}
 
 	if isEndOfSprint {
