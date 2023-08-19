@@ -109,7 +109,7 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 		switch txType {
 		case AccessListTx:
 			bTxn = NewTx(&AccessListStruct{})
-		default:
+		case DynamicFeeTx, LegacyTx, StateTx:
 			bTxn = NewTx(&MixedTx{
 				Type: txType,
 			})

@@ -9,13 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// func createTestTx(gasFeeCap, gasTipCap *big.Int) *types.Transaction {
-//     return types.NewTx(&types.MixedTx{
-//         GasFeeCap: gasFeeCap,
-//         GasTipCap: gasTipCap,
-//     })
-// }
-
 func Test_maxPriceQueue(t *testing.T) {
 	t.Parallel()
 
@@ -165,16 +158,19 @@ func Test_maxPriceQueue(t *testing.T) {
 			unsorted: []*types.Transaction{
 				// Highest tx fee
 				types.NewTx(&types.MixedTx{
+					GasPrice:  nil,
 					GasFeeCap: big.NewInt(1000),
 					GasTipCap: big.NewInt(300),
 				}),
 				// Lowest tx fee
 				types.NewTx(&types.MixedTx{
+					GasPrice:  nil,
 					GasFeeCap: big.NewInt(1000),
 					GasTipCap: big.NewInt(100),
 				}),
 				// Middle tx fee
 				types.NewTx(&types.MixedTx{
+					GasPrice:  nil,
 					GasFeeCap: big.NewInt(1000),
 					GasTipCap: big.NewInt(200),
 				}),
@@ -182,16 +178,19 @@ func Test_maxPriceQueue(t *testing.T) {
 			sorted: []*types.Transaction{
 				// Highest tx fee
 				types.NewTx(&types.MixedTx{
+					GasPrice:  nil,
 					GasFeeCap: big.NewInt(1000),
 					GasTipCap: big.NewInt(300),
 				}),
 				// Middle tx fee
 				types.NewTx(&types.MixedTx{
+					GasPrice:  nil,
 					GasFeeCap: big.NewInt(1000),
 					GasTipCap: big.NewInt(200),
 				}),
 				// Lowest tx fee
 				types.NewTx(&types.MixedTx{
+					GasPrice:  nil,
 					GasFeeCap: big.NewInt(1000),
 					GasTipCap: big.NewInt(100),
 				}),
@@ -304,9 +303,6 @@ func generateTx(i int) *types.Transaction {
 		types.DynamicFeeTx,
 	}
 
-	// tx := &types.Transaction{
-	// 	Type: txTypes[r.Intn(len(txTypes))],
-	// }
 	tx := types.NewTx(&types.MixedTx{
 		Type: txTypes[r.Intn(len(txTypes))],
 	})
@@ -315,17 +311,14 @@ func generateTx(i int) *types.Transaction {
 	case types.LegacyTx:
 		minGasPrice := 1000 * i
 		maxGasPrice := 100000 * i
-		//tx.GasPrice = new(big.Int).SetInt64(int64(rand.Intn(maxGasPrice-minGasPrice) + minGasPrice))
 		tx.SetGasPrice(new(big.Int).SetInt64(int64(rand.Intn(maxGasPrice-minGasPrice) + minGasPrice)))
 	case types.DynamicFeeTx:
 		minGasFeeCap := 1000 * i
 		maxGasFeeCap := 100000 * i
-		//tx.GasFeeCap = new(big.Int).SetInt64(int64(rand.Intn(maxGasFeeCap-minGasFeeCap) + minGasFeeCap))
 		tx.SetGasFeeCap(new(big.Int).SetInt64(int64(rand.Intn(maxGasFeeCap-minGasFeeCap) + minGasFeeCap)))
 
 		minGasTipCap := 100 * i
 		maxGasTipCap := 10000 * i
-		//tx.GasTipCap = new(big.Int).SetInt64(int64(rand.Intn(maxGasTipCap-minGasTipCap) + minGasTipCap))
 		tx.SetGasTipCap(new(big.Int).SetInt64(int64(rand.Intn(maxGasTipCap-minGasTipCap) + minGasTipCap)))
 	}
 

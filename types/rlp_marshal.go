@@ -227,19 +227,17 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 			// Convert TxAccessList to RLP format and add it to the vv array.
 			accessListVV := arena.NewArray()
 
-			if t.AccessList() != nil {
-				for _, accessTuple := range t.AccessList() {
-					accessTupleVV := arena.NewArray()
-					accessTupleVV.Set(arena.NewCopyBytes(accessTuple.Address.Bytes()))
+			for _, accessTuple := range t.AccessList() {
+				accessTupleVV := arena.NewArray()
+				accessTupleVV.Set(arena.NewCopyBytes(accessTuple.Address.Bytes()))
 
-					storageKeysVV := arena.NewArray()
-					for _, storageKey := range accessTuple.StorageKeys {
-						storageKeysVV.Set(arena.NewCopyBytes(storageKey.Bytes()))
-					}
-
-					accessTupleVV.Set(storageKeysVV)
-					accessListVV.Set(accessTupleVV)
+				storageKeysVV := arena.NewArray()
+				for _, storageKey := range accessTuple.StorageKeys {
+					storageKeysVV.Set(arena.NewCopyBytes(storageKey.Bytes()))
 				}
+
+				accessTupleVV.Set(storageKeysVV)
+				accessListVV.Set(accessTupleVV)
 			}
 
 			vv.Set(accessListVV)
@@ -274,19 +272,17 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 		// add accessList
 		accessListVV := arena.NewArray()
 
-		if t.AccessList() != nil {
-			for _, accessTuple := range t.AccessList() {
-				accessTupleVV := arena.NewArray()
-				accessTupleVV.Set(arena.NewCopyBytes(accessTuple.Address.Bytes()))
+		for _, accessTuple := range t.AccessList() {
+			accessTupleVV := arena.NewArray()
+			accessTupleVV.Set(arena.NewCopyBytes(accessTuple.Address.Bytes()))
 
-				storageKeysVV := arena.NewArray()
-				for _, storageKey := range accessTuple.StorageKeys {
-					storageKeysVV.Set(arena.NewCopyBytes(storageKey.Bytes()))
-				}
-
-				accessTupleVV.Set(storageKeysVV)
-				accessListVV.Set(accessTupleVV)
+			storageKeysVV := arena.NewArray()
+			for _, storageKey := range accessTuple.StorageKeys {
+				storageKeysVV.Set(arena.NewCopyBytes(storageKey.Bytes()))
 			}
+
+			accessTupleVV.Set(storageKeysVV)
+			accessListVV.Set(accessTupleVV)
 		}
 
 		vv.Set(accessListVV)

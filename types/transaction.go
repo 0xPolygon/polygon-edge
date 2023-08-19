@@ -269,14 +269,16 @@ func DeepCopyTxData(data TxData) TxData {
 			newMixedTx.Value.Set(t.Value)
 		}
 
+		if newMixedTx.V != nil {
+			newMixedTx.V = new(big.Int).Set(t.V)
+		}
+
 		if newMixedTx.R != nil {
-			newMixedTx.R = new(big.Int)
-			newMixedTx.R = big.NewInt(0).SetBits(t.R.Bits())
+			newMixedTx.R = new(big.Int).Set(t.R)
 		}
 
 		if newMixedTx.S != nil {
-			newMixedTx.S = new(big.Int)
-			newMixedTx.S = big.NewInt(0).SetBits(t.S.Bits())
+			newMixedTx.S = new(big.Int).Set(t.S)
 		}
 
 		newMixedTx.Input = make([]byte, len(t.Input))
@@ -302,14 +304,16 @@ func DeepCopyTxData(data TxData) TxData {
 			newAccessListStruct.Value.Set(t.Value)
 		}
 
+		if newAccessListStruct.V != nil {
+			newAccessListStruct.V = new(big.Int).Set(t.V)
+		}
+
 		if newAccessListStruct.R != nil {
-			newAccessListStruct.R = new(big.Int)
-			newAccessListStruct.R = big.NewInt(0).SetBits(t.R.Bits())
+			newAccessListStruct.R = new(big.Int).Set(t.R)
 		}
 
 		if newAccessListStruct.S != nil {
-			newAccessListStruct.S = new(big.Int)
-			newAccessListStruct.S = big.NewInt(0).SetBits(t.S.Bits())
+			newAccessListStruct.S = new(big.Int).Set(t.S)
 		}
 
 		newAccessListStruct.Input = make([]byte, len(t.Input))
