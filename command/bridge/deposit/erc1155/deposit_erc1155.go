@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -110,7 +111,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		amountRaw := dp.Amounts[i]
 		tokenIDRaw := dp.TokenIDs[i]
 
-		amount, err := types.ParseUint256orHex(&amountRaw)
+		amount, err := helperCommon.ParseUint256orHex(&amountRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amountRaw, err))
 
@@ -119,7 +120,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		amounts[i] = amount
 
-		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
+		tokenID, err := helperCommon.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided token id %s: %w", tokenIDRaw, err))
 
@@ -147,7 +148,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		receipt, err := txRelayer.SendTransaction(mintTxn, minterKey)
 		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
+			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s: %w", depositorAddr, err))
 
 			return
 		}
@@ -171,7 +172,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send root erc 1155 approve transaction"))
+		outputter.SetError(fmt.Errorf("failed to send root erc 1155 approve transaction: %w", err))
 
 		return
 	}

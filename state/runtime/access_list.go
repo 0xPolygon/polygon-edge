@@ -45,38 +45,18 @@ func (al *AccessList) Copy() *AccessList {
 }
 
 // AddAddress adds an address to the access list
-// returns 'true' if the operation results in a change (i.e., the address was not already present in the list).
-func (al *AccessList) AddAddress(address types.Address) bool {
-	if _, exists := (*al)[address]; exists {
-		return false
+func (al *AccessList) AddAddress(address ...types.Address) {
+	for _, addr := range address {
+		if _, exists := (*al)[addr]; exists {
+			continue
+		}
+
+		(*al)[addr] = make(map[types.Hash]struct{})
 	}
-
-	(*al)[address] = make(map[types.Hash]struct{})
-
-	return true
 }
 
-// This function adds the specified address and slot pair to the access list.
-// The return values indicate whether the address was newly added and whether the slot was newly added.
-func (al *AccessList) AddSlot(address types.Address, slot types.Hash) (addrChange bool, slotChange bool) {
-	slotMap, addressExists := (*al)[address]
-	if !addressExists {
-		slotMap = make(map[types.Hash]struct{})
-		(*al)[address] = slotMap
-	}
-
-	_, slotPresent := slotMap[slot]
-	if !slotPresent {
-		slotMap[slot] = struct{}{}
-
-		return !addressExists, true
-	}
-
-	// slot and address were already present in access list
-	return false, false
-}
-
-func (al *AccessList) AddSlots(address types.Address, slot []types.Hash) {
+// This function adds the specified address and slot pairs to the access list
+func (al *AccessList) AddSlot(address types.Address, slot ...types.Hash) {
 	slotMap, addressExists := (*al)[address]
 	if !addressExists {
 		slotMap = make(map[types.Hash]struct{})
@@ -103,17 +83,11 @@ func (al *AccessList) PrepareAccessList(
 	}
 
 	// add the precompiles
-	for _, addr := range precompiles {
-		al.AddAddress(addr)
-	}
+	al.AddAddress(precompiles...)
 
 	// add accessList provided with access list and dynamic tx
 	for _, accessListTuple := range txAccessList {
-		//al.AddSlots(accessListTuple.Address, accessListTuple.StorageKeys)
 		al.AddAddress(accessListTuple.Address)
-
-		for _, slot := range accessListTuple.StorageKeys {
-			al.AddSlot(accessListTuple.Address, slot)
-		}
+		al.AddSlot(accessListTuple.Address, accessListTuple.StorageKeys...)
 	}
 }

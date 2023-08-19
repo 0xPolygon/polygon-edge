@@ -172,6 +172,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 
 	for idx, txn := range b.Transactions {
 		if fullTx {
+			txn.SetGasPrice(txn.GetGasPrice(b.Header.BaseFee))
 			res.Transactions = append(
 				res.Transactions,
 				toTransaction(

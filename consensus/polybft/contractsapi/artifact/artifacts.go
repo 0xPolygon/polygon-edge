@@ -3,7 +3,7 @@ package artifact
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -18,7 +18,7 @@ func ReadArtifactData(rootFolder, contractPath, contractName string) ([]byte, er
 		return nil, err
 	}
 
-	return ioutil.ReadFile(filepath.Clean(absolutePath))
+	return os.ReadFile(filepath.Clean(absolutePath))
 }
 
 func DecodeArtifact(data []byte) (*Artifact, error) {

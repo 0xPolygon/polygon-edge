@@ -180,7 +180,7 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 		return nil, nil
 	}
 
-	return *types.EncodeUint64(uint64(len(block.Transactions))), nil
+	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
 }
 
 // BlockNumber returns current block number
@@ -236,6 +236,8 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 		// Find the transaction within the block
 		if txn, idx := types.FindTxByHash(block.Transactions, hash); txn != nil {
+			txn.SetGasPrice(txn.GetGasPrice(block.Header.BaseFee))
+
 			return toTransaction(
 				txn,
 				argUintPtr(block.Number()),
@@ -573,8 +575,16 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Checks if executor level valid gas errors occurred
 	isGasApplyError := func(err error) bool {
-		// Not linting this as the underlying error is actually wrapped
-		return errors.Is(err, state.ErrNotEnoughIntrinsicGas)
+		if errors.Is(err, state.ErrNotEnoughIntrinsicGas) {
+			return true
+		}
+
+		var expected *state.TransitionApplicationError
+		if errors.As(err, &expected) {
+			return errors.Is(expected.Err, state.ErrNotEnoughIntrinsicGas)
+		}
+
+		return false
 	}
 
 	// Checks if EVM level valid gas errors occurred

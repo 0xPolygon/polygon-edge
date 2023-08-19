@@ -75,7 +75,7 @@ func TestBlockBuilder_BuildBlockTxOneFailedTxAndOneTakesTooMuchGas(t *testing.T)
 	parentHeader := &types.Header{StateRoot: hash, GasLimit: 1_000_000_000_000_000}
 
 	txPool := &txPoolMock{}
-	txPool.On("Prepare", uint64(0)).Once()
+	txPool.On("Prepare").Once()
 
 	for i, acc := range accounts {
 		receiver := types.Address(acc.Ecdsa.Address())

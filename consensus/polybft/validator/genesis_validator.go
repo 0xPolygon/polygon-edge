@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -27,7 +28,7 @@ type genesisValidatorRaw struct {
 
 func (v *GenesisValidator) MarshalJSON() ([]byte, error) {
 	raw := &genesisValidatorRaw{Address: v.Address, BlsKey: v.BlsKey, MultiAddr: v.MultiAddr}
-	raw.Stake = types.EncodeBigInt(v.Stake)
+	raw.Stake = common.EncodeBigInt(v.Stake)
 
 	return json.Marshal(raw)
 }
@@ -43,7 +44,7 @@ func (v *GenesisValidator) UnmarshalJSON(data []byte) (err error) {
 	v.BlsKey = raw.BlsKey
 	v.MultiAddr = raw.MultiAddr
 
-	v.Stake, err = types.ParseUint256orHex(raw.Stake)
+	v.Stake, err = common.ParseUint256orHex(raw.Stake)
 
 	return err
 }

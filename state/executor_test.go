@@ -202,7 +202,7 @@ func Test_Transition_EIP2929(t *testing.T) {
 				uint8(evm.PUSH1), 0x11, uint8(evm.PUSH1), 0xe2, uint8(evm.SSTORE),
 				// SLOAD `0xe2`, address present in access list
 				uint8(evm.PUSH1), 0xe2, uint8(evm.SLOAD),
-				// SLOAD `0xe3`, ColdSloadCostEIP2929 charged since address not present in access list
+				// SLOAD `0xe3`, ColdStorageReadCostEIP2929 charged since address not present in access list
 				uint8(evm.PUSH1), 0xe3, uint8(evm.SLOAD),
 			},
 			gasConsumed: uint64(46529),

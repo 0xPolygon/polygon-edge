@@ -109,10 +109,10 @@ type transitionInterface interface {
 	Write(txn *types.Transaction) error
 }
 
-func (d *Dev) writeTransactions(baseFee, gasLimit uint64, transition transitionInterface) []*types.Transaction {
+func (d *Dev) writeTransactions(gasLimit uint64, transition transitionInterface) []*types.Transaction {
 	var successful []*types.Transaction
 
-	d.txpool.Prepare(baseFee)
+	d.txpool.Prepare()
 
 	for {
 		tx := d.txpool.Peek()
@@ -167,10 +167,8 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	baseFee := d.blockchain.CalculateBaseFee(parent)
-
 	header.GasLimit = gasLimit
-	header.BaseFee = baseFee
+	header.BaseFee = d.blockchain.CalculateBaseFee(parent)
 
 	miner, err := d.GetBlockCreator(header)
 	if err != nil {
@@ -183,7 +181,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		return err
 	}
 
-	txns := d.writeTransactions(baseFee, gasLimit, transition)
+	txns := d.writeTransactions(gasLimit, transition)
 
 	// Commit the changes
 	_, root, err := transition.Commit()

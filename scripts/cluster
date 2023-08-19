@@ -9,9 +9,10 @@ if [[ "$1" == "polybft" ]] && ! command -v jq >/dev/null 2>&1; then
   dp_error_flag=1
 fi
 
-# Check if nc is installed
-if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
-  echo "Netcat (nc) is not installed."
+# Check if curl is installed
+if [[ "$1" == "polybft" ]] && ! command -v curl >/dev/null 2>&1; then
+  echo "curl is not installed."
+  echo "Manual installation instructions: Visit https://everything.curl.dev/get/ for more information."
   dp_error_flag=1
 fi
 
@@ -90,10 +91,10 @@ function initRootchain() {
   fi
 
   set +e
-  t=1
-  while [ $t -gt 0 ]; do
-    nc -z 127.0.0.1 8545 </dev/null
-    t=$?
+  while true; do
+    if curl -sSf -o /dev/null http://127.0.0.1:8545; then
+      break
+    fi
     sleep 1
   done
   set -e

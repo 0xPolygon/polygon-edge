@@ -82,3 +82,18 @@ func (p *TxPool) Subscribe(
 		}
 	}
 }
+
+// TxPoolSubscribe subscribes to new events in the tx pool and returns subscription channel and unsubscribe fn
+func (p *TxPool) TxPoolSubscribe(request *proto.SubscribeRequest) (<-chan *proto.TxPoolEvent, func(), error) {
+	if err := request.ValidateAll(); err != nil {
+		return nil, nil, err
+	}
+
+	subscription := p.eventManager.subscribe(request.Types)
+
+	cancelSubscription := func() {
+		p.eventManager.cancelSubscription(subscription.subscriptionID)
+	}
+
+	return subscription.subscriptionChannel, cancelSubscription, nil
+}

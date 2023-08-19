@@ -62,8 +62,9 @@ type contract interface {
 
 // Precompiled is the runtime for the precompiled contracts
 type Precompiled struct {
-	buf       []byte
-	contracts map[types.Address]contract
+	buf          []byte
+	contracts    map[types.Address]contract
+	ContractAddr []types.Address
 }
 
 // NewPrecompiled creates a new runtime for the precompiled contracts
@@ -105,6 +106,7 @@ func (p *Precompiled) register(addrStr string, b contract) {
 	}
 
 	p.contracts[types.StringToAddress(addrStr)] = b
+	p.ContractAddr = append(p.ContractAddr, types.StringToAddress(addrStr))
 }
 
 var (

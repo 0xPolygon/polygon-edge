@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftWallet "github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -203,7 +204,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManagerAddr, stakeMan
 		return nil, err
 	}
 
-	stake, err := types.ParseUint256orHex(&response)
+	stake, err := common.ParseUint256orHex(&response)
 	if err != nil {
 		return nil, err
 	}
