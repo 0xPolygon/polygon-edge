@@ -219,7 +219,7 @@ func (e *Executor) BeginTxn(
 	}
 
 	// allow/block list should be possible if
-	if e.config.SuperAdminAllowBlock != nil || e.config.ContractDeployerBlockList != nil {
+	if e.config.SuperAdminAllowBlock != nil || e.config.ContractDeployerAllowList != nil {
 		txn.deploymentAllowList = addresslist.NewAddressList(
 			txn, contracts.AllowListContractsAddr, e.config.SuperAdminAllowBlock)
 	}
@@ -694,7 +694,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 
 	// check txns access lists, allow list takes precedence over block list
-	if t.txnAllowList != nil {
+	if t.txnAllowList != nil && t.txnAllowList.IsEnabled() {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnAllowList.GetRole(contract.Caller)
 			if !role.Enabled() {
@@ -710,7 +710,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
-	} else if t.txnBlockList != nil {
+	} else if t.txnBlockList != nil && t.txnBlockList.IsEnabled() {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnBlockList.GetRole(contract.Caller)
 			if role == addresslist.EnabledRole {
@@ -862,7 +862,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}()
 
 	// check if contract creation allow list is enabled
-	if t.deploymentAllowList != nil {
+	if t.deploymentAllowList != nil && t.deploymentAllowList.IsEnabled() {
 		role := t.deploymentAllowList.GetRole(c.Caller)
 
 		if !role.Enabled() {
@@ -877,7 +877,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				Err:     runtime.ErrNotAuth,
 			}
 		}
-	} else if t.deploymentBlockList != nil {
+	} else if t.deploymentBlockList != nil && t.deploymentBlockList.IsEnabled() {
 		role := t.deploymentBlockList.GetRole(c.Caller)
 
 		if role == addresslist.EnabledRole {
