@@ -158,9 +158,15 @@ function initRootchain() {
 function startServerFromBinary() {
   if [ "$1" == "write-logs" ]; then
     echo "Writing validators logs to the files..."
-    ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
-      --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
+    if [ "$1" == "polybft" ]; then
+      ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
+        --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
+        --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
+    else 
+      ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
+        --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 \
+        --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
+    fi
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
       --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-2.log &
@@ -172,9 +178,15 @@ function startServerFromBinary() {
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-4.log &
     wait
   else
-    ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
-      --num-block-confirmations 2 --seal --log-level DEBUG &
+    if [ "$1" == "polybft" ]; then
+      ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
+        --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
+        --num-block-confirmations 2 --seal --log-level DEBUG &
+    else
+      ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
+        --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 \
+        --num-block-confirmations 2 --seal --log-level DEBUG &
+    fi
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
       --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
       --num-block-confirmations 2 --seal --log-level DEBUG &
