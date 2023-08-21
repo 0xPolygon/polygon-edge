@@ -69,8 +69,10 @@ type checkpointManager struct {
 	logger hclog.Logger
 	// state boltDb instance
 	state *State
-	// eventGetter gets exit events (missed or current) from blocks
-	eventGetter *eventsGetter[*ExitEvent]
+	// exitEventsGetter gets exit events (missed or current) from blocks
+	exitEventsGetter *eventsGetter[*ExitEvent]
+	// slashedEventsGetter gets slashed events from blocks
+	slashedEventsGetter *eventsGetter[*contractsapi.SlashedEvent]
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
@@ -78,12 +80,24 @@ func newCheckpointManager(key ethgo.Key,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
-	retry := &eventsGetter[*ExitEvent]{
+	exitEventGetter := &eventsGetter[*ExitEvent]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
 			return l.Address == contracts.L2StateSenderContract
 		},
 		parseEventFn: parseExitEvent,
+	}
+	slashedEventGetter := &eventsGetter[*contractsapi.SlashedEvent]{
+		blockchain: blockchain,
+		isValidLogFn: func(l *types.Log) bool {
+			return l.Address == contracts.ValidatorSetContract
+		},
+		parseEventFn: func(_ *types.Header, l *ethgo.Log) (*contractsapi.SlashedEvent, bool, error) {
+			var slashedEvent contractsapi.SlashedEvent
+			doesMatch, err := slashedEvent.ParseLog(l)
+
+			return &slashedEvent, doesMatch, err
+		},
 	}
 
 	return &checkpointManager{
@@ -94,7 +108,8 @@ func newCheckpointManager(key ethgo.Key,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
 		state:                 state,
-		eventGetter:           retry,
+		exitEventsGetter:      exitEventGetter,
+		slashedEventsGetter:   slashedEventGetter,
 	}
 }
 
@@ -290,7 +305,7 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
-	exitEvents, err := c.eventGetter.getFromBlocks(lastBlock, req.FullBlock)
+	exitEvents, err := c.exitEventsGetter.getFromBlocks(lastBlock, req.FullBlock)
 	if err != nil {
 		return err
 	}
@@ -305,6 +320,20 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 	}
 
 	if err := c.state.ExitEventStore.updateLastSaved(block); err != nil {
+		return err
+	}
+
+	slashedEvents, err := c.slashedEventsGetter.getFromBlocks(lastBlock, req.FullBlock)
+	if err != nil {
+		return err
+	}
+
+	processedExitIDs := make([]uint64, len(slashedEvents))
+	for i, event := range slashedEvents {
+		processedExitIDs[i] = event.ExitID.Uint64()
+	}
+
+	if err := c.state.ExitEventStore.removeSlashExitEvents(processedExitIDs...); err != nil {
 		return err
 	}
 

@@ -170,24 +170,6 @@ func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	require.Nil(t, event)
 }
 
-func Test_getExitEventsByIds(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	exitEvents := insertTestExitEvents(t, state, 2, 4, 2)
-
-	ids := make([]uint64, len(exitEvents))
-	for i, e := range exitEvents {
-		ids[i] = e.ID.Uint64()
-	}
-
-	resExitEvents, err := state.ExitEventStore.getExitEventsByIds(ids...)
-	require.NoError(t, err)
-
-	require.Len(t, resExitEvents, len(exitEvents))
-	require.Equal(t, exitEvents, resExitEvents)
-}
-
 func Test_getPendingSlashExitIDs(t *testing.T) {
 	t.Parallel()
 
@@ -203,6 +185,35 @@ func Test_getPendingSlashExitIDs(t *testing.T) {
 	for i, event := range exitEvents {
 		require.Equal(t, event.ID.Uint64(), exitEventIDs[i])
 	}
+}
+
+func Test_removeSlashExitEvents(t *testing.T) {
+	t.Parallel()
+
+	const (
+		exitEventsCount    = 5
+		exitEventsToRemove = 3
+	)
+
+	state := newTestState(t)
+	exitEvents := generateTestExitEvents(t, 1, exitEventsCount, 1)
+
+	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
+
+	exitEventIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
+	require.NoError(t, err)
+	require.Len(t, exitEventIDs, len(exitEvents))
+
+	idsToRemove := exitEventIDs[:exitEventsToRemove]
+	require.NoError(t, state.ExitEventStore.removeSlashExitEvents(idsToRemove...))
+
+	remainingExitIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
+	require.NoError(t, err)
+	require.Len(t, remainingExitIDs, exitEventsCount-exitEventsToRemove)
+
+	expRemainingExitIDs := exitEventIDs[exitEventsToRemove:]
+	require.Len(t, remainingExitIDs, len(expRemainingExitIDs))
+	require.Equal(t, expRemainingExitIDs, remainingExitIDs)
 }
 
 func generateTestExitEvents(t *testing.T, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
