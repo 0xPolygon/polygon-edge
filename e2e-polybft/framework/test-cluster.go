@@ -191,10 +191,11 @@ func (c *TestClusterConfig) initLogsDir() {
 }
 
 type TestCluster struct {
-	Config      *TestClusterConfig
-	Servers     []*TestServer
-	Bridge      *TestBridge
-	initialPort int64
+	Config                   *TestClusterConfig
+	Servers                  []*TestServer
+	Bridge                   *TestBridge
+	initialPort              int64
+	ByzantineValidatorsIndex []int
 
 	once         sync.Once
 	failCh       chan struct{}
@@ -690,6 +691,9 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 	}(srv.node)
 
 	c.Servers = append(c.Servers, srv)
+	if byzantine {
+		c.ByzantineValidatorsIndex = append(c.ByzantineValidatorsIndex, len(c.Servers)-1)
+	}
 }
 
 func (c *TestCluster) cmdRun(args ...string) error {
@@ -984,6 +988,34 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 		txn:    txn,
 		hash:   hash,
 	}
+}
+
+func (c *TestCluster) GetByzantineValidators(t *testing.T) []*TestServer {
+	t.Helper()
+
+	var validators []*TestServer
+
+	for _, server := range c.Servers {
+		if server.config.Byzantine {
+			validators = append(validators, server)
+		}
+	}
+
+	return validators
+}
+
+func (c *TestCluster) GetByzantineAddresses(t *testing.T) []types.Address {
+	t.Helper()
+
+	var addresses []types.Address
+
+	for _, server := range c.Servers {
+		if server.config.Byzantine {
+			addresses = append(addresses, server.address)
+		}
+	}
+
+	return addresses
 }
 
 type TestTxn struct {

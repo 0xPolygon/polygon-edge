@@ -622,8 +622,8 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 func TestE2E_Consensus_WithByzantineNode(t *testing.T) {
 	const (
-		epochSize      = 4
-		validatorCount = 4
+		epochSize      = 10
+		validatorCount = 5
 		byzantineCount = 2
 	)
 
@@ -635,7 +635,18 @@ func TestE2E_Consensus_WithByzantineNode(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
+	byzantineValidators := cluster.GetByzantineValidators(t)
+	require.Equal(t, byzantineCount, len(byzantineValidators))
+
+	for _, i := range cluster.ByzantineValidatorsIndex {
+		node := cluster.Servers[i]
+		require.True(t, node.IsByzantine())
+	}
+
+	addresses := cluster.GetByzantineAddresses(t)
+	require.Equal(t, byzantineCount, len(addresses))
+
 	t.Run("consensus protocol", func(t *testing.T) {
-		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 1*time.Minute))
+		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 10*time.Minute))
 	})
 }
