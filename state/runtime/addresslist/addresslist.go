@@ -17,6 +17,7 @@ var (
 	SetNoneFunc         = abi.MustNewMethod("function setNone(address)")
 	ReadAddressListFunc = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
 	SetEnabledListFunc  = abi.MustNewMethod("function setEnabledList(bool)")
+	GetEnabledListFunc  = abi.MustNewMethod("function getEnabledList() return (bool)")
 )
 
 // list of gas costs for the operations
@@ -75,15 +76,6 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 	sig, inputBytes := input[:4], input[4:]
 
-	// SetEnabledList receives bool as input parameter which in abi get codified
-	// as a 32 bytes array
-	// all the other functions have the same input (i.e. tuple(address)) which
-	// in abi gets codified as a 32 bytes array with the first 20 bytes
-	// encoding the address
-	if len(inputBytes) != 32 {
-		return nil, 0, errInputTooShort
-	}
-
 	var gasUsed uint64
 
 	consumeGas := func(gasConsume uint64) error {
@@ -95,6 +87,27 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 		return nil
 	}
+
+	// GetEnabledList does not have any parameters and returns bool value
+	if bytes.Equal(sig, GetEnabledListFunc.ID()) {
+		if err := consumeGas(readAddressListCost); err != nil {
+			return nil, 0, err
+		}
+
+		vl, _ := abi.MustNewType("bool").Encode(a.IsEnabled())
+
+		return vl, gasUsed, nil
+	}
+
+	// SetEnabledList receives bool as input parameter which in abi get codified
+	// as a 32 bytes array
+	// all the other functions have the same input (i.e. tuple(address)) which
+	// in abi gets codified as a 32 bytes array with the first 20 bytes
+	// encoding the address
+	if len(inputBytes) != 32 {
+		return nil, 0, errInputTooShort
+	}
+
 	isSuperAdmin := a.superAdmin != nil && *a.superAdmin == caller
 
 	if bytes.Equal(sig, SetEnabledListFunc.ID()) {
