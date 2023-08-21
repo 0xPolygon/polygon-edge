@@ -16,8 +16,8 @@ var (
 	SetEnabledFunc      = abi.MustNewMethod("function setEnabled(address)")
 	SetNoneFunc         = abi.MustNewMethod("function setNone(address)")
 	ReadAddressListFunc = abi.MustNewMethod("function readAddressList(address) returns (uint256)")
-	SetEnabledListFunc  = abi.MustNewMethod("function setEnabledList(bool)")
-	GetEnabledListFunc  = abi.MustNewMethod("function getEnabledList() return (bool)")
+	SetListEnabledFunc  = abi.MustNewMethod("function setListEnabled(bool)")
+	GetListEnabledFunc  = abi.MustNewMethod("function getListEnabled() returns (bool)")
 )
 
 // list of gas costs for the operations
@@ -89,7 +89,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	}
 
 	// GetEnabledList does not have any parameters and returns bool value
-	if bytes.Equal(sig, GetEnabledListFunc.ID()) {
+	if bytes.Equal(sig, GetListEnabledFunc.ID()) {
 		if err := consumeGas(readAddressListCost); err != nil {
 			return nil, 0, err
 		}
@@ -110,7 +110,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 	isSuperAdmin := a.superAdmin != nil && *a.superAdmin == caller
 
-	if bytes.Equal(sig, SetEnabledListFunc.ID()) {
+	if bytes.Equal(sig, SetListEnabledFunc.ID()) {
 		value := types.BytesToHash(input) != types.ZeroHash
 
 		if err := consumeGas(writeAddressListCost); err != nil {

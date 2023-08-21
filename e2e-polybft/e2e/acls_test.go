@@ -413,3 +413,132 @@ func TestE2E_AddressLists_Bridge(t *testing.T) {
 		expectRole(t, cluster, contracts.BlockListBridgeAddr, otherAddr, addresslist.EnabledRole)
 	}
 }
+
+func TestE2E_AllowList_SuperAdmin(t *testing.T) {
+	superadmin, _ := wallet.GenerateKey()
+	admin, _ := wallet.GenerateKey()
+	rndUser, _ := wallet.GenerateKey()
+
+	adminAddr := types.Address(admin.Address())
+	rndUserAddress := types.Address(rndUser.Address())
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
+		framework.WithPremine(adminAddr, rndUserAddress),
+		framework.WithSuperAdminAllowBlock(types.Address(superadmin.Address())),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	// bytecode for an empty smart contract
+	bytecode, _ := hex.DecodeString("608060405234801561001057600080fd5b506103db806100206000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c80635e9f13f81461003b578063d78bca6914610059575b600080fd5b610043610089565b6040516100509190610217565b60405180910390f35b610073600480360381019061006e9190610263565b6100a1565b60405161008091906102a9565b60405180910390f35b73020000000000000000000000000000000000000081565b600080600073020000000000000000000000000000000000000073ffffffffffffffffffffffffffffffffffffffff16846040516024016100e29190610217565b6040516020818303038152906040527fd78bca69000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19166020820180517bffffffffffffffffffffffffffffffffffffffffffffffffffffffff838183161783525050505060405161016c9190610335565b6000604051808303816000865af19150503d80600081146101a9576040519150601f19603f3d011682016040523d82523d6000602084013e6101ae565b606091505b50915091506000818060200190518101906101c99190610378565b9050809350505050919050565b600073ffffffffffffffffffffffffffffffffffffffff82169050919050565b6000610201826101d6565b9050919050565b610211816101f6565b82525050565b600060208201905061022c6000830184610208565b92915050565b600080fd5b610240816101f6565b811461024b57600080fd5b50565b60008135905061025d81610237565b92915050565b60006020828403121561027957610278610232565b5b60006102878482850161024e565b91505092915050565b6000819050919050565b6102a381610290565b82525050565b60006020820190506102be600083018461029a565b92915050565b600081519050919050565b600081905092915050565b60005b838110156102f85780820151818401526020810190506102dd565b60008484015250505050565b600061030f826102c4565b61031981856102cf565b93506103298185602086016102da565b80840191505092915050565b60006103418284610304565b915081905092915050565b61035581610290565b811461036057600080fd5b50565b6000815190506103728161034c565b92915050565b60006020828403121561038e5761038d610232565b5b600061039c84828501610363565b9150509291505056fea264697066735822122035f391b5c3dbf9a5e31072167a4ada71e9ba762650849f6320bc6150fa45aa9564736f6c63430008110033")
+
+	{
+		// Step 0. allow lists should be disabled
+		expectIsEnabled(t, cluster, contracts.AllowListTransactionsAddr, false)
+		expectIsEnabled(t, cluster, contracts.AllowListContractsAddr, false)
+	}
+
+	{
+		// Step 1. anyone can send normal transaction or deploy smart contract because lists are disabled
+		tx := cluster.Transfer(t, admin, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, tx.Wait())
+		require.True(t, tx.Succeed())
+
+		tx = cluster.Deploy(t, rndUser, bytecode)
+		require.NoError(t, tx.Wait())
+		require.True(t, tx.Succeed())
+		require.True(t, cluster.ExistsCode(t, tx.Receipt().ContractAddress))
+	}
+
+	{
+		// Step 2. super admin enables two lists
+		input, _ := addresslist.SetListEnabledFunc.Encode([]interface{}{true})
+
+		saTxn := cluster.MethodTxn(t, superadmin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.False(t, saTxn.Failed())
+
+		input, _ = addresslist.SetListEnabledFunc.Encode([]interface{}{true})
+
+		saTxn = cluster.MethodTxn(t, superadmin, contracts.AllowListContractsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.False(t, saTxn.Failed())
+	}
+
+	{
+		// Step 3. no one can send normal transaction or deploy smart contract because lists are enabled and empty
+		tx := cluster.Transfer(t, rndUser, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, tx.Wait())
+		require.False(t, tx.Succeed())
+
+		tx = cluster.Deploy(t, admin, bytecode)
+		require.NoError(t, tx.Wait())
+		require.False(t, tx.Succeed())
+		require.False(t, cluster.ExistsCode(t, tx.Receipt().ContractAddress))
+	}
+
+	{
+		// Step 4. add two roles by superadmin
+		input, _ := addresslist.SetAdminFunc.Encode([]interface{}{adminAddr})
+
+		saTxn := cluster.MethodTxn(t, superadmin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.True(t, saTxn.Succeed())
+
+		input, _ = addresslist.SetEnabledFunc.Encode([]interface{}{rndUserAddress})
+
+		saTxn = cluster.MethodTxn(t, superadmin, contracts.AllowListContractsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.True(t, saTxn.Succeed())
+
+		// add one more role by admin
+		input, _ = addresslist.SetEnabledFunc.Encode([]interface{}{rndUserAddress})
+
+		saTxn = cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.True(t, saTxn.Succeed())
+
+		// adding role by normal user should fail
+		input, _ = addresslist.SetEnabledFunc.Encode([]interface{}{adminAddr})
+
+		saTxn = cluster.MethodTxn(t, rndUser, contracts.AllowListContractsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.True(t, saTxn.Failed())
+
+		expectRole(t, cluster, contracts.AllowListTransactionsAddr, adminAddr, addresslist.AdminRole)
+		expectRole(t, cluster, contracts.AllowListContractsAddr, rndUserAddress, addresslist.EnabledRole)
+		expectRole(t, cluster, contracts.AllowListTransactionsAddr, rndUserAddress, addresslist.EnabledRole)
+		expectRole(t, cluster, contracts.AllowListContractsAddr, adminAddr, addresslist.NoRole)
+	}
+
+	{
+		// Step 4. admin address can send normal transaction, user can deploy contract...
+		tx := cluster.Transfer(t, admin, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, tx.Wait())
+		require.True(t, tx.Succeed())
+
+		tx = cluster.Deploy(t, rndUser, bytecode)
+		require.NoError(t, tx.Wait())
+		require.True(t, tx.Succeed())
+		require.True(t, cluster.ExistsCode(t, tx.Receipt().ContractAddress))
+
+		// ... but admin address is not in deployment allow list
+		tx = cluster.Deploy(t, admin, bytecode)
+		require.NoError(t, tx.Wait())
+		require.True(t, tx.Reverted())
+		require.False(t, cluster.ExistsCode(t, tx.Receipt().ContractAddress))
+
+		// remove rndUser address from tx allow list so that address can not send transactions anymore
+		input, _ := addresslist.SetNoneFunc.Encode([]interface{}{rndUserAddress})
+
+		saTxn := cluster.MethodTxn(t, admin, contracts.AllowListTransactionsAddr, input)
+		require.NoError(t, saTxn.Wait())
+		require.True(t, saTxn.Succeed())
+
+		tx = cluster.Transfer(t, rndUser, types.ZeroAddress, big.NewInt(1))
+		require.NoError(t, tx.Wait())
+		require.True(t, tx.Reverted())
+	}
+}

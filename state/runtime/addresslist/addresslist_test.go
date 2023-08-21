@@ -212,7 +212,7 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	expectEnabled := func(t *testing.T, a *AddressList, address types.Address, value bool) {
 		t.Helper()
 
-		input, _ := GetEnabledListFunc.Encode([]interface{}{})
+		input, _ := GetListEnabledFunc.Encode([]interface{}{})
 		result, gasCost, err := a.runInputCall(address, input, readAddressListCost, false)
 
 		require.NoError(t, err)
@@ -231,7 +231,7 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	expectEnabled(t, a, targetAddr, true)
 
 	// try disabling list with non super admin
-	input, _ := SetEnabledListFunc.Encode([]interface{}{false})
+	input, _ := SetListEnabledFunc.Encode([]interface{}{false})
 	_, gasCost, err := a.runInputCall(types.ZeroAddress, input, writeAddressListCost, false)
 
 	require.ErrorIs(t, err, runtime.ErrNotAuth)
@@ -239,7 +239,7 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	expectEnabled(t, a, targetAddr, true)
 
 	// disable list
-	input, _ = SetEnabledListFunc.Encode([]interface{}{false})
+	input, _ = SetListEnabledFunc.Encode([]interface{}{false})
 	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
@@ -281,7 +281,7 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	expectEnabled(t, a, targetAddr, false)
 
 	// enable list
-	input, _ = SetEnabledListFunc.Encode([]interface{}{true})
+	input, _ = SetListEnabledFunc.Encode([]interface{}{true})
 	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
@@ -300,6 +300,8 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 }
 
 func TestAddressList_WriteOp_NonAdmin(t *testing.T) {
+	t.Parallel()
+
 	adminAddress := types.Address{0x95}
 	enabledRoleAddress := types.Address{0x94}
 	noRoleAddress := types.Address{0x93}
