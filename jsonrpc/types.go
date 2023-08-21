@@ -377,6 +377,10 @@ func convertToArgUint64SliceSlice(slice [][]uint64) [][]argUint64 {
 }
 
 func uuidToHex(uuidStr string) (string, error) {
+	if strings.HasPrefix(uuidStr, "0x") {
+		return uuidStr, nil
+	}
+
 	uuidObj, err := uuid.Parse(uuidStr)
 	if err != nil {
 		return "", err
@@ -385,20 +389,4 @@ func uuidToHex(uuidStr string) (string, error) {
 	uuidBytes := uuidObj[:]
 
 	return "0x" + hex.EncodeToString(uuidBytes), nil
-}
-
-func hexToUUID(hexStr string) (string, error) {
-	hexStr = strings.TrimPrefix(hexStr, "0x") // Remove "0x" prefix if present
-
-	uuidBytes, err := hex.DecodeString(hexStr)
-	if err != nil {
-		return "", err
-	}
-
-	uuidObj, err := uuid.FromBytes(uuidBytes)
-	if err != nil {
-		return "", err
-	}
-
-	return uuidObj.String(), nil
 }

@@ -82,8 +82,9 @@ type filterBase struct {
 
 // newFilterBase initializes filterBase with unique ID
 func newFilterBase(ws wsConn) filterBase {
+	newId, _ := uuidToHex(uuid.New().String())
 	return filterBase{
-		id:        uuid.New().String(),
+		id:        newId,
 		ws:        ws,
 		heapIndex: NoIndexInHeap,
 	}
@@ -389,11 +390,10 @@ func (f *FilterManager) Run() {
 
 	for {
 		// check for the next filter to be removed
-		filterID, filterExpiresAt := f.nextTimeoutFilter()
-		filterID, _ = hexToUUID(filterID)
+		filterId, filterExpiresAt := f.nextTimeoutFilter()
 
 		// set timer to remove filter
-		if filterID != "" {
+		if filterId != "" {
 			timeoutCh = time.After(time.Until(filterExpiresAt))
 		}
 
@@ -413,8 +413,8 @@ func (f *FilterManager) Run() {
 		case <-timeoutCh:
 			// timeout for filter
 			// if filter still exists
-			if !f.Uninstall(filterID) {
-				f.logger.Warn("failed to uninstall filter", "id", filterID)
+			if !f.Uninstall(filterId) {
+				f.logger.Warn("failed to uninstall filter", "id", filterId)
 			}
 
 		case <-f.updateCh:
@@ -708,8 +708,7 @@ func (f *FilterManager) addFilter(filter filter) string {
 		f.addFilterTimeout(base)
 	}
 
-	baseId, _ := uuidToHex(base.id)
-	return baseId
+	return base.id
 }
 
 func (f *FilterManager) emitSignalToUpdateCh() {

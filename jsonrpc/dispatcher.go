@@ -233,7 +233,6 @@ func (d *Dispatcher) handleUnsubscribe(req Request) (bool, Error) {
 		return false, NewSubscriptionNotFoundError(filterID)
 	}
 
-	filterID, _ = hexToUUID(filterID)
 	return d.filterManager.Uninstall(filterID), nil
 }
 
