@@ -197,11 +197,11 @@ func (d *Debug) TraceCall(
 			}
 
 			tracer, cancel, err := newTracer(config)
-			defer cancel()
-
 			if err != nil {
 				return nil, err
 			}
+
+			defer cancel()
 
 			return d.store.TraceCall(tx, header, tracer)
 		},
@@ -217,11 +217,11 @@ func (d *Debug) traceBlock(
 	}
 
 	tracer, cancel, err := newTracer(config)
-	defer cancel()
-
 	if err != nil {
 		return nil, err
 	}
+
+	defer cancel()
 
 	return d.store.TraceBlock(block, tracer)
 }
