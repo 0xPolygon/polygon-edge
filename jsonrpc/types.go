@@ -7,7 +7,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/google/uuid"
 )
 
 const jsonRPCMetric = "json_rpc"
@@ -374,19 +373,4 @@ func convertToArgUint64SliceSlice(slice [][]uint64) [][]argUint64 {
 	}
 
 	return argSlice
-}
-
-func uuidToHex(uuidStr string) (string, error) {
-	if strings.HasPrefix(uuidStr, "0x") {
-		return uuidStr, nil
-	}
-
-	uuidObj, err := uuid.Parse(uuidStr)
-	if err != nil {
-		return "", err
-	}
-
-	uuidBytes := uuidObj[:]
-
-	return "0x" + hex.EncodeToString(uuidBytes), nil
 }

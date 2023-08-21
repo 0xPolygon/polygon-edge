@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
@@ -82,9 +83,12 @@ type filterBase struct {
 
 // newFilterBase initializes filterBase with unique ID
 func newFilterBase(ws wsConn) filterBase {
-	newId, _ := uuidToHex(uuid.New().String())
+	uuidObj := uuid.New()
+	uuidBytes := uuidObj[:]
+	newID := "0x" + hex.EncodeToString(uuidBytes)
+
 	return filterBase{
-		id:        newId,
+		id:        newID,
 		ws:        ws,
 		heapIndex: NoIndexInHeap,
 	}
@@ -390,10 +394,10 @@ func (f *FilterManager) Run() {
 
 	for {
 		// check for the next filter to be removed
-		filterId, filterExpiresAt := f.nextTimeoutFilter()
+		filterID, filterExpiresAt := f.nextTimeoutFilter()
 
 		// set timer to remove filter
-		if filterId != "" {
+		if filterID != "" {
 			timeoutCh = time.After(time.Until(filterExpiresAt))
 		}
 
@@ -413,8 +417,8 @@ func (f *FilterManager) Run() {
 		case <-timeoutCh:
 			// timeout for filter
 			// if filter still exists
-			if !f.Uninstall(filterId) {
-				f.logger.Warn("failed to uninstall filter", "id", filterId)
+			if !f.Uninstall(filterID) {
+				f.logger.Warn("failed to uninstall filter", "id", filterID)
 			}
 
 		case <-f.updateCh:
