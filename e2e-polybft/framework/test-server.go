@@ -104,6 +104,10 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
 }
 
+func (t *TestServer) IsByzantine() bool {
+	return t.config.Byzantine
+}
+
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
 	bridgeJSONRPC string, callback TestServerConfigCallback) *TestServer {
 	t.Helper()
