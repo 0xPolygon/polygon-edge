@@ -95,6 +95,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 		return nil
 	}
+	isSuperAdmin := a.superAdmin != nil && *a.superAdmin == caller
 
 	if bytes.Equal(sig, SetEnabledListFunc.ID()) {
 		value := types.BytesToHash(input) != types.ZeroHash
@@ -103,7 +104,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 			return nil, 0, err
 		}
 
-		if a.superAdmin == nil || *a.superAdmin != caller {
+		if !isSuperAdmin {
 			return nil, gasUsed, runtime.ErrNotAuth
 		}
 
@@ -120,7 +121,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 			return nil, 0, err
 		}
 
-		if !a.IsEnabled() {
+		if !a.IsEnabled() && !isSuperAdmin {
 			return nil, gasUsed, errListIsNotEnabled
 		}
 
@@ -146,7 +147,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 		return nil, gasUsed, err
 	}
 
-	if !a.IsEnabled() {
+	if !a.IsEnabled() && !isSuperAdmin {
 		return nil, gasUsed, errListIsNotEnabled
 	}
 
@@ -157,7 +158,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 	// Only Admin or superadmin accounts can modify the role of other accounts
 	addrRole := a.GetRole(caller)
-	if addrRole != AdminRole && (a.superAdmin == nil || *a.superAdmin != caller) {
+	if addrRole != AdminRole && !isSuperAdmin {
 		return nil, gasUsed, runtime.ErrNotAuth
 	}
 

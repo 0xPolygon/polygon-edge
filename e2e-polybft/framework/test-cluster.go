@@ -93,6 +93,7 @@ type TestClusterConfig struct {
 	NativeTokenConfigRaw string
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 
+	SuperAdminAllowBlock             *types.Address
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
 	ContractDeployerBlockListAdmin   []types.Address
@@ -263,6 +264,12 @@ func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
 func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.NumBlockConfirmations = numBlockConfirmations
+	}
+}
+
+func WithSuperAdminAllowBlock(addr types.Address) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.SuperAdminAllowBlock = &addr
 	}
 }
 
@@ -487,6 +494,10 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for i := 0; i < bootNodesCnt; i++ {
 				args = append(args, "--bootnode", validators[i].MultiAddr)
 			}
+		}
+
+		if cluster.Config.SuperAdminAllowBlock != nil {
+			args = append(args, "--super-admin-allow-block", cluster.Config.SuperAdminAllowBlock.String())
 		}
 
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {

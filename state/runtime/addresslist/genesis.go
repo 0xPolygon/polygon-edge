@@ -15,20 +15,18 @@ func ApplyGenesisAllocs(chain *chain.Genesis, addressListAddr types.Address, con
 
 	if config == nil {
 		allocList.SetEnabled(false)
+	} else {
+		allocList.SetEnabled(true)
 
-		return
-	}
+		// enabled addr
+		for _, addr := range config.EnabledAddresses {
+			allocList.SetRole(addr, EnabledRole)
+		}
 
-	allocList.SetEnabled(true)
-
-	// enabled addr
-	for _, addr := range config.EnabledAddresses {
-		allocList.SetRole(addr, EnabledRole)
-	}
-
-	// admin addr
-	for _, addr := range config.AdminAddresses {
-		allocList.SetRole(addr, AdminRole)
+		// admin addr
+		for _, addr := range config.AdminAddresses {
+			allocList.SetRole(addr, AdminRole)
+		}
 	}
 }
 
