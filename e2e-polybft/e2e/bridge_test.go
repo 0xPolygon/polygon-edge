@@ -1564,9 +1564,10 @@ func TestE2E_DoubleSign_Slashing(t *testing.T) {
 	byzantineValStakeOnChildAfter := erc20BalanceOf(t, byzantineValidatorAcc.Address(),
 		contracts.ValidatorSetContract, childRelayer)
 
-	expectedStakeOnRoot := new(big.Int)
-	expectedStakeOnRoot.Mul(byzantineValStakeOnRootBefore, slashingPercentage)
-	expectedStakeOnRoot.Div(expectedStakeOnRoot, new(big.Int).SetUint64(100))
+	slashedAmountOnRoot := new(big.Int)
+	slashedAmountOnRoot.Mul(byzantineValStakeOnRootBefore, slashingPercentage)
+	slashedAmountOnRoot.Div(slashedAmountOnRoot, new(big.Int).SetUint64(100))
+	expectedStakeOnRoot := slashedAmountOnRoot.Sub(byzantineValStakeOnRootBefore, slashedAmountOnRoot)
 
 	require.True(t, expectedStakeOnRoot.Cmp(byzantineValStakeOnRootAfter) == 0,
 		fmt.Sprintf("byzantine validator stake on root chain doesn't match expected value after slashing. "+
