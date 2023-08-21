@@ -217,7 +217,10 @@ func (d *Debug) traceBlock(
 	}
 
 	tracer, cancel, err := newTracer(config)
-	defer cancel()
+
+	if cancel != nil {
+		defer cancel()
+	}
 
 	if err != nil {
 		return nil, err
