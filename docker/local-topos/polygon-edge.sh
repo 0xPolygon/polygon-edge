@@ -47,7 +47,7 @@ case "$1" in
                       --dir genesis.json \
                       --consensus ibft \
                       --ibft-validators-prefix-path data- \
-                      --validator-set-size=$NUMBER_OF_NODES \
+                      --max-validator-count=$NUMBER_OF_NODES \
                       --bootnode /dns4/"$BOOTNODE_DOMAIN_NAME"/tcp/1478/p2p/$BOOTNODE_ID \
                       --premine=$BOOTNODE_ADDRESS:1000000000000000000000 \
                     && cd /polygon-edge
@@ -76,7 +76,7 @@ case "$1" in
                       --dir "$GENESIS_PATH" \
                       --consensus polybft \
                       --manifest /data/manifest.json \
-                      --validator-set-size=$NUMBER_OF_NODES \
+                      --max-validator-count=$NUMBER_OF_NODES \
                       --bootnode /dns4/"$BOOTNODE_DOMAIN_NAME"/tcp/1478/p2p/$BOOTNODE_ID
                 fi
             ;;
@@ -103,7 +103,7 @@ case "$1" in
         "$POLYGON_EDGE_BIN" genesis --dir genesis.json \
          --consensus ibft \
          --ibft-validators-prefix-path data- \
-         --validator-set-size=1 \
+         --max-validator-count=1 \
          --premine=0x4AAb25B4fAd0Beaac466050f3A7142A502f4Cf0a:1000000000000000000000 \
          --bootnode /ip4/127.0.0.1/tcp/10001/p2p/$NODE_ID
 
