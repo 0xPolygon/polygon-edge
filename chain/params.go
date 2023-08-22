@@ -21,7 +21,7 @@ type Params struct {
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
 	// Access control configuration
-	SuperAdminAccessLists     *types.Address     `json:"superAdminAccessLists,omitempty"`
+	AccessListsSuperAdmin     *types.Address     `json:"accessListsSuperAdmin,omitempty"`
 	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
 	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
 	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`

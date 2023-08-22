@@ -121,7 +121,7 @@ type genesisParams struct {
 	bridgeAllowListEnabled           []string
 	bridgeBlockListAdmin             []string
 	bridgeBlockListEnabled           []string
-	superAdminAccessLists            string
+	accessListsSuperAdmin            string
 
 	nativeTokenConfigRaw string
 	nativeTokenConfig    *polybft.TokenConfig
