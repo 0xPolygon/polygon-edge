@@ -88,15 +88,15 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 		return nil
 	}
 
-	// GetEnabledList does not have any parameters and returns bool value
+	// GetListEnabledFunc does not have any parameters and returns bool value
 	if bytes.Equal(sig, GetListEnabledFunc.ID()) {
 		if err := consumeGas(readAddressListCost); err != nil {
 			return nil, 0, err
 		}
 
-		vl, _ := abi.MustNewType("bool").Encode(a.IsEnabled())
+		result := getAbiBoolValue(a.IsEnabled())
 
-		return vl, gasUsed, nil
+		return result, gasUsed, nil
 	}
 
 	// SetEnabledList receives bool as input parameter which in abi get codified
@@ -104,7 +104,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	// all the other functions have the same input (i.e. tuple(address)) which
 	// in abi gets codified as a 32 bytes array with the first 20 bytes
 	// encoding the address
-	if len(inputBytes) != 32 {
+	if len(inputBytes) != types.HashLength {
 		return nil, 0, errInputTooShort
 	}
 
@@ -200,8 +200,7 @@ func (a *AddressList) IsEnabled() bool {
 }
 
 func (a *AddressList) SetEnabled(value bool) {
-	vl, _ := abi.MustNewType("bool").Encode(value)
-	stateValue := types.BytesToHash(vl)
+	stateValue := types.BytesToHash(getAbiBoolValue(value))
 
 	a.state.SetState(a.addr, enabledKeyHash, stateValue)
 }
@@ -236,4 +235,10 @@ func (r Role) Enabled() bool {
 type stateRef interface {
 	SetState(addr types.Address, key, value types.Hash)
 	GetStorage(addr types.Address, key types.Hash) types.Hash
+}
+
+func getAbiBoolValue(value bool) []byte {
+	encodedValue, _ := abi.MustNewType("bool").Encode(value)
+
+	return encodedValue
 }

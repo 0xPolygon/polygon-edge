@@ -93,7 +93,7 @@ type TestClusterConfig struct {
 	NativeTokenConfigRaw string
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 
-	SuperAdminAllowBlock             *types.Address
+	SuperAdminAccessLists            *types.Address
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
 	ContractDeployerBlockListAdmin   []types.Address
@@ -267,9 +267,9 @@ func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	}
 }
 
-func WithSuperAdminAllowBlock(addr types.Address) ClusterOption {
+func WithSuperAdminAccessLists(addr types.Address) ClusterOption {
 	return func(h *TestClusterConfig) {
-		h.SuperAdminAllowBlock = &addr
+		h.SuperAdminAccessLists = &addr
 	}
 }
 
@@ -496,8 +496,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			}
 		}
 
-		if cluster.Config.SuperAdminAllowBlock != nil {
-			args = append(args, "--super-admin-allow-block", cluster.Config.SuperAdminAllowBlock.String())
+		if cluster.Config.SuperAdminAccessLists != nil {
+			args = append(args, "--super-admin-access-lists", cluster.Config.SuperAdminAccessLists.String())
 		}
 
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {

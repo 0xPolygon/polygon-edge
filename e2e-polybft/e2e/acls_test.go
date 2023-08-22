@@ -425,7 +425,7 @@ func TestE2E_AllowList_SuperAdmin(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, rndUserAddress),
-		framework.WithSuperAdminAllowBlock(types.Address(superadmin.Address())),
+		framework.WithSuperAdminAccessLists(types.Address(superadmin.Address())),
 	)
 	defer cluster.Stop()
 

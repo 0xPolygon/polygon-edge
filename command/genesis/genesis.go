@@ -324,8 +324,8 @@ func setFlags(cmd *cobra.Command) {
 		)
 
 		cmd.Flags().StringVar(
-			&params.superAdminAllowBlock,
-			superAdminAllowBlockFlag,
+			&params.superAdminAccessLists,
+			superAdminAccessListsFlag,
 			"",
 			"super admin for all allow and block lists",
 		)
