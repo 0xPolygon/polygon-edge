@@ -29,16 +29,17 @@ var (
 var (
 	// is list enabled or not key hash
 	enabledKeyHash = types.StringToHash("ffffffffffffffffffffffffffffffffffffffff")
+	// super admin key hash
+	superAdminKeyHash = types.StringToHash("fffffffffffffffffffffffffffffffffffffffe")
 )
 
 type AddressList struct {
-	state      stateRef
-	addr       types.Address
-	superAdmin *types.Address
+	state stateRef
+	addr  types.Address
 }
 
-func NewAddressList(state stateRef, addr types.Address, superAdmin *types.Address) *AddressList {
-	return &AddressList{state: state, addr: addr, superAdmin: superAdmin}
+func NewAddressList(state stateRef, addr types.Address) *AddressList {
+	return &AddressList{state: state, addr: addr}
 }
 
 func (a *AddressList) Addr() types.Address {
@@ -108,7 +109,8 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 		return nil, 0, errInputTooShort
 	}
 
-	isSuperAdmin := a.superAdmin != nil && *a.superAdmin == caller
+	superAdmin, superAdminExists := a.GetSuperAdmin()
+	isSuperAdmin := superAdminExists && superAdmin == caller
 
 	if bytes.Equal(sig, SetListEnabledFunc.ID()) {
 		value := types.BytesToHash(input) != types.ZeroHash
@@ -203,6 +205,34 @@ func (a *AddressList) SetEnabled(value bool) {
 	stateValue := types.BytesToHash(getAbiBoolValue(value))
 
 	a.state.SetState(a.addr, enabledKeyHash, stateValue)
+}
+
+func (a *AddressList) SetSuperAdmin(addr *types.Address) {
+	if addr == nil {
+		// if we want to clear superadmin, do not do anything if superadmin does not exists in storage
+		if _, exists := a.GetSuperAdmin(); !exists {
+			return
+		}
+
+		a.state.SetState(a.addr, superAdminKeyHash, types.ZeroHash)
+	} else {
+		value := types.BytesToHash(addr.Bytes())
+		// The first byte specifies the presence of a super admin
+		// (allowing the use of the types.ZeroAddress address for the superadmin)
+		value[0] = 1
+
+		a.state.SetState(a.addr, superAdminKeyHash, value)
+	}
+}
+
+func (a *AddressList) GetSuperAdmin() (types.Address, bool) {
+	res := a.state.GetStorage(a.addr, superAdminKeyHash)
+	// If the first byte of the hash is zero, it indicates that no superadmin has been saved in the storage
+	if res[0] == 0 {
+		return types.ZeroAddress, false
+	}
+
+	return types.BytesToAddress(res[:]), true
 }
 
 type Role types.Hash

@@ -7,11 +7,21 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func ApplyGenesisAllocs(chain *chain.Genesis, addressListAddr types.Address, config *chain.AddressListConfig) {
+func ApplyGenesisAllocs(
+	chain *chain.Genesis,
+	addressListAddr types.Address,
+	config *chain.AddressListConfig,
+	superAdmin *types.Address) {
+	if superAdmin == nil && config == nil {
+		return
+	}
+
 	allocList := &AddressList{
 		addr:  addressListAddr,
 		state: &genesisState{chain},
 	}
+
+	allocList.SetSuperAdmin(superAdmin)
 
 	if config == nil {
 		allocList.SetEnabled(false)

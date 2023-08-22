@@ -28,8 +28,9 @@ func newMockAddressList() *AddressList {
 		state: map[types.Hash]types.Hash{},
 	}
 
-	al := NewAddressList(state, types.Address{}, &superAdmin)
+	al := NewAddressList(state, types.Address{})
 	al.SetEnabled(true)
+	al.SetSuperAdmin(&superAdmin)
 
 	return al
 }
