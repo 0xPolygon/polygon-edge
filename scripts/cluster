@@ -158,7 +158,7 @@ function initRootchain() {
 function startServerFromBinary() {
   if [ "$1" == "write-logs" ]; then
     echo "Writing validators logs to the files..."
-    if [ "$1" == "polybft" ]; then
+    if [ "$0" == "polybft" ]; then
       ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
         --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
         --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
@@ -178,7 +178,7 @@ function startServerFromBinary() {
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-4.log &
     wait
   else
-    if [ "$1" == "polybft" ]; then
+    if [ "$0" == "polybft" ]; then
       ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
         --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
         --num-block-confirmations 2 --seal --log-level DEBUG &
