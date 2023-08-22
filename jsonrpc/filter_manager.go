@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
@@ -84,11 +83,9 @@ type filterBase struct {
 // newFilterBase initializes filterBase with unique ID
 func newFilterBase(ws wsConn) filterBase {
 	uuidObj := uuid.New()
-	uuidBytes := uuidObj[:]
-	newID := "0x" + hex.EncodeToString(uuidBytes)
 
 	return filterBase{
-		id:        newID,
+		id:        string(encodeToHex(uuidObj[:])),
 		ws:        ws,
 		heapIndex: NoIndexInHeap,
 	}
