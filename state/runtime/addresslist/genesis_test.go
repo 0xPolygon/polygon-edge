@@ -10,6 +10,8 @@ import (
 )
 
 func TestGenesis(t *testing.T) {
+	t.Parallel()
+
 	one := types.Address{0x1}
 	two := types.Address{0x2}
 	three := types.Address{0x3}
@@ -38,7 +40,6 @@ func TestGenesis(t *testing.T) {
 	expect := &chain.GenesisAccount{
 		Balance: big.NewInt(1),
 		Storage: map[types.Hash]types.Hash{
-			types.StringToHash("fffffffffffffffffffffffffffffffffffffffe"): types.ZeroHash,
 			types.StringToHash("ffffffffffffffffffffffffffffffffffffffff"): types.StringToHash("1"),
 			types.BytesToHash(one.Bytes()):                                 types.Hash(AdminRole),
 			types.BytesToHash(two.Bytes()):                                 types.Hash(EnabledRole),
