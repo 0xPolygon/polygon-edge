@@ -210,11 +210,11 @@ func TestRole_Enabled(t *testing.T) {
 func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	t.Parallel()
 
-	expectEnabled := func(t *testing.T, a *AddressList, address types.Address, value bool) {
+	expectEnabled := func(t *testing.T, a *AddressList, caller types.Address, value bool) {
 		t.Helper()
 
 		input, _ := GetListEnabledFunc.Encode([]interface{}{})
-		result, gasCost, err := a.runInputCall(address, input, readAddressListCost, false)
+		result, gasCost, err := a.runInputCall(caller, input, readAddressListCost, false)
 
 		require.NoError(t, err)
 		require.Equal(t, readAddressListCost, gasCost)
@@ -224,20 +224,20 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 		require.Equal(t, value, resultVal)
 	}
 
-	targetAddr := types.Address{0x99, 0xAA}
+	someRndAddress := types.Address{0x99, 0xAA}
 	simpleAdmin := types.Address{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99}
 	a := newMockAddressList()
-	a.SetRole(types.Address{}, AdminRole)
 
-	expectEnabled(t, a, targetAddr, true)
+	a.SetRole(types.Address{}, EnabledRole)
+	expectEnabled(t, a, someRndAddress, true)
 
-	// try disabling list with non super admin
+	// only admin or super admin should be able to disable list
 	input, _ := SetListEnabledFunc.Encode([]interface{}{false})
 	_, gasCost, err := a.runInputCall(types.ZeroAddress, input, writeAddressListCost, false)
 
 	require.ErrorIs(t, err, runtime.ErrNotAuth)
 	require.Equal(t, writeAddressListCost, gasCost)
-	expectEnabled(t, a, targetAddr, true)
+	expectEnabled(t, a, someRndAddress, true)
 
 	// disable list
 	input, _ = SetListEnabledFunc.Encode([]interface{}{false})
@@ -245,7 +245,7 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)
-	expectEnabled(t, a, targetAddr, false)
+	expectEnabled(t, a, simpleAdmin, false)
 
 	// superadmin can add admin role while list is disabled
 	input, _ = SetAdminFunc.Encode([]interface{}{simpleAdmin})
@@ -253,51 +253,39 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)
-	expectEnabled(t, a, superAdmin, false)
+	require.Equal(t, AdminRole, a.GetRole(simpleAdmin))
 
-	// superadmin can also check role of newly added admin while list is disabled
+	// anyone can check role of newly added admin while list is disabled
 	input, _ = ReadAddressListFunc.Encode([]interface{}{simpleAdmin})
-	role, gasCost, err := a.runInputCall(superAdmin, input, writeAddressListCost, false)
+	role, gasCost, err := a.runInputCall(someRndAddress, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, readAddressListCost, gasCost)
 	require.Equal(t, AdminRole.Bytes(), role)
-	expectEnabled(t, a, targetAddr, false)
 
-	// simple admin can not add new role while list is disabled
-	input, _ = SetEnabledFunc.Encode([]interface{}{targetAddr})
-	ret, gasCost, err := a.runInputCall(simpleAdmin, input, writeAddressListCost, false)
-
-	require.Equal(t, writeAddressListCost, gasCost)
-	require.ErrorIs(t, err, errListIsNotEnabled)
-	require.Empty(t, ret)
-	require.Equal(t, NoRole, a.GetRole(targetAddr))
-
-	// simple admin can not check role while list is disabled
-	input, _ = ReadAddressListFunc.Encode([]interface{}{simpleAdmin})
+	// simple admin can add new role while list is disabled
+	input, _ = SetEnabledFunc.Encode([]interface{}{someRndAddress})
 	_, gasCost, err = a.runInputCall(simpleAdmin, input, writeAddressListCost, false)
 
-	require.ErrorIs(t, err, errListIsNotEnabled)
-	require.Equal(t, readAddressListCost, gasCost)
-	expectEnabled(t, a, targetAddr, false)
+	require.NoError(t, err)
+	require.Equal(t, writeAddressListCost, gasCost)
+	require.Equal(t, EnabledRole, a.GetRole(someRndAddress))
 
-	// enable list
+	// non admin can not add role
+	input, _ = SetEnabledFunc.Encode([]interface{}{types.Address{0xff, 0xfe}})
+	_, gasCost, err = a.runInputCall(someRndAddress, input, writeAddressListCost, false)
+
+	require.ErrorIs(t, err, runtime.ErrNotAuth)
+	require.Equal(t, writeAddressListCost, gasCost)
+	expectEnabled(t, a, simpleAdmin, false)
+
+	// simple admin can enable list too
 	input, _ = SetListEnabledFunc.Encode([]interface{}{true})
-	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
+	_, gasCost, err = a.runInputCall(simpleAdmin, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)
-	expectEnabled(t, a, targetAddr, true)
-
-	// after list is enabled, simple admin can add new role
-	input, _ = SetEnabledFunc.Encode([]interface{}{targetAddr})
-	ret, gasCost, err = a.runInputCall(simpleAdmin, input, writeAddressListCost, false)
-
-	require.Equal(t, writeAddressListCost, gasCost)
-	require.NoError(t, err)
-	require.Empty(t, ret)
-	require.Equal(t, EnabledRole, a.GetRole(targetAddr))
-	expectEnabled(t, a, simpleAdmin, true)
+	expectEnabled(t, a, someRndAddress, true)
 }
 
 func TestAddressList_WriteOp_NonAdmin(t *testing.T) {

@@ -65,7 +65,6 @@ var (
 	errFunctionNotFound    = fmt.Errorf("function not found")
 	errWriteProtection     = fmt.Errorf("write protection")
 	errAdminSelfRemove     = fmt.Errorf("cannot remove admin role from caller")
-	errListIsNotEnabled    = fmt.Errorf("list is not enabled")
 )
 
 func (a *AddressList) runInputCall(caller types.Address, input []byte,
@@ -113,20 +112,20 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	isSuperAdmin := superAdminExists && superAdmin == caller
 
 	if bytes.Equal(sig, SetListEnabledFunc.ID()) {
-		value := types.BytesToHash(input) != types.ZeroHash
-
 		if err := consumeGas(writeAddressListCost); err != nil {
 			return nil, 0, err
 		}
 
-		if !isSuperAdmin {
-			return nil, gasUsed, runtime.ErrNotAuth
+		if isSuperAdmin || a.GetRole(caller) == AdminRole {
+			// any hash different than zero hash will be treated as true
+			value := types.BytesToHash(input) != types.ZeroHash
+
+			a.SetEnabled(value)
+
+			return nil, gasUsed, nil
 		}
 
-		// any address different than zero address will be treated as true
-		a.SetEnabled(value)
-
-		return nil, gasUsed, nil
+		return nil, gasUsed, runtime.ErrNotAuth
 	}
 
 	inputAddr := types.BytesToAddress(inputBytes)
@@ -134,10 +133,6 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 	if bytes.Equal(sig, ReadAddressListFunc.ID()) {
 		if err := consumeGas(readAddressListCost); err != nil {
 			return nil, 0, err
-		}
-
-		if !a.IsEnabled() && !isSuperAdmin {
-			return nil, gasUsed, errListIsNotEnabled
 		}
 
 		// read operation
@@ -160,10 +155,6 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 
 	if err := consumeGas(writeAddressListCost); err != nil {
 		return nil, gasUsed, err
-	}
-
-	if !a.IsEnabled() && !isSuperAdmin {
-		return nil, gasUsed, errListIsNotEnabled
 	}
 
 	// we cannot perform any write operation if the call is static
