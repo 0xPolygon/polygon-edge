@@ -423,3 +423,22 @@ func executeSlashingOnRootChain(t *testing.T, polybftConfig polyCommon.PolyBFTCo
 	_, err = rootRelayer.SendTransaction(exitTxn, rootchainDeployer)
 	require.NoError(t, err)
 }
+
+func getValidatorsWithdrawableStakeOnRoot(
+	t *testing.T, txRelayer txrelayer.TxRelayer,
+	stakeManagerAddress, validatorAddress types.Address) *big.Int {
+	t.Helper()
+
+	withdrawableStakeMethod := contractsapi.StakeManager.Abi.GetMethod("withdrawableStake")
+
+	encoded, err := withdrawableStakeMethod.Encode([]interface{}{validatorAddress})
+	require.NoError(t, err)
+
+	response, err := txRelayer.Call(ethgo.Address(types.ZeroAddress), ethgo.Address(stakeManagerAddress), encoded)
+	require.NoError(t, err)
+
+	withdrawableStake, err := common.ParseUint256orHex(&response)
+	require.NoError(t, err)
+
+	return withdrawableStake
+}

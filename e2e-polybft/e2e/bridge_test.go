@@ -1518,12 +1518,15 @@ func TestE2E_DoubleSign_Slashing(t *testing.T) {
 	require.NoError(t, err)
 
 	// for now, the cluster.Servers contains honest validators first, then byzantine ones
-	byzantineValidatorAcc, err := sidechain.GetAccountFromDir(cluster.Servers[validatorNumber].DataDir())
+	byzantineServer := cluster.Servers[validatorNumber]
+	byzantineValidatorAcc, err := sidechain.GetAccountFromDir(byzantineServer.DataDir())
 	require.NoError(t, err)
+
+	byzantineValidatorAddress := byzantineValidatorAcc.Address()
 
 	// get byzantine validator stake from root chain before executing slashing exit event
 	byzantineValidatorInfo, err := sidechain.GetValidatorInfo(
-		ethgo.Address(byzantineValidatorAcc.Address()),
+		ethgo.Address(byzantineValidatorAddress),
 		polybftConfig.Bridge.CustomSupernetManagerAddr,
 		polybftConfig.Bridge.StakeManagerAddr,
 		polybftConfig.SupernetID,
@@ -1533,8 +1536,12 @@ func TestE2E_DoubleSign_Slashing(t *testing.T) {
 
 	byzantineValStakeOnRootBefore := byzantineValidatorInfo.Stake
 
+	// get byzantine validator stake token balance from root chain before executing slashing exit event
+	byzantineValStakeTokenBalanceOnRootBefore := erc20BalanceOf(
+		t, byzantineValidatorAddress, polybftConfig.Bridge.StakeTokenAddr, rootRelayer)
+
 	// get byzantine validator stake from child chain before executing slashing exit event
-	byzantineValStakeOnChildBefore := erc20BalanceOf(t, byzantineValidatorAcc.Address(),
+	byzantineValStakeOnChildBefore := erc20BalanceOf(t, byzantineValidatorAddress,
 		contracts.ValidatorSetContract, childRelayer)
 
 	require.True(t, byzantineValStakeOnRootBefore.Cmp(byzantineValStakeOnChildBefore) == 0,
@@ -1547,7 +1554,7 @@ func TestE2E_DoubleSign_Slashing(t *testing.T) {
 
 	// get byzantine validator stake from root chain after executing slashing exit event
 	byzantineValidatorInfo, err = sidechain.GetValidatorInfo(
-		ethgo.Address(byzantineValidatorAcc.Address()),
+		ethgo.Address(byzantineValidatorAddress),
 		polybftConfig.Bridge.CustomSupernetManagerAddr,
 		polybftConfig.Bridge.StakeManagerAddr,
 		polybftConfig.SupernetID,
@@ -1561,20 +1568,56 @@ func TestE2E_DoubleSign_Slashing(t *testing.T) {
 	require.NoError(t, cluster.WaitForBlock(polybftConfig.SprintSize*4, time.Minute))
 
 	// get byzantine validator stake from child chain after state sync commitment is processed
-	byzantineValStakeOnChildAfter := erc20BalanceOf(t, byzantineValidatorAcc.Address(),
+	byzantineValStakeOnChildAfter := erc20BalanceOf(t, byzantineValidatorAddress,
 		contracts.ValidatorSetContract, childRelayer)
 
-	slashedAmountOnRoot := new(big.Int)
-	slashedAmountOnRoot.Mul(byzantineValStakeOnRootBefore, slashingPercentage)
-	slashedAmountOnRoot.Div(slashedAmountOnRoot, new(big.Int).SetUint64(100))
-	expectedStakeOnRoot := slashedAmountOnRoot.Sub(byzantineValStakeOnRootBefore, slashedAmountOnRoot)
+	// slashing will unstake entire validator stake on root chain, so its stake will fall to 0
+	expectedStakeAfterSlashing := new(big.Int).SetUint64(0)
 
-	require.True(t, expectedStakeOnRoot.Cmp(byzantineValStakeOnRootAfter) == 0,
+	require.True(t, expectedStakeAfterSlashing.Cmp(byzantineValStakeOnRootAfter) == 0,
 		fmt.Sprintf("byzantine validator stake on root chain doesn't match expected value after slashing. "+
-			"expected: %v, actual: %v", expectedStakeOnRoot, byzantineValStakeOnRootAfter))
+			"expected: %v, actual: %v", expectedStakeAfterSlashing, byzantineValStakeOnRootAfter))
 
 	require.True(t, byzantineValStakeOnRootAfter.Cmp(byzantineValStakeOnChildAfter) == 0,
 		fmt.Sprintf("byzantine validator stake on root and child chains doesn't match after slashing. "+
 			"root chain stake: %v, child chain stake: %v",
 			byzantineValStakeOnRootAfter, byzantineValStakeOnChildAfter))
+
+	expectedSlashedStake := new(big.Int)
+	expectedSlashedStake.Mul(byzantineValStakeOnRootBefore, slashingPercentage)
+	expectedSlashedStake.Div(expectedSlashedStake, new(big.Int).SetUint64(100))
+	expectedWithdrawableStake := expectedSlashedStake.Sub(byzantineValStakeOnRootBefore, expectedSlashedStake)
+
+	withdrawableStakeAfterSlashing := getValidatorsWithdrawableStakeOnRoot(
+		t, rootRelayer, polybftConfig.Bridge.StakeManagerAddr, byzantineValidatorAddress)
+
+	require.True(t, expectedWithdrawableStake.Cmp(withdrawableStakeAfterSlashing) == 0,
+		fmt.Sprintf("byzantine validator withdrawable stake on root chain doesn't match"+
+			"expected value after slashing. expected: %v, actual: %v",
+			expectedWithdrawableStake, withdrawableStakeAfterSlashing))
+
+	err = byzantineServer.WithdrawRootChain(
+		byzantineValidatorAddress.String(),
+		withdrawableStakeAfterSlashing,
+		ethgo.Address(polybftConfig.Bridge.StakeManagerAddr),
+		cluster.Bridge.JSONRPCAddr())
+	require.NoError(t, err)
+
+	// get byzantine validator stake token balance from root chain after withdrawal
+	byzantineValStakeTokenBalanceOnRootAfter := erc20BalanceOf(
+		t, byzantineValidatorAddress, polybftConfig.Bridge.StakeTokenAddr, rootRelayer)
+
+	// expected validators staking token balance after withdrawal is the sum of previous balance and
+	// amount it withdraw from the staking manager contract
+	expectedStakeTokenBalanceOnRoot := new(big.Int)
+	expectedStakeTokenBalanceOnRoot.Add(byzantineValStakeTokenBalanceOnRootBefore, withdrawableStakeAfterSlashing)
+
+	require.True(t, expectedStakeTokenBalanceOnRoot.Cmp(byzantineValStakeTokenBalanceOnRootAfter) == 0,
+		fmt.Sprintf("byzantine validator staking token balance on root chain doesn't match expected value. "+
+			"expected: %v, actual: %v", expectedStakeTokenBalanceOnRoot, byzantineValStakeTokenBalanceOnRootAfter))
+
+	// verify that the executed slashing exit event is no longer returned by the RPC endpoint
+	_, _, err = getSlashExitEventWithProof(
+		t, cluster.Servers[0].JSONRPCAddr(), blockWithSlashTx.Number)
+	require.ErrorContains(t, err, fmt.Sprintf("no slashing exit event proof found for block number %v", blockWithSlashTx.Number))
 }

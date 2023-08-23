@@ -1605,7 +1605,6 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 type SlashedEvent struct {
 	ExitID     *big.Int        `abi:"exitId"`
 	Validators []types.Address `abi:"validators"`
-	Amounts    []*big.Int      `abi:"amounts"`
 }
 
 func (*SlashedEvent) Sig() ethgo.Hash {
