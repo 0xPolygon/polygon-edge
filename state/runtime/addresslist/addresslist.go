@@ -116,6 +116,11 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 			return nil, 0, err
 		}
 
+		// we cannot perform any write operation if the call is static
+		if isStatic {
+			return nil, gasUsed, errWriteProtection
+		}
+
 		if isSuperAdmin || a.GetRole(caller) == AdminRole {
 			// any hash different than zero hash will be treated as true
 			value := types.BytesToHash(input) != types.ZeroHash
@@ -183,6 +188,11 @@ func (a *AddressList) SetRole(addr types.Address, role Role) {
 }
 
 func (a *AddressList) GetRole(addr types.Address) Role {
+	superAdmin, superAdminExists := a.GetSuperAdmin()
+	if superAdminExists && addr == superAdmin {
+		return AdminRole
+	}
+
 	res := a.state.GetStorage(a.addr, types.BytesToHash(addr.Bytes()))
 
 	return Role(res)

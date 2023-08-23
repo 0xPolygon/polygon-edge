@@ -207,6 +207,25 @@ func TestRole_Enabled(t *testing.T) {
 	}
 }
 
+func TestAddressList_GetRole_SuperAdmin(t *testing.T) {
+	t.Parallel()
+
+	a := newMockAddressList()
+
+	require.Equal(t, AdminRole, a.GetRole(superAdmin))
+}
+
+func TestAddressList_SetEnabled_IsStatic(t *testing.T) {
+	t.Parallel()
+
+	a := newMockAddressList()
+	input, _ := SetListEnabledFunc.Encode([]interface{}{false})
+	_, gasCost, err := a.runInputCall(superAdmin, input, writeAddressListCost, true)
+
+	require.ErrorIs(t, err, errWriteProtection)
+	require.Equal(t, writeAddressListCost, gasCost)
+}
+
 func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	t.Parallel()
 
