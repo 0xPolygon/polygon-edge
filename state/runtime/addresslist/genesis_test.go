@@ -33,27 +33,26 @@ func TestGenesis(t *testing.T) {
 		},
 	}
 
-	// without superadmin
+	// without superadmin and enabled
 
 	ApplyGenesisAllocs(gen, types.Address{}, config, nil)
 
 	expect := &chain.GenesisAccount{
 		Balance: big.NewInt(1),
 		Storage: map[types.Hash]types.Hash{
-			types.StringToHash("ffffffffffffffffffffffffffffffffffffffff"): types.StringToHash("1"),
-			types.BytesToHash(one.Bytes()):                                 types.Hash(AdminRole),
-			types.BytesToHash(two.Bytes()):                                 types.Hash(EnabledRole),
-			types.BytesToHash(three.Bytes()):                               types.Hash(EnabledRole),
+			types.BytesToHash(one.Bytes()):   types.Hash(AdminRole),
+			types.BytesToHash(two.Bytes()):   types.Hash(EnabledRole),
+			types.BytesToHash(three.Bytes()): types.Hash(EnabledRole),
 		},
 	}
 
 	require.Equal(t, expect, gen.Alloc[types.Address{}])
 
-	// with superadmin
+	// with superadmin and disabled
 
 	gen.Alloc = map[types.Address]*chain.GenesisAccount{}
 
-	ApplyGenesisAllocs(gen, types.Address{}, config, &superAdmin)
+	ApplyGenesisAllocs(gen, types.Address{}, nil, &superAdmin)
 
 	superAdminHash := types.BytesToHash(superAdmin.Bytes())
 	superAdminHash[0] = 1
@@ -62,9 +61,6 @@ func TestGenesis(t *testing.T) {
 		Storage: map[types.Hash]types.Hash{
 			types.StringToHash("fffffffffffffffffffffffffffffffffffffffe"): superAdminHash,
 			types.StringToHash("ffffffffffffffffffffffffffffffffffffffff"): types.StringToHash("1"),
-			types.BytesToHash(one.Bytes()):                                 types.Hash(AdminRole),
-			types.BytesToHash(two.Bytes()):                                 types.Hash(EnabledRole),
-			types.BytesToHash(three.Bytes()):                               types.Hash(EnabledRole),
 		},
 	}
 
