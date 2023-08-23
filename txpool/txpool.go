@@ -661,8 +661,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	}
 
-	fmt.Println("tx.GetGasPrice(baseFee)", tx.GetGasPrice(baseFee), baseFee)
-
 	// Check if the given tx is not underpriced
 	if tx.GetGasPrice(baseFee).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
 		metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
