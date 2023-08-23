@@ -28,7 +28,7 @@ var (
 
 var (
 	// is list enabled or not key hash
-	enabledKeyHash = types.StringToHash("ffffffffffffffffffffffffffffffffffffffff")
+	disabledKeyHash = types.StringToHash("ffffffffffffffffffffffffffffffffffffffff")
 	// super admin key hash
 	superAdminKeyHash = types.StringToHash("fffffffffffffffffffffffffffffffffffffffe")
 )
@@ -189,13 +189,25 @@ func (a *AddressList) GetRole(addr types.Address) Role {
 }
 
 func (a *AddressList) IsEnabled() bool {
-	return a.state.GetStorage(a.addr, enabledKeyHash) != types.ZeroHash
+	return a.state.GetStorage(a.addr, disabledKeyHash) == types.ZeroHash
 }
 
 func (a *AddressList) SetEnabled(value bool) {
-	stateValue := types.BytesToHash(getAbiBoolValue(value))
+	// due to backward compatibility, we aim to avoid storing 'isEnabled' in storage.
+	// instead, we intend to retain 'isDisabled' in storage.
+	// by default, 'isDisabled' will not be present in storage, indicating that the list is enabled.
+	if value {
+		// we do not want to update storage if disabledKeyHash is not writtern in storage at all
+		if a.state.GetStorage(a.addr, disabledKeyHash) != types.ZeroHash {
+			isDisabled := types.BytesToHash(getAbiBoolValue(false))
 
-	a.state.SetState(a.addr, enabledKeyHash, stateValue)
+			a.state.SetState(a.addr, disabledKeyHash, isDisabled)
+		}
+	} else {
+		isDisabled := types.BytesToHash(getAbiBoolValue(true))
+
+		a.state.SetState(a.addr, disabledKeyHash, isDisabled)
+	}
 }
 
 func (a *AddressList) SetSuperAdmin(addr *types.Address) {

@@ -21,6 +21,7 @@ func ApplyGenesisAllocs(
 		state: &genesisState{chain},
 	}
 
+	// if super admin is nil nothing will be written to the storage
 	allocList.SetSuperAdmin(superAdmin)
 
 	if config == nil {
