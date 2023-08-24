@@ -27,6 +27,7 @@ import (
 
 const (
 	defaultPriceLimit         uint64 = 1
+	defaultBaseFee            uint64 = 1
 	defaultMaxSlots           uint64 = 4096
 	defaultMaxAccountEnqueued uint64 = 128
 	validGasLimit             uint64 = 4712350
@@ -2793,6 +2794,8 @@ func TestExecutablesOrder(t *testing.T) {
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
+
+			pool.baseFee = defaultBaseFee
 			pool.SetSigner(&mockSigner{})
 
 			pool.Start()
