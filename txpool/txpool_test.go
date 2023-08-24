@@ -3540,6 +3540,8 @@ func TestResetWithHeadersSetsBaseFee(t *testing.T) {
 }
 
 func TestAddTx_TxReplacement(t *testing.T) {
+	t.Parallel()
+
 	const (
 		firstAccountNonce  = 1
 		secondAccountNonce = 2
@@ -3640,8 +3642,6 @@ func TestAddTx_TxReplacement(t *testing.T) {
 
 	require.NoError(t, pool.addTx(local, tx1))
 	require.NoError(t, pool.addTx(local, tx2))
-
-	time.Sleep(time.Second)
 
 	assert.Equal(t, ac1.nonceToTx.mapping[firstAccountNonce], tx2)
 	assert.Equal(t, ac2.nonceToTx.mapping[secondAccountNonce], tx1)
