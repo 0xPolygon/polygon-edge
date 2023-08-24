@@ -234,11 +234,11 @@ func NewServer(config *Config) (*Server, error) {
 
 	// apply bridge allow list genesis data (owner is omitted for bridge allow list)
 	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-		m.config.Chain.Params.BridgeAllowList, nil)
+		m.config.Chain.Params.BridgeAllowList, m.config.Chain.Params.AccessListsOwner)
 
 	// apply bridge block list genesis data (owner is omitted for bridge block list)
 	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-		m.config.Chain.Params.BridgeBlockList, nil)
+		m.config.Chain.Params.BridgeBlockList, m.config.Chain.Params.AccessListsOwner)
 
 	var initialStateRoot = types.ZeroHash
 

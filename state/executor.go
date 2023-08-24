@@ -242,13 +242,14 @@ func (e *Executor) BeginTxn(
 			txn, contracts.BlockListTransactionsAddr)
 	}
 
-	// bridge access list should be enabled if access lists are defined in the genesis
-	if e.config.BridgeAllowList != nil {
+	// bridge access list should be enabled
+	// either if access lists super admin is defined or access lists are defined in the genesis
+	if e.config.AccessListsOwner != nil || e.config.BridgeAllowList != nil {
 		txn.bridgeAllowList = addresslist.NewAddressList(
 			txn, contracts.AllowListBridgeAddr)
 	}
 
-	if e.config.BridgeBlockList != nil {
+	if e.config.AccessListsOwner != nil || e.config.BridgeBlockList != nil {
 		txn.bridgeBlockList = addresslist.NewAddressList(
 			txn, contracts.BlockListBridgeAddr)
 	}

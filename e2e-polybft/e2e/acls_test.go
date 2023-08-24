@@ -463,7 +463,7 @@ func TestE2E_AccessListsOwner(t *testing.T) {
 	}
 
 	{
-		// Step 3. future admin or rnUser can not send transaction or deploy smart contract because they are not in the lists yet
+		// Step 3. future admin or rndUser can not send transaction or deploy smart contract because they are not in the lists yet
 		tx := cluster.Transfer(t, rndUser, types.ZeroAddress, big.NewInt(1))
 		require.NoError(t, tx.Wait())
 		require.False(t, tx.Succeed())
