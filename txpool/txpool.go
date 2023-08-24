@@ -808,7 +808,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
-		} else if oldTxWithSameNonce.GasPrice.Cmp(tx.GasPrice) >= 0 {
+		} else if oldTxWithSameNonce.GetGasPrice(p.baseFee).Cmp(
+			tx.GetGasPrice(p.baseFee)) >= 0 {
 			// if tx with same nonce does exist and has same or better gas price -> return error
 			return ErrUnderpriced
 		}

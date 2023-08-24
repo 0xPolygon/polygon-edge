@@ -3539,6 +3539,116 @@ func TestResetWithHeadersSetsBaseFee(t *testing.T) {
 	assert.Equal(t, blocks[len(blocks)-1].Header.BaseFee, pool.GetBaseFee())
 }
 
+func TestAddTx_TxReplacement(t *testing.T) {
+	const (
+		firstAccountNonce  = 1
+		secondAccountNonce = 2
+	)
+
+	poolSigner := crypto.NewEIP155Signer(100, true)
+	firstKey, firstKeyAddr := tests.GenerateKeyAndAddr(t)
+	secondKey, secondKeyAddr := tests.GenerateKeyAndAddr(t)
+
+	createDynamicTx := func(
+		t *testing.T, nonce, gasFeeCap, gasTipCap uint64,
+		key *ecdsa.PrivateKey, addr types.Address) *types.Transaction {
+		t.Helper()
+
+		tx := newTx(addr, nonce, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.Input = nil
+		tx.GasPrice = nil
+		tx.GasTipCap = new(big.Int).SetUint64(gasTipCap)
+		tx.GasFeeCap = new(big.Int).SetUint64(gasFeeCap)
+
+		singedTx, err := poolSigner.SignTx(tx, key)
+		require.NoError(t, err)
+
+		singedTx.ComputeHash(0)
+
+		return singedTx
+	}
+
+	createLegacyTx := func(
+		t *testing.T, nonce, gasPrice uint64,
+		key *ecdsa.PrivateKey, addr types.Address) *types.Transaction {
+		t.Helper()
+
+		tx := newTx(addr, nonce, 1)
+		tx.Input = nil
+		tx.GasPrice = new(big.Int).SetUint64(gasPrice)
+
+		singedTx, err := poolSigner.SignTx(tx, key)
+		require.NoError(t, err)
+
+		singedTx.ComputeHash(0)
+
+		return singedTx
+	}
+
+	pool, err := newTestPool()
+	require.NoError(t, err)
+
+	pool.baseFee = 100
+	pool.SetSigner(poolSigner)
+
+	txLegacy := createLegacyTx(t, firstAccountNonce, 100, firstKey, firstKeyAddr)
+	txDynamic := createDynamicTx(t, secondAccountNonce, 120, 120, secondKey, secondKeyAddr)
+
+	ac1 := pool.accounts.initOnce(firstKeyAddr, firstAccountNonce)
+	ac2 := pool.accounts.initOnce(secondKeyAddr, secondAccountNonce)
+
+	ac1.nonceToTx.mapping[firstAccountNonce] = txLegacy
+	ac2.nonceToTx.mapping[secondAccountNonce] = txDynamic
+
+	ac1.enqueued = newAccountQueue()
+	ac2.enqueued = newAccountQueue()
+	ac1.enqueued.queue = minNonceQueue{txLegacy}
+	ac2.enqueued.queue = minNonceQueue{txDynamic}
+
+	// These tests can not be executed in parallel because Success test change state
+
+	// ErrAlreadyKnown
+	tx1 := createLegacyTx(t,
+		firstAccountNonce, txLegacy.GasPrice.Uint64(), firstKey, firstKeyAddr)
+	tx2 := createDynamicTx(t,
+		secondAccountNonce, txDynamic.GasFeeCap.Uint64(), txDynamic.GasTipCap.Uint64(), secondKey, secondKeyAddr)
+
+	assert.ErrorIs(t, pool.addTx(local, tx1), ErrAlreadyKnown)
+	assert.ErrorIs(t, pool.addTx(local, tx2), ErrAlreadyKnown)
+
+	// ErrUnderpriced
+	tx1 = createLegacyTx(t,
+		firstAccountNonce, 90, firstKey, firstKeyAddr)
+	tx2 = createDynamicTx(t,
+		secondAccountNonce, 90, 90, secondKey, secondKeyAddr)
+	tx3 := createLegacyTx(t,
+		secondAccountNonce, 110, secondKey, secondKeyAddr)
+	tx4 := createDynamicTx(t,
+		firstAccountNonce, 90, 90, firstKey, firstKeyAddr)
+
+	assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx2), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx3), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx4), ErrUnderpriced)
+
+	// Success
+	tx1 = createLegacyTx(t,
+		secondAccountNonce, 180, secondKey, secondKeyAddr)
+	tx2 = createDynamicTx(t,
+		firstAccountNonce, 200, 200, firstKey, firstKeyAddr)
+
+	require.NoError(t, pool.addTx(local, tx1))
+	require.NoError(t, pool.addTx(local, tx2))
+
+	time.Sleep(time.Second)
+
+	assert.Equal(t, ac1.nonceToTx.mapping[firstAccountNonce], tx2)
+	assert.Equal(t, ac2.nonceToTx.mapping[secondAccountNonce], tx1)
+	assert.Equal(t, ac1.enqueued.queue[0], tx2)
+	assert.Equal(t, ac2.enqueued.queue[0], tx1)
+}
+
 func BenchmarkAddTxTime(b *testing.B) {
 	b.Run("benchmark add one tx", func(b *testing.B) {
 		signer := crypto.NewEIP155Signer(100, true)
