@@ -634,11 +634,17 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip became to be either gas tip cap or (gas fee cap - current base fee)
 	effectiveTip := new(big.Int).Set(gasPrice)
-	if t.config.London && msg.Type == types.DynamicFeeTx {
-		effectiveTip = common.BigMin(
-			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
-			new(big.Int).Set(msg.GasTipCap),
-		)
+
+	if t.config.London {
+		if msg.Type == types.DynamicFeeTx {
+			effectiveTip = common.BigMin(
+				new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
+				new(big.Int).Set(msg.GasTipCap),
+			)
+		} else {
+			// legacy tx
+			effectiveTip.Sub(gasPrice, t.ctx.BaseFee)
+		}
 	}
 
 	// Pay the coinbase fee as a miner reward using the calculated effective tip.

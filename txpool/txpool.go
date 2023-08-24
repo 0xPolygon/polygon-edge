@@ -661,6 +661,12 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		}
 	} else {
 		// Legacy approach to check if the given tx is not underpriced
+		if forks.London && tx.GasPrice.Cmp(new(big.Int).SetUint64(baseFee)) < 0 {
+			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+
+			return ErrUnderpriced
+		}
+
 		if tx.GetGasPrice(baseFee).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
