@@ -9,7 +9,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-var superAdmin = types.StringToAddress("ffffffffffffffffffffffffffffffffffffffff")
+var addressListsOwner = types.StringToAddress("ffffffffffffffffffffffffffffffffffffffff")
 
 type mockState struct {
 	state map[types.Hash]types.Hash
@@ -30,7 +30,7 @@ func newMockAddressList() *AddressList {
 
 	al := NewAddressList(state, types.Address{})
 	al.SetEnabled(true)
-	al.SetSuperAdmin(&superAdmin)
+	al.SetOwner(&addressListsOwner)
 
 	return al
 }
@@ -207,12 +207,12 @@ func TestRole_Enabled(t *testing.T) {
 	}
 }
 
-func TestAddressList_GetRole_SuperAdmin(t *testing.T) {
+func TestAddressList_GetRole_AddressListsOwner(t *testing.T) {
 	t.Parallel()
 
 	a := newMockAddressList()
 
-	require.Equal(t, AdminRole, a.GetRole(superAdmin))
+	require.Equal(t, AdminRole, a.GetRole(addressListsOwner))
 }
 
 func TestAddressList_SetEnabled_IsStatic(t *testing.T) {
@@ -220,13 +220,13 @@ func TestAddressList_SetEnabled_IsStatic(t *testing.T) {
 
 	a := newMockAddressList()
 	input, _ := SetListEnabledFunc.Encode([]interface{}{false})
-	_, gasCost, err := a.runInputCall(superAdmin, input, writeAddressListCost, true)
+	_, gasCost, err := a.runInputCall(addressListsOwner, input, writeAddressListCost, true)
 
 	require.ErrorIs(t, err, errWriteProtection)
 	require.Equal(t, writeAddressListCost, gasCost)
 }
 
-func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
+func TestAddressList_SetEnabled(t *testing.T) {
 	t.Parallel()
 
 	expectEnabled := func(t *testing.T, a *AddressList, caller types.Address, value bool) {
@@ -244,13 +244,13 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 	}
 
 	someRndAddress := types.Address{0x99, 0xAA}
-	simpleAdmin := types.Address{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99}
+	admin := types.Address{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x99}
 	a := newMockAddressList()
 
 	a.SetRole(types.Address{}, EnabledRole)
 	expectEnabled(t, a, someRndAddress, true)
 
-	// only admin or super admin should be able to disable list
+	// only admin or owner should be able to disable list
 	input, _ := SetListEnabledFunc.Encode([]interface{}{false})
 	_, gasCost, err := a.runInputCall(types.ZeroAddress, input, writeAddressListCost, false)
 
@@ -260,31 +260,31 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 
 	// disable list
 	input, _ = SetListEnabledFunc.Encode([]interface{}{false})
-	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
+	_, gasCost, err = a.runInputCall(addressListsOwner, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)
-	expectEnabled(t, a, simpleAdmin, false)
+	expectEnabled(t, a, admin, false)
 
-	// superadmin can add admin role while list is disabled
-	input, _ = SetAdminFunc.Encode([]interface{}{simpleAdmin})
-	_, gasCost, err = a.runInputCall(superAdmin, input, writeAddressListCost, false)
+	// owner can add admin role while list is disabled
+	input, _ = SetAdminFunc.Encode([]interface{}{admin})
+	_, gasCost, err = a.runInputCall(addressListsOwner, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)
-	require.Equal(t, AdminRole, a.GetRole(simpleAdmin))
+	require.Equal(t, AdminRole, a.GetRole(admin))
 
 	// anyone can check role of newly added admin while list is disabled
-	input, _ = ReadAddressListFunc.Encode([]interface{}{simpleAdmin})
+	input, _ = ReadAddressListFunc.Encode([]interface{}{admin})
 	role, gasCost, err := a.runInputCall(someRndAddress, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, readAddressListCost, gasCost)
 	require.Equal(t, AdminRole.Bytes(), role)
 
-	// simple admin can add new role while list is disabled
+	// admin can add new role while list is disabled
 	input, _ = SetEnabledFunc.Encode([]interface{}{someRndAddress})
-	_, gasCost, err = a.runInputCall(simpleAdmin, input, writeAddressListCost, false)
+	_, gasCost, err = a.runInputCall(admin, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)
@@ -296,11 +296,11 @@ func TestAddressList_SuperAdmin_SetEnabled(t *testing.T) {
 
 	require.ErrorIs(t, err, runtime.ErrNotAuth)
 	require.Equal(t, writeAddressListCost, gasCost)
-	expectEnabled(t, a, simpleAdmin, false)
+	expectEnabled(t, a, admin, false)
 
-	// simple admin can enable list too
+	// admin can enable list too
 	input, _ = SetListEnabledFunc.Encode([]interface{}{true})
-	_, gasCost, err = a.runInputCall(simpleAdmin, input, writeAddressListCost, false)
+	_, gasCost, err = a.runInputCall(admin, input, writeAddressListCost, false)
 
 	require.NoError(t, err)
 	require.Equal(t, writeAddressListCost, gasCost)

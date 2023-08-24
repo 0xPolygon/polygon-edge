@@ -11,8 +11,8 @@ func ApplyGenesisAllocs(
 	chain *chain.Genesis,
 	addressListAddr types.Address,
 	config *chain.AddressListConfig,
-	superAdmin *types.Address) {
-	if superAdmin == nil && config == nil {
+	owner *types.Address) {
+	if owner == nil && config == nil {
 		return
 	}
 
@@ -21,8 +21,8 @@ func ApplyGenesisAllocs(
 		state: &genesisState{chain},
 	}
 
-	// if super admin is nil nothing will be written to the storage
-	allocList.SetSuperAdmin(superAdmin)
+	// if owner is nil nothing will be written to the storage
+	allocList.SetOwner(owner)
 
 	if config == nil {
 		allocList.SetEnabled(false)

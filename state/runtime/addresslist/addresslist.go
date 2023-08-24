@@ -29,8 +29,8 @@ var (
 var (
 	// is list enabled or not key hash
 	disabledKeyHash = types.StringToHash("ffffffffffffffffffffffffffffffffffffffff")
-	// super admin key hash
-	superAdminKeyHash = types.StringToHash("fffffffffffffffffffffffffffffffffffffffe")
+	// owner key hash
+	ownerKeyHash = types.StringToHash("fffffffffffffffffffffffffffffffffffffffe")
 )
 
 type AddressList struct {
@@ -164,7 +164,7 @@ func (a *AddressList) runInputCall(caller types.Address, input []byte,
 		return nil, gasUsed, errWriteProtection
 	}
 
-	// Only Admin or superadmin accounts can modify the role of other accounts
+	// Only Admin or owner accounts can modify the role of other accounts
 	addrRole := a.GetRole(caller)
 	if addrRole != AdminRole {
 		return nil, gasUsed, runtime.ErrNotAuth
@@ -185,8 +185,8 @@ func (a *AddressList) SetRole(addr types.Address, role Role) {
 }
 
 func (a *AddressList) GetRole(addr types.Address) Role {
-	superAdmin, superAdminExists := a.GetSuperAdmin()
-	if superAdminExists && addr == superAdmin {
+	owner, ownerExists := a.GetOwner()
+	if ownerExists && addr == owner {
 		return AdminRole
 	}
 
@@ -217,27 +217,27 @@ func (a *AddressList) SetEnabled(value bool) {
 	}
 }
 
-func (a *AddressList) SetSuperAdmin(addr *types.Address) {
+func (a *AddressList) SetOwner(addr *types.Address) {
 	if addr == nil {
-		// if we want to clear superadmin, do not do anything if superadmin does not exists in storage
-		if _, exists := a.GetSuperAdmin(); !exists {
+		// if we want to clear owner, do not do anything if owner does not exists in storage
+		if _, exists := a.GetOwner(); !exists {
 			return
 		}
 
-		a.state.SetState(a.addr, superAdminKeyHash, types.ZeroHash)
+		a.state.SetState(a.addr, ownerKeyHash, types.ZeroHash)
 	} else {
 		value := types.BytesToHash(addr.Bytes())
-		// The first byte specifies the presence of a super admin
-		// (allowing the use of the types.ZeroAddress address for the superadmin)
+		// The first byte specifies the presence of a owner
+		// (allowing the use of the types.ZeroAddress address for the owner)
 		value[0] = 1
 
-		a.state.SetState(a.addr, superAdminKeyHash, value)
+		a.state.SetState(a.addr, ownerKeyHash, value)
 	}
 }
 
-func (a *AddressList) GetSuperAdmin() (types.Address, bool) {
-	res := a.state.GetStorage(a.addr, superAdminKeyHash)
-	// If the first byte of the hash is zero, it indicates that no superadmin has been saved in the storage
+func (a *AddressList) GetOwner() (types.Address, bool) {
+	res := a.state.GetStorage(a.addr, ownerKeyHash)
+	// If the first byte of the hash is zero, it indicates that no owner has been saved in the storage
 	if res[0] == 0 {
 		return types.ZeroAddress, false
 	}

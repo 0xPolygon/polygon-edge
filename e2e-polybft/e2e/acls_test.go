@@ -410,8 +410,8 @@ func TestE2E_AddressLists_Bridge(t *testing.T) {
 	}
 }
 
-func TestE2E_AllowList_SuperAdmin(t *testing.T) {
-	superadmin, _ := wallet.GenerateKey()
+func TestE2E_AccessListsOwner(t *testing.T) {
+	owner, _ := wallet.GenerateKey()
 	admin, _ := wallet.GenerateKey()
 	rndUser, _ := wallet.GenerateKey()
 
@@ -421,7 +421,7 @@ func TestE2E_AllowList_SuperAdmin(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, adminAddr)),
 		framework.WithPremine(adminAddr, rndUserAddress),
-		framework.WithAccessListsSuperAdmin(types.Address(superadmin.Address())),
+		framework.WithAccessListsOwner(types.Address(owner.Address())),
 	)
 	defer cluster.Stop()
 
@@ -448,22 +448,22 @@ func TestE2E_AllowList_SuperAdmin(t *testing.T) {
 	}
 
 	{
-		// Step 2. super admin enables two lists
+		// Step 2. owner enables allow tx list and allow contracts list
 		input, _ := addresslist.SetListEnabledFunc.Encode([]interface{}{true})
 
-		saTxn := cluster.MethodTxn(t, superadmin, contracts.AllowListTransactionsAddr, input)
+		saTxn := cluster.MethodTxn(t, owner, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, saTxn.Wait())
 		require.False(t, saTxn.Failed())
 
 		input, _ = addresslist.SetListEnabledFunc.Encode([]interface{}{true})
 
-		saTxn = cluster.MethodTxn(t, superadmin, contracts.AllowListContractsAddr, input)
+		saTxn = cluster.MethodTxn(t, owner, contracts.AllowListContractsAddr, input)
 		require.NoError(t, saTxn.Wait())
 		require.False(t, saTxn.Failed())
 	}
 
 	{
-		// Step 3. no one can send normal transaction or deploy smart contract because lists are enabled and empty
+		// Step 3. future admin or rnUser can not send transaction or deploy smart contract because they are not in the lists yet
 		tx := cluster.Transfer(t, rndUser, types.ZeroAddress, big.NewInt(1))
 		require.NoError(t, tx.Wait())
 		require.False(t, tx.Succeed())
@@ -475,16 +475,16 @@ func TestE2E_AllowList_SuperAdmin(t *testing.T) {
 	}
 
 	{
-		// Step 4. add two roles by superadmin
+		// Step 4. add two roles by owner
 		input, _ := addresslist.SetAdminFunc.Encode([]interface{}{adminAddr})
 
-		saTxn := cluster.MethodTxn(t, superadmin, contracts.AllowListTransactionsAddr, input)
+		saTxn := cluster.MethodTxn(t, owner, contracts.AllowListTransactionsAddr, input)
 		require.NoError(t, saTxn.Wait())
 		require.True(t, saTxn.Succeed())
 
 		input, _ = addresslist.SetEnabledFunc.Encode([]interface{}{rndUserAddress})
 
-		saTxn = cluster.MethodTxn(t, superadmin, contracts.AllowListContractsAddr, input)
+		saTxn = cluster.MethodTxn(t, owner, contracts.AllowListContractsAddr, input)
 		require.NoError(t, saTxn.Wait())
 		require.True(t, saTxn.Succeed())
 

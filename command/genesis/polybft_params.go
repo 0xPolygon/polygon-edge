@@ -44,7 +44,7 @@ const (
 	defaultEpochReward      = 1
 	defaultBlockTimeDrift   = uint64(10)
 
-	accessListsSuperAdminFlag            = "access-lists-super-admin" // #nosec G101
+	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
 	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
@@ -297,9 +297,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if p.accessListsSuperAdmin != "" {
-		value := types.StringToAddress(p.accessListsSuperAdmin)
-		chainConfig.Params.AccessListsSuperAdmin = &value
+	if p.accessListsOwner != "" {
+		value := types.StringToAddress(p.accessListsOwner)
+		chainConfig.Params.AccessListsOwner = &value
 	}
 
 	if p.isBurnContractEnabled() {

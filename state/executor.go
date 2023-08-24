@@ -220,24 +220,24 @@ func (e *Executor) BeginTxn(
 
 	// contract deployment access list should be enabled
 	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsSuperAdmin != nil || e.config.ContractDeployerAllowList != nil {
+	if e.config.AccessListsOwner != nil || e.config.ContractDeployerAllowList != nil {
 		txn.deploymentAllowList = addresslist.NewAddressList(
 			txn, contracts.AllowListContractsAddr)
 	}
 
-	if e.config.AccessListsSuperAdmin != nil || e.config.ContractDeployerBlockList != nil {
+	if e.config.AccessListsOwner != nil || e.config.ContractDeployerBlockList != nil {
 		txn.deploymentBlockList = addresslist.NewAddressList(
 			txn, contracts.BlockListContractsAddr)
 	}
 
 	// transaction access list should be enabled
 	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsSuperAdmin != nil || e.config.TransactionsAllowList != nil {
+	if e.config.AccessListsOwner != nil || e.config.TransactionsAllowList != nil {
 		txn.txnAllowList = addresslist.NewAddressList(
 			txn, contracts.AllowListTransactionsAddr)
 	}
 
-	if e.config.AccessListsSuperAdmin != nil || e.config.TransactionsBlockList != nil {
+	if e.config.AccessListsOwner != nil || e.config.TransactionsBlockList != nil {
 		txn.txnBlockList = addresslist.NewAddressList(
 			txn, contracts.BlockListTransactionsAddr)
 	}

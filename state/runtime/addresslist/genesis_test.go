@@ -15,7 +15,7 @@ func TestGenesis(t *testing.T) {
 	one := types.Address{0x1}
 	two := types.Address{0x2}
 	three := types.Address{0x3}
-	superAdmin := types.Address{0x88}
+	owner := types.Address{0x88}
 
 	// initial genesis chain with different types of
 	// struct initialization
@@ -33,7 +33,7 @@ func TestGenesis(t *testing.T) {
 		},
 	}
 
-	// without superadmin and enabled
+	// without owner and enabled
 
 	ApplyGenesisAllocs(gen, types.Address{}, config, nil)
 
@@ -48,18 +48,18 @@ func TestGenesis(t *testing.T) {
 
 	require.Equal(t, expect, gen.Alloc[types.Address{}])
 
-	// with superadmin and disabled
+	// with owner and disabled
 
 	gen.Alloc = map[types.Address]*chain.GenesisAccount{}
 
-	ApplyGenesisAllocs(gen, types.Address{}, nil, &superAdmin)
+	ApplyGenesisAllocs(gen, types.Address{}, nil, &owner)
 
-	superAdminHash := types.BytesToHash(superAdmin.Bytes())
-	superAdminHash[0] = 1
+	ownerHash := types.BytesToHash(owner.Bytes())
+	ownerHash[0] = 1
 	expect = &chain.GenesisAccount{
 		Balance: big.NewInt(1),
 		Storage: map[types.Hash]types.Hash{
-			types.StringToHash("fffffffffffffffffffffffffffffffffffffffe"): superAdminHash,
+			types.StringToHash("fffffffffffffffffffffffffffffffffffffffe"): ownerHash,
 			types.StringToHash("ffffffffffffffffffffffffffffffffffffffff"): types.StringToHash("1"),
 		},
 	}
