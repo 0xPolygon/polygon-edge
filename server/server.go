@@ -232,13 +232,13 @@ func NewServer(config *Config) (*Server, error) {
 	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
 		m.config.Chain.Params.TransactionsBlockList, m.config.Chain.Params.AccessListsSuperAdmin)
 
-	// apply bridge allow list genesis data
+	// apply bridge allow list genesis data (superadmin is omitted for bridge allow list)
 	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-		m.config.Chain.Params.BridgeAllowList, m.config.Chain.Params.AccessListsSuperAdmin)
+		m.config.Chain.Params.BridgeAllowList, nil)
 
-	// apply bridge block list genesis data
+	// apply bridge block list genesis data (superadmin is omitted for bridge block list)
 	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-		m.config.Chain.Params.BridgeBlockList, m.config.Chain.Params.AccessListsSuperAdmin)
+		m.config.Chain.Params.BridgeBlockList, nil)
 
 	var initialStateRoot = types.ZeroHash
 
