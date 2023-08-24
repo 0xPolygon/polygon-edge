@@ -450,7 +450,7 @@ func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
 	factor := new(big.Int)
 	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
 		// Apply EIP-1559 tx cost calculation factor
-		factor = factor.Set(msg.GasFeeCap)
+		factor = factor.Set(msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
 	} else {
 		// Apply legacy tx cost calculation factor
 		factor = factor.Set(msg.GasPrice)
