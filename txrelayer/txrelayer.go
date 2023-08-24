@@ -156,7 +156,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			maxFeePerGas := new(big.Int).Add(baseFee, maxPriorityFee)
 			compMaxFeePerGas := new(big.Int).Mul(maxFeePerGas, big.NewInt(feeIncreasePercentage))
 			compMaxFeePerGas = compMaxFeePerGas.Div(compMaxFeePerGas, big.NewInt(100))
-			txn.MaxFeePerGas = new(big.Int).Add(compMaxFeePerGas, maxFeePerGas)
+			txn.MaxFeePerGas = new(big.Int).Add(maxFeePerGas, compMaxFeePerGas)
 		}
 	} else if txn.GasPrice == 0 {
 		gasPrice, err := t.Client().Eth().GasPrice()
