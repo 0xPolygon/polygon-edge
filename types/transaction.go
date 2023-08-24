@@ -144,7 +144,7 @@ func (t *Transaction) Cost() *big.Int {
 //
 // Here is the logic:
 //   - use existing gas price if exists
-//   - or calculate a value with formula: min(gasFeeCap, gasTipCap * baseFee);
+//   - or calculate a value with formula: min(gasFeeCap, gasTipCap + baseFee);
 func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 	if t.GasPrice != nil && t.GasPrice.BitLen() > 0 {
 		return new(big.Int).Set(t.GasPrice)
