@@ -177,16 +177,20 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
 		}
 
-		// initialize Predicate SCs
-		if bridgeAllowListAdmin != types.ZeroAddress || bridgeBlockListAdmin != types.ZeroAddress {
-			// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
-			owner := contracts.SystemCaller
-			useBridgeAllowList := bridgeAllowListAdmin != types.ZeroAddress
-			useBridgeBlockList := bridgeBlockListAdmin != types.ZeroAddress
+		hasOwner := config.Params.AccessListsOwner != nil
+		useBridgeAllowList := bridgeAllowListAdmin != types.ZeroAddress
+		useBridgeBlockList := bridgeBlockListAdmin != types.ZeroAddress
 
-			if bridgeAllowListAdmin != types.ZeroAddress {
+		// initialize Predicate SCs
+		if hasOwner || useBridgeAllowList || useBridgeBlockList {
+			// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
+			var owner types.Address
+
+			if hasOwner {
+				owner = *config.Params.AccessListsOwner
+			} else if useBridgeAllowList {
 				owner = bridgeAllowListAdmin
-			} else if bridgeBlockListAdmin != types.ZeroAddress {
+			} else {
 				owner = bridgeBlockListAdmin
 			}
 

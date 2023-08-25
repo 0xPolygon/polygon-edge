@@ -217,40 +217,28 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// apply allow list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
-			m.config.Chain.Params.ContractDeployerAllowList)
-	}
+	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+		m.config.Chain.Params.ContractDeployerAllowList, m.config.Chain.Params.AccessListsOwner)
 
 	// apply block list contracts deployer genesis data
-	if m.config.Chain.Params.ContractDeployerBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
-			m.config.Chain.Params.ContractDeployerBlockList)
-	}
+	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
+		m.config.Chain.Params.ContractDeployerBlockList, m.config.Chain.Params.AccessListsOwner)
 
 	// apply transactions execution allow list genesis data
-	if m.config.Chain.Params.TransactionsAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
-			m.config.Chain.Params.TransactionsAllowList)
-	}
+	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+		m.config.Chain.Params.TransactionsAllowList, m.config.Chain.Params.AccessListsOwner)
 
 	// apply transactions execution block list genesis data
-	if m.config.Chain.Params.TransactionsBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
-			m.config.Chain.Params.TransactionsBlockList)
-	}
+	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
+		m.config.Chain.Params.TransactionsBlockList, m.config.Chain.Params.AccessListsOwner)
 
-	// apply bridge allow list genesis data
-	if m.config.Chain.Params.BridgeAllowList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-			m.config.Chain.Params.BridgeAllowList)
-	}
+	// apply bridge allow list genesis data (owner is omitted for bridge allow list)
+	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
+		m.config.Chain.Params.BridgeAllowList, m.config.Chain.Params.AccessListsOwner)
 
-	// apply bridge block list genesis data
-	if m.config.Chain.Params.BridgeBlockList != nil {
-		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-			m.config.Chain.Params.BridgeBlockList)
-	}
+	// apply bridge block list genesis data (owner is omitted for bridge block list)
+	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
+		m.config.Chain.Params.BridgeBlockList, m.config.Chain.Params.AccessListsOwner)
 
 	var initialStateRoot = types.ZeroHash
 
