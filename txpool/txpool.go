@@ -337,8 +337,15 @@ func (p *TxPool) Prepare() {
 	// fetch primary from each account
 	primaries := p.accounts.getPrimaries()
 
+	var eligiblePrimaries []*types.Transaction
+	for _, tx := range primaries {
+		if tx.GetGasFeeCap().Cmp(new(big.Int).SetUint64(p.GetBaseFee())) >= 0 {
+			eligiblePrimaries = append(eligiblePrimaries, tx)
+		}
+	}
+
 	// create new executables queue with base fee and initial transactions (primaries)
-	p.executables = newPricesQueue(p.GetBaseFee(), primaries)
+	p.executables = newPricesQueue(p.GetBaseFee(), eligiblePrimaries)
 }
 
 // Peek returns the best-price selected
