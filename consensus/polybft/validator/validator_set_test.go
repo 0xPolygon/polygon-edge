@@ -21,7 +21,7 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 		signers[v.Address()] = struct{}{}
 	})
 
-	require.True(t, vs.HasQuorum(signers))
+	require.True(t, vs.HasQuorum(1, signers))
 
 	// not enough signers for quorum (less than 2/3 super-majority of validators are signers)
 	signers = make(map[types.Address]struct{})
@@ -29,7 +29,7 @@ func TestValidatorSet_HasQuorum(t *testing.T) {
 	validators.IterAcct([]string{"A", "B", "C", "D"}, func(v *TestValidator) {
 		signers[v.Address()] = struct{}{}
 	})
-	require.False(t, vs.HasQuorum(signers))
+	require.False(t, vs.HasQuorum(1, signers))
 }
 
 func TestValidatorSet_getQuorumSize(t *testing.T) {
@@ -47,7 +47,7 @@ func TestValidatorSet_getQuorumSize(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		quorumSize := getQuorumSize(big.NewInt(c.totalVotingPower))
+		quorumSize := getQuorumSize(1, big.NewInt(c.totalVotingPower))
 		require.Equal(t, c.expectedQuorumSize, quorumSize.Int64())
 	}
 }

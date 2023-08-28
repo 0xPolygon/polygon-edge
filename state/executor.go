@@ -9,7 +9,6 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -21,8 +20,7 @@ import (
 )
 
 const (
-	SpuriousDragonMaxCodeSize = 24576
-	TxPoolMaxInitCodeSize     = 2 * SpuriousDragonMaxCodeSize
+	spuriousDragonMaxCodeSize = 24576
 
 	TxGas                 uint64 = 21000 // Per transaction not creating a contract
 	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract
@@ -40,8 +38,7 @@ type Executor struct {
 	state   State
 	GetHash GetHashByNumberHelper
 
-	PostHook        func(txn *Transition)
-	GenesisPostHook func(*Transition) error
+	PostHook func(txn *Transition)
 }
 
 // NewExecutor creates a new executor
@@ -53,40 +50,9 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 	}
 }
 
-func (e *Executor) WriteGenesis(
-	alloc map[types.Address]*chain.GenesisAccount,
-	initialStateRoot types.Hash) (types.Hash, error) {
-	var (
-		snap Snapshot
-		err  error
-	)
-
-	if initialStateRoot == types.ZeroHash {
-		snap = e.state.NewSnapshot()
-	} else {
-		snap, err = e.state.NewSnapshotAt(initialStateRoot)
-	}
-
-	if err != nil {
-		return types.Hash{}, err
-	}
-
+func (e *Executor) WriteGenesis(alloc map[types.Address]*chain.GenesisAccount) types.Hash {
+	snap := e.state.NewSnapshot()
 	txn := NewTxn(snap)
-	config := e.config.Forks.At(0)
-
-	env := runtime.TxContext{
-		ChainID: e.config.ChainID,
-	}
-
-	transition := &Transition{
-		logger:      e.logger,
-		ctx:         env,
-		state:       txn,
-		auxState:    e.state,
-		gasPool:     uint64(env.GasLimit),
-		config:      config,
-		precompiles: precompiled.NewPrecompiled(),
-	}
 
 	for addr, account := range alloc {
 		if account.Balance != nil {
@@ -347,6 +313,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
+	var err error
+	if txn.From == emptyFrom {
+		// Decrypt the from address
 		txn.From, err = signer.Sender(txn)
 		if err != nil {
 			return NewTransitionApplicationError(err, false)
@@ -369,7 +338,6 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	receipt := &types.Receipt{
 		CumulativeGasUsed: t.totalGas,
-		TransactionType:   txn.Type,
 		TxHash:            txn.Hash,
 		GasUsed:           result.GasUsed,
 	}
@@ -612,9 +580,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 		return nil, NewTransitionApplicationError(err, false)
 	}
 
-	// the purchased gas is enough to cover intrinsic usage
+	// 5. the purchased gas is enough to cover intrinsic usage
 	gasLeft := msg.Gas - intrinsicGasCost
-	// because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
+	// Because we are working with unsigned integers for gas, the `>` operator is used instead of the more intuitive `<`
 	if gasLeft > msg.Gas {
 		return nil, NewTransitionApplicationError(ErrNotEnoughIntrinsicGas, false)
 	}
@@ -622,7 +590,7 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	gasPrice := msg.GetGasPrice(t.ctx.BaseFee.Uint64())
 	value := new(big.Int).Set(msg.Value)
 
-	// set the specific transaction fields in the context
+	// Set the specific transaction fields in the context
 	t.ctx.GasPrice = types.BytesToHash(gasPrice.Bytes())
 	t.ctx.Origin = msg.From
 
@@ -630,11 +598,11 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
-		t.state.IncrNonce(msg.From)
+		txn.IncrNonce(msg.From)
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
-	refund := t.state.GetRefund()
+	refund := txn.GetRefund()
 	result.UpdateGasUsed(msg.Gas, refund)
 
 	if t.ctx.Tracer != nil {
@@ -752,7 +720,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 }
 
-func (t *Transition) Transfer(from, to types.Address, amount *big.Int) error {
+func (t *Transition) transfer(from, to types.Address, amount *big.Int) error {
 	if amount == nil {
 		return nil
 	}
@@ -787,7 +755,7 @@ func (t *Transition) applyCall(
 
 	if callType == runtime.Call {
 		// Transfers only allowed on calls
-		if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
+		if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
 				Err:     err,
@@ -855,7 +823,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Transfer the value
-	if err := t.Transfer(c.Caller, c.Address, c.Value); err != nil {
+	if err := t.transfer(c.Caller, c.Address, c.Value); err != nil {
 		return &runtime.ExecutionResult{
 			GasLeft: gasLimit,
 			Err:     err,
@@ -915,7 +883,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 		return result
 	}
 
-	if t.config.EIP158 && len(result.ReturnValue) > SpuriousDragonMaxCodeSize {
+	if t.config.EIP158 && len(result.ReturnValue) > spuriousDragonMaxCodeSize {
 		// Contract size exceeds 'SpuriousDragon' size limit
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
@@ -950,7 +918,6 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	result.GasLeft -= gasCost
-	result.Address = c.Address
 	t.state.SetCode(c.Address, result.ReturnValue)
 
 	return result
@@ -1151,61 +1118,6 @@ func TransactionGasCost(msg *types.Transaction, isHomestead, isIstanbul bool) (u
 	}
 
 	return cost, nil
-}
-
-// checkAndProcessTx - first check if this message satisfies all consensus rules before
-// applying the message. The rules include these clauses:
-// 1. the nonce of the message caller is correct
-// 2. caller has enough balance to cover transaction fee(gaslimit * gasprice * val) or fee(gasfeecap * gasprice * val)
-func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
-	// 1. the nonce of the message caller is correct
-	if err := t.nonceCheck(msg); err != nil {
-		return NewTransitionApplicationError(err, true)
-	}
-
-	// 2. check dynamic fees of the transaction
-	if err := t.checkDynamicFees(msg); err != nil {
-		return NewTransitionApplicationError(err, true)
-	}
-
-	// 3. caller has enough balance to cover transaction
-	if err := t.subGasLimitPrice(msg); err != nil {
-		return NewTransitionApplicationError(err, true)
-	}
-
-	return nil
-}
-
-func checkAndProcessStateTx(msg *types.Transaction) error {
-	if msg.GasPrice.Cmp(big.NewInt(0)) != 0 {
-		return NewTransitionApplicationError(
-			errors.New("gasPrice of state transaction must be zero"),
-			true,
-		)
-	}
-
-	if msg.Gas != types.StateTransactionGasLimit {
-		return NewTransitionApplicationError(
-			fmt.Errorf("gas of state transaction must be %d", types.StateTransactionGasLimit),
-			true,
-		)
-	}
-
-	if msg.From != contracts.SystemCaller {
-		return NewTransitionApplicationError(
-			fmt.Errorf("state transaction sender must be %v, but got %v", contracts.SystemCaller, msg.From),
-			true,
-		)
-	}
-
-	if msg.To == nil || *msg.To == types.ZeroAddress {
-		return NewTransitionApplicationError(
-			errors.New("to of state transaction must be specified"),
-			true,
-		)
-	}
-
-	return nil
 }
 
 // captureCallStart calls CallStart in Tracer if context has the tracer

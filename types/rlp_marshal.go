@@ -6,10 +6,6 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-const (
-	RLPSingleByteUpperLimit = 0x7f
-)
-
 type RLPMarshaler interface {
 	MarshalRLPTo(dst []byte) []byte
 }
@@ -104,7 +100,6 @@ func (r Receipts) MarshalRLPTo(dst []byte) []byte {
 
 func (r *Receipts) MarshalRLPWith(a *fastrlp.Arena) *fastrlp.Value {
 	vv := a.NewArray()
-
 	for _, rr := range *r {
 		if !rr.IsLegacyTx() {
 			vv.Set(a.NewCopyBytes([]byte{byte(rr.TransactionType)}))
@@ -121,10 +116,6 @@ func (r *Receipt) MarshalRLP() []byte {
 }
 
 func (r *Receipt) MarshalRLPTo(dst []byte) []byte {
-	if !r.IsLegacyTx() {
-		dst = append(dst, byte(r.TransactionType))
-	}
-
 	return MarshalRLPTo(r.MarshalRLPWith, dst)
 }
 
@@ -181,10 +172,6 @@ func (t *Transaction) MarshalRLP() []byte {
 }
 
 func (t *Transaction) MarshalRLPTo(dst []byte) []byte {
-	if t.Type != LegacyTx {
-		dst = append(dst, byte(t.Type))
-	}
-
 	return MarshalRLPTo(t.MarshalRLPWith, dst)
 }
 

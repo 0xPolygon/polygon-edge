@@ -6,12 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"math"
-	"math/big"
 	"os"
 	"os/signal"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -70,17 +67,26 @@ func BigMin(x, y *big.Int) *big.Int {
 	return x
 }
 
-func ConvertUnmarshalledUint(x interface{}) (uint64, error) {
+// BigMin returns the smallest of x or y.
+func BigMin(x, y *big.Int) *big.Int {
+	if x.Cmp(y) > 0 {
+		return y
+	}
+
+	return x
+}
+
+func ConvertUnmarshalledInt(x interface{}) (int64, error) {
 	switch tx := x.(type) {
 	case float64:
-		return uint64(roundFloat(tx)), nil
+		return roundFloat(tx), nil
 	case string:
 		v, err := ParseUint64orHex(&tx)
 		if err != nil {
 			return 0, err
 		}
 
-		return v, nil
+		return int64(v), nil
 	default:
 		return 0, errors.New("unsupported type for unmarshalled integer")
 	}
@@ -109,14 +115,14 @@ func roundFloat(num float64) int64 {
 }
 
 // SetupDataDir sets up the data directory and the corresponding sub-directories
-func SetupDataDir(dataDir string, paths []string, perms fs.FileMode) error {
-	if err := CreateDirSafe(dataDir, perms); err != nil {
+func SetupDataDir(dataDir string, paths []string) error {
+	if err := createDir(dataDir); err != nil {
 		return fmt.Errorf("failed to create data dir: (%s): %w", dataDir, err)
 	}
 
 	for _, path := range paths {
 		path := filepath.Join(dataDir, path)
-		if err := CreateDirSafe(path, perms); err != nil {
+		if err := createDir(path); err != nil {
 			return fmt.Errorf("failed to create path: (%s): %w", path, err)
 		}
 	}
@@ -126,11 +132,6 @@ func SetupDataDir(dataDir string, paths []string, perms fs.FileMode) error {
 
 // DirectoryExists checks if the directory at the specified path exists
 func DirectoryExists(directoryPath string) bool {
-	// Check if path is empty
-	if directoryPath == "" {
-		return false
-	}
-
 	// Grab the absolute filepath
 	pathAbs, err := filepath.Abs(directoryPath)
 	if err != nil {
@@ -145,101 +146,17 @@ func DirectoryExists(directoryPath string) bool {
 	return true
 }
 
-// Checks if the file at the specified path exists
-func FileExists(filePath string) bool {
-	// Check if path is empty
-	if filePath == "" {
-		return false
-	}
-
-	// Grab the absolute filepath
-	pathAbs, err := filepath.Abs(filePath)
-	if err != nil {
-		return false
-	}
-
-	// Check if the file exists, and that it's actually a file if there is a hit
-	if fileInfo, statErr := os.Stat(pathAbs); os.IsNotExist(statErr) || (fileInfo != nil && fileInfo.IsDir()) {
-		return false
-	}
-
-	return true
-}
-
-// Creates a directory at path and with perms level permissions.
-// If directory already exists, owner and permissions are verified.
-func CreateDirSafe(path string, perms fs.FileMode) error {
-	info, err := os.Stat(path)
-	// check if an error occurred other than path not exists
+// createDir creates a file system directory if it doesn't exist
+func createDir(path string) error {
+	_, err := os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	// create directory if it does not exist
-	if !DirectoryExists(path) {
-		if err := os.MkdirAll(path, perms); err != nil {
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(path, os.ModePerm); err != nil {
 			return err
 		}
-
-		return nil
-	}
-
-	// verify that existing directory's owner and permissions are safe
-	return verifyFileOwnerAndPermissions(path, info, perms)
-}
-
-// Creates a file at path and with perms level permissions.
-// If file already exists, owner and permissions are
-// verified, and the file is overwritten.
-func SaveFileSafe(path string, data []byte, perms fs.FileMode) error {
-	info, err := os.Stat(path)
-	// check if an error occurred other than path not exists
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	if FileExists(path) {
-		// verify that existing file's owner and permissions are safe
-		if err := verifyFileOwnerAndPermissions(path, info, perms); err != nil {
-			return err
-		}
-	}
-
-	// create or overwrite the file
-	return os.WriteFile(path, data, perms)
-}
-
-// Verifies that the file owner is the current user,
-// or the file owner is in the same group as current user
-// and permissions are set correctly by the owner.
-func verifyFileOwnerAndPermissions(path string, info fs.FileInfo, expectedPerms fs.FileMode) error {
-	// get stats
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if stat == nil || !ok {
-		return fmt.Errorf("failed to get stats of %s", path)
-	}
-
-	// get current user
-	currUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("failed to get current user")
-	}
-
-	// get user id of the owner
-	ownerUID := strconv.FormatUint(uint64(stat.Uid), 10)
-	if currUser.Uid == ownerUID {
-		return nil
-	}
-
-	// get group id of the owner
-	ownerGID := strconv.FormatUint(uint64(stat.Gid), 10)
-	if currUser.Gid != ownerGID {
-		return fmt.Errorf("file/directory created by a user from a different group: %s", path)
-	}
-
-	// check if permissions are set correctly by the owner
-	if info.Mode() != expectedPerms {
-		return fmt.Errorf("permissions of the file/directory '%s' are set incorrectly by another user", path)
 	}
 
 	return nil
@@ -260,7 +177,7 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	val, err := ConvertUnmarshalledUint(rawValue)
+	val, err := ConvertUnmarshalledInt(rawValue)
 	if err != nil {
 		return err
 	}
@@ -269,7 +186,7 @@ func (d *JSONNumber) UnmarshalJSON(data []byte) error {
 		return errors.New("must be positive value")
 	}
 
-	d.Value = val
+	d.Value = uint64(val)
 
 	return nil
 }

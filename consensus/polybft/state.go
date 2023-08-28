@@ -5,25 +5,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	bolt "go.etcd.io/bbolt"
-
-	"github.com/umbracle/ethgo"
 )
-
-// ExitEvent is an event emitted by Exit contract
-type ExitEvent struct {
-	// ID is the decoded 'index' field from the event
-	ID uint64 `abi:"id"`
-	// Sender is the decoded 'sender' field from the event
-	Sender ethgo.Address `abi:"sender"`
-	// Receiver is the decoded 'receiver' field from the event
-	Receiver ethgo.Address `abi:"receiver"`
-	// Data is the decoded 'data' field from the event
-	Data []byte `abi:"data"`
-	// EpochNumber is the epoch number in which exit event was added
-	EpochNumber uint64 `abi:"-"`
-	// BlockNumber is the block in which exit event was added
-	BlockNumber uint64 `abi:"-"`
-}
 
 // MessageSignature encapsulates sender identifier and its signature
 type MessageSignature struct {

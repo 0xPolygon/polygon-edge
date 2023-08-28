@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
+	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -204,7 +206,6 @@ func NewBlockchain(
 		logger:    logger.Named("blockchain"),
 		config:    config,
 		consensus: consensus,
-		db:        db,
 		executor:  executor,
 		txSigner:  txSigner,
 		stream:    &eventStream{},
@@ -213,6 +214,26 @@ func NewBlockchain(
 			count: big.NewInt(0),
 		},
 	}
+
+	var (
+		db  storage.Storage
+		err error
+	)
+
+	if dataDir == "" {
+		if db, err = memory.NewMemoryStorage(nil); err != nil {
+			return nil, err
+		}
+	} else {
+		if db, err = leveldb.NewLevelDBStorage(
+			filepath.Join(dataDir, "blockchain"),
+			logger,
+		); err != nil {
+			return nil, err
+		}
+	}
+
+	b.db = db
 
 	if err := b.initCaches(defaultCacheSize); err != nil {
 		return nil, err
@@ -657,17 +678,15 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 // outside the method call
 func (b *Blockchain) VerifyPotentialBlock(block *types.Block) error {
 	// Do just the initial block verification
-	_, err := b.verifyBlock(block)
-
-	return err
+	return b.verifyBlock(block)
 }
 
 // VerifyFinalizedBlock verifies that the block is valid by performing a series of checks.
 // It is assumed that the block status is sealed (committed)
-func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) (*types.FullBlock, error) {
+func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) error {
 	// Make sure the consensus layer verifies this block header
 	if err := b.consensus.VerifyHeader(block.Header); err != nil {
-		return nil, fmt.Errorf("failed to verify the header: %w", err)
+		return fmt.Errorf("failed to verify the header: %w", err)
 	}
 
 	// Do the initial block verification
@@ -684,12 +703,12 @@ func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) (*types.FullBlock,
 func (b *Blockchain) verifyBlock(block *types.Block) (*BlockResult, error) {
 	// Make sure the block is present
 	if block == nil {
-		return nil, ErrNoBlock
+		return ErrNoBlock
 	}
 
 	// Make sure the block is in line with the parent block
 	if err := b.verifyBlockParent(block); err != nil {
-		return nil, err
+		return err
 	}
 
 	// Make sure the block body data is valid
@@ -760,7 +779,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) (*BlockResult, error) {
 			block.Header.Sha3Uncles,
 		))
 
-		return nil, ErrInvalidSha3Uncles
+		return ErrInvalidSha3Uncles
 	}
 
 	// Make sure the transactions root matches up
@@ -771,18 +790,18 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) (*BlockResult, error) {
 			block.Header.TxRoot,
 		))
 
-		return nil, ErrInvalidTxRoot
+		return ErrInvalidTxRoot
 	}
 
 	// Execute the transactions in the block and grab the result
 	blockResult, executeErr := b.executeBlockTransactions(block)
 	if executeErr != nil {
-		return nil, fmt.Errorf("unable to execute block transactions, %w", executeErr)
+		return fmt.Errorf("unable to execute block transactions, %w", executeErr)
 	}
 
 	// Verify the local execution result with the proposed block data
 	if err := blockResult.verifyBlockResult(block); err != nil {
-		return nil, fmt.Errorf("unable to verify block execution result, %w", err)
+		return fmt.Errorf("unable to verify block execution result, %w", err)
 	}
 
 	return blockResult, nil
@@ -977,7 +996,6 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 		"txs", len(block.Transactions),
 		"hash", header.Hash,
 		"parent", header.ParentHash,
-		"source", source,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
@@ -988,21 +1006,6 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	b.logger.Info("new block", logArgs...)
 
 	return nil
-}
-
-// GetCachedReceipts retrieves cached receipts for given headerHash
-func (b *Blockchain) GetCachedReceipts(headerHash types.Hash) ([]*types.Receipt, error) {
-	receipts, found := b.receiptsCache.Get(headerHash)
-	if !found {
-		return nil, fmt.Errorf("failed to retrieve receipts for header hash: %s", headerHash)
-	}
-
-	extractedReceipts, ok := receipts.([]*types.Receipt)
-	if !ok {
-		return nil, errors.New("invalid type assertion for receipts")
-	}
-
-	return extractedReceipts, nil
 }
 
 // extractBlockReceipts extracts the receipts from the passed in block
@@ -1081,7 +1084,7 @@ func (b *Blockchain) ReadTxLookup(hash types.Hash) (types.Hash, bool) {
 // return error if the invalid signature found
 func (b *Blockchain) recoverFromFieldsInBlock(block *types.Block) error {
 	for _, tx := range block.Transactions {
-		if tx.From != types.ZeroAddress || tx.Type == types.StateTx {
+		if tx.From != types.ZeroAddress {
 			continue
 		}
 
@@ -1102,7 +1105,7 @@ func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Trans
 	updated := false
 
 	for _, tx := range transactions {
-		if tx.From != types.ZeroAddress || tx.Type == types.StateTx {
+		if tx.From != types.ZeroAddress {
 			continue
 		}
 
@@ -1213,7 +1216,7 @@ func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
 
 	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
 	if !ok {
-		return errors.New("failed to get header difficulty")
+		panic("failed to get header difficulty")
 	}
 
 	// parent total difficulty of incoming header

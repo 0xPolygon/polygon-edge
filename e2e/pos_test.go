@@ -19,6 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/e2e/framework"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
@@ -44,7 +45,7 @@ func getBigDefaultStakedBalance(t *testing.T) *big.Int {
 	t.Helper()
 
 	val := stakingHelper.DefaultStakedBalance
-	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
+	bigDefaultStakedBalance, err := common.ParseUint256orHex(&val)
 
 	if err != nil {
 		t.Fatalf("unable to parse DefaultStakedBalance, %v", err)

@@ -484,8 +484,7 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 
 		return object.Code
 	}
-	//nolint:godox
-	// TODO; Should we move this to state? (to be fixed in EVM-527)
+	// TODO; Should we move this to state?
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {

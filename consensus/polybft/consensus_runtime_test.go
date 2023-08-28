@@ -360,7 +360,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 	err := runtime.FSM()
 	require.NoError(t, err)
 
-	assert.True(t, runtime.isActiveValidator())
+	assert.True(t, runtime.IsActiveValidator())
 	assert.False(t, runtime.fsm.isEndOfEpoch)
 	assert.False(t, runtime.fsm.isEndOfSprint)
 	assert.Equal(t, lastBlock.Number, runtime.fsm.parent.Number)
@@ -482,7 +482,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	require.NoError(t, err)
 
-	assert.False(t, runtime.isActiveValidator())
+	assert.False(t, runtime.IsActiveValidator())
 	assert.Equal(t, runtime.config.DataDir, tmpDir)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.SprintSize)
 	assert.Equal(t, uint64(10), runtime.config.PolyBFTConfig.EpochSize)
@@ -1074,7 +1074,7 @@ func encodeExitEvents(t *testing.T, exitEvents []*ExitEvent) [][]byte {
 
 	var exitEventAPI contractsapi.L2StateSyncedEvent
 	for i, e := range exitEvents {
-		encodedEvent, err := exitEventAPI.Encode(e)
+		encodedEvent, err := exitEventAPI.Encode(e.L2StateSyncedEvent)
 		require.NoError(t, err)
 
 		encodedEvents[i] = encodedEvent

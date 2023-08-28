@@ -1202,8 +1202,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			},
 		}
 
-		_, err = blockchain.verifyBlockBody(block)
-		assert.ErrorIs(t, err, ErrInvalidSha3Uncles)
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), ErrInvalidSha3Uncles)
 	})
 
 	t.Run("Invalid Transactions root", func(t *testing.T) {
@@ -1220,8 +1219,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			},
 		}
 
-		_, err = blockchain.verifyBlockBody(block)
-		assert.ErrorIs(t, err, ErrInvalidTxRoot)
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), ErrInvalidTxRoot)
 	})
 
 	t.Run("Invalid execution result - missing parent", func(t *testing.T) {
@@ -1248,8 +1246,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			},
 		}
 
-		_, err = blockchain.verifyBlockBody(block)
-		assert.ErrorIs(t, err, ErrParentNotFound)
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), ErrParentNotFound)
 	})
 
 	t.Run("Invalid execution result - unable to fetch block creator", func(t *testing.T) {
@@ -1288,8 +1285,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			},
 		}
 
-		_, err = blockchain.verifyBlockBody(block)
-		assert.ErrorIs(t, err, errBlockCreatorNotFound)
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), errBlockCreatorNotFound)
 	})
 
 	t.Run("Invalid execution result - unable to execute transactions", func(t *testing.T) {
@@ -1331,8 +1327,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 			},
 		}
 
-		_, err = blockchain.verifyBlockBody(block)
-		assert.ErrorIs(t, err, errUnableToExecute)
+		assert.ErrorIs(t, blockchain.verifyBlockBody(block), errUnableToExecute)
 	})
 }
 

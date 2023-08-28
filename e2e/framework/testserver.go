@@ -196,7 +196,6 @@ func (t *TestServer) SecretsInit() (*InitIBFTResult, error) {
 	commandSlice := strings.Split(fmt.Sprintf("secrets %s", secretsInitCmd.Use), " ")
 	args = append(args, commandSlice...)
 	args = append(args, "--data-dir", filepath.Join(t.Config.IBFTDir, "tmp"))
-	args = append(args, "--insecure")
 
 	cmd := exec.Command(resolveBinary(), args...) //nolint:gosec
 	cmd.Dir = t.Config.RootDir
@@ -675,14 +674,14 @@ func (t *Txn) sendImpl() error {
 	return nil
 }
 
-func (t *Txn) Send() (*Txn, error) {
+func (t *Txn) Send() *Txn {
 	if t.hash != nil {
-		return nil, errors.New("txn already sent")
+		panic("BUG: txn already sent")
 	}
 
 	t.sendErr = t.sendImpl()
 
-	return t, nil
+	return t
 }
 
 func (t *Txn) Receipt() *ethgo.Receipt {

@@ -40,6 +40,11 @@ func (g *slotGauge) highPressure() bool {
 	return g.read() > (highPressureMark*g.max)/100
 }
 
+// free slots returns how many slots are currently available
+func (g *slotGauge) freeSlots() uint64 {
+	return g.max - g.read()
+}
+
 // slotsRequired calculates the number of slots required for given transaction(s).
 func slotsRequired(txs ...*types.Transaction) uint64 {
 	slots := uint64(0)

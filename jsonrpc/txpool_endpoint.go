@@ -172,21 +172,21 @@ func (t *TxPool) Inspect() (interface{}, error) {
 func (t *TxPool) Status() (interface{}, error) {
 	pendingTxs, queuedTxs := t.store.GetTxs(true)
 
-	var pendingCount uint64
+	var pendingCount int
 
 	for _, t := range pendingTxs {
-		pendingCount += uint64(len(t))
+		pendingCount += len(t)
 	}
 
-	var queuedCount uint64
+	var queuedCount int
 
 	for _, t := range queuedTxs {
-		queuedCount += uint64(len(t))
+		queuedCount += len(t)
 	}
 
 	resp := StatusResponse{
-		Pending: pendingCount,
-		Queued:  queuedCount,
+		Pending: uint64(pendingCount),
+		Queued:  uint64(queuedCount),
 	}
 
 	return resp, nil

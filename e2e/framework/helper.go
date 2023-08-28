@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts/abis"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	"github.com/0xPolygon/polygon-edge/crypto"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/server/proto"
@@ -194,7 +195,7 @@ func GetStakedAmount(from types.Address, rpcClient *jsonrpc.Client) (*big.Int, e
 		return nil, fmt.Errorf("unable to call Staking contract method stakedAmount, %w", err)
 	}
 
-	bigResponse, decodeErr := types.ParseUint256orHex(&response)
+	bigResponse, decodeErr := common.ParseUint256orHex(&response)
 	if decodeErr != nil {
 		return nil, fmt.Errorf("unable to decode hex response")
 	}

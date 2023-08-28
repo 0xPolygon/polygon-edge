@@ -23,9 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -40,11 +37,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/validate"
 	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/ethgo"
 	"google.golang.org/grpc"
 )
 
@@ -88,6 +83,7 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
+}
 
 	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
 	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
@@ -148,19 +144,14 @@ func NewServer(config *Config) (*Server, error) {
 		logger:             logger.Named("server"),
 		config:             config,
 		chain:              config.Chain,
-		grpcServer:         grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
+		grpcServer:         grpc.NewServer(),
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
-	var dirPaths = []string{
-		"blockchain",
-		"trie",
-	}
-
 	// Generate all the paths in the dataDir
-	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
+	if err := common.SetupDataDir(config.DataDir, dirPaths); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
 	}
 
@@ -297,6 +288,7 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// compute the genesis root state
+	genesisRoot := m.executor.WriteGenesis(config.Chain.Genesis.Alloc)
 	config.Chain.Genesis.StateRoot = genesisRoot
 
 	// Use the london signer with eip-155 as a fallback one
@@ -418,30 +410,9 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// start relayer
-	if config.Relayer {
-		if err := m.setupRelayer(); err != nil {
-			return nil, err
-		}
-	}
-
 	m.txpool.Start()
 
 	return m, nil
-}
-
-func unaryInterceptor(
-	ctx context.Context,
-	req interface{},
-	_ *grpc.UnaryServerInfo,
-	handler grpc.UnaryHandler,
-) (interface{}, error) {
-	// Validate request
-	if err := validate.ValidateRequest(req); err != nil {
-		return nil, err
-	}
-
-	return handler(ctx, req)
 }
 
 func (s *Server) restoreChain() error {
@@ -987,15 +958,10 @@ func (s *Server) Close() {
 		}
 	}
 
-	// Stop state sync relayer
-	if s.stateSyncRelayer != nil {
-		s.stateSyncRelayer.Stop()
-	}
-
-	// Close the txpool's main loop
+	// close the txpool's main loop
 	s.txpool.Close()
 
-	// Close DataDog profiler
+	// close DataDog profiler
 	s.closeDataDogProfiler()
 }
 

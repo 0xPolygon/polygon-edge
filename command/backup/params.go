@@ -6,7 +6,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/archive"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
-	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -41,14 +41,14 @@ type backupParams struct {
 func (p *backupParams) validateFlags() error {
 	var parseErr error
 
-	if p.from, parseErr = types.ParseUint64orHex(&p.fromRaw); parseErr != nil {
+	if p.from, parseErr = common.ParseUint64orHex(&p.fromRaw); parseErr != nil {
 		return errDecodeRange
 	}
 
 	if p.toRaw != "" {
 		var parsedTo uint64
 
-		if parsedTo, parseErr = types.ParseUint64orHex(&p.toRaw); parseErr != nil {
+		if parsedTo, parseErr = common.ParseUint64orHex(&p.toRaw); parseErr != nil {
 			return errDecodeRange
 		}
 

@@ -23,6 +23,8 @@ func GetCommand() *cobra.Command {
 	setFlags(genesisCmd)
 	setLegacyFlags(genesisCmd)
 
+	helper.SetRequiredFlags(genesisCmd, params.getRequiredFlags())
+
 	genesisCmd.AddCommand(
 		// genesis predeploy
 		predeploy.GetCommand(),
@@ -344,8 +346,6 @@ func preRunCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	helper.SetRequiredFlags(cmd, params.getRequiredFlags())
-
 	return params.initRawParams()
 }
 
@@ -353,15 +353,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	outputter := command.InitializeOutputter(cmd)
 	defer outputter.WriteOutput()
 
-	var err error
-
-	if params.isPolyBFTConsensus() {
-		err = params.generatePolyBftChainConfig(outputter)
-	} else {
-		err = params.generateGenesis()
-	}
-
-	if err != nil {
+	if err := params.generateGenesis(); err != nil {
 		outputter.SetError(err)
 
 		return

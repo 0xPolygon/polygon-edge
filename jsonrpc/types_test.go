@@ -128,6 +128,39 @@ func TestToTransaction_Returns_V_R_S_ValuesWithoutLeading0(t *testing.T) {
 	assert.Equal(t, hexWithoutLeading0, string(jsonS))
 }
 
+func TestToTransaction_EIP1559(t *testing.T) {
+	hexWithLeading0 := "0x0ba93811466694b3b3cb8853cb8227b7c9f49db10bf6e7db59d20ac904961565"
+	hexWithoutLeading0 := "0xba93811466694b3b3cb8853cb8227b7c9f49db10bf6e7db59d20ac904961565"
+	v, _ := hex.DecodeHex(hexWithLeading0)
+	r, _ := hex.DecodeHex(hexWithLeading0)
+	s, _ := hex.DecodeHex(hexWithLeading0)
+	txn := types.Transaction{
+		Nonce:     0,
+		GasPrice:  nil,
+		GasTipCap: big.NewInt(10),
+		GasFeeCap: big.NewInt(10),
+		Gas:       0,
+		To:        nil,
+		Value:     big.NewInt(0),
+		Input:     nil,
+		V:         new(big.Int).SetBytes(v),
+		R:         new(big.Int).SetBytes(r),
+		S:         new(big.Int).SetBytes(s),
+		Hash:      types.Hash{},
+		From:      types.Address{},
+	}
+
+	jsonTx := toTransaction(&txn, nil, nil, nil)
+
+	jsonV, _ := jsonTx.V.MarshalText()
+	jsonR, _ := jsonTx.R.MarshalText()
+	jsonS, _ := jsonTx.S.MarshalText()
+
+	assert.Equal(t, hexWithoutLeading0, string(jsonV))
+	assert.Equal(t, hexWithoutLeading0, string(jsonR))
+	assert.Equal(t, hexWithoutLeading0, string(jsonS))
+}
+
 func TestBlock_Copy(t *testing.T) {
 	b := &block{
 		ExtraData: []byte{0x1},
@@ -206,7 +239,7 @@ func mockTxn() *transaction {
 
 	tt := &transaction{
 		Nonce:       1,
-		GasPrice:    argBig(*big.NewInt(10)),
+		GasPrice:    argBigPtr(big.NewInt(10)),
 		Gas:         100,
 		To:          &to,
 		Value:       argBig(*big.NewInt(1000)),

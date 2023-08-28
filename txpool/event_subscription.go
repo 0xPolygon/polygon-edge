@@ -38,12 +38,12 @@ func (es *eventSubscription) eventSupported(eventType proto.EventType) bool {
 // close stops the event subscription
 func (es *eventSubscription) close() {
 	close(es.doneCh)
-	close(es.outputCh)
-	close(es.notifyCh)
 }
 
 // runLoop is the main loop that listens for notifications and handles the event / close signals
 func (es *eventSubscription) runLoop() {
+	defer close(es.outputCh)
+
 	for {
 		select {
 		case <-es.doneCh: // Break if a close signal has been received

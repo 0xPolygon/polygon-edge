@@ -16,7 +16,7 @@ var (
 // Params are all the set of params for the chain
 type Params struct {
 	Forks          *Forks                 `json:"forks"`
-	ChainID        int64                  `json:"chainID"`
+	ChainID        int                    `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
@@ -161,7 +161,6 @@ type ForksInTime struct {
 	Constantinople,
 	Petersburg,
 	Istanbul,
-	London,
 	EIP150,
 	EIP158,
 	EIP155 bool
@@ -177,5 +176,4 @@ var AllForksEnabled = &Forks{
 	Constantinople: NewFork(0),
 	Petersburg:     NewFork(0),
 	Istanbul:       NewFork(0),
-	London:         NewFork(0),
 }

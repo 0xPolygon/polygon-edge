@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/umbracle/fastrlp"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,7 +62,9 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 	unmarshalledTxn.ComputeHash()
 
 	txn.Hash = unmarshalledTxn.Hash
-	assert.Equal(t, txn, unmarshalledTxn, "[ERROR] Unmarshalled transaction not equal to base transaction")
+	if !reflect.DeepEqual(txn, unmarshalledTxn) {
+		t.Fatal("[ERROR] Unmarshalled transaction not equal to base transaction")
+	}
 }
 
 func TestRLPStorage_Marshall_And_Unmarshall_Receipt(t *testing.T) {

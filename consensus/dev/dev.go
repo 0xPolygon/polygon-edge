@@ -164,7 +164,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		ParentHash: parent.Hash,
 		Number:     num + 1,
 		GasLimit:   parent.GasLimit, // Inherit from parent for now, will need to adjust dynamically later.
-		Timestamp:  uint64(time.Now().UTC().Unix()),
+		Timestamp:  uint64(time.Now().Unix()),
 	}
 
 	// calculate gas limit based on parent header
@@ -224,7 +224,7 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 		Receipts: transition.Receipts(),
 	})
 
-	if _, err := d.blockchain.VerifyFinalizedBlock(block); err != nil {
+	if err := d.blockchain.VerifyFinalizedBlock(block); err != nil {
 		return err
 	}
 

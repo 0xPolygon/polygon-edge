@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/go-hclog v1.5.0
 	github.com/hashicorp/go-immutable-radix v1.3.1
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/hashicorp/golang-lru v0.5.4
 	github.com/hashicorp/hcl v1.0.0
 	github.com/hashicorp/vault/api v1.9.2
 	github.com/libp2p/go-libp2p v0.27.6
@@ -119,7 +119,6 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 // indirect
 	github.com/btcsuite/btcutil v1.0.3-0.20201208143702-a53e38424cce // indirect
 	github.com/bwesterb/go-ristretto v1.2.0 // indirect
-	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/consensys/gnark-crypto v0.5.3 // indirect
@@ -192,7 +191,6 @@ require (
 	github.com/opencontainers/runc v1.1.5 // indirect
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
-	github.com/ory/dockertest v3.3.5+incompatible // indirect
 	github.com/pbnjay/memory v0.0.0-20210728143218-7b4eea64cf58 // indirect
 	github.com/philhofer/fwd v1.1.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect

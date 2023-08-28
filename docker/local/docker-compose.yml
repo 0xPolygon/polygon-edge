@@ -1,4 +1,4 @@
-version: '3.9'
+version: '3.5'
 
 services:
   ## RUN ROOTCHAIN
@@ -36,11 +36,16 @@ services:
       rootchain:
         condition: service_started
     volumes:
-      - data:/data
+      - node-1:/polygon-edge/data-1
+      - node-2:/polygon-edge/data-2
+      - node-3:/polygon-edge/data-3
+      - node-4:/polygon-edge/data-4
+      - genesis:/genesis
     networks:
       - polygon-edge-docker
-
+  
   ## RUN NODES
+  ## Nodes must have the same names as folders in genesis-legde
   node-1:
     image: local/polygon-edge
     container_name: polygon-edge-validator-1
@@ -62,13 +67,13 @@ services:
     ports:
       - '10000:9632'
       - '10002:8545'
-      - '10003:5001'
     volumes:
-      - data:/data
+      - node-1:/data
+      - genesis:/genesis
     networks:
       - polygon-edge-docker
     restart: on-failure
-
+    
   node-2:
     image: local/polygon-edge
     container_name: polygon-edge-validator-2
@@ -91,13 +96,13 @@ services:
     ports:
       - '20000:9632'
       - '20002:8545'
-      - '20003:5001'
     volumes:
-      - data:/data
+      - node-2:/data
+      - genesis:/genesis
     networks:
       - polygon-edge-docker
     restart: on-failure
-
+    
   node-3:
     image: local/polygon-edge
     container_name: polygon-edge-validator-3
@@ -119,13 +124,13 @@ services:
     ports:
       - '30000:9632'
       - '30002:8545'
-      - '30003:5001'
     volumes:
-      - data:/data
+      - node-3:/data
+      - genesis:/genesis
     networks:
       - polygon-edge-docker
     restart: on-failure
-
+    
   node-4:
     image: local/polygon-edge
     container_name: polygon-edge-validator-4
@@ -147,9 +152,9 @@ services:
     ports:
       - '40000:9632'
       - '40002:8545'
-      - '40003:5001'
     volumes:
-      - data:/data
+      - node-4:/data
+      - genesis:/genesis
     networks:
       - polygon-edge-docker
     restart: on-failure

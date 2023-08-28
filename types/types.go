@@ -108,11 +108,11 @@ func (a Address) Bytes() []byte {
 }
 
 func StringToHash(str string) Hash {
-	return BytesToHash(StringToBytes(str))
+	return BytesToHash(stringToBytes(str))
 }
 
 func StringToAddress(str string) Address {
-	return BytesToAddress(StringToBytes(str))
+	return BytesToAddress(stringToBytes(str))
 }
 
 func AddressToString(address Address) string {
@@ -130,7 +130,7 @@ func BytesToAddress(b []byte) Address {
 	return a
 }
 
-func StringToBytes(str string) []byte {
+func stringToBytes(str string) []byte {
 	str = strings.TrimPrefix(str, "0x")
 	if len(str)%2 == 1 {
 		str = "0" + str
@@ -164,14 +164,14 @@ func IsValidAddress(address string) error {
 
 // UnmarshalText parses a hash in hex syntax.
 func (h *Hash) UnmarshalText(input []byte) error {
-	*h = BytesToHash(StringToBytes(string(input)))
+	*h = BytesToHash(stringToBytes(string(input)))
 
 	return nil
 }
 
 // UnmarshalText parses an address in hex syntax.
 func (a *Address) UnmarshalText(input []byte) error {
-	buf := StringToBytes(string(input))
+	buf := stringToBytes(string(input))
 	if len(buf) != AddressLength {
 		return fmt.Errorf("incorrect length")
 	}
@@ -192,7 +192,7 @@ func (a Address) MarshalText() ([]byte, error) {
 // TODO: Replace jsonrpc/types/argByte with this?
 // Still unsure if the codification will be done on protobuf side more
 // than marshaling in json and if this will become necessary.
-//
+
 //nolint:godox
 type ArgBytes []byte
 
@@ -338,9 +338,8 @@ func (j *JournalEntry) Merge(jj *JournalEntry) {
 	}
 }
 
-type Proof struct {
-	Data     []Hash // the proof himself
-	Metadata map[string]interface{}
+type Trace struct {
+	Trace map[string]string
 }
 
 type OverrideAccount struct {

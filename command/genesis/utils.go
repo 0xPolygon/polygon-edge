@@ -1,16 +1,11 @@
 package genesis
 
 import (
-	"encoding/hex"
 	"fmt"
-	"io/ioutil"
-	"math/big"
 	"os"
-	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -20,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -107,13 +101,9 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 			return nil, fmt.Errorf("invalid event tracker start block configuration provided: %s", trackerStartBlocksRaw)
 		}
 
-		// <contractAddress>:<startBlock>
-		address := types.StringToAddress(startBlockRaw[:delimiterIdx])
-		startBlockRaw := startBlockRaw[delimiterIdx+1:]
-
-		startBlock, err := strconv.ParseUint(startBlockRaw, 10, 64)
+		amount, err := types.ParseUint256orHex(&val)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse provided start block %s: %w", startBlockRaw, err)
+			return fmt.Errorf("failed to parse amount %s: %w", val, err)
 		}
 
 		trackerStartBlocksConfig[address] = startBlock

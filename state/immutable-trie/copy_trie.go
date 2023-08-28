@@ -82,14 +82,14 @@ func copyTrie(node Node, storage Storage, newStorage Storage, agg []byte, isStor
 		if !isStorage {
 			var account state.Account
 			if err := account.UnmarshalRlp(n.buf); err != nil {
-				return fmt.Errorf("cant parse account %s: %w", hex.EncodeToString(encodeCompact(agg)), err)
+				return fmt.Errorf("can't parse account %s: %w", hex.EncodeToString(encodeCompact(agg)), err)
 			} else {
 				if account.CodeHash != nil && bytes.Equal(account.CodeHash, emptyCodeHash) == false {
 					code, ok := storage.GetCode(types.BytesToHash(account.CodeHash))
 					if ok {
 						newStorage.SetCode(types.BytesToHash(account.CodeHash), code)
 					} else {
-						return fmt.Errorf("cant find code %s", hex.EncodeToString(account.CodeHash))
+						return fmt.Errorf("can't find code %s", hex.EncodeToString(account.CodeHash))
 					}
 				}
 
@@ -118,7 +118,7 @@ func HashChecker(stateRoot []byte, storage Storage) (types.Hash, error) {
 
 	h, ok := hasherPool.Get().(*hasher)
 	if !ok {
-		return types.Hash{}, errors.New("cant get hasher")
+		return types.Hash{}, errors.New("can't get hasher")
 	}
 
 	arena, _ := h.AcquireArena()
