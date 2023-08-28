@@ -269,7 +269,7 @@ func TestTraceBlockByNumber(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := NewDebug(test.store, 100000)
+			endpoint := &Debug{test.store}
 
 			res, err := endpoint.TraceBlockByNumber(test.blockNumber, test.config)
 
@@ -338,7 +338,7 @@ func TestTraceBlockByHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := NewDebug(test.store, 100000)
+			endpoint := &Debug{test.store}
 
 			res, err := endpoint.TraceBlockByHash(test.blockHash, test.config)
 
@@ -397,7 +397,7 @@ func TestTraceBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := NewDebug(test.store, 100000)
+			endpoint := &Debug{test.store}
 
 			res, err := endpoint.TraceBlock(test.input, test.config)
 
@@ -543,7 +543,7 @@ func TestTraceTransaction(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := NewDebug(test.store, 100000)
+			endpoint := &Debug{test.store}
 
 			res, err := endpoint.TraceTransaction(test.txHash, test.config)
 
@@ -600,7 +600,7 @@ func TestTraceCall(t *testing.T) {
 		}
 	)
 
-	decodedTx.ComputeHash(1)
+	decodedTx.ComputeHash()
 
 	tests := []struct {
 		name   string
@@ -630,12 +630,6 @@ func TestTraceCall(t *testing.T) {
 
 					return testTraceResult, nil
 				},
-				headerFn: func() *types.Header {
-					return testLatestHeader
-				},
-				getAccountFn: func(h types.Hash, a types.Address) (*Account, error) {
-					return &Account{Nonce: 1}, nil
-				},
 			},
 			result: testTraceResult,
 			err:    false,
@@ -653,12 +647,6 @@ func TestTraceCall(t *testing.T) {
 					assert.False(t, full)
 
 					return nil, false
-				},
-				headerFn: func() *types.Header {
-					return testLatestHeader
-				},
-				getAccountFn: func(h types.Hash, a types.Address) (*Account, error) {
-					return &Account{Nonce: 1}, nil
 				},
 			},
 			result: nil,
@@ -679,9 +667,6 @@ func TestTraceCall(t *testing.T) {
 				headerFn: func() *types.Header {
 					return testLatestHeader
 				},
-				getAccountFn: func(h types.Hash, a types.Address) (*Account, error) {
-					return &Account{Nonce: 1}, nil
-				},
 			},
 			result: nil,
 			err:    true,
@@ -694,7 +679,7 @@ func TestTraceCall(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := NewDebug(test.store, 100000)
+			endpoint := &Debug{test.store}
 
 			res, err := endpoint.TraceCall(test.arg, test.filter, test.config)
 

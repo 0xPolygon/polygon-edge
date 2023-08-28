@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -80,7 +79,7 @@ type Polybft struct {
 	// state is reference to the struct which encapsulates consensus data persistence logic
 	state *State
 
-	// consensus parameters
+	// consensus parametres
 	config *consensus.Params
 
 	// consensusConfig is genesis configuration for polybft consensus protocol
@@ -167,7 +166,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		// check if there are Bridge Allow List Admins and Bridge Block List Admins
 		// and if there are, get the first address as the Admin
-		bridgeAllowListAdmin := types.ZeroAddress
+		var bridgeAllowListAdmin types.Address
 		if config.Params.BridgeAllowList != nil && len(config.Params.BridgeAllowList.AdminAddresses) > 0 {
 			bridgeAllowListAdmin = config.Params.BridgeAllowList.AdminAddresses[0]
 		}
@@ -177,26 +176,18 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
 		}
 
-		hasOwner := config.Params.AccessListsOwner != nil
-		useBridgeAllowList := bridgeAllowListAdmin != types.ZeroAddress
-		useBridgeBlockList := bridgeBlockListAdmin != types.ZeroAddress
-
 		// initialize Predicate SCs
-		if hasOwner || useBridgeAllowList || useBridgeBlockList {
+		if bridgeAllowListAdmin != types.ZeroAddress || bridgeBlockListAdmin != types.ZeroAddress {
 			// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
-			var owner types.Address
-
-			if hasOwner {
-				owner = *config.Params.AccessListsOwner
-			} else if useBridgeAllowList {
+			owner := contracts.SystemCaller
+			if bridgeAllowListAdmin != types.ZeroAddress {
 				owner = bridgeAllowListAdmin
-			} else {
+			} else if bridgeBlockListAdmin != types.ZeroAddress {
 				owner = bridgeBlockListAdmin
 			}
 
 			// initialize ChildERC20PredicateAccessList SC
-			input, err := getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner,
-				useBridgeAllowList, useBridgeBlockList, false)
+			input, err := getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
@@ -207,8 +198,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize ChildERC721PredicateAccessList SC
-			input, err = getInitERC721PredicateACLInput(polyBFTConfig.Bridge, owner,
-				useBridgeAllowList, useBridgeBlockList, false)
+			input, err = getInitERC721PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
@@ -219,8 +209,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize ChildERC1155PredicateAccessList SC
-			input, err = getInitERC1155PredicateACLInput(polyBFTConfig.Bridge, owner,
-				useBridgeAllowList, useBridgeBlockList, false)
+			input, err = getInitERC1155PredicateACLInput(polyBFTConfig.Bridge, owner, false)
 			if err != nil {
 				return err
 			}
@@ -231,8 +220,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize RootMintableERC20PredicateAccessList SC
-			input, err = getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner,
-				useBridgeAllowList, useBridgeBlockList, true)
+			input, err = getInitERC20PredicateACLInput(polyBFTConfig.Bridge, owner, true)
 			if err != nil {
 				return err
 			}
@@ -243,8 +231,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize RootMintableERC721PredicateAccessList SC
-			input, err = getInitERC721PredicateACLInput(polyBFTConfig.Bridge, owner,
-				useBridgeAllowList, useBridgeBlockList, true)
+			input, err = getInitERC721PredicateACLInput(polyBFTConfig.Bridge, owner, true)
 			if err != nil {
 				return err
 			}
@@ -255,8 +242,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize RootMintableERC1155PredicateAccessList SC
-			input, err = getInitERC1155PredicateACLInput(polyBFTConfig.Bridge, owner,
-				useBridgeAllowList, useBridgeBlockList, true)
+			input, err = getInitERC1155PredicateACLInput(polyBFTConfig.Bridge, owner, true)
 			if err != nil {
 				return err
 			}
@@ -478,13 +464,13 @@ func (p *Polybft) Initialize() error {
 	return nil
 }
 
-func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
+func ForkManagerInitialParamsFactory(config *chain.Chain) (*chain.ForkParams, error) {
 	pbftConfig, err := GetPolyBFTConfig(config)
 	if err != nil {
 		return nil, err
 	}
 
-	return &forkmanager.ForkParams{
+	return &chain.ForkParams{
 		MaxValidatorSetSize: &pbftConfig.MaxValidatorSetSize,
 		EpochSize:           &pbftConfig.EpochSize,
 		SprintSize:          &pbftConfig.SprintSize,
@@ -612,7 +598,7 @@ func (p *Polybft) startConsensusProtocol() {
 		p.txPool.SetSealing(isValidator) // update tx pool
 
 		if isValidator {
-			// initialize FSM as a stateless ibft backend via runtime as an adapter
+			// initialze FSM as a stateless ibft backend via runtime as an adapter
 			err = p.runtime.FSM()
 			if err != nil {
 				p.logger.Error("failed to create fsm", "block number", latestHeader.Number, "error", err)
@@ -757,7 +743,6 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 			commitmentTxExists = true
 
 			if err := verifyBridgeCommitmentTx(
-				block.Number(),
 				tx.Hash,
 				signedCommitment,
 				validator.NewValidatorSet(validators, p.logger)); err != nil {

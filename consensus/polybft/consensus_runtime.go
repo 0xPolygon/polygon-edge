@@ -37,7 +37,7 @@ var (
 
 // txPoolInterface is an abstraction of transaction pool
 type txPoolInterface interface {
-	Prepare()
+	Prepare(uint64)
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(*types.Transaction)
@@ -180,7 +180,6 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				maxCommitmentSize:     maxCommitmentSize,
 				numBlockConfirmations: c.config.numBlockConfirmations,
 			},
-			c,
 		)
 
 		c.stateSyncManager = stateSyncManager
@@ -196,9 +195,7 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		// enable checkpoint manager
-		txRelayer, err := txrelayer.NewTxRelayer(
-			txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint),
-			txrelayer.WithWriter(logger.StandardWriter(&hcf.StandardLoggerOptions{})))
+		txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
 		if err != nil {
 			return err
 		}
@@ -380,7 +377,7 @@ func (c *consensusRuntime) FSM() error {
 	}
 
 	if isEndOfSprint {
-		commitment, err := c.stateSyncManager.Commitment(pendingBlockNumber)
+		commitment, err := c.stateSyncManager.Commitment()
 		if err != nil {
 			return err
 		}
@@ -607,7 +604,7 @@ func (c *consensusRuntime) setIsActiveValidator(isActiveValidator bool) {
 }
 
 // isActiveValidator indicates if node is in validator set or not
-func (c *consensusRuntime) IsActiveValidator() bool {
+func (c *consensusRuntime) isActiveValidator() bool {
 	return c.activeValidatorFlag.Load()
 }
 

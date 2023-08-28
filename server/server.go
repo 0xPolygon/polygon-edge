@@ -217,28 +217,40 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// apply allow list contracts deployer genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
-		m.config.Chain.Params.ContractDeployerAllowList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+			m.config.Chain.Params.ContractDeployerAllowList)
+	}
 
 	// apply block list contracts deployer genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
-		m.config.Chain.Params.ContractDeployerBlockList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.ContractDeployerBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
+			m.config.Chain.Params.ContractDeployerBlockList)
+	}
 
 	// apply transactions execution allow list genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
-		m.config.Chain.Params.TransactionsAllowList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.TransactionsAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+			m.config.Chain.Params.TransactionsAllowList)
+	}
 
 	// apply transactions execution block list genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
-		m.config.Chain.Params.TransactionsBlockList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.TransactionsBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
+			m.config.Chain.Params.TransactionsBlockList)
+	}
 
-	// apply bridge allow list genesis data (owner is omitted for bridge allow list)
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-		m.config.Chain.Params.BridgeAllowList, m.config.Chain.Params.AccessListsOwner)
+	// apply bridge allow list genesis data
+	if m.config.Chain.Params.BridgeAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
+			m.config.Chain.Params.BridgeAllowList)
+	}
 
-	// apply bridge block list genesis data (owner is omitted for bridge block list)
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-		m.config.Chain.Params.BridgeBlockList, m.config.Chain.Params.AccessListsOwner)
+	// apply bridge block list genesis data
+	if m.config.Chain.Params.BridgeBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
+			m.config.Chain.Params.BridgeBlockList)
+	}
 
 	var initialStateRoot = types.ZeroHash
 
@@ -269,7 +281,18 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	if err := initForkManager(engineName, config.Chain); err != nil {
+	var initialParams *chain.ForkParams
+
+	if pf := forkManagerInitialParamsFactory[ConsensusType(engineName)]; pf != nil {
+		if initialParams, err = pf(config.Chain); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := forkmanager.ForkManagerInit(
+		initialParams,
+		forkManagerFactory[ConsensusType(engineName)],
+		config.Chain.Params.Forks); err != nil {
 		return nil, err
 	}
 
@@ -306,23 +329,22 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// blockchain object
+	blockchainConfig := &blockchain.Config{Chain: config.Chain, DataDir: config.DataDir}
 	m.blockchain, err = blockchain.NewBlockchain(
 		logger,
 		db,
-		config.Chain,
+		blockchainConfig,
 		nil,
 		m.executor,
 		signer,
 	)
+
 	if err != nil {
 		return nil, err
 	}
 
 	// here we can provide some other configuration
-	m.gasHelper, err = gasprice.NewGasHelper(gasprice.DefaultGasHelperConfig, m.blockchain)
-	if err != nil {
-		return nil, err
-	}
+	m.gasHelper = gasprice.NewGasHelper(gasprice.DefaultGasHelperConfig, m.blockchain)
 
 	m.executor.GetHash = m.blockchain.GetHashHelper
 
@@ -335,7 +357,7 @@ func NewServer(config *Config) (*Server, error) {
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
 			logger,
-			m.chain.Params.Forks,
+			m.chain.Params.Forks.At(0),
 			hub,
 			m.grpcServer,
 			m.network,
@@ -343,7 +365,6 @@ func NewServer(config *Config) (*Server, error) {
 				MaxSlots:           m.config.MaxSlots,
 				PriceLimit:         m.config.PriceLimit,
 				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
-				ChainID:            big.NewInt(m.config.Chain.Params.ChainID),
 			},
 		)
 		if err != nil {
@@ -404,7 +425,6 @@ func NewServer(config *Config) (*Server, error) {
 		}
 	}
 
-	m.txpool.SetBaseFee(m.blockchain.Header())
 	m.txpool.Start()
 
 	return m, nil
@@ -896,7 +916,6 @@ func (s *Server) setupJSONRPC() error {
 		PriceLimit:               s.config.PriceLimit,
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
 		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
-		ConcurrentRequestsDebug:  s.config.JSONRPC.ConcurrentRequestsDebug,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
@@ -1009,58 +1028,4 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 	}()
 
 	return srv
-}
-
-func initForkManager(engineName string, config *chain.Chain) error {
-	var initialParams *forkmanager.ForkParams
-
-	if factory := forkManagerInitialParamsFactory[ConsensusType(engineName)]; factory != nil {
-		params, err := factory(config)
-		if err != nil {
-			return err
-		}
-
-		initialParams = params
-	}
-
-	fm := forkmanager.GetInstance()
-
-	// clear everything in forkmanager (if there was something because of tests) and register initial fork
-	fm.Clear()
-	fm.RegisterFork(forkmanager.InitialFork, initialParams)
-
-	// Register forks
-	for name, f := range *config.Params.Forks {
-		// check if fork is not supported by current edge version
-		if _, found := (*chain.AllForksEnabled)[name]; !found {
-			return fmt.Errorf("fork is not available: %s", name)
-		}
-
-		fm.RegisterFork(name, f.Params)
-	}
-
-	// Register handlers and additional forks here
-	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
-		return err
-	}
-
-	if factory := forkManagerFactory[ConsensusType(engineName)]; factory != nil {
-		if err := factory(config.Params.Forks); err != nil {
-			return err
-		}
-	}
-
-	// Activate initial fork
-	if err := fm.ActivateFork(forkmanager.InitialFork, uint64(0)); err != nil {
-		return err
-	}
-
-	// Activate forks
-	for name, f := range *config.Params.Forks {
-		if err := fm.ActivateFork(name, f.Block); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

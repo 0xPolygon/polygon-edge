@@ -42,7 +42,7 @@ func (ep *whitelistParams) validateFlags() error {
 }
 
 type whitelistResult struct {
-	NewValidatorAddresses []string `json:"newValidatorAddresses"`
+	newValidatorAddresses []string
 }
 
 func (wr whitelistResult) GetOutput() string {
@@ -50,8 +50,8 @@ func (wr whitelistResult) GetOutput() string {
 
 	buffer.WriteString("\n[WHITELIST VALIDATORS]\n")
 
-	vals := make([]string, len(wr.NewValidatorAddresses))
-	for i, addr := range wr.NewValidatorAddresses {
+	vals := make([]string, len(wr.newValidatorAddresses))
+	for i, addr := range wr.newValidatorAddresses {
 		vals[i] = fmt.Sprintf("Validator address|%s", addr)
 	}
 

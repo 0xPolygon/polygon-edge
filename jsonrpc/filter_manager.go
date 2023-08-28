@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
@@ -26,7 +25,6 @@ var (
 	ErrIncorrectBlockRange              = errors.New("incorrect range")
 	ErrBlockRangeTooHigh                = errors.New("block range too high")
 	ErrNoWSConnection                   = errors.New("no websocket connection")
-	ErrUnknownSubscriptionType          = errors.New("unknown subscription type")
 )
 
 // defaultTimeout is the timeout to remove the filters that don't have a web socket stream
@@ -37,16 +35,6 @@ const (
 	NoIndexInHeap = -1
 )
 
-// subscriptionType determines which event type the filter is subscribed to
-type subscriptionType byte
-
-const (
-	// Blocks represents subscription type for blockchain events
-	Blocks subscriptionType = iota
-	// PendingTransactions represents subscription type for tx pool events
-	PendingTransactions
-)
-
 // filter is an interface that BlockFilter and LogFilter implement
 type filter interface {
 	// hasWSConn returns the flag indicating the filter has web socket stream
@@ -54,9 +42,6 @@ type filter interface {
 
 	// getFilterBase returns filterBase that has common fields
 	getFilterBase() *filterBase
-
-	// getSubscriptionType returns the type of the event the filter is subscribed to
-	getSubscriptionType() subscriptionType
 
 	// getUpdates returns stored data in a JSON serializable form
 	getUpdates() (interface{}, error)
@@ -82,10 +67,8 @@ type filterBase struct {
 
 // newFilterBase initializes filterBase with unique ID
 func newFilterBase(ws wsConn) filterBase {
-	uuidObj := uuid.New()
-
 	return filterBase{
-		id:        string(encodeToHex(uuidObj[:])),
+		id:        uuid.New().String(),
 		ws:        ws,
 		heapIndex: NoIndexInHeap,
 	}
@@ -176,11 +159,6 @@ func (f *blockFilter) sendUpdates() error {
 	return nil
 }
 
-// getSubscriptionType returns the type of the event the filter is subscribed to
-func (f *blockFilter) getSubscriptionType() subscriptionType {
-	return Blocks
-}
-
 // logFilter is a filter to store logs that meet the conditions in query
 type logFilter struct {
 	filterBase
@@ -234,63 +212,6 @@ func (f *logFilter) sendUpdates() error {
 	return nil
 }
 
-// getSubscriptionType returns the type of the event the filter is subscribed to
-func (f *logFilter) getSubscriptionType() subscriptionType {
-	return Blocks
-}
-
-// pendingTxFilter is a filter to store pending tx
-type pendingTxFilter struct {
-	filterBase
-	sync.Mutex
-
-	txHashes []string
-}
-
-// appendPendingTxHashes appends new pending tx hash to tx hashes
-func (f *pendingTxFilter) appendPendingTxHashes(txHash string) {
-	f.Lock()
-	defer f.Unlock()
-
-	f.txHashes = append(f.txHashes, txHash)
-}
-
-// takePendingTxsUpdates returns all saved pending tx hashes in filter and sets a new slice
-func (f *pendingTxFilter) takePendingTxsUpdates() []string {
-	f.Lock()
-	defer f.Unlock()
-
-	txHashes := f.txHashes
-	f.txHashes = []string{}
-
-	return txHashes
-}
-
-// getSubscriptionType returns the type of the event the filter is subscribed to
-func (f *pendingTxFilter) getSubscriptionType() subscriptionType {
-	return PendingTransactions
-}
-
-// getUpdates returns stored pending tx hashes
-func (f *pendingTxFilter) getUpdates() (interface{}, error) {
-	pendingTxHashes := f.takePendingTxsUpdates()
-
-	return pendingTxHashes, nil
-}
-
-// sendUpdates write the hashes for all pending transactions to web socket stream
-func (f *pendingTxFilter) sendUpdates() error {
-	pendingTxHashes := f.takePendingTxsUpdates()
-
-	for _, txHash := range pendingTxHashes {
-		if err := f.writeMessageToWs(txHash); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // filterManagerStore provides methods required by FilterManager
 type filterManagerStore interface {
 	// Header returns the current header of the chain (genesis if empty)
@@ -307,9 +228,6 @@ type filterManagerStore interface {
 
 	// GetBlockByNumber returns a block using the provided number
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
-
-	// TxPoolSubscribe subscribes for tx pool events
-	TxPoolSubscribe(request *proto.SubscribeRequest) (<-chan *proto.TxPoolEvent, func(), error)
 }
 
 // FilterManager manages all running filters
@@ -361,7 +279,7 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 // Run starts worker process to handle events
 func (f *FilterManager) Run() {
 	// watch for new events in the blockchain
-	blockWatchCh := make(chan *blockchain.Event)
+	watchCh := make(chan *blockchain.Event)
 
 	go func() {
 		for {
@@ -369,23 +287,9 @@ func (f *FilterManager) Run() {
 			if evnt == nil {
 				return
 			}
-			blockWatchCh <- evnt
+			watchCh <- evnt
 		}
 	}()
-
-	// watch for new events in the tx pool
-	txRequest := &proto.SubscribeRequest{
-		Types: []proto.EventType{proto.EventType_ADDED},
-	}
-
-	txWatchCh, txPoolUnsubscribe, err := f.store.TxPoolSubscribe(txRequest)
-	if err != nil {
-		f.logger.Error("Unable to subscribe to tx pool")
-
-		return
-	}
-
-	defer txPoolUnsubscribe()
 
 	var timeoutCh <-chan time.Time
 
@@ -399,16 +303,10 @@ func (f *FilterManager) Run() {
 		}
 
 		select {
-		case evnt := <-blockWatchCh:
+		case evnt := <-watchCh:
 			// new blockchain event
 			if err := f.dispatchEvent(evnt); err != nil {
-				f.logger.Error("failed to dispatch block event", "err", err)
-			}
-
-		case evnt := <-txWatchCh:
-			// new tx pool event
-			if err := f.dispatchEvent(evnt); err != nil {
-				f.logger.Error("failed to dispatch tx pool event", "err", err)
+				f.logger.Error("failed to dispatch event", "err", err)
 			}
 
 		case <-timeoutCh:
@@ -452,20 +350,6 @@ func (f *FilterManager) NewLogFilter(logQuery *LogQuery, ws wsConn) string {
 	filter := &logFilter{
 		filterBase: newFilterBase(ws),
 		query:      logQuery,
-	}
-
-	if filter.hasWSConn() {
-		ws.SetFilterID(filter.id)
-	}
-
-	return f.addFilter(filter)
-}
-
-// NewPendingTxFilter adds new PendingTxFilter
-func (f *FilterManager) NewPendingTxFilter(ws wsConn) string {
-	filter := &pendingTxFilter{
-		filterBase: newFilterBase(ws),
-		txHashes:   []string{},
 	}
 
 	if filter.hasWSConn() {
@@ -737,26 +621,12 @@ func (f *FilterManager) nextTimeoutFilter() (string, time.Time) {
 }
 
 // dispatchEvent is an event handler for new block event
-func (f *FilterManager) dispatchEvent(evnt interface{}) error {
-	var subType subscriptionType
-
+func (f *FilterManager) dispatchEvent(evnt *blockchain.Event) error {
 	// store new event in each filters
-	switch evt := evnt.(type) {
-	case *blockchain.Event:
-		f.processBlockEvent(evt)
-
-		subType = Blocks
-	case *proto.TxPoolEvent:
-		f.processTxEvent(evt)
-
-		subType = PendingTransactions
-
-	default:
-		return ErrUnknownSubscriptionType
-	}
+	f.processEvent(evnt)
 
 	// send data to web socket stream
-	if err := f.flushWsFilters(subType); err != nil {
+	if err := f.flushWsFilters(); err != nil {
 		return err
 	}
 
@@ -764,7 +634,7 @@ func (f *FilterManager) dispatchEvent(evnt interface{}) error {
 }
 
 // processEvent makes each filter append the new data that interests them
-func (f *FilterManager) processBlockEvent(evnt *blockchain.Event) {
+func (f *FilterManager) processEvent(evnt *blockchain.Event) {
 	f.RLock()
 	defer f.RUnlock()
 
@@ -808,8 +678,6 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 		return nil
 	}
 
-	logIndex := uint64(0)
-
 	for indx, receipt := range receipts {
 		if receipt.TxHash == types.ZeroHash {
 			// Extract tx Hash
@@ -828,39 +696,24 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 						TxHash:      receipt.TxHash,
 						TxIndex:     argUint64(indx),
 						Removed:     false,
-						LogIndex:    argUint64(logIndex),
 					})
 				}
 			}
-
-			logIndex++
 		}
 	}
 
 	return nil
 }
 
-// processTxEvent makes each filter refresh the pending tx hashes
-func (f *FilterManager) processTxEvent(evnt *proto.TxPoolEvent) {
-	f.RLock()
-	defer f.RUnlock()
-
-	for _, f := range f.filters {
-		if txFilter, ok := f.(*pendingTxFilter); ok {
-			txFilter.appendPendingTxHashes(evnt.TxHash)
-		}
-	}
-}
-
 // flushWsFilters make each filters with web socket connection write the updates to web socket stream
 // flushWsFilters also removes the filters if flushWsFilters notices the connection is closed
-func (f *FilterManager) flushWsFilters(subType subscriptionType) error {
+func (f *FilterManager) flushWsFilters() error {
 	closedFilterIDs := make([]string, 0)
 
 	f.RLock()
 
 	for id, filter := range f.filters {
-		if !filter.hasWSConn() || filter.getSubscriptionType() != subType {
+		if !filter.hasWSConn() {
 			continue
 		}
 

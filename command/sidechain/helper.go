@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -79,7 +78,7 @@ func GetValidatorInfo(validatorAddr ethgo.Address, supernetManager, stakeManager
 		return nil, err
 	}
 
-	withdrawableRewards, err := common.ParseUint256orHex(&response)
+	withdrawableRewards, err := types.ParseUint256orHex(&response)
 	if err != nil {
 		return nil, err
 	}

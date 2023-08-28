@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -128,7 +127,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
+		txn := &ethgo.Transaction{
+			From:  ownerKey.Address(),
+			Input: encoded,
+			To:    &supernetAddr,
+		}
 
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
 			receipt, err := txRelayer.SendTransaction(txn, ownerKey)
@@ -205,7 +208,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
+		txn := &ethgo.Transaction{
+			From:  ownerKey.Address(),
+			Input: encoded,
+			To:    &supernetAddr,
+		}
 
 		receipt, err := txRelayer.SendTransaction(txn, ownerKey)
 		if err != nil {
@@ -218,8 +225,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	result := &supernetResult{
-		IsGenesisSetFinalized: params.finalizeGenesisSet,
-		IsStakingEnabled:      params.enableStaking,
+		isGenesisSetFinalized: params.finalizeGenesisSet,
+		isStakingEnabled:      params.enableStaking,
 	}
 
 	outputter.WriteCommandResult(result)
@@ -245,7 +252,7 @@ func getFinalizedStake(owner, validator, stakeManager types.Address, chainID int
 		return nil, err
 	}
 
-	return common.ParseUint256orHex(&response)
+	return types.ParseUint256orHex(&response)
 }
 
 // validatorSetToABISlice converts given validators to generic map

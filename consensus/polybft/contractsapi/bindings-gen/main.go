@@ -5,16 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"go/format"
+	"io/ioutil"
 	"log"
 	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/umbracle/ethgo/abi"
-
 	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -448,7 +447,7 @@ import (
 		log.Fatal(err)
 	}
 
-	if err = common.SaveFileSafe("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
+	if err := ioutil.WriteFile("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
 		log.Fatal(err)
 	}
 }

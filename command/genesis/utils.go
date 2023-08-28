@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
@@ -82,7 +81,7 @@ func parsePremineInfo(premineInfoRaw string) (*premineInfo, error) {
 		// <addr>:<balance>
 		valueRaw := premineInfoRaw[delimiterIdx+1:]
 
-		amount, err = common.ParseUint256orHex(&valueRaw)
+		amount, err = types.ParseUint256orHex(&valueRaw)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse amount %s: %w", valueRaw, err)
 		}
@@ -133,7 +132,7 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 
 	blockRaw := burnContractParts[0]
 
-	blockNum, err := common.ParseUint64orHex(&blockRaw)
+	blockNum, err := types.ParseUint64orHex(&blockRaw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse block number %s: %w", blockRaw, err)
 	}
@@ -218,10 +217,10 @@ func ReadValidatorsByPrefix(dir, prefix string) ([]*validator.GenesisValidator, 
 		}
 
 		validators[i] = &validator.GenesisValidator{
-			Address:   types.Address(account.Ecdsa.Address()),
-			BlsKey:    hex.EncodeToString(account.Bls.PublicKey().Marshal()),
-			MultiAddr: fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
-			Stake:     big.NewInt(0),
+			Address:       types.Address(account.Ecdsa.Address()),
+			BlsPrivateKey: account.Bls,
+			BlsKey:        hex.EncodeToString(account.Bls.PublicKey().Marshal()),
+			MultiAddr:     fmt.Sprintf("/ip4/%s/tcp/%d/p2p/%s", "127.0.0.1", bootnodePortStart+int64(i), nodeID),
 		}
 	}
 

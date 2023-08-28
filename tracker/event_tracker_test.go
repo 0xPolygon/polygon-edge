@@ -20,7 +20,7 @@ type mockEventSubscriber struct {
 	logs []*ethgo.Log
 }
 
-func (m *mockEventSubscriber) AddLog(log *ethgo.Log) error {
+func (m *mockEventSubscriber) AddLog(log *ethgo.Log) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -29,8 +29,6 @@ func (m *mockEventSubscriber) AddLog(log *ethgo.Log) error {
 	}
 
 	m.logs = append(m.logs, log)
-
-	return nil
 }
 
 func (m *mockEventSubscriber) len() int {

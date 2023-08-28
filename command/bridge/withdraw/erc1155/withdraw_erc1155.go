@@ -12,10 +12,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -108,14 +106,14 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		amountRaw := wp.Amounts[i]
 		tokenIDRaw := wp.TokenIDs[i]
 
-		amount, err := helperCommon.ParseUint256orHex(&amountRaw)
+		amount, err := types.ParseUint256orHex(&amountRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amountRaw, err))
 
 			return
 		}
 
-		tokenID, err := helperCommon.ParseUint256orHex(&tokenIDRaw)
+		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided token id %s: %w", amountRaw, err))
 
@@ -188,6 +186,8 @@ func createWithdrawTxn(receivers []ethgo.Address, amounts, TokenIDs []*big.Int) 
 
 	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
-	return helper.CreateTransaction(ethgo.ZeroAddress, &addr, input,
-		nil, wp.ChildChainMintable), nil
+	return &ethgo.Transaction{
+		To:    &addr,
+		Input: input,
+	}, nil
 }

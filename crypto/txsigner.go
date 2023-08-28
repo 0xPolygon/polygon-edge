@@ -62,25 +62,19 @@ func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 }
 
 // calcTxHash calculates the transaction hash (keccak256 hash of the RLP value)
-// LegacyTx:
-// keccak256(RLP(nonce, gasPrice, gas, to, value, input, chainId, 0, 0))
-// AccessListsTx:
-// keccak256(RLP(type, chainId, nonce, gasPrice, gas, to, value, input, accessList))
-// DynamicFeeTx:
-// keccak256(RLP(type, chainId, nonce, gasTipCap, gasFeeCap, gas, to, value, input, accessList))
 func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	a := signerPool.Get()
-	defer signerPool.Put(a)
+	isDynamicFeeTx := tx.Type == types.DynamicFeeTx
 
 	v := a.NewArray()
 
-	if tx.Type != types.LegacyTx {
+	if isDynamicFeeTx {
 		v.Set(a.NewUint(chainID))
 	}
 
 	v.Set(a.NewUint(tx.Nonce))
 
-	if tx.Type == types.DynamicFeeTx {
+	if isDynamicFeeTx {
 		v.Set(a.NewBigInt(tx.GasTipCap))
 		v.Set(a.NewBigInt(tx.GasFeeCap))
 	} else {
@@ -96,27 +90,28 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	}
 
 	v.Set(a.NewBigInt(tx.Value))
+
 	v.Set(a.NewCopyBytes(tx.Input))
 
-	if tx.Type == types.LegacyTx {
+	if isDynamicFeeTx {
+		v.Set(a.NewArray())
+	} else {
 		// EIP155
 		if chainID != 0 {
 			v.Set(a.NewUint(chainID))
 			v.Set(a.NewUint(0))
 			v.Set(a.NewUint(0))
 		}
-	} else {
-		//nolint:godox
-		// TODO: Introduce AccessList
-		v.Set(a.NewArray())
 	}
 
 	var hash []byte
-	if tx.Type == types.LegacyTx {
-		hash = keccak.Keccak256Rlp(nil, v)
-	} else {
+	if isDynamicFeeTx {
 		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type)}, nil, v)
+	} else {
+		hash = keccak.Keccak256Rlp(nil, v)
 	}
+
+	signerPool.Put(a)
 
 	return types.BytesToHash(hash)
 }

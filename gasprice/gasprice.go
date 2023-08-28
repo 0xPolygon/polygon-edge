@@ -9,7 +9,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	lru "github.com/hashicorp/golang-lru"
 	"github.com/umbracle/ethgo"
 )
 
@@ -45,7 +44,6 @@ type Config struct {
 
 // Blockchain is the interface representing blockchain
 type Blockchain interface {
-	GetBlockByNumber(number uint64, full bool) (*types.Block, bool)
 	GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool)
 	Header() *types.Header
 	Config() *chain.Params
@@ -55,8 +53,6 @@ type Blockchain interface {
 type GasStore interface {
 	// MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
 	MaxPriorityFeePerGas() (*big.Int, error)
-	// FeeHistory returns the collection of historical gas information
-	FeeHistory(uint64, uint64, []float64) (*FeeHistoryReturn, error)
 }
 
 var _ GasStore = (*GasHelper)(nil)
@@ -82,20 +78,13 @@ type GasHelper struct {
 	lastHeaderHash types.Hash
 
 	lock sync.Mutex
-
-	historyCache *lru.Cache
 }
 
 // NewGasHelper is the constructor function for GasHelper struct
-func NewGasHelper(config *Config, backend Blockchain) (*GasHelper, error) {
+func NewGasHelper(config *Config, backend Blockchain) *GasHelper {
 	pricePercentile := config.PricePercentile
 	if pricePercentile > 100 {
 		pricePercentile = 100
-	}
-
-	cache, err := lru.New(100)
-	if err != nil {
-		return nil, err
 	}
 
 	return &GasHelper{
@@ -106,8 +95,7 @@ func NewGasHelper(config *Config, backend Blockchain) (*GasHelper, error) {
 		lastPrice:          config.LastPrice,
 		maxPrice:           config.MaxPrice,
 		backend:            backend,
-		historyCache:       cache,
-	}, nil
+	}
 }
 
 // MaxPriorityFeePerGas calculates the priority fee needed for transaction to be included in a block
@@ -140,7 +128,7 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 	var allPrices []*big.Int
 
 	collectPrices := func(block *types.Block) error {
-		baseFee := new(big.Int).SetUint64(block.Header.BaseFee)
+		baseFee := block.Header.BaseFee
 		txSorter := newTxByEffectiveTipSorter(block.Transactions, baseFee)
 		sort.Sort(txSorter)
 
@@ -150,7 +138,7 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 		blockTxPrices := make([]*big.Int, 0)
 
 		for _, tx := range txSorter.txs {
-			tip := tx.EffectiveGasTip(baseFee)
+			tip := tx.EffectiveTip(baseFee)
 
 			if tip.Cmp(g.ignorePrice) == -1 {
 				// ignore transactions with tip lower than ignore price
@@ -238,11 +226,11 @@ func (g *GasHelper) MaxPriorityFeePerGas() (*big.Int, error) {
 // txSortedByEffectiveTip sorts transactions by effective tip from smallest to largest
 type txSortedByEffectiveTip struct {
 	txs     []*types.Transaction
-	baseFee *big.Int
+	baseFee uint64
 }
 
 // newTxByEffectiveTipSorter is constructor function for txSortedByEffectiveTip
-func newTxByEffectiveTipSorter(txs []*types.Transaction, baseFee *big.Int) *txSortedByEffectiveTip {
+func newTxByEffectiveTipSorter(txs []*types.Transaction, baseFee uint64) *txSortedByEffectiveTip {
 	return &txSortedByEffectiveTip{
 		txs:     txs,
 		baseFee: baseFee,
@@ -259,8 +247,8 @@ func (t *txSortedByEffectiveTip) Swap(i, j int) {
 
 // Less is implementation of sort.Interface
 func (t *txSortedByEffectiveTip) Less(i, j int) bool {
-	tip1 := t.txs[i].EffectiveGasTip(t.baseFee)
-	tip2 := t.txs[j].EffectiveGasTip(t.baseFee)
+	tip1 := t.txs[i].EffectiveTip(t.baseFee)
+	tip2 := t.txs[j].EffectiveTip(t.baseFee)
 
 	return tip1.Cmp(tip2) < 0
 }

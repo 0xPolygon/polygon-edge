@@ -11,10 +11,8 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
-	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -97,7 +95,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 		receiver := wp.Receivers[i]
 		amount := wp.Amounts[i]
 
-		amountBig, err := helperCommon.ParseUint256orHex(&amount)
+		amountBig, err := types.ParseUint256orHex(&amount)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amount, err))
 
@@ -166,6 +164,8 @@ func createWithdrawTxn(receiver types.Address, amount *big.Int) (*ethgo.Transact
 
 	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
-	return helper.CreateTransaction(ethgo.ZeroAddress, &addr, input,
-		nil, wp.ChildChainMintable), nil
+	return &ethgo.Transaction{
+		To:    &addr,
+		Input: input,
+	}, nil
 }

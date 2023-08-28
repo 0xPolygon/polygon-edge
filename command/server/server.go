@@ -228,13 +228,6 @@ func setFlags(cmd *cobra.Command) {
 		"minimal number of child blocks required for the parent block to be considered final",
 	)
 
-	cmd.Flags().Uint64Var(
-		&params.rawConfig.ConcurrentRequestsDebug,
-		concurrentRequestsDebugFlag,
-		defaultConfig.ConcurrentRequestsDebug,
-		"maximal number of concurrent requests for debug endpoints",
-	)
-
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)

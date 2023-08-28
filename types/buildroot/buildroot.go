@@ -25,12 +25,18 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 }
 
 // CalculateTransactionsRoot calculates the root of a list of transactions
-func CalculateTransactionsRoot(transactions []*types.Transaction, blockNumber uint64) types.Hash {
-	handler := types.GetTransactionHashHandler(blockNumber)
+func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
+	ar := arenaPool.Get()
 
-	return CalculateRoot(len(transactions), func(indx int) []byte {
-		return handler.SerializeForRootCalculation(transactions[indx], &arenaPool)
+	res := calculateRootWithRlp(len(transactions), func(i int) *fastrlp.Value {
+		ar.Reset()
+
+		return transactions[i].MarshalRLPWith(ar)
 	})
+
+	arenaPool.Put(ar)
+
+	return res
 }
 
 // CalculateUncleRoot calculates the root of a list of uncles

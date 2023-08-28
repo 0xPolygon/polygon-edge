@@ -1,6 +1,8 @@
 package e2e
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"path"
@@ -20,6 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -617,4 +620,106 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, validatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+}
+
+func TestE2E_Consensus_Trace(t *testing.T) {
+	const (
+		validatorSecrets = "test-chain-1"
+		newAccSecrets    = "test-chain-newAcc"
+		epochSize        = 5
+		validatorCount   = 5
+	)
+
+	var (
+		premineAmount = ethgo.Ether(10)
+		minterBalance = ethgo.Ether(1e6)
+	)
+
+	minter, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithEpochReward(int(ethgo.Ether(1).Uint64())),
+		framework.WithEpochSize(epochSize),
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, minter.Address())),
+		framework.WithSecretsCallback(func(addresses []types.Address, config *framework.TestClusterConfig) {
+			config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", minter.Address(), minterBalance))
+			for _, a := range addresses {
+				config.Premine = append(config.Premine, fmt.Sprintf("%s:%d", a, premineAmount))
+				config.StakeAmounts = append(config.StakeAmounts, new(big.Int).Set(premineAmount))
+			}
+		}),
+	)
+	defer cluster.Stop()
+
+	// init new account
+	_, err = cluster.InitSecrets(newAccSecrets, 1)
+	require.NoError(t, err)
+
+	cluster.WaitForReady(t)
+
+	// extract new acc secrets
+	newAccSecretsPath := path.Join(cluster.Config.TmpDir, newAccSecrets)
+	newAcc, err := sidechain.GetAccountFromDir(newAccSecretsPath)
+	require.NoError(t, err)
+
+	newAccAddr := newAcc.Ecdsa.Address()
+
+	// extract validator's secrets
+	validatorSecretsPath := path.Join(cluster.Config.TmpDir, validatorSecrets)
+
+	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecretsPath)
+	require.NoError(t, err)
+
+	validatorAddr := validatorAcc.Ecdsa.Address()
+
+	// transfer funds to the new account
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
+		From:  validatorAddr,
+		To:    &newAccAddr,
+		Value: ethgo.Ether(2),
+	}, validatorAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
+	require.NotNil(t, receipt.TransactionHash)
+
+	// verify trace existence on all validators
+	for i := 0; i < validatorCount; i++ {
+		ethEndpoint := cluster.Servers[i].JSONRPC().Eth()
+
+		blockResponse, err := ethEndpoint.GetBlockByNumber(ethgo.BlockNumber(receipt.BlockNumber), false)
+		require.NoError(t, err)
+		require.NotEqual(t, blockResponse.Miner, ethgo.ZeroAddress)
+
+		parentBlock, err := ethEndpoint.GetBlockByHash(blockResponse.ParentHash, false)
+		require.NoError(t, err)
+
+		sysClient := cluster.Servers[i].Conn()
+		traceResp, err := sysClient.GetTrace(context.Background(), &proto.GetTraceRequest{Number: receipt.BlockNumber})
+		require.NoError(t, err)
+
+		var trace *types.Trace
+		err = json.Unmarshal(traceResp.Trace, &trace)
+		require.NoError(t, err)
+		require.Equal(t, parentBlock.StateRoot.Bytes(), trace.ParentStateRoot.Bytes())
+
+		containsCoinbaseAddr, containsSenderAddr, containsReceiverAddr := false, false, false
+
+		var journalEntry *types.JournalEntry
+
+		for _, tr := range trace.TxnTraces {
+			_, containsCoinbaseAddr = tr.Delta[types.Address(blockResponse.Miner)]
+			_, containsSenderAddr = tr.Delta[types.Address(validatorAddr)]
+
+			journalEntry, containsReceiverAddr = tr.Delta[types.Address(newAccAddr)]
+			require.True(t, journalEntry.Balance.Cmp(ethgo.Ether(2)) == 0)
+		}
+
+		require.True(t, containsCoinbaseAddr)
+		require.True(t, containsSenderAddr)
+		require.True(t, containsReceiverAddr)
+	}
 }

@@ -211,7 +211,7 @@ func buildState(
 		return nil, nil, types.ZeroHash, err
 	}
 
-	snap, root := snap.Commit(objs)
+	snap, _, root := snap.Commit(objs)
 
 	return s, snap, types.BytesToHash(root), nil
 }
@@ -343,7 +343,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 		loopVal := i
 
 		if loopVal != "0x" {
-			v, err := common.ParseUint256orHex(&loopVal)
+			v, err := types.ParseUint256orHex(&loopVal)
 			if err != nil {
 				return err
 			}
@@ -383,7 +383,7 @@ func (t *stTransaction) UnmarshalJSON(input []byte) error {
 	t.From = types.Address{}
 
 	if len(dec.SecretKey) > 0 {
-		secretKey, err := common.ParseBytes(&dec.SecretKey)
+		secretKey, err := types.ParseBytes(&dec.SecretKey)
 		if err != nil {
 			return fmt.Errorf("failed to parse secret key: %w", err)
 		}

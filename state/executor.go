@@ -117,7 +117,7 @@ func (e *Executor) WriteGenesis(
 		return types.Hash{}, err
 	}
 
-	_, root := snap.Commit(objs)
+	_, _, root := snap.Commit(objs)
 
 	return types.BytesToHash(root), nil
 }
@@ -216,42 +216,36 @@ func (e *Executor) BeginTxn(
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 
-	// contract deployment access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListContractsAddr)
+	// enable contract deployment allow list (if any)
+	if e.config.ContractDeployerAllowList != nil {
+		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.ContractDeployerBlockList != nil {
-		txn.deploymentBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListContractsAddr)
+	if e.config.ContractDeployerBlockList != nil {
+		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
 	}
 
-	// transaction access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListTransactionsAddr)
+	// enable transactions allow list (if any)
+	if e.config.TransactionsAllowList != nil {
+		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.TransactionsBlockList != nil {
-		txn.txnBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListTransactionsAddr)
+	if e.config.TransactionsBlockList != nil {
+		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
 	}
 
-	// bridge access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.BridgeAllowList != nil {
-		txn.bridgeAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListBridgeAddr)
+	// enable transactions allow list (if any)
+	if e.config.BridgeAllowList != nil {
+		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.BridgeBlockList != nil {
-		txn.bridgeBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListBridgeAddr)
+	if e.config.BridgeBlockList != nil {
+		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
 	}
 
 	return txn, nil
@@ -276,6 +270,8 @@ type Transition struct {
 
 	PostHook func(t *Transition)
 
+	trace *types.Trace
+
 	// runtimes
 	evm         *evm.EVM
 	precompiles *precompiled.Precompiled
@@ -296,6 +292,9 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 }
 
@@ -396,19 +395,27 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
+	t.trace.TxnTraces = append(t.trace.TxnTraces, &types.TxnTrace{
+		Transaction: txn.MarshalRLP(),
+		Delta:       t.Txn().getCompactJournal(),
+	})
+
 	return nil
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash, error) {
+func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash, error) {
 	objs, err := t.state.Commit(t.config.EIP155)
 	if err != nil {
-		return nil, types.ZeroHash, err
+		return nil, nil, types.ZeroHash, err
 	}
 
-	s2, root := t.snap.Commit(objs)
+	s2, snapTrace, root := t.snap.Commit(objs)
 
-	return s2, types.BytesToHash(root), nil
+	t.trace.AccountTrie = snapTrace.AccountTrie
+	t.trace.StorageTrie = snapTrace.StorageTrie
+
+	return s2, t.trace, types.BytesToHash(root), nil
 }
 
 func (t *Transition) subGasPool(amount uint64) error {
@@ -528,11 +535,11 @@ func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 // surfacing of these errors reject the transaction thus not including it in the block
 
 var (
-	ErrNonceIncorrect        = errors.New("incorrect nonce")
-	ErrNotEnoughFundsForGas  = errors.New("not enough funds to cover gas costs")
-	ErrBlockLimitReached     = errors.New("gas limit reached in the pool")
-	ErrIntrinsicGasOverflow  = errors.New("overflow in intrinsic gas calculation")
-	ErrNotEnoughIntrinsicGas = errors.New("not enough gas supplied for intrinsic gas costs")
+	ErrNonceIncorrect        = fmt.Errorf("incorrect nonce")
+	ErrNotEnoughFundsForGas  = fmt.Errorf("not enough funds to cover gas costs")
+	ErrBlockLimitReached     = fmt.Errorf("gas limit reached in the pool")
+	ErrIntrinsicGasOverflow  = fmt.Errorf("overflow in intrinsic gas calculation")
+	ErrNotEnoughIntrinsicGas = fmt.Errorf("not enough gas supplied for intrinsic gas costs")
 
 	// ErrTipAboveFeeCap is a sanity error to ensure no one is able to specify a
 	// transaction with a tip higher than the total fee cap.
@@ -697,7 +704,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 
 	// check txns access lists, allow list takes precedence over block list
-	if t.txnAllowList != nil && t.txnAllowList.IsEnabled() {
+	if t.txnAllowList != nil {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnAllowList.GetRole(contract.Caller)
 			if !role.Enabled() {
@@ -713,7 +720,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
-	} else if t.txnBlockList != nil && t.txnBlockList.IsEnabled() {
+	} else if t.txnBlockList != nil {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnBlockList.GetRole(contract.Caller)
 			if role == addresslist.EnabledRole {
@@ -865,7 +872,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}()
 
 	// check if contract creation allow list is enabled
-	if t.deploymentAllowList != nil && t.deploymentAllowList.IsEnabled() {
+	if t.deploymentAllowList != nil {
 		role := t.deploymentAllowList.GetRole(c.Caller)
 
 		if !role.Enabled() {
@@ -880,7 +887,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				Err:     runtime.ErrNotAuth,
 			}
 		}
-	} else if t.deploymentBlockList != nil && t.deploymentBlockList.IsEnabled() {
+	} else if t.deploymentBlockList != nil {
 		role := t.deploymentBlockList.GetRole(c.Caller)
 
 		if role == addresslist.EnabledRole {

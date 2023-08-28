@@ -19,5 +19,5 @@
     "hash": "0x0800000000000000000000000000000000000000000000000000000000000000",
     "transactions": null,
     "uncles": null,
-    "baseFeePerGas": "0xf"
+    "baseFee": "0xf"
 }

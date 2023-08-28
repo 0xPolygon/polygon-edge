@@ -98,10 +98,12 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		}
 	}
 
-	_, root, err := transition.Commit()
+	_, trace, root, err := transition.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}
+
+	trace.ParentStateRoot = parent.StateRoot
 
 	updateBlockExecutionMetric(start)
 
@@ -116,14 +118,10 @@ func (p *blockchainWrapper) ProcessBlock(parent *types.Header, block *types.Bloc
 		Receipts: transition.Receipts(),
 	})
 
-	if builtBlock.Header.TxRoot != block.Header.TxRoot {
-		return nil, fmt.Errorf("incorrect tx root (expected: %s, actual: %s)",
-			builtBlock.Header.TxRoot, block.Header.TxRoot)
-	}
-
 	return &types.FullBlock{
 		Block:    builtBlock,
 		Receipts: transition.Receipts(),
+		Trace:    trace,
 	}, nil
 }
 

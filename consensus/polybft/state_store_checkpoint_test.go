@@ -1,12 +1,10 @@
 package polybft
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
@@ -98,13 +96,13 @@ func TestState_NoEpochForExitEventInLookup(t *testing.T) {
 
 	exitEventFromDB, err := state.CheckpointStore.getExitEvent(exitToTest)
 	require.NoError(t, err)
-	require.Equal(t, exitToTest, exitEventFromDB.ID.Uint64())
+	require.Equal(t, exitToTest, exitEventFromDB.ID)
 	require.Equal(t, epochToMatch, exitEventFromDB.EpochNumber)
 	require.Equal(t, blockNumberToMatch, exitEventFromDB.BlockNumber)
 
 	// simulate invalid case (for some reason lookup table doesn't have epoch for given exit)
 	err = state.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(exitEventToEpochLookupBucket).Delete(common.EncodeUint64ToBytes(exitEventFromDB.ID.Uint64()))
+		return tx.Bucket(exitEventToEpochLookupBucket).Delete(common.EncodeUint64ToBytes(exitEventFromDB.ID))
 	})
 
 	require.NoError(t, err)
@@ -143,7 +141,7 @@ func TestState_decodeExitEvent(t *testing.T) {
 
 	event, err := decodeExitEvent(log, epoch, blockNumber)
 	require.NoError(t, err)
-	require.Equal(t, uint64(exitID), event.ID.Uint64())
+	require.Equal(t, uint64(exitID), event.ID)
 	require.Equal(t, uint64(epoch), event.EpochNumber)
 	require.Equal(t, uint64(blockNumber), event.BlockNumber)
 
@@ -183,12 +181,10 @@ func insertTestExitEvents(t *testing.T, state *State,
 			for k := 1; k <= numOfEventsPerBlock; k++ {
 				exitEvents[index] =
 					&ExitEvent{
-						L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
-							ID:       new(big.Int).SetUint64(index),
-							Sender:   types.ZeroAddress,
-							Receiver: types.ZeroAddress,
-							Data:     generateRandomBytes(t),
-						},
+						ID:          index,
+						Sender:      ethgo.ZeroAddress,
+						Receiver:    ethgo.ZeroAddress,
+						Data:        generateRandomBytes(t),
 						EpochNumber: i,
 						BlockNumber: block,
 					}

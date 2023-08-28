@@ -3,10 +3,12 @@ package txpool
 import (
 	"math/big"
 	"math/rand"
+	"sort"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func Test_maxPriceQueue(t *testing.T) {
@@ -222,12 +224,6 @@ func Test_maxPriceQueue(t *testing.T) {
 				},
 			},
 		},
-		{
-			name:     "empty",
-			baseFee:  0,
-			unsorted: nil,
-			sorted:   []*types.Transaction{},
-		},
 	}
 
 	for _, tt := range testTable {
@@ -236,10 +232,15 @@ func Test_maxPriceQueue(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			queue := newPricesQueue(tt.baseFee, tt.unsorted)
+			queue := &maxPriceQueue{
+				baseFee: tt.baseFee,
+				txs:     tt.unsorted,
+			}
+
+			sort.Sort(queue)
 
 			for _, tx := range tt.sorted {
-				actual := queue.pop()
+				actual := queue.Pop()
 				assert.Equal(t, tx, actual)
 			}
 		})
@@ -268,7 +269,12 @@ func Benchmark_pricedQueue(t *testing.B) {
 	for _, tt := range testTable {
 		t.Run(tt.name, func(b *testing.B) {
 			for i := 0; i < t.N; i++ {
-				q := newPricesQueue(uint64(100), tt.unsortedTxs)
+				q := newPricedQueue()
+				q.queue.baseFee = uint64(i)
+
+				for _, tx := range tt.unsortedTxs {
+					q.push(tx)
+				}
 
 				for q.length() > 0 {
 					_ = q.pop()

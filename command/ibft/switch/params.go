@@ -10,6 +10,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 )
 
@@ -135,7 +136,7 @@ func (p *switchParams) initDeployment() error {
 			)
 		}
 
-		d, err := common.ParseUint64orHex(&p.deploymentRaw)
+		d, err := types.ParseUint64orHex(&p.deploymentRaw)
 		if err != nil {
 			return fmt.Errorf(
 				"unable to parse deployment value, %w",
@@ -223,7 +224,7 @@ func (p *switchParams) initPoSConfig() error {
 	}
 
 	if p.minValidatorCountRaw != "" {
-		value, err := common.ParseUint64orHex(&p.minValidatorCountRaw)
+		value, err := types.ParseUint64orHex(&p.minValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
 				"unable to parse min validator count value, %w",
@@ -235,7 +236,7 @@ func (p *switchParams) initPoSConfig() error {
 	}
 
 	if p.maxValidatorCountRaw != "" {
-		value, err := common.ParseUint64orHex(&p.maxValidatorCountRaw)
+		value, err := types.ParseUint64orHex(&p.maxValidatorCountRaw)
 		if err != nil {
 			return fmt.Errorf(
 				"unable to parse max validator count value, %w",
@@ -272,7 +273,7 @@ func (p *switchParams) validateMinMaxValidatorNumber() error {
 }
 
 func (p *switchParams) initFrom() error {
-	from, err := common.ParseUint64orHex(&p.fromRaw)
+	from, err := types.ParseUint64orHex(&p.fromRaw)
 	if err != nil {
 		return fmt.Errorf("unable to parse from value, %w", err)
 	}

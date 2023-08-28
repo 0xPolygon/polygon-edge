@@ -180,7 +180,7 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 		return nil, nil
 	}
 
-	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
+	return *types.EncodeUint64(uint64(len(block.Transactions))), nil
 }
 
 // BlockNumber returns current block number
@@ -200,7 +200,8 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 		return nil, err
 	}
 
-	// tx hash will be calculated inside e.store.AddTx
+	tx.ComputeHash()
+
 	if err := e.store.AddTx(tx); err != nil {
 		return nil, err
 	}
@@ -211,7 +212,7 @@ func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
 // SendTransaction rejects eth_sendTransaction json-rpc call as we don't support wallet management
 func (e *Eth) SendTransaction(_ *txnArgs) (interface{}, error) {
 	return nil, fmt.Errorf("request calls to eth_sendTransaction method are not supported," +
-		" use eth_sendRawTransaction instead")
+		" use eth_sendRawTransaction insead")
 }
 
 // GetTransactionByHash returns a transaction by its hash.
@@ -229,21 +230,22 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 		}
 
 		block, ok := e.store.GetBlockByHash(blockHash, true)
+
 		if !ok {
 			// Block receipts not found in storage
 			return nil
 		}
 
 		// Find the transaction within the block
-		if txn, idx := types.FindTxByHash(block.Transactions, hash); txn != nil {
-			txn.GasPrice = txn.GetGasPrice(block.Header.BaseFee)
-
-			return toTransaction(
-				txn,
-				argUintPtr(block.Number()),
-				argHashPtr(block.Hash()),
-				&idx,
-			)
+		for idx, txn := range block.Transactions {
+			if txn.Hash == hash {
+				return toTransaction(
+					txn,
+					argUintPtr(block.Number()),
+					argHashPtr(block.Hash()),
+					&idx,
+				)
+			}
 		}
 
 		return nil
@@ -316,20 +318,27 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		return nil, nil
 	}
 	// find the transaction in the body
+	txIndex := -1
 	logIndex := 0
-	txn, txIndex := types.FindTxByHash(block.Transactions, hash)
+
+	for i, txn := range block.Transactions {
+		if txn.Hash == hash {
+			txIndex = i
+
+			break
+		}
+
+		// accumulate receipt logs indexes from block transactions
+		// that are before the desired transaction
+		logIndex += len(receipts[i].Logs)
+	}
 
 	if txIndex == -1 {
 		// txn not found
 		return nil, nil
 	}
 
-	for i := 0; i < txIndex; i++ {
-		// accumulate receipt logs indexes from block transactions
-		// that are before the desired transaction
-		logIndex += len(receipts[i].Logs)
-	}
-
+	txn := block.Transactions[txIndex]
 	raw := receipts[txIndex]
 
 	logs := make([]*Log, len(raw.Logs))
@@ -340,7 +349,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 			Data:        argBytes(elem.Data),
 			BlockHash:   block.Hash(),
 			BlockNumber: argUint64(block.Number()),
-			TxHash:      hash,
+			TxHash:      txn.Hash,
 			TxIndex:     argUint64(txIndex),
 			LogIndex:    argUint64(logIndex + i),
 			Removed:     false,
@@ -352,7 +361,7 @@ func (e *Eth) GetTransactionReceipt(hash types.Hash) (interface{}, error) {
 		CumulativeGasUsed: argUint64(raw.CumulativeGasUsed),
 		LogsBloom:         raw.LogsBloom,
 		Status:            argUint64(*raw.Status),
-		TxHash:            hash,
+		TxHash:            txn.Hash,
 		TxIndex:           argUint64(txIndex),
 		BlockHash:         block.Hash(),
 		BlockNumber:       argUint64(block.Number()),
@@ -444,7 +453,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 
-	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
+	transaction, err := DecodeTxn(arg, e.store)
 	if err != nil {
 		return nil, err
 	}
@@ -481,6 +490,11 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 
 // EstimateGas estimates the gas needed to execute a transaction
 func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error) {
+	transaction, err := DecodeTxn(arg, e.store)
+	if err != nil {
+		return nil, err
+	}
+
 	number := LatestBlockNumber
 	if rawNum != nil {
 		number = *rawNum
@@ -488,12 +502,6 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Fetch the requested header
 	header, err := GetBlockHeader(number, e.store)
-	if err != nil {
-		return nil, err
-	}
-
-	// testTransaction should execute tx with nonce always set to the current expected nonce for the account
-	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
 	if err != nil {
 		return nil, err
 	}
@@ -576,21 +584,14 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Checks if executor level valid gas errors occurred
 	isGasApplyError := func(err error) bool {
-		if errors.Is(err, state.ErrNotEnoughIntrinsicGas) {
-			return true
-		}
-
-		var expected *state.TransitionApplicationError
-		if errors.As(err, &expected) {
-			return errors.Is(expected.Err, state.ErrNotEnoughIntrinsicGas)
-		}
-
-		return false
+		// Not linting this as the underlying error is actually wrapped
+		return errors.Is(err, state.ErrNotEnoughIntrinsicGas)
 	}
 
 	// Checks if EVM level valid gas errors occurred
 	isGasEVMError := func(err error) bool {
-		return errors.Is(err, runtime.ErrOutOfGas) || errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+		return errors.Is(err, runtime.ErrOutOfGas) ||
+			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
 	}
 
 	// Checks if the EVM reverted during execution
@@ -601,9 +602,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	// Run the transaction with the specified gas value.
 	// Returns a status indicating if the transaction failed and the accompanying error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
-		transaction.Gas = gas
+		// Create a dummy transaction with the new gas
+		txn := transaction.Copy()
+		txn.Gas = gas
 
-		result, applyErr := e.store.ApplyTxn(header, transaction, nil)
+		result, applyErr := e.store.ApplyTxn(header, txn, nil)
 
 		if applyErr != nil {
 			// Check the application error.
@@ -641,10 +644,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Start the binary search for the lowest possible gas price
 	for lowEnd < highEnd {
-		mid := lowEnd + ((highEnd - lowEnd) >> 1) // (lowEnd + highEnd) / 2 can overflow
+		mid := (lowEnd + highEnd) / 2
 
 		failed, testErr := testTransaction(mid, true)
-		if testErr != nil && !isEVMRevertError(testErr) {
+		if testErr != nil &&
+			!isEVMRevertError(testErr) {
 			// Reverts are ignored in the binary search, but are checked later on
 			// during the execution for the optimal gas limit found
 			return 0, testErr
@@ -797,52 +801,4 @@ func (e *Eth) MaxPriorityFeePerGas() (interface{}, error) {
 	}
 
 	return argBigPtr(priorityFee), nil
-}
-
-func (e *Eth) FeeHistory(blockCount argUint64, newestBlock BlockNumber,
-	rewardPercentiles []float64) (interface{}, error) {
-	block, err := GetNumericBlockNumber(newestBlock, e.store)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse newest block argument. Error: %w", err)
-	}
-
-	// Retrieve oldestBlock, baseFeePerGas, gasUsedRatio, and reward synchronously
-	history, err := e.store.FeeHistory(uint64(blockCount), block, rewardPercentiles)
-	if err != nil {
-		return nil, err
-	}
-
-	// Create channels to receive the processed slices asynchronously
-	baseFeePerGasCh := make(chan []argUint64)
-	gasUsedRatioCh := make(chan []float64)
-	rewardCh := make(chan [][]argUint64)
-
-	// Process baseFeePerGas asynchronously
-	go func() {
-		baseFeePerGasCh <- convertToArgUint64Slice(history.BaseFeePerGas)
-	}()
-
-	// Process gasUsedRatio asynchronously
-	go func() {
-		gasUsedRatioCh <- history.GasUsedRatio
-	}()
-
-	// Process reward asynchronously
-	go func() {
-		rewardCh <- convertToArgUint64SliceSlice(history.Reward)
-	}()
-
-	// Wait for the processed slices from goroutines
-	baseFeePerGasResult := <-baseFeePerGasCh
-	gasUsedRatioResult := <-gasUsedRatioCh
-	rewardResult := <-rewardCh
-
-	result := &feeHistoryResult{
-		OldestBlock:   *argUintPtr(history.OldestBlock),
-		BaseFeePerGas: baseFeePerGasResult,
-		GasUsedRatio:  gasUsedRatioResult,
-		Reward:        rewardResult,
-	}
-
-	return result, nil
 }

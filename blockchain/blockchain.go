@@ -1,9 +1,12 @@
 package blockchain
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -52,8 +55,8 @@ type Blockchain struct {
 	executor  Executor
 	txSigner  TxSigner
 
-	config  *chain.Chain // Config containing chain information
-	genesis types.Hash   // The hash of the genesis block
+	config  *Config    // Config containing chain information
+	genesis types.Hash // The hash of the genesis block
 
 	headersCache    *lru.Cache // LRU cache for the headers
 	difficultyCache *lru.Cache // LRU cache for the difficulty
@@ -107,6 +110,7 @@ type BlockResult struct {
 	Root     types.Hash
 	Receipts []*types.Receipt
 	TotalGas uint64
+	Trace    *types.Trace
 }
 
 // updateGasPriceAvg updates the rolling average value of the gas price
@@ -191,7 +195,7 @@ func (b *Blockchain) GetAvgGasPrice() *big.Int {
 func NewBlockchain(
 	logger hclog.Logger,
 	db storage.Storage,
-	config *chain.Chain,
+	config *Config,
 	consensus Verifier,
 	executor Executor,
 	txSigner TxSigner,
@@ -255,7 +259,7 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 
 		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != b.config.Genesis.Hash() {
+		if b.genesis != b.config.Chain.Genesis.Hash() {
 			return fmt.Errorf("genesis file does not match current genesis")
 		}
 
@@ -280,12 +284,12 @@ func (b *Blockchain) ComputeGenesis() error {
 		b.setCurrentHeader(header, diff)
 	} else {
 		// empty storage, write the genesis
-		if err := b.writeGenesis(b.config.Genesis); err != nil {
+		if err := b.writeGenesis(b.config.Chain.Genesis); err != nil {
 			return err
 		}
 	}
 
-	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
+	b.logger.Info("genesis", "hash", b.config.Chain.Genesis.Hash())
 
 	return nil
 }
@@ -322,7 +326,7 @@ func (b *Blockchain) CurrentTD() *big.Int {
 
 // Config returns the blockchain configuration
 func (b *Blockchain) Config() *chain.Params {
-	return b.config.Params
+	return b.config.Chain.Params
 }
 
 // GetHeader returns the block header using the hash
@@ -400,18 +404,18 @@ func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
 
 // writeGenesisImpl writes the genesis file to the DB + blockchain reference
 func (b *Blockchain) writeGenesisImpl(header *types.Header) error {
-	batchWriter := storage.NewBatchWriter(b.db)
+	// Update the reference
+	b.genesis = header.Hash
 
-	newTD := new(big.Int).SetUint64(header.Difficulty)
-
-	batchWriter.PutCanonicalHeader(header, newTD)
-
-	if err := b.writeBatchAndUpdate(batchWriter, header, newTD, true); err != nil {
+	// Update the DB
+	if err := b.db.WriteHeader(header); err != nil {
 		return err
 	}
 
-	// Update the reference
-	b.genesis = header.Hash
+	// Advance the head
+	if _, err := b.advanceHead(header); err != nil {
+		return err
+	}
 
 	// Create an event and send it to the stream
 	event := &Event{}
@@ -438,6 +442,68 @@ func (b *Blockchain) GetChainTD() (*big.Int, bool) {
 // GetTD returns the difficulty for the header hash
 func (b *Blockchain) GetTD(hash types.Hash) (*big.Int, bool) {
 	return b.readTotalDifficulty(hash)
+}
+
+// writeCanonicalHeader writes the new header
+func (b *Blockchain) writeCanonicalHeader(event *Event, h *types.Header) error {
+	parentTD, ok := b.readTotalDifficulty(h.ParentHash)
+	if !ok {
+		return fmt.Errorf("parent difficulty not found")
+	}
+
+	newTD := big.NewInt(0).Add(parentTD, new(big.Int).SetUint64(h.Difficulty))
+	if err := b.db.WriteCanonicalHeader(h, newTD); err != nil {
+		return err
+	}
+
+	event.Type = EventHead
+	event.AddNewHeader(h)
+	event.SetDifficulty(newTD)
+
+	b.setCurrentHeader(h, newTD)
+
+	return nil
+}
+
+// advanceHead Sets the passed in header as the new head of the chain
+func (b *Blockchain) advanceHead(newHeader *types.Header) (*big.Int, error) {
+	// Write the current head hash into storage
+	if err := b.db.WriteHeadHash(newHeader.Hash); err != nil {
+		return nil, err
+	}
+
+	// Write the current head number into storage
+	if err := b.db.WriteHeadNumber(newHeader.Number); err != nil {
+		return nil, err
+	}
+
+	// Matches the current head number with the current hash
+	if err := b.db.WriteCanonicalHash(newHeader.Number, newHeader.Hash); err != nil {
+		return nil, err
+	}
+
+	// Check if there was a parent difficulty
+	parentTD := big.NewInt(0)
+
+	if newHeader.ParentHash != types.StringToHash("") {
+		td, ok := b.readTotalDifficulty(newHeader.ParentHash)
+		if !ok {
+			return nil, fmt.Errorf("parent difficulty not found")
+		}
+
+		parentTD = td
+	}
+
+	// Calculate the new total difficulty
+	newTD := big.NewInt(0).Add(parentTD, big.NewInt(0).SetUint64(newHeader.Difficulty))
+	if err := b.db.WriteTotalDifficulty(newHeader.Hash, newTD); err != nil {
+		return nil, err
+	}
+
+	// Update the blockchain reference
+	b.setCurrentHeader(newHeader, newTD)
+
+	return newTD, nil
 }
 
 // GetReceiptsByHash returns the receipts by their hash
@@ -493,11 +559,7 @@ func (b *Blockchain) readBody(hash types.Hash) (*types.Body, bool) {
 
 	// To return from field in the transactions of the past blocks
 	if updated := b.recoverFromFieldsInTransactions(bb.Transactions); updated {
-		batchWriter := storage.NewBatchWriter(b.db)
-
-		batchWriter.PutBody(hash, bb)
-
-		if err := batchWriter.WriteBatch(); err != nil {
+		if err := b.db.WriteBody(hash, bb); err != nil {
 			b.logger.Warn("failed to write body into storage", "hash", hash, "err", err)
 		}
 	}
@@ -546,6 +608,11 @@ func (b *Blockchain) GetHeaderByNumber(n uint64) (*types.Header, bool) {
 	return h, true
 }
 
+// WriteHeaders writes an array of headers
+func (b *Blockchain) WriteHeaders(headers []*types.Header) error {
+	return b.WriteHeadersWithBodies(headers)
+}
+
 // WriteHeadersWithBodies writes a batch of headers
 func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 	// Check the size
@@ -571,18 +638,10 @@ func (b *Blockchain) WriteHeadersWithBodies(headers []*types.Header) error {
 		}
 	}
 
-	// Write the actual headers in separate batches for now
-	for _, header := range headers {
+	// Write the actual headers
+	for _, h := range headers {
 		event := &Event{}
-
-		batchWriter := storage.NewBatchWriter(b.db)
-
-		isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, event, header)
-		if err != nil {
-			return err
-		}
-
-		if err := b.writeBatchAndUpdate(batchWriter, header, newTD, isCanonical); err != nil {
+		if err := b.writeHeaderImpl(event, h); err != nil {
 			return err
 		}
 
@@ -612,17 +671,17 @@ func (b *Blockchain) VerifyFinalizedBlock(block *types.Block) (*types.FullBlock,
 	}
 
 	// Do the initial block verification
-	receipts, err := b.verifyBlock(block)
+	blockResult, err := b.verifyBlock(block)
 	if err != nil {
 		return nil, err
 	}
 
-	return &types.FullBlock{Block: block, Receipts: receipts}, nil
+	return &types.FullBlock{Block: block, Receipts: blockResult.Receipts, Trace: blockResult.Trace}, nil
 }
 
 // verifyBlock does the base (common) block verification steps by
 // verifying the block body as well as the parent information
-func (b *Blockchain) verifyBlock(block *types.Block) ([]*types.Receipt, error) {
+func (b *Blockchain) verifyBlock(block *types.Block) (*BlockResult, error) {
 	// Make sure the block is present
 	if block == nil {
 		return nil, ErrNoBlock
@@ -692,7 +751,7 @@ func (b *Blockchain) verifyBlockParent(childBlock *types.Block) error {
 // - The trie roots match up (state, transactions, receipts, uncles)
 // - The receipts match up
 // - The execution result matches up
-func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, error) {
+func (b *Blockchain) verifyBlockBody(block *types.Block) (*BlockResult, error) {
 	// Make sure the Uncles root matches up
 	if hash := buildroot.CalculateUncleRoot(block.Uncles); hash != block.Header.Sha3Uncles {
 		b.logger.Error(fmt.Sprintf(
@@ -705,9 +764,9 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, erro
 	}
 
 	// Make sure the transactions root matches up
-	if hash := buildroot.CalculateTransactionsRoot(block.Transactions, block.Number()); hash != block.Header.TxRoot {
+	if hash := buildroot.CalculateTransactionsRoot(block.Transactions); hash != block.Header.TxRoot {
 		b.logger.Error(fmt.Sprintf(
-			"incorrect tx root (expected: %s, actual: %s)",
+			"transaction root hash mismatch: have %s, want %s",
 			hash,
 			block.Header.TxRoot,
 		))
@@ -726,7 +785,7 @@ func (b *Blockchain) verifyBlockBody(block *types.Block) ([]*types.Receipt, erro
 		return nil, fmt.Errorf("unable to verify block execution result, %w", err)
 	}
 
-	return blockResult.Receipts, nil
+	return blockResult, nil
 }
 
 // verifyBlockResult verifies that the block transaction execution result
@@ -780,7 +839,9 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		return nil, err
 	}
 
-	_, root, err := txn.Commit()
+	_, trace, root, err := txn.Commit()
+	trace.ParentStateRoot = parent.StateRoot
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}
@@ -792,6 +853,7 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 		Root:     root,
 		Receipts: txn.Receipts(),
 		TotalGas: txn.TotalGas(),
+		Trace:    trace,
 	}, nil
 }
 
@@ -800,10 +862,10 @@ func (b *Blockchain) executeBlockTransactions(block *types.Block) (*BlockResult,
 // This function is a copy of WriteBlock but with a full block which does not
 // require to compute again the Receipts.
 func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) error {
+	block := fblock.Block
+
 	b.writeLock.Lock()
 	defer b.writeLock.Unlock()
-
-	block := fblock.Block
 
 	if block.Number() <= b.Header().Number {
 		b.logger.Info("block already inserted", "block", block.Number(), "source", source)
@@ -813,38 +875,37 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 
 	header := block.Header
 
-	batchWriter := storage.NewBatchWriter(b.db)
-
-	if err := b.writeBody(batchWriter, block); err != nil {
+	if err := b.writeBody(block); err != nil {
 		return err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
-
-	isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, evnt, header)
-	if err != nil {
+	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
 
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchWriter.PutReceipts(block.Hash(), fblock.Receipts)
+	if err := b.db.WriteReceipts(block.Hash(), fblock.Receipts); err != nil {
+		return err
+	}
+
+	// write the trace
+	if err := b.writeTrace(fblock.Trace, header.Number); err != nil {
+		return err
+	}
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
 
+	b.dispatchEvent(evnt)
+
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
-
-	if err := b.writeBatchAndUpdate(batchWriter, header, newTD, isCanonical); err != nil {
-		return err
-	}
-
-	b.dispatchEvent(evnt)
 
 	logArgs := []interface{}{
 		"number", header.Number,
@@ -878,17 +939,13 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	header := block.Header
 
-	batchWriter := storage.NewBatchWriter(b.db)
-
-	if err := b.writeBody(batchWriter, block); err != nil {
+	if err := b.writeBody(block); err != nil {
 		return err
 	}
 
 	// Write the header to the chain
 	evnt := &Event{Source: source}
-
-	isCanonical, newTD, err := b.writeHeaderImpl(batchWriter, evnt, header)
-	if err != nil {
+	if err := b.writeHeaderImpl(evnt, header); err != nil {
 		return err
 	}
 
@@ -901,21 +958,19 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 	// write the receipts, do it only after the header has been written.
 	// Otherwise, a client might ask for a header once the receipt is valid,
 	// but before it is written into the storage
-	batchWriter.PutReceipts(block.Hash(), blockReceipts)
+	if err := b.db.WriteReceipts(block.Hash(), blockReceipts); err != nil {
+		return err
+	}
 
 	// update snapshot
 	if err := b.consensus.ProcessHeaders([]*types.Header{header}); err != nil {
 		return err
 	}
 
+	b.dispatchEvent(evnt)
+
 	// Update the average gas price
 	b.updateGasPriceAvgWithBlock(block)
-
-	if err := b.writeBatchAndUpdate(batchWriter, header, newTD, isCanonical); err != nil {
-		return err
-	}
-
-	b.dispatchEvent(evnt)
 
 	logArgs := []interface{}{
 		"number", header.Number,
@@ -992,7 +1047,7 @@ func (b *Blockchain) updateGasPriceAvgWithBlock(block *types.Block) {
 
 // writeBody writes the block body to the DB.
 // Additionally, it also updates the txn lookup, for txnHash -> block lookups
-func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Block) error {
+func (b *Blockchain) writeBody(block *types.Block) error {
 	// Recover 'from' field in tx before saving
 	// Because the block passed from the consensus layer doesn't have from field in tx,
 	// due to missing encoding in RLP
@@ -1001,11 +1056,15 @@ func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Bl
 	}
 
 	// Write the full body (txns + receipts)
-	batchWriter.PutBody(block.Header.Hash, block.Body())
+	if err := b.db.WriteBody(block.Header.Hash, block.Body()); err != nil {
+		return err
+	}
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		batchWriter.PutTxLookup(txn.Hash, block.Hash())
+		if err := b.db.WriteTxLookup(txn.Hash, block.Hash()); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -1139,74 +1198,75 @@ func (b *Blockchain) dispatchEvent(evnt *Event) {
 }
 
 // writeHeaderImpl writes a block and the data, assumes the genesis is already set
-// Returning parameters (is canonical header, new total difficulty, error)
-func (b *Blockchain) writeHeaderImpl(
-	batchWriter *storage.BatchWriter, evnt *Event, header *types.Header) (bool, *big.Int, error) {
+func (b *Blockchain) writeHeaderImpl(evnt *Event, header *types.Header) error {
+	currentHeader := b.Header()
+
+	// Write the data
+	if header.ParentHash == currentHeader.Hash {
+		// Fast path to save the new canonical header
+		return b.writeCanonicalHeader(evnt, header)
+	}
+
+	if err := b.db.WriteHeader(header); err != nil {
+		return err
+	}
+
+	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
+	if !ok {
+		return errors.New("failed to get header difficulty")
+	}
+
 	// parent total difficulty of incoming header
 	parentTD, ok := b.readTotalDifficulty(header.ParentHash)
 	if !ok {
-		return false, nil, fmt.Errorf(
+		return fmt.Errorf(
 			"parent of %s (%d) not found",
 			header.Hash.String(),
 			header.Number,
 		)
 	}
 
-	currentHeader := b.Header()
-	incomingTD := new(big.Int).Add(parentTD, new(big.Int).SetUint64(header.Difficulty))
-
-	// if parent of new header is current header just put everything in batch and update event
-	// new header will be canonical one
-	if header.ParentHash == currentHeader.Hash {
-		batchWriter.PutCanonicalHeader(header, incomingTD)
-
-		evnt.Type = EventHead
-		evnt.AddNewHeader(header)
-		evnt.SetDifficulty(incomingTD)
-
-		return true, incomingTD, nil
+	// Write the difficulty
+	if err := b.db.WriteTotalDifficulty(
+		header.Hash,
+		big.NewInt(0).Add(
+			parentTD,
+			big.NewInt(0).SetUint64(header.Difficulty),
+		),
+	); err != nil {
+		return err
 	}
 
-	currentTD, ok := b.readTotalDifficulty(currentHeader.Hash)
-	if !ok {
-		return false, nil, errors.New("failed to get header difficulty")
-	}
+	// Update the headers cache
+	b.headersCache.Add(header.Hash, header)
 
+	incomingTD := big.NewInt(0).Add(parentTD, big.NewInt(0).SetUint64(header.Difficulty))
 	if incomingTD.Cmp(currentTD) > 0 {
 		// new block has higher difficulty, reorg the chain
-		if err := b.handleReorg(batchWriter, evnt, currentHeader, header, incomingTD); err != nil {
-			return false, nil, err
+		if err := b.handleReorg(evnt, currentHeader, header); err != nil {
+			return err
 		}
+	} else {
+		// new block has lower difficulty, create a new fork
+		evnt.AddOldHeader(header)
+		evnt.Type = EventFork
 
-		batchWriter.PutCanonicalHeader(header, incomingTD)
-
-		return true, incomingTD, nil
+		if err := b.writeFork(header); err != nil {
+			return err
+		}
 	}
 
-	forks, err := b.getForksToWrite(header)
-	if err != nil {
-		return false, nil, err
-	}
-
-	batchWriter.PutHeader(header)
-	batchWriter.PutTotalDifficulty(header.Hash, incomingTD)
-	batchWriter.PutForks(forks)
-
-	// new block has lower difficulty, create a new fork
-	evnt.AddOldHeader(header)
-	evnt.Type = EventFork
-
-	return false, nil, nil
+	return nil
 }
 
-// getForksToWrite retrieves new header forks that should be written to the DB
-func (b *Blockchain) getForksToWrite(header *types.Header) ([]types.Hash, error) {
+// writeFork writes the new header forks to the DB
+func (b *Blockchain) writeFork(header *types.Header) error {
 	forks, err := b.db.ReadForks()
 	if err != nil {
 		if errors.Is(err, storage.ErrNotFound) {
 			forks = []types.Hash{}
 		} else {
-			return nil, err
+			return err
 		}
 	}
 
@@ -1218,16 +1278,35 @@ func (b *Blockchain) getForksToWrite(header *types.Header) ([]types.Hash, error)
 		}
 	}
 
-	return append(newForks, header.Hash), nil
+	newForks = append(newForks, header.Hash)
+	if err := b.db.WriteForks(newForks); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// writeTrace writes the block trace to the file
+func (b *Blockchain) writeTrace(trace *types.Trace, blockNumber uint64) error {
+	raw, err := json.Marshal(trace)
+	if err != nil {
+		return err
+	}
+
+	consensusDir := filepath.Join(b.config.DataDir, "consensus")
+	if err := ioutil.WriteFile(
+		filepath.Join(consensusDir, fmt.Sprintf("trace_%d.json", blockNumber)), raw, 0600); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // handleReorg handles a reorganization event
 func (b *Blockchain) handleReorg(
-	batchWriter *storage.BatchWriter,
 	evnt *Event,
 	oldHeader *types.Header,
 	newHeader *types.Header,
-	newTD *big.Int,
 ) error {
 	newChainHead := newHeader
 	oldChainHead := oldHeader
@@ -1271,18 +1350,6 @@ func (b *Blockchain) handleReorg(
 		oldChain = append(oldChain, oldHeader)
 	}
 
-	forks, err := b.getForksToWrite(oldChainHead)
-	if err != nil {
-		return fmt.Errorf("failed to write the old header as fork: %w", err)
-	}
-
-	batchWriter.PutForks(forks)
-
-	// Update canonical chain numbers
-	for _, h := range newChain {
-		batchWriter.PutCanonicalHash(h.Number, h.Hash)
-	}
-
 	for _, b := range oldChain[:len(oldChain)-1] {
 		evnt.AddOldHeader(b)
 	}
@@ -1294,9 +1361,25 @@ func (b *Blockchain) handleReorg(
 		evnt.AddNewHeader(b)
 	}
 
+	if err := b.writeFork(oldChainHead); err != nil {
+		return fmt.Errorf("failed to write the old header as fork: %w", err)
+	}
+
+	// Update canonical chain numbers
+	for _, h := range newChain {
+		if err := b.db.WriteCanonicalHash(h.Number, h.Hash); err != nil {
+			return err
+		}
+	}
+
+	diff, err := b.advanceHead(newChainHead)
+	if err != nil {
+		return err
+	}
+
 	// Set the event type and difficulty
 	evnt.Type = EventReorg
-	evnt.SetDifficulty(newTD)
+	evnt.SetDifficulty(diff)
 
 	return nil
 }
@@ -1356,22 +1439,11 @@ func (b *Blockchain) Close() error {
 
 // CalculateBaseFee calculates the basefee of the header.
 func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
-	// Return zero base fee is a london hardfork is not enabled
-	if !b.config.Params.Forks.IsActive(chain.London, parent.Number) {
-		return 0
-	}
-
-	// Check if this is the first London hardfork block.
-	// Should return chain.GenesisBaseFee ins this case.
-	if parent.BaseFee == 0 {
-		if b.config.Genesis.BaseFee > 0 {
-			return b.config.Genesis.BaseFee
-		}
-
+	if !b.config.Chain.Params.Forks.IsActive(chain.London, parent.Number) {
 		return chain.GenesisBaseFee
 	}
 
-	parentGasTarget := parent.GasLimit / b.config.Genesis.BaseFeeEM
+	parentGasTarget := parent.GasLimit / b.config.Chain.Genesis.BaseFeeEM
 
 	// If the parent gasUsed is the same as the target, the baseFee remains unchanged.
 	if parent.GasUsed == parentGasTarget {
@@ -1397,21 +1469,4 @@ func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 	y := baseFee * gasUsedDelta / parentGasTarget
 
 	return y / defaultBaseFeeChangeDenom
-}
-
-func (b *Blockchain) writeBatchAndUpdate(
-	batchWriter *storage.BatchWriter,
-	header *types.Header,
-	newTD *big.Int,
-	isCanonnical bool) error {
-	if err := batchWriter.WriteBatch(); err != nil {
-		return err
-	}
-
-	if isCanonnical {
-		b.headersCache.Add(header.Hash, header)
-		b.setCurrentHeader(header, newTD) // Update the blockchain reference
-	}
-
-	return nil
 }

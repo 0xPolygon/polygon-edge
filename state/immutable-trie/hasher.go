@@ -40,6 +40,13 @@ type hasher struct {
 	buf   []byte
 	hash  hashImpl
 	tmp   [32]byte
+	batch Putter
+}
+
+func (h *hasher) WithBatch(batch Putter) *hasher {
+	h.batch = batch
+
+	return h
 }
 
 func (h *hasher) Reset() {
@@ -85,20 +92,15 @@ func (h *hasher) Hash(data []byte) []byte {
 	return h.tmp[:]
 }
 
-func (t *Txn) Hash() ([]byte, error) {
-	if t.root == nil {
+func (h *hasher) doHash(rootNode Node) ([]byte, error) {
+	if rootNode == nil {
 		return emptyRoot, nil
-	}
-
-	h, ok := hasherPool.Get().(*hasher)
-	if !ok {
-		return nil, errors.New("invalid type assertion")
 	}
 
 	var root []byte
 
 	arena, _ := h.AcquireArena()
-	val := t.hash(t.root, h, arena, 0)
+	val := h.hashImpl(rootNode, arena, true, 0)
 
 	// REDO
 	if val.Type() == fastrlp.TypeBytes {
@@ -108,8 +110,8 @@ func (t *Txn) Hash() ([]byte, error) {
 
 			root = h.hash.Sum(nil)
 
-			if t.batch != nil {
-				t.batch.Put(root, val.Raw())
+			if h.batch != nil {
+				h.batch.Put(root, val.Raw())
 			}
 		} else {
 			root = make([]byte, 32)
@@ -122,26 +124,45 @@ func (t *Txn) Hash() ([]byte, error) {
 
 		root = h.hash.Sum(nil)
 
-		if t.batch != nil {
-			t.batch.Put(root, tmp)
+		if h.batch != nil {
+			h.batch.Put(root, tmp)
 		}
 	}
 
 	h.ReleaseArenas(0)
-	hasherPool.Put(h)
 
 	return root, nil
 }
 
-func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value {
+func (t *Txn) Hash() ([]byte, error) {
+	h, ok := hasherPool.Get().(*hasher)
+	if !ok {
+		return nil, errors.New("invalid type assertion")
+	}
+
+	defer hasherPool.Put(h)
+
+	h.WithBatch(t.batch)
+
+	root, err := h.doHash(t.root)
+	if err != nil {
+		return nil, err
+	}
+
+	return root, nil
+}
+
+func (h *hasher) hashImpl(node Node, a *fastrlp.Arena, useHash bool, d int) *fastrlp.Value {
 	var val *fastrlp.Value
 
 	var aa *fastrlp.Arena
 
 	var idx int
 
-	if h, ok := node.Hash(); ok {
-		return a.NewCopyBytes(h)
+	if useHash {
+		if h, ok := node.Hash(); ok {
+			return a.NewCopyBytes(h)
+		}
 	}
 
 	switch n := node.(type) {
@@ -149,7 +170,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		return a.NewCopyBytes(n.buf)
 
 	case *ShortNode:
-		child := t.hash(n.child, h, a, d+1)
+		child := h.hashImpl(n.child, a, true, d+1)
 
 		val = a.NewArray()
 		val.Set(a.NewBytes(encodeCompact(n.key)))
@@ -164,7 +185,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 			if i == nil {
 				val.Set(a.NewNull())
 			} else {
-				val.Set(t.hash(i, h, aa, d+1))
+				val.Set(h.hashImpl(i, aa, true, d+1))
 			}
 		}
 
@@ -172,7 +193,7 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 		if n.value == nil {
 			val.Set(a.NewNull())
 		} else {
-			val.Set(t.hash(n.value, h, a, d+1))
+			val.Set(h.hashImpl(n.value, a, true, d+1))
 		}
 
 	default:
@@ -194,8 +215,8 @@ func (t *Txn) hash(node Node, h *hasher, a *fastrlp.Arena, d int) *fastrlp.Value
 	hh := node.SetHash(tmp)
 
 	// Write data
-	if t.batch != nil {
-		t.batch.Put(tmp, h.buf)
+	if h.batch != nil {
+		h.batch.Put(tmp, h.buf)
 	}
 
 	return a.NewCopyBytes(hh)

@@ -107,20 +107,20 @@ func (r *StateSyncRelayer) Stop() {
 	close(r.closeCh)
 }
 
-func (r *StateSyncRelayer) AddLog(log *ethgo.Log) error {
+func (r *StateSyncRelayer) AddLog(log *ethgo.Log) {
 	r.logger.Debug("Received a log", "log", log)
 
 	var commitEvent contractsapi.NewCommitmentEvent
 
 	doesMatch, err := commitEvent.ParseLog(log)
 	if !doesMatch {
-		return nil
+		return
 	}
 
 	if err != nil {
 		r.logger.Error("Failed to parse log", "err", err)
 
-		return err
+		return
 	}
 
 	startID := commitEvent.StartID.Uint64()
@@ -128,8 +128,6 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) error {
 
 	r.logger.Info("Execute commitment", "Block", log.BlockNumber, "StartID", startID, "EndID", endID)
 
-	// we don't return errors if some client logic fails,
-	// only if event is not parsed
 	for i := startID; i <= endID; i++ {
 		// query the state sync proof
 		stateSyncProof, err := r.queryStateSyncProof(fmt.Sprintf("0x%x", i))
@@ -140,15 +138,13 @@ func (r *StateSyncRelayer) AddLog(log *ethgo.Log) error {
 		}
 
 		if err := r.executeStateSync(stateSyncProof); err != nil {
-			r.logger.Error("State sync execution failed", "err", err)
+			r.logger.Error("Failed to execute state sync", "err", err)
 
 			continue
 		}
 
 		r.logger.Info("State sync executed", "ID", i)
 	}
-
-	return nil
 }
 
 // queryStateSyncProof queries the state sync proof
@@ -208,27 +204,11 @@ func (r *StateSyncRelayer) executeStateSync(proof *types.Proof) error {
 
 	receipt, err := r.txRelayer.SendTransaction(txn, r.key)
 	if err != nil {
-		return fmt.Errorf("failed to send execute state sync transaction for id %d: %w", sse.ID, err)
+		return fmt.Errorf("failed to send state sync transaction: %w", err)
 	}
 
 	if receipt.Status == uint64(types.ReceiptFailed) {
-		return fmt.Errorf("transaction execution reverted for state sync id: %d", sse.ID)
-	}
-
-	var stateSyncResult contractsapi.StateSyncResultEvent
-	for _, log := range receipt.Logs {
-		matches, err := stateSyncResult.ParseLog(log)
-		if err != nil {
-			return fmt.Errorf("failed to find state sync event result log for state sync id: %d", sse.ID)
-		}
-
-		if !matches {
-			continue
-		}
-
-		if !stateSyncResult.Status {
-			return fmt.Errorf("failed to execute state sync id: %d", sse.ID)
-		}
+		return fmt.Errorf("state sync execution failed: %d", execute.Obj.ID)
 	}
 
 	return nil

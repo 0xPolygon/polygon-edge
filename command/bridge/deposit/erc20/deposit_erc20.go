@@ -12,7 +12,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -102,7 +101,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i, amountRaw := range dp.Amounts {
 		amountRaw := amountRaw
 
-		amount, err := helperCommon.ParseUint256orHex(&amountRaw)
+		amount, err := types.ParseUint256orHex(&amountRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided amount %s: %w", amountRaw, err))
 
@@ -123,7 +122,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		// mint tokens to depositor, so he is able to send them
 		mintTxn, err := helper.CreateMintTxn(types.Address(depositorAddr),
-			types.StringToAddress(dp.TokenAddr), aggregateAmount, !dp.ChildChainMintable)
+			types.StringToAddress(dp.TokenAddr), aggregateAmount)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("mint transaction creation failed: %w", err))
 
@@ -132,7 +131,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 		receipt, err := txRelayer.SendTransaction(mintTxn, minterKey)
 		if err != nil {
-			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s: %w", depositorAddr, err))
+			outputter.SetError(fmt.Errorf("failed to send mint transaction to depositor %s", depositorAddr))
 
 			return
 		}
@@ -147,9 +146,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	// approve erc20 predicate
 	approveTxn, err := helper.CreateApproveERC20Txn(aggregateAmount,
 		types.StringToAddress(dp.PredicateAddr),
-		types.StringToAddress(dp.TokenAddr),
-		!dp.ChildChainMintable,
-	)
+		types.StringToAddress(dp.TokenAddr))
 	if err != nil {
 		outputter.SetError(fmt.Errorf("failed to create root erc 20 approve transaction: %w", err))
 
@@ -158,7 +155,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 	receipt, err := txRelayer.SendTransaction(approveTxn, depositorKey)
 	if err != nil {
-		outputter.SetError(fmt.Errorf("failed to send root erc 20 approve transaction: %w", err))
+		outputter.SetError(fmt.Errorf("failed to send root erc 20 approve transaction"))
 
 		return
 	}
@@ -279,6 +276,9 @@ func createDepositTxn(sender, receiver types.Address, amount *big.Int) (*ethgo.T
 
 	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
-	return helper.CreateTransaction(ethgo.Address(sender), &addr,
-		input, nil, !dp.ChildChainMintable), nil
+	return &ethgo.Transaction{
+		From:  ethgo.Address(sender),
+		To:    &addr,
+		Input: input,
+	}, nil
 }

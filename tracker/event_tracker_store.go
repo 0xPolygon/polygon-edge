@@ -124,8 +124,6 @@ func (b *EventTrackerStore) Set(k, v string) error {
 	if strings.HasPrefix(k, dbLastBlockPrefix) {
 		if err := b.onNewBlock(k[len(dbLastBlockPrefix):], v); err != nil {
 			b.logger.Warn("new block error", "err", err)
-
-			return err
 		}
 	}
 
@@ -162,17 +160,15 @@ func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 		return nil // nothing to process
 	}
 
-	// notify subscriber with logs
-	for _, log := range logs {
-		if err := b.subscriber.AddLog(log); err != nil {
-			return err
-		}
-	}
-
-	// save next to process only if every AddLog finished successfully
 	nextToProcessIdx := common.EncodeBytesToUint64(lastProcessedKey) + 1
+
 	if err := entry.saveNextToProcessIndx(nextToProcessIdx); err != nil {
 		return err
+	}
+
+	// notify subscriber with logs
+	for _, log := range logs {
+		b.subscriber.AddLog(log)
 	}
 
 	b.logger.Debug("Event logs have been notified to a subscriber", "len", len(logs), "next", nextToProcessIdx)

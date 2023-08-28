@@ -5,23 +5,19 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 )
 
 const (
-	defaultGasPrice       = 1879048192 // 0x70000000
-	DefaultGasLimit       = 5242880    // 0x500000
-	DefaultRPCAddress     = "http://127.0.0.1:8545"
-	numRetries            = 1000
-	gasLimitPercent       = 100
-	feeIncreasePercentage = 20
+	defaultGasPrice   = 1879048192 // 0x70000000
+	DefaultGasLimit   = 5242880    // 0x500000
+	DefaultRPCAddress = "http://127.0.0.1:8545"
+	numRetries        = 1000
 )
 
 var (
@@ -88,15 +84,6 @@ func (t *TxRelayerImpl) Call(from ethgo.Address, to ethgo.Address, input []byte)
 func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (*ethgo.Receipt, error) {
 	txnHash, err := t.sendTransactionLocked(txn, key)
 	if err != nil {
-		if txn.Type != ethgo.TransactionLegacy &&
-			strings.Contains(err.Error(), types.ErrTxTypeNotSupported.Error()) {
-			// downgrade transaction to legacy tx type and resend it
-			txn.Type = ethgo.TransactionLegacy
-			txn.GasPrice = 0
-
-			return t.SendTransaction(txn, key)
-		}
-
 		return nil, err
 	}
 
@@ -112,68 +99,38 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
-	if err != nil {
-		return ethgo.ZeroHash, fmt.Errorf("failed to get nonce: %w", err)
-	}
+	txn.From = key.Address()
 
-	chainID, err := t.client.Eth().ChainID()
+	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
 	if err != nil {
 		return ethgo.ZeroHash, err
 	}
 
-	txn.ChainID = chainID
 	txn.Nonce = nonce
 
-	if txn.From == ethgo.ZeroAddress {
-		txn.From = key.Address()
-	}
+	txn.From = key.Address()
 
-	if txn.Type == ethgo.TransactionDynamicFee {
-		maxPriorityFee := txn.MaxPriorityFeePerGas
-		if maxPriorityFee == nil {
-			// retrieve the max priority fee per gas
-			if maxPriorityFee, err = t.Client().Eth().MaxPriorityFeePerGas(); err != nil {
-				return ethgo.ZeroHash, fmt.Errorf("failed to get max priority fee per gas: %w", err)
-			}
-
-			// set retrieved max priority fee per gas increased by certain percentage
-			compMaxPriorityFee := new(big.Int).Mul(maxPriorityFee, big.NewInt(feeIncreasePercentage))
-			compMaxPriorityFee = compMaxPriorityFee.Div(compMaxPriorityFee, big.NewInt(100))
-			txn.MaxPriorityFeePerGas = new(big.Int).Add(maxPriorityFee, compMaxPriorityFee)
-		}
-
-		if txn.MaxFeePerGas == nil {
-			// retrieve the latest base fee
-			feeHist, err := t.Client().Eth().FeeHistory(1, ethgo.Latest, nil)
-			if err != nil {
-				return ethgo.ZeroHash, fmt.Errorf("failed to get fee history: %w", err)
-			}
-
-			baseFee := feeHist.BaseFee[len(feeHist.BaseFee)-1]
-			// set max fee per gas as sum of base fee and max priority fee
-			// (increased by certain percentage)
-			maxFeePerGas := new(big.Int).Add(baseFee, maxPriorityFee)
-			compMaxFeePerGas := new(big.Int).Mul(maxFeePerGas, big.NewInt(feeIncreasePercentage))
-			compMaxFeePerGas = compMaxFeePerGas.Div(compMaxFeePerGas, big.NewInt(100))
-			txn.MaxFeePerGas = new(big.Int).Add(maxFeePerGas, compMaxFeePerGas)
-		}
-	} else if txn.GasPrice == 0 {
+	if txn.GasPrice == 0 {
 		gasPrice, err := t.Client().Eth().GasPrice()
 		if err != nil {
-			return ethgo.ZeroHash, fmt.Errorf("failed to get gas price: %w", err)
+			return ethgo.ZeroHash, err
 		}
 
-		txn.GasPrice = gasPrice + (gasPrice * feeIncreasePercentage / 100)
+		txn.GasPrice = gasPrice
 	}
 
 	if txn.Gas == 0 {
 		gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
 		if err != nil {
-			return ethgo.ZeroHash, fmt.Errorf("failed to estimate gas: %w", err)
+			return ethgo.ZeroHash, err
 		}
 
-		txn.Gas = gasLimit + (gasLimit * gasLimitPercent / 100)
+		txn.Gas = gasLimit
+	}
+
+	chainID, err := t.client.Eth().ChainID()
+	if err != nil {
+		return ethgo.ZeroHash, err
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())

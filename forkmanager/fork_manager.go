@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"sort"
 	"sync"
+
+	"github.com/0xPolygon/polygon-edge/chain"
 )
 
 var (
@@ -17,7 +19,7 @@ type forkManager struct {
 
 	forkMap     map[string]*Fork
 	handlersMap map[HandlerDesc][]forkHandler
-	params      []forkParamsBlock
+	params      []*forkParamsBlock
 }
 
 // GeInstance returns fork manager singleton instance. Thread safe
@@ -42,7 +44,7 @@ func (fm *forkManager) Clear() {
 }
 
 // RegisterFork registers fork by its name
-func (fm *forkManager) RegisterFork(name string, forkParams *ForkParams) {
+func (fm *forkManager) RegisterFork(name string, forkParams *chain.ForkParams) {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -145,7 +147,7 @@ func (fm *forkManager) GetHandler(name HandlerDesc, blockNumber uint64) interfac
 }
 
 // GetParams retrieves chain.ForkParams for a block number
-func (fm *forkManager) GetParams(blockNumber uint64) *ForkParams {
+func (fm *forkManager) GetParams(blockNumber uint64) *chain.ForkParams {
 	fm.lock.Lock()
 	defer fm.lock.Unlock()
 
@@ -213,13 +215,6 @@ func (fm *forkManager) addHandler(handlerName HandlerDesc, blockNumber uint64, h
 		index := sort.Search(len(handlers), func(i int) bool {
 			return handlers[i].FromBlockNumber >= blockNumber
 		})
-		// replace existing handler if on the same block as current one
-		if index < len(handlers) && handlers[index].FromBlockNumber == blockNumber {
-			handlers[index].Handler = handler
-
-			return
-		}
-
 		handlers = append(handlers, forkHandler{})
 		copy(handlers[index+1:], handlers[index:])
 		handlers[index] = forkHandler{
@@ -247,12 +242,12 @@ func (fm *forkManager) removeHandler(handlerName HandlerDesc, blockNumber uint64
 	}
 }
 
-func (fm *forkManager) addParams(blockNumber uint64, params *ForkParams) {
+func (fm *forkManager) addParams(blockNumber uint64, params *chain.ForkParams) {
 	if params == nil {
 		return
 	}
 
-	item := forkParamsBlock{FromBlockNumber: blockNumber, Params: params}
+	item := &forkParamsBlock{FromBlockNumber: blockNumber, Params: params}
 
 	if len(fm.params) == 0 {
 		fm.params = append(fm.params, item)
@@ -262,7 +257,7 @@ func (fm *forkManager) addParams(blockNumber uint64, params *ForkParams) {
 			return fm.params[i].FromBlockNumber >= blockNumber
 		})
 
-		fm.params = append(fm.params, forkParamsBlock{})
+		fm.params = append(fm.params, (*forkParamsBlock)(nil))
 		copy(fm.params[index+1:], fm.params[index:])
 		fm.params[index] = item
 
@@ -285,12 +280,12 @@ func (fm *forkManager) removeParams(blockNumber uint64) {
 
 	if index < len(fm.params) && fm.params[index].FromBlockNumber == blockNumber {
 		copy(fm.params[index:], fm.params[index+1:])
-		fm.params[len(fm.params)-1] = forkParamsBlock{}
+		fm.params[len(fm.params)-1] = nil
 		fm.params = fm.params[:len(fm.params)-1]
 	}
 }
 
-func copyParams(dest, src *ForkParams) {
+func copyParams(dest, src *chain.ForkParams) {
 	srcValue := reflect.ValueOf(src).Elem()
 	dstValue := reflect.ValueOf(dest).Elem()
 

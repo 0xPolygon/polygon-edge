@@ -40,7 +40,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	ibftOp "github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -349,7 +348,7 @@ func (t *TestServer) GenerateGenesis() error {
 
 	// add base fee
 	if t.Config.BaseFee != 0 {
-		args = append(args, "--base-fee", *common.EncodeUint64(t.Config.BaseFee))
+		args = append(args, "--base-fee", *types.EncodeUint64(t.Config.BaseFee))
 	}
 
 	// add burn contracts
@@ -449,7 +448,7 @@ func (t *TestServer) Start(ctx context.Context) error {
 
 	// add block gas target
 	if t.Config.BlockGasTarget != 0 {
-		args = append(args, "--block-gas-target", *common.EncodeUint64(t.Config.BlockGasTarget))
+		args = append(args, "--block-gas-target", *types.EncodeUint64(t.Config.BlockGasTarget))
 	}
 
 	if t.Config.IBFTBaseTimeout != 0 {

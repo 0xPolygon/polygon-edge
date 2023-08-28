@@ -2,8 +2,11 @@ package ibft
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages"
@@ -179,6 +182,8 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 	}
 
 	// calculate base fee
+	baseFee := i.blockchain.CalculateBaseFee(parent)
+
 	header.GasLimit = gasLimit
 
 	if err := i.currentHooks.ModifyHeader(header, i.currentSigner.Address()); err != nil {
@@ -207,6 +212,7 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 
 	txs := i.writeTransactions(
 		writeCtx,
+		baseFee,
 		gasLimit,
 		header.Number,
 		transition,
@@ -218,9 +224,24 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	_, root, err := transition.Commit()
+	_, trace, root, err := transition.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
+	}
+
+	trace.ParentStateRoot = parent.StateRoot
+
+	// write the trace
+	{
+		raw, err := json.Marshal(trace)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := ioutil.WriteFile(
+			filepath.Join(i.config.Path, fmt.Sprintf("trace_%d", header.Number))+".json", raw, 0600); err != nil {
+			return nil, err
+		}
 	}
 
 	header.StateRoot = root
@@ -294,6 +315,7 @@ type transitionInterface interface {
 
 func (i *backendIBFT) writeTransactions(
 	writeCtx context.Context,
+	baseFee,
 	gasLimit,
 	blockNumber uint64,
 	transition transitionInterface,
@@ -320,7 +342,7 @@ func (i *backendIBFT) writeTransactions(
 		)
 	}()
 
-	i.txpool.Prepare()
+	i.txpool.Prepare(baseFee)
 
 write:
 	for {

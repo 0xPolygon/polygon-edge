@@ -42,8 +42,8 @@ func (sp *supernetParams) validateFlags() error {
 }
 
 type supernetResult struct {
-	IsGenesisSetFinalized bool `json:"isGenesisSetFinalized"`
-	IsStakingEnabled      bool `json:"isStakingEnabled"`
+	isGenesisSetFinalized bool
+	isStakingEnabled      bool
 }
 
 func (sr supernetResult) GetOutput() string {
@@ -54,11 +54,11 @@ func (sr supernetResult) GetOutput() string {
 
 	buffer.WriteString("\n[SUPERNET COMMAND]\n")
 
-	if sr.IsGenesisSetFinalized {
+	if sr.isGenesisSetFinalized {
 		vals = append(vals, "Genesis validator set finalized on supernet manager")
 	}
 
-	if sr.IsStakingEnabled {
+	if sr.isStakingEnabled {
 		vals = append(vals, "Staking enabled on supernet manager")
 	}
 

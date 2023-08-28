@@ -146,11 +146,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 		assert.NoError(t, server.Close())
 	})
 
-	receiver := make(chan *peerEvent.PeerEvent)
-
-	err := server.Subscribe(context.Background(), func(evnt *peerEvent.PeerEvent) {
-		receiver <- evnt
-	})
+	sub, err := server.Subscribe()
 	assert.NoError(t, err)
 
 	count := 10
@@ -174,7 +170,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 			id, event := getIDAndEventType(i)
 			server.emitEvent(id, event)
 
-			received := <-receiver
+			received := sub.Get()
 			assert.Equal(t, &peerEvent.PeerEvent{
 				PeerID: id,
 				Type:   event,
@@ -188,7 +184,7 @@ func TestPeerEvent_EmitAndSubscribe(t *testing.T) {
 			server.emitEvent(id, event)
 		}
 		for i := 0; i < count; i++ {
-			received := <-receiver
+			received := sub.Get()
 			id, event := getIDAndEventType(i)
 			assert.Equal(t, &peerEvent.PeerEvent{
 				PeerID: id,
@@ -696,7 +692,7 @@ func TestRunDial(t *testing.T) {
 	})
 }
 
-func TestSubscribe(t *testing.T) {
+func TestSubscribeFn(t *testing.T) {
 	t.Parallel()
 
 	setupServer := func(t *testing.T, shouldCloseAfterTest bool) *Server {
@@ -734,7 +730,7 @@ func TestSubscribe(t *testing.T) {
 			close(eventCh)
 		})
 
-		err := server.Subscribe(ctx, func(e *peerEvent.PeerEvent) {
+		err := server.SubscribeFn(ctx, func(e *peerEvent.PeerEvent) {
 			eventCh <- e
 		})
 

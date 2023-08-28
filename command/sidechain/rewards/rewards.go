@@ -4,19 +4,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
-
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
 )
 
 var params withdrawRewardsParams
@@ -87,7 +84,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	amount, err := common.ParseUint256orHex(&response)
+	amount, err := types.ParseUint256orHex(&response)
 	if err != nil {
 		return err
 	}
@@ -97,7 +94,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	txn := rootHelper.CreateTransaction(validatorAddr, &rewardPoolAddr, encoded, nil, false)
+	txn := &ethgo.Transaction{
+		From:  validatorAddr,
+		Input: encoded,
+		To:    &rewardPoolAddr,
+	}
 
 	receipt, err := txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {
@@ -109,8 +110,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	result := &withdrawRewardResult{
-		ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
-		RewardAmount:     amount.Uint64(),
+		validatorAddress: validatorAccount.Ecdsa.Address().String(),
+		rewardAmount:     amount.Uint64(),
 	}
 
 	outputter.WriteCommandResult(result)

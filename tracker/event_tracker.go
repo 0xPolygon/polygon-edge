@@ -15,7 +15,7 @@ import (
 const minBlockMaxBacklog = 96
 
 type eventSubscription interface {
-	AddLog(log *ethgo.Log) error
+	AddLog(log *ethgo.Log)
 }
 
 type EventTracker struct {
@@ -80,21 +80,17 @@ func (e *EventTracker) Start(ctx context.Context) error {
 
 	// Init and start block tracker concurrently, retrying indefinitely
 	go common.RetryForever(ctx, time.Second, func(context.Context) error {
-		// Init
 		start := time.Now().UTC()
+
 		if err := blockTracker.Init(); err != nil {
 			e.logger.Error("failed to init blocktracker", "error", err)
 
 			return err
 		}
-		elapsed := time.Now().UTC().Sub(start)
 
-		// Start
+		elapsed := time.Now().UTC().Sub(start) // Calculate the elapsed time
+
 		if err := blockTracker.Start(); err != nil {
-			if common.IsContextDone(err) {
-				return nil
-			}
-
 			e.logger.Error("failed to start blocktracker", "error", err)
 
 			return err
@@ -121,18 +117,8 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		return err
 	}
 	// Sync concurrently, retrying indefinitely
-	go common.RetryForever(ctx, time.Second, func(ctx context.Context) error {
-		// Some errors from sync can cause this channel to be closed.
-		// We need to ensure that it is not closed before we retry,
-		// otherwise we will get a panic.
-		tt.ReadyCh = make(chan struct{})
-
-		// Run the sync
+	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		if err := tt.Sync(ctx); err != nil {
-			if common.IsContextDone(err) {
-				return nil
-			}
-
 			e.logger.Error("failed to sync", "error", err)
 
 			return err

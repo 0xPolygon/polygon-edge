@@ -31,8 +31,8 @@ func (v *unstakeParams) validateFlags() (err error) {
 }
 
 type unstakeResult struct {
-	ValidatorAddress string `json:"validatorAddress"`
-	Amount           uint64 `json:"amount"`
+	validatorAddress string
+	amount           uint64
 }
 
 func (ur unstakeResult) GetOutput() string {
@@ -41,8 +41,8 @@ func (ur unstakeResult) GetOutput() string {
 	buffer.WriteString("\n[UNSTAKE]\n")
 
 	vals := make([]string, 0, 2)
-	vals = append(vals, fmt.Sprintf("Validator Address|%s", ur.ValidatorAddress))
-	vals = append(vals, fmt.Sprintf("Amount Unstaked|%v", ur.Amount))
+	vals = append(vals, fmt.Sprintf("Validator Address|%s", ur.validatorAddress))
+	vals = append(vals, fmt.Sprintf("Amount Unstaked|%v", ur.amount))
 
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")

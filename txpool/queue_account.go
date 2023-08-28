@@ -144,11 +144,10 @@ func (q *minNonceQueue) Push(x interface{}) {
 }
 
 func (q *minNonceQueue) Pop() interface{} {
-	old := *q
-	n := len(old)
-	item := old[n-1]
-	old[n-1] = nil // avoid memory leak
-	*q = old[0 : n-1]
+	old := q
+	n := len(*old)
+	x := (*old)[n-1]
+	*q = (*old)[0 : n-1]
 
-	return item
+	return x
 }

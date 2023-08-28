@@ -96,6 +96,10 @@ func (g *Genesis) GenesisHeader() *types.Header {
 		head.Difficulty = GenesisDifficulty
 	}
 
+	if g.BaseFee == 0 {
+		head.BaseFee = GenesisBaseFee
+	}
+
 	return head
 }
 
@@ -128,13 +132,13 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 	var enc Genesis
 	enc.Nonce = hex.EncodeToHex(g.Nonce[:])
 
-	enc.Timestamp = common.EncodeUint64(g.Timestamp)
-	enc.ExtraData = common.EncodeBytes(g.ExtraData)
+	enc.Timestamp = types.EncodeUint64(g.Timestamp)
+	enc.ExtraData = types.EncodeBytes(g.ExtraData)
 
-	enc.GasLimit = common.EncodeUint64(g.GasLimit)
-	enc.Difficulty = common.EncodeUint64(g.Difficulty)
-	enc.BaseFee = common.EncodeUint64(g.BaseFee)
-	enc.BaseFeeEM = common.EncodeUint64(g.BaseFeeEM)
+	enc.GasLimit = types.EncodeUint64(g.GasLimit)
+	enc.Difficulty = types.EncodeUint64(g.Difficulty)
+	enc.BaseFee = types.EncodeUint64(g.BaseFee)
+	enc.BaseFeeEM = types.EncodeUint64(g.BaseFeeEM)
 
 	enc.Mixhash = g.Mixhash
 	enc.Coinbase = g.Coinbase
@@ -148,8 +152,8 @@ func (g *Genesis) MarshalJSON() ([]byte, error) {
 		enc.Alloc = &alloc
 	}
 
-	enc.Number = common.EncodeUint64(g.Number)
-	enc.GasUsed = common.EncodeUint64(g.GasUsed)
+	enc.Number = types.EncodeUint64(g.Number)
+	enc.GasUsed = types.EncodeUint64(g.GasUsed)
 	enc.ParentHash = g.ParentHash
 
 	return json.Marshal(&enc)
@@ -197,7 +201,7 @@ func (g *Genesis) UnmarshalJSON(data []byte) error {
 	}
 
 	if dec.ExtraData != nil {
-		g.ExtraData, subErr = common.ParseBytes(dec.ExtraData)
+		g.ExtraData, subErr = types.ParseBytes(dec.ExtraData)
 		if subErr != nil {
 			parseError("extradata", subErr)
 		}
@@ -284,7 +288,7 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	obj := &genesisAccountEncoder{}
 
 	if g.Code != nil {
-		obj.Code = common.EncodeBytes(g.Code)
+		obj.Code = types.EncodeBytes(g.Code)
 	}
 
 	if len(g.Storage) != 0 {
@@ -292,15 +296,15 @@ func (g *GenesisAccount) MarshalJSON() ([]byte, error) {
 	}
 
 	if g.Balance != nil {
-		obj.Balance = common.EncodeBigInt(g.Balance)
+		obj.Balance = types.EncodeBigInt(g.Balance)
 	}
 
 	if g.Nonce != 0 {
-		obj.Nonce = common.EncodeUint64(g.Nonce)
+		obj.Nonce = types.EncodeUint64(g.Nonce)
 	}
 
 	if g.PrivateKey != nil {
-		obj.PrivateKey = common.EncodeBytes(g.PrivateKey)
+		obj.PrivateKey = types.EncodeBytes(g.PrivateKey)
 	}
 
 	return json.Marshal(obj)
@@ -331,7 +335,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	}
 
 	if dec.Code != nil {
-		g.Code, subErr = common.ParseBytes(dec.Code)
+		g.Code, subErr = types.ParseBytes(dec.Code)
 		if subErr != nil {
 			parseError("code", subErr)
 		}
@@ -341,7 +345,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 		g.Storage = dec.Storage
 	}
 
-	g.Balance, subErr = common.ParseUint256orHex(dec.Balance)
+	g.Balance, subErr = types.ParseUint256orHex(dec.Balance)
 	if subErr != nil {
 		parseError("balance", subErr)
 	}
@@ -353,7 +357,7 @@ func (g *GenesisAccount) UnmarshalJSON(data []byte) error {
 	}
 
 	if dec.PrivateKey != nil {
-		g.PrivateKey, subErr = common.ParseBytes(dec.PrivateKey)
+		g.PrivateKey, subErr = types.ParseBytes(dec.PrivateKey)
 		if subErr != nil {
 			parseError("privatekey", subErr)
 		}

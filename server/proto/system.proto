@@ -11,6 +11,8 @@ service System {
   // GetInfo returns info about the client
   rpc GetStatus(google.protobuf.Empty) returns (ServerStatus);
 
+  rpc GetTrace(GetTraceRequest) returns (GetTraceResponse);
+
   // PeersAdd adds a new peer
   rpc PeersAdd(PeersAddRequest) returns (PeersAddResponse);
 
@@ -28,6 +30,14 @@ service System {
 
   // Export returns blockchain data
   rpc Export(ExportRequest) returns (stream ExportEvent);
+}
+
+message GetTraceRequest {
+  uint64 number = 1;
+}
+
+message GetTraceResponse {
+  bytes trace = 1;
 }
 
 message BlockchainEvent {

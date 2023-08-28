@@ -21,16 +21,16 @@ import (
 var params stakeManagerDeployParams
 
 func GetCommand() *cobra.Command {
-	stakeMgrDeployCmd := &cobra.Command{
+	registerCmd := &cobra.Command{
 		Use:     "stake-manager-deploy",
 		Short:   "Command for deploying stake manager contract on rootchain",
 		PreRunE: runPreRun,
 		RunE:    runCommand,
 	}
 
-	setFlags(stakeMgrDeployCmd)
+	setFlags(registerCmd)
 
-	return stakeMgrDeployCmd
+	return registerCmd
 }
 
 func runPreRun(cmd *cobra.Command, _ []string) error {
@@ -110,7 +110,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to get deployer key: %w", err)
+		return fmt.Errorf("faield to get deployer key: %w", err)
 	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC))
@@ -121,10 +121,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	if params.isTestMode {
 		// fund deployer so that he can deploy contracts
 		deployerAddr := deployerKey.Address()
-		txn := rootHelper.CreateTransaction(ethgo.ZeroAddress, &deployerAddr, nil, ethgo.Ether(1), true)
+		txn := &ethgo.Transaction{To: &deployerAddr, Value: ethgo.Ether(1)}
 
 		if _, err = txRelayer.SendTransactionLocal(txn); err != nil {
-			return fmt.Errorf("failed to send local transaction: %w", err)
+			return fmt.Errorf("faield to send local transaction: %w", err)
 		}
 	}
 
@@ -247,7 +247,10 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 
 func deployContract(txRelayer txrelayer.TxRelayer, deployerKey ethgo.Key,
 	artifact *artifact.Artifact, contractName string) (types.Address, error) {
-	txn := rootHelper.CreateTransaction(ethgo.ZeroAddress, nil, artifact.Bytecode, nil, true)
+	txn := &ethgo.Transaction{
+		To:    nil, // contract deployment
+		Input: artifact.Bytecode,
+	}
 
 	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 	if err != nil {

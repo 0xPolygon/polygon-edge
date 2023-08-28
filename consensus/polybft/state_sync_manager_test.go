@@ -22,7 +22,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime Runtime) *stateSyncManager {
+func newTestStateSyncManager(t *testing.T, key *validator.TestValidator) *stateSyncManager {
 	t.Helper()
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-data-dir-state-sync")
@@ -41,7 +41,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 			topic:             topic,
 			key:               key.Key(),
 			maxCommitmentSize: maxCommitmentSize,
-		}, runtime)
+		})
 
 	t.Cleanup(func() {
 		os.RemoveAll(tmpDir)
@@ -51,184 +51,189 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 }
 
 func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
-	t.Parallel()
-
 	vals := validator.NewTestValidators(t, 5)
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
-	t.Run("When node is validator", func(t *testing.T) {
-		t.Parallel()
+	// there are no state syncs
+	require.NoError(t, s.buildCommitment())
+	require.Nil(t, s.pendingCommitments)
 
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	stateSyncs10 := generateStateSyncEvents(t, 10, 0)
 
-		// there are no state syncs
-		require.NoError(t, s.buildCommitment())
-		require.Nil(t, s.pendingCommitments)
+	// add 5 state syncs starting in index 0, it will generate one smaller commitment
+	for i := 0; i < 5; i++ {
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
+	}
 
-		stateSyncs10 := generateStateSyncEvents(t, 10, 0)
+	require.NoError(t, s.buildCommitment())
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(4), s.pendingCommitments[0].EndID.Uint64())
+	require.Equal(t, uint64(0), s.pendingCommitments[0].Epoch)
 
-		// add 5 state syncs starting in index 0, it will generate one smaller commitment
-		for i := 0; i < 5; i++ {
-			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
-		}
+	// add the next 5 state syncs, at that point, so that it generates a larger commitment
+	for i := 5; i < 10; i++ {
+		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
+	}
 
-		require.NoError(t, s.buildCommitment())
-		require.Len(t, s.pendingCommitments, 1)
-		require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
-		require.Equal(t, uint64(4), s.pendingCommitments[0].EndID.Uint64())
-		require.Equal(t, uint64(0), s.pendingCommitments[0].Epoch)
+	require.NoError(t, s.buildCommitment())
+	require.Len(t, s.pendingCommitments, 2)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
+	require.Equal(t, uint64(9), s.pendingCommitments[1].EndID.Uint64())
+	require.Equal(t, uint64(0), s.pendingCommitments[1].Epoch)
 
-		// add the next 5 state syncs, at that point, so that it generates a larger commitment
-		for i := 5; i < 10; i++ {
-			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
-		}
-
-		require.NoError(t, s.buildCommitment())
-		require.Len(t, s.pendingCommitments, 2)
-		require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
-		require.Equal(t, uint64(9), s.pendingCommitments[1].EndID.Uint64())
-		require.Equal(t, uint64(0), s.pendingCommitments[1].Epoch)
-
-		// the message was sent
-		require.NotNil(t, s.config.topic.(*mockTopic).consume()) //nolint
-	})
-
-	t.Run("When node is not validator", func(t *testing.T) {
-		t.Parallel()
-
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: false})
-
-		stateSyncs10 := generateStateSyncEvents(t, 10, 0)
-
-		// add 5 state syncs starting in index 0, they will be saved to db
-		for i := 0; i < 5; i++ {
-			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
-		}
-
-		// I am not a validator so no commitments should be built
-		require.NoError(t, s.buildCommitment())
-		require.Len(t, s.pendingCommitments, 0)
-	})
+	// the message was sent
+	require.NotNil(t, s.config.topic.(*mockTopic).consume()) //nolint
 }
 
-func TestStateSyncManager_MessagePool(t *testing.T) {
+func TestStateSyncManager_MessagePool_OldEpoch(t *testing.T) {
+	vals := validator.NewTestValidators(t, 5)
+
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.epoch = 1
+
+	msg := &TransportMessage{
+		EpochNumber: 0,
+	}
+	err := s.saveVote(msg)
+	require.NoError(t, err)
+}
+
+type mockMsg struct {
+	hash  []byte
+	epoch uint64
+}
+
+func newMockMsg() *mockMsg {
+	hash := make([]byte, 32)
+	rand.Read(hash)
+
+	return &mockMsg{hash: hash}
+}
+
+func (m *mockMsg) WithHash(hash []byte) *mockMsg {
+	m.hash = hash
+
+	return m
+}
+
+func (m *mockMsg) sign(val *validator.TestValidator, domain []byte) (*TransportMessage, error) {
+	signature, err := val.MustSign(m.hash, domain).Marshal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &TransportMessage{
+		Hash:        m.hash,
+		Signature:   signature,
+		From:        val.Address().String(),
+		EpochNumber: m.epoch,
+	}, nil
+}
+
+func TestStateSyncManager_MessagePool_SenderIsNoValidator(t *testing.T) {
+	vals := validator.NewTestValidators(t, 5)
+
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
+
+	badVal := validator.NewTestValidator(t, "a", 0)
+	msg, err := newMockMsg().sign(badVal, bls.DomainStateReceiver)
+	require.NoError(t, err)
+
+	require.Error(t, s.saveVote(msg))
+}
+
+func TestStateSyncManager_MessagePool_InvalidEpoch(t *testing.T) {
 	t.Parallel()
 
 	vals := validator.NewTestValidators(t, 5)
 
-	t.Run("Old epoch", func(t *testing.T) {
-		t.Parallel()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	val := newMockMsg()
+	msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
+	require.NoError(t, err)
 
-		s.epoch = 1
-		msg := &TransportMessage{
-			EpochNumber: 0,
-		}
+	msg.EpochNumber = 1
 
-		err := s.saveVote(msg)
-		require.NoError(t, err)
-	})
+	require.NoError(t, s.saveVote(msg))
 
-	t.Run("Sender is not a validator", func(t *testing.T) {
-		t.Parallel()
+	// no votes for the current epoch
+	votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.Hash)
+	require.NoError(t, err)
+	require.Len(t, votes, 0)
 
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
-		s.validatorSet = vals.ToValidatorSet()
+	// returns an error for the invalid epoch
+	_, err = s.state.StateSyncStore.getMessageVotes(1, msg.Hash)
+	require.Error(t, err)
+}
 
-		badVal := validator.NewTestValidator(t, "a", 0)
-		msg, err := newMockMsg().sign(badVal, bls.DomainStateReceiver)
-		require.NoError(t, err)
+func TestStateSyncManager_MessagePool_SenderAndSignatureMissmatch(t *testing.T) {
+	t.Parallel()
 
-		require.Error(t, s.saveVote(msg))
-	})
+	vals := validator.NewTestValidators(t, 5)
 
-	t.Run("Invalid epoch", func(t *testing.T) {
-		t.Parallel()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
-		s.validatorSet = vals.ToValidatorSet()
+	// validator signs the msg in behalf of another validator
+	val := newMockMsg()
+	msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
+	require.NoError(t, err)
 
-		val := newMockMsg()
-		msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
-		require.NoError(t, err)
+	msg.From = vals.GetValidator("1").Address().String()
+	require.Error(t, s.saveVote(msg))
 
-		msg.EpochNumber = 1
+	// non validator signs the msg in behalf of a validator
+	badVal := validator.NewTestValidator(t, "a", 0)
+	msg, err = newMockMsg().sign(badVal, bls.DomainStateReceiver)
+	require.NoError(t, err)
 
-		require.NoError(t, s.saveVote(msg))
+	msg.From = vals.GetValidator("1").Address().String()
+	require.Error(t, s.saveVote(msg))
+}
 
-		// no votes for the current epoch
-		votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.Hash)
-		require.NoError(t, err)
-		require.Len(t, votes, 0)
+func TestStateSyncManager_MessagePool_SenderVotes(t *testing.T) {
+	vals := validator.NewTestValidators(t, 5)
 
-		// returns an error for the invalid epoch
-		_, err = s.state.StateSyncStore.getMessageVotes(1, msg.Hash)
-		require.Error(t, err)
-	})
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
+	s.validatorSet = vals.ToValidatorSet()
 
-	t.Run("Sender and signature mismatch", func(t *testing.T) {
-		t.Parallel()
+	msg := newMockMsg()
+	val1signed, err := msg.sign(vals.GetValidator("1"), bls.DomainStateReceiver)
+	require.NoError(t, err)
 
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
-		s.validatorSet = vals.ToValidatorSet()
+	val2signed, err := msg.sign(vals.GetValidator("2"), bls.DomainStateReceiver)
+	require.NoError(t, err)
 
-		// validator signs the msg in behalf of another validator
-		val := newMockMsg()
-		msg, err := val.sign(vals.GetValidator("0"), bls.DomainStateReceiver)
-		require.NoError(t, err)
+	// vote with validator 1
+	require.NoError(t, s.saveVote(val1signed))
 
-		msg.From = vals.GetValidator("1").Address().String()
-		require.Error(t, s.saveVote(msg))
+	votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.hash)
+	require.NoError(t, err)
+	require.Len(t, votes, 1)
 
-		// non validator signs the msg in behalf of a validator
-		badVal := validator.NewTestValidator(t, "a", 0)
-		msg, err = newMockMsg().sign(badVal, bls.DomainStateReceiver)
-		require.NoError(t, err)
+	// vote with validator 1 again (the votes do not increase)
+	require.NoError(t, s.saveVote(val1signed))
+	votes, _ = s.state.StateSyncStore.getMessageVotes(0, msg.hash)
+	require.Len(t, votes, 1)
 
-		msg.From = vals.GetValidator("1").Address().String()
-		require.Error(t, s.saveVote(msg))
-	})
-
-	t.Run("Sender votes", func(t *testing.T) {
-		t.Parallel()
-
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
-		s.validatorSet = vals.ToValidatorSet()
-
-		msg := newMockMsg()
-		val1signed, err := msg.sign(vals.GetValidator("1"), bls.DomainStateReceiver)
-		require.NoError(t, err)
-
-		val2signed, err := msg.sign(vals.GetValidator("2"), bls.DomainStateReceiver)
-		require.NoError(t, err)
-
-		// vote with validator 1
-		require.NoError(t, s.saveVote(val1signed))
-
-		votes, err := s.state.StateSyncStore.getMessageVotes(0, msg.hash)
-		require.NoError(t, err)
-		require.Len(t, votes, 1)
-
-		// vote with validator 1 again (the votes do not increase)
-		require.NoError(t, s.saveVote(val1signed))
-		votes, _ = s.state.StateSyncStore.getMessageVotes(0, msg.hash)
-		require.Len(t, votes, 1)
-
-		// vote with validator 2
-		require.NoError(t, s.saveVote(val2signed))
-		votes, _ = s.state.StateSyncStore.getMessageVotes(0, msg.hash)
-		require.Len(t, votes, 2)
-	})
+	// vote with validator 2
+	require.NoError(t, s.saveVote(val2signed))
+	votes, _ = s.state.StateSyncStore.getMessageVotes(0, msg.hash)
+	require.Len(t, votes, 2)
 }
 
 func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 	s.validatorSet = vals.ToValidatorSet()
 
 	// commitment is empty
-	commitment, err := s.Commitment(1)
+	commitment, err := s.Commitment()
 	require.NoError(t, err)
 	require.Nil(t, commitment)
 
@@ -262,7 +267,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.NoError(t, s.saveVote(signedMsg1))
 	require.NoError(t, s.saveVote(signedMsg2))
 
-	commitment, err = s.Commitment(1)
+	commitment, err = s.Commitment()
 	require.NoError(t, err) // there is no error if quorum is not met, since its a valid case
 	require.Nil(t, commitment)
 
@@ -277,7 +282,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 	require.NoError(t, s.saveVote(signedMsg1))
 	require.NoError(t, s.saveVote(signedMsg2))
 
-	commitment, err = s.Commitment(1)
+	commitment, err = s.Commitment()
 	require.NoError(t, err)
 	require.NotNil(t, commitment)
 }
@@ -285,7 +290,7 @@ func TestStateSyncManager_BuildCommitment(t *testing.T) {
 func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	vals := validator.NewTestValidators(t, 5)
 
-	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
 	for _, evnt := range generateStateSyncEvents(t, 20, 0) {
 		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(evnt))
@@ -304,7 +309,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	txData, err := mockMsg.EncodeAbi()
 	require.NoError(t, err)
 
-	tx := createStateTransactionWithData(1, types.Address{}, txData)
+	tx := createStateTransactionWithData(types.Address{}, txData)
 
 	req := &PostBlockRequest{
 		FullBlock: &types.FullBlock{
@@ -325,116 +330,79 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 }
 
 func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
-	t.Parallel()
-
 	vals := validator.NewTestValidators(t, 5)
 
-	t.Run("Node is a validator", func(t *testing.T) {
-		t.Parallel()
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	// empty log which is not an state sync
+	s.AddLog(&ethgo.Log{})
+	stateSyncs, err := s.state.StateSyncStore.list()
 
-		// empty log which is not an state sync
-		require.NoError(t, s.AddLog(&ethgo.Log{}))
-		stateSyncs, err := s.state.StateSyncStore.list()
+	require.NoError(t, err)
+	require.Len(t, stateSyncs, 0)
 
-		require.NoError(t, err)
-		require.Len(t, stateSyncs, 0)
+	var stateSyncedEvent contractsapi.StateSyncedEvent
 
-		var stateSyncedEvent contractsapi.StateSyncedEvent
+	stateSyncEventID := stateSyncedEvent.Sig()
 
-		stateSyncEventID := stateSyncedEvent.Sig()
+	// log with the state sync topic but incorrect content
+	s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateSyncEventID}})
+	stateSyncs, err = s.state.StateSyncStore.list()
 
-		// log with the state sync topic but incorrect content
-		require.Error(t, s.AddLog(&ethgo.Log{Topics: []ethgo.Hash{stateSyncEventID}}))
-		stateSyncs, err = s.state.StateSyncStore.list()
+	require.NoError(t, err)
+	require.Len(t, stateSyncs, 0)
 
-		require.NoError(t, err)
-		require.Len(t, stateSyncs, 0)
+	// correct event log
+	data, err := abi.MustNewType("tuple(string a)").Encode([]string{"data"})
+	require.NoError(t, err)
 
-		// correct event log
-		data, err := abi.MustNewType("tuple(string a)").Encode([]string{"data"})
-		require.NoError(t, err)
+	goodLog := &ethgo.Log{
+		Topics: []ethgo.Hash{
+			stateSyncEventID,
+			ethgo.BytesToHash([]byte{0x0}), // state sync index 0
+			ethgo.ZeroHash,
+			ethgo.ZeroHash,
+		},
+		Data: data,
+	}
 
-		goodLog := &ethgo.Log{
-			Topics: []ethgo.Hash{
-				stateSyncEventID,
-				ethgo.BytesToHash([]byte{0x0}), // state sync index 0
-				ethgo.ZeroHash,
-				ethgo.ZeroHash,
-			},
-			Data: data,
-		}
+	s.AddLog(goodLog)
 
-		require.NoError(t, s.AddLog(goodLog))
+	stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
+	require.NoError(t, err)
+	require.Len(t, stateSyncs, 1)
+	require.Len(t, s.pendingCommitments, 1)
+	require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
+	require.Equal(t, uint64(0), s.pendingCommitments[0].EndID.Uint64())
 
-		stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
-		require.NoError(t, err)
-		require.Len(t, stateSyncs, 1)
-		require.Len(t, s.pendingCommitments, 1)
-		require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
-		require.Equal(t, uint64(0), s.pendingCommitments[0].EndID.Uint64())
+	// add one more log to have a minimum commitment
+	goodLog2 := goodLog.Copy()
+	goodLog2.Topics[1] = ethgo.BytesToHash([]byte{0x1}) // state sync index 1
+	s.AddLog(goodLog2)
 
-		// add one more log to have a minimum commitment
-		goodLog2 := goodLog.Copy()
-		goodLog2.Topics[1] = ethgo.BytesToHash([]byte{0x1}) // state sync index 1
-		require.NoError(t, s.AddLog(goodLog2))
+	require.Len(t, s.pendingCommitments, 2)
+	require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
+	require.Equal(t, uint64(1), s.pendingCommitments[1].EndID.Uint64())
 
-		require.Len(t, s.pendingCommitments, 2)
-		require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
-		require.Equal(t, uint64(1), s.pendingCommitments[1].EndID.Uint64())
+	// add two more logs to have larger commitments
+	goodLog3 := goodLog.Copy()
+	goodLog3.Topics[1] = ethgo.BytesToHash([]byte{0x2}) // state sync index 2
+	s.AddLog(goodLog3)
 
-		// add two more logs to have larger commitments
-		goodLog3 := goodLog.Copy()
-		goodLog3.Topics[1] = ethgo.BytesToHash([]byte{0x2}) // state sync index 2
-		require.NoError(t, s.AddLog(goodLog3))
+	goodLog4 := goodLog.Copy()
+	goodLog4.Topics[1] = ethgo.BytesToHash([]byte{0x3}) // state sync index 3
+	s.AddLog(goodLog4)
 
-		goodLog4 := goodLog.Copy()
-		goodLog4.Topics[1] = ethgo.BytesToHash([]byte{0x3}) // state sync index 3
-		require.NoError(t, s.AddLog(goodLog4))
-
-		require.Len(t, s.pendingCommitments, 4)
-		require.Equal(t, uint64(0), s.pendingCommitments[3].StartID.Uint64())
-		require.Equal(t, uint64(3), s.pendingCommitments[3].EndID.Uint64())
-	})
-
-	t.Run("Node is not a validator", func(t *testing.T) {
-		t.Parallel()
-
-		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: false})
-
-		// correct event log
-		data, err := abi.MustNewType("tuple(string a)").Encode([]string{"data"})
-		require.NoError(t, err)
-
-		var stateSyncedEvent contractsapi.StateSyncedEvent
-
-		goodLog := &ethgo.Log{
-			Topics: []ethgo.Hash{
-				stateSyncedEvent.Sig(),
-				ethgo.BytesToHash([]byte{0x0}), // state sync index 0
-				ethgo.ZeroHash,
-				ethgo.ZeroHash,
-			},
-			Data: data,
-		}
-
-		require.NoError(t, s.AddLog(goodLog))
-
-		// node should have inserted given state sync event, but it shouldn't build any commitment
-		stateSyncs, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
-		require.NoError(t, err)
-		require.Len(t, stateSyncs, 1)
-		require.Equal(t, uint64(0), stateSyncs[0].ID.Uint64())
-		require.Len(t, s.pendingCommitments, 0)
-	})
+	require.Len(t, s.pendingCommitments, 4)
+	require.Equal(t, uint64(0), s.pendingCommitments[3].StartID.Uint64())
+	require.Equal(t, uint64(3), s.pendingCommitments[3].EndID.Uint64())
 }
 
 func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 	t.Parallel()
 
 	vals := validator.NewTestValidators(t, 5)
-	s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
+	s := newTestStateSyncManager(t, vals.GetValidator("0"))
 
 	server := testutil.DeployTestServer(t, nil)
 
@@ -476,7 +444,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 func TestStateSyncManager_Close(t *testing.T) {
 	t.Parallel()
 
-	mgr := newTestStateSyncManager(t, validator.NewTestValidator(t, "A", 100), &mockRuntime{isActiveValidator: true})
+	mgr := newTestStateSyncManager(t, validator.NewTestValidator(t, "A", 100))
 	require.NotPanics(t, func() { mgr.Close() })
 }
 
@@ -593,44 +561,4 @@ func (m *mockTopic) Publish(obj proto.Message) error {
 
 func (m *mockTopic) Subscribe(handler func(obj interface{}, from peer.ID)) error {
 	return nil
-}
-
-type mockMsg struct {
-	hash  []byte
-	epoch uint64
-}
-
-func newMockMsg() *mockMsg {
-	hash := make([]byte, 32)
-	rand.Read(hash)
-
-	return &mockMsg{hash: hash}
-}
-
-func (m *mockMsg) WithHash(hash []byte) *mockMsg {
-	m.hash = hash
-
-	return m
-}
-
-func (m *mockMsg) sign(val *validator.TestValidator, domain []byte) (*TransportMessage, error) {
-	signature, err := val.MustSign(m.hash, domain).Marshal()
-	if err != nil {
-		return nil, err
-	}
-
-	return &TransportMessage{
-		Hash:        m.hash,
-		Signature:   signature,
-		From:        val.Address().String(),
-		EpochNumber: m.epoch,
-	}, nil
-}
-
-type mockRuntime struct {
-	isActiveValidator bool
-}
-
-func (m *mockRuntime) IsActiveValidator() bool {
-	return m.isActiveValidator
 }

@@ -1,13 +1,10 @@
 package genesis
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 
-	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -116,109 +113,6 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, c.expectedCfg, p.nativeTokenConfig)
 			}
-		})
-	}
-}
-
-func Test_validatePremineInfo(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name                 string
-		premineRaw           []string
-		expectedPremines     []*premineInfo
-		expectValidateErrMsg string
-		expectedParseErrMsg  string
-	}{
-		{
-			name:                "invalid premine balance",
-			premineRaw:          []string{"0x12345:loremIpsum"},
-			expectedPremines:    []*premineInfo{},
-			expectedParseErrMsg: "invalid premine balance amount provided",
-		},
-		{
-			name:       "missing zero address premine",
-			premineRaw: []string{types.StringToAddress("12").String()},
-			expectedPremines: []*premineInfo{
-				{address: types.StringToAddress("12"), amount: command.DefaultPremineBalance},
-			},
-			expectValidateErrMsg: errReserveAccMustBePremined.Error(),
-		},
-		{
-			name: "valid premine information",
-			premineRaw: []string{
-				fmt.Sprintf("%s:%d", types.StringToAddress("1"), ethgo.Ether(10)),
-				fmt.Sprintf("%s:%d", types.ZeroAddress, ethgo.Ether(10000)),
-			},
-			expectedPremines: []*premineInfo{
-				{address: types.StringToAddress("1"), amount: ethgo.Ether(10)},
-				{address: types.ZeroAddress, amount: ethgo.Ether(10000)},
-			},
-			expectValidateErrMsg: "",
-		},
-	}
-
-	for _, c := range cases {
-		c := c
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
-			p := &genesisParams{premine: c.premineRaw}
-			err := p.parsePremineInfo()
-			if c.expectedParseErrMsg != "" {
-				require.ErrorContains(t, err, c.expectedParseErrMsg)
-
-				return
-			} else {
-				require.NoError(t, err)
-			}
-
-			err = p.validatePremineInfo()
-
-			if c.expectValidateErrMsg != "" {
-				require.ErrorContains(t, err, c.expectValidateErrMsg)
-			} else {
-				require.NoError(t, err)
-			}
-
-			require.Equal(t, c.expectedPremines, p.premineInfos)
-		})
-	}
-}
-
-func Test_validateRewardWallet(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name              string
-		rewardWallet      string
-		epochReward       uint64
-		expectValidateErr error
-	}{
-		{
-			name:              "invalid reward wallet: no premine + reward",
-			rewardWallet:      types.StringToAddress("1").String() + ":0",
-			epochReward:       10,
-			expectValidateErr: errRewardWalletAmountZero,
-		},
-		{
-			name:              "valid reward wallet: no premine + no reward",
-			rewardWallet:      types.StringToAddress("1").String() + ":0",
-			epochReward:       0,
-			expectValidateErr: nil,
-		},
-	}
-	for _, c := range cases {
-		c := c
-		t.Run(c.name, func(t *testing.T) {
-			t.Parallel()
-
-			p := &genesisParams{
-				rewardWallet: c.rewardWallet,
-				epochReward:  c.epochReward,
-			}
-			err := p.validateRewardWallet()
-			require.ErrorIs(t, err, c.expectValidateErr)
 		})
 	}
 }

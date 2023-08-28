@@ -9,43 +9,17 @@ if [[ "$1" == "polybft" ]] && ! command -v jq >/dev/null 2>&1; then
   dp_error_flag=1
 fi
 
-# Check if curl is installed
-if [[ "$1" == "polybft" ]] && ! command -v curl >/dev/null 2>&1; then
-  echo "curl is not installed."
-  echo "Manual installation instructions: Visit https://everything.curl.dev/get/ for more information."
-  dp_error_flag=1
-fi
-
-# Check if docker-compose is installed
-if [[ "$2" == "--docker" ]] && ! command -v docker-compose >/dev/null 2>&1; then
-  echo "docker-compose is not installed."
-  echo "Manual installation instructions: Visit https://docs.docker.com/compose/install/ for more information."
+# Check if nc is installed
+if [[ "$1" == "polybft" ]] && ! command -v nc >/dev/null 2>&1; then
+  echo "Netcat (nc) is not installed."
   dp_error_flag=1
 fi
 
 # Stop script if any of the dependencies have failed
-if [[ "$dp_error_flag" -eq 1 ]]; then
+if [[ "$dp_error_flag" -eq 1]]; then
   echo "Missing dependencies. Please install them and run the script again."
   exit 1
-fi
-
-function showhelp(){
-  echo "Usage: cluster {consensus} [{command}] [{flags}]"
-  echo "Consensus:"
-  echo "  ibft            Start Supernets test environment locally with ibft consensus"
-  echo "  polybft         Start Supernets test environment locally with polybft consensus"
-  echo "Commands:"
-  echo "  stop            Stop the running environment"
-  echo "  destroy         Destroy the running environment"
-  echo "  write-logs      Writes STDOUT and STDERR output to log file. Not applicable when using --docker flag."
-  echo "Flags:"
-  echo "  --docker        Run using Docker (requires docker-compose)."
-  echo "  --help          Display this help information"
-  echo "Examples:"
-  echo "  cluster polybft -- Run the script with the polybft consensus"
-  echo "  cluster polybtt --docker -- Run the script with the polybft consensus using docker"
-  echo "  cluster polybft stop -- Stop the running environment"
-}
+fi	
 
 function initIbftConsensus() {
   echo "Running with ibft consensus"
@@ -91,10 +65,10 @@ function initRootchain() {
   fi
 
   set +e
-  while true; do
-    if curl -sSf -o /dev/null http://127.0.0.1:8545; then
-      break
-    fi
+  t=1
+  while [ $t -gt 0 ]; do
+    nc -z 127.0.0.1 8545 </dev/null
+    t=$?
     sleep 1
   done
   set -e
@@ -159,7 +133,7 @@ function startServerFromBinary() {
   if [ "$1" == "write-logs" ]; then
     echo "Writing validators logs to the files..."
     ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
+      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
       --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
@@ -173,7 +147,7 @@ function startServerFromBinary() {
     wait
   else
     ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
+      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 \
       --num-block-confirmations 2 --seal --log-level DEBUG &
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
       --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
@@ -189,7 +163,8 @@ function startServerFromBinary() {
 }
 
 function startServerFromDockerCompose() {
-  if [ "$1" != "polybft" ]; then
+  if [ "$1" != "polybft" ]
+  then
     export EDGE_CONSENSUS="$1"
   fi
 
@@ -205,12 +180,6 @@ function stopDockerEnvironment() {
 }
 
 set -e
-
-# Show help if help flag is entered or no arguments are provided
-if [[ "$1" == "--help" ]] || [[ $# -eq 0 ]]; then
-  showhelp
-  exit 0
-fi
 
 # Reset test-dirs
 rm -rf test-chain-*
@@ -230,7 +199,7 @@ case "$2" in
   # cluster {consensus} --docker stop
   elif [ "$3" == "stop" ]; then
     stopDockerEnvironment
-    echo "Docker $1 environment stopped!"
+    echo "Docker $1 environment stoped!"
     exit 0
   fi
 
@@ -260,8 +229,7 @@ case "$2" in
     startServerFromBinary $2
     exit 0
   else
-    echo "Unsupported consensus mode. Supported modes are: ibft and polybft."
-    showhelp
+    echo "Unsupported consensus mode. Supported modes are: ibft and polybft "
     exit 1
   fi
   ;;

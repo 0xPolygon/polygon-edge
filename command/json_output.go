@@ -29,7 +29,7 @@ func (jo *jsonOutput) WriteOutput() {
 
 // WriteCommandResult implements OutputFormatter interface
 func (jo *jsonOutput) WriteCommandResult(result CommandResult) {
-	_, _ = fmt.Fprintln(os.Stdout, marshalJSONToString(result))
+	_, _ = fmt.Fprintln(os.Stdout, result.GetOutput())
 }
 
 // WriteOutput implements OutputFormatter plus io.Writer interfaces

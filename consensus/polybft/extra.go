@@ -141,7 +141,7 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 	}
 
 	// validate current block signatures
-	checkpointHash, err := i.Checkpoint.Hash(chainID, blockNumber, header.Hash)
+	checkpointHash, err := i.Checkpoint.Hash(chainID, header.Number, header.Hash)
 	if err != nil {
 		return fmt.Errorf("failed to calculate proposal hash: %w", err)
 	}
@@ -151,7 +151,7 @@ func (i *Extra) ValidateFinalizedData(header *types.Header, parent *types.Header
 		return fmt.Errorf("failed to validate header for block %d. could not retrieve block validators:%w", blockNumber, err)
 	}
 
-	if err := i.Committed.Verify(blockNumber, validators, checkpointHash, domain, logger); err != nil {
+	if err := i.Committed.Verify(validators, checkpointHash, domain, logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for block %d (proposal hash %s): %w",
 			blockNumber, checkpointHash, err)
 	}
@@ -197,8 +197,7 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 		return fmt.Errorf("failed to calculate parent proposal hash: %w", err)
 	}
 
-	parentBlockNumber := blockNumber - 1
-	if err := i.Parent.Verify(parentBlockNumber, parentValidators, parentCheckpointHash, domain, logger); err != nil {
+	if err := i.Parent.Verify(parentValidators, parentCheckpointHash, domain, logger); err != nil {
 		return fmt.Errorf("failed to verify signatures for parent of block %d (proposal hash: %s): %w",
 			blockNumber, parentCheckpointHash, err)
 	}
@@ -257,15 +256,14 @@ func (s *Signature) UnmarshalRLPWith(v *fastrlp.Value) error {
 }
 
 // Verify is used to verify aggregated signature based on current validator set, message hash and domain
-func (s *Signature) Verify(blockNumber uint64, validators validator.AccountSet,
-	hash types.Hash, domain []byte, logger hclog.Logger) error {
+func (s *Signature) Verify(validators validator.AccountSet, hash types.Hash, domain []byte, logger hclog.Logger) error {
 	signers, err := validators.GetFilteredValidators(s.Bitmap)
 	if err != nil {
 		return err
 	}
 
 	validatorSet := validator.NewValidatorSet(validators, logger)
-	if !validatorSet.HasQuorum(blockNumber, signers.GetAddressesAsSet()) {
+	if !validatorSet.HasQuorum(signers.GetAddressesAsSet()) {
 		return fmt.Errorf("quorum not reached")
 	}
 
@@ -499,6 +497,10 @@ func GetIbftExtra(extraRaw []byte) (*Extra, error) {
 
 	if err := extra.UnmarshalRLP(extraRaw); err != nil {
 		return nil, err
+	}
+
+	if extra.Validators == nil {
+		extra.Validators = &validator.ValidatorSetDelta{}
 	}
 
 	return extra, nil

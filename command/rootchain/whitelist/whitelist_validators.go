@@ -104,7 +104,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
-	txn := rootHelper.CreateTransaction(ecdsaKey.Address(), &supernetAddr, encoded, nil, true)
+	txn := &ethgo.Transaction{
+		From:  ecdsaKey.Address(),
+		Input: encoded,
+		To:    &supernetAddr,
+	}
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)
 	if err != nil {
@@ -130,10 +134,10 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		result.NewValidatorAddresses = append(result.NewValidatorAddresses, whitelistEvent.Validator.String())
+		result.newValidatorAddresses = append(result.newValidatorAddresses, whitelistEvent.Validator.String())
 	}
 
-	if len(result.NewValidatorAddresses) != len(params.newValidatorAddresses) {
+	if len(result.newValidatorAddresses) != len(params.newValidatorAddresses) {
 		return fmt.Errorf("whitelist of validators did not pass successfully")
 	}
 

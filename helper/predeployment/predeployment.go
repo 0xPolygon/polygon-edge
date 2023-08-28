@@ -8,8 +8,6 @@ import (
 	"math/big"
 	"os"
 
-	"github.com/umbracle/ethgo/abi"
-
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -17,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo/abi"
 )
 
 var (
@@ -117,7 +116,7 @@ func getModifiedStorageMap(radix *state.Txn, address types.Address) map[types.Ha
 	return storageMap
 }
 
-func getPredeployAccount(address types.Address, input []byte, chainID int64) (*chain.GenesisAccount, error) {
+func getPredeployAccount(address types.Address, input, deployedBytecode []byte) (*chain.GenesisAccount, error) {
 	// Create an instance of the state
 	st := itrie.NewState(itrie.NewMemoryStorage())
 
@@ -143,7 +142,6 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 
 	// Create a transition
 	transition := state.NewTransition(config, snapshot, radix)
-	transition.ContextPtr().ChainID = chainID
 
 	// Run the transition through the EVM
 	res := evm.NewEVM().Run(contract, transition, &config)
@@ -155,7 +153,7 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 	// the state needs to be walked to collect all touched all storage slots
 	storageMap := getModifiedStorageMap(radix, address)
 
-	_, _, err := transition.Commit()
+	_, _, _, err := transition.Commit() //nolint:dogsled
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}
@@ -163,7 +161,7 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 	return &chain.GenesisAccount{
 		Balance: transition.GetBalance(address),
 		Nonce:   transition.GetNonce(address),
-		Code:    res.ReturnValue,
+		Code:    deployedBytecode,
 		Storage: storageMap,
 	}, nil
 }
@@ -174,7 +172,6 @@ func GenerateGenesisAccountFromFile(
 	filepath string,
 	constructorArgs []string,
 	predeployAddress types.Address,
-	chainID int64,
 ) (*chain.GenesisAccount, error) {
 	// Create the artifact from JSON
 	artifact, err := loadContractArtifact(filepath)
@@ -212,5 +209,5 @@ func GenerateGenesisAccountFromFile(
 		finalBytecode = append(artifact.Bytecode, constructor...)
 	}
 
-	return getPredeployAccount(predeployAddress, finalBytecode, chainID)
+	return getPredeployAccount(predeployAddress, finalBytecode, artifact.DeployedBytecode)
 }

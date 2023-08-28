@@ -37,8 +37,8 @@ func (sp *stakeParams) validateFlags() (err error) {
 }
 
 type stakeResult struct {
-	ValidatorAddress string   `json:"validatorAddress"`
-	Amount           *big.Int `json:"amount"`
+	validatorAddress string
+	amount           *big.Int
 }
 
 func (sr stakeResult) GetOutput() string {
@@ -47,8 +47,8 @@ func (sr stakeResult) GetOutput() string {
 	buffer.WriteString("\n[VALIDATOR STAKE]\n")
 
 	vals := make([]string, 0, 2)
-	vals = append(vals, fmt.Sprintf("Validator Address|%s", sr.ValidatorAddress))
-	vals = append(vals, fmt.Sprintf("Amount Staked|%d", sr.Amount))
+	vals = append(vals, fmt.Sprintf("Validator Address|%s", sr.validatorAddress))
+	vals = append(vals, fmt.Sprintf("Amount Staked|%d", sr.amount))
 
 	buffer.WriteString(helper.FormatKV(vals))
 	buffer.WriteString("\n")

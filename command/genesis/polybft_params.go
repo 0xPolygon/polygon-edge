@@ -44,7 +44,6 @@ const (
 	defaultEpochReward      = 1
 	defaultBlockTimeDrift   = uint64(10)
 
-	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
 	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
@@ -75,8 +74,13 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	// populate premine balance map
 	premineBalances := make(map[types.Address]*premineInfo, len(p.premine))
 
-	for _, premine := range p.premineInfos {
-		premineBalances[premine.address] = premine
+	for _, premine := range p.premine {
+		premineInfo, err := parsePremineInfo(premine)
+		if err != nil {
+			return fmt.Errorf("invalid balance amount provided '%s' : %w", premine, err)
+		}
+
+		premineBalances[premineInfo.address] = premineInfo
 	}
 
 	walletPremineInfo, err := parsePremineInfo(p.rewardWallet)
@@ -101,10 +105,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 	if p.rewardTokenCode == "" {
 		// native token is used as a reward token, and reward wallet is not a zero address
-		if p.epochReward > 0 {
-			// epoch reward is non zero so premine reward wallet
-			premineBalances[walletPremineInfo.address] = walletPremineInfo
-		}
+		// so we need to add that address to premine map
+		premineBalances[walletPremineInfo.address] = walletPremineInfo
 	} else {
 		bytes, err := hex.DecodeString(p.rewardTokenCode)
 		if err != nil {
@@ -115,7 +117,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		rewardTokenAddr = contracts.RewardTokenContract
 	}
 
-	initialValidators, err := p.getValidatorAccounts()
+	initialValidators, err := p.getValidatorAccounts(premineBalances)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve genesis validators: %w", err)
 	}
@@ -297,11 +299,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if p.accessListsOwner != "" {
-		value := types.StringToAddress(p.accessListsOwner)
-		chainConfig.Params.AccessListsOwner = &value
-	}
-
 	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
@@ -392,7 +389,7 @@ func (p *genesisParams) deployContracts(
 			})
 	}
 
-	if len(p.bridgeAllowListAdmin) != 0 || len(p.bridgeBlockListAdmin) != 0 || p.accessListsOwner != "" {
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		// rootchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
@@ -492,7 +489,8 @@ func (p *genesisParams) deployContracts(
 }
 
 // getValidatorAccounts gathers validator accounts info either from CLI or from provided local storage
-func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, error) {
+func (p *genesisParams) getValidatorAccounts(
+	premineBalances map[types.Address]*premineInfo) ([]*validator.GenesisValidator, error) {
 	// populate validators premine info
 	if len(p.validators) > 0 {
 		validators := make([]*validator.GenesisValidator, len(p.validators))
@@ -523,6 +521,7 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 				MultiAddr: parts[0],
 				Address:   addr,
 				BlsKey:    trimmedBLSKey,
+				Balance:   getPremineAmount(addr, premineBalances, big.NewInt(0)),
 				Stake:     big.NewInt(0),
 			}
 		}
@@ -540,7 +539,22 @@ func (p *genesisParams) getValidatorAccounts() ([]*validator.GenesisValidator, e
 		return nil, err
 	}
 
+	for _, v := range validators {
+		v.Balance = getPremineAmount(v.Address, premineBalances, big.NewInt(0))
+		v.Stake = big.NewInt(0)
+	}
+
 	return validators, nil
+}
+
+// getPremineAmount retrieves amount from the premine map or if not provided, returns default amount
+func getPremineAmount(addr types.Address, premineMap map[types.Address]*premineInfo,
+	defaultAmount *big.Int) *big.Int {
+	if premine, exists := premineMap[addr]; exists {
+		return premine.amount
+	}
+
+	return defaultAmount
 }
 
 func stringSliceToAddressSlice(addrs []string) []types.Address {

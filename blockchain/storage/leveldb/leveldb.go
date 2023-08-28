@@ -6,12 +6,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/hashicorp/go-hclog"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/opt"
-)
-
-const (
-	DefaultCache   = int(256)
-	DefaultHandles = int(256)
 )
 
 // Factory creates a leveldb storage
@@ -29,21 +23,9 @@ func Factory(config map[string]interface{}, logger hclog.Logger) (storage.Storag
 	return NewLevelDBStorage(pathStr, logger)
 }
 
-// NewLevelDBStorage creates the new storage reference with leveldb default options
+// NewLevelDBStorage creates the new storage reference with leveldb
 func NewLevelDBStorage(path string, logger hclog.Logger) (storage.Storage, error) {
-	// Set default options
-	options := &opt.Options{
-		OpenFilesCacheCapacity: DefaultHandles,
-		BlockCacheCapacity:     DefaultCache / 2 * opt.MiB,
-		WriteBuffer:            DefaultCache / 4 * opt.MiB, // Two of these are used internally
-	}
-
-	return NewLevelDBStorageWithOpt(path, logger, options)
-}
-
-// NewLevelDBStorageWithOpt creates the new storage reference with leveldb with custom options
-func NewLevelDBStorageWithOpt(path string, logger hclog.Logger, opts *opt.Options) (storage.Storage, error) {
-	db, err := leveldb.OpenFile(path, opts)
+	db, err := leveldb.OpenFile(path, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -80,8 +62,4 @@ func (l *levelDBKV) Get(p []byte) ([]byte, bool, error) {
 // Close closes the leveldb storage instance
 func (l *levelDBKV) Close() error {
 	return l.db.Close()
-}
-
-func (l *levelDBKV) NewBatch() storage.Batch {
-	return NewBatchLevelDB(l.db)
 }

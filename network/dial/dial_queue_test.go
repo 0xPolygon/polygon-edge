@@ -1,7 +1,6 @@
 package dial
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -11,43 +10,29 @@ import (
 
 func TestDialQueue(t *testing.T) {
 	q := NewDialQueue()
-	infos := [3]*peer.AddrInfo{}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 
-	defer cancel()
-
-	for i, x := range []string{"a", "b", "c"} {
-		infos[i] = &peer.AddrInfo{
-			ID: peer.ID(x),
-		}
-
-		if i != 1 {
-			q.AddTask(infos[i], 8)
-		} else {
-			q.AddTask(infos[i], 1)
-		}
-
-		assert.Equal(t, i+1, q.heap.Len())
+	info0 := &peer.AddrInfo{
+		ID: peer.ID("a"),
 	}
+	q.AddTask(info0, 1)
+	assert.Equal(t, 1, q.heap.Len())
 
-	q.AddTask(infos[0], 8) // existing task, same priority
-	assert.Equal(t, 3, q.heap.Len())
+	info1 := &peer.AddrInfo{
+		ID: peer.ID("b"),
+	}
+	q.AddTask(info1, 1)
+	assert.Equal(t, 2, q.heap.Len())
 
-	q.AddTask(infos[2], 1) // existing task, more priority
-	assert.Equal(t, 3, q.heap.Len())
-
-	assert.Equal(t, peer.ID("b"), q.PopTask().addrInfo.ID)
-	assert.Equal(t, peer.ID("c"), q.PopTask().addrInfo.ID)
-	assert.Equal(t, peer.ID("a"), q.PopTask().addrInfo.ID)
+	assert.Equal(t, q.popTaskImpl().addrInfo.ID, peer.ID("a"))
+	assert.Equal(t, q.popTaskImpl().addrInfo.ID, peer.ID("b"))
 	assert.Equal(t, 0, q.heap.Len())
 
-	assert.Nil(t, q.PopTask())
+	assert.Nil(t, q.popTaskImpl())
 
 	done := make(chan struct{})
 
 	go func() {
-		q.Wait(ctx) // wait for first update
-		q.Wait(ctx) // wait for second update (line 61)
+		q.PopTask()
 		done <- struct{}{}
 	}()
 
@@ -58,7 +43,7 @@ func TestDialQueue(t *testing.T) {
 	case <-time.After(1 * time.Second):
 	}
 
-	q.AddTask(infos[0], 1)
+	q.AddTask(info0, 1)
 
 	select {
 	case <-done:

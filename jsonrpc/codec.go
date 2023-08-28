@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -182,7 +181,7 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 		return EarliestBlockNumber, nil
 	}
 
-	n, err := common.ParseUint64orHex(&str)
+	n, err := types.ParseUint64orHex(&str)
 	if err != nil {
 		return 0, err
 	}

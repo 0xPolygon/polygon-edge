@@ -91,8 +91,9 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	root  Node
-	epoch uint32
+	root   Node
+	epoch  uint32
+	tracer Tracer
 }
 
 func NewTrie() *Trie {
@@ -101,6 +102,8 @@ func NewTrie() *Trie {
 
 func (t *Trie) Get(k []byte, storage Storage) ([]byte, bool) {
 	txn := t.Txn(storage)
+	txn.tracer = t.tracer
+
 	res := txn.Lookup(k)
 
 	return res, res != nil
@@ -143,11 +146,16 @@ type Putter interface {
 	Put(k, v []byte)
 }
 
+type Tracer interface {
+	Trace(node Node)
+}
+
 type Txn struct {
 	root    Node
 	epoch   uint32
 	storage Storage
 	batch   Putter
+	tracer  Tracer
 }
 
 func (t *Txn) Commit() *Trie {
@@ -160,7 +168,11 @@ func (t *Txn) Lookup(key []byte) []byte {
 	return res
 }
 
-func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
+func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
+	if t.tracer != nil {
+		t.tracer.Trace(node)
+	}
+
 	switch n := node.(type) {
 	case nil:
 		return nil, nil
@@ -457,6 +469,10 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			}
 
 			nc = aux
+		}
+
+		if t.tracer != nil {
+			t.tracer.Trace(nc)
 		}
 
 		obj, ok := nc.(*ShortNode)

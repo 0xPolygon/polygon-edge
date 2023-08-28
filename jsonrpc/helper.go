@@ -90,8 +90,10 @@ func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*ty
 		return nil, nil
 	}
 
-	if txn, _ := types.FindTxByHash(block.Transactions, txHash); txn != nil {
-		return txn, block
+	for _, txn := range block.Transactions {
+		if txn.Hash == txHash {
+			return txn, block
+		}
 	}
 
 	return nil, nil
@@ -165,15 +167,12 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonce bool) (*types.Transaction, error) {
-	if arg == nil {
-		return nil, errors.New("missing value for required argument 0")
-	}
+func DecodeTxn(arg *txnArgs, store nonceGetter) (*types.Transaction, error) {
 	// set default values
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
 		arg.Nonce = argUintPtr(0)
-	} else if arg.Nonce == nil || forceSetNonce {
+	} else if arg.Nonce == nil {
 		// get nonce from the pool
 		nonce, err := GetNextNonce(*arg.From, LatestBlockNumber, store)
 		if err != nil {
@@ -238,7 +237,7 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonc
 		txn.To = arg.To
 	}
 
-	txn.ComputeHash(blockNumber)
+	txn.ComputeHash()
 
 	return txn, nil
 }

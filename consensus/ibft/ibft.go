@@ -42,7 +42,7 @@ var (
 )
 
 type txPoolInterface interface {
-	Prepare()
+	Prepare(uint64)
 	Length() uint64
 	Peek() *types.Transaction
 	Pop(tx *types.Transaction)
@@ -343,9 +343,6 @@ func (i *backendIBFT) updateMetrics(block *types.Block) {
 
 	// Update the Number of transactions in the block metric
 	metrics.SetGauge([]string{consensusMetrics, "num_txs"}, float32(len(block.Body().Transactions)))
-
-	// Update the base fee metric
-	metrics.SetGauge([]string{consensusMetrics, "base_fee"}, float32(block.Header.BaseFee))
 }
 
 // verifyHeaderImpl verifies fields including Extra
