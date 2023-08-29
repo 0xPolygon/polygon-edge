@@ -218,31 +218,40 @@ func (e *Executor) BeginTxn(
 		PostHook:    e.PostHook,
 	}
 
-	// enable contract deployment allow list (if any)
-	if e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
+	// contract deployment access list should be enabled
+	// either if access lists super admin is defined or access lists are defined in the genesis
+	if e.config.AccessListsOwner != nil || e.config.ContractDeployerAllowList != nil {
+		txn.deploymentAllowList = addresslist.NewAddressList(
+			txn, contracts.AllowListContractsAddr)
 	}
 
-	if e.config.ContractDeployerBlockList != nil {
-		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
+	if e.config.AccessListsOwner != nil || e.config.ContractDeployerBlockList != nil {
+		txn.deploymentBlockList = addresslist.NewAddressList(
+			txn, contracts.BlockListContractsAddr)
 	}
 
-	// enable transactions allow list (if any)
-	if e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
+	// transaction access list should be enabled
+	// either if access lists super admin is defined or access lists are defined in the genesis
+	if e.config.AccessListsOwner != nil || e.config.TransactionsAllowList != nil {
+		txn.txnAllowList = addresslist.NewAddressList(
+			txn, contracts.AllowListTransactionsAddr)
 	}
 
-	if e.config.TransactionsBlockList != nil {
-		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
+	if e.config.AccessListsOwner != nil || e.config.TransactionsBlockList != nil {
+		txn.txnBlockList = addresslist.NewAddressList(
+			txn, contracts.BlockListTransactionsAddr)
 	}
 
-	// enable transactions allow list (if any)
-	if e.config.BridgeAllowList != nil {
-		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
+	// bridge access list should be enabled
+	// either if access lists super admin is defined or access lists are defined in the genesis
+	if e.config.AccessListsOwner != nil || e.config.BridgeAllowList != nil {
+		txn.bridgeAllowList = addresslist.NewAddressList(
+			txn, contracts.AllowListBridgeAddr)
 	}
 
-	if e.config.BridgeBlockList != nil {
-		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
+	if e.config.AccessListsOwner != nil || e.config.BridgeBlockList != nil {
+		txn.bridgeBlockList = addresslist.NewAddressList(
+			txn, contracts.BlockListBridgeAddr)
 	}
 
 	return txn, nil
@@ -688,7 +697,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 
 	// check txns access lists, allow list takes precedence over block list
-	if t.txnAllowList != nil {
+	if t.txnAllowList != nil && t.txnAllowList.IsEnabled() {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnAllowList.GetRole(contract.Caller)
 			if !role.Enabled() {
@@ -704,7 +713,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
-	} else if t.txnBlockList != nil {
+	} else if t.txnBlockList != nil && t.txnBlockList.IsEnabled() {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnBlockList.GetRole(contract.Caller)
 			if role == addresslist.EnabledRole {
@@ -856,7 +865,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}()
 
 	// check if contract creation allow list is enabled
-	if t.deploymentAllowList != nil {
+	if t.deploymentAllowList != nil && t.deploymentAllowList.IsEnabled() {
 		role := t.deploymentAllowList.GetRole(c.Caller)
 
 		if !role.Enabled() {
@@ -871,7 +880,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				Err:     runtime.ErrNotAuth,
 			}
 		}
-	} else if t.deploymentBlockList != nil {
+	} else if t.deploymentBlockList != nil && t.deploymentBlockList.IsEnabled() {
 		role := t.deploymentBlockList.GetRole(c.Caller)
 
 		if role == addresslist.EnabledRole {

@@ -35,7 +35,7 @@ type Config struct {
 	Relayer               bool   `json:"relayer" yaml:"relayer"`
 	NumBlockConfirmations uint64 `json:"num_block_confirmations" yaml:"num_block_confirmations"`
 
-	RequestsPerSecondDebug uint64 `json:"requests_per_second_debug" yaml:"requests_per_second_debug"`
+	ConcurrentRequestsDebug uint64 `json:"concurrent_requests_debug" yaml:"concurrent_requests_debug"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -82,8 +82,8 @@ const (
 	// on ethereum epoch lasts for 32 blocks. more details: https://www.alchemy.com/overviews/ethereum-commitment-levels
 	DefaultNumBlockConfirmations uint64 = 64
 
-	// Maximum number of allowed requests per second for debug endpoints
-	DefaultRequestsPerSecondDebug uint64 = 5
+	// Maximum number of allowed concurrent requests for debug endpoints
+	DefaultConcurrentRequestsDebug uint64 = 32
 )
 
 // DefaultConfig returns the default server configuration
@@ -121,7 +121,7 @@ func DefaultConfig() *Config {
 		JSONRPCBlockRangeLimit:   DefaultJSONRPCBlockRangeLimit,
 		Relayer:                  false,
 		NumBlockConfirmations:    DefaultNumBlockConfirmations,
-		RequestsPerSecondDebug:   DefaultRequestsPerSecondDebug,
+		ConcurrentRequestsDebug:  DefaultConcurrentRequestsDebug,
 	}
 }
 

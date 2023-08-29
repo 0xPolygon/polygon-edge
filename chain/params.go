@@ -21,6 +21,7 @@ type Params struct {
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
 	// Access control configuration
+	AccessListsOwner          *types.Address     `json:"accessListsOwner,omitempty"`
 	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
 	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
 	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
@@ -89,8 +90,8 @@ const (
 	EIP155              = "EIP155"
 	QuorumCalcAlignment = "quorumcalcalignment"
 	TxHashWithType      = "txHashWithType"
-	DoubleSignSlashing  = "doubleSignSlashing"
 	Governance          = "governance"
+	DoubleSignSlashing  = "doubleSignSlashing"
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis

@@ -137,6 +137,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 				return ethgo.ZeroHash, fmt.Errorf("failed to get max priority fee per gas: %w", err)
 			}
 
+			// set retrieved max priority fee per gas increased by certain percentage
 			compMaxPriorityFee := new(big.Int).Mul(maxPriorityFee, big.NewInt(feeIncreasePercentage))
 			compMaxPriorityFee = compMaxPriorityFee.Div(compMaxPriorityFee, big.NewInt(100))
 			txn.MaxPriorityFeePerGas = new(big.Int).Add(maxPriorityFee, compMaxPriorityFee)
@@ -151,9 +152,11 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 
 			baseFee := feeHist.BaseFee[len(feeHist.BaseFee)-1]
 			// set max fee per gas as sum of base fee and max priority fee
+			// (increased by certain percentage)
 			maxFeePerGas := new(big.Int).Add(baseFee, maxPriorityFee)
 			compMaxFeePerGas := new(big.Int).Mul(maxFeePerGas, big.NewInt(feeIncreasePercentage))
-			txn.MaxFeePerGas = new(big.Int).Add(compMaxFeePerGas, maxFeePerGas)
+			compMaxFeePerGas = compMaxFeePerGas.Div(compMaxFeePerGas, big.NewInt(100))
+			txn.MaxFeePerGas = new(big.Int).Add(maxFeePerGas, compMaxFeePerGas)
 		}
 	} else if txn.GasPrice == 0 {
 		gasPrice, err := t.Client().Eth().GasPrice()

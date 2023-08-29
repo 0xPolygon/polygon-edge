@@ -594,6 +594,10 @@ func (m *mockBlockStore) TxPoolSubscribe(request *proto.SubscribeRequest) (<-cha
 	return nil, nil, nil
 }
 
+func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
+	return &Account{Nonce: 0}, nil
+}
+
 func newTestBlock(number uint64, hash types.Hash) *types.Block {
 	return &types.Block{
 		Header: &types.Header{

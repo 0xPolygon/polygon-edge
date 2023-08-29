@@ -825,7 +825,7 @@ func TestDecodeTxn(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			tx, err := DecodeTxn(test.arg, 1, test.store)
+			tx, err := DecodeTxn(test.arg, 1, test.store, false)
 
 			// DecodeTxn computes hash of tx
 			if !test.err {

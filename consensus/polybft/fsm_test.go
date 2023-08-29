@@ -552,52 +552,6 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 	})
 }
 
-func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
-	fsm := &fsm{
-		parent:        &types.Header{Number: 1},
-		doubleSigners: []types.Address{types.StringToAddress("0x1"), types.StringToAddress("0x2")},
-		logger:        hclog.NewNullLogger(),
-	}
-
-	// slashing transaction is not expected since the fork isn't activated yet
-	slashingTx1, err := fsm.createSlashingTx()
-	require.NoError(t, err)
-	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
-	assert.ErrorIs(t, err, errSlashingTxNotExpected)
-
-	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, nil)
-	_ = forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0)
-
-	// no slashing transaction, but it was expected
-	err = fsm.VerifyStateTransactions([]*types.Transaction{})
-	assert.ErrorIs(t, err, errSlashingTxDoesNotExist)
-
-	// multiple slashing transactions
-	slashingTx1, err = fsm.createSlashingTx()
-	require.NoError(t, err)
-	slashingTx2, err := fsm.createSlashingTx()
-	require.NoError(t, err)
-
-	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1, slashingTx2})
-	assert.ErrorIs(t, err, errSlashingTxSingleExpected)
-
-	// slashing transaction that doesn't match the expected one
-	var differentDoubleSigners slashing.DoubleSigners = []types.Address{types.StringToAddress("0x3"), types.StringToAddress("0x4")}
-	inputData, err := differentDoubleSigners.EncodeAbi()
-	require.NoError(t, err)
-
-	slashingTx3 := createStateTransactionWithData(fsm.Height(), contracts.ValidatorSetContract, inputData)
-	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx3})
-	assert.ErrorContains(t, err, "invalid slashing transaction")
-
-	// slashing transaction found, but it wasn't expected
-	fsm.doubleSigners = slashing.DoubleSigners{}
-	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
-	assert.ErrorIs(t, err, errSlashingTxNotExpected)
-
-	_ = forkmanager.GetInstance().DeactivateFork(chain.DoubleSignSlashing)
-}
-
 func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 	t.Parallel()
 
@@ -670,6 +624,52 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
 		require.ErrorContains(t, err, errDistributeRewardsTxDoesNotExist.Error())
 	})
+}
+
+func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
+	fsm := &fsm{
+		parent:        &types.Header{Number: 1},
+		doubleSigners: []types.Address{types.StringToAddress("0x1"), types.StringToAddress("0x2")},
+		logger:        hclog.NewNullLogger(),
+	}
+
+	// slashing transaction is not expected since the fork isn't activated yet
+	slashingTx1, err := fsm.createSlashingTx()
+	require.NoError(t, err)
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
+	assert.ErrorIs(t, err, errSlashingTxNotExpected)
+
+	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, nil)
+	_ = forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0)
+
+	// no slashing transaction, but it was expected
+	err = fsm.VerifyStateTransactions([]*types.Transaction{})
+	assert.ErrorIs(t, err, errSlashingTxDoesNotExist)
+
+	// multiple slashing transactions
+	slashingTx1, err = fsm.createSlashingTx()
+	require.NoError(t, err)
+	slashingTx2, err := fsm.createSlashingTx()
+	require.NoError(t, err)
+
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1, slashingTx2})
+	assert.ErrorIs(t, err, errSlashingTxSingleExpected)
+
+	// slashing transaction that doesn't match the expected one
+	var differentDoubleSigners slashing.DoubleSigners = []types.Address{types.StringToAddress("0x3"), types.StringToAddress("0x4")}
+	inputData, err := differentDoubleSigners.EncodeAbi()
+	require.NoError(t, err)
+
+	slashingTx3 := createStateTransactionWithData(fsm.Height(), contracts.ValidatorSetContract, inputData)
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx3})
+	assert.ErrorContains(t, err, "invalid slashing transaction")
+
+	// slashing transaction found, but it wasn't expected
+	fsm.doubleSigners = slashing.DoubleSigners{}
+	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
+	assert.ErrorIs(t, err, errSlashingTxNotExpected)
+
+	_ = forkmanager.GetInstance().DeactivateFork(chain.DoubleSignSlashing)
 }
 
 func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
