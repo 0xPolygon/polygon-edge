@@ -1395,8 +1395,8 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	// Check if this is the first London hardfork block.
 	// Should return chain.GenesisBaseFee ins this case.
 	if parent.BaseFee == 0 {
-		if b.config.Genesis.BaseFee > 0 {
-			return b.config.Genesis.BaseFee
+		if b.config.Chain.Genesis.BaseFee > 0 {
+			return b.config.Chain.Genesis.BaseFee
 		}
 
 		return chain.GenesisBaseFee
