@@ -1,6 +1,7 @@
 package txpool
 
 import (
+	"math/big"
 	"sync"
 	"sync/atomic"
 
@@ -44,7 +45,7 @@ func (m *accountsMap) exists(addr types.Address) bool {
 
 // getPrimaries collects the heads (first-in-line transaction)
 // from each of the promoted queues.
-func (m *accountsMap) getPrimaries() (primaries []*types.Transaction) {
+func (m *accountsMap) getPrimaries(baseFee uint64) (primaries []*types.Transaction) {
 	m.Range(func(key, value interface{}) bool {
 		addressKey, ok := key.(types.Address)
 		if !ok {
@@ -57,7 +58,7 @@ func (m *accountsMap) getPrimaries() (primaries []*types.Transaction) {
 		defer account.promoted.unlock()
 
 		// add head of the queue
-		if tx := account.promoted.peek(); tx != nil {
+		if tx := account.promoted.peek(); tx != nil && tx.GetGasFeeCap().Cmp(new(big.Int).SetUint64(baseFee)) >= 0 {
 			primaries = append(primaries, tx)
 		}
 

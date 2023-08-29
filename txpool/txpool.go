@@ -335,18 +335,10 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 // ready for execution. (primaries)
 func (p *TxPool) Prepare() {
 	// fetch primary from each account
-	primaries := p.accounts.getPrimaries()
-
-	var eligiblePrimaries []*types.Transaction
-
-	for _, tx := range primaries {
-		if tx.GetGasFeeCap().Cmp(new(big.Int).SetUint64(p.GetBaseFee())) >= 0 {
-			eligiblePrimaries = append(eligiblePrimaries, tx)
-		}
-	}
+	primaries := p.accounts.getPrimaries(p.GetBaseFee())
 
 	// create new executables queue with base fee and initial transactions (primaries)
-	p.executables = newPricesQueue(p.GetBaseFee(), eligiblePrimaries)
+	p.executables = newPricesQueue(p.GetBaseFee(), primaries)
 }
 
 // Peek returns the best-price selected
@@ -393,7 +385,7 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 	p.updatePending(-1)
 
 	// update executables
-	if tx := account.promoted.peek(); tx != nil {
+	if tx := account.promoted.peek(); tx != nil && tx.GetGasFeeCap().Cmp(new(big.Int).SetUint64(p.GetBaseFee())) >= 0 {
 		p.executables.push(tx)
 	}
 }
