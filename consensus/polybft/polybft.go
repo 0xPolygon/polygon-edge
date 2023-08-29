@@ -152,7 +152,11 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		proxyAddr := contracts.GetProxyImplementationMapping()
 
-		if burnContractAddress, ok := getBurnContractAddress(config, polyBFTConfig); ok {
+		var burnContractAddress types.Address
+
+		var isBurnContractSet bool
+
+		if burnContractAddress, isBurnContractSet = getBurnContractAddress(config, polyBFTConfig); isBurnContractSet {
 			proxyAddr[contracts.DefaultBurnContract] = burnContractAddress
 		}
 
@@ -160,10 +164,9 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			proxyAddr[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
 		}
 
-		if err = setUpProxies(transition, types.StringToAddress("0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"),
-			proxyAddr); err != nil {
+		if err = setUpProxies(transition, config.Params.ProxyContractsAdmin, proxyAddr); err != nil {
 			return err
-		} // add address from config
+		}
 
 		// initialize NetworkParams SC
 		if err = initNetworkParamsContract(polyBFTConfig, transition); err != nil {
@@ -416,7 +419,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize EIP1559Burn SC
-			if burnContractAddress, ok := getBurnContractAddress(config, polyBFTConfig); ok {
+			if isBurnContractSet {
 				burnParams := &contractsapi.InitializeEIP1559BurnFn{
 					NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
 					NewBurnDestination:     config.Params.BurnContractDestinationAddress,
@@ -810,8 +813,7 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 	return p.runtime
 }
 
-// GetBridgeProvider is an implementation of Consensus interface
-// Filters extra data to not contain Committed field
+// FilterExtra is an implementation of Consensus interface
 func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
 }

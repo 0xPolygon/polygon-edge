@@ -46,6 +46,7 @@ const (
 	voteProposalThresholdFlag = "vote-proposal-threshold"
 	governorAdminFlag         = "governor-admin"
 	proposalQuorumFlag        = "proposal-quorum"
+	proxyContractsAdminFlag   = "proxy-contracts-admin"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -150,6 +151,8 @@ type genesisParams struct {
 	proposalThreshold string
 	proposalQuorum    uint64
 	governorAdmin     string
+
+	proxyContractsAdmin string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -187,6 +190,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateGovernorAdminAddr(); err != nil {
+			return err
+		}
+
+		if err := p.validateProxyContractsAdmin(); err != nil {
 			return err
 		}
 	}
@@ -563,6 +570,19 @@ func (p *genesisParams) validateBurnContract() error {
 				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
 			}
 		}
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateProxyContractsAdmin() error {
+	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
+		return errors.New("proxy contracts admin address must be set")
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
 	}
 
 	return nil

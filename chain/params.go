@@ -33,6 +33,10 @@ type Params struct {
 	BurnContract map[uint64]types.Address `json:"burnContract"`
 	// Destination address to initialize default burn contract with
 	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
+
+	// ProxyContractsAdmin is the address that will have the privilege to change both the proxy
+	// implementation address and the admin
+	ProxyContractsAdmin types.Address `json:"proxyContractsAdmin,omitempty"`
 }
 
 type AddressListConfig struct {

@@ -129,6 +129,8 @@ type TestClusterConfig struct {
 	VotingPeriod uint64
 	VotingDelay  uint64
 
+	ProxyContractsAdmin string
+
 	logsDirOnce sync.Once
 }
 
@@ -396,6 +398,12 @@ func WithGovernanceVotingDelay(votingDelay uint64) ClusterOption {
 	}
 }
 
+func WithProxyContractsAdmin(address string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ProxyContractsAdmin = address
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -601,6 +609,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge-block-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
 		}
+
+		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
+		if proxyAdminAddr == "" {
+			proxyAdminAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+		}
+		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 
 		// run genesis command with all the arguments
 		err = cluster.cmdRun(args...)

@@ -370,6 +370,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
 	}
 
+	chainConfig.Params.ProxyContractsAdmin = types.StringToAddress(p.proxyContractsAdmin)
+
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
 
@@ -378,8 +380,10 @@ func (p *genesisParams) deployContracts(
 	polybftConfig *polyCommon.PolyBFTConfig,
 	chainConfig *chain.Chain,
 	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
-	var proxyAddresses []types.Address
-	for proxyAddr := range contracts.GetProxyImplementationMapping() {
+	proxyToImplAddrMap := contracts.GetProxyImplementationMapping()
+	proxyAddresses := make([]types.Address, 0, len(proxyToImplAddrMap))
+
+	for proxyAddr := range proxyToImplAddrMap {
 		proxyAddresses = append(proxyAddresses, proxyAddr)
 	}
 
@@ -392,17 +396,17 @@ func (p *genesisParams) deployContracts(
 		{
 			// ChildERC20 token contract
 			artifact: contractsapi.ChildERC20,
-			address:  contracts.ChildERC20ContractV1,
+			address:  contracts.ChildERC20Contract,
 		},
 		{
 			// ChildERC721 token contract
 			artifact: contractsapi.ChildERC721,
-			address:  contracts.ChildERC721ContractV1,
+			address:  contracts.ChildERC721Contract,
 		},
 		{
 			// ChildERC1155 contract
 			artifact: contractsapi.ChildERC1155,
-			address:  contracts.ChildERC1155ContractV1,
+			address:  contracts.ChildERC1155Contract,
 		},
 		{
 			// BLS contract
@@ -562,7 +566,7 @@ func (p *genesisParams) deployContracts(
 		proxyAddresses = append(proxyAddresses, contracts.RewardTokenContract)
 	}
 
-	genesisContracts = append(genesisContracts, deployProxyContracts(proxyAddresses)...)
+	genesisContracts = append(genesisContracts, getProxyContractsInfo(proxyAddresses)...)
 
 	for _, contract := range genesisContracts {
 		allocations[contract.address] = &chain.GenesisAccount{
@@ -635,15 +639,15 @@ func stringSliceToAddressSlice(addrs []string) []types.Address {
 	return res
 }
 
-func deployProxyContracts(inputs []types.Address) []*contractInfo {
-	res := make([]*contractInfo, len(inputs))
+func getProxyContractsInfo(addresses []types.Address) []*contractInfo {
+	result := make([]*contractInfo, len(addresses))
 
-	for i, proxyAddress := range inputs {
-		res[i] = &contractInfo{
+	for i, proxyAddress := range addresses {
+		result[i] = &contractInfo{
 			artifact: contractsapi.GenesisProxy,
 			address:  proxyAddress,
 		}
 	}
 
-	return res
+	return result
 }

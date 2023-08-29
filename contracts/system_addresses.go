@@ -40,26 +40,20 @@ var (
 	// L2StateSenderContractV1 is an address of bridge contract to the rootchain
 	L2StateSenderContractV1 = types.StringToAddress("0x10021")
 
-	// ChildERC20Contract is an address of bridgable ERC20 proxy token contract on the child chain
+	// ChildERC20Contract is an address of bridgable ERC20 token contract on the child chain
 	ChildERC20Contract = types.StringToAddress("0x1003")
-	// ChildERC20ContractV1 is an address of bridgable ERC20 token contract on the child chain
-	ChildERC20ContractV1 = types.StringToAddress("0x10031")
 	// ChildERC20PredicateContract is an address of child ERC20 proxy predicate contract on the child chain
 	ChildERC20PredicateContract = types.StringToAddress("0x1004")
 	// ChildERC20PredicateContractV1 is an address of child ERC20 predicate contract on the child chain
 	ChildERC20PredicateContractV1 = types.StringToAddress("0x10041")
-	// ChildERC721Contract is an address of bridgable ERC721 proxy token contract on the child chain
+	// ChildERC721Contract is an address of bridgable ERC721 token contract on the child chain
 	ChildERC721Contract = types.StringToAddress("0x1005")
-	// ChildERC721ContractV1 is an address of bridgable ERC721 token contract on the child chain
-	ChildERC721ContractV1 = types.StringToAddress("0x10051")
 	// ChildERC721PredicateContract is an address of child ERC721 proxy predicate contract on the child chain
 	ChildERC721PredicateContract = types.StringToAddress("0x1006")
 	// ChildERC721PredicateContractV1 is an address of child ERC721 predicate contract on the child chain
 	ChildERC721PredicateContractV1 = types.StringToAddress("0x10061")
-	// ChildERC1155Contract is an address of bridgable ERC1155 proxy token contract on the child chain
+	// ChildERC1155Contract is an address of bridgable ERC1155 token contract on the child chain
 	ChildERC1155Contract = types.StringToAddress("0x1007")
-	// ChildERC1155ContractV1 is an address of bridgable ERC1155 token contract on the child chain
-	ChildERC1155ContractV1 = types.StringToAddress("0x10071")
 	// ChildERC1155PredicateContract is an address of child ERC1155 proxy predicate contract on the child chain
 	ChildERC1155PredicateContract = types.StringToAddress("0x1008")
 	// ChildERC1155PredicateContractV1 is an address of child ERC1155 predicate contract on the child chain
@@ -122,9 +116,6 @@ var (
 func GetProxyImplementationMapping() map[types.Address]types.Address {
 	return map[types.Address]types.Address{
 		StateReceiverContract:                StateReceiverContractV1,
-		ChildERC20Contract:                   ChildERC20ContractV1,
-		ChildERC721Contract:                  ChildERC721ContractV1,
-		ChildERC1155Contract:                 ChildERC1155ContractV1,
 		BLSContract:                          BLSContractV1,
 		MerkleContract:                       MerkleContractV1,
 		L2StateSenderContract:                L2StateSenderContractV1,
