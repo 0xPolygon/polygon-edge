@@ -59,6 +59,8 @@ type dispatcherParams struct {
 	priceLimit              uint64
 	jsonRPCBatchLengthLimit uint64
 	blockRangeLimit         uint64
+
+	concurrentRequestsDebug uint64
 }
 
 func (dp dispatcherParams) isExceedingBatchLengthLimit(value uint64) bool {
@@ -109,9 +111,7 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) error {
 	d.endpoints.Bridge = &Bridge{
 		store,
 	}
-	d.endpoints.Debug = &Debug{
-		store,
-	}
+	d.endpoints.Debug = NewDebug(store, d.params.concurrentRequestsDebug)
 
 	var err error
 
@@ -209,6 +209,8 @@ func (d *Dispatcher) handleSubscribe(req Request, conn wsConn) (string, Error) {
 			return "", NewInternalError(err.Error())
 		}
 		filterID = d.filterManager.NewLogFilter(logQuery, conn)
+	} else if subscribeMethod == "newPendingTransactions" {
+		filterID = d.filterManager.NewPendingTxFilter(conn)
 	} else {
 		return "", NewSubscriptionNotFoundError(subscribeMethod)
 	}

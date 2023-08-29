@@ -8,8 +8,10 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
+	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -94,7 +96,7 @@ func run(cmd *cobra.Command, _ []string) {
 	for i, tokenIDRaw := range wp.TokenIDs {
 		tokenIDRaw := tokenIDRaw
 
-		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
+		tokenID, err := helperCommon.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided token id %s: %w", tokenIDRaw, err))
 
@@ -164,8 +166,6 @@ func createWithdrawTxn(receivers []ethgo.Address, tokenIDs []*big.Int) (*ethgo.T
 
 	addr := ethgo.Address(types.StringToAddress(wp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.ZeroAddress, &addr, input,
+		nil, wp.ChildChainMintable), nil
 }

@@ -177,7 +177,7 @@ func PredeployStakingSC(
 
 	// Parse the default staked balance value into *big.Int
 	val := DefaultStakedBalance
-	bigDefaultStakedBalance, err := types.ParseUint256orHex(&val)
+	bigDefaultStakedBalance, err := common.ParseUint256orHex(&val)
 
 	if err != nil {
 		return nil, fmt.Errorf("unable to generate DefaultStatkedBalance, %w", err)

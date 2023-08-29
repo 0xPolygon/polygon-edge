@@ -57,6 +57,7 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrInvalidTxType           = errors.New("invalid tx type")
+	ErrTxTypeNotSupported      = types.ErrTxTypeNotSupported
 	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
 	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
@@ -144,7 +145,7 @@ type promoteRequest struct {
 type TxPool struct {
 	logger hclog.Logger
 	signer signer
-	forks  chain.ForksInTime
+	forks  *chain.Forks
 	store  store
 
 	// map of all accounts registered by the pool
@@ -199,7 +200,7 @@ type TxPool struct {
 // NewTxPool returns a new pool for processing incoming transactions.
 func NewTxPool(
 	logger hclog.Logger,
-	forks chain.ForksInTime,
+	forks *chain.Forks,
 	store store,
 	grpcServer *grpc.Server,
 	network *network.Server,
@@ -592,26 +593,31 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		tx.From = from
 	}
 
+	// Grab current block number
+	currentHeader := p.store.Header()
+	currentBlockNumber := currentHeader.Number
+
+	// Get forks state for the current block
+	forks := p.forks.At(currentBlockNumber)
+
 	// Check if transaction can deploy smart contract
-	if tx.IsContractCreation() && p.forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
+	if tx.IsContractCreation() && forks.EIP158 && len(tx.Input) > state.TxPoolMaxInitCodeSize {
 		metrics.IncrCounter([]string{txPoolMetrics, "contract_deploy_too_large_txs"}, 1)
 
 		return runtime.ErrMaxCodeSizeExceeded
 	}
 
-	// Grab the state root, current block number and block gas limit for the latest block
-	currentHeader := p.store.Header()
+	// Grab the state root, and block gas limit for the latest block
 	stateRoot := currentHeader.StateRoot
-	currentBlockNumber := currentHeader.Number
 	latestBlockGasLimit := currentHeader.GasLimit
 	baseFee := p.GetBaseFee() // base fee is calculated for the next block
 
 	if tx.Type == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
-		if !p.forks.London {
-			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
+		if !forks.London {
+			metrics.IncrCounter([]string{txPoolMetrics, "tx_type"}, 1)
 
-			return ErrInvalidTxType
+			return ErrTxTypeNotSupported
 		}
 
 		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
@@ -653,13 +659,13 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 
 			return ErrUnderpriced
 		}
-	} else {
-		// Legacy approach to check if the given tx is not underpriced
-		if tx.GetGasPrice(baseFee).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
-			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+	}
 
-			return ErrUnderpriced
-		}
+	// Check if the given tx is not underpriced
+	if tx.GetGasPrice(baseFee).Cmp(new(big.Int).SetUint64(p.priceLimit)) < 0 {
+		metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+
+		return ErrUnderpriced
 	}
 
 	// Check nonce ordering
@@ -684,7 +690,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	}
 
 	// Make sure the transaction has more gas than the basic transaction fee
-	intrinsicGas, err := state.TransactionGasCost(tx, p.forks.Homestead, p.forks.Istanbul)
+	intrinsicGas, err := state.TransactionGasCost(tx, forks.Homestead, forks.Istanbul)
 	if err != nil {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_intrinsic_gas_tx"}, 1)
 
@@ -802,14 +808,15 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
-		} else if oldTxWithSameNonce.GasPrice.Cmp(tx.GasPrice) >= 0 {
+		} else if oldTxWithSameNonce.GetGasPrice(p.baseFee).Cmp(
+			tx.GetGasPrice(p.baseFee)) >= 0 {
 			// if tx with same nonce does exist and has same or better gas price -> return error
 			return ErrUnderpriced
 		}
 
 		slotsFree += slotsRequired(oldTxWithSameNonce) // add old tx slots
 	} else {
-		if account.enqueued.length() == account.maxEnqueued {
+		if account.enqueued.length() == account.maxEnqueued && tx.Nonce != accountNonce {
 			return ErrMaxEnqueuedLimitReached
 		}
 

@@ -105,14 +105,16 @@ func (t *Transaction) Copy() *Transaction {
 		tt.Value.Set(t.Value)
 	}
 
+	if t.V != nil {
+		tt.V = new(big.Int).Set(t.V)
+	}
+
 	if t.R != nil {
-		tt.R = new(big.Int)
-		tt.R = big.NewInt(0).SetBits(t.R.Bits())
+		tt.R = new(big.Int).Set(t.R)
 	}
 
 	if t.S != nil {
-		tt.S = new(big.Int)
-		tt.S = big.NewInt(0).SetBits(t.S.Bits())
+		tt.S = new(big.Int).Set(t.S)
 	}
 
 	tt.Input = make([]byte, len(t.Input))
@@ -142,7 +144,7 @@ func (t *Transaction) Cost() *big.Int {
 //
 // Here is the logic:
 //   - use existing gas price if exists
-//   - or calculate a value with formula: min(gasFeeCap, gasTipCap * baseFee);
+//   - or calculate a value with formula: min(gasFeeCap, gasTipCap + baseFee);
 func (t *Transaction) GetGasPrice(baseFee uint64) *big.Int {
 	if t.GasPrice != nil && t.GasPrice.BitLen() > 0 {
 		return new(big.Int).Set(t.GasPrice)

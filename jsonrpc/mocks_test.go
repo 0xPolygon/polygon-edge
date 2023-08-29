@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -44,11 +45,12 @@ type mockEvent struct {
 type mockStore struct {
 	JSONRPCStore
 
-	header       *types.Header
-	subscription *blockchain.MockSubscription
-	receiptsLock sync.Mutex
-	receipts     map[types.Hash][]*types.Receipt
-	accounts     map[types.Address]*Account
+	header        *types.Header
+	subscription  *blockchain.MockSubscription
+	txPoolChannel chan *proto.TxPoolEvent
+	receiptsLock  sync.Mutex
+	receipts      map[types.Hash][]*types.Receipt
+	accounts      map[types.Address]*Account
 
 	// headers is the list of historical headers
 	historicalHeaders []*types.Header
@@ -56,9 +58,10 @@ type mockStore struct {
 
 func newMockStore() *mockStore {
 	m := &mockStore{
-		header:       &types.Header{Number: 0},
-		subscription: blockchain.NewMockSubscription(),
-		accounts:     map[types.Address]*Account{},
+		header:        &types.Header{Number: 0},
+		subscription:  blockchain.NewMockSubscription(),
+		accounts:      map[types.Address]*Account{},
+		txPoolChannel: make(chan *proto.TxPoolEvent),
 	}
 	m.addHeader(m.header)
 
@@ -108,6 +111,15 @@ func (m *mockStore) emitEvent(evnt *mockEvent) {
 	m.subscription.Push(bEvnt)
 }
 
+func (m *mockStore) emitTxPoolEvent(eventType proto.EventType, txHash string) {
+	evt := &proto.TxPoolEvent{
+		Type:   eventType,
+		TxHash: txHash,
+	}
+
+	m.txPoolChannel <- evt
+}
+
 func (m *mockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
 	if acc, ok := m.accounts[addr]; ok {
 		return acc, nil
@@ -135,6 +147,14 @@ func (m *mockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
 func (m *mockStore) SubscribeEvents() blockchain.Subscription {
 	return m.subscription
+}
+
+func (m *mockStore) TxPoolSubscribe(request *proto.SubscribeRequest) (<-chan *proto.TxPoolEvent, func(), error) {
+	txPoolUnsubscribe := func() {
+		close(m.txPoolChannel)
+	}
+
+	return m.txPoolChannel, txPoolUnsubscribe, nil
 }
 
 func (m *mockStore) GetHeaderByNumber(num uint64) (*types.Header, bool) {

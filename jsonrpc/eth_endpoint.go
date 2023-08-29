@@ -180,7 +180,7 @@ func (e *Eth) GetBlockTransactionCountByNumber(number BlockNumber) (interface{},
 		return nil, nil
 	}
 
-	return *types.EncodeUint64(uint64(len(block.Transactions))), nil
+	return *common.EncodeUint64(uint64(len(block.Transactions))), nil
 }
 
 // BlockNumber returns current block number
@@ -236,6 +236,8 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 		// Find the transaction within the block
 		if txn, idx := types.FindTxByHash(block.Transactions, hash); txn != nil {
+			txn.GasPrice = txn.GetGasPrice(block.Header.BaseFee)
+
 			return toTransaction(
 				txn,
 				argUintPtr(block.Number()),
@@ -442,7 +444,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 
-	transaction, err := DecodeTxn(arg, header.Number, e.store)
+	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
 	if err != nil {
 		return nil, err
 	}
@@ -490,7 +492,8 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		return nil, err
 	}
 
-	transaction, err := DecodeTxn(arg, header.Number, e.store)
+	// testTransaction should execute tx with nonce always set to the current expected nonce for the account
+	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
 	if err != nil {
 		return nil, err
 	}
@@ -587,8 +590,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Checks if EVM level valid gas errors occurred
 	isGasEVMError := func(err error) bool {
-		return errors.Is(err, runtime.ErrOutOfGas) ||
-			errors.Is(err, runtime.ErrCodeStoreOutOfGas)
+		return errors.Is(err, runtime.ErrOutOfGas) || errors.Is(err, runtime.ErrCodeStoreOutOfGas)
 	}
 
 	// Checks if the EVM reverted during execution
@@ -599,11 +601,9 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	// Run the transaction with the specified gas value.
 	// Returns a status indicating if the transaction failed and the accompanying error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
-		// Create a dummy transaction with the new gas
-		txn := transaction.Copy()
-		txn.Gas = gas
+		transaction.Gas = gas
 
-		result, applyErr := e.store.ApplyTxn(header, txn, nil)
+		result, applyErr := e.store.ApplyTxn(header, transaction, nil)
 
 		if applyErr != nil {
 			// Check the application error.
@@ -641,11 +641,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Start the binary search for the lowest possible gas price
 	for lowEnd < highEnd {
-		mid := (lowEnd + highEnd) / 2
+		mid := lowEnd + ((highEnd - lowEnd) >> 1) // (lowEnd + highEnd) / 2 can overflow
 
 		failed, testErr := testTransaction(mid, true)
-		if testErr != nil &&
-			!isEVMRevertError(testErr) {
+		if testErr != nil && !isEVMRevertError(testErr) {
 			// Reverts are ignored in the binary search, but are checked later on
 			// during the execution for the optimal gas limit found
 			return 0, testErr

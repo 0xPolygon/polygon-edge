@@ -12,6 +12,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -120,6 +121,12 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			BlockID:     11,
 			StakeValue:  70,
 		},
+		{
+			EpochID:     7,
+			ValidatorID: 1,
+			BlockID:     2,
+			StakeValue:  10,
+		},
 	}
 
 	for _, seed := range seeds {
@@ -149,6 +156,12 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 
 		validatorSetAddr := types.StringToAddress("0x0001")
 
+		bcMock := new(blockchainMock)
+		for i := 0; i < int(data.BlockID); i++ {
+			bcMock.On("GetHeaderByNumber", mock.Anything).Return(&types.Header{Hash: types.Hash{6, 4}}, true).Once()
+			bcMock.On("GetReceiptsByHash", mock.Anything).Return([]*types.Receipt{{}}, error(nil)).Once()
+		}
+
 		stakeManager := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
@@ -156,7 +169,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			validatorSetAddr,
 			types.StringToAddress("0x0002"),
-			nil,
+			bcMock,
 			5,
 		)
 

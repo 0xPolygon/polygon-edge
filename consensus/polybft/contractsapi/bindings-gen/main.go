@@ -5,21 +5,27 @@ import (
 	"errors"
 	"fmt"
 	"go/format"
-	"io/ioutil"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
 
+	"github.com/umbracle/ethgo/abi"
+
 	gensc "github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
-	"github.com/umbracle/ethgo/abi"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const (
 	abiTypeNameFormat  = "var %sABIType = abi.MustNewType(\"%s\")"
 	eventNameFormat    = "%sEvent"
 	functionNameFormat = "%sFn"
+)
+
+var (
+	signatureFunctionFormat = regexp.MustCompile(`^(.*)\((.*)\)$`)
 )
 
 type generatedData struct {
@@ -104,7 +110,7 @@ func main() {
 			gensc.ChildERC20PredicateACL,
 			false,
 			[]string{
-				"initialize",
+				"initialize(address,address,address,address,address,bool,bool,address)",
 				"withdrawTo",
 			},
 			[]string{},
@@ -414,8 +420,18 @@ func main() {
 			}
 		}
 
-		for _, method := range c.functions {
-			if err := generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method]); err != nil {
+		for _, methodRaw := range c.functions {
+			// There could be two objects with the same name in the generated JSON ABI (hardhat bug).
+			// This case can be fixed by specifying a function signature instead of just name
+			// e.g. "myFunc(address,bool,uint256)" instead of just "myFunc"
+			var method *abi.Method
+			if signatureFunctionFormat.MatchString(methodRaw) {
+				method = c.artifact.Abi.GetMethodBySignature(methodRaw)
+			} else {
+				method = c.artifact.Abi.GetMethod(methodRaw)
+			}
+
+			if err := generateFunction(generatedData, c.contractName, method); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -447,7 +463,7 @@ import (
 		log.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
+	if err = common.SaveFileSafe("./consensus/polybft/contractsapi/contractsapi.go", output, 0600); err != nil {
 		log.Fatal(err)
 	}
 }

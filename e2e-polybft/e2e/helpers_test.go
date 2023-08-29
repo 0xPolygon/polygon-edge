@@ -169,7 +169,7 @@ func getCheckpointBlockNumber(l1Relayer txrelayer.TxRelayer, checkpointManagerAd
 		return 0, err
 	}
 
-	actualCheckpointBlock, err := types.ParseUint64orHex(&checkpointBlockNumRaw)
+	actualCheckpointBlock, err := common.ParseUint64orHex(&checkpointBlockNumRaw)
 	if err != nil {
 		return 0, err
 	}
@@ -246,11 +246,19 @@ func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Add
 	out := cluster.Call(t, contract, addresslist.ReadAddressListFunc, addr)
 
 	num, ok := out["0"].(*big.Int)
-	if !ok {
-		t.Fatal("unexpected")
-	}
 
+	require.True(t, ok)
 	require.Equal(t, role.Uint64(), num.Uint64())
+}
+
+func expectIsEnabled(t *testing.T, cluster *framework.TestCluster, contract types.Address, value bool) {
+	t.Helper()
+	out := cluster.Call(t, contract, addresslist.GetListEnabledFunc)
+
+	num, ok := out["0"].(bool)
+
+	require.True(t, ok)
+	require.Equal(t, value, num)
 }
 
 // getFilteredLogs retrieves Ethereum logs, described by event signature within the block range
@@ -274,7 +282,7 @@ func erc20BalanceOf(t *testing.T, account types.Address, tokenAddr types.Address
 
 	balanceRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(tokenAddr), balanceOfInput)
 	require.NoError(t, err)
-	balance, err := types.ParseUint256orHex(&balanceRaw)
+	balance, err := common.ParseUint256orHex(&balanceRaw)
 	require.NoError(t, err)
 
 	return balance

@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -127,11 +128,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		txn := &ethgo.Transaction{
-			From:  ownerKey.Address(),
-			Input: encoded,
-			To:    &supernetAddr,
-		}
+		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
 
 		if _, err = txRelayer.Call(ownerKey.Address(), supernetAddr, encoded); err == nil {
 			receipt, err := txRelayer.SendTransaction(txn, ownerKey)
@@ -208,11 +205,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 
-		txn := &ethgo.Transaction{
-			From:  ownerKey.Address(),
-			Input: encoded,
-			To:    &supernetAddr,
-		}
+		txn := rootHelper.CreateTransaction(ownerKey.Address(), &supernetAddr, encoded, nil, true)
 
 		receipt, err := txRelayer.SendTransaction(txn, ownerKey)
 		if err != nil {
@@ -252,7 +245,7 @@ func getFinalizedStake(owner, validator, stakeManager types.Address, chainID int
 		return nil, err
 	}
 
-	return types.ParseUint256orHex(&response)
+	return common.ParseUint256orHex(&response)
 }
 
 // validatorSetToABISlice converts given validators to generic map

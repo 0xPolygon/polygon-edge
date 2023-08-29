@@ -189,7 +189,7 @@ func (r *RewardsConfig) MarshalJSON() ([]byte, error) {
 	raw := &rewardsConfigRaw{
 		TokenAddress:  r.TokenAddress,
 		WalletAddress: r.WalletAddress,
-		WalletAmount:  types.EncodeBigInt(r.WalletAmount),
+		WalletAmount:  common.EncodeBigInt(r.WalletAmount),
 	}
 
 	return json.Marshal(raw)
@@ -208,7 +208,7 @@ func (r *RewardsConfig) UnmarshalJSON(data []byte) error {
 	r.TokenAddress = raw.TokenAddress
 	r.WalletAddress = raw.WalletAddress
 
-	r.WalletAmount, err = types.ParseUint256orHex(raw.WalletAmount)
+	r.WalletAmount, err = common.ParseUint256orHex(raw.WalletAmount)
 	if err != nil {
 		return err
 	}

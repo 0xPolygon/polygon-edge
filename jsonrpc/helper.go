@@ -165,7 +165,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter) (*types.Transaction, error) {
+func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonce bool) (*types.Transaction, error) {
 	if arg == nil {
 		return nil, errors.New("missing value for required argument 0")
 	}
@@ -173,7 +173,7 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter) (*types.Tran
 	if arg.From == nil {
 		arg.From = &types.ZeroAddress
 		arg.Nonce = argUintPtr(0)
-	} else if arg.Nonce == nil {
+	} else if arg.Nonce == nil || forceSetNonce {
 		// get nonce from the pool
 		nonce, err := GetNextNonce(*arg.From, LatestBlockNumber, store)
 		if err != nil {

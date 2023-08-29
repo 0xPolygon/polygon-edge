@@ -9,6 +9,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	helperCommon "github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/spf13/cobra"
@@ -98,7 +99,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	for i, tokenIDRaw := range dp.TokenIDs {
 		tokenIDRaw := tokenIDRaw
 
-		tokenID, err := types.ParseUint256orHex(&tokenIDRaw)
+		tokenID, err := helperCommon.ParseUint256orHex(&tokenIDRaw)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to decode provided token id %s: %w", tokenIDRaw, err))
 
@@ -233,11 +234,7 @@ func createDepositTxn(sender ethgo.Address,
 
 	addr := ethgo.Address(types.StringToAddress(dp.PredicateAddr))
 
-	return &ethgo.Transaction{
-		From:  sender,
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(sender, &addr, input, nil, !dp.ChildChainMintable), nil
 }
 
 // createMintTxn encodes parameters for mint function on rootchain token contract
@@ -253,11 +250,8 @@ func createMintTxn(sender, receiver types.Address) (*ethgo.Transaction, error) {
 
 	addr := ethgo.Address(types.StringToAddress(dp.TokenAddr))
 
-	return &ethgo.Transaction{
-		From:  ethgo.Address(sender),
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.Address(sender), &addr,
+		input, nil, !dp.ChildChainMintable), nil
 }
 
 // createApproveERC721PredicateTxn sends approve transaction
@@ -274,8 +268,6 @@ func createApproveERC721PredicateTxn(rootERC721Predicate, rootERC721Token types.
 
 	addr := ethgo.Address(rootERC721Token)
 
-	return &ethgo.Transaction{
-		To:    &addr,
-		Input: input,
-	}, nil
+	return helper.CreateTransaction(ethgo.ZeroAddress, &addr, input,
+		nil, !dp.ChildChainMintable), nil
 }

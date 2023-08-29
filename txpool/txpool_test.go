@@ -27,6 +27,7 @@ import (
 
 const (
 	defaultPriceLimit         uint64 = 1
+	defaultBaseFee            uint64 = 1
 	defaultMaxSlots           uint64 = 4096
 	defaultMaxAccountEnqueued uint64 = 128
 	validGasLimit             uint64 = 4712350
@@ -89,7 +90,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 
 	return NewTxPool(
 		hclog.NewNullLogger(),
-		forks.At(0),
+		forks,
 		storeToUse,
 		nil,
 		nil,
@@ -766,6 +767,43 @@ func TestEnqueueHandler(t *testing.T) {
 			acc.nonceToTx.lock()
 			assert.Equal(t, int(1), len(acc.nonceToTx.mapping))
 			acc.nonceToTx.unlock()
+		},
+	)
+
+	t.Run(
+		"accept new tx with nextNonce when enqueued is full",
+		func(t *testing.T) {
+			t.Parallel()
+
+			pool, err := newTestPool()
+			assert.NoError(t, err)
+			pool.SetSigner(&mockSigner{})
+
+			// mock full enqueued
+			pool.accounts.maxEnqueuedLimit = 10
+
+			// add 10 transaction in txpool i.e. max enqueued transactions
+			for i := uint64(1); i <= 10; i++ {
+				err := pool.addTx(local, newTx(addr1, i, 1))
+				assert.NoError(t, err)
+			}
+
+			assert.Equal(t, uint64(10), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
+
+			err = pool.addTx(local, newTx(addr1, 11, 1))
+			assert.True(t, errors.Is(err, ErrMaxEnqueuedLimitReached))
+
+			// add the transaction with nextNonce i.e. nonce=0
+			err = pool.addTx(local, newTx(addr1, uint64(0), 1))
+			assert.NoError(t, err)
+
+			pool.handlePromoteRequest(<-pool.promoteReqCh)
+
+			assert.Equal(t, uint64(0), pool.accounts.get(addr1).enqueued.length())
+			assert.Equal(t, uint64(11), pool.accounts.get(addr1).promoted.length())
+			assert.Equal(t, uint64(11), pool.accounts.get(addr1).getNonce())
 		},
 	)
 }
@@ -2053,7 +2091,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks.EIP158 = true
+		pool.forks = chain.AllForksEnabled
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize+1)
 		_, err := rand.Read(input)
@@ -2072,7 +2110,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks.EIP158 = true
+		pool.forks = chain.AllForksEnabled
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize)
 		_, err := rand.Read(input)
@@ -2195,7 +2233,8 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("eip-1559 tx placed without eip-1559 fork enabled", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks.London = false
+		pool.forks = chain.AllForksEnabled
+		pool.forks.RemoveFork(chain.London)
 
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.DynamicFeeTx
@@ -2204,7 +2243,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 
 		assert.ErrorIs(t,
 			pool.validateTx(signTx(tx)),
-			ErrInvalidTxType,
+			ErrTxTypeNotSupported,
 		)
 	})
 }
@@ -2755,6 +2794,8 @@ func TestExecutablesOrder(t *testing.T) {
 
 			pool, err := newTestPool()
 			assert.NoError(t, err)
+
+			pool.baseFee = defaultBaseFee
 			pool.SetSigner(&mockSigner{})
 
 			pool.Start()
@@ -3499,6 +3540,116 @@ func TestResetWithHeadersSetsBaseFee(t *testing.T) {
 
 	pool.ResetWithHeaders(blocks[len(blocks)-2].Header, blocks[len(blocks)-1].Header)
 	assert.Equal(t, blocks[len(blocks)-1].Header.BaseFee, pool.GetBaseFee())
+}
+
+func TestAddTx_TxReplacement(t *testing.T) {
+	t.Parallel()
+
+	const (
+		firstAccountNonce  = 1
+		secondAccountNonce = 2
+	)
+
+	poolSigner := crypto.NewEIP155Signer(100, true)
+	firstKey, firstKeyAddr := tests.GenerateKeyAndAddr(t)
+	secondKey, secondKeyAddr := tests.GenerateKeyAndAddr(t)
+
+	createDynamicTx := func(
+		t *testing.T, nonce, gasFeeCap, gasTipCap uint64,
+		key *ecdsa.PrivateKey, addr types.Address) *types.Transaction {
+		t.Helper()
+
+		tx := newTx(addr, nonce, 1)
+		tx.Type = types.DynamicFeeTx
+		tx.Input = nil
+		tx.GasPrice = nil
+		tx.GasTipCap = new(big.Int).SetUint64(gasTipCap)
+		tx.GasFeeCap = new(big.Int).SetUint64(gasFeeCap)
+
+		singedTx, err := poolSigner.SignTx(tx, key)
+		require.NoError(t, err)
+
+		singedTx.ComputeHash(0)
+
+		return singedTx
+	}
+
+	createLegacyTx := func(
+		t *testing.T, nonce, gasPrice uint64,
+		key *ecdsa.PrivateKey, addr types.Address) *types.Transaction {
+		t.Helper()
+
+		tx := newTx(addr, nonce, 1)
+		tx.Input = nil
+		tx.GasPrice = new(big.Int).SetUint64(gasPrice)
+
+		singedTx, err := poolSigner.SignTx(tx, key)
+		require.NoError(t, err)
+
+		singedTx.ComputeHash(0)
+
+		return singedTx
+	}
+
+	pool, err := newTestPool()
+	require.NoError(t, err)
+
+	pool.baseFee = 100
+	pool.SetSigner(poolSigner)
+
+	txLegacy := createLegacyTx(t, firstAccountNonce, 100, firstKey, firstKeyAddr)
+	txDynamic := createDynamicTx(t, secondAccountNonce, 120, 120, secondKey, secondKeyAddr)
+
+	ac1 := pool.accounts.initOnce(firstKeyAddr, firstAccountNonce)
+	ac2 := pool.accounts.initOnce(secondKeyAddr, secondAccountNonce)
+
+	ac1.nonceToTx.mapping[firstAccountNonce] = txLegacy
+	ac2.nonceToTx.mapping[secondAccountNonce] = txDynamic
+
+	ac1.enqueued = newAccountQueue()
+	ac2.enqueued = newAccountQueue()
+	ac1.enqueued.queue = minNonceQueue{txLegacy}
+	ac2.enqueued.queue = minNonceQueue{txDynamic}
+
+	// These tests can not be executed in parallel because Success test change state
+
+	// ErrAlreadyKnown
+	tx1 := createLegacyTx(t,
+		firstAccountNonce, txLegacy.GasPrice.Uint64(), firstKey, firstKeyAddr)
+	tx2 := createDynamicTx(t,
+		secondAccountNonce, txDynamic.GasFeeCap.Uint64(), txDynamic.GasTipCap.Uint64(), secondKey, secondKeyAddr)
+
+	assert.ErrorIs(t, pool.addTx(local, tx1), ErrAlreadyKnown)
+	assert.ErrorIs(t, pool.addTx(local, tx2), ErrAlreadyKnown)
+
+	// ErrUnderpriced
+	tx1 = createLegacyTx(t,
+		firstAccountNonce, 90, firstKey, firstKeyAddr)
+	tx2 = createDynamicTx(t,
+		secondAccountNonce, 90, 90, secondKey, secondKeyAddr)
+	tx3 := createLegacyTx(t,
+		secondAccountNonce, 110, secondKey, secondKeyAddr)
+	tx4 := createDynamicTx(t,
+		firstAccountNonce, 90, 90, firstKey, firstKeyAddr)
+
+	assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx2), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx3), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx4), ErrUnderpriced)
+
+	// Success
+	tx1 = createLegacyTx(t,
+		secondAccountNonce, 180, secondKey, secondKeyAddr)
+	tx2 = createDynamicTx(t,
+		firstAccountNonce, 200, 200, firstKey, firstKeyAddr)
+
+	require.NoError(t, pool.addTx(local, tx1))
+	require.NoError(t, pool.addTx(local, tx2))
+
+	assert.Equal(t, ac1.nonceToTx.mapping[firstAccountNonce], tx2)
+	assert.Equal(t, ac2.nonceToTx.mapping[secondAccountNonce], tx1)
+	assert.Equal(t, ac1.enqueued.queue[0], tx2)
+	assert.Equal(t, ac2.enqueued.queue[0], tx1)
 }
 
 func BenchmarkAddTxTime(b *testing.B) {
