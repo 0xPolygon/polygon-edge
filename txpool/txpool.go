@@ -811,6 +811,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		} else if oldTxWithSameNonce.GetGasPrice(p.baseFee).Cmp(
 			tx.GetGasPrice(p.baseFee)) >= 0 {
 			// if tx with same nonce does exist and has same or better gas price -> return error
+			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+
 			return ErrUnderpriced
 		}
 
@@ -822,6 +824,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 		// reject low nonce tx
 		if tx.Nonce < accountNonce {
+			metrics.IncrCounter([]string{txPoolMetrics, "nonce_too_low_tx"}, 1)
+
 			return ErrNonceTooLow
 		}
 	}
