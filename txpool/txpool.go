@@ -338,6 +338,7 @@ func (p *TxPool) Prepare() {
 	primaries := p.accounts.getPrimaries()
 
 	var eligiblePrimaries []*types.Transaction
+
 	for _, tx := range primaries {
 		if tx.GetGasFeeCap().Cmp(new(big.Int).SetUint64(p.GetBaseFee())) >= 0 {
 			eligiblePrimaries = append(eligiblePrimaries, tx)
