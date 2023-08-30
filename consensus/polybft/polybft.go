@@ -152,11 +152,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 		proxyAddr := contracts.GetProxyImplementationMapping()
 
-		var burnContractAddress types.Address
-
-		var isBurnContractSet bool
-
-		if burnContractAddress, isBurnContractSet = getBurnContractAddress(config, polyBFTConfig); isBurnContractSet {
+		burnContractAddress, isBurnContractSet := getBurnContractAddress(config, polyBFTConfig)
+		if isBurnContractSet {
 			proxyAddr[contracts.DefaultBurnContract] = burnContractAddress
 		}
 

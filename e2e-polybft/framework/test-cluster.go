@@ -52,8 +52,9 @@ const (
 )
 
 var (
-	startTime            int64
-	testRewardWalletAddr = types.StringToAddress("0xFFFFFFFF")
+	startTime              int64
+	testRewardWalletAddr   = types.StringToAddress("0xFFFFFFFF")
+	ProxyContractAdminAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
 )
 
 func init() {
@@ -612,7 +613,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 
 		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
 		if proxyAdminAddr == "" {
-			proxyAdminAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+			proxyAdminAddr = ProxyContractAdminAddr
 		}
 		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 

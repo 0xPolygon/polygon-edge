@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -583,6 +584,10 @@ func (p *genesisParams) validateProxyContractsAdmin() error {
 	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
 	if proxyContractsAdminAddr == types.ZeroAddress {
 		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	if proxyContractsAdminAddr == contracts.SystemCaller {
+		return errors.New("proxy contracts admin address must not be system caller address")
 	}
 
 	return nil
