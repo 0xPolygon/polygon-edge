@@ -591,7 +591,7 @@ func TestFilterWebsocket(t *testing.T) {
 	select {
 	case <-msgCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("bad")
+		t.Fatal("no new block events received in the predefined time slot")
 	}
 }
 
@@ -619,7 +619,7 @@ func TestFilterPendingTxWebsocket(t *testing.T) {
 	select {
 	case <-msgCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("bad")
+		t.Fatal("no tx pool events received in the predefined time slot")
 	}
 }
 
