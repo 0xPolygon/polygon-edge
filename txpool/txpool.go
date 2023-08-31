@@ -393,9 +393,14 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // Drop clears the entire account associated with the given transaction
 // and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
-	// fetch associated account
 	account := p.accounts.get(tx.From)
+	p.dropAccount(account, tx.Nonce, tx)
+}
 
+// dropAccount clears all promoted and enqueued tx from the account
+// signals EventType_DROPPED for provided hash, clears all the slots and metrics
+// and sets nonce to provided nonce
+func (p *TxPool) dropAccount(account *account, nextNonce uint64, tx *types.Transaction) {
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
 	account.nonceToTx.lock()
@@ -419,7 +424,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}
 
 	// rollback nonce
-	nextNonce := tx.Nonce
 	account.setNonce(nextNonce)
 
 	// reset accounts nonce map
@@ -1001,6 +1005,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 // updateAccountSkipsCounts update the accounts' skips,
 // the number of the consecutive blocks that doesn't have the account's transactions
 func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address]uint64) {
+	stateRoot := p.store.Header().StateRoot
 	p.accounts.Range(
 		func(key, value interface{}) bool {
 			address, _ := key.(types.Address)
@@ -1026,7 +1031,8 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 			}
 
 			// account has been skipped too many times
-			p.Drop(firstTx)
+			nextNonce := p.store.GetNonce(stateRoot, firstTx.From)
+			p.dropAccount(account, nextNonce, firstTx)
 
 			account.resetSkips()
 
