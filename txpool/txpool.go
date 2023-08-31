@@ -334,11 +334,12 @@ func (p *TxPool) AddTx(tx *types.Transaction) error {
 // Prepare generates all the transactions
 // ready for execution. (primaries)
 func (p *TxPool) Prepare() {
+	baseFee := p.GetBaseFee()
 	// fetch primary from each account
-	primaries := p.accounts.getPrimaries(p.GetBaseFee())
+	primaries := p.accounts.getPrimaries(baseFee)
 
 	// create new executables queue with base fee and initial transactions (primaries)
-	p.executables = newPricesQueue(p.GetBaseFee(), primaries)
+	p.executables = newPricesQueue(baseFee, primaries)
 }
 
 // Peek returns the best-price selected
