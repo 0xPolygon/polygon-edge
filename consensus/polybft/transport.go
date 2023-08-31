@@ -63,7 +63,6 @@ func (p *Polybft) createTopics() (err error) {
 
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *ibftProto.Message) {
-	p.logger.Error(fmt.Sprintf("[MulticastPublish]"))
 
 	if msg.Type == ibftProto.MessageType_COMMIT {
 		sender := types.BytesToAddress(msg.From)
