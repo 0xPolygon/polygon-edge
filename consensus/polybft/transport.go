@@ -92,14 +92,6 @@ func (p *Polybft) Multicast(msg *ibftProto.Message) {
 		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}
 }
-func RecoverAddressFromSignature(sig, rawContent []byte) (types.Address, error) {
-	pub, err := crypto.RecoverPubkey(sig, crypto.Keccak256(rawContent))
-	if err != nil {
-		return types.Address{}, fmt.Errorf("cannot recover address from signature: %w", err)
-	}
-
-	return crypto.PubKeyToAddress(pub), nil
-}
 
 func generateRandomHash() []byte {
 	result := make([]byte, types.HashLength)
