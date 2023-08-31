@@ -207,7 +207,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				var exitEventIDs []*big.Int
 
 				if dp.ChildChainMintable {
-					if exitEventIDs, err = common.ExtractExitEventID(receipt); err != nil {
+					if exitEventIDs, err = common.ExtractExitEventIDs(receipt); err != nil {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
 				}

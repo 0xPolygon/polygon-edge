@@ -138,7 +138,7 @@ func run(cmd *cobra.Command, _ []string) {
 	}
 
 	if !wp.ChildChainMintable {
-		exitEventIDs, err := common.ExtractExitEventID(receipt)
+		exitEventIDs, err := common.ExtractExitEventIDs(receipt)
 		if err != nil {
 			outputter.SetError(fmt.Errorf("failed to extract exit event: %w", err))
 
