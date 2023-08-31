@@ -492,7 +492,6 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 // Basically, makes sure gas tip cap and gas fee cap are good for dynamic and legacy transactions
 func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
 	if msg.Type == types.DynamicFeeTx {
-
 		if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
 			return nil
 		}
