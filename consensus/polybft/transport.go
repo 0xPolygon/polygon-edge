@@ -65,8 +65,14 @@ func (p *Polybft) Multicast(msg *ibftProto.Message) {
 	if msg.Type == ibftProto.MessageType_COMMIT {
 		sender := types.BytesToAddress(msg.From)
 		localAddr := types.Address(p.key.Address())
+
 		if sender == localAddr {
-			tamperedMsg := proto.Clone(msg).(*ibftProto.Message)
+			tamperedMsg, ok := proto.Clone(msg).(*ibftProto.Message)
+
+			if ok {
+				p.logger.Debug("wrong type assertion")
+			}
+
 			tamperedMsg.GetCommitData().ProposalHash = generateRandomHash()
 			tamperedMsg.Signature = nil
 
@@ -76,11 +82,12 @@ func (p *Polybft) Multicast(msg *ibftProto.Message) {
 				p.logger.Warn("failed to sign message", "error", err)
 			}
 
-			if p.consensusTopic.Publish(tamperedMsg); err != nil {
+			if err = p.consensusTopic.Publish(tamperedMsg); err != nil {
 				p.logger.Warn("failed to multicast second consensus message", "error", err)
 			}
 		}
 	}
+
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}
