@@ -138,9 +138,9 @@ func TestFilterDecode(t *testing.T) {
 
 		if c.res != nil {
 			require.NoError(t, err)
-			assert.Equal(t, c.res, res)
+			require.Equal(t, c.res, res)
 		} else {
-			assert.Error(t, err)
+			require.Error(t, err)
 		}
 	}
 }

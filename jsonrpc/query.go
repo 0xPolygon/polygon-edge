@@ -90,7 +90,7 @@ func (q *LogQuery) UnmarshalJSON(data []byte) error {
 
 	q.BlockHash = obj.BlockHash
 
-	// pending from/to blocks or "" will we treated as a latest block
+	// pending from/to blocks or "" is treated as a latest block
 	if q.fromBlock, err = stringToBlockNumberSafe(obj.FromBlock); err != nil {
 		return err
 	}
