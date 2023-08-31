@@ -18,6 +18,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/0xPolygon/polygon-edge/types/buildroot"
 )
 
 const (
@@ -404,10 +405,14 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
-	t.trace.TxnTraces = append(t.trace.TxnTraces, &types.TxnTrace{
+	txnTrace := &types.TxnTrace{
 		Transaction: txn.MarshalRLP(),
 		Delta:       t.Txn().getCompactJournal(),
-	})
+		ReceiptRoot: buildroot.CalculateReceiptsRoot(t.receipts),
+		// TxnRoot:     buildroot.CalculateTransactionsRoot(transactions, blockNumber),
+	}
+
+	t.trace.TxnTraces = append(t.trace.TxnTraces, txnTrace)
 
 	return nil
 }

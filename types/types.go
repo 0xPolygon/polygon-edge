@@ -257,6 +257,12 @@ type TxnTrace struct {
 
 	// Delta is the list of updates per account during this transaction
 	Delta map[Address]*JournalEntry `json:"delta"`
+
+	// ReceiptRoot is the root of the trie of receipts for this transaction
+	ReceiptRoot Hash `json:"receiptRoot"`
+
+	// TxnRoot is the root of the trie of transactions for this block
+	TxnRoot Hash `json:"txnRoot,omitempty"`
 }
 
 type JournalEntry struct {
