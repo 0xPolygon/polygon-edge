@@ -10,7 +10,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/protobuf/proto"
-	protobuf "google.golang.org/protobuf/proto"
 )
 
 // BridgeTransport is an abstraction of network layer for a bridge
@@ -63,55 +62,25 @@ func (p *Polybft) createTopics() (err error) {
 
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *ibftProto.Message) {
-	p.logger.Error(fmt.Sprintf("[MulticastPublish]"))
-
 	if msg.Type == ibftProto.MessageType_COMMIT {
 		sender := types.BytesToAddress(msg.From)
 		localAddr := types.Address(p.key.Address())
-		p.logger.Debug("[Multicast]", "msg sender", sender.String(), "local node address", localAddr.String())
-
 		if sender == localAddr {
 			tamperedMsg := proto.Clone(msg).(*ibftProto.Message)
 			tamperedMsg.GetCommitData().ProposalHash = generateRandomHash()
 			tamperedMsg.Signature = nil
 
-			tamperedMsgRaw, _ := protobuf.Marshal(tamperedMsg)
-
-			p.logger.Error("MsgRaw", "before", tamperedMsgRaw, "cryptokeccakBefore:", crypto.Keccak256(tamperedMsgRaw))
-
 			tamperedMsg, err := p.key.SignIBFTMessage(tamperedMsg)
 
 			if err != nil {
-				p.logger.Error("Error while signing", "error", err)
+				p.logger.Warn("failed to sign message", "error", err)
 			}
 
-			p.logger.Error(fmt.Sprintf("[Polybft]Multicast(publish1): %+v", tamperedMsg))
-			msgNoSigTampered, err := tamperedMsg.PayloadNoSig()
-
-			if err != nil {
-				p.logger.Error("NoPayload")
-			}
-
-			pub, _ := crypto.RecoverPubkey(tamperedMsg.Signature, crypto.Keccak256(msgNoSigTampered))
-
-			p.logger.Error("msgRawAfter", "after", msgNoSigTampered, "CryptoKeccakAfter", crypto.Keccak256(msgNoSigTampered))
-			p.logger.Error("PubKey", "after", pub)
-			signerAddress, err := RecoverAddressFromSignature(tamperedMsg.Signature, msgNoSigTampered)
-
-			if err != nil {
-				p.logger.Error("failed to recover address from signature: %w", err)
-			}
-
-			p.logger.Error("Signer", "Address", signerAddress.String())
-
-			err = p.consensusTopic.Publish(tamperedMsg)
-			if err != nil {
-				p.logger.Error("Error while sending byzantian message", "error", err)
+			if p.consensusTopic.Publish(tamperedMsg); err != nil {
+				p.logger.Warn("failed to multicast second consensus message", "error", err)
 			}
 		}
 	}
-
-	p.logger.Error("[Polybft]Multicast(publish2): %+v", msg)
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}
