@@ -170,7 +170,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	}
 
 	type bridgeTxData struct {
-		exitEventID    *big.Int
+		exitEventIDs   []*big.Int
 		blockNumber    uint64
 		childTokenAddr *types.Address
 	}
@@ -204,10 +204,10 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("receiver: %s, amount: %s", receiver, amount)
 				}
 
-				var exitEventID *big.Int
+				var exitEventIDs []*big.Int
 
 				if dp.ChildChainMintable {
-					if exitEventID, err = common.ExtractExitEventID(receipt); err != nil {
+					if exitEventIDs, err = common.ExtractExitEventIDs(receipt); err != nil {
 						return fmt.Errorf("failed to extract exit event: %w", err)
 					}
 				}
@@ -221,7 +221,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				// send aggregated data to channel if everything went ok
 				bridgeTxCh <- bridgeTxData{
 					blockNumber:    receipt.BlockNumber,
-					exitEventID:    exitEventID,
+					exitEventIDs:   exitEventIDs,
 					childTokenAddr: childToken,
 				}
 
@@ -241,8 +241,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	var childToken *types.Address
 
 	for x := range bridgeTxCh {
-		if x.exitEventID != nil {
-			exitEventIDs = append(exitEventIDs, x.exitEventID)
+		if x.exitEventIDs != nil {
+			exitEventIDs = append(exitEventIDs, x.exitEventIDs...)
 		}
 
 		blockNumbers = append(blockNumbers, x.blockNumber)

@@ -169,6 +169,21 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// stringToBlockNumberSafe parses string and returns Block Number
+// works similar to stringToBlockNumber
+// but treats empty string or pending block number as a latest
+func stringToBlockNumberSafe(str string) (BlockNumber, error) {
+	switch str {
+	case "", pending:
+		return LatestBlockNumber, nil
+	default:
+		return stringToBlockNumber(str)
+	}
+}
+
+// stringToBlockNumber parses string and returns Block Number
+// empty string is treated as an error
+// pending blocks are allowed
 func stringToBlockNumber(str string) (BlockNumber, error) {
 	if str == "" {
 		return 0, fmt.Errorf("value is empty")
@@ -176,7 +191,9 @@ func stringToBlockNumber(str string) (BlockNumber, error) {
 
 	str = strings.Trim(str, "\"")
 	switch str {
-	case pending, latest:
+	case pending:
+		return PendingBlockNumber, nil
+	case latest:
 		return LatestBlockNumber, nil
 	case earliest:
 		return EarliestBlockNumber, nil

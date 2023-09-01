@@ -1,10 +1,11 @@
 package jsonrpc
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -101,11 +102,21 @@ func TestFilterDecode(t *testing.T) {
 		},
 		{
 			`{
+				"fromBlock": "earliest",
+				"toBlock": ""
+			}`,
+			&LogQuery{
+				fromBlock: EarliestBlockNumber,
+				toBlock:   LatestBlockNumber, // empty is converted to the latest
+			},
+		},
+		{
+			`{
 				"fromBlock": "pending",
 				"toBlock": "earliest"
 			}`,
 			&LogQuery{
-				fromBlock: LatestBlockNumber, // pending = latest
+				fromBlock: LatestBlockNumber, // pending is converted to the latest
 				toBlock:   EarliestBlockNumber,
 			},
 		},
@@ -121,22 +132,15 @@ func TestFilterDecode(t *testing.T) {
 		},
 	}
 
-	for indx, c := range cases {
+	for _, c := range cases {
 		res := &LogQuery{}
 		err := res.UnmarshalJSON([]byte(c.str))
 
-		if err != nil && c.res != nil {
-			t.Fatal(err)
-		}
-
-		if err == nil && c.res == nil {
-			t.Fatal("it should fail")
-		}
-
 		if c.res != nil {
-			if !reflect.DeepEqual(res, c.res) {
-				t.Fatalf("bad %d", indx)
-			}
+			require.NoError(t, err)
+			require.Equal(t, c.res, res)
+		} else {
+			require.Error(t, err)
 		}
 	}
 }
@@ -223,9 +227,7 @@ func TestFilterMatch(t *testing.T) {
 		},
 	}
 
-	for indx, c := range cases {
-		if c.filter.Match(c.log) != c.match {
-			t.Fatalf("bad %d", indx)
-		}
+	for _, c := range cases {
+		assert.Equal(t, c.match, c.filter.Match(c.log))
 	}
 }
