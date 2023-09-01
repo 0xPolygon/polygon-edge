@@ -1024,9 +1024,7 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 				return true
 			}
 
-			account.incrementSkips()
-
-			if account.skips < maxAccountSkips {
+			if account.incrementSkips() < maxAccountSkips {
 				return true
 			}
 
