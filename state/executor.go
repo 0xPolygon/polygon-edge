@@ -18,7 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime/precompiled"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/0xPolygon/polygon-edge/types/buildroot"
 )
 
 const (
@@ -408,7 +407,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	txnTrace := &types.TxnTrace{
 		Transaction: txn.MarshalRLP(),
 		Delta:       t.Txn().getCompactJournal(),
-		ReceiptRoot: buildroot.CalculateReceiptsRoot(t.receipts),
+		Hash:        txn.Hash,
+		// This is not possible to do it here because of dependency cycle
+		// ReceiptRoot: buildroot.CalculateReceiptsRoot(t.receipts),
 		// TxnRoot:     buildroot.CalculateTransactionsRoot(transactions, blockNumber),
 	}
 

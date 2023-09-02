@@ -2,6 +2,7 @@ package buildroot
 
 import (
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/fastrlp"
 )
@@ -81,26 +82,25 @@ func CalculateRoot(num int, h func(indx int) []byte) types.Hash {
 	}
 
 	// fallback to slow hash
-	// return types.BytesToHash(deriveSlow(num, h))
-	return types.ZeroHash
+	return types.BytesToHash(deriveSlow(num, h))
 }
 
 var numArenaPool fastrlp.ArenaPool
 
-// func deriveSlow(num int, h func(indx int) []byte) []byte {
-// 	t := itrie.NewTrie()
-// 	txn := t.Txn(nil)
+func deriveSlow(num int, h func(indx int) []byte) []byte {
+	t := itrie.NewTrie()
+	txn := t.Txn(nil)
 
-// 	ar := numArenaPool.Get()
-// 	for i := 0; i < num; i++ {
-// 		indx := ar.NewUint(uint64(i))
-// 		txn.Insert(indx.MarshalTo(nil), h(i))
-// 		ar.Reset()
-// 	}
+	ar := numArenaPool.Get()
+	for i := 0; i < num; i++ {
+		indx := ar.NewUint(uint64(i))
+		txn.Insert(indx.MarshalTo(nil), h(i))
+		ar.Reset()
+	}
 
-// 	numArenaPool.Put(ar)
+	numArenaPool.Put(ar)
 
-// 	x, _ := txn.Hash()
+	x, _ := txn.Hash()
 
-// 	return x
-// }
+	return x
+}

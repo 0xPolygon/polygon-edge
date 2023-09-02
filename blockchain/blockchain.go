@@ -843,6 +843,20 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 	batchWriter.PutReceipts(block.Hash(), fblock.Receipts)
 
 	// write the trace
+
+	// At this point we can loop through the traces and receipts, and generate intermediate tries
+	var rs types.Receipts
+
+	for _, tt := range fblock.Trace.TxnTraces {
+		for _, r := range fblock.Receipts {
+			if r.TxHash == tt.Hash {
+				rs = append(rs, r)
+			}
+		}
+
+		tt.ReceiptRoot = buildroot.CalculateReceiptsRoot(rs)
+	}
+
 	if err := b.writeTrace(fblock.Trace, header.Number); err != nil {
 		return err
 	}

@@ -99,7 +99,7 @@ func TestTxn_TracesCompaction(t *testing.T) {
 
 	nonce := uint64(2)
 
-	require.Equal(t, trace[addr], &types.JournalEntry{
+	require.Equal(t, &types.JournalEntry{
 		Balance: big.NewInt(2),
 		Nonce:   &nonce,
 		Storage: map[types.Hash]types.Hash{
@@ -109,7 +109,7 @@ func TestTxn_TracesCompaction(t *testing.T) {
 		CodeRead: []byte{0x1},
 		Touched:  boolTruePtr(),
 		Read:     boolTruePtr(),
-	})
+	}, trace[addr])
 }
 
 func TestJournalEntry_Merge(t *testing.T) {

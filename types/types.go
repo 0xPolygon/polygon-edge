@@ -263,6 +263,9 @@ type TxnTrace struct {
 
 	// TxnRoot is the root of the trie of transactions for this block
 	TxnRoot Hash `json:"txnRoot,omitempty"`
+
+	// Hash is the hash of the transaction
+	Hash Hash `json:"hash"`
 }
 
 type JournalEntry struct {
