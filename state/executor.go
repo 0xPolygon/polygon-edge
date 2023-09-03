@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
@@ -454,18 +453,7 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	upfrontGasCost := new(big.Int).SetUint64(msg.Gas)
-
-	factor := new(big.Int)
-	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
-		// Apply EIP-1559 tx cost calculation factor
-		factor = factor.Set(msg.GasFeeCap)
-	} else {
-		// Apply legacy tx cost calculation factor
-		factor = factor.Set(msg.GasPrice)
-	}
-
-	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, factor)
+	upfrontGasCost := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
@@ -613,11 +601,8 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip became to be either gas tip cap or (gas fee cap - current base fee)
 	effectiveTip := new(big.Int).Set(gasPrice)
-	if t.config.London && msg.Type == types.DynamicFeeTx {
-		effectiveTip = common.BigMin(
-			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
-			new(big.Int).Set(msg.GasTipCap),
-		)
+	if t.config.London {
+		effectiveTip = msg.EffectiveGasTip(t.ctx.BaseFee)
 	}
 
 	// Pay the coinbase fee as a miner reward using the calculated effective tip.
