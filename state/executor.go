@@ -491,35 +491,7 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 // checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
 // Basically, makes sure gas tip cap and gas fee cap are good for dynamic and legacy transactions
 func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
-	if msg.Type == types.DynamicFeeTx {
-		if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
-			return nil
-		}
-
-		if l := msg.GasFeeCap.BitLen(); l > 256 {
-			return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
-				msg.From.String(), l)
-		}
-
-		if l := msg.GasTipCap.BitLen(); l > 256 {
-			return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
-				msg.From.String(), l)
-		}
-
-		if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
-			return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
-				msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
-		}
-	}
-
-	// This will panic if baseFee is nil, but basefee presence is verified
-	// as part of header validation.
-	if msg.GetGasFeeCap().Cmp(t.ctx.BaseFee) < 0 {
-		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), msg.GasFeeCap, t.ctx.BaseFee)
-	}
-
-	return nil
+	return GetLondonFixHandler(uint64(t.ctx.Number)).checkDynamicFees(msg, t)
 }
 
 // errors that can originate in the consensus rules checks of the apply method below
@@ -1154,11 +1126,9 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 		return NewTransitionApplicationError(err, true)
 	}
 
-	// 2. check dynamic fees of the transaction when london fork is enabled
-	if t.config.London {
-		if err := t.checkDynamicFees(msg); err != nil {
-			return NewTransitionApplicationError(err, true)
-		}
+	// 2. check dynamic fees of the transaction
+	if err := t.checkDynamicFees(msg); err != nil {
+		return NewTransitionApplicationError(err, true)
 	}
 
 	// 3. caller has enough balance to cover transaction
