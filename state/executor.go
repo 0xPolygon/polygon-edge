@@ -453,7 +453,7 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	upfrontGasCost := new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GetGasPrice(t.ctx.BaseFee.Uint64()))
+	upfrontGasCost := GetLondonFixHandler(uint64(t.ctx.Number)).getUpfrontGasCost(msg, t.ctx.BaseFee)
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
@@ -600,10 +600,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// Define effective tip based on tx type.
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip became to be either gas tip cap or (gas fee cap - current base fee)
-	effectiveTip := new(big.Int).Set(gasPrice)
-	if t.config.London {
-		effectiveTip = msg.EffectiveGasTip(t.ctx.BaseFee)
-	}
+	effectiveTip := GetLondonFixHandler(uint64(t.ctx.Number)).getEffectiveTip(
+		msg, gasPrice, t.ctx.BaseFee, t.config.London,
+	)
 
 	// Pay the coinbase fee as a miner reward using the calculated effective tip.
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), effectiveTip)

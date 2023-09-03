@@ -2,8 +2,10 @@ package state
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/0xPolygon/polygon-edge/forkmanager"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -11,6 +13,9 @@ const LondonFixHandler forkmanager.HandlerDesc = "LondonFixHandler"
 
 type LondonFixFork interface {
 	checkDynamicFees(*types.Transaction, *Transition) error
+	getUpfrontGasCost(msg *types.Transaction, baseFee *big.Int) *big.Int
+	getEffectiveTip(msg *types.Transaction, gasPrice *big.Int,
+		baseFee *big.Int, isLondonForkEnabled bool) *big.Int
 }
 
 type LondonFixForkV1 struct{}
@@ -52,6 +57,33 @@ func (l *LondonFixForkV1) checkDynamicFees(msg *types.Transaction, t *Transition
 	return nil
 }
 
+func (l *LondonFixForkV1) getUpfrontGasCost(msg *types.Transaction, baseFee *big.Int) *big.Int {
+	upfrontGasCost := new(big.Int).SetUint64(msg.Gas)
+
+	factor := new(big.Int)
+	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
+		// Apply EIP-1559 tx cost calculation factor
+		factor = factor.Set(msg.GasFeeCap)
+	} else {
+		// Apply legacy tx cost calculation factor
+		factor = factor.Set(msg.GasPrice)
+	}
+
+	return upfrontGasCost.Mul(upfrontGasCost, factor)
+}
+
+func (l *LondonFixForkV1) getEffectiveTip(msg *types.Transaction, gasPrice *big.Int,
+	baseFee *big.Int, isLondonForkEnabled bool) *big.Int {
+	if isLondonForkEnabled && msg.Type == types.DynamicFeeTx {
+		return common.BigMin(
+			new(big.Int).Sub(msg.GasFeeCap, baseFee),
+			new(big.Int).Set(msg.GasTipCap),
+		)
+	}
+
+	return new(big.Int).Set(gasPrice)
+}
+
 type LondonFixForkV2 struct{}
 
 func (l *LondonFixForkV2) checkDynamicFees(msg *types.Transaction, t *Transition) error {
@@ -88,6 +120,19 @@ func (l *LondonFixForkV2) checkDynamicFees(msg *types.Transaction, t *Transition
 	}
 
 	return nil
+}
+
+func (l *LondonFixForkV2) getUpfrontGasCost(msg *types.Transaction, baseFee *big.Int) *big.Int {
+	return new(big.Int).Mul(new(big.Int).SetUint64(msg.Gas), msg.GetGasPrice(baseFee.Uint64()))
+}
+
+func (l *LondonFixForkV2) getEffectiveTip(msg *types.Transaction, gasPrice *big.Int,
+	baseFee *big.Int, isLondonForkEnabled bool) *big.Int {
+	if isLondonForkEnabled {
+		return msg.EffectiveGasTip(baseFee)
+	}
+
+	return new(big.Int).Set(gasPrice)
 }
 
 func RegisterLondonFixFork(londonFixFork string) error {
