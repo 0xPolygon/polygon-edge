@@ -50,7 +50,6 @@ func (l *LondonFixForkV1) checkDynamicFees(msg *types.Transaction, t *Transition
 	}
 
 	return nil
-
 }
 
 type LondonFixForkV2 struct{}
