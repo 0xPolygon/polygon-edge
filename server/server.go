@@ -897,6 +897,7 @@ func (s *Server) setupJSONRPC() error {
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
 		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 		ConcurrentRequestsDebug:  s.config.JSONRPC.ConcurrentRequestsDebug,
+		WebSocketReadLimit:       s.config.JSONRPC.WebSocketReadLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)

@@ -70,6 +70,7 @@ type Config struct {
 	BlockRangeLimit          uint64
 
 	ConcurrentRequestsDebug uint64
+	WebSocketReadLimit      uint64
 }
 
 // NewJSONRPC returns the JSONRPC http server
@@ -220,6 +221,11 @@ func (j *JSONRPC) handleWs(w http.ResponseWriter, req *http.Request) {
 		j.logger.Error(fmt.Sprintf("Unable to upgrade to a WS connection, %s", err.Error()))
 
 		return
+	}
+
+	// Set a read limit (maximum message size) for this connection
+	if j.config.WebSocketReadLimit != 0 {
+		ws.SetReadLimit(int64(j.config.WebSocketReadLimit))
 	}
 
 	// Defer WS closure
