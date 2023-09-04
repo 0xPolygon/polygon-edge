@@ -66,11 +66,7 @@ func (p *Polybft) Multicast(msg *ibftProto.Message) {
 		localAddr := types.Address(p.key.Address())
 
 		if sender == localAddr {
-			tamperedMsg, ok := proto.Clone(msg).(*ibftProto.Message)
-
-			if ok {
-				p.logger.Debug("wrong type assertion")
-			}
+			tamperedMsg, _ := proto.Clone(msg).(*ibftProto.Message)
 
 			tamperedMsg.GetCommitData().ProposalHash = generateRandomHash()
 			tamperedMsg.Signature = nil
