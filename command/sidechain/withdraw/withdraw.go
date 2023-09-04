@@ -114,7 +114,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("could not find an appropriate log in receipt that withdraw happened on ValidatorSet")
 	}
 
-	exitEventID, err := common.ExtractExitEventID(receipt)
+	exitEventIDs, err := common.ExtractExitEventIDs(receipt)
 	if err != nil {
 		return fmt.Errorf("withdrawal failed: %w", err)
 	}
@@ -123,7 +123,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		&withdrawResult{
 			ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
 			Amount:           withdrawalEvent.Amount,
-			ExitEventID:      exitEventID,
+			ExitEventIDs:     exitEventIDs,
 			BlockNumber:      receipt.BlockNumber,
 		})
 

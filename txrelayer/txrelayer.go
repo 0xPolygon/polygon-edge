@@ -16,12 +16,12 @@ import (
 )
 
 const (
-	defaultGasPrice       = 1879048192 // 0x70000000
-	DefaultGasLimit       = 5242880    // 0x500000
-	DefaultRPCAddress     = "http://127.0.0.1:8545"
-	numRetries            = 1000
-	gasLimitPercent       = 100
-	feeIncreasePercentage = 20
+	defaultGasPrice            = 1879048192 // 0x70000000
+	DefaultGasLimit            = 5242880    // 0x500000
+	DefaultRPCAddress          = "http://127.0.0.1:8545"
+	numRetries                 = 1000
+	gasLimitIncreasePercentage = 100
+	feeIncreasePercentage      = 100
 )
 
 var (
@@ -173,7 +173,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			return ethgo.ZeroHash, fmt.Errorf("failed to estimate gas: %w", err)
 		}
 
-		txn.Gas = gasLimit + (gasLimit * gasLimitPercent / 100)
+		txn.Gas = gasLimit + (gasLimit * gasLimitIncreasePercentage / 100)
 	}
 
 	signer := wallet.NewEIP155Signer(chainID.Uint64())

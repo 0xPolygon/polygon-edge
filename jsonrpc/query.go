@@ -90,20 +90,13 @@ func (q *LogQuery) UnmarshalJSON(data []byte) error {
 
 	q.BlockHash = obj.BlockHash
 
-	if obj.FromBlock == "" {
-		q.fromBlock = LatestBlockNumber
-	} else {
-		if q.fromBlock, err = stringToBlockNumber(obj.FromBlock); err != nil {
-			return err
-		}
+	// pending from/to blocks or "" is treated as a latest block
+	if q.fromBlock, err = stringToBlockNumberSafe(obj.FromBlock); err != nil {
+		return err
 	}
 
-	if obj.ToBlock == "" {
-		q.toBlock = LatestBlockNumber
-	} else {
-		if q.toBlock, err = stringToBlockNumber(obj.ToBlock); err != nil {
-			return err
-		}
+	if q.toBlock, err = stringToBlockNumberSafe(obj.ToBlock); err != nil {
+		return err
 	}
 
 	if obj.Address != nil {
