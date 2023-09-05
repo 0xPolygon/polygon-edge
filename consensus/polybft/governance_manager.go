@@ -7,15 +7,16 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -23,7 +24,10 @@ const (
 	newRewardLookbackSize = uint64(1)
 )
 
-var errUnknownGovernanceEvent = errors.New("unknown event from governance")
+var (
+	errUnknownGovernanceEvent = errors.New("unknown event from governance")
+	stringABIType             = abi.MustNewType("tuple(string)")
+)
 
 // isRewardDistributionBlock indicates if reward distribution transaction
 // should happen in given block
@@ -106,7 +110,6 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 
 	// cache all fork name hashes that we have in code
 	allForkNameHashes := map[types.Hash]string{}
-	stringABIType := abi.MustNewType("tuple(string)")
 
 	for name := range *chain.AllForksEnabled {
 		encoded, err := stringABIType.Encode([]interface{}{name})
