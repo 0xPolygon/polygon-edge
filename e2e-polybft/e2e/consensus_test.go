@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -617,4 +618,123 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, validatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+}
+
+// TestE2E_Consensus_EIP1559Check sends a legacy and a dynamic tx to the cluster
+// and check if balance of sender, receiver, burn contract and miner is updates correctly
+// in accordance with EIP-1559 specifications
+func TestE2E_Consensus_EIP1559Check(t *testing.T) {
+	sender1, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	sender2, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	recipientKey, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	recipient := recipientKey.Address()
+
+	// first account should have some matics premined
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender1.Address())),
+		framework.WithPremine(types.Address(sender1.Address()), types.Address(sender2.Address())),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	client := cluster.Servers[0].JSONRPC().Eth()
+
+	waitUntilBalancesChanged := func(acct ethgo.Address, bal *big.Int) error {
+		err := cluster.WaitUntil(30*time.Second, 2*time.Second, func() bool {
+			balance, err := client.GetBalance(recipient, ethgo.Latest)
+			if err != nil {
+				return true
+			}
+
+			return balance.Cmp(bal) > 0
+		})
+
+		return err
+	}
+
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// create and send tx
+	sendAmount := ethgo.Gwei(1)
+
+	txn := []*ethgo.Transaction{
+		{
+			Value:    sendAmount,
+			To:       &recipient,
+			Gas:      21000,
+			Nonce:    uint64(0),
+			GasPrice: ethgo.Gwei(1).Uint64(),
+		},
+		{
+			Value:                sendAmount,
+			To:                   &recipient,
+			Gas:                  21000,
+			Nonce:                uint64(0),
+			Type:                 ethgo.TransactionDynamicFee,
+			MaxFeePerGas:         ethgo.Gwei(1),
+			MaxPriorityFeePerGas: ethgo.Gwei(1),
+		},
+	}
+
+	initialMinerBalance := big.NewInt(0)
+
+	var prevMiner ethgo.Address
+
+	for i := 0; i < 2; i++ {
+		curTxn := txn[i]
+
+		senderInitialBalance, _ := client.GetBalance(sender1.Address(), ethgo.Latest)
+		receiverInitialBalance, _ := client.GetBalance(recipient, ethgo.Latest)
+		burnContractInitialBalance, _ := client.GetBalance(ethgo.Address(types.ZeroAddress), ethgo.Latest)
+
+		receipt, err := relayer.SendTransaction(curTxn, sender1)
+		require.NoError(t, err)
+
+		// wait for balance to get changed
+		err = waitUntilBalancesChanged(recipient, receiverInitialBalance)
+		require.NoError(t, err)
+
+		// Retrieve the transaction receipt
+		txReceipt, err := client.GetTransactionByHash(receipt.TransactionHash)
+		require.NoError(t, err)
+
+		block, _ := client.GetBlockByHash(txReceipt.BlockHash, true)
+		finalMinerFinalBalance, _ := client.GetBalance(block.Miner, ethgo.Latest)
+
+		if i == 0 {
+			prevMiner = block.Miner
+		}
+
+		senderFinalBalance, _ := client.GetBalance(sender1.Address(), ethgo.Latest)
+		receiverFinalBalance, _ := client.GetBalance(recipient, ethgo.Latest)
+		burnContractFinalBalance, _ := client.GetBalance(ethgo.Address(types.ZeroAddress), ethgo.Latest)
+
+		diffReciverBalance := new(big.Int).Sub(receiverFinalBalance, receiverInitialBalance)
+		assert.Equal(t, sendAmount, diffReciverBalance, "Receiver balance should be increased by send amount")
+
+		if i == 1 && prevMiner != block.Miner {
+			initialMinerBalance = big.NewInt(0)
+		}
+
+		diffBurnContractBalance := new(big.Int).Sub(burnContractFinalBalance, burnContractInitialBalance)
+		diffSenderBalance := new(big.Int).Sub(senderInitialBalance, senderFinalBalance)
+		diffMinerBalance := new(big.Int).Sub(finalMinerFinalBalance, initialMinerBalance)
+
+		diffSenderBalance.Sub(diffSenderBalance, diffReciverBalance)
+		diffSenderBalance.Sub(diffSenderBalance, diffBurnContractBalance)
+		diffSenderBalance.Sub(diffSenderBalance, diffMinerBalance)
+
+		assert.Zero(t, diffSenderBalance.Int64(), "Sender balance should be decreased by send amount + gas")
+
+		initialMinerBalance = finalMinerFinalBalance
+	}
 }

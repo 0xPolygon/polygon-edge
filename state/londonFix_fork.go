@@ -160,5 +160,5 @@ func GetLondonFixHandler(blockNumber uint64) LondonFixFork {
 	}
 
 	// for tests
-	return &LondonFixForkV1{}
+	return &LondonFixForkV2{}
 }
