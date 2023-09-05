@@ -185,6 +185,10 @@ func (p *genesisParams) validateFlags() error {
 		if err := p.validatePremineInfo(); err != nil {
 			return err
 		}
+
+		if err := p.validateGovernorAdminAddr(); err != nil {
+			return err
+		}
 	}
 
 	// Check if the genesis file already exists
@@ -529,6 +533,15 @@ func (p *genesisParams) validatePremineInfo() error {
 	}
 
 	return errReserveAccMustBePremined
+}
+
+// validateGovernorAdminAddr validates governor admin address
+func (p *genesisParams) validateGovernorAdminAddr() error {
+	if err := types.IsValidAddress(p.governorAdmin); err != nil {
+		return fmt.Errorf("governor admin address is not valid: %w", err)
+	}
+
+	return nil
 }
 
 // validateBurnContract validates burn contract. If native token is mintable,
