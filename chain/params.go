@@ -90,6 +90,7 @@ const (
 	EIP155              = "EIP155"
 	QuorumCalcAlignment = "quorumcalcalignment"
 	TxHashWithType      = "txHashWithType"
+	LondonFix           = "londonfix"
 	Governance          = "governance"
 	DoubleSignSlashing  = "doubleSignSlashing"
 )
@@ -127,6 +128,7 @@ func (f *Forks) At(block uint64) ForksInTime {
 		EIP155:              f.IsActive(EIP155, block),
 		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
 		TxHashWithType:      f.IsActive(TxHashWithType, block),
+		LondonFix:           f.IsActive(LondonFix, block),
 		Governance:          f.IsActive(Governance, block),
 		DoubleSignSlashing:  f.IsActive(DoubleSignSlashing, block),
 	}
@@ -158,6 +160,7 @@ type ForksInTime struct {
 	EIP155,
 	QuorumCalcAlignment,
 	TxHashWithType,
+	LondonFix,
 	Governance,
 	DoubleSignSlashing bool
 }
@@ -175,6 +178,7 @@ var AllForksEnabled = &Forks{
 	London:              NewFork(0),
 	QuorumCalcAlignment: NewFork(0),
 	TxHashWithType:      NewFork(0),
+	LondonFix:           NewFork(0),
 	Governance:          NewFork(0),
 	DoubleSignSlashing:  NewFork(0),
 }

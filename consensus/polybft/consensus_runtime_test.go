@@ -24,9 +24,16 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
+
+func init() {
+	// for tests
+	forkmanager.GetInstance().RegisterFork(chain.Governance, nil)
+	forkmanager.GetInstance().ActivateFork(chain.Governance, 0) //nolint:errcheck
+}
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
 	t.Parallel()

@@ -586,7 +586,6 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			validators:             validatorSet,
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
-			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		distributeRewardsTx, err := fsm.createDistributeRewardsTx()
@@ -604,7 +603,6 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			validators:             validatorSet,
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
-			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		distributeRewardsTx, err := fsm.createDistributeRewardsTx()
@@ -623,7 +621,6 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			validators:             validatorSet,
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
-			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		distributeRewardsTx, err := fsm.createDistributeRewardsTx()
@@ -641,7 +638,6 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			parent:              &types.Header{Number: 9},
 			validators:          validatorSet,
 			logger:              hclog.NewNullLogger(),
-			forks:               &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
