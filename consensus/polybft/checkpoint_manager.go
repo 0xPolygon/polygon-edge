@@ -2,10 +2,15 @@ package polybft
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
+
+	metrics "github.com/armon/go-metrics"
+	hclog "github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -16,15 +21,14 @@ import (
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	metrics "github.com/armon/go-metrics"
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
 )
 
 var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
+
+	errInvalidEvent = errors.New("invalid event retrieved")
 )
 
 type CheckpointManager interface {
@@ -546,5 +550,5 @@ func parseEvent(h *types.Header, l *ethgo.Log) (contractsapi.EventAbi, bool, err
 		return &slashedEvent, matches, err
 	}
 
-	return nil, false, nil
+	return nil, false, errInvalidEvent
 }
