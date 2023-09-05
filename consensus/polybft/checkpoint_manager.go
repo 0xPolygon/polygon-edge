@@ -550,5 +550,5 @@ func parseEvent(h *types.Header, l *ethgo.Log) (contractsapi.EventAbi, bool, err
 		return &slashedEvent, matches, err
 	}
 
-	return nil, false, errInvalidEvent
+	return nil, false, nil
 }
