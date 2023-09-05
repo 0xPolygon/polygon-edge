@@ -69,6 +69,8 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
+
+	proposalQuorumMax = uint64(100)
 )
 
 var (
@@ -169,9 +171,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	}
 
 	proposalQuorum := p.proposalQuorum
-	if proposalQuorum > 100 {
+	if proposalQuorum > proposalQuorumMax {
 		// proposal can be from 0 to 100, so we sanitize the value
-		proposalQuorum = 100
+		proposalQuorum = proposalQuorumMax
 	}
 
 	polyBftConfig := &polyCommon.PolyBFTConfig{

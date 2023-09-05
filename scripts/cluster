@@ -43,7 +43,7 @@ function showhelp(){
   echo "  --help          Display this help information"
   echo "Examples:"
   echo "  cluster polybft -- Run the script with the polybft consensus"
-  echo "  cluster polybtt --docker -- Run the script with the polybft consensus using docker"
+  echo "  cluster polybft --docker -- Run the script with the polybft consensus using docker"
   echo "  cluster polybft stop -- Stop the running environment"
 }
 

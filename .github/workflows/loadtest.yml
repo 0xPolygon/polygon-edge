@@ -79,7 +79,7 @@ jobs:
       - name: Install xk6
         run: |
           go install go.k6.io/xk6/cmd/xk6@latest
-          xk6 build --with github.com/distribworks/xk6-ethereum@v1.0.2
+          xk6 build --with github.com/distribworks/xk6-ethereum@v1.0.3
       
       - name: Install JQ
         run: |

@@ -357,12 +357,12 @@ func (a *account) promote() (promoted []*types.Transaction, pruned []*types.Tran
 
 // resetSkips sets 0 to skips
 func (a *account) resetSkips() {
-	a.skips = 0
+	atomic.StoreUint64(&a.skips, 0)
 }
 
 // incrementSkips increments skips
-func (a *account) incrementSkips() {
-	a.skips++
+func (a *account) incrementSkips() uint64 {
+	return atomic.AddUint64(&a.skips, 1)
 }
 
 // getLowestTx returns the transaction with lowest nonce, which might be popped next

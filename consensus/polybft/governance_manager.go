@@ -25,7 +25,10 @@ const (
 	newRewardLookbackSize = uint64(1)
 )
 
-var errUnknownGovernanceEvent = errors.New("unknown event from governance")
+var (
+	errUnknownGovernanceEvent = errors.New("unknown event from governance")
+	stringABIType             = abi.MustNewType("tuple(string)")
+)
 
 // isRewardDistributionBlock indicates if reward distribution transaction
 // should happen in given block
@@ -108,7 +111,6 @@ func newGovernanceManager(genesisConfig *polyCommon.PolyBFTConfig,
 
 	// cache all fork name hashes that we have in code
 	allForkNameHashes := map[types.Hash]string{}
-	stringABIType := abi.MustNewType("tuple(string)")
 
 	for name := range *chain.AllForksEnabled {
 		encoded, err := stringABIType.Encode([]interface{}{name})

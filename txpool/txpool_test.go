@@ -2055,6 +2055,51 @@ func Test_updateAccountSkipsCounts(t *testing.T) {
 		assert.Equal(t, slotsRequired(tx), pool.gauge.read())
 		checkTxExistence(t, pool, tx.Hash, true)
 	})
+
+	t.Run("drop should set nonce to current account nonce from store", func(t *testing.T) {
+		t.Parallel()
+
+		const storeNonce = uint64(10)
+
+		// create pool
+		store := defaultMockStore{
+			DefaultHeader: mockHeader,
+			nonce:         storeNonce,
+		}
+
+		pool, err := newTestPool(store)
+		assert.NoError(t, err)
+
+		pool.SetSigner(&mockSigner{})
+
+		accountMap := pool.accounts.initOnce(addr1, storeNonce)
+		accountMap.enqueued.push(&types.Transaction{
+			Nonce: storeNonce + 2,
+			Hash:  types.StringToHash("0xffa"),
+		})
+		accountMap.enqueued.push(&types.Transaction{
+			Nonce: storeNonce + 4,
+			Hash:  types.StringToHash("0xff1"),
+		})
+		accountMap.promoted.push(&types.Transaction{
+			Nonce: storeNonce,
+			Hash:  types.StringToHash("0xff2"),
+		})
+		accountMap.promoted.push(&types.Transaction{
+			Nonce: storeNonce + 1,
+			Hash:  types.StringToHash("0xff3"),
+		})
+		accountMap.setNonce(storeNonce + 3)
+		accountMap.skips = maxAccountSkips - 1
+
+		pool.updateAccountSkipsCounts(map[types.Address]uint64{})
+
+		// make sure the account queue is empty and skips is reset
+		assert.Zero(t, accountMap.enqueued.length())
+		assert.Equal(t, uint64(0), accountMap.promoted.length())
+		assert.Equal(t, uint64(0), accountMap.skips)
+		assert.Equal(t, storeNonce, accountMap.getNonce())
+	})
 }
 
 func Test_TxPool_validateTx(t *testing.T) {

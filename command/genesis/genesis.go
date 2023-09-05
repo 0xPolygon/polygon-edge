@@ -240,7 +240,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.checkpointInterval,
 			checkpointIntervalFlag,
 			defaultCheckpointInterval,
-			"number of blocks after which a new checkpoint is submitted",
+			"checkpoint submission interval in blocks",
 		)
 
 		cmd.Flags().Uint64Var(
