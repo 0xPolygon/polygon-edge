@@ -235,6 +235,13 @@ func setFlags(cmd *cobra.Command) {
 		"maximal number of concurrent requests for debug endpoints",
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.WebSocketReadLimit,
+		webSocketReadLimitFlag,
+		defaultConfig.WebSocketReadLimit,
+		"maximum size in bytes for a message read from the peer by websocket",
+	)
+
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)
