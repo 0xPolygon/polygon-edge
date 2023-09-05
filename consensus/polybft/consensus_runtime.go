@@ -173,12 +173,9 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
 
-	tracker, err := slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker"), config.State.StakeStore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize double signing tracker: %w", err)
+	if err := runtime.initDoubleSigningTracker(logger, config.State.StakeStore); err != nil {
+		return nil, err
 	}
-
-	runtime.doubleSigningTracker = tracker
 
 	return runtime, nil
 }
@@ -283,6 +280,20 @@ func (c *consensusRuntime) initGovernanceManager(logger hcf.Logger) error {
 	return nil
 }
 
+// initDoubleSigningTracker initializes double signing tracker
+//
+//	(which is used for creating slashing evidence).
+func (c *consensusRuntime) initDoubleSigningTracker(logger hcf.Logger, store *StakeStore) error {
+	tracker, err := slashing.NewDoubleSigningTracker(logger.Named("double_sign_tracker"), store)
+	if err != nil {
+		return fmt.Errorf("failed to initialize double signing tracker: %w", err)
+	}
+
+	c.doubleSigningTracker = tracker
+
+	return nil
+}
+
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.
 func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
@@ -367,11 +378,6 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// update double signing tracker internal state
 	if err := c.doubleSigningTracker.PostBlock(postBlock); err != nil {
 		c.logger.Error("post block callback failed in double signing tracker", "err", err)
-	}
-
-	// handle governance events that happened in block
-	if err := c.governanceManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block in governance manager", "err", err)
 	}
 
 	// handle governance events that happened in block
