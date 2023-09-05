@@ -198,7 +198,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to read chain configuration: %w", err)
 	}
 
-	consensusConfig, err := polyCommon.GetPolyBFTConfig(chainConfig)
+	consensusConfig, err := polyCommon.GetPolyBFTConfig(chainConfig.Params)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve consensus configuration: %w", err)
 	}

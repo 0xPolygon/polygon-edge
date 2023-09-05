@@ -335,6 +335,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			MaxValidatorSetSize:  100,
 			CheckpointInterval:   900,
 			WithdrawalWaitPeriod: 1,
+			BaseFeeChangeDenom:   20,
 			BlockTimeDrift:       10,
 			// use 1st account as governance address
 			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],

@@ -16,6 +16,9 @@ import (
 )
 
 const (
+	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
+	BaseFeeChangeDenom = uint64(8)
+
 	// GenesisBaseFeeEM is the initial base fee elasticity multiplier for EIP-1559 blocks.
 	GenesisBaseFeeEM = 2
 

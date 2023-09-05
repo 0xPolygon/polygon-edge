@@ -42,6 +42,7 @@ const (
 	rewardWalletFlag          = "reward-wallet"
 	checkpointIntervalFlag    = "checkpoint-interval"
 	withdrawalWaitPeriodFlag  = "withdrawal-wait-period"
+	baseFeeChangeDenomFlag    = "base-fee-change-denom"
 	voteDelayFlag             = "vote-delay"
 	votePeriodFlag            = "vote-period"
 	voteProposalThresholdFlag = "vote-proposal-threshold"
@@ -74,6 +75,7 @@ var (
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
 	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
+	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
 )
 
 type genesisParams struct {
@@ -145,6 +147,7 @@ type genesisParams struct {
 
 	checkpointInterval   uint64
 	withdrawalWaitPeriod uint64
+	baseFeeChangeDenom   uint64
 
 	// governance
 	voteDelay         string
@@ -171,6 +174,10 @@ func (p *genesisParams) validateFlags() error {
 
 	if err := p.parsePremineInfo(); err != nil {
 		return err
+	}
+
+	if p.baseFeeChangeDenom == 0 {
+		return errBaseFeeChangeDenomZero
 	}
 
 	if p.isPolyBFTConsensus() {
@@ -429,9 +436,10 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID: int64(p.chainID),
-			Forks:   enabledForks,
-			Engine:  p.consensusEngineConfig,
+			ChainID:            int64(p.chainID),
+			Forks:              enabledForks,
+			Engine:             p.consensusEngineConfig,
+			BaseFeeChangeDenom: p.baseFeeChangeDenom,
 		},
 		Bootnodes: p.bootnodes,
 	}
