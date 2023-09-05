@@ -1,6 +1,7 @@
 package common
 
 import (
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -26,6 +27,9 @@ type PostBlockRequest struct {
 
 	// CurrentClientConfig is the latest client configuration
 	CurrentClientConfig *PolyBFTConfig
+
+	// Forks holds forks configuration
+	Forks *chain.Forks
 }
 
 type PostEpochRequest struct {
@@ -41,4 +45,7 @@ type PostEpochRequest struct {
 
 	// ValidatorSet is the validator set for the new epoch
 	ValidatorSet validator.ValidatorSet
+
+	// Forks holds forks configuration
+	Forks *chain.Forks
 }

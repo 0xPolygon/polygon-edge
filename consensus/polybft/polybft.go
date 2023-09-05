@@ -560,6 +560,7 @@ func (p *Polybft) Start() error {
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
 		GenesisPolyBFTConfig:  p.genesisClientConfig,
+		Forks:                 p.config.Config.Params.Forks,
 		Key:                   p.key,
 		DataDir:               p.dataDir,
 		State:                 p.state,

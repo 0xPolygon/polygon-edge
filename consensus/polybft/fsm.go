@@ -21,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -59,6 +58,8 @@ var (
 type fsm struct {
 	// PolyBFT consensus protocol configuration
 	config *common.PolyBFTConfig
+	// forks holds forks configuration
+	forks *chain.Forks
 
 	// parent block header
 	parent *types.Header
@@ -150,7 +151,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		}
 	}
 
-	if isRewardDistributionBlock(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		tx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return nil, err
@@ -167,7 +168,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		}
 	}
 
-	if forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) {
+	if f.forks.IsActive(chain.DoubleSignSlashing, f.Height()) {
 		if err := f.applySlashingTx(); err != nil {
 			return nil, err
 		}
@@ -520,7 +521,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 				return fmt.Errorf("error while verifying distribute rewards transaction: %w", err)
 			}
 		case *contractsapi.SlashValidatorSetFn:
-			if !forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) {
+			if !f.forks.IsActive(chain.DoubleSignSlashing, f.Height()) {
 				return errSlashingTxNotExpected
 			}
 
@@ -538,8 +539,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		}
 	}
 
-	if forkmanager.GetInstance().IsForkEnabled(chain.DoubleSignSlashing, f.Height()) &&
-		len(f.doubleSigners) > 0 && !slashingTxExists {
+	if f.forks.IsActive(chain.DoubleSignSlashing, f.Height()) && len(f.doubleSigners) > 0 && !slashingTxExists {
 		return errSlashingTxDoesNotExist
 	}
 
@@ -551,7 +551,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		}
 	}
 
-	if isRewardDistributionBlock(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		if !distributeRewardsTxExists {
 			// this is a check if distribute rewards transaction is not in the list of transactions at all
 			// but it should be
@@ -671,7 +671,7 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 // and compares its hash with the one extracted from the block.
 func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) error {
 	// we don't have distribute rewards tx if we just started the chain
-	if isRewardDistributionBlock(f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		localDistributeRewardsTx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return err

@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -33,6 +34,7 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	require.ErrorIs(t, governanceManager.PostEpoch(&common.PostEpochRequest{
 		NewEpochID:        2,
 		FirstBlockOfEpoch: 21,
+		Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}),
 		errClientConfigNotFound)
 
@@ -43,6 +45,7 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	require.NoError(t, governanceManager.PostEpoch(&common.PostEpochRequest{
 		NewEpochID:        2,
 		FirstBlockOfEpoch: 21,
+		Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}))
 
 	updatedConfig, err := state.GovernanceStore.getClientConfig()
@@ -67,6 +70,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 				Receipts: []*types.Receipt{},
 			},
 			Epoch: 1,
+			Forks: &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		blockchainMock := new(blockchainMock)
@@ -111,6 +115,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 				Receipts: []*types.Receipt{receipt},
 			},
 			Epoch: 1,
+			Forks: &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		blockchainMock := new(blockchainMock)

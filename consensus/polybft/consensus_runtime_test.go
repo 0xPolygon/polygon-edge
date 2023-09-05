@@ -24,16 +24,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
-
-func init() {
-	// for tests
-	forkmanager.GetInstance().RegisterFork(chain.Governance, nil)
-	forkmanager.GetInstance().ActivateFork(chain.Governance, 0) //nolint:errcheck
-}
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
 	t.Parallel()
@@ -354,6 +347,7 @@ func TestConsensusRuntime_FSM_NotEndOfEpoch_NotEndOfSprint(t *testing.T) {
 		},
 		Key:        wallet.NewKey(validators.GetPrivateIdentities()[0]),
 		blockchain: blockchainMock,
+		Forks:      chain.AllForksEnabled,
 	}
 	runtime := &consensusRuntime{
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
@@ -418,6 +412,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 		},
 		Key:        validatorAccounts.GetValidator("A").Key(),
 		blockchain: blockchainMock,
+		Forks:      chain.AllForksEnabled,
 	}
 
 	metadata := &epochMetadata{
@@ -493,6 +488,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		Key:                  createTestKey(t),
 		blockchain:           blockchainMock,
 		bridgeTopic:          &mockTopic{},
+		Forks:                chain.AllForksEnabled,
 	}
 	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	require.NoError(t, err)
@@ -585,6 +581,7 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 		blockchain:           blockchainMock,
 		polybftBackend:       polybftBackendMock,
 		Key:                  validators.GetValidator("A").Key(),
+		Forks:                chain.AllForksEnabled,
 	}
 
 	consensusRuntime := &consensusRuntime{

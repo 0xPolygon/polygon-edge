@@ -20,7 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
@@ -150,8 +149,16 @@ func TestFSM_BuildProposal_WithoutCommitEpochTxGood(t *testing.T) {
 		},
 	}
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &common.PolyBFTConfig{}, backend: blockchainMock,
-		validators: validators.ToValidatorSet(), exitEventRootHash: eventRoot, logger: hclog.NewNullLogger()}
+	fsm := &fsm{
+		parent:            parent,
+		blockBuilder:      mBlockBuilder,
+		config:            &common.PolyBFTConfig{},
+		backend:           blockchainMock,
+		validators:        validators.ToValidatorSet(),
+		exitEventRootHash: eventRoot,
+		logger:            hclog.NewNullLogger(),
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}
 
 	proposal, err := fsm.BuildProposal(currentRound)
 	assert.NoError(t, err)
@@ -223,6 +230,7 @@ func TestFSM_BuildProposal_WithCommitEpochTxGood(t *testing.T) {
 		commitEpochInput:  createTestCommitEpochInput(t, 0, 10),
 		exitEventRootHash: eventRoot,
 		logger:            hclog.NewNullLogger(),
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}
 
 	proposal, err := fsm.BuildProposal(currentRound)
@@ -341,6 +349,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_ValidatorsDeltaExists(t *testing.T) 
 		exitEventRootHash:  types.ZeroHash,
 		logger:             hclog.NewNullLogger(),
 		newValidatorsDelta: newDelta,
+		forks:              &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}
 
 	proposal, err := fsm.BuildProposal(0)
@@ -388,10 +397,16 @@ func TestFSM_BuildProposal_NonEpochEndingBlock_ValidatorsDeltaNil(t *testing.T) 
 	blockBuilderMock.On("Fill").Once()
 	blockBuilderMock.On("Reset").Return(error(nil)).Once()
 
-	fsm := &fsm{parent: parent, blockBuilder: blockBuilderMock,
-		config: &common.PolyBFTConfig{}, backend: &blockchainMock{},
-		isEndOfEpoch: false, validators: testValidators.ToValidatorSet(),
-		exitEventRootHash: types.ZeroHash, logger: hclog.NewNullLogger()}
+	fsm := &fsm{parent: parent,
+		blockBuilder:      blockBuilderMock,
+		config:            &common.PolyBFTConfig{},
+		backend:           &blockchainMock{},
+		isEndOfEpoch:      false,
+		validators:        testValidators.ToValidatorSet(),
+		exitEventRootHash: types.ZeroHash,
+		logger:            hclog.NewNullLogger(),
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}
 
 	proposal, err := fsm.BuildProposal(0)
 	assert.NoError(t, err)
@@ -438,6 +453,7 @@ func TestFSM_BuildProposal_EpochEndingBlock_FailToGetNextValidatorsHash(t *testi
 		commitEpochInput:   createTestCommitEpochInput(t, 0, 10),
 		exitEventRootHash:  types.ZeroHash,
 		newValidatorsDelta: newValidatorDelta,
+		forks:              &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}
 
 	proposal, err := fsm.BuildProposal(0)
@@ -465,6 +481,7 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 			commitEpochInput:       createTestCommitEpochInput(t, 0, 10),
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
+			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		// add commit epoch commitEpochTx to the end of transactions list
@@ -494,6 +511,7 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 		fsm := &fsm{
 			parent:           &types.Header{Number: 5},
 			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+			forks:            &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
 		require.NoError(t, err)
@@ -506,6 +524,7 @@ func TestFSM_VerifyStateTransactions_CommitEpoch(t *testing.T) {
 			parent:           &types.Header{Number: 9},
 			isEndOfEpoch:     true,
 			commitEpochInput: createTestCommitEpochInput(t, 0, 10),
+			forks:            &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
 		require.ErrorContains(t, err, errCommitEpochTxDoesNotExist.Error())
@@ -567,6 +586,7 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			validators:             validatorSet,
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
+			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		distributeRewardsTx, err := fsm.createDistributeRewardsTx()
@@ -584,6 +604,7 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			validators:             validatorSet,
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
+			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		distributeRewardsTx, err := fsm.createDistributeRewardsTx()
@@ -602,6 +623,7 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			validators:             validatorSet,
 			distributeRewardsInput: createTestDistributeRewardsInput(t, 0, validators.GetPublicIdentities(), 10),
 			logger:                 hclog.NewNullLogger(),
+			forks:                  &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		distributeRewardsTx, err := fsm.createDistributeRewardsTx()
@@ -619,6 +641,7 @@ func TestFSM_VerifyStateTransactions_DistributeRewards(t *testing.T) {
 			parent:              &types.Header{Number: 9},
 			validators:          validatorSet,
 			logger:              hclog.NewNullLogger(),
+			forks:               &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		err := fsm.VerifyStateTransactions([]*types.Transaction{})
@@ -631,6 +654,7 @@ func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
 		parent:        &types.Header{Number: 1},
 		doubleSigners: []types.Address{types.StringToAddress("0x1"), types.StringToAddress("0x2")},
 		logger:        hclog.NewNullLogger(),
+		forks:         &chain.Forks{},
 	}
 
 	// slashing transaction is not expected since the fork isn't activated yet
@@ -639,8 +663,7 @@ func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
 	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
 	assert.ErrorIs(t, err, errSlashingTxNotExpected)
 
-	forkmanager.GetInstance().RegisterFork(chain.DoubleSignSlashing, nil)
-	_ = forkmanager.GetInstance().ActivateFork(chain.DoubleSignSlashing, 0)
+	fsm.forks.SetFork(chain.DoubleSignSlashing, chain.NewFork(0)) // enable double sign slashing fork
 
 	// no slashing transaction, but it was expected
 	err = fsm.VerifyStateTransactions([]*types.Transaction{})
@@ -668,8 +691,6 @@ func TestFSM_VerifyStateTransactions_SlashingTx(t *testing.T) {
 	fsm.doubleSigners = slashing.DoubleSigners{}
 	err = fsm.VerifyStateTransactions([]*types.Transaction{slashingTx1})
 	assert.ErrorIs(t, err, errSlashingTxNotExpected)
-
-	_ = forkmanager.GetInstance().DeactivateFork(chain.DoubleSignSlashing)
 }
 
 func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
@@ -701,6 +722,7 @@ func TestFSM_VerifyStateTransaction_Commitments(t *testing.T) {
 				isEndOfSprint: true,
 				parent:        &types.Header{Number: 9},
 				validators:    validators.ToValidatorSet(),
+				forks:         &chain.Forks{chain.Governance: chain.NewFork(0)},
 			}
 
 			var txns []*types.Transaction
@@ -859,8 +881,16 @@ func TestFSM_ValidateCommit_WrongValidator(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &common.PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.ToValidatorSet(), logger: hclog.NewNullLogger(), exitEventRootHash: types.ZeroHash}
+	fsm := &fsm{
+		parent:            parent,
+		blockBuilder:      mBlockBuilder,
+		config:            &common.PolyBFTConfig{},
+		backend:           &blockchainMock{},
+		validators:        validators.ToValidatorSet(),
+		logger:            hclog.NewNullLogger(),
+		exitEventRootHash: types.ZeroHash,
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}
 
 	_, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
@@ -887,8 +917,16 @@ func TestFSM_ValidateCommit_InvalidHash(t *testing.T) {
 	stateBlock := createDummyStateBlock(parentBlockNumber+1, parent.Hash, parent.ExtraData)
 	mBlockBuilder := newBlockBuilderMock(stateBlock)
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &common.PolyBFTConfig{}, backend: &blockchainMock{},
-		validators: validators.ToValidatorSet(), exitEventRootHash: types.ZeroHash, logger: hclog.NewNullLogger()}
+	fsm := &fsm{
+		parent:            parent,
+		blockBuilder:      mBlockBuilder,
+		config:            &common.PolyBFTConfig{},
+		backend:           &blockchainMock{},
+		validators:        validators.ToValidatorSet(),
+		exitEventRootHash: types.ZeroHash,
+		logger:            hclog.NewNullLogger(),
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}
 
 	_, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
@@ -916,10 +954,16 @@ func TestFSM_ValidateCommit_Good(t *testing.T) {
 
 	validatorSet := validator.NewValidatorSet(validatorsMetadata, hclog.NewNullLogger())
 
-	fsm := &fsm{parent: parent, blockBuilder: mBlockBuilder, config: &common.PolyBFTConfig{}, backend: &blockchainMock{},
+	fsm := &fsm{
+		parent:            parent,
+		blockBuilder:      mBlockBuilder,
+		config:            &common.PolyBFTConfig{},
+		backend:           &blockchainMock{},
 		validators:        validatorSet,
 		exitEventRootHash: types.ZeroHash,
-		logger:            hclog.NewNullLogger()}
+		logger:            hclog.NewNullLogger(),
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}
 
 	proposal, err := fsm.BuildProposal(0)
 	require.NoError(t, err)
@@ -989,6 +1033,7 @@ func TestFSM_Validate_ExitEventRootNotExpected(t *testing.T) {
 		polybftBackend:    polybftBackendMock,
 		config:            &common.PolyBFTConfig{BlockTimeDrift: 1},
 		exitEventRootHash: types.BytesToHash([]byte{0, 1, 2, 3, 4}), // expect this to be in proposal extra
+		forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}
 
 	err = fsm.Validate(proposal)
@@ -1072,6 +1117,7 @@ func TestFSM_Validate_EpochEndingBlock_MismatchInDeltas(t *testing.T) {
 		polybftBackend:     polybftBackendMock,
 		newValidatorsDelta: newValidatorDelta,
 		config:             &common.PolyBFTConfig{BlockTimeDrift: 1},
+		forks:              &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}
 
 	err = fsm.Validate(proposal)
@@ -1146,6 +1192,7 @@ func TestFSM_Validate_EpochEndingBlock_UpdatingValidatorSetInNonEpochEndingBlock
 		logger:         hclog.NewNullLogger(),
 		polybftBackend: polybftBackendMock,
 		config:         &common.PolyBFTConfig{BlockTimeDrift: 1},
+		forks:          &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}
 
 	err = fsm.Validate(proposal)

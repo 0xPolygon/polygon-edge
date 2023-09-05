@@ -21,7 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -79,6 +78,7 @@ type guardedDataDTO struct {
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
 	GenesisPolyBFTConfig  *common.PolyBFTConfig
+	Forks                 *chain.Forks
 	DataDir               string
 	Key                   *wallet.Key
 	State                 *State
@@ -353,6 +353,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		Epoch:               epoch.Number,
 		IsEpochEndingBlock:  isEndOfEpoch,
 		CurrentClientConfig: epoch.CurrentClientConfig,
+		Forks:               c.config.Forks,
 	}
 
 	// handle commitment and proofs creation
@@ -445,6 +446,7 @@ func (c *consensusRuntime) FSM() error {
 
 	ff := &fsm{
 		config:              epoch.CurrentClientConfig,
+		forks:               c.config.Forks,
 		parent:              parent,
 		backend:             c.config.blockchain,
 		polybftBackend:      c.config.polybftBackend,
@@ -558,6 +560,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		NewEpochID:        epochNumber,
 		FirstBlockOfEpoch: firstBlockInEpoch,
 		ValidatorSet:      validator.NewValidatorSet(validatorSet, c.logger),
+		Forks:             c.config.Forks,
 	}
 
 	if err := c.stateSyncManager.PostEpoch(reqObj); err != nil {
@@ -606,7 +609,7 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 	lastFinalizedBlock *types.Header,
 	epochID uint64,
 ) (*contractsapi.DistributeRewardForRewardPoolFn, error) {
-	if !isRewardDistributionBlock(isFirstBlockOfEpoch, isEndOfEpoch, pendingBlockNumber) {
+	if !isRewardDistributionBlock(c.config.Forks, isFirstBlockOfEpoch, isEndOfEpoch, pendingBlockNumber) {
 		// we don't have to distribute rewards at this block
 		return nil, nil
 	}
@@ -619,7 +622,7 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 		blockHeader   = lastFinalizedBlock // start calculating from this block
 	)
 
-	if forkmanager.GetInstance().IsForkEnabled(chain.Governance, pendingBlockNumber) {
+	if c.config.Forks.IsActive(chain.Governance, pendingBlockNumber) {
 		// if governance is enabled, we are distributing rewards for previous epoch
 		// at the beginning of a new epoch, so modify epochID
 		epochID--
@@ -672,7 +675,7 @@ func (c *consensusRuntime) calculateDistributeRewardsInput(
 		}
 	}
 
-	lookbackSize := getLookbackSizeForRewardDistribution(pendingBlockNumber)
+	lookbackSize := getLookbackSizeForRewardDistribution(c.config.Forks, pendingBlockNumber)
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
 	// since we can not calculate uptime for the last block in epoch (because of parent signatures)
