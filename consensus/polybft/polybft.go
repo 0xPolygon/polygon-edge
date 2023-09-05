@@ -161,7 +161,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			proxyAddr[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
 		}
 
-		if err = setUpProxies(transition, config.Params.ProxyContractsAdmin, proxyAddr); err != nil {
+		if err = setUpProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddr); err != nil {
 			return err
 		}
 

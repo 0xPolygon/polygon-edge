@@ -200,7 +200,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
-		BlockTimeDrift: p.blockTimeDrift,
+		BlockTimeDrift:      p.blockTimeDrift,
+		ProxyContractsAdmin: types.StringToAddress(p.proxyContractsAdmin),
 		GovernanceConfig: &polyCommon.GovernanceConfig{
 			VotingDelay:              voteDelay,
 			VotingPeriod:             votingPeriod,
@@ -369,8 +370,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
 		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
 	}
-
-	chainConfig.Params.ProxyContractsAdmin = types.StringToAddress(p.proxyContractsAdmin)
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
 }
