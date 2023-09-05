@@ -433,6 +433,7 @@ func main() {
 				"NewVotingPeriod",
 				"NewProposalThreshold",
 				"NewSprintSize",
+				"NewBaseFeeChangeDenom",
 			},
 		},
 		{

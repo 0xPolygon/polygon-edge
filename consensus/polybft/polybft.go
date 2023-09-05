@@ -127,7 +127,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config)
+		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config.Params)
 		if err != nil {
 			return err
 		}
@@ -506,7 +506,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
-	pbftConfig, err := polyCommon.GetPolyBFTConfig(config)
+	pbftConfig, err := polyCommon.GetPolyBFTConfig(config.Params)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +559,8 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		GenesisPolyBFTConfig:  p.genesisClientConfig,
+		genesisParams:         p.config.Config.Params,
+		GenesisConfig:         p.genesisClientConfig,
 		Forks:                 p.config.Config.Params.Forks,
 		Key:                   p.key,
 		DataDir:               p.dataDir,

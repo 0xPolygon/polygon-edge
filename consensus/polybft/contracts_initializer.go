@@ -293,6 +293,7 @@ func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Trans
 			NewMinValidatorSetSize:     new(big.Int).SetUint64(cfg.MinValidatorSetSize),
 			NewMaxValidatorSetSize:     new(big.Int).SetUint64(cfg.MaxValidatorSetSize),
 			NewWithdrawalWaitPeriod:    new(big.Int).SetUint64(cfg.WithdrawalWaitPeriod),
+			NewBaseFeeChangeDenom:      new(big.Int).SetUint64(cfg.BaseFeeChangeDenom),
 			NewBlockTime:               new(big.Int).SetUint64(uint64(cfg.BlockTime.Duration)),
 			NewBlockTimeDrift:          new(big.Int).SetUint64(cfg.BlockTimeDrift),
 			NewVotingDelay:             new(big.Int).Set(cfg.GovernanceConfig.VotingDelay),
@@ -361,7 +362,7 @@ func initChildGovernor(cfg common.PolyBFTConfig, transition *state.Transition) e
 	initFn := &contractsapi.InitializeChildGovernorFn{
 		Token_:           contracts.ValidatorSetContract,
 		Timelock_:        cfg.GovernanceConfig.ChildTimelockAddr,
-		NetworkParams_:   cfg.GovernanceConfig.NetworkParamsAddr,
+		NetworkParams:    cfg.GovernanceConfig.NetworkParamsAddr,
 		QuorumNumerator_: new(big.Int).SetUint64(cfg.GovernanceConfig.ProposalQuorumPercentage),
 	}
 
