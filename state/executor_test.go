@@ -147,6 +147,9 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 				ctx: runtime.TxContext{
 					BaseFee: tt.baseFee,
 				},
+				config: chain.ForksInTime{
+					London: true,
+				},
 			}
 
 			err := tr.checkDynamicFees(tt.tx)
