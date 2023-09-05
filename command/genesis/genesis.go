@@ -140,7 +140,7 @@ func setFlags(cmd *cobra.Command) {
 		cmd.Flags().Uint64Var(
 			&params.minNumValidators,
 			minValidatorCount,
-			1,
+			4,
 			"the minimum number of validators in the validator set for PoS",
 		)
 
@@ -234,6 +234,59 @@ func setFlags(cmd *cobra.Command) {
 			blockTimeDriftFlag,
 			defaultBlockTimeDrift,
 			"configuration for block time drift value (in seconds)",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.checkpointInterval,
+			checkpointIntervalFlag,
+			defaultCheckpointInterval,
+			"checkpoint submission interval in blocks",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.withdrawalWaitPeriod,
+			withdrawalWaitPeriodFlag,
+			defaultWithdrawalWaitPeriod,
+			"number of epochs after which withdrawal can be done from child chain",
+		)
+	}
+
+	// Governance
+	{
+		cmd.Flags().StringVar(
+			&params.voteDelay,
+			voteDelayFlag,
+			defaultVotingDelay,
+			"number of blocks after proposal is submitted before voting starts",
+		)
+
+		cmd.Flags().StringVar(
+			&params.votingPeriod,
+			votePeriodFlag,
+			defaultVotingPeriod,
+			"number of blocks that the voting period for a proposal lasts",
+		)
+
+		cmd.Flags().StringVar(
+			&params.proposalThreshold,
+			voteProposalThresholdFlag,
+			defaultVoteProposalThreshold,
+			"number of vote tokens (in wei) required in order for a voter to submit a proposal",
+		)
+
+		cmd.Flags().StringVar(
+			&params.governorAdmin,
+			governorAdminFlag,
+			"",
+			"address of a governance admin (governance admin can add new or remove old proposers "+
+				"of governance proposals, and add new and remove old executors of accepted proposals)",
+		)
+
+		cmd.Flags().Uint64Var(
+			&params.proposalQuorum,
+			proposalQuorumFlag,
+			defaultProposalQuorumPercentage,
+			"percentage of total validator stake needed for a governance proposal to be accepted (from 0 to 100%)",
 		)
 	}
 
