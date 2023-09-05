@@ -69,10 +69,8 @@ type checkpointManager struct {
 	logger hclog.Logger
 	// state boltDb instance
 	state *State
-	// exitEventsGetter gets exit events (missed or current) from blocks
-	exitEventsGetter *eventsGetter[*ExitEvent]
-	// slashedEventsGetter gets slashed events from blocks
-	slashedEventsGetter *eventsGetter[*contractsapi.SlashedEvent]
+	// eventsGetter gets Ethereum events (missed or current) from blocks
+	eventsGetter *eventsGetter[contractsapi.EventAbi]
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
@@ -80,24 +78,13 @@ func newCheckpointManager(key ethgo.Key,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
-	exitEventGetter := &eventsGetter[*ExitEvent]{
+	eventsGetter := &eventsGetter[contractsapi.EventAbi]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.L2StateSenderContract
+			return l.Address == contracts.L2StateSenderContract ||
+				l.Address == contracts.ValidatorSetContract
 		},
-		parseEventFn: parseExitEvent,
-	}
-	slashedEventGetter := &eventsGetter[*contractsapi.SlashedEvent]{
-		blockchain: blockchain,
-		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.ValidatorSetContract
-		},
-		parseEventFn: func(_ *types.Header, l *ethgo.Log) (*contractsapi.SlashedEvent, bool, error) {
-			var slashedEvent contractsapi.SlashedEvent
-			doesMatch, err := slashedEvent.ParseLog(l)
-
-			return &slashedEvent, doesMatch, err
-		},
+		parseEventFn: parseEvent,
 	}
 
 	return &checkpointManager{
@@ -108,8 +95,7 @@ func newCheckpointManager(key ethgo.Key,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
 		state:                 state,
-		exitEventsGetter:      exitEventGetter,
-		slashedEventsGetter:   slashedEventGetter,
+		eventsGetter:          eventsGetter,
 	}
 }
 
@@ -305,9 +291,21 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
-	exitEvents, err := c.exitEventsGetter.getFromBlocks(lastBlock, req.FullBlock)
+	events, err := c.eventsGetter.getFromBlocks(lastBlock, req.FullBlock)
 	if err != nil {
 		return err
+	}
+
+	exitEvents := make([]*ExitEvent, 0, len(events))
+	slashedEvents := make([]*contractsapi.SlashedEvent, 0, len(events))
+
+	for _, e := range events {
+		switch specificEvent := e.(type) {
+		case *ExitEvent:
+			exitEvents = append(exitEvents, specificEvent)
+		case *contractsapi.SlashedEvent:
+			slashedEvents = append(slashedEvents, specificEvent)
+		}
 	}
 
 	sort.Slice(exitEvents, func(i, j int) bool {
@@ -320,11 +318,6 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 	}
 
 	if err := c.state.ExitEventStore.updateLastSaved(block); err != nil {
-		return err
-	}
-
-	slashedEvents, err := c.slashedEventsGetter.getFromBlocks(lastBlock, req.FullBlock)
-	if err != nil {
 		return err
 	}
 
@@ -515,28 +508,43 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	return merkle.NewMerkleTree(data)
 }
 
-// parseExitEvent parses exit event from provided log
-func parseExitEvent(h *types.Header, l *ethgo.Log) (*ExitEvent, bool, error) {
-	extra, err := GetIbftExtra(h.ExtraData)
-	if err != nil {
-		return nil, false,
-			fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
+// parseEvent parses event (either exit or slashed event) from the provided log
+func parseEvent(h *types.Header, l *ethgo.Log) (contractsapi.EventAbi, bool, error) {
+	var (
+		exitEvent    ExitEvent
+		slashedEvent contractsapi.SlashedEvent
+	)
+
+	switch l.Topics[0] {
+	case exitEvent.Sig():
+		extra, err := GetIbftExtra(h.ExtraData)
+		if err != nil {
+			return nil, false,
+				fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
+		}
+
+		epoch := extra.Checkpoint.EpochNumber
+		block := h.Number
+
+		if extra.Validators != nil {
+			// exit events that happened in epoch ending blocks,
+			// should be added to the tree of the next epoch
+			epoch++
+			block++
+		}
+
+		event, err := decodeExitEvent(l, epoch, block)
+		if err != nil {
+			return nil, false, err
+		}
+
+		return event, true, nil
+
+	case slashedEvent.Sig():
+		matches, err := slashedEvent.ParseLog(l)
+
+		return &slashedEvent, matches, err
 	}
 
-	epoch := extra.Checkpoint.EpochNumber
-	block := h.Number
-
-	if extra.Validators != nil {
-		// exit events that happened in epoch ending blocks,
-		// should be added to the tree of the next epoch
-		epoch++
-		block++
-	}
-
-	event, err := decodeExitEvent(l, epoch, block)
-	if err != nil {
-		return nil, false, err
-	}
-
-	return event, true, nil
+	return nil, false, nil
 }
