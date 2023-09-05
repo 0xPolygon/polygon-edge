@@ -58,6 +58,7 @@ var (
 type fsm struct {
 	// PolyBFT consensus protocol configuration
 	config *common.PolyBFTConfig
+
 	// forks holds forks configuration
 	forks *chain.Forks
 
