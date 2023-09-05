@@ -129,7 +129,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		if i%2 == 0 {
 			txn.Type = ethgo.TransactionDynamicFee
 			txn.MaxFeePerGas = big.NewInt(1000000000)
-			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+			txn.MaxPriorityFeePerGas = big.NewInt(1000000000)
 		} else {
 			txn.Type = ethgo.TransactionLegacy
 			txn.GasPrice = ethgo.Gwei(1).Uint64()
