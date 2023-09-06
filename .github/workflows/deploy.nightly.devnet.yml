@@ -131,7 +131,8 @@ jobs:
                           --block-time {{ block_time }}s \
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address' | sed 's/^0x//'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey') {% endif %}{% endfor %} \
                           --epoch-size 10 \
-                          --native-token-config MyToken:MTK:18:true:0x0000000000000000000000000000000000001010
+                          --native-token-config MyToken:MTK:18:true:{{ loadtest_account }} \
+                          --governor-admin {{ loadtest_account }}
 
               polygon-edge polybft stake-manager-deploy \
                   --jsonrpc {{ rootchain_json_rpc }} \
