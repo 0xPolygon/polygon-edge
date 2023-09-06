@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -280,6 +281,11 @@ func TestEth_Syncing(t *testing.T) {
 func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
 	priceLimit := uint64(100333)
 	store := newMockBlockStore()
+	store.blocks = []*types.Block{
+		{
+			Header: &types.Header{Number: uint64(1)},
+		},
+	}
 	// not using newTestEthEndpoint as we need to set priceLimit
 	eth := newTestEthEndpointWithPriceLimit(store, priceLimit)
 
@@ -596,6 +602,14 @@ func (m *mockBlockStore) TxPoolSubscribe(request *proto.SubscribeRequest) (<-cha
 
 func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
 	return &Account{Nonce: 0}, nil
+}
+
+func (m *mockBlockStore) GetBaseFee() uint64 {
+	return 0
+}
+
+func (m *mockBlockStore) GetForksInTime(block uint64) chain.ForksInTime {
+	return chain.ForksInTime{London: false}
 }
 
 func newTestBlock(number uint64, hash types.Hash) *types.Block {
