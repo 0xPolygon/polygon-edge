@@ -395,7 +395,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	transactions := []*types.Transaction{
 		{
 			Nonce:    0,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			GasPrice: big.NewInt(1000000000),
 			Gas:      22000,
 			To:       &receiverAddress,
 			Value:    oneEth,
@@ -404,7 +404,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		},
 		{
 			Nonce:    1,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			GasPrice: big.NewInt(1000000000),
 			Gas:      22000,
 			To:       &receiverAddress,
 			Value:    oneEth,
