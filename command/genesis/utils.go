@@ -14,6 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -124,7 +125,7 @@ func parseTrackerStartBlocks(trackerStartBlocksRaw []string) (map[types.Address]
 }
 
 // parseBurnContractInfo parses provided burn contract information and returns burn contract block and address
-func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInfo, error) {
+func parseBurnContractInfo(burnContractInfoRaw string) (*polyCommon.BurnContractInfo, error) {
 	// <block>:<address>[:<burn destination address>]
 	burnContractParts := strings.Split(burnContractInfoRaw, ":")
 	if len(burnContractParts) < 2 || len(burnContractParts) > 3 {
@@ -144,7 +145,7 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 	}
 
 	if len(burnContractParts) == 2 {
-		return &polybft.BurnContractInfo{
+		return &polyCommon.BurnContractInfo{
 			BlockNumber:        blockNum,
 			Address:            types.StringToAddress(contractAddress),
 			DestinationAddress: types.ZeroAddress,
@@ -156,7 +157,7 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 		return nil, fmt.Errorf("failed to parse burn destination address %s: %w", destinationAddress, err)
 	}
 
-	return &polybft.BurnContractInfo{
+	return &polyCommon.BurnContractInfo{
 		BlockNumber:        blockNum,
 		Address:            types.StringToAddress(contractAddress),
 		DestinationAddress: types.StringToAddress(destinationAddress),

@@ -8,7 +8,7 @@ import (
 	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/command"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -18,13 +18,13 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 	cases := []struct {
 		name        string
 		rawConfig   string
-		expectedCfg *polybft.TokenConfig
+		expectedCfg *common.TokenConfig
 		expectErr   bool
 	}{
 		{
 			name:      "default token config",
 			rawConfig: "",
-			expectedCfg: &polybft.TokenConfig{
+			expectedCfg: &common.TokenConfig{
 				Name:       defaultNativeTokenName,
 				Symbol:     defaultNativeTokenSymbol,
 				Decimals:   defaultNativeTokenDecimals,
@@ -66,7 +66,7 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 		{
 			name:      "non-mintable valid config",
 			rawConfig: "MyToken:MTK:9:false",
-			expectedCfg: &polybft.TokenConfig{
+			expectedCfg: &common.TokenConfig{
 				Name:       "MyToken",
 				Symbol:     "MTK",
 				Decimals:   9,
@@ -78,7 +78,7 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 		{
 			name:      "non-mintable token config, owner provided but ignored",
 			rawConfig: "MyToken:MTK:9:false:0x123456789",
-			expectedCfg: &polybft.TokenConfig{
+			expectedCfg: &common.TokenConfig{
 				Name:       "MyToken",
 				Symbol:     "MTK",
 				Decimals:   9,
@@ -90,7 +90,7 @@ func Test_extractNativeTokenMetadata(t *testing.T) {
 		{
 			name:      "mintable token valid config",
 			rawConfig: "MyMintToken:MMTK:9:true:0x123456789",
-			expectedCfg: &polybft.TokenConfig{
+			expectedCfg: &common.TokenConfig{
 				Name:       "MyMintToken",
 				Symbol:     "MMTK",
 				Decimals:   9,

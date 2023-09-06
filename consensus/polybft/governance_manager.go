@@ -12,6 +12,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 
 	"github.com/0xPolygon/polygon-edge/chain"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
@@ -34,9 +35,9 @@ var (
 // if governance fork is enabled, reward distribution is only present on the first block of epoch
 // and if we are not at the start of chain
 // if governance fork is not enabled, reward distribution is only present at the epoch ending block
-func isRewardDistributionBlock(isFirstBlockOfEpoch, isEndOfEpoch bool,
+func isRewardDistributionBlock(forks *chain.Forks, isFirstBlockOfEpoch, isEndOfEpoch bool,
 	pendingBlockNumber uint64) bool {
-	if forkmanager.GetInstance().IsForkEnabled(chain.Governance, pendingBlockNumber) {
+	if forks.IsActive(chain.Governance, pendingBlockNumber) {
 		return isFirstBlockOfEpoch && pendingBlockNumber > 1
 	}
 
@@ -45,8 +46,8 @@ func isRewardDistributionBlock(isFirstBlockOfEpoch, isEndOfEpoch bool,
 
 // getLookbackSizeForRewardDistribution returns lookback size for reward distribution
 // based on if governance fork is enabled or not
-func getLookbackSizeForRewardDistribution(blockNumber uint64) uint64 {
-	if forkmanager.GetInstance().IsForkEnabled(chain.Governance, blockNumber) {
+func getLookbackSizeForRewardDistribution(forks *chain.Forks, blockNumber uint64) uint64 {
+	if forks.IsActive(chain.Governance, blockNumber) {
 		return newRewardLookbackSize
 	}
 
@@ -56,9 +57,9 @@ func getLookbackSizeForRewardDistribution(blockNumber uint64) uint64 {
 // GovernanceManager interface provides functions for handling governance events
 // and updating client configuration based on executed governance proposals
 type GovernanceManager interface {
-	PostBlock(req *PostBlockRequest) error
-	PostEpoch(req *PostEpochRequest) error
-	GetClientConfig() (*PolyBFTConfig, error)
+	PostBlock(req *polyCommon.PostBlockRequest) error
+	PostEpoch(req *polyCommon.PostEpochRequest) error
+	GetClientConfig() (*polyCommon.PolyBFTConfig, error)
 }
 
 var _ GovernanceManager = (*dummyGovernanceManager)(nil)
@@ -67,9 +68,9 @@ var _ GovernanceManager = (*dummyGovernanceManager)(nil)
 // used only for unit testing
 type dummyGovernanceManager struct{}
 
-func (d *dummyGovernanceManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (d *dummyGovernanceManager) PostEpoch(req *PostEpochRequest) error { return nil }
-func (d *dummyGovernanceManager) GetClientConfig() (*PolyBFTConfig, error) {
+func (d *dummyGovernanceManager) PostBlock(req *polyCommon.PostBlockRequest) error { return nil }
+func (d *dummyGovernanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error { return nil }
+func (d *dummyGovernanceManager) GetClientConfig() (*polyCommon.PolyBFTConfig, error) {
 	return nil, nil
 }
 
@@ -85,7 +86,7 @@ type governanceManager struct {
 }
 
 // newGovernanceManager is a constructor function for governance manager
-func newGovernanceManager(genesisConfig *PolyBFTConfig,
+func newGovernanceManager(genesisConfig *polyCommon.PolyBFTConfig,
 	logger hclog.Logger,
 	state *State,
 	blockhain blockchainBackend) (*governanceManager, error) {
@@ -146,13 +147,13 @@ func newGovernanceManager(genesisConfig *PolyBFTConfig,
 }
 
 // GetClientConfig returns latest client configuration from boltdb
-func (g *governanceManager) GetClientConfig() (*PolyBFTConfig, error) {
+func (g *governanceManager) GetClientConfig() (*polyCommon.PolyBFTConfig, error) {
 	return g.state.GovernanceStore.getClientConfig()
 }
 
 // PostEpoch notifies the governance manager that an epoch has changed
-func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
-	if !forkmanager.GetInstance().IsForkEnabled(chain.Governance, req.FirstBlockOfEpoch) {
+func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
+	if !req.Forks.IsActive(chain.Governance, req.FirstBlockOfEpoch) {
 		// if governance fork is not enabled, do nothing
 		return nil
 	}
@@ -358,8 +359,8 @@ func (g *governanceManager) PostEpoch(req *PostEpochRequest) error {
 
 // PostBlock notifies governance manager that a block was finalized
 // so that he can extract governance events and save them to bolt db
-func (g *governanceManager) PostBlock(req *PostBlockRequest) error {
-	if !forkmanager.GetInstance().IsForkEnabled(chain.Governance, req.FullBlock.Block.Number()) {
+func (g *governanceManager) PostBlock(req *polyCommon.PostBlockRequest) error {
+	if !req.Forks.IsActive(chain.Governance, req.FullBlock.Block.Number()) {
 		// if governance fork is not enabled, do nothing
 		return nil
 	}

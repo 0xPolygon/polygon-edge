@@ -1,10 +1,11 @@
 package polybft
 
 import (
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
 )
 
 // eventsGetter is a struct for getting missed and current events
@@ -117,4 +118,21 @@ func (e *eventsGetter[T]) getEventsFromReceipts(blockHeader *types.Header,
 	}
 
 	return events, nil
+}
+
+// convertLog converts types.Log to ethgo.Log
+func convertLog(log *types.Log) *ethgo.Log {
+	l := &ethgo.Log{
+		Address: ethgo.Address(log.Address),
+		Data:    make([]byte, len(log.Data)),
+		Topics:  make([]ethgo.Hash, len(log.Topics)),
+	}
+
+	copy(l.Data, log.Data)
+
+	for i, topic := range log.Topics {
+		l.Topics[i] = ethgo.Hash(topic)
+	}
+
+	return l
 }

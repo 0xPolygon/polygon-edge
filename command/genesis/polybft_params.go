@@ -15,6 +15,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -175,7 +176,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		proposalQuorum = proposalQuorumMax
 	}
 
-	polyBftConfig := &polybft.PolyBFTConfig{
+	polyBftConfig := &polyCommon.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
 		EpochSize:           p.epochSize,
@@ -189,13 +190,13 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		MaxValidatorSetSize:  p.maxNumValidators,
 		CheckpointInterval:   p.checkpointInterval,
 		WithdrawalWaitPeriod: p.withdrawalWaitPeriod,
-		RewardConfig: &polybft.RewardsConfig{
+		RewardConfig: &polyCommon.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
 		BlockTimeDrift: p.blockTimeDrift,
-		GovernanceConfig: &polybft.GovernanceConfig{
+		GovernanceConfig: &polyCommon.GovernanceConfig{
 			VotingDelay:              voteDelay,
 			VotingPeriod:             votingPeriod,
 			ProposalThreshold:        proposalThreshold,
@@ -369,7 +370,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 func (p *genesisParams) deployContracts(
 	rewardTokenByteCode []byte,
-	polybftConfig *polybft.PolyBFTConfig,
+	polybftConfig *polyCommon.PolyBFTConfig,
 	chainConfig *chain.Chain,
 	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
 	type contractInfo struct {

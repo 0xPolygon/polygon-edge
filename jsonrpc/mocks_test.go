@@ -203,6 +203,10 @@ func (m *mockStore) GenerateExitProof(exitID uint64) (types.Proof, error) {
 	}, nil
 }
 
+func (m *mockStore) GetPendingSlashProofs() ([]types.Proof, error) {
+	return nil, nil
+}
+
 func (m *mockStore) GetPeers() int {
 	return 20
 }

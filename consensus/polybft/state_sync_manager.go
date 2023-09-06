@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -38,8 +39,8 @@ type StateSyncManager interface {
 	Close()
 	Commitment(blockNumber uint64) (*CommitmentMessageSigned, error)
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
-	PostBlock(req *PostBlockRequest) error
-	PostEpoch(req *PostEpochRequest) error
+	PostBlock(req *common.PostBlockRequest) error
+	PostEpoch(req *common.PostEpochRequest) error
 }
 
 var _ StateSyncManager = (*dummyStateSyncManager)(nil)
@@ -52,8 +53,8 @@ func (n *dummyStateSyncManager) Close()      {}
 func (n *dummyStateSyncManager) Commitment(blockNumber uint64) (*CommitmentMessageSigned, error) {
 	return nil, nil
 }
-func (n *dummyStateSyncManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (n *dummyStateSyncManager) PostEpoch(req *PostEpochRequest) error { return nil }
+func (n *dummyStateSyncManager) PostBlock(req *common.PostBlockRequest) error { return nil }
+func (n *dummyStateSyncManager) PostEpoch(req *common.PostEpochRequest) error { return nil }
 func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
 }
@@ -373,7 +374,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(blockNumber uint6
 
 // PostEpoch notifies the state sync manager that an epoch has changed,
 // so that it can discard any previous epoch commitments, and build a new one (since validator set changed)
-func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
+func (s *stateSyncManager) PostEpoch(req *common.PostEpochRequest) error {
 	s.lock.Lock()
 
 	s.pendingCommitments = nil
@@ -397,7 +398,7 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 
 // PostBlock notifies state sync manager that a block was finalized,
 // so that it can build state sync proofs if a block has a commitment submission transaction
-func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
+func (s *stateSyncManager) PostBlock(req *common.PostBlockRequest) error {
 	commitment, err := getCommitmentMessageSignedTx(req.FullBlock.Block.Transactions)
 	if err != nil {
 		return err

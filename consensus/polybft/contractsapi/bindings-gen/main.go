@@ -383,11 +383,13 @@ func main() {
 				"commitEpoch",
 				"unstake",
 				"initialize",
+				"slash",
 			},
 			[]string{
 				"Transfer",
 				"WithdrawalRegistered",
 				"Withdrawal",
+				"Slashed",
 			},
 		},
 		{

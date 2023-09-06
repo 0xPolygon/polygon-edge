@@ -90,4 +90,7 @@ type BridgeDataProvider interface {
 
 	// GetStateSyncProof retrieves the StateSync proof
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
+
+	// GetPendingSlashProofs retrieves executable slashing exit event proofs
+	GetPendingSlashProofs() ([]types.Proof, error)
 }

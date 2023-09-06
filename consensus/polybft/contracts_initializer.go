@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -16,7 +18,7 @@ const (
 )
 
 // initValidatorSet initializes ValidatorSet SC
-func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+func initValidatorSet(polyBFTConfig common.PolyBFTConfig, transition *state.Transition) error {
 	initialValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
 		initialValidators[i] = &contractsapi.ValidatorInit{
@@ -43,7 +45,7 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 }
 
 // initRewardPool initializes RewardPool SC
-func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) error {
+func initRewardPool(polybftConfig common.PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeRewardPoolFn{
 		NewRewardToken:    polybftConfig.RewardConfig.TokenAddress,
 		NewRewardWallet:   polybftConfig.RewardConfig.WalletAddress,
@@ -61,7 +63,7 @@ func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) e
 }
 
 // getInitERC20PredicateInput builds initialization input parameters for child chain ERC20Predicate SC
-func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) ([]byte, error) {
+func getInitERC20PredicateInput(config *common.BridgeConfig, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
 		params = &contractsapi.InitializeRootMintableERC20PredicateFn{
@@ -84,7 +86,7 @@ func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) (
 }
 
 // getInitERC20PredicateACLInput builds initialization input parameters for child chain ERC20PredicateAccessList SC
-func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
+func getInitERC20PredicateACLInput(config *common.BridgeConfig, owner types.Address,
 	useAllowList, useBlockList, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
@@ -114,7 +116,7 @@ func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
 }
 
 // getInitERC721PredicateInput builds initialization input parameters for child chain ERC721Predicate SC
-func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens bool) ([]byte, error) {
+func getInitERC721PredicateInput(config *common.BridgeConfig, childOriginatedTokens bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childOriginatedTokens {
 		params = &contractsapi.InitializeRootMintableERC721PredicateFn{
@@ -137,7 +139,7 @@ func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens boo
 
 // getInitERC721PredicateACLInput builds initialization input parameters
 // for child chain ERC721PredicateAccessList SC
-func getInitERC721PredicateACLInput(config *BridgeConfig, owner types.Address,
+func getInitERC721PredicateACLInput(config *common.BridgeConfig, owner types.Address,
 	useAllowList, useBlockList, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
@@ -166,7 +168,7 @@ func getInitERC721PredicateACLInput(config *BridgeConfig, owner types.Address,
 }
 
 // getInitERC1155PredicateInput builds initialization input parameters for child chain ERC1155Predicate SC
-func getInitERC1155PredicateInput(config *BridgeConfig, childChainMintable bool) ([]byte, error) {
+func getInitERC1155PredicateInput(config *common.BridgeConfig, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
 		params = &contractsapi.InitializeRootMintableERC1155PredicateFn{
@@ -189,7 +191,7 @@ func getInitERC1155PredicateInput(config *BridgeConfig, childChainMintable bool)
 
 // getInitERC1155PredicateACLInput builds initialization input parameters
 // for child chain ERC1155PredicateAccessList SC
-func getInitERC1155PredicateACLInput(config *BridgeConfig, owner types.Address,
+func getInitERC1155PredicateACLInput(config *common.BridgeConfig, owner types.Address,
 	useAllowList, useBlockList, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
@@ -218,7 +220,7 @@ func getInitERC1155PredicateACLInput(config *BridgeConfig, owner types.Address,
 }
 
 // mintRewardTokensToWallet mints configured amount of reward tokens to reward wallet address
-func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+func mintRewardTokensToWallet(polyBFTConfig common.PolyBFTConfig, transition *state.Transition) error {
 	if isNativeRewardToken(polyBFTConfig) {
 		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
 		// for given wallet address to it since this is done in premine
@@ -241,7 +243,7 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 
 // approveRewardPoolAsSpender approves reward pool contract as reward token spender
 // since reward pool distributes rewards.
-func approveRewardPoolAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+func approveRewardPoolAsSpender(polyBFTConfig common.PolyBFTConfig, transition *state.Transition) error {
 	approveFn := &contractsapi.ApproveRootERC20Fn{
 		Spender: contracts.RewardPoolContract,
 		Amount:  polyBFTConfig.RewardConfig.WalletAmount,
@@ -273,12 +275,12 @@ func callContract(from, to types.Address, input []byte, contractName string, tra
 }
 
 // isNativeRewardToken returns true in case a native token is used as a reward token as well
-func isNativeRewardToken(cfg PolyBFTConfig) bool {
+func isNativeRewardToken(cfg common.PolyBFTConfig) bool {
 	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
 }
 
 // initNetworkParamsContract initializes NetworkParams contract on child chain
-func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
+func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeNetworkParamsFn{
 		InitParams: &contractsapi.InitParams{
 			// only timelock controller can execute transactions on network params
@@ -309,7 +311,7 @@ func initNetworkParamsContract(cfg PolyBFTConfig, transition *state.Transition) 
 }
 
 // initForkParamsContract initializes ForkParams contract on child chain
-func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) error {
+func initForkParamsContract(cfg common.PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeForkParamsFn{
 		NewOwner: cfg.GovernanceConfig.ChildTimelockAddr,
 	}
@@ -324,7 +326,7 @@ func initForkParamsContract(cfg PolyBFTConfig, transition *state.Transition) err
 }
 
 // initChildTimelock initializes ChildTimelock contract on child chain
-func initChildTimelock(cfg PolyBFTConfig, transition *state.Transition) error {
+func initChildTimelock(cfg common.PolyBFTConfig, transition *state.Transition) error {
 	addresses := make([]types.Address, len(cfg.InitialValidatorSet)+1)
 	// we need to add child governor to list of proposers and executors as well
 	addresses[0] = cfg.GovernanceConfig.ChildGovernorAddr
@@ -350,7 +352,7 @@ func initChildTimelock(cfg PolyBFTConfig, transition *state.Transition) error {
 }
 
 // initChildGovernor initializes ChildGovernor contract on child chain
-func initChildGovernor(cfg PolyBFTConfig, transition *state.Transition) error {
+func initChildGovernor(cfg common.PolyBFTConfig, transition *state.Transition) error {
 	addresses := make([]types.Address, len(cfg.InitialValidatorSet))
 	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
 		addresses[i] = cfg.InitialValidatorSet[i].Address

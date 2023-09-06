@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -69,29 +69,40 @@ func resolveBinary() string {
 	return "polygon-edge"
 }
 
+func resolveByzantineBinary() string {
+	bin := os.Getenv("BYZANTINE_BINARY")
+	if bin != "" {
+		return bin
+	}
+	// fallback
+	return "polygon-edge-byzantine"
+}
+
 type TestClusterConfig struct {
 	t *testing.T
 
-	Name                 string
-	Premine              []string // address[:amount]
-	PremineValidators    []string // address[:amount]
-	StakeAmounts         []*big.Int
-	WithoutBridge        bool
-	BootnodeCount        int
-	NonValidatorCount    int
-	WithLogs             bool
-	WithStdout           bool
-	LogsDir              string
-	TmpDir               string
-	BlockGasLimit        uint64
-	BurnContract         *polybft.BurnContractInfo
-	ValidatorPrefix      string
-	Binary               string
-	ValidatorSetSize     uint64
-	EpochSize            int
-	EpochReward          int
-	NativeTokenConfigRaw string
-	SecretsCallback      func([]types.Address, *TestClusterConfig)
+	Name                     string
+	Premine                  []string // address[:amount]
+	PremineValidators        []string // address[:amount]
+	StakeAmounts             []*big.Int
+	WithoutBridge            bool
+	BootnodeCount            int
+	NonValidatorCount        int
+	WithLogs                 bool
+	WithStdout               bool
+	LogsDir                  string
+	TmpDir                   string
+	BlockGasLimit            uint64
+	BurnContract             *polyCommon.BurnContractInfo
+	ValidatorPrefix          string
+	Binary                   string
+	ValidatorSetSize         uint64
+	ByzantineBinary          string
+	ByzantineValidatorsCount uint64
+	EpochSize                int
+	EpochReward              int
+	NativeTokenConfigRaw     string
+	SecretsCallback          func([]types.Address, *TestClusterConfig)
 
 	AccessListsOwner                 *types.Address
 	ContractDeployerAllowListAdmin   []types.Address
@@ -181,10 +192,11 @@ func (c *TestClusterConfig) initLogsDir() {
 }
 
 type TestCluster struct {
-	Config      *TestClusterConfig
-	Servers     []*TestServer
-	Bridge      *TestBridge
-	initialPort int64
+	Config                   *TestClusterConfig
+	Servers                  []*TestServer
+	Bridge                   *TestBridge
+	initialPort              int64
+	ByzantineValidatorsIndex []int
 
 	once         sync.Once
 	failCh       chan struct{}
@@ -258,7 +270,7 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
+func WithBurnContract(burnContract *polyCommon.BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BurnContract = burnContract
 	}
@@ -366,6 +378,12 @@ func WithTestRewardToken() ClusterOption {
 	}
 }
 
+func WithByzantineValidators(num int) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ByzantineValidatorsCount = uint64(num)
+	}
+}
+
 func WithGovernanceVotingPeriod(votingPeriod uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.VotingPeriod = votingPeriod
@@ -396,15 +414,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	var err error
 
 	config := &TestClusterConfig{
-		t:             t,
-		WithLogs:      isTrueEnv(envLogsEnabled),
-		WithStdout:    isTrueEnv(envStdoutEnabled),
-		Binary:        resolveBinary(),
-		EpochSize:     10,
-		EpochReward:   1,
-		BlockGasLimit: 1e7, // 10M
-		StakeAmounts:  []*big.Int{},
-		VotingDelay:   10,
+		t:               t,
+		WithLogs:        isTrueEnv(envLogsEnabled),
+		WithStdout:      isTrueEnv(envStdoutEnabled),
+		Binary:          resolveBinary(),
+		ByzantineBinary: resolveByzantineBinary(),
+		EpochSize:       10,
+		EpochReward:     1,
+		BlockGasLimit:   1e7, // 10M
+		StakeAmounts:    []*big.Int{},
+		VotingDelay:     10,
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -443,7 +462,8 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	// run init accounts for validators
-	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
+	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix,
+		int(cluster.Config.ValidatorSetSize)+int(config.ByzantineValidatorsCount))
 	require.NoError(t, err)
 
 	if cluster.Config.SecretsCallback != nil {
@@ -600,7 +620,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err = cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
-		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+		polybftConfig, err := polyCommon.LoadPolyBFTConfig(genesisPath)
 		require.NoError(t, err)
 
 		// fund validators on the rootchain
@@ -627,20 +647,26 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
+			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */, false /* byzantine */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			false, false /* relayer */)
+			false, false /* relayer */, false /* byzantine */)
+	}
+
+	allValidatorSetSize := int(cluster.Config.ValidatorSetSize) + int(cluster.Config.ByzantineValidatorsCount)
+	for i := 1 + int(cluster.Config.ValidatorSetSize); i <= allValidatorSetSize; i++ {
+		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), true, false /* relayer */, true /* byzantine */)
 	}
 
 	return cluster
 }
 
 func (c *TestCluster) InitTestServer(t *testing.T,
-	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool) {
+	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool, byzantine bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -662,6 +688,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
+		config.Byzantine = byzantine
 	})
 
 	// watch the server for stop signals. It is important to fix the specific
@@ -675,6 +702,9 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 	}(srv.node)
 
 	c.Servers = append(c.Servers, srv)
+	if byzantine {
+		c.ByzantineValidatorsIndex = append(c.ByzantineValidatorsIndex, len(c.Servers)-1)
+	}
 }
 
 func (c *TestCluster) cmdRun(args ...string) error {
@@ -969,6 +999,34 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 		txn:    txn,
 		hash:   hash,
 	}
+}
+
+func (c *TestCluster) GetByzantineValidators(t *testing.T) []*TestServer {
+	t.Helper()
+
+	var validators []*TestServer
+
+	for _, server := range c.Servers {
+		if server.config.Byzantine {
+			validators = append(validators, server)
+		}
+	}
+
+	return validators
+}
+
+func (c *TestCluster) GetByzantineAddresses(t *testing.T) []types.Address {
+	t.Helper()
+
+	var addresses []types.Address
+
+	for _, server := range c.Servers {
+		if server.config.Byzantine {
+			addresses = append(addresses, server.address)
+		}
+	}
+
+	return addresses
 }
 
 type TestTxn struct {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -50,8 +50,8 @@ func TestDeployContracts_NoPanics(t *testing.T) {
 	outputter := command.InitializeOutputter(GetCommand())
 	params.stakeManagerAddr = receipt.ContractAddress.String()
 	params.stakeTokenAddr = types.StringToAddress("0x123456789").String()
-	consensusCfg = polybft.PolyBFTConfig{
-		NativeTokenConfig: &polybft.TokenConfig{
+	consensusCfg = polyCommon.PolyBFTConfig{
+		NativeTokenConfig: &polyCommon.TokenConfig{
 			Name:       "Test",
 			Symbol:     "TST",
 			Decimals:   18,

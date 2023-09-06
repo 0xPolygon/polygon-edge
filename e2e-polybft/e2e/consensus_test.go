@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -18,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/genesis"
 	"github.com/0xPolygon/polygon-edge/command/sidechain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
@@ -161,7 +161,7 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftConfig, err := common.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	// create the first account and extract the address
@@ -222,10 +222,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	// start the first and the second validator
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+1),
-		cluster.Bridge.JSONRPCAddr(), true, false)
+		cluster.Bridge.JSONRPCAddr(), true, false, false)
 
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+2),
-		cluster.Bridge.JSONRPCAddr(), true, false)
+		cluster.Bridge.JSONRPCAddr(), true, false, false)
 
 	// collect the first and the second validator from the cluster
 	firstValidator := cluster.Servers[validatorSetSize]
@@ -340,7 +340,7 @@ func TestE2E_Consensus_Validator_Unstake(t *testing.T) {
 		}),
 	)
 
-	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftCfg, err := common.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	srv := cluster.Servers[0]
@@ -605,7 +605,7 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 	rootChainRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Bridge.JSONRPCAddr()))
 	require.NoError(t, err)
 
-	polybftConfig, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	polybftConfig, err := common.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
 	require.NoError(t, err)
 
 	validatorAcc, err := sidechain.GetAccountFromDir(owner.DataDir())
@@ -618,6 +618,37 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, validatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+}
+
+func TestE2E_Consensus_WithByzantineNode(t *testing.T) {
+	const (
+		epochSize      = 10
+		validatorCount = 5
+		byzantineCount = 2
+	)
+
+	cluster := framework.NewTestCluster(t, validatorCount,
+		framework.WithEpochSize(epochSize),
+		framework.WithByzantineValidators(byzantineCount),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	byzantineValidators := cluster.GetByzantineValidators(t)
+	require.Equal(t, byzantineCount, len(byzantineValidators))
+
+	for _, i := range cluster.ByzantineValidatorsIndex {
+		node := cluster.Servers[i]
+		require.True(t, node.IsByzantine())
+	}
+
+	addresses := cluster.GetByzantineAddresses(t)
+	require.Equal(t, byzantineCount, len(addresses))
+
+	t.Run("consensus protocol", func(t *testing.T) {
+		require.NoError(t, cluster.WaitForBlock(2*epochSize+1, 10*time.Minute))
+	})
 }
 
 // TestE2E_Consensus_EIP1559Check sends a legacy and a dynamic tx to the cluster
@@ -639,7 +670,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender1.Address())),
 		framework.WithPremine(types.Address(sender1.Address()), types.Address(sender2.Address())),
-		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+		framework.WithBurnContract(&common.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 
@@ -719,7 +750,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 		burnContractFinalBalance, _ := client.GetBalance(ethgo.Address(types.ZeroAddress), ethgo.Latest)
 
 		diffReciverBalance := new(big.Int).Sub(receiverFinalBalance, receiverInitialBalance)
-		assert.Equal(t, sendAmount, diffReciverBalance, "Receiver balance should be increased by send amount")
+		require.Equal(t, sendAmount, diffReciverBalance, "Receiver balance should be increased by send amount")
 
 		if i == 1 && prevMiner != block.Miner {
 			initialMinerBalance = big.NewInt(0)
@@ -733,7 +764,7 @@ func TestE2E_Consensus_EIP1559Check(t *testing.T) {
 		diffSenderBalance.Sub(diffSenderBalance, diffBurnContractBalance)
 		diffSenderBalance.Sub(diffSenderBalance, diffMinerBalance)
 
-		assert.Zero(t, diffSenderBalance.Int64(), "Sender balance should be decreased by send amount + gas")
+		require.Zero(t, diffSenderBalance.Int64(), "Sender balance should be decreased by send amount + gas")
 
 		initialMinerBalance = finalMinerFinalBalance
 	}
