@@ -442,7 +442,6 @@ func ForkManagerFactory(forks *chain.Forks) error {
 // Initialize initializes the consensus (e.g. setup data)
 func (p *Polybft) Initialize() error {
 	p.logger.Info("initializing polybft...")
-	p.logger.Error("Initializing byzantine node...")
 
 	// read account
 	account, err := wallet.NewAccountFromSecret(p.config.SecretsManager)

@@ -1,14 +1,12 @@
 package polybft
 
 import (
-	"crypto/rand"
 	"fmt"
 
 	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/protobuf/proto"
 )
 
 // BridgeTransport is an abstraction of network layer for a bridge
@@ -73,36 +71,9 @@ func (p *Polybft) createTopics() (err error) {
 
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *ibftProto.Message) {
-	if msg.Type == ibftProto.MessageType_COMMIT {
-		sender := types.BytesToAddress(msg.From)
-		localAddr := types.Address(p.key.Address())
-
-		if sender == localAddr {
-			tamperedMsg, _ := proto.Clone(msg).(*ibftProto.Message)
-
-			tamperedMsg.GetCommitData().ProposalHash = generateRandomHash()
-			tamperedMsg.Signature = nil
-
-			tamperedMsg, err := p.key.SignIBFTMessage(tamperedMsg)
-
-			if err != nil {
-				p.logger.Warn("failed to sign message", "error", err)
-			}
-
-			if err = p.consensusTopic.Publish(tamperedMsg); err != nil {
-				p.logger.Warn("failed to multicast second consensus message", "error", err)
-			}
-		}
-	}
+	p.customMulticastHandler(msg)
 
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}
-}
-
-func generateRandomHash() []byte {
-	result := make([]byte, types.HashLength)
-	_, _ = rand.Reader.Read(result)
-
-	return result
 }
