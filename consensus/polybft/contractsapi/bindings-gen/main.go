@@ -785,20 +785,43 @@ func generateFunction(generatedData *generatedData, contractName string,
 	}
 
 	// write encode/decode functions
-	tmplStr := generateFunctionTemplate(fnSigResolution)
+
+	tmplString := `
+	{{range .Structs}}
+		{{.}}
+	{{ end }}
+	
+	func ({{.Sig}} *{{.TName}}) Sig() []byte {
+		return {{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"].ID()
+	}
+	
+	func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+		return {{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"].Encode({{.Sig}})
+	}
+	
+	func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+		return decodeMethod({{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"], buf, {{.Sig}})
+	}`
+
+	methodGetter := "Methods"
+	if fnSigResolution {
+		methodGetter = "MethodsBySignature"
+	}
+
 	inputs := map[string]interface{}{
 		"Structs":      res,
 		"Sig":          strings.ToLower(string(methodName[0])),
 		"Name":         method.Name,
 		"ContractName": contractName,
 		"TName":        strings.Title(methodName),
+		"MethodGetter": methodGetter,
 	}
 
 	if fnSigResolution {
 		inputs["Name"] = method.Sig()
 	}
 
-	renderedString, err := renderTmpl(tmplStr, inputs)
+	renderedString, err := renderTmpl(tmplString, inputs)
 	if err != nil {
 		return err
 	}
@@ -806,46 +829,6 @@ func generateFunction(generatedData *generatedData, contractName string,
 	generatedData.resultString = append(generatedData.resultString, renderedString)
 
 	return nil
-}
-
-// generateFunctionTemplate generates function template string, based on provided flag
-// depending whether function is resolved by signature or by name
-func generateFunctionTemplate(fnSigResolution bool) string {
-	if fnSigResolution {
-		return `
-		{{range .Structs}}
-			{{.}}
-		{{ end }}
-		
-		func ({{.Sig}} *{{.TName}}) Sig() []byte {
-			return {{.ContractName}}.Abi.MethodsBySignature["{{.Name}}"].ID()
-		}
-		
-		func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
-			return {{.ContractName}}.Abi.MethodsBySignature["{{.Name}}"].Encode({{.Sig}})
-		}
-		
-		func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
-			return decodeMethod({{.ContractName}}.Abi.MethodsBySignature["{{.Name}}"], buf, {{.Sig}})
-		}`
-	}
-
-	return `
-	{{range .Structs}}
-		{{.}}
-	{{ end }}
-	
-	func ({{.Sig}} *{{.TName}}) Sig() []byte {
-		return {{.ContractName}}.Abi.Methods["{{.Name}}"].ID()
-	}
-	
-	func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
-		return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})
-	}
-	
-	func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
-		return decodeMethod({{.ContractName}}.Abi.Methods["{{.Name}}"], buf, {{.Sig}})
-	}`
 }
 
 func renderTmpl(tmplStr string, inputs map[string]interface{}) (string, error) {
