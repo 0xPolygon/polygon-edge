@@ -774,7 +774,8 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 }
 
 // generateFunction generates code for smart contract function and its parameters
-func generateFunction(generatedData *generatedData, contractName string, method *abi.Method, resolveBySignature bool) error {
+func generateFunction(generatedData *generatedData, contractName string,
+	method *abi.Method, fnSigResolution bool) error {
 	methodName := fmt.Sprintf(functionNameFormat, strings.Title(method.Name+contractName))
 	res := []string{}
 
@@ -784,7 +785,7 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 	}
 
 	// write encode/decode functions
-	tmplStr := generateFunctionTemplate(resolveBySignature)
+	tmplStr := generateFunctionTemplate(fnSigResolution)
 	inputs := map[string]interface{}{
 		"Structs":      res,
 		"Sig":          strings.ToLower(string(methodName[0])),
@@ -793,7 +794,7 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 		"TName":        strings.Title(methodName),
 	}
 
-	if resolveBySignature {
+	if fnSigResolution {
 		inputs["Name"] = method.Sig()
 	}
 
@@ -809,8 +810,8 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 
 // generateFunctionTemplate generates function template string, based on provided flag
 // depending whether function is resolved by signature or by name
-func generateFunctionTemplate(resolvedBySignature bool) string {
-	if resolvedBySignature {
+func generateFunctionTemplate(fnSigResolution bool) string {
+	if fnSigResolution {
 		return `
 		{{range .Structs}}
 			{{.}}
