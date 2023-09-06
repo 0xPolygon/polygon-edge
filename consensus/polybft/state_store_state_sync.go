@@ -19,6 +19,8 @@ var (
 	stateSyncProofsBucket = []byte("stateSyncProofs")
 	// bucket to store message votes (signatures)
 	messageVotesBucket = []byte("votes")
+	// bucket to store all state sync relayer data
+	stateSyncRelayerBucket = []byte("relayer")
 
 	// errNotEnoughStateSyncs error message
 	errNotEnoughStateSyncs = errors.New("there is either a gap or not enough sync events")
@@ -26,6 +28,11 @@ var (
 	errCommitmentNotBuilt = errors.New("there is no built commitment to register")
 	// errNoCommitmentForStateSync error message
 	errNoCommitmentForStateSync = errors.New("no commitment found for given state sync event")
+	// errDataForStateSyncRelayer error message
+	errDataForStateSyncRelayer = errors.New("no data for state sync relayer")
+
+	stateSyncRelayerBlockNumberKey = []byte("block_number_key")
+	stateSyncRelayerEventIDKey     = []byte("event_id_key")
 )
 
 /*
@@ -39,6 +46,10 @@ commitments/
 
 stateSyncProofs/
 |--> stateSyncProof.StateSync.Id -> *StateSyncProof (json marshalled)
+
+relayer/
+|--> block_number_key -> uint64 block number
+|--> event_id_key     -> uint64 eventid number
 */
 
 type StateSyncStore struct {
@@ -57,6 +68,13 @@ func (s *StateSyncStore) initialize(tx *bolt.Tx) error {
 
 	if _, err := tx.CreateBucketIfNotExists(stateSyncProofsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncProofsBucket), err)
+	}
+
+	// create bucket for state sync relayer and init default values
+	if _, err := tx.CreateBucketIfNotExists(stateSyncRelayerBucket); err != nil {
+		return fmt.Errorf("failed to create bucket=%s: %w", string(stateSyncRelayerBucket), err)
+	} else if err := s.insertStateSyncRelayerDataWithTx(tx, 1, 0); err != nil {
+		return fmt.Errorf("failed to insert initial values into bucket=%s: %w", string(stateSyncRelayerBucket), err)
 	}
 
 	return nil
@@ -364,4 +382,42 @@ func (s *StateSyncStore) getStateSyncProof(stateSyncID uint64) (*StateSyncProof,
 	})
 
 	return ssp, err
+}
+
+// insertStateSyncRelayerData inserts the data for state sync relayer
+func (s *StateSyncStore) insertStateSyncRelayerData(blockNumber, eventID uint64) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return s.insertStateSyncRelayerDataWithTx(tx, blockNumber, eventID)
+	})
+}
+
+// getStateSyncRelayerData gets the data for state sync relayer
+func (s *StateSyncStore) getStateSyncRelayerData() (blockNumber uint64, eventID uint64, err error) {
+	err = s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(stateSyncRelayerBucket)
+		blockNumberBytes := bucket.Get(stateSyncRelayerBlockNumberKey)
+		eventIDBytes := bucket.Get(stateSyncRelayerEventIDKey)
+
+		if len(blockNumberBytes) == 0 || len(eventIDBytes) == 0 {
+			return errDataForStateSyncRelayer
+		}
+
+		blockNumber = common.EncodeBytesToUint64(blockNumberBytes)
+		eventID = common.EncodeBytesToUint64(eventIDBytes)
+
+		return nil
+	})
+
+	return
+}
+
+// insertStateSyncRelayerDataWithTx inserts the data for state sync relayer
+func (s *StateSyncStore) insertStateSyncRelayerDataWithTx(tx *bolt.Tx, blockNumber, eventID uint64) error {
+	bucket := tx.Bucket(stateSyncRelayerBucket)
+
+	if err := bucket.Put(stateSyncRelayerBlockNumberKey, common.EncodeUint64ToBytes(blockNumber)); err != nil {
+		return err
+	}
+
+	return bucket.Put(stateSyncRelayerEventIDKey, common.EncodeUint64ToBytes(eventID))
 }

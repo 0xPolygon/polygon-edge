@@ -208,7 +208,10 @@ func TestPolybft_Close(t *testing.T) {
 	polybft := Polybft{
 		closeCh: make(chan struct{}),
 		syncer:  syncer,
-		runtime: &consensusRuntime{stateSyncManager: &dummyStateSyncManager{}},
+		runtime: &consensusRuntime{
+			stateSyncManager: &dummyStateSyncManager{},
+			stateSyncRelayer: &dummyStakeSyncRelayer{},
+		},
 	}
 
 	assert.NoError(t, polybft.Close())

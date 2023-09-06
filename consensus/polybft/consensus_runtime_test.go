@@ -232,6 +232,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		checkpointManager: &dummyCheckpointManager{},
 		stakeManager:      &dummyStakeManager{},
 		eventProvider:     NewEventProvider(blockchainMock),
+		stateSyncRelayer:  &dummyStakeSyncRelayer{},
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 

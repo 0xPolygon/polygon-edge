@@ -82,6 +82,8 @@ type runtimeConfig struct {
 	txPool                txPoolInterface
 	bridgeTopic           topic
 	numBlockConfirmations uint64
+	IsRelayer             bool
+	RPCEndpoint           string
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -120,6 +122,9 @@ type consensusRuntime struct {
 	stakeManager StakeManager
 
 	eventProvider *EventProvider
+
+	// stateSyncRelayer is relayer for commitment events
+	stateSyncRelayer StateSyncRelayer
 
 	// logger instance
 	logger hcf.Logger
@@ -160,6 +165,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, err
 	}
 
+	if err := runtime.initStateSyncRelayer(log); err != nil {
+		return nil, err
+	}
+
 	// we need to call restart epoch on runtime to initialize epoch state
 	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, dbTx)
 	if err != nil {
@@ -175,6 +184,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 
 // close is used to tear down allocated resources
 func (c *consensusRuntime) close() {
+	c.stateSyncRelayer.Close()
 	c.stateSyncManager.Close()
 }
 
@@ -236,6 +246,31 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	c.eventProvider.Subscribe(c.checkpointManager)
 
 	return nil
+}
+
+// initStateSyncRelayer initializes state sync relayer
+// if not enabled, then a dummy checkpoint manager will be used
+func (c *consensusRuntime) initStateSyncRelayer(logger hcf.Logger) error {
+	if c.config.IsRelayer {
+		// enable checkpoint manager
+		txRelayer, err := getStateSyncTxRelayer(c.config.RPCEndpoint, logger)
+		if err != nil {
+			return err
+		}
+
+		c.stateSyncRelayer = NewStateSyncRelayer(
+			txRelayer,
+			contracts.StateReceiverContract,
+			c.state,
+			c,
+			c.config.blockchain,
+			wallet.NewEcdsaSigner(c.config.Key),
+			logger.Named("state_sync_relayer"))
+	} else {
+		c.stateSyncRelayer = &dummyStakeSyncRelayer{}
+	}
+
+	return c.stateSyncRelayer.Init()
 }
 
 // initStakeManager initializes stake manager
@@ -367,6 +402,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		c.logger.Error("failed to post block in stake manager", "err", err)
 
 		return
+	}
+
+	// handle state sync relayer events that happened in block
+	if err := c.stateSyncRelayer.PostBlock(postBlock); err != nil {
+		c.logger.Error("post block callback failed in state sync relayer", "err", err)
 	}
 
 	if isEndOfEpoch {
