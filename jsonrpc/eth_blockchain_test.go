@@ -312,6 +312,11 @@ func TestEth_GasPrice(t *testing.T) {
 	store := newMockBlockStore()
 	store.averageGasPrice = 9999
 	eth := newTestEthEndpoint(store)
+	store.blocks = []*types.Block{
+		{
+			Header: &types.Header{Number: uint64(1)},
+		},
+	}
 
 	res, err := eth.GasPrice()
 	assert.NoError(t, err)
