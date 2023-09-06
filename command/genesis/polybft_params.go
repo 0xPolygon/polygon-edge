@@ -50,6 +50,7 @@ const (
 	defaultVotingPeriod             = "10000"     // in blocks
 	defaultVoteProposalThreshold    = "1000"      // in blocks
 	defaultProposalQuorumPercentage = uint64(67)  // percentage
+	defaultBlockTrackerPollInterval = time.Second
 
 	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
@@ -214,6 +215,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			NetworkParamsAddr: contracts.NetworkParamsContract,
 			ForkParamsAddr:    contracts.ForkParamsContract,
 		},
+		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
 	}
 
 	// Disable london hardfork if burn contract address is not provided

@@ -263,6 +263,13 @@ func setFlags(cmd *cobra.Command) {
 			command.DefaultGenesisBaseFeeChangeDenom,
 			"default base fee change denominator the value to bound the amount the base fee can change between blocks.",
 		)
+
+		cmd.Flags().DurationVar(
+			&params.blockTrackerPollInterval,
+			blockTrackerPollIntervalFlag,
+			defaultBlockTrackerPollInterval,
+			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
+		)
 	}
 
 	// Governance

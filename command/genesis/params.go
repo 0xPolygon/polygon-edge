@@ -26,29 +26,30 @@ import (
 )
 
 const (
-	dirFlag                   = "dir"
-	nameFlag                  = "name"
-	premineFlag               = "premine"
-	chainIDFlag               = "chain-id"
-	epochSizeFlag             = "epoch-size"
-	epochRewardFlag           = "epoch-reward"
-	blockGasLimitFlag         = "block-gas-limit"
-	burnContractFlag          = "burn-contract"
-	posFlag                   = "pos"
-	minValidatorCount         = "min-validator-count"
-	maxValidatorCount         = "max-validator-count"
-	nativeTokenConfigFlag     = "native-token-config"
-	rewardTokenCodeFlag       = "reward-token-code"
-	rewardWalletFlag          = "reward-wallet"
-	checkpointIntervalFlag    = "checkpoint-interval"
-	withdrawalWaitPeriodFlag  = "withdrawal-wait-period"
-	baseFeeChangeDenomFlag    = "base-fee-change-denom"
-	voteDelayFlag             = "vote-delay"
-	votePeriodFlag            = "vote-period"
-	voteProposalThresholdFlag = "vote-proposal-threshold"
-	governorAdminFlag         = "governor-admin"
-	proposalQuorumFlag        = "proposal-quorum"
-	proxyContractsAdminFlag   = "proxy-contracts-admin"
+	dirFlag                      = "dir"
+	nameFlag                     = "name"
+	premineFlag                  = "premine"
+	chainIDFlag                  = "chain-id"
+	epochSizeFlag                = "epoch-size"
+	epochRewardFlag              = "epoch-reward"
+	blockGasLimitFlag            = "block-gas-limit"
+	burnContractFlag             = "burn-contract"
+	posFlag                      = "pos"
+	minValidatorCount            = "min-validator-count"
+	maxValidatorCount            = "max-validator-count"
+	nativeTokenConfigFlag        = "native-token-config"
+	rewardTokenCodeFlag          = "reward-token-code"
+	rewardWalletFlag             = "reward-wallet"
+	checkpointIntervalFlag       = "checkpoint-interval"
+	withdrawalWaitPeriodFlag     = "withdrawal-wait-period"
+	baseFeeChangeDenomFlag       = "base-fee-change-denom"
+	voteDelayFlag                = "vote-delay"
+	votePeriodFlag               = "vote-period"
+	voteProposalThresholdFlag    = "vote-proposal-threshold"
+	governorAdminFlag            = "governor-admin"
+	proposalQuorumFlag           = "proposal-quorum"
+	proxyContractsAdminFlag      = "proxy-contracts-admin"
+	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -76,6 +77,7 @@ var (
 	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
 	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
 	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
+	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 )
 
 type genesisParams struct {
@@ -156,7 +158,8 @@ type genesisParams struct {
 	proposalQuorum    uint64
 	governorAdmin     string
 
-	proxyContractsAdmin string
+	proxyContractsAdmin      string
+	blockTrackerPollInterval time.Duration
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -202,6 +205,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateProxyContractsAdmin(); err != nil {
+			return err
+		}
+
+		if err := p.validateBlockTrackerPollInterval(); err != nil {
 			return err
 		}
 	}
@@ -555,6 +562,16 @@ func (p *genesisParams) validatePremineInfo() error {
 func (p *genesisParams) validateGovernorAdminAddr() error {
 	if err := types.IsValidAddress(p.governorAdmin); err != nil {
 		return fmt.Errorf("governor admin address is not valid: %w", err)
+	}
+
+	return nil
+}
+
+// validateBlockTrackerPollInterval validates block tracker block interval
+// which can not be 0
+func (p *genesisParams) validateBlockTrackerPollInterval() error {
+	if p.blockTrackerPollInterval == 0 {
+		return errBlockTrackerPollInterval
 	}
 
 	return nil

@@ -10,12 +10,13 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	polybftCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -39,8 +40,8 @@ type StateSyncManager interface {
 	Close()
 	Commitment(blockNumber uint64) (*CommitmentMessageSigned, error)
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
-	PostBlock(req *common.PostBlockRequest) error
-	PostEpoch(req *common.PostEpochRequest) error
+	PostBlock(req *polybftCommon.PostBlockRequest) error
+	PostEpoch(req *polybftCommon.PostEpochRequest) error
 }
 
 var _ StateSyncManager = (*dummyStateSyncManager)(nil)
@@ -53,22 +54,23 @@ func (n *dummyStateSyncManager) Close()      {}
 func (n *dummyStateSyncManager) Commitment(blockNumber uint64) (*CommitmentMessageSigned, error) {
 	return nil, nil
 }
-func (n *dummyStateSyncManager) PostBlock(req *common.PostBlockRequest) error { return nil }
-func (n *dummyStateSyncManager) PostEpoch(req *common.PostEpochRequest) error { return nil }
+func (n *dummyStateSyncManager) PostBlock(req *polybftCommon.PostBlockRequest) error { return nil }
+func (n *dummyStateSyncManager) PostEpoch(req *polybftCommon.PostEpochRequest) error { return nil }
 func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
 }
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr       types.Address
-	stateSenderStartBlock uint64
-	jsonrpcAddr           string
-	dataDir               string
-	topic                 topic
-	key                   *wallet.Key
-	maxCommitmentSize     uint64
-	numBlockConfirmations uint64
+	stateSenderAddr          types.Address
+	stateSenderStartBlock    uint64
+	jsonrpcAddr              string
+	dataDir                  string
+	topic                    topic
+	key                      *wallet.Key
+	maxCommitmentSize        uint64
+	numBlockConfirmations    uint64
+	blockTrackerPollInterval common.Duration
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -138,7 +140,8 @@ func (s *stateSyncManager) initTracker() error {
 		s,
 		s.config.numBlockConfirmations,
 		s.config.stateSenderStartBlock,
-		s.logger)
+		s.logger,
+		s.config.blockTrackerPollInterval)
 
 	go func() {
 		<-s.closeCh
@@ -374,7 +377,7 @@ func (s *stateSyncManager) getAggSignatureForCommitmentMessage(blockNumber uint6
 
 // PostEpoch notifies the state sync manager that an epoch has changed,
 // so that it can discard any previous epoch commitments, and build a new one (since validator set changed)
-func (s *stateSyncManager) PostEpoch(req *common.PostEpochRequest) error {
+func (s *stateSyncManager) PostEpoch(req *polybftCommon.PostEpochRequest) error {
 	s.lock.Lock()
 
 	s.pendingCommitments = nil
@@ -398,7 +401,7 @@ func (s *stateSyncManager) PostEpoch(req *common.PostEpochRequest) error {
 
 // PostBlock notifies state sync manager that a block was finalized,
 // so that it can build state sync proofs if a block has a commitment submission transaction
-func (s *stateSyncManager) PostBlock(req *common.PostBlockRequest) error {
+func (s *stateSyncManager) PostBlock(req *polybftCommon.PostBlockRequest) error {
 	commitment, err := getCommitmentMessageSignedTx(req.FullBlock.Block.Transactions)
 	if err != nil {
 		return err

@@ -8,9 +8,11 @@ import (
 	"net"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -90,6 +92,7 @@ func (r *StateSyncRelayer) Start() error {
 		0, // sidechain (Polygon POS) is instant finality, so no need to wait
 		r.eventTrackerStartBlock,
 		r.logger,
+		common.Duration{Duration: time.Second},
 	)
 
 	ctx, cancelFn := context.WithCancel(context.Background())
