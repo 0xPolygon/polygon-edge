@@ -625,7 +625,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 
 	stakingContractAddr := staking.AddrStakingContract
 	defaultBalance := framework.EthToWei(100)
-	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+	bigGasPrice := big.NewInt(10000000000)
 
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	numDummyStakers := 10
@@ -818,7 +818,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		&framework.PreparedTransaction{
 			From:     faucetAddr,
 			To:       &firstNonValidatorAddr,
-			GasPrice: big.NewInt(10000),
+			GasPrice: big.NewInt(1000000000),
 			Gas:      1000000,
 			Value:    framework.EthToWei(300),
 		}, faucetKey)
