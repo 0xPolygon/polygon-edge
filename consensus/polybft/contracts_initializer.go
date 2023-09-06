@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/umbracle/ethgo/abi"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -16,7 +18,7 @@ const (
 )
 
 // initValidatorSet initializes ValidatorSet SC
-func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+func initValidatorSet(polyBFTConfig common.PolyBFTConfig, transition *state.Transition) error {
 	initialValidators := make([]*contractsapi.ValidatorInit, len(polyBFTConfig.InitialValidatorSet))
 	for i, validator := range polyBFTConfig.InitialValidatorSet {
 		initialValidators[i] = &contractsapi.ValidatorInit{
@@ -29,7 +31,7 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 		NewStateSender:      contracts.L2StateSenderContract,
 		NewStateReceiver:    contracts.StateReceiverContract,
 		NewRootChainManager: polyBFTConfig.Bridge.CustomSupernetManagerAddr,
-		NewEpochSize:        new(big.Int).SetUint64(polyBFTConfig.EpochSize),
+		NewNetworkParams:    polyBFTConfig.GovernanceConfig.NetworkParamsAddr,
 		InitialValidators:   initialValidators,
 	}
 
@@ -43,12 +45,12 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 }
 
 // initRewardPool initializes RewardPool SC
-func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) error {
+func initRewardPool(polybftConfig common.PolyBFTConfig, transition *state.Transition) error {
 	initFn := &contractsapi.InitializeRewardPoolFn{
-		NewRewardToken:  polybftConfig.RewardConfig.TokenAddress,
-		NewRewardWallet: polybftConfig.RewardConfig.WalletAddress,
-		NewValidatorSet: contracts.ValidatorSetContract,
-		NewBaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+		NewRewardToken:    polybftConfig.RewardConfig.TokenAddress,
+		NewRewardWallet:   polybftConfig.RewardConfig.WalletAddress,
+		NewValidatorSet:   contracts.ValidatorSetContract,
+		NetworkParamsAddr: polybftConfig.GovernanceConfig.NetworkParamsAddr,
 	}
 
 	input, err := initFn.EncodeAbi()
@@ -61,7 +63,7 @@ func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) e
 }
 
 // getInitERC20PredicateInput builds initialization input parameters for child chain ERC20Predicate SC
-func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) ([]byte, error) {
+func getInitERC20PredicateInput(config *common.BridgeConfig, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
 		params = &contractsapi.InitializeRootMintableERC20PredicateFn{
@@ -84,7 +86,7 @@ func getInitERC20PredicateInput(config *BridgeConfig, childChainMintable bool) (
 }
 
 // getInitERC20PredicateACLInput builds initialization input parameters for child chain ERC20PredicateAccessList SC
-func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
+func getInitERC20PredicateACLInput(config *common.BridgeConfig, owner types.Address,
 	useAllowList, useBlockList, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
@@ -114,7 +116,7 @@ func getInitERC20PredicateACLInput(config *BridgeConfig, owner types.Address,
 }
 
 // getInitERC721PredicateInput builds initialization input parameters for child chain ERC721Predicate SC
-func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens bool) ([]byte, error) {
+func getInitERC721PredicateInput(config *common.BridgeConfig, childOriginatedTokens bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childOriginatedTokens {
 		params = &contractsapi.InitializeRootMintableERC721PredicateFn{
@@ -137,7 +139,7 @@ func getInitERC721PredicateInput(config *BridgeConfig, childOriginatedTokens boo
 
 // getInitERC721PredicateACLInput builds initialization input parameters
 // for child chain ERC721PredicateAccessList SC
-func getInitERC721PredicateACLInput(config *BridgeConfig, owner types.Address,
+func getInitERC721PredicateACLInput(config *common.BridgeConfig, owner types.Address,
 	useAllowList, useBlockList, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
@@ -166,7 +168,7 @@ func getInitERC721PredicateACLInput(config *BridgeConfig, owner types.Address,
 }
 
 // getInitERC1155PredicateInput builds initialization input parameters for child chain ERC1155Predicate SC
-func getInitERC1155PredicateInput(config *BridgeConfig, childChainMintable bool) ([]byte, error) {
+func getInitERC1155PredicateInput(config *common.BridgeConfig, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
 		params = &contractsapi.InitializeRootMintableERC1155PredicateFn{
@@ -189,7 +191,7 @@ func getInitERC1155PredicateInput(config *BridgeConfig, childChainMintable bool)
 
 // getInitERC1155PredicateACLInput builds initialization input parameters
 // for child chain ERC1155PredicateAccessList SC
-func getInitERC1155PredicateACLInput(config *BridgeConfig, owner types.Address,
+func getInitERC1155PredicateACLInput(config *common.BridgeConfig, owner types.Address,
 	useAllowList, useBlockList, childChainMintable bool) ([]byte, error) {
 	var params contractsapi.StateTransactionInput
 	if childChainMintable {
@@ -218,7 +220,7 @@ func getInitERC1155PredicateACLInput(config *BridgeConfig, owner types.Address,
 }
 
 // mintRewardTokensToWallet mints configured amount of reward tokens to reward wallet address
-func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+func mintRewardTokensToWallet(polyBFTConfig common.PolyBFTConfig, transition *state.Transition) error {
 	if isNativeRewardToken(polyBFTConfig) {
 		// if reward token is a native erc20 token, we don't need to mint an amount of tokens
 		// for given wallet address to it since this is done in premine
@@ -241,7 +243,7 @@ func mintRewardTokensToWallet(polyBFTConfig PolyBFTConfig, transition *state.Tra
 
 // approveRewardPoolAsSpender approves reward pool contract as reward token spender
 // since reward pool distributes rewards.
-func approveRewardPoolAsSpender(polyBFTConfig PolyBFTConfig, transition *state.Transition) error {
+func approveRewardPoolAsSpender(polyBFTConfig common.PolyBFTConfig, transition *state.Transition) error {
 	approveFn := &contractsapi.ApproveRootERC20Fn{
 		Spender: contracts.RewardPoolContract,
 		Amount:  polyBFTConfig.RewardConfig.WalletAmount,
@@ -273,6 +275,101 @@ func callContract(from, to types.Address, input []byte, contractName string, tra
 }
 
 // isNativeRewardToken returns true in case a native token is used as a reward token as well
-func isNativeRewardToken(cfg PolyBFTConfig) bool {
+func isNativeRewardToken(cfg common.PolyBFTConfig) bool {
 	return cfg.RewardConfig.TokenAddress == contracts.NativeERC20TokenContract
+}
+
+// initNetworkParamsContract initializes NetworkParams contract on child chain
+func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Transition) error {
+	initFn := &contractsapi.InitializeNetworkParamsFn{
+		InitParams: &contractsapi.InitParams{
+			// only timelock controller can execute transactions on network params
+			// so we set it as its owner
+			NewOwner:                   cfg.GovernanceConfig.ChildTimelockAddr,
+			NewCheckpointBlockInterval: new(big.Int).SetUint64(cfg.CheckpointInterval),
+			NewSprintSize:              new(big.Int).SetUint64(cfg.SprintSize),
+			NewEpochSize:               new(big.Int).SetUint64(cfg.EpochSize),
+			NewEpochReward:             new(big.Int).SetUint64(cfg.EpochReward),
+			NewMinValidatorSetSize:     new(big.Int).SetUint64(cfg.MinValidatorSetSize),
+			NewMaxValidatorSetSize:     new(big.Int).SetUint64(cfg.MaxValidatorSetSize),
+			NewWithdrawalWaitPeriod:    new(big.Int).SetUint64(cfg.WithdrawalWaitPeriod),
+			NewBlockTime:               new(big.Int).SetUint64(uint64(cfg.BlockTime.Duration)),
+			NewBlockTimeDrift:          new(big.Int).SetUint64(cfg.BlockTimeDrift),
+			NewVotingDelay:             new(big.Int).Set(cfg.GovernanceConfig.VotingDelay),
+			NewVotingPeriod:            new(big.Int).Set(cfg.GovernanceConfig.VotingPeriod),
+			NewProposalThreshold:       new(big.Int).Set(cfg.GovernanceConfig.ProposalThreshold),
+		},
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("NetworkParams.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		cfg.GovernanceConfig.NetworkParamsAddr, input, "NetworkParams.initialize", transition)
+}
+
+// initForkParamsContract initializes ForkParams contract on child chain
+func initForkParamsContract(cfg common.PolyBFTConfig, transition *state.Transition) error {
+	initFn := &contractsapi.InitializeForkParamsFn{
+		NewOwner: cfg.GovernanceConfig.ChildTimelockAddr,
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("ForkParams.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		cfg.GovernanceConfig.ForkParamsAddr, input, "ForkParams.initialize", transition)
+}
+
+// initChildTimelock initializes ChildTimelock contract on child chain
+func initChildTimelock(cfg common.PolyBFTConfig, transition *state.Transition) error {
+	addresses := make([]types.Address, len(cfg.InitialValidatorSet)+1)
+	// we need to add child governor to list of proposers and executors as well
+	addresses[0] = cfg.GovernanceConfig.ChildGovernorAddr
+
+	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
+		addresses[i+1] = cfg.InitialValidatorSet[i].Address
+	}
+
+	initFn := &contractsapi.InitializeChildTimelockFn{
+		Admin:     cfg.GovernanceConfig.GovernorAdmin,
+		Proposers: addresses,
+		Executors: addresses,
+		MinDelay:  big.NewInt(1), // for now
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("ChildTimelock.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		cfg.GovernanceConfig.ChildTimelockAddr, input, "ChildTimelock.initialize", transition)
+}
+
+// initChildGovernor initializes ChildGovernor contract on child chain
+func initChildGovernor(cfg common.PolyBFTConfig, transition *state.Transition) error {
+	addresses := make([]types.Address, len(cfg.InitialValidatorSet))
+	for i := 0; i < len(cfg.InitialValidatorSet); i++ {
+		addresses[i] = cfg.InitialValidatorSet[i].Address
+	}
+
+	initFn := &contractsapi.InitializeChildGovernorFn{
+		Token_:           contracts.ValidatorSetContract,
+		Timelock_:        cfg.GovernanceConfig.ChildTimelockAddr,
+		NetworkParams_:   cfg.GovernanceConfig.NetworkParamsAddr,
+		QuorumNumerator_: new(big.Int).SetUint64(cfg.GovernanceConfig.ProposalQuorumPercentage),
+	}
+
+	input, err := initFn.EncodeAbi()
+	if err != nil {
+		return fmt.Errorf("ChildGovernor.initialize params encoding failed: %w", err)
+	}
+
+	return callContract(contracts.SystemCaller,
+		cfg.GovernanceConfig.ChildGovernorAddr, input, "ChildGovernor.initialize", transition)
 }

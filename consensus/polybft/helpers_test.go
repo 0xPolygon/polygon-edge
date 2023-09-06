@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -74,6 +75,7 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64,
 			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
 			EpochRoot:  types.Hash{},
 		},
+		EpochSize: new(big.Int).SetUint64(epochSize),
 	}
 
 	return commitEpoch
@@ -97,8 +99,9 @@ func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
 	}
 
 	return &contractsapi.DistributeRewardForRewardPoolFn{
-		EpochID: new(big.Int).SetUint64(epochID),
-		Uptime:  uptime,
+		EpochID:   new(big.Int).SetUint64(epochID),
+		Uptime:    uptime,
+		EpochSize: new(big.Int).SetUint64(epochSize),
 	}
 }
 
@@ -177,8 +180,8 @@ func generateTestAccount(tb testing.TB) *wallet.Account {
 }
 
 // createTestBridgeConfig creates test bridge configuration with hard-coded addresses
-func createTestBridgeConfig() *BridgeConfig {
-	return &BridgeConfig{
+func createTestBridgeConfig() *polyCommon.BridgeConfig {
+	return &polyCommon.BridgeConfig{
 		StateSenderAddr:                   types.StringToAddress("1"),
 		CheckpointManagerAddr:             types.StringToAddress("2"),
 		ExitHelperAddr:                    types.StringToAddress("3"),

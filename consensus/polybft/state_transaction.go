@@ -20,6 +20,7 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 		commitFn            contractsapi.CommitStateReceiverFn
 		commitEpochFn       contractsapi.CommitEpochValidatorSetFn
 		distributeRewardsFn contractsapi.DistributeRewardForRewardPoolFn
+		slashFn             contractsapi.SlashValidatorSetFn
 		obj                 contractsapi.StateTransactionInput
 	)
 
@@ -32,6 +33,9 @@ func decodeStateTransaction(txData []byte) (contractsapi.StateTransactionInput, 
 	} else if bytes.Equal(sig, distributeRewardsFn.Sig()) {
 		// distribute rewards
 		obj = &contractsapi.DistributeRewardForRewardPoolFn{}
+	} else if bytes.Equal(sig, slashFn.Sig()) {
+		// slashing
+		obj = &contractsapi.SlashValidatorSetFn{}
 	} else {
 		return nil, fmt.Errorf("unknown state transaction")
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -28,18 +29,21 @@ var (
 // StakeManager interface provides functions for handling stake change of validators
 // and updating validator set based on changed stake
 type StakeManager interface {
-	PostBlock(req *PostBlockRequest) error
-	PostEpoch(req *PostEpochRequest) error
-	UpdateValidatorSet(epoch uint64, currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
+	PostBlock(req *common.PostBlockRequest) error
+	PostEpoch(req *common.PostEpochRequest) error
+	UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
+		currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
+
+var _ StakeManager = (*dummyStakeManager)(nil)
 
 // dummyStakeManager is a dummy implementation of StakeManager interface
 // used only for unit testing
 type dummyStakeManager struct{}
 
-func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
-func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
+func (d *dummyStakeManager) PostBlock(req *common.PostBlockRequest) error { return nil }
+func (d *dummyStakeManager) PostEpoch(req *common.PostEpochRequest) error { return nil }
+func (d *dummyStakeManager) UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
 }
@@ -54,7 +58,6 @@ type stakeManager struct {
 	rootChainRelayer        txrelayer.TxRelayer
 	key                     ethgo.Key
 	supernetManagerContract types.Address
-	maxValidatorSetSize     int
 	eventsGetter            *eventsGetter[*contractsapi.TransferEvent]
 }
 
@@ -66,7 +69,6 @@ func newStakeManager(
 	key ethgo.Key,
 	validatorSetAddr, supernetManagerAddr types.Address,
 	blockchain blockchainBackend,
-	maxValidatorSetSize int,
 ) *stakeManager {
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
 		blockchain: blockchain,
@@ -87,13 +89,12 @@ func newStakeManager(
 		rootChainRelayer:        rootchainRelayer,
 		key:                     key,
 		supernetManagerContract: supernetManagerAddr,
-		maxValidatorSetSize:     maxValidatorSetSize,
 		eventsGetter:            eventsGetter,
 	}
 }
 
 // PostEpoch saves the initial validator set to db
-func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
+func (s *stakeManager) PostEpoch(req *common.PostEpochRequest) error {
 	if req.NewEpochID != 1 {
 		return nil
 	}
@@ -109,7 +110,7 @@ func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any transfer event that happened in block and update full validator set in db
-func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
+func (s *stakeManager) PostBlock(req *common.PostBlockRequest) error {
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
 	if err != nil {
 		return err
@@ -184,8 +185,8 @@ func (s *stakeManager) updateWithReceipts(
 
 // UpdateValidatorSet returns an updated validator set
 // based on stake change (transfer) events from ValidatorSet contract
-func (s *stakeManager) UpdateValidatorSet(
-	epoch uint64, oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
+func (s *stakeManager) UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
+	oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	s.logger.Info("Calculating validators set update...", "epoch", epoch)
 
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
@@ -197,7 +198,7 @@ func (s *stakeManager) UpdateValidatorSet(
 	stakeMap := fullValidatorSet.Validators
 
 	// slice of all validator set
-	newValidatorSet := stakeMap.getSorted(s.maxValidatorSetSize)
+	newValidatorSet := stakeMap.getSorted(int(maxValidatorSetSize))
 	// set of all addresses that will be in next validator set
 	addressesSet := make(map[types.Address]struct{}, len(newValidatorSet))
 
@@ -354,7 +355,7 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 	stakeData.IsActive = stakeData.VotingPower.Cmp(bigZero) > 0
 }
 
-// getSorted returns validators (*ValidatorMetadata) in sorted order
+// getSorted returns validators ([]*ValidatorMetadata) in sorted order
 func (sc validatorStakeMap) getSorted(maxValidatorSetSize int) validator.AccountSet {
 	activeValidators := make(validator.AccountSet, 0, len(sc))
 

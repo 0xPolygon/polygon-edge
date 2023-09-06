@@ -22,7 +22,7 @@ func TestStateTransaction_Signature(t *testing.T) {
 	}{
 		{
 			contractsapi.ValidatorSet.Abi.GetMethod("commitEpoch"),
-			"0f50287c",
+			"dab567de",
 		},
 	}
 	for _, c := range cases {
@@ -42,6 +42,7 @@ func TestStateTransaction_Encoding(t *testing.T) {
 				EndBlock:   big.NewInt(10),
 				EpochRoot:  types.Hash{},
 			},
+			EpochSize: new(big.Int).SetUint64(10),
 		},
 	}
 

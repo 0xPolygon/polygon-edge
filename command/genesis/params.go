@@ -16,7 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -25,20 +25,27 @@ import (
 )
 
 const (
-	dirFlag               = "dir"
-	nameFlag              = "name"
-	premineFlag           = "premine"
-	chainIDFlag           = "chain-id"
-	epochSizeFlag         = "epoch-size"
-	epochRewardFlag       = "epoch-reward"
-	blockGasLimitFlag     = "block-gas-limit"
-	burnContractFlag      = "burn-contract"
-	posFlag               = "pos"
-	minValidatorCount     = "min-validator-count"
-	maxValidatorCount     = "max-validator-count"
-	nativeTokenConfigFlag = "native-token-config"
-	rewardTokenCodeFlag   = "reward-token-code"
-	rewardWalletFlag      = "reward-wallet"
+	dirFlag                   = "dir"
+	nameFlag                  = "name"
+	premineFlag               = "premine"
+	chainIDFlag               = "chain-id"
+	epochSizeFlag             = "epoch-size"
+	epochRewardFlag           = "epoch-reward"
+	blockGasLimitFlag         = "block-gas-limit"
+	burnContractFlag          = "burn-contract"
+	posFlag                   = "pos"
+	minValidatorCount         = "min-validator-count"
+	maxValidatorCount         = "max-validator-count"
+	nativeTokenConfigFlag     = "native-token-config"
+	rewardTokenCodeFlag       = "reward-token-code"
+	rewardWalletFlag          = "reward-wallet"
+	checkpointIntervalFlag    = "checkpoint-interval"
+	withdrawalWaitPeriodFlag  = "withdrawal-wait-period"
+	voteDelayFlag             = "vote-delay"
+	votePeriodFlag            = "vote-period"
+	voteProposalThresholdFlag = "vote-proposal-threshold"
+	governorAdminFlag         = "governor-admin"
+	proposalQuorumFlag        = "proposal-quorum"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -63,6 +70,8 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
+	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
+	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
 )
 
 type genesisParams struct {
@@ -124,13 +133,23 @@ type genesisParams struct {
 	accessListsOwner                 string
 
 	nativeTokenConfigRaw string
-	nativeTokenConfig    *polybft.TokenConfig
+	nativeTokenConfig    *common.TokenConfig
 
 	premineInfos []*premineInfo
 
 	// rewards
 	rewardTokenCode string
 	rewardWallet    string
+
+	checkpointInterval   uint64
+	withdrawalWaitPeriod uint64
+
+	// governance
+	voteDelay         string
+	votingPeriod      string
+	proposalThreshold string
+	proposalQuorum    uint64
+	governorAdmin     string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -164,6 +183,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validatePremineInfo(); err != nil {
+			return err
+		}
+
+		if err := p.validateGovernorAdminAddr(); err != nil {
 			return err
 		}
 	}
@@ -512,6 +535,15 @@ func (p *genesisParams) validatePremineInfo() error {
 	return errReserveAccMustBePremined
 }
 
+// validateGovernorAdminAddr validates governor admin address
+func (p *genesisParams) validateGovernorAdminAddr() error {
+	if err := types.IsValidAddress(p.governorAdmin); err != nil {
+		return fmt.Errorf("governor admin address is not valid: %w", err)
+	}
+
+	return nil
+}
+
 // validateBurnContract validates burn contract. If native token is mintable,
 // burn contract flag must not be set. If native token is non mintable only one burn contract
 // can be set and the specified address will be used to predeploy default EIP1559 burn contract.
@@ -544,7 +576,7 @@ func (p *genesisParams) isBurnContractEnabled() bool {
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
 func (p *genesisParams) extractNativeTokenMetadata() error {
 	if p.nativeTokenConfigRaw == "" {
-		p.nativeTokenConfig = &polybft.TokenConfig{
+		p.nativeTokenConfig = &common.TokenConfig{
 			Name:       defaultNativeTokenName,
 			Symbol:     defaultNativeTokenSymbol,
 			Decimals:   defaultNativeTokenDecimals,
@@ -595,7 +627,7 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		owner = types.StringToAddress(strings.TrimSpace(params[4]))
 	}
 
-	p.nativeTokenConfig = &polybft.TokenConfig{
+	p.nativeTokenConfig = &common.TokenConfig{
 		Name:       name,
 		Symbol:     symbol,
 		Decimals:   uint8(decimals),

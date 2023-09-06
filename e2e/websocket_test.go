@@ -114,7 +114,7 @@ func TestWS_Response(t *testing.T) {
 		_, err = srv.SendRawTx(ctx, &framework.PreparedTransaction{
 			From:     preminedAccounts[0].address,
 			To:       &preminedAccounts[1].address,
-			GasPrice: big.NewInt(10000),
+			GasPrice: big.NewInt(1000000000),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 		}, preminedAccounts[0].key)

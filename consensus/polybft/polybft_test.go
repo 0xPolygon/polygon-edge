@@ -2,22 +2,25 @@ package polybft
 
 import (
 	"errors"
+	"math/big"
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
+	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 // the test initializes polybft and chain mock (map of headers) after which a new header is verified
@@ -67,7 +70,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	validators := validator.NewTestValidators(t, allValidatorsSize)
 
 	// create configuration
-	polyBftConfig := PolyBFTConfig{
+	polyBftConfig := polyCommon.PolyBFTConfig{
 		InitialValidatorSet: validators.GetParamValidators(),
 		EpochSize:           fixedEpochSize,
 		SprintSize:          5,
@@ -113,15 +116,20 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 
 	// create polybft with appropriate mocks
 	polybft := &Polybft{
-		closeCh:         make(chan struct{}),
-		logger:          hclog.NewNullLogger(),
-		consensusConfig: &polyBftConfig,
-		blockchain:      blockchainMock,
+		closeCh:             make(chan struct{}),
+		logger:              hclog.NewNullLogger(),
+		genesisClientConfig: &polyBftConfig,
+		blockchain:          blockchainMock,
 		validatorsCache: newValidatorsSnapshotCache(
 			hclog.NewNullLogger(),
 			newTestState(t),
 			blockchainMock,
 		),
+		runtime: &consensusRuntime{
+			epoch: &epochMetadata{
+				CurrentClientConfig: &polyBftConfig,
+			},
+		},
 	}
 
 	// create parent header (block 10)
@@ -270,7 +278,7 @@ func Test_Factory(t *testing.T) {
 	require.True(t, ok)
 
 	assert.Equal(t, txPool, polybft.txPool)
-	assert.Equal(t, epochSize, polybft.consensusConfig.EpochSize)
+	assert.Equal(t, epochSize, polybft.genesisClientConfig.EpochSize)
 	assert.Equal(t, params, polybft.config)
 }
 
@@ -286,30 +294,44 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 	bridgeCfg := createTestBridgeConfig()
 	cases := []struct {
 		name            string
-		config          *PolyBFTConfig
+		config          *polyCommon.PolyBFTConfig
 		bridgeAllowList *chain.AddressListConfig
 		expectedErr     error
 	}{
 		{
 			name: "non-mintable native token; access lists disabled",
-			config: &PolyBFTConfig{
+			config: &polyCommon.PolyBFTConfig{
 				InitialValidatorSet: validators.GetParamValidators(),
 				Bridge:              bridgeCfg,
 				EpochSize:           epochSize,
-				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
-				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
+				RewardConfig:        &polyCommon.RewardsConfig{WalletAmount: ethgo.Ether(1000)},
+				NativeTokenConfig:   &polyCommon.TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
+				GovernanceConfig: &polyCommon.GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					GovernorAdmin:            types.ZeroAddress,
+					ProposalQuorumPercentage: 67,
+				},
 			},
 		},
 		{
 			name: "mintable native token; access lists enabled",
-			config: &PolyBFTConfig{
+			config: &polyCommon.PolyBFTConfig{
 				InitialValidatorSet: validators.GetParamValidators(),
 				Bridge:              bridgeCfg,
 				EpochSize:           epochSize,
-				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
-				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
+				RewardConfig:        &polyCommon.RewardsConfig{WalletAmount: ethgo.Ether(1000)},
+				NativeTokenConfig:   &polyCommon.TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
 				MaxValidatorSetSize: maxValidators,
+				GovernanceConfig: &polyCommon.GovernanceConfig{
+					VotingDelay:              bigZero,
+					VotingPeriod:             big.NewInt(10),
+					ProposalThreshold:        big.NewInt(25),
+					GovernorAdmin:            types.ZeroAddress,
+					ProposalQuorumPercentage: 67,
+				},
 			},
 			bridgeAllowList: &chain.AddressListConfig{
 				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},
@@ -318,7 +340,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 		},
 		{
 			name:        "missing bridge configuration",
-			config:      &PolyBFTConfig{},
+			config:      &polyCommon.PolyBFTConfig{},
 			expectedErr: errMissingBridgeConfig,
 		},
 	}
@@ -329,11 +351,11 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 			t.Parallel()
 
 			params := &chain.Params{
-				Engine:          map[string]interface{}{ConsensusName: tc.config},
+				Engine:          map[string]interface{}{polyCommon.ConsensusName: tc.config},
 				BridgeAllowList: tc.bridgeAllowList,
 			}
 			chainConfig := &chain.Chain{Params: params, Genesis: &chain.Genesis{Alloc: make(map[types.Address]*chain.GenesisAccount)}}
-			initHandler := GenesisPostHookFactory(chainConfig, ConsensusName)
+			initHandler := GenesisPostHookFactory(chainConfig, polyCommon.ConsensusName)
 			require.NotNil(t, initHandler)
 
 			transition := newTestTransition(t, nil)
