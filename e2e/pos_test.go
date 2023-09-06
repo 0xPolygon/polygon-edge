@@ -328,7 +328,7 @@ func TestPoS_UnstakeExploit(t *testing.T) {
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 	defaultBalance := framework.EthToWei(100)
-	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+	bigGasPrice := big.NewInt(1000000000)
 
 	devInterval := 5 // s
 	numDummyValidators := 5
@@ -477,7 +477,7 @@ func TestPoS_StakeUnstakeExploit(t *testing.T) {
 	stakingContractAddr := staking.AddrStakingContract
 	bigDefaultStakedBalance := getBigDefaultStakedBalance(t)
 	defaultBalance := framework.EthToWei(100)
-	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
+	bigGasPrice := big.NewInt(1000000000)
 
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	numDummyStakers := 100
