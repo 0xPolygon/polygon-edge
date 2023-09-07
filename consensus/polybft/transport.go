@@ -71,7 +71,7 @@ func (p *Polybft) createTopics() (err error) {
 
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *ibftProto.Message) {
-	p.customMulticastHandler(msg)
+	p.ibftMsgMulticast(msg)
 
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "error", err)
