@@ -130,7 +130,9 @@ type TestClusterConfig struct {
 	VotingPeriod uint64
 	VotingDelay  uint64
 
-	ProxyContractsAdmin string
+	ProxyContractsAdmin        string
+	RootTrackerPollInterval    time.Duration
+	RelayerTrackerPollInterval time.Duration
 
 	logsDirOnce sync.Once
 }
@@ -414,6 +416,18 @@ func WithProxyContractsAdmin(address string) ClusterOption {
 	}
 }
 
+func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RootTrackerPollInterval = pollInterval
+	}
+}
+
+func WithRelayerTrackerPollInterval(pollInterval time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RelayerTrackerPollInterval = pollInterval
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -513,6 +527,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
 			"--governor-admin", addresses[0].String(), // set first validator as governor admin
 			"--vote-delay", fmt.Sprint(cluster.Config.VotingDelay),
+		}
+
+		if cluster.Config.RelayerTrackerPollInterval != 0 {
+			args = append(args, "--block-tracker-poll-interval",
+				cluster.Config.RelayerTrackerPollInterval.String())
 		}
 
 		if cluster.Config.VotingPeriod > 0 {
@@ -713,6 +732,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
 		config.Byzantine = byzantine
+		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

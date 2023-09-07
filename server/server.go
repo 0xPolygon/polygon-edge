@@ -635,6 +635,7 @@ func (s *Server) setupRelayer() error {
 		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		s.config.RelayerTrackerPollInterval,
 	)
 
 	// start relayer
