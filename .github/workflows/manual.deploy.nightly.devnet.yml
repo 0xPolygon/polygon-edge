@@ -19,7 +19,7 @@ jobs:
     name: Build Devnet
     uses: ./.github/workflows/deploy.nightly.devnet.yml
     secrets:
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_REGION: eu-west-1
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
       TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
