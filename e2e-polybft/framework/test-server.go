@@ -32,10 +32,10 @@ type TestServerConfig struct {
 	JSONRPCPort           int64
 	GRPCPort              int64
 	P2PPort               int64
-	Seal                  bool
 	DataDir               string
 	Chain                 string
 	LogLevel              string
+	Validator             bool
 	Relayer               bool
 	NumBlockConfirmations uint64
 	BridgeJSONRPC         string
@@ -176,10 +176,6 @@ func (t *TestServer) Start() {
 		args = append(args, "--log-level", config.LogLevel)
 	} else {
 		args = append(args, "--log-level", "DEBUG")
-	}
-
-	if config.Seal {
-		args = append(args, "--seal")
 	}
 
 	if config.Relayer {

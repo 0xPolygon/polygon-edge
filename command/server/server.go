@@ -119,13 +119,6 @@ func setFlags(cmd *cobra.Command) {
 	)
 
 	cmd.Flags().BoolVar(
-		&params.rawConfig.ShouldSeal,
-		sealFlag,
-		defaultConfig.ShouldSeal,
-		"the flag indicating that the client should seal blocks",
-	)
-
-	cmd.Flags().BoolVar(
 		&params.rawConfig.Network.NoDiscover,
 		command.NoDiscoverFlag,
 		defaultConfig.Network.NoDiscover,

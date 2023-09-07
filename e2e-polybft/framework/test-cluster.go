@@ -681,10 +681,10 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 
 	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
 		config.DataDir = dataDir
-		config.Seal = isValidator
 		config.Chain = c.Config.Dir("genesis.json")
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
+		config.Validator = isValidator
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
@@ -739,7 +739,7 @@ func (c *TestCluster) Stats(t *testing.T) {
 		}
 
 		num, err := i.JSONRPC().Eth().BlockNumber()
-		t.Log("Stats node", index, "err", err, "block", num, "validator", i.config.Seal)
+		t.Log("Stats node", index, "err", err, "block", num, "validator", i.config.Validator)
 	}
 }
 
