@@ -63,7 +63,7 @@ jobs:
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
-        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-terraform-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
@@ -81,7 +81,7 @@ jobs:
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
           TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
       - name: Retrieve state file from s3
-        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+        run: aws s3 cp s3://polygon-edge-devnet-terraform-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Configure private keys
         run: |
           terraform output pk_ansible > ~/devnet_private.key
@@ -268,9 +268,9 @@ jobs:
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
-        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-terraform-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - name: Retrieve state file from s3
-        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+        run: aws s3 cp s3://polygon-edge-devnet-terraform-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Terraform Destroy
         id: destroy
         run: terraform destroy -auto-approve -state=state.json
