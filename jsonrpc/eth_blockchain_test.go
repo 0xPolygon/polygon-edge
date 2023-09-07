@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -276,42 +277,89 @@ func TestEth_Syncing(t *testing.T) {
 	})
 }
 
-// if price-limit flag is set its value should be returned if it is higher than avg gas price
-func TestEth_GetPrice_PriceLimitSet(t *testing.T) {
-	priceLimit := uint64(100333)
+func TestEth_GasPrice_WithLondonFork(t *testing.T) {
+	const (
+		baseFee    = uint64(10000)
+		tipCap     = uint64(1000)
+		priceLimit = uint64(10010)
+	)
+
 	store := newMockBlockStore()
+	store.blocks = []*types.Block{
+		{
+			Header: &types.Header{Number: uint64(1)},
+		},
+	}
+	store.maxPriorityFeePerGasFn = func() (*big.Int, error) {
+		return new(big.Int).SetUint64(tipCap), nil
+	}
+
 	// not using newTestEthEndpoint as we need to set priceLimit
 	eth := newTestEthEndpointWithPriceLimit(store, priceLimit)
 
-	t.Run("returns price limit flag value when it is larger than average gas price", func(t *testing.T) {
+	t.Run("returns price limit flag value when it is larger than MaxPriorityFee+BaseFee", func(t *testing.T) {
+		store.baseFee = 0
+
 		res, err := eth.GasPrice()
-		store.averageGasPrice = 0
+
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-
 		assert.Equal(t, argUint64(priceLimit), res)
 	})
 
-	t.Run("returns average gas price when it is larger than set price limit flag", func(t *testing.T) {
-		store.averageGasPrice = 500000
+	t.Run("returns MaxPriorityFee+BaseFee when it is larger than set price limit flag", func(t *testing.T) {
+		store.baseFee = baseFee
+
 		res, err := eth.GasPrice()
+
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
+		assert.Equal(t, argUint64(baseFee+tipCap), res)
+	})
 
-		assert.GreaterOrEqual(t, res, argUint64(priceLimit))
+	t.Run("returns error if MaxPriorityFeePerGas returns error", func(t *testing.T) {
+		store.maxPriorityFeePerGasFn = func() (*big.Int, error) {
+			return nil, runtime.ErrDepth
+		}
+
+		_, err := eth.GasPrice()
+
+		assert.ErrorIs(t, err, runtime.ErrDepth)
 	})
 }
 
-func TestEth_GasPrice(t *testing.T) {
+func TestEth_GasPrice_WithoutLondonFork(t *testing.T) {
+	const priceLimit = 100000
+
 	store := newMockBlockStore()
-	store.averageGasPrice = 9999
-	eth := newTestEthEndpoint(store)
+	store.forksInTime.London = false
+	store.blocks = []*types.Block{
+		{
+			Header: &types.Header{Number: uint64(1)},
+		},
+	}
 
-	res, err := eth.GasPrice()
-	assert.NoError(t, err)
-	assert.NotNil(t, res)
+	eth := newTestEthEndpointWithPriceLimit(store, priceLimit)
 
-	assert.Equal(t, argUint64(store.averageGasPrice), res)
+	t.Run("priceLimit is greater than averageGasPrice", func(t *testing.T) {
+		store.averageGasPrice = priceLimit - 100
+
+		res, err := eth.GasPrice()
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, argUint64(priceLimit), res)
+	})
+
+	t.Run("averageGasPrice is greater than priceLimit", func(t *testing.T) {
+		store.averageGasPrice = priceLimit + 100
+
+		res, err := eth.GasPrice()
+
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Equal(t, argUint64(priceLimit+100), res)
+	})
 }
 
 func TestEth_Call(t *testing.T) {
@@ -406,11 +454,16 @@ type mockBlockStore struct {
 	averageGasPrice int64
 	ethCallError    error
 	returnValue     []byte
+	forksInTime     chain.ForksInTime
+	baseFee         uint64
+
+	maxPriorityFeePerGasFn func() (*big.Int, error)
 }
 
 func newMockBlockStore() *mockBlockStore {
 	store := &mockBlockStore{}
 	store.receipts = make(map[types.Hash][]*types.Receipt)
+	store.forksInTime = chain.AllForksEnabled.At(0)
 
 	return store
 }
@@ -596,6 +649,22 @@ func (m *mockBlockStore) TxPoolSubscribe(request *proto.SubscribeRequest) (<-cha
 
 func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
 	return &Account{Nonce: 0}, nil
+}
+
+func (m *mockBlockStore) GetBaseFee() uint64 {
+	return m.baseFee
+}
+
+func (m *mockBlockStore) GetForksInTime(block uint64) chain.ForksInTime {
+	return m.forksInTime
+}
+
+func (m *mockBlockStore) MaxPriorityFeePerGas() (*big.Int, error) {
+	if m.maxPriorityFeePerGasFn != nil {
+		return m.maxPriorityFeePerGasFn()
+	}
+
+	return big.NewInt(0), nil
 }
 
 func newTestBlock(number uint64, hash types.Hash) *types.Block {
