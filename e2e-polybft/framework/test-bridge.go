@@ -316,6 +316,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 		"deploy",
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
+		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
 		"--genesis", genesisPath,
 		"--test",
 	}
@@ -519,6 +520,7 @@ func (t *TestBridge) deployStakeManager(genesisPath string) error {
 		"stake-manager-deploy",
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--genesis", genesisPath,
+		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
 		"--test",
 	}
 

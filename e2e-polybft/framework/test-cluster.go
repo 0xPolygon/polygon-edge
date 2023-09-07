@@ -194,6 +194,15 @@ func (c *TestClusterConfig) initLogsDir() {
 	c.LogsDir = logsDir
 }
 
+func (c *TestClusterConfig) GetProxyContractsAdmin() string {
+	proxyAdminAddr := c.ProxyContractsAdmin
+	if proxyAdminAddr == "" {
+		proxyAdminAddr = ProxyContractAdminAddr
+	}
+
+	return proxyAdminAddr
+}
+
 type TestCluster struct {
 	Config                   *TestClusterConfig
 	Servers                  []*TestServer

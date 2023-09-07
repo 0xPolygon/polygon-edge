@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -16,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ryanuber/columnize"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -259,4 +261,17 @@ func ParseAmount(amount string) (*big.Int, error) {
 	}
 
 	return result, nil
+}
+
+func ValidateProxyContractsAdmin(proxyContractsAdmin string) error {
+	if strings.TrimSpace(proxyContractsAdmin) == "" {
+		return errors.New("proxy contracts admin address must be set")
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	return nil
 }

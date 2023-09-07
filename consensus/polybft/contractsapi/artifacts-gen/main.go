@@ -208,6 +208,10 @@ func main() {
 			"lib/GenesisProxy.sol",
 			"GenesisProxy",
 		},
+		{
+			"../@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+			"TransparentUpgradeableProxy",
+		},
 	}
 
 	str := `// This is auto-generated file. DO NOT EDIT.
