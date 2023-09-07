@@ -26,6 +26,9 @@ type ethTxPoolStore interface {
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
+
+	// returns the current base fee of TxPool
+	GetBaseFee() uint64
 }
 
 type Account struct {
@@ -393,10 +396,19 @@ func (e *Eth) GetStorageAt(
 // GasPrice returns the average gas price based on the last x blocks
 // taking into consideration operator defined price limit
 func (e *Eth) GasPrice() (interface{}, error) {
+	// Return --price-limit flag defined value if it is greater than avgGasPrice/baseFee+priorityFee
+	if e.store.GetForksInTime(e.store.Header().Number).London {
+		priorityFee, err := e.store.MaxPriorityFeePerGas()
+		if err != nil {
+			return nil, err
+		}
+
+		return argUint64(common.Max(e.priceLimit, priorityFee.Uint64()+e.store.GetBaseFee())), nil
+	}
+
 	// Fetch average gas price in uint64
 	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
-	// Return --price-limit flag defined value if it is greater than avgGasPrice
 	return argUint64(common.Max(e.priceLimit, avgGasPrice)), nil
 }
 
