@@ -77,6 +77,13 @@ func setFlags(cmd *cobra.Command) {
 		"the burn contract block and address (format: <block>:<address>[:<burn destination>])",
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.baseFee,
+		genesisBaseFeeFlag,
+		command.DefaultGenesisBaseFee,
+		"initial base fee for the chain in wei, Default BaseFee is 1 Gwei (London fork is disabled when baseFee is 0)",
+	)
+
 	cmd.Flags().StringArrayVar(
 		&params.bootnodes,
 		command.BootnodeFlag,
