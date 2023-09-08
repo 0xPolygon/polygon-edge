@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -85,7 +84,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 		rpcEndpoint:           server.HTTPAddr(),
 		contractAddr:          addr,
 		numBlockConfirmations: numBlockConfirmations,
-		pollInterval:          common.Duration{Duration: time.Second},
+		pollInterval:          time.Second,
 	}
 
 	err = tracker.Start(context.Background())
