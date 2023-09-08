@@ -2,13 +2,6 @@
 
 set -e
 
-# Check if jq is installed. If not exit and inform user.
-if ! command -v jq >/dev/null 2>&1; then
-  echo "The jq utility is not installed or is not in the PATH. Please install it and run the script again."
-  exit 1
-fi
-
-
 POLYGON_EDGE_BIN=./polygon-edge
 CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
 --block-gas-limit 10000000
@@ -16,6 +9,7 @@ CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
 --chain-id 51001
 --name polygon-edge-docker
 --premine 0x0000000000000000000000000000000000000000
+--premine 0xFA9eEc9FBA16303eaE51EB0ef3F7e090035e3e1A:0xD3C21BCECCEDA1000000
 --premine 0x228466F2C715CbEC05dEAbfAc040ce3619d7CF0B:0xD3C21BCECCEDA1000000
 --premine 0xca48694ebcB2548dF5030372BE4dAad694ef174e:0xD3C21BCECCEDA1000000
 --burn-contract 0:0x0000000000000000000000000000000000000000
@@ -61,6 +55,7 @@ case "$1" in
                 --validators-prefix data- \
                 --reward-wallet 0xDEADBEEF:1000000 \
                 --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
+                --governor-admin "$(echo "$secrets" | jq -r '.[0] | .address')" \
                 --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
                 --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
                 --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
