@@ -1767,6 +1767,22 @@ func (s *SetNewSprintSizeNetworkParamsFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(NetworkParams.Abi.Methods["setNewSprintSize"], buf, s)
 }
 
+type SetNewBaseFeeChangeDenomNetworkParamsFn struct {
+	NewBaseFeeChangeDenom *big.Int `abi:"newBaseFeeChangeDenom"`
+}
+
+func (s *SetNewBaseFeeChangeDenomNetworkParamsFn) Sig() []byte {
+	return NetworkParams.Abi.Methods["setNewBaseFeeChangeDenom"].ID()
+}
+
+func (s *SetNewBaseFeeChangeDenomNetworkParamsFn) EncodeAbi() ([]byte, error) {
+	return NetworkParams.Abi.Methods["setNewBaseFeeChangeDenom"].Encode(s)
+}
+
+func (s *SetNewBaseFeeChangeDenomNetworkParamsFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(NetworkParams.Abi.Methods["setNewBaseFeeChangeDenom"], buf, s)
+}
+
 type NewCheckpointBlockIntervalEvent struct {
 	CheckpointInterval *big.Int `abi:"checkpointInterval"`
 }

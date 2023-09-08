@@ -369,6 +369,10 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 		}
 	}
 
+	if len(eventsRaw) > 0 {
+		latestChainParams.Engine[polyCommon.ConsensusName] = latestPolybftConfig
+	}
+
 	// save updated config to db
 	return g.state.GovernanceStore.insertClientConfig(latestChainParams)
 }

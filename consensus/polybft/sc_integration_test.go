@@ -271,6 +271,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	reward := uint64(math.Pow(10, 18))             // 1 token
 	walletAddress := types.StringToAddress("1234889893")
 
+	baseFeeDenom := uint64(8)
+
 	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
 
 	// create all validator sets which will be used in test
@@ -335,7 +337,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			MaxValidatorSetSize:  100,
 			CheckpointInterval:   900,
 			WithdrawalWaitPeriod: 1,
-			BaseFeeChangeDenom:   20,
 			BlockTimeDrift:       10,
 			// use 1st account as governance address
 			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],
@@ -367,7 +368,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init NetworkParams
-		err = initNetworkParamsContract(polyBFTConfig, transition)
+		err = initNetworkParamsContract(baseFeeDenom, polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch

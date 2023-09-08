@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/polygon-edge/chain"
 	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -104,33 +105,39 @@ func TestGovernanceStore_InsertAndGetEvents(t *testing.T) {
 	require.Equal(t, block+1, lastProcessedBlock)
 }
 
-// TODO: FIX
-// func TestGovernanceStore_InsertAndGetClientConfig(t *testing.T) {
-// 	t.Parallel()
+func TestGovernanceStore_InsertAndGetClientConfig(t *testing.T) {
+	t.Parallel()
 
-// 	initialConfig := createTestPolybftConfig()
-// 	state := newTestState(t)
+	initialPolyConfig := createTestPolybftConfig()
+	initialConfig := &chain.Params{
+		Engine: map[string]interface{}{polyCommon.ConsensusName: initialPolyConfig},
+	}
+	state := newTestState(t)
 
-// 	// try get config when there is none
-// 	_, err := state.GovernanceStore.getClientConfig()
-// 	require.ErrorIs(t, err, errClientConfigNotFound)
+	// try get config when there is none
+	_, err := state.GovernanceStore.getClientConfig()
+	require.ErrorIs(t, err, errClientConfigNotFound)
 
-// 	// insert config
-// 	require.NoError(t, state.GovernanceStore.insertClientConfig(initialConfig))
+	// insert config
+	require.NoError(t, state.GovernanceStore.insertClientConfig(initialConfig))
 
-// 	// now config should exist
-// 	configFromDB, err := state.GovernanceStore.getClientConfig()
-// 	require.NoError(t, err)
-// 	// check some fields to make sure they are as expected
-// 	require.Len(t, configFromDB.InitialValidatorSet, len(initialConfig.InitialValidatorSet))
-// 	require.Equal(t, configFromDB.BlockTime, initialConfig.BlockTime)
-// 	require.Equal(t, configFromDB.BlockTimeDrift, initialConfig.BlockTimeDrift)
-// 	require.Equal(t, configFromDB.CheckpointInterval, initialConfig.CheckpointInterval)
-// 	require.Equal(t, configFromDB.EpochReward, initialConfig.EpochReward)
-// 	require.Equal(t, configFromDB.EpochSize, initialConfig.EpochSize)
-// 	require.Equal(t, configFromDB.Governance, initialConfig.Governance)
-// 	require.Equal(t, configFromDB.BaseFeeChangeDenom, initialConfig.BaseFeeChangeDenom)
-// }
+	// now config should exist
+	configFromDB, err := state.GovernanceStore.getClientConfig()
+	require.NoError(t, err)
+
+	polyConfigFromDB, err := polyCommon.GetPolyBFTConfig(configFromDB)
+	require.NoError(t, err)
+
+	// check some fields to make sure they are as expected
+	require.Len(t, polyConfigFromDB.InitialValidatorSet, len(initialPolyConfig.InitialValidatorSet))
+	require.Equal(t, polyConfigFromDB.BlockTime, initialPolyConfig.BlockTime)
+	require.Equal(t, polyConfigFromDB.BlockTimeDrift, initialPolyConfig.BlockTimeDrift)
+	require.Equal(t, polyConfigFromDB.CheckpointInterval, initialPolyConfig.CheckpointInterval)
+	require.Equal(t, polyConfigFromDB.EpochReward, initialPolyConfig.EpochReward)
+	require.Equal(t, polyConfigFromDB.EpochSize, initialPolyConfig.EpochSize)
+	require.Equal(t, polyConfigFromDB.Governance, initialPolyConfig.Governance)
+	require.Equal(t, configFromDB.BaseFeeChangeDenom, initialConfig.BaseFeeChangeDenom)
+}
 
 func createTestPolybftConfig() *polyCommon.PolyBFTConfig {
 	return &polyCommon.PolyBFTConfig{
@@ -195,7 +202,6 @@ func createTestPolybftConfig() *polyCommon.PolyBFTConfig {
 		},
 		InitialTrieRoot:      types.ZeroHash,
 		WithdrawalWaitPeriod: 1,
-		BaseFeeChangeDenom:   20,
 		RewardConfig: &polyCommon.RewardsConfig{
 			TokenAddress:  types.StringToAddress("0xRewardTokenAddr"),
 			WalletAddress: types.StringToAddress("0xRewardWalletAddr"),
