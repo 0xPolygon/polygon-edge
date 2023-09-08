@@ -215,10 +215,10 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
 
 	snapshot := NewProposerSnapshot(epochSize-1, validatorSet)
+	polybftCfg := &polyCommon.PolyBFTConfig{EpochSize: epochSize}
 	config := &runtimeConfig{
-		GenesisConfig: &polyCommon.PolyBFTConfig{
-			EpochSize: epochSize,
-		},
+		GenesisConfig:  polybftCfg,
+		genesisParams:  &chain.Params{Engine: map[string]interface{}{polyCommon.ConsensusName: polybftCfg}},
 		blockchain:     blockchainMock,
 		polybftBackend: polybftBackendMock,
 		txPool:         txPool,
@@ -238,11 +238,14 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 			FirstBlockInEpoch:   header.Number - epochSize + 1,
 			CurrentClientConfig: config.GenesisConfig,
 		},
-		lastBuiltBlock:       &types.Header{Number: header.Number - 1},
-		stateSyncManager:     &dummyStateSyncManager{},
-		checkpointManager:    &dummyCheckpointManager{},
-		stakeManager:         &dummyStakeManager{},
-		governanceManager:    &dummyGovernanceManager{},
+		lastBuiltBlock:    &types.Header{Number: header.Number - 1},
+		stateSyncManager:  &dummyStateSyncManager{},
+		checkpointManager: &dummyCheckpointManager{},
+		stakeManager:      &dummyStakeManager{},
+		governanceManager: &dummyGovernanceManager{
+			getClientConfigFn: func() (*chain.Params, error) {
+				return config.genesisParams, nil
+			}},
 		doubleSigningTracker: tracker,
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
