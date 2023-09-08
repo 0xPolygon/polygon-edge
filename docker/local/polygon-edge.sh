@@ -46,6 +46,8 @@ case "$1" in
 
               rm -f /data/genesis.json
 
+              proxyContractsAdmin=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
+
               echo "Generating PolyBFT genesis file..."
               "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
                 --dir /data/genesis.json \
@@ -55,6 +57,7 @@ case "$1" in
                 --reward-wallet 0xDEADBEEF:1000000 \
                 --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
                 --governor-admin "$(echo "$secrets" | jq -r '.[0] | .address')" \
+                --proxy-contracts-admin ${proxyContractsAdmin} \
                 --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
                 --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
                 --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
