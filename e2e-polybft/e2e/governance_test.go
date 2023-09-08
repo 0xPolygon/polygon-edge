@@ -175,7 +175,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 	})
 	t.Run("successful change of base fee denom", func(t *testing.T) {
 		var baseFee = uint64(215)
-		// propose a new epoch size
+		// propose a new base fee change denom
 		setNewBaseFeeDenomFn := &contractsapi.SetNewBaseFeeChangeDenomNetworkParamsFn{
 			NewBaseFeeChangeDenom: big.NewInt(int64(baseFee)),
 		}
@@ -241,7 +241,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 			polybftCfg.GovernanceConfig.NetworkParamsAddr,
 			proposalInput, proposalDescription)
 
-		// check if epoch size changed on NetworkParams
+		// check if base fee change denom changed on NetworkParams
 		networkParamsResponse, err := ABICall(l2Relayer, contractsapi.NetworkParams,
 			ethgo.Address(polybftCfg.GovernanceConfig.NetworkParamsAddr), ethgo.ZeroAddress, "baseFeeChangeDenom")
 		require.NoError(t, err)
