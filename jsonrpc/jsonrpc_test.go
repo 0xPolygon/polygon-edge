@@ -8,12 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/helper/tests"
-	"github.com/0xPolygon/polygon-edge/versioning"
-	"github.com/stretchr/testify/assert"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/hashicorp/go-hclog"
+	"github.com/0xPolygon/polygon-edge/helper/tests"
+	"github.com/0xPolygon/polygon-edge/versioning"
 )
 
 func TestHTTPServer(t *testing.T) {
@@ -40,12 +39,12 @@ func Test_handleGetRequest(t *testing.T) {
 
 	response := &GetResponse{}
 
-	assert.NoError(
+	require.NoError(
 		t,
 		json.Unmarshal(mockWriter.Bytes(), response),
 	)
 
-	assert.Equal(
+	require.Equal(
 		t,
 		&GetResponse{
 			Name:    chainName,
@@ -56,23 +55,47 @@ func Test_handleGetRequest(t *testing.T) {
 	)
 }
 
-func TestHandleJSONRPCRequest_MaliciousInput(t *testing.T) {
+func TestJSONRPC_handleJSONRPCRequest(t *testing.T) {
 	t.Parallel()
 
 	j, err := newTestJSONRPC(t)
 	require.NoError(t, err)
 
-	maliciousInput := `<script>alert("XSS attack");</script>`
+	cases := []struct {
+		name             string
+		request          string
+		expectedResponse string
+	}{
+		{
+			name: "malicious input (XSS attack)",
+			request: `{"jsonrpc":"2.0","id":0,"method":"eth_getBlockByNumber","params":["latest",false]}
+<script>alert("XSS attack");</script>`,
+			expectedResponse: `{"jsonrpc":"2.0","error":{"code":-32600,"message":"Invalid json request"}}`,
+		},
+		{
+			name:             "valid input",
+			request:          `{"jsonrpc":"2.0","id":0,"method":"eth_getBlockByNumber","params":["latest",false]}`,
+			expectedResponse: `{"jsonrpc":"2.0","id":0,"result":{`,
+		},
+	}
 
-	req := httptest.NewRequest("POST", "/eth_blockNumber", strings.NewReader(maliciousInput))
-	req.Header.Set("Content-Type", "application/json")
+	for _, c := range cases {
+		c := c
 
-	w := httptest.NewRecorder()
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
 
-	j.handleJSONRPCRequest(w, req)
+			req := httptest.NewRequest("POST", "/eth_getBlockByNumber", strings.NewReader(c.request))
+			req.Header.Set("Content-Type", "application/json")
 
-	responseBody := w.Body.String()
-	require.Contains(t, responseBody, "Invalid json request")
+			w := httptest.NewRecorder()
+
+			j.handleJSONRPCRequest(w, req)
+
+			response := w.Body.String()
+			require.Contains(t, response, c.expectedResponse)
+		})
+	}
 }
 
 func newTestJSONRPC(t *testing.T) (*JSONRPC, error) {

@@ -3,7 +3,6 @@ package jsonrpc
 import (
 	"encoding/json"
 	"fmt"
-	"html/template"
 	"io"
 	"net"
 	"net/http"
@@ -304,9 +303,7 @@ func (j *JSONRPC) handle(w http.ResponseWriter, req *http.Request) {
 
 func (j *JSONRPC) handleJSONRPCRequest(w http.ResponseWriter, req *http.Request) {
 	data, err := io.ReadAll(req.Body)
-	fmt.Println("request body", string(data))
 	if err != nil {
-		fmt.Println("failed to read request data")
 		_, _ = w.Write([]byte(err.Error()))
 
 		return
@@ -317,10 +314,9 @@ func (j *JSONRPC) handleJSONRPCRequest(w http.ResponseWriter, req *http.Request)
 
 	resp, err := j.dispatcher.Handle(data)
 	if err != nil {
-		fmt.Println("failed to handle request", err)
 		_, _ = w.Write([]byte(err.Error()))
 	} else {
-		template.HTMLEscape(w, resp)
+		_, _ = w.Write(resp)
 	}
 
 	j.logger.Debug("handle", "response", string(resp))
