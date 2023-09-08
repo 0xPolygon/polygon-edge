@@ -422,6 +422,26 @@ func (e *Eth) getGasPrice() (uint64, error) {
 	return common.Max(e.priceLimit, avgGasPrice), nil
 }
 
+// fillTransactionGasPrice fills transaction gas price if no provided
+func (e *Eth) fillTransactionGasPrice(tx *types.Transaction) error {
+	if tx.GetGasPrice(e.store.GetBaseFee()).BitLen() > 0 {
+		return nil
+	}
+
+	estimatedGasPrice, err := e.getGasPrice()
+	if err != nil {
+		return err
+	}
+
+	if tx.Type == types.DynamicFeeTx {
+		tx.GasFeeCap = new(big.Int).SetUint64(estimatedGasPrice)
+	} else {
+		tx.GasPrice = new(big.Int).SetUint64(estimatedGasPrice)
+	}
+
+	return nil
+}
+
 type overrideAccount struct {
 	Nonce     *argUint64                 `json:"nonce"`
 	Code      *argBytes                  `json:"code"`
@@ -477,17 +497,8 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 	}
 
 	// Force transaction gas price if empty
-	if transaction.GetGasPrice(e.store.GetBaseFee()).BitLen() == 0 {
-		estimatedGasPrice, err := e.getGasPrice()
-		if err != nil {
-			return nil, err
-		}
-
-		if transaction.Type == types.DynamicFeeTx {
-			transaction.GasFeeCap = new(big.Int).SetUint64(estimatedGasPrice)
-		} else {
-			transaction.GasPrice = new(big.Int).SetUint64(estimatedGasPrice)
-		}
+	if err = e.fillTransactionGasPrice(transaction); err != nil {
+		return nil, err
 	}
 
 	var override types.StateOverride
@@ -536,17 +547,8 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Force transaction gas price if empty
-	if transaction.GetGasPrice(e.store.GetBaseFee()).BitLen() == 0 {
-		estimatedGasPrice, err := e.getGasPrice()
-		if err != nil {
-			return nil, err
-		}
-
-		if transaction.Type == types.DynamicFeeTx {
-			transaction.GasFeeCap = new(big.Int).SetUint64(estimatedGasPrice)
-		} else {
-			transaction.GasPrice = new(big.Int).SetUint64(estimatedGasPrice)
-		}
+	if err = e.fillTransactionGasPrice(transaction); err != nil {
+		return nil, err
 	}
 
 	forksInTime := e.store.GetForksInTime(header.Number)
