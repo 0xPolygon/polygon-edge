@@ -115,13 +115,8 @@ func (l *LondonFixForkV2) checkDynamicFees(msg *types.Transaction, t *Transition
 	// This will panic if baseFee is nil, but basefee presence is verified
 	// as part of header validation.
 	if gasFeeCap := msg.GetGasFeeCap(); gasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
-		field := "GasPrice"
-		if msg.Type == types.DynamicFeeTx {
-			field = "GasFeeCap"
-		}
-
-		return fmt.Errorf("%w: address %v, %s: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), gasFeeCap, field, t.ctx.BaseFee)
+		return fmt.Errorf("%w: address %v, GasFeeCap/GasPrice: %s, BaseFee: %s", ErrFeeCapTooLow,
+			msg.From.String(), gasFeeCap, t.ctx.BaseFee)
 	}
 
 	return nil
