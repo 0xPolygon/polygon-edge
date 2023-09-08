@@ -745,6 +745,7 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 
 func TestEth_EstimateGas_Errors(t *testing.T) {
 	store := getExampleStore()
+	store.ethStore = newMockBlockStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
 	// Account doesn't have any balance
