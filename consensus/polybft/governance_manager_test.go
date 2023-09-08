@@ -90,8 +90,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Number: 0,
 		})
 
-		chainParams := &chain.Params{}
-		chainParams.Engine[common.ConsensusName] = genesisPolybftConfig
+		chainParams := &chain.Params{Engine: map[string]interface{}{common.ConsensusName: genesisPolybftConfig}}
 		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
@@ -137,8 +136,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Number: 4,
 		})
 
-		chainParams := &chain.Params{}
-		chainParams.Engine[common.ConsensusName] = genesisPolybftConfig
+		chainParams := &chain.Params{Engine: map[string]interface{}{common.ConsensusName: genesisPolybftConfig}}
 		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
