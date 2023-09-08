@@ -1403,6 +1403,13 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 				},
 			}
 
+			blockchain.setCurrentHeader(&types.Header{
+				Number:   test.blockNumber + 1,
+				GasLimit: test.parentGasLimit,
+				GasUsed:  test.parentGasUsed,
+				BaseFee:  test.parentBaseFee,
+			}, big.NewInt(1))
+
 			parent := &types.Header{
 				Number:   test.blockNumber,
 				GasLimit: test.parentGasLimit,

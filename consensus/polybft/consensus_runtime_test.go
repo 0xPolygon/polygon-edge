@@ -490,6 +490,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	config := &runtimeConfig{
 		polybftBackend: polybftBackendMock,
 		State:          newTestState(t),
+		genesisParams:  &chain.Params{Engine: map[string]interface{}{polyCommon.ConsensusName: polyBftConfig}},
 		GenesisConfig:  polyBftConfig,
 		DataDir:        tmpDir,
 		Key:            createTestKey(t),
