@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -32,7 +31,7 @@ type StateSyncRelayer struct {
 	txRelayer              txrelayer.TxRelayer
 	key                    ethgo.Key
 	closeCh                chan struct{}
-	pollInterval           common.Duration
+	pollInterval           time.Duration
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -82,7 +81,7 @@ func NewRelayer(
 		key:                    key,
 		closeCh:                make(chan struct{}),
 		eventTrackerStartBlock: stateReceiverTrackerStartBlock,
-		pollInterval:           common.Duration{Duration: pollInterval},
+		pollInterval:           pollInterval,
 	}
 }
 

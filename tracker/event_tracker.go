@@ -26,7 +26,7 @@ type EventTracker struct {
 	subscriber            eventSubscription
 	logger                hcf.Logger
 	numBlockConfirmations uint64 // minimal number of child blocks required for the parent block to be considered final
-	pollInterval          common.Duration
+	pollInterval          time.Duration
 }
 
 func NewEventTracker(
@@ -37,7 +37,7 @@ func NewEventTracker(
 	numBlockConfirmations uint64,
 	startBlock uint64,
 	logger hcf.Logger,
-	pollInterval common.Duration,
+	pollInterval time.Duration,
 ) *EventTracker {
 	return &EventTracker{
 		dbPath:                dbPath,
@@ -75,7 +75,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	}
 
 	jsonBlockTracker := blocktracker.NewJSONBlockTracker(provider.Eth())
-	jsonBlockTracker.PollInterval = e.pollInterval.Duration
+	jsonBlockTracker.PollInterval = e.pollInterval
 	blockTracker := blocktracker.NewBlockTracker(
 		provider.Eth(),
 		blocktracker.WithBlockMaxBacklog(blockMaxBacklog),

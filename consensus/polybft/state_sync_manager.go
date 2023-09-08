@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	polybftCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
@@ -16,7 +17,6 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -70,7 +70,7 @@ type stateSyncConfig struct {
 	key                      *wallet.Key
 	maxCommitmentSize        uint64
 	numBlockConfirmations    uint64
-	blockTrackerPollInterval common.Duration
+	blockTrackerPollInterval time.Duration
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)

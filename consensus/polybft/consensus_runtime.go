@@ -203,7 +203,7 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				topic:                    c.config.bridgeTopic,
 				maxCommitmentSize:        maxCommitmentSize,
 				numBlockConfirmations:    c.config.numBlockConfirmations,
-				blockTrackerPollInterval: c.config.GenesisConfig.BlockTrackerPollInterval,
+				blockTrackerPollInterval: c.config.GenesisConfig.BlockTrackerPollInterval.Duration,
 			},
 			c,
 		)

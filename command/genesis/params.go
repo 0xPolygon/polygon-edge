@@ -571,7 +571,7 @@ func (p *genesisParams) validateGovernorAdminAddr() error {
 // which can not be 0
 func (p *genesisParams) validateBlockTrackerPollInterval() error {
 	if p.blockTrackerPollInterval == 0 {
-		return errBlockTrackerPollInterval
+		return helper.ErrBlockTrackerPollInterval
 	}
 
 	return nil
