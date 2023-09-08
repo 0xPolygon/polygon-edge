@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"net"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -264,8 +263,8 @@ func ParseAmount(amount string) (*big.Int, error) {
 }
 
 func ValidateProxyContractsAdmin(proxyContractsAdmin string) error {
-	if strings.TrimSpace(proxyContractsAdmin) == "" {
-		return errors.New("proxy contracts admin address must be set")
+	if err := types.IsValidAddress(proxyContractsAdmin); err != nil {
+		return fmt.Errorf("proxy contracts admin address is not valid: %w", err)
 	}
 
 	proxyContractsAdminAddr := types.StringToAddress(proxyContractsAdmin)
