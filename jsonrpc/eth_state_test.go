@@ -589,6 +589,7 @@ func constructMockTx(gasLimit *argUint64, data *argBytes) *txnArgs {
 
 func getExampleStore() *mockSpecialStore {
 	return &mockSpecialStore{
+		ethStore: newMockBlockStore(),
 		account: &mockAccount{
 			address: addr0,
 			account: &Account{
@@ -714,7 +715,6 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 	revertReason := errors.New("revert reason")
 
 	store := getExampleStore()
-	store.ethStore = newMockBlockStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
 	// We want to simulate an EVM revert here
@@ -745,7 +745,6 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 
 func TestEth_EstimateGas_Errors(t *testing.T) {
 	store := getExampleStore()
-	store.ethStore = newMockBlockStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
 	// Account doesn't have any balance
