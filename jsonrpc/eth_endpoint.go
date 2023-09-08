@@ -27,7 +27,7 @@ type ethTxPoolStore interface {
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
 
-	// returns the current base fee of TxPool
+	// GetBaseFee returns the current base fee of TxPool
 	GetBaseFee() uint64
 }
 
@@ -393,23 +393,33 @@ func (e *Eth) GetStorageAt(
 	return argBytesPtr(result), nil
 }
 
-// GasPrice returns the average gas price based on the last x blocks
-// taking into consideration operator defined price limit
+// GasPrice exposes "getGasPrice"'s function logic to public RPC interface
 func (e *Eth) GasPrice() (interface{}, error) {
+	gasPrice, err := e.getGasPrice()
+	if err != nil {
+		return nil, err
+	}
+
+	return argUint64(gasPrice), nil
+}
+
+// getGasPrice returns the average gas price based on the last x blocks
+// taking into consideration operator defined price limit
+func (e *Eth) getGasPrice() (uint64, error) {
 	// Return --price-limit flag defined value if it is greater than avgGasPrice/baseFee+priorityFee
 	if e.store.GetForksInTime(e.store.Header().Number).London {
 		priorityFee, err := e.store.MaxPriorityFeePerGas()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 
-		return argUint64(common.Max(e.priceLimit, priorityFee.Uint64()+e.store.GetBaseFee())), nil
+		return common.Max(e.priceLimit, priorityFee.Uint64()+e.store.GetBaseFee()), nil
 	}
 
 	// Fetch average gas price in uint64
 	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
-	return argUint64(common.Max(e.priceLimit, avgGasPrice)), nil
+	return common.Max(e.priceLimit, avgGasPrice), nil
 }
 
 type overrideAccount struct {
@@ -460,9 +470,24 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 	if err != nil {
 		return nil, err
 	}
+
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
 	if transaction.Gas == 0 {
 		transaction.Gas = header.GasLimit
+	}
+
+	// Force transaction gas price if empty
+	if transaction.GetGasPrice(e.store.GetBaseFee()).BitLen() == 0 {
+		estimatedGasPrice, err := e.getGasPrice()
+		if err != nil {
+			return nil, err
+		}
+
+		if transaction.Type == types.DynamicFeeTx {
+			transaction.GasFeeCap = new(big.Int).SetUint64(estimatedGasPrice)
+		} else {
+			transaction.GasPrice = new(big.Int).SetUint64(estimatedGasPrice)
+		}
 	}
 
 	var override types.StateOverride
@@ -508,6 +533,20 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
 	if err != nil {
 		return nil, err
+	}
+
+	// Force transaction gas price if empty
+	if transaction.GetGasPrice(e.store.GetBaseFee()).BitLen() == 0 {
+		estimatedGasPrice, err := e.getGasPrice()
+		if err != nil {
+			return nil, err
+		}
+
+		if transaction.Type == types.DynamicFeeTx {
+			transaction.GasFeeCap = new(big.Int).SetUint64(estimatedGasPrice)
+		} else {
+			transaction.GasPrice = new(big.Int).SetUint64(estimatedGasPrice)
+		}
 	}
 
 	forksInTime := e.store.GetForksInTime(header.Number)
