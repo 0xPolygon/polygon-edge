@@ -204,7 +204,7 @@ jobs:
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
-          ansible-playbook site.yml --extra-vars "block_time=2s"
+          ansible-playbook site.yml --extra-vars "block_gas_limit=200_000_000 block_time=2"
       - name: Set rpc url value
         id: url
         run: |
