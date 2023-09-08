@@ -714,6 +714,7 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 	revertReason := errors.New("revert reason")
 
 	store := getExampleStore()
+	store.ethStore = newMockBlockStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
 	// We want to simulate an EVM revert here
