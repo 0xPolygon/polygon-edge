@@ -539,6 +539,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	g, ctx := errgroup.WithContext(cmdCtx)
 	results := make(map[string]*deployContractResult, len(allContracts))
 	resultsLock := sync.Mutex{}
+	proxyAdmin := types.StringToAddress(params.proxyContractsAdmin)
 
 	for _, contract := range allContracts {
 		contract := contract
@@ -562,57 +563,34 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 				resultsLock.Lock()
 				defer resultsLock.Unlock()
 
+				implementationAddress := types.Address(receipt.ContractAddress)
+
 				results[contract.name] = newDeployContractsResult(contract.name,
-					types.Address(receipt.ContractAddress),
+					implementationAddress,
 					receipt.TransactionHash,
 					receipt.GasUsed)
 
+				if contract.hasProxy {
+					proxyContractName := getProxyNameForImpl(contract.name)
+
+					receipt, err := helper.DeployProxyContract(
+						txRelayer, deployerKey, proxyContractName, proxyAdmin, implementationAddress)
+					if err != nil {
+						return err
+					}
+
+					if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
+						return fmt.Errorf("deployment of %s contract failed", proxyContractName)
+					}
+
+					results[proxyContractName] = newDeployContractsResult(proxyContractName,
+						types.Address(receipt.ContractAddress),
+						receipt.TransactionHash,
+						receipt.GasUsed)
+				}
+
 				return nil
 			}
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return collectResultsOnError(results), err
-	}
-
-	proxyAdmin := types.StringToAddress(params.proxyContractsAdmin)
-
-	g, ctx = errgroup.WithContext(cmdCtx)
-
-	for _, contract := range allContracts {
-		contract := contract
-
-		if !contract.hasProxy {
-			continue
-		}
-
-		g.Go(func() error {
-			proxyContractName := getProxyNameForImpl(contract.name)
-
-			implResult, ok := results[contract.name]
-			if !ok {
-				return fmt.Errorf("implementation contract %s not deployed", contract.name)
-			}
-
-			receipt, err := helper.DeployProxyContract(txRelayer, deployerKey, proxyContractName, proxyAdmin, implResult.Address)
-			if err != nil {
-				return err
-			}
-
-			if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-				return fmt.Errorf("deployment of %s contract failed", proxyContractName)
-			}
-
-			resultsLock.Lock()
-			defer resultsLock.Unlock()
-
-			results[proxyContractName] = newDeployContractsResult(proxyContractName,
-				types.Address(receipt.ContractAddress),
-				receipt.TransactionHash,
-				receipt.GasUsed)
-
-			return nil
 		})
 	}
 
