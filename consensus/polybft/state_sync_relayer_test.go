@@ -96,7 +96,9 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
 		&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Times(5)
 	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
-		&ethgo.Receipt{Status: uint64(types.ReceiptFailed)}, nil).Once()
+		&ethgo.Receipt{
+			Status: uint64(types.ReceiptFailed),
+		}, nil).Once()
 
 	require.NoError(t, stateSyncRelayer.Init())
 
@@ -115,12 +117,12 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	time.Sleep(time.Second * 2) // wait for some time
 
 	// we need to be sure that 5 events are processed and last one failed
-	blockNumber, eventID, err := state.StateSyncStore.getStateSyncRelayerData()
+	ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
 
 	blockhainMock.AssertExpectations(t)
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), blockNumber)
-	require.Equal(t, uint64(6), eventID)
+	require.Equal(t, uint64(2), ssrStateData.NextBlockNumber)
+	require.Equal(t, uint64(6), ssrStateData.NextEventID)
 
 	// post block 3, all the events should be processed and everything should pass
 	blockhainMock.On("GetHeaderByNumber", uint64(2)).Return(&types.Header{
@@ -147,12 +149,12 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	time.Sleep(time.Second * 2) // wait for some time
 
 	// we need to be sure that 5 events are processed and last one failed
-	blockNumber, eventID, err = state.StateSyncStore.getStateSyncRelayerData()
+	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
 
 	blockhainMock.AssertExpectations(t)
 	require.NoError(t, err)
-	require.Equal(t, uint64(4), blockNumber)
-	require.Equal(t, uint64(8), eventID)
+	require.Equal(t, uint64(4), ssrStateData.NextBlockNumber)
+	require.Equal(t, uint64(8), ssrStateData.NextEventID)
 }
 
 type mockStateSyncProofRetriever struct {
@@ -183,15 +185,13 @@ func createTestLogForNewCommitmentEvent(
 	encodedData2, err := abi.MustNewType("uint256").Encode(new(big.Int).SetUint64(endEventID))
 	require.NoError(t, err)
 
-	topics := []types.Hash{
-		types.Hash(evnt.Sig()),
-		types.BytesToHash(encodedData1),
-		types.BytesToHash(encodedData2),
-	}
-
 	return &types.Log{
 		Address: stateSyncAddr,
-		Topics:  topics,
-		Data:    rootHash[:],
+		Topics: []types.Hash{
+			types.Hash(evnt.Sig()),
+			types.BytesToHash(encodedData1),
+			types.BytesToHash(encodedData2),
+		},
+		Data: rootHash[:],
 	}
 }

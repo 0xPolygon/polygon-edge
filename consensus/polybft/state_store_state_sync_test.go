@@ -298,25 +298,29 @@ func createTestStateSync(index int64) *contractsapi.StateSyncedEvent {
 	}
 }
 
-func TestState_StateSync_StateSyncRelayerData(t *testing.T) {
+func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
 	t.Parallel()
 
 	state := newTestState(t)
 
 	// get before insert - should return initialized values
-	blockNumber, eventID, err := state.StateSyncStore.getStateSyncRelayerData()
+	ssrStateData, err := state.StateSyncStore.getStateSyncRelayerStateData()
 
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), blockNumber)
-	assert.Equal(t, uint64(0), eventID)
+	require.NoError(t, err)
+	assert.Nil(t, ssrStateData)
 
 	// insert
-	require.NoError(t, state.StateSyncStore.insertStateSyncRelayerData(100, 200))
+	require.NoError(t, state.StateSyncStore.insertStateSyncRelayerStateData(
+		&StateSyncRelayerStateData{
+			NextBlockNumber: 100,
+			NextEventID:     200,
+		},
+	))
 
 	// get after insert
-	blockNumber, eventID, err = state.StateSyncStore.getStateSyncRelayerData()
+	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
 
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(100), blockNumber)
-	assert.Equal(t, uint64(200), eventID)
+	require.NoError(t, err)
+	assert.Equal(t, uint64(100), ssrStateData.NextBlockNumber)
+	assert.Equal(t, uint64(200), ssrStateData.NextEventID)
 }

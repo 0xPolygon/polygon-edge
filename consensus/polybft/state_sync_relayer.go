@@ -19,19 +19,21 @@ import (
 
 var errFailedToExecuteStateSync = errors.New("failed to execute state sync")
 
+// StateSyncRelayer is an interface that defines functions for state sync relayer
 type StateSyncRelayer interface {
 	PostBlock(req *common.PostBlockRequest) error
 	Init() error
 	Close()
 }
 
+// stateSyncProofRetriever is an interface that exposes function for retrieving state sync proof
 type stateSyncProofRetriever interface {
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
 }
 
 var _ StateSyncRelayer = (*dummyStakeSyncRelayer)(nil)
 
-// dummyStakeSyncRelayer is a dummy implementation of a StateSyncRelayer used only for unit testing
+// dummyStakeSyncRelayer is a dummy implementation of a StateSyncRelayer
 type dummyStakeSyncRelayer struct{}
 
 func (d *dummyStakeSyncRelayer) PostBlock(req *common.PostBlockRequest) error { return nil }
@@ -40,6 +42,12 @@ func (d *dummyStakeSyncRelayer) Init() error { return nil }
 func (d *dummyStakeSyncRelayer) Close()      {}
 
 var _ StateSyncRelayer = (*stateSyncRelayerImpl)(nil)
+
+// StateSyncRelayerStateData is used to keep state of state sync relayer
+type StateSyncRelayerStateData struct {
+	NextBlockNumber uint64 `json:"nextBlockNumber"`
+	NextEventID     uint64 `json:"nextEventID"`
+}
 
 type stateSyncRelayerImpl struct {
 	txRelayer    txrelayer.TxRelayer
@@ -94,28 +102,39 @@ func (ssr *stateSyncRelayerImpl) Init() error {
 			case <-ssr.closeCh:
 				return
 			case req := <-ssr.dataCh:
-				stateNextBlockNumber, stateNextEventID, err := ssr.state.StateSyncStore.getStateSyncRelayerData()
+				ssrStateData, err := ssr.state.StateSyncStore.getStateSyncRelayerStateData()
 				if err != nil {
 					ssr.logger.Error("state sync relayer get state failed", "err", err)
 
 					break
 				}
 
-				nextBlockNum, nextEventID, err := ssr.handleNewBlock(
-					req.FullBlock.Block.Header, req.FullBlock.Receipts, stateNextBlockNumber, stateNextEventID)
+				// create default state data if this is the first time
+				if ssrStateData == nil {
+					ssrStateData = &StateSyncRelayerStateData{
+						NextBlockNumber: 1,
+						NextEventID:     0,
+					}
+				}
+
+				nextBlockNumber, nextEventID, err := ssr.handleNewBlock(
+					req.FullBlock.Block.Header, req.FullBlock.Receipts, ssrStateData)
 				if err != nil {
 					ssr.logger.Error("state sync relayer failed",
-						"state block", stateNextBlockNumber, "state eventID", stateNextEventID,
-						"block", nextBlockNum, "eventID", nextEventID,
+						"state block", ssrStateData.NextBlockNumber, "state eventID", ssrStateData.NextEventID,
+						"block", nextBlockNumber, "eventID", nextEventID,
 						"err", err)
 				}
 
 				// we should write data back to database even if handleNewBlock returned some error
-				if err = ssr.state.StateSyncStore.insertStateSyncRelayerData(
-					nextBlockNum, nextEventID); err != nil {
+				err = ssr.state.StateSyncStore.insertStateSyncRelayerStateData(&StateSyncRelayerStateData{
+					NextBlockNumber: nextBlockNumber,
+					NextEventID:     nextEventID,
+				})
+				if err != nil {
 					ssr.logger.Error("state sync relayer insert state failed",
-						"state block", stateNextBlockNumber, "state eventID", stateNextEventID,
-						"block", nextBlockNum, "eventID", nextEventID,
+						"state block", ssrStateData.NextBlockNumber, "state eventID", ssrStateData.NextEventID,
+						"block", nextBlockNumber, "eventID", nextEventID,
 						"err", err)
 				}
 			}
@@ -136,11 +155,12 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *common.PostBlockRequest) error {
 }
 
 func (ssr *stateSyncRelayerImpl) handleNewBlock(
-	header *types.Header, receipts []*types.Receipt,
-	nextBlockNumber uint64, nextEventID uint64) (uint64, uint64, error) {
+	header *types.Header, receipts []*types.Receipt, stateData *StateSyncRelayerStateData) (uint64, uint64, error) {
 	var (
-		err    error
-		events []*contractsapi.NewCommitmentEvent
+		err             error
+		events          []*contractsapi.NewCommitmentEvent
+		nextBlockNumber = stateData.NextBlockNumber
+		nextEventID     = stateData.NextEventID
 	)
 
 	for nextBlockNumber < header.Number {
@@ -183,13 +203,11 @@ func (ssr *stateSyncRelayerImpl) handleEvents(
 
 			proof, err := ssr.store.GetStateSyncProof(nextEventID)
 			if err != nil {
-				// ssr.logger.Error("failed to query proof", "id", currEventID, "err", err)
 				return nextEventID, fmt.Errorf("failed to query proof: %w", err)
 			}
 
 			tx, err := ssr.createTx(proof)
 			if err != nil {
-				// ssr.logger.Error("failed to create tx", "id", currEventID, "err", err)
 				return nextEventID, fmt.Errorf("failed to create tx: %w", err)
 			}
 
