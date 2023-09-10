@@ -173,6 +173,53 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		// check that epoch size actually changed in our consensus
 		require.True(t, endOfNewEpoch-endOfPreviousEpoch == newEpochSize)
 	})
+	t.Run("a proposal does not have enough votes (quorum)", func(t *testing.T) {
+		// propose a new sprint size
+		setNewSprintSizeFn := &contractsapi.SetNewSprintSizeNetworkParamsFn{
+			NewSprintSize: big.NewInt(int64(newEpochSize)),
+		}
+
+		proposalInput, err := setNewSprintSizeFn.EncodeAbi()
+		require.NoError(t, err)
+
+		proposalDescription := fmt.Sprintf("Change sprint size from %d to %d", oldEpochSize, newEpochSize)
+
+		proposalID := sendProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			polybftCfg.GovernanceConfig.NetworkParamsAddr,
+			proposalInput, proposalDescription)
+
+		// check that proposal delay finishes, and porposal becomes active (ready to for voting)
+		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
+			proposalState := getProposalState(t, proposalID,
+				polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
+
+			return proposalState == Active
+		}))
+
+		// only the proposer votes for proposal and rest of them vote against
+		sendVoteTransaction(t, proposalID, For, polybftCfg.GovernanceConfig.ChildGovernorAddr,
+			l2Relayer, proposerAcc.Ecdsa)
+
+		for _, s := range cluster.Servers[1:] {
+			voterAcc, err := sidechain.GetAccountFromDir(s.DataDir())
+			require.NoError(t, err)
+
+			sendVoteTransaction(t, proposalID, Against, polybftCfg.GovernanceConfig.ChildGovernorAddr,
+				l2Relayer, voterAcc.Ecdsa)
+		}
+
+		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
+		require.NoError(t, err)
+
+		// wait for voting period to end
+		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+votingPeriod+5, 3*time.Minute))
+
+		// check if proposal has quorum (if it was accepted), in this case it won't be
+		proposalState := getProposalState(t, proposalID,
+			polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
+		require.Equal(t, Defeated, proposalState)
+	})
 	t.Run("successful change of base fee denom", func(t *testing.T) {
 		var baseFee = uint64(215)
 		// propose a new base fee change denom
@@ -249,54 +296,6 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		baseFeeDenomOnNetworkParams, err := common.ParseUint256orHex(&networkParamsResponse)
 		require.NoError(t, err)
 		require.Equal(t, baseFee, baseFeeDenomOnNetworkParams.Uint64())
-	})
-
-	t.Run("a proposal does not have enough votes (quorum)", func(t *testing.T) {
-		// propose a new sprint size
-		setNewSprintSizeFn := &contractsapi.SetNewSprintSizeNetworkParamsFn{
-			NewSprintSize: big.NewInt(int64(newEpochSize)),
-		}
-
-		proposalInput, err := setNewSprintSizeFn.EncodeAbi()
-		require.NoError(t, err)
-
-		proposalDescription := fmt.Sprintf("Change sprint size from %d to %d", oldEpochSize, newEpochSize)
-
-		proposalID := sendProposalTransaction(t, l2Relayer, proposerAcc.Ecdsa,
-			polybftCfg.GovernanceConfig.ChildGovernorAddr,
-			polybftCfg.GovernanceConfig.NetworkParamsAddr,
-			proposalInput, proposalDescription)
-
-		// check that proposal delay finishes, and porposal becomes active (ready to for voting)
-		require.NoError(t, cluster.WaitUntil(3*time.Minute, 2*time.Second, func() bool {
-			proposalState := getProposalState(t, proposalID,
-				polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
-
-			return proposalState == Active
-		}))
-
-		// only the proposer votes for proposal and rest of them vote against
-		sendVoteTransaction(t, proposalID, For, polybftCfg.GovernanceConfig.ChildGovernorAddr,
-			l2Relayer, proposerAcc.Ecdsa)
-
-		for _, s := range cluster.Servers[1:] {
-			voterAcc, err := sidechain.GetAccountFromDir(s.DataDir())
-			require.NoError(t, err)
-
-			sendVoteTransaction(t, proposalID, Against, polybftCfg.GovernanceConfig.ChildGovernorAddr,
-				l2Relayer, voterAcc.Ecdsa)
-		}
-
-		currentBlockNumber, err := l2Relayer.Client().Eth().BlockNumber()
-		require.NoError(t, err)
-
-		// wait for voting period to end
-		require.NoError(t, cluster.WaitForBlock(currentBlockNumber+votingPeriod+5, 3*time.Minute))
-
-		// check if proposal has quorum (if it was accepted), in this case it won't be
-		proposalState := getProposalState(t, proposalID,
-			polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
-		require.Equal(t, Defeated, proposalState)
 	})
 }
 
