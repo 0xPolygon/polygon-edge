@@ -188,6 +188,10 @@ func main() {
 			"child/EIP1559Burn.sol",
 			"EIP1559Burn",
 		},
+		{
+			"lib/GenesisProxy.sol",
+			"GenesisProxy",
+		},
 	}
 
 	str := `// This is auto-generated file. DO NOT EDIT.

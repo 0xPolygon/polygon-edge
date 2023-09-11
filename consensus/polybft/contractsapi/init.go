@@ -54,6 +54,7 @@ var (
 	RootERC721                      *artifact.Artifact
 	RootERC1155                     *artifact.Artifact
 	EIP1559Burn                     *artifact.Artifact
+	GenesisProxy                    *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -281,6 +282,12 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// TODO: @Stefan-Ethernal Re-run generate SC bindings, when GenesisProxy is again available
+	// GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 }
 
 func readTestContractContent(contractFileName string) []byte {
