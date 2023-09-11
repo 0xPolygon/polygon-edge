@@ -20,7 +20,7 @@ on:  # yamllint disable-line rule:truthy
         description: The scenario to run
         type: string
       duration:
-        default: '2m'
+        default: '5m'
         description: Duration of the test
         required: false
         type: string
@@ -39,7 +39,7 @@ on:  # yamllint disable-line rule:truthy
         description: The mode for the stress test
         type: string
       duration:
-        default: '2m'
+        default: '5m'
         description: Duration of the test
         required: false
         type: string
