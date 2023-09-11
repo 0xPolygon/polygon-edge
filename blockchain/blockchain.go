@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -1393,7 +1392,7 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 
 func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 	baseFeeChangeDenom := chain.BaseFeeChangeDenom
-	if forkmanager.GetInstance().IsForkEnabled(chain.Governance, b.Header().Number) {
+	if b.config.Params.Forks.IsActive(chain.Governance, b.Header().Number) {
 		baseFeeChangeDenom = b.Config().BaseFeeChangeDenom
 	}
 

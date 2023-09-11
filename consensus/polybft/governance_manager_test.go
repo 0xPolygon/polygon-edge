@@ -15,44 +15,55 @@ import (
 	"github.com/umbracle/ethgo/abi"
 )
 
-// TODO: @Stefan-Ethernal FIXME
-// func TestGovernanceManager_PostEpoch(t *testing.T) {
-// 	t.Parallel()
+func TestGovernanceManager_PostEpoch(t *testing.T) {
+	t.Parallel()
 
-// 	state := newTestState(t)
-// 	governanceManager := &governanceManager{
-// 		state:  state,
-// 		logger: hclog.NewNullLogger(),
-// 	}
+	state := newTestState(t)
+	governanceManager := &governanceManager{
+		state:  state,
+		logger: hclog.NewNullLogger(),
+	}
 
-// 	// insert some governance event
-// 	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10_000)}
-// 	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(1, 7, []contractsapi.EventAbi{epochRewardEvent}))
-// 	// insert last processed block
-// 	require.NoError(t, state.GovernanceStore.insertLastProcessed(20))
+	// insert some governance event
+	baseFeeChangeDenomEvent := &contractsapi.NewBaseFeeChangeDenomEvent{BaseFeeChangeDenom: big.NewInt(100)}
+	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10000)}
 
-// // no initial config was saved, so we expect an error
-// require.ErrorIs(t, governanceManager.PostEpoch(&common.PostEpochRequest{
-// 	NewEpochID:        2,
-// 	FirstBlockOfEpoch: 21,
-// 	Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
-// }),
-// 	errClientConfigNotFound)
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(1, 7, []contractsapi.EventAbi{baseFeeChangeDenomEvent, epochRewardEvent}))
+	// insert last processed block
+	require.NoError(t, state.GovernanceStore.insertLastProcessed(20))
 
-// 	// insert initial config
-// 	require.NoError(t, state.GovernanceStore.insertClientConfig(createTestPolybftConfig()))
+	// no initial config was saved, so we expect an error
+	require.ErrorIs(t, governanceManager.PostEpoch(&common.PostEpochRequest{
+		NewEpochID:        2,
+		FirstBlockOfEpoch: 21,
+		Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}),
+		errClientConfigNotFound)
 
-// // PostEpoch will now update config with new epoch reward value
-// require.NoError(t, governanceManager.PostEpoch(&common.PostEpochRequest{
-// 	NewEpochID:        2,
-// 	FirstBlockOfEpoch: 21,
-// 	Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
-// }))
+	params := &chain.Params{
+		BaseFeeChangeDenom: 8,
+		Engine:             map[string]interface{}{common.ConsensusName: createTestPolybftConfig()},
+	}
 
-// 	updatedConfig, err := state.GovernanceStore.getClientConfig()
-// 	require.NoError(t, err)
-// 	require.Equal(t, epochRewardEvent.Reward.Uint64(), updatedConfig.EpochReward)
-// }
+	// insert initial config
+	require.NoError(t, state.GovernanceStore.insertClientConfig(params))
+
+	// PostEpoch will now update config with new epoch reward value
+	require.NoError(t, governanceManager.PostEpoch(&common.PostEpochRequest{
+		NewEpochID:        2,
+		FirstBlockOfEpoch: 21,
+		Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
+	}))
+
+	updatedConfig, err := state.GovernanceStore.getClientConfig()
+	require.NoError(t, err)
+	require.Equal(t, baseFeeChangeDenomEvent.BaseFeeChangeDenom.Uint64(), updatedConfig.BaseFeeChangeDenom)
+
+	pbftConfig, err := common.GetPolyBFTConfig(updatedConfig)
+	require.NoError(t, err)
+
+	require.Equal(t, epochRewardEvent.Reward.Uint64(), pbftConfig.EpochReward)
+}
 
 func TestGovernanceManager_PostBlock(t *testing.T) {
 	t.Parallel()
@@ -79,8 +90,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Number: 0,
 		})
 
-		chainParams := &chain.Params{}
-		chainParams.Engine[common.ConsensusName] = genesisPolybftConfig
+		chainParams := &chain.Params{Engine: map[string]interface{}{common.ConsensusName: genesisPolybftConfig}}
 		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
@@ -126,8 +136,7 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Number: 4,
 		})
 
-		chainParams := &chain.Params{}
-		chainParams.Engine[common.ConsensusName] = genesisPolybftConfig
+		chainParams := &chain.Params{Engine: map[string]interface{}{common.ConsensusName: genesisPolybftConfig}}
 		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)

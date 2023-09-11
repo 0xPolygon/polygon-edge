@@ -264,6 +264,8 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 func TestIntegration_CommitEpoch(t *testing.T) {
 	t.Parallel()
 
+	baseFeeChangeDenom := uint64(25)
+
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100}
 
@@ -335,7 +337,6 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			MaxValidatorSetSize:  100,
 			CheckpointInterval:   900,
 			WithdrawalWaitPeriod: 1,
-			BaseFeeChangeDenom:   20,
 			BlockTimeDrift:       10,
 			// use 1st account as governance address
 			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],
@@ -367,7 +368,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init NetworkParams
-		err = initNetworkParamsContract(polyBFTConfig, transition)
+		err = initNetworkParamsContract(baseFeeChangeDenom, polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch

@@ -166,7 +166,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize NetworkParams SC
-		if err = initNetworkParamsContract(polyBFTConfig, transition); err != nil {
+		if err = initNetworkParamsContract(config.Params.BaseFeeChangeDenom, polyBFTConfig, transition); err != nil {
 			return err
 		}
 

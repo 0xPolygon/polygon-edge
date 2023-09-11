@@ -56,10 +56,6 @@ type PolyBFTConfig struct {
 	// WithdrawalWaitPeriod indicates a number of epochs after which withdrawal can be done from child chain
 	WithdrawalWaitPeriod uint64 `json:"withdrawalWaitPeriod,omitempty"`
 
-	// TODO: @Stefan-Ethernal REMOVE!
-	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
-	BaseFeeChangeDenom uint64 `json:"baseFeeChangeDenom,omitempty"`
-
 	// RewardConfig defines rewards configuration
 	RewardConfig *RewardsConfig `json:"rewardConfig"`
 

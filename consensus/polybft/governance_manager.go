@@ -66,11 +66,17 @@ var _ GovernanceManager = (*dummyGovernanceManager)(nil)
 
 // dummyStakeManager is a dummy implementation of GovernanceManager interface
 // used only for unit testing
-type dummyGovernanceManager struct{}
+type dummyGovernanceManager struct {
+	getClientConfigFn func() (*chain.Params, error)
+}
 
 func (d *dummyGovernanceManager) PostBlock(req *polyCommon.PostBlockRequest) error { return nil }
 func (d *dummyGovernanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error { return nil }
 func (d *dummyGovernanceManager) GetClientConfig() (*chain.Params, error) {
+	if d.getClientConfigFn != nil {
+		return d.getClientConfigFn()
+	}
+
 	return nil, nil
 }
 
@@ -367,6 +373,10 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 		default:
 			return errUnknownGovernanceEvent
 		}
+	}
+
+	if len(eventsRaw) > 0 {
+		latestChainParams.Engine[polyCommon.ConsensusName] = latestPolybftConfig
 	}
 
 	// save updated config to db

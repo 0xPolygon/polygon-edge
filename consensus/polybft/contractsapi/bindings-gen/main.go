@@ -419,6 +419,7 @@ func main() {
 				"initialize",
 				"setNewEpochSize",
 				"setNewSprintSize",
+				"setNewBaseFeeChangeDenom",
 			},
 			[]string{
 				"NewCheckpointBlockInterval",

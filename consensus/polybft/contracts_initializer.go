@@ -280,7 +280,8 @@ func isNativeRewardToken(cfg common.PolyBFTConfig) bool {
 }
 
 // initNetworkParamsContract initializes NetworkParams contract on child chain
-func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Transition) error {
+func initNetworkParamsContract(baseFeeChangeDenom uint64, cfg common.PolyBFTConfig,
+	transition *state.Transition) error {
 	initFn := &contractsapi.InitializeNetworkParamsFn{
 		InitParams: &contractsapi.InitParams{
 			// only timelock controller can execute transactions on network params
@@ -293,12 +294,12 @@ func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Trans
 			NewMinValidatorSetSize:     new(big.Int).SetUint64(cfg.MinValidatorSetSize),
 			NewMaxValidatorSetSize:     new(big.Int).SetUint64(cfg.MaxValidatorSetSize),
 			NewWithdrawalWaitPeriod:    new(big.Int).SetUint64(cfg.WithdrawalWaitPeriod),
-			NewBaseFeeChangeDenom:      new(big.Int).SetUint64(cfg.BaseFeeChangeDenom),
 			NewBlockTime:               new(big.Int).SetUint64(uint64(cfg.BlockTime.Duration)),
 			NewBlockTimeDrift:          new(big.Int).SetUint64(cfg.BlockTimeDrift),
 			NewVotingDelay:             new(big.Int).Set(cfg.GovernanceConfig.VotingDelay),
 			NewVotingPeriod:            new(big.Int).Set(cfg.GovernanceConfig.VotingPeriod),
 			NewProposalThreshold:       new(big.Int).Set(cfg.GovernanceConfig.ProposalThreshold),
+			NewBaseFeeChangeDenom:      new(big.Int).SetUint64(baseFeeChangeDenom),
 		},
 	}
 
