@@ -64,8 +64,7 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		return nil, err
 	}
 
-	err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig)
-	if err != nil {
+	if err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig); err != nil {
 		return nil, err
 	}
 
@@ -803,6 +802,15 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 	}
 
 	return nil
+}
+
+// GetLatestChainConfig returns the latest chain configuration
+func (p *Polybft) GetLatestChainConfig() (*chain.Params, error) {
+	if p.runtime != nil {
+		return p.runtime.governanceManager.GetClientConfig()
+	}
+
+	return nil, nil
 }
 
 // GetBridgeProvider is an implementation of Consensus interface

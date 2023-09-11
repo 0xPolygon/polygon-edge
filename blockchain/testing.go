@@ -271,6 +271,10 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 	return types.BytesToAddress(header.Miner), nil
 }
 
+func (m *MockVerifier) GetLatestChainConfig() (*chain.Params, error) {
+	return nil, nil
+}
+
 func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {
 	m.getBlockCreatorFn = fn
 }

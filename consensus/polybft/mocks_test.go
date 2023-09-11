@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
@@ -125,10 +124,6 @@ func (m *blockchainMock) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, e
 	args := m.Called(hash)
 
 	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
-}
-
-func (m *blockchainMock) SetConfig(p *chain.Params) {
-	_ = m.Called(p)
 }
 
 var _ polybftBackend = (*polybftBackendMock)(nil)

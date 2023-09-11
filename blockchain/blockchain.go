@@ -89,6 +89,7 @@ type Verifier interface {
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
 	PreCommitState(block *types.Block, txn *state.Transition) error
+	GetLatestChainConfig() (*chain.Params, error)
 }
 
 type Executor interface {
@@ -320,11 +321,6 @@ func (b *Blockchain) CurrentTD() *big.Int {
 // Config returns the blockchain configuration
 func (b *Blockchain) Config() *chain.Params {
 	return b.config.Params
-}
-
-// SetConfig updates blockchain configuration
-func (b *Blockchain) SetConfig(params *chain.Params) {
-	b.config.Params = params
 }
 
 // GetHeader returns the block header using the hash
@@ -1397,10 +1393,18 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 
 func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 	baseFeeChangeDenom := chain.BaseFeeChangeDenom
-	config := b.Config()
 
-	if config.Forks.IsActive(chain.Governance, b.Header().Number) {
-		baseFeeChangeDenom = config.BaseFeeChangeDenom
+	if b.Config().Forks.IsActive(chain.Governance, b.Header().Number) {
+		chainConfig, err := b.consensus.GetLatestChainConfig()
+		if err != nil {
+			b.logger.Error("failed to calculate base fee delta", "error", err)
+
+			return baseFeeChangeDenom
+		}
+
+		if chainConfig != nil {
+			baseFeeChangeDenom = chainConfig.BaseFeeChangeDenom
+		}
 	}
 
 	y := baseFee * gasUsedDelta / parentGasTarget
