@@ -30,10 +30,9 @@ func (s *stakeManagerDeployParams) validateFlags() error {
 
 	// validate jsonrpc address
 	_, err := helper.ParseJSONRPCAddress(s.jsonRPC)
-
-	if err := helper.ValidateProxyContractsAdmin(s.proxyContractsAdmin); err != nil {
+	if err != nil {
 		return err
 	}
 
-	return err
+	return helper.ValidateProxyContractsAdmin(s.proxyContractsAdmin)
 }

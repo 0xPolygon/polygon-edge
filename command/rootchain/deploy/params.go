@@ -51,9 +51,5 @@ func (ip *deployParams) validateFlags() error {
 		return errors.New("stake token address is not provided")
 	}
 
-	if err := helper.ValidateProxyContractsAdmin(ip.proxyContractsAdmin); err != nil {
-		return err
-	}
-
-	return nil
+	return helper.ValidateProxyContractsAdmin(ip.proxyContractsAdmin)
 }
