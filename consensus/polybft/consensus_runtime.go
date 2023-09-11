@@ -384,8 +384,17 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 
 	// handle governance events that happened in block
 	if err := c.governanceManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("failed to post block in governance manager", "err", err)
+		c.logger.Error("post block callback failed in governance manager", "err", err)
 	}
+
+	currentParams, err := c.governanceManager.GetClientConfig()
+	if err != nil {
+		c.logger.Error("failed to retrieve the latest blockchain config", "error", err)
+
+		return
+	}
+
+	c.config.blockchain.UpdateConfig(currentParams)
 
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {

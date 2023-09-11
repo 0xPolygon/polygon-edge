@@ -322,6 +322,11 @@ func (b *Blockchain) Config() *chain.Params {
 	return b.config.Params
 }
 
+// SetConfig updates blockchain configuration
+func (b *Blockchain) SetConfig(params *chain.Params) {
+	b.config.Params = params
+}
+
 // GetHeader returns the block header using the hash
 func (b *Blockchain) GetHeader(hash types.Hash, number uint64) (*types.Header, bool) {
 	return b.GetHeaderByHash(hash)
@@ -1392,8 +1397,10 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 
 func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 	baseFeeChangeDenom := chain.BaseFeeChangeDenom
-	if b.config.Params.Forks.IsActive(chain.Governance, b.Header().Number) {
-		baseFeeChangeDenom = b.Config().BaseFeeChangeDenom
+	config := b.Config()
+
+	if config.Forks.IsActive(chain.Governance, b.Header().Number) {
+		baseFeeChangeDenom = config.BaseFeeChangeDenom
 	}
 
 	y := baseFee * gasUsedDelta / parentGasTarget

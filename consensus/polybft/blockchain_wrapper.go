@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -63,6 +64,9 @@ type blockchainBackend interface {
 
 	// GetReceiptsByHash retrieves receipts by hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
+
+	// UpdateConfig updates blockchain configuration with the latest parameter values
+	UpdateConfig(params *chain.Params)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -189,6 +193,10 @@ func (p *blockchainWrapper) GetChainID() uint64 {
 
 func (p *blockchainWrapper) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
 	return p.blockchain.GetReceiptsByHash(hash)
+}
+
+func (p *blockchainWrapper) UpdateConfig(params *chain.Params) {
+	p.blockchain.SetConfig(params)
 }
 
 var _ contract.Provider = &stateProvider{}
