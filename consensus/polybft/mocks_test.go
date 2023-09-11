@@ -127,7 +127,7 @@ func (m *blockchainMock) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, e
 	return args.Get(0).([]*types.Receipt), args.Error(1) //nolint:forcetypeassert
 }
 
-func (m *blockchainMock) UpdateConfig(p *chain.Params) {
+func (m *blockchainMock) SetConfig(p *chain.Params) {
 	_ = m.Called(p)
 }
 

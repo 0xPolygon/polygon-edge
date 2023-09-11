@@ -394,7 +394,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		return
 	}
 
-	c.config.blockchain.UpdateConfig(currentParams)
+	c.config.blockchain.SetConfig(currentParams)
 
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {

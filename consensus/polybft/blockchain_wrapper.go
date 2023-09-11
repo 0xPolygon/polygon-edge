@@ -65,8 +65,8 @@ type blockchainBackend interface {
 	// GetReceiptsByHash retrieves receipts by hash
 	GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error)
 
-	// UpdateConfig updates blockchain configuration with the latest parameter values
-	UpdateConfig(params *chain.Params)
+	// SetConfig updates blockchain configuration with the latest parameter values
+	SetConfig(params *chain.Params)
 }
 
 var _ blockchainBackend = &blockchainWrapper{}
@@ -195,7 +195,7 @@ func (p *blockchainWrapper) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt
 	return p.blockchain.GetReceiptsByHash(hash)
 }
 
-func (p *blockchainWrapper) UpdateConfig(params *chain.Params) {
+func (p *blockchainWrapper) SetConfig(params *chain.Params) {
 	p.blockchain.SetConfig(params)
 }
 
