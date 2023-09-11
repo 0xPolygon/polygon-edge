@@ -2237,3 +2237,21 @@ func (s *SetUpProxyGenesisProxyFn) EncodeAbi() ([]byte, error) {
 func (s *SetUpProxyGenesisProxyFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(GenesisProxy.Abi.Methods["setUpProxy"], buf, s)
 }
+
+type TransparentUpgradeableProxyConstructorFn struct {
+	Logic  types.Address `abi:"_logic"`
+	Admin_ types.Address `abi:"admin_"`
+	Data   []byte        `abi:"_data"`
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) Sig() []byte {
+	return TransparentUpgradeableProxy.Abi.Constructor.ID()
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) EncodeAbi() ([]byte, error) {
+	return TransparentUpgradeableProxy.Abi.Constructor.Inputs.Encode(t)
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(TransparentUpgradeableProxy.Abi.Constructor, buf, t)
+}
