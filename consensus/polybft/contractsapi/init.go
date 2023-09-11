@@ -55,6 +55,7 @@ var (
 	RootERC1155                     *artifact.Artifact
 	EIP1559Burn                     *artifact.Artifact
 	GenesisProxy                    *artifact.Artifact
+	TransparentUpgradeableProxy     *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -288,6 +289,11 @@ func init() {
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
+
+	TransparentUpgradeableProxy, err = artifact.DecodeArtifact([]byte(TransparentUpgradeableProxyArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func readTestContractContent(contractFileName string) []byte {

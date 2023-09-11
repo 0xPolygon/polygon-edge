@@ -66,6 +66,7 @@ case "$1" in
               "$POLYGON_EDGE_BIN" polybft stake-manager-deploy \
                 --jsonrpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
+                --proxy-contracts-admin ${proxyContractsAdmin} \
                 --test
 
               stakeManagerAddr=$(cat /data/genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr')
@@ -76,6 +77,7 @@ case "$1" in
                 --stake-token ${stakeToken} \
                 --json-rpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
+                --proxy-contracts-admin ${proxyContractsAdmin} \
                 --test
 
               customSupernetManagerAddr=$(cat /data/genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')

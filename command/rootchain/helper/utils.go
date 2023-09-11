@@ -37,6 +37,8 @@ const (
 	DefaultGenesisPath      = "./genesis.json"
 	StakeTokenFlag          = "stake-token"
 	StakeTokenFlagDesc      = "address of ERC20 token used for staking on rootchain"
+	ProxyContractsAdminFlag = "proxy-contracts-admin"
+	ProxyContractsAdminDesc = "admin for proxy contracts"
 )
 
 var (
@@ -288,4 +290,33 @@ func CreateTransaction(sender ethgo.Address, receiver *ethgo.Address,
 	}
 
 	return txn
+}
+
+func DeployProxyContract(txRelayer txrelayer.TxRelayer, deployerKey ethgo.Key, proxyContractName string,
+	proxyAdmin, logicAddress types.Address) (*ethgo.Receipt, error) {
+	proxyConstructorFn := contractsapi.TransparentUpgradeableProxyConstructorFn{
+		Logic:  logicAddress,
+		Admin_: proxyAdmin,
+		Data:   []byte{},
+	}
+
+	constructorInput, err := proxyConstructorFn.EncodeAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode proxy constructor function for %s contract. error: %w",
+			proxyContractName, err)
+	}
+
+	var proxyDeployInput []byte
+
+	proxyDeployInput = append(proxyDeployInput, contractsapi.TransparentUpgradeableProxy.Bytecode...)
+	proxyDeployInput = append(proxyDeployInput, constructorInput...)
+
+	txn := CreateTransaction(ethgo.ZeroAddress, nil, proxyDeployInput, nil, true)
+
+	receipt, err := txRelayer.SendTransaction(txn, deployerKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed sending %s contract deploy transaction: %w", proxyContractName, err)
+	}
+
+	return receipt, nil
 }

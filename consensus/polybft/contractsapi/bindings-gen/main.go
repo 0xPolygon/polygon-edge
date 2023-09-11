@@ -418,6 +418,13 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"TransparentUpgradeableProxy",
+			gensc.TransparentUpgradeableProxy,
+			true,
+			[]string{},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

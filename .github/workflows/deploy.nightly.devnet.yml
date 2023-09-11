@@ -147,12 +147,14 @@ jobs:
 
               polygon-edge polybft stake-manager-deploy \
                   --jsonrpc {{ rootchain_json_rpc }} \
+                  --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN \
                   --test
 
               polygon-edge rootchain deploy \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
                           --stake-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr') \
                           --json-rpc {{ rootchain_json_rpc }} \
+                          --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN \
                           --test
 
               polygon-edge rootchain fund \
