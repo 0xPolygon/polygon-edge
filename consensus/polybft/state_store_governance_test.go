@@ -110,7 +110,8 @@ func TestGovernanceStore_InsertAndGetClientConfig(t *testing.T) {
 
 	initialPolyConfig := createTestPolybftConfig()
 	initialConfig := &chain.Params{
-		Engine: map[string]interface{}{polyCommon.ConsensusName: initialPolyConfig},
+		Engine:             map[string]interface{}{polyCommon.ConsensusName: initialPolyConfig},
+		BaseFeeChangeDenom: 16,
 	}
 	state := newTestState(t)
 

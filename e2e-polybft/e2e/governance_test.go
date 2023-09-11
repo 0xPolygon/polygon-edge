@@ -173,6 +173,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 		// check that epoch size actually changed in our consensus
 		require.True(t, endOfNewEpoch-endOfPreviousEpoch == newEpochSize)
 	})
+
 	t.Run("a proposal does not have enough votes (quorum)", func(t *testing.T) {
 		// propose a new sprint size
 		setNewSprintSizeFn := &contractsapi.SetNewSprintSizeNetworkParamsFn{
@@ -220,6 +221,7 @@ func TestE2E_Governance_ProposeAndExecuteSimpleProposal(t *testing.T) {
 			polybftCfg.GovernanceConfig.ChildGovernorAddr, l2Relayer)
 		require.Equal(t, Defeated, proposalState)
 	})
+
 	t.Run("successful change of base fee denom", func(t *testing.T) {
 		var baseFee = uint64(215)
 		// propose a new base fee change denom

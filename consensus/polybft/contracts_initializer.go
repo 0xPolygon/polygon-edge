@@ -304,7 +304,6 @@ func initNetworkParamsContract(baseFeeChangeDenom uint64, cfg common.PolyBFTConf
 	}
 
 	input, err := initFn.EncodeAbi()
-
 	if err != nil {
 		return fmt.Errorf("NetworkParams.initialize params encoding failed: %w", err)
 	}
