@@ -8,12 +8,22 @@ on:  # yamllint disable-line rule:truthy
         description: The environment to run against
         required: false
         type: environment
+      duration:
+        default: '10m'
+        description: Duration of the test
+        required: false
+        type: string
   workflow_call:
     inputs:
       environment:
         description: The environment to run against
         type: string
         required: true
+      duration:
+        default: '10m'
+        description: Duration of the test
+        required: false
+        type: string
     outputs:
       workflow_output_loadtest1:
         description: "Loadtest output"
@@ -203,7 +213,7 @@ jobs:
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
-          ansible-playbook site.yml
+          ansible-playbook site.yml --extra-vars "block_gas_limit=200000000 block_time=2"
       - name: Set rpc url value
         id: url
         run: |
@@ -226,6 +236,7 @@ jobs:
       runner: devnet
       environment: ${{ inputs.environment }}
       scenario: multiple_EOA
+      duration: ${{ inputs.duration }}
 
   loadtest2:
     needs: loadtest1
@@ -240,6 +251,7 @@ jobs:
       runner: devnet
       environment: ${{ inputs.environment }}
       scenario: multiple_ERC20
+      duration: ${{ inputs.duration }}
 
   destroy_devnet:
     needs: [loadtest1, loadtest2]

@@ -7,7 +7,13 @@ on:  # yamllint disable-line rule:truthy
     branches:
       - jesse/fix-*
   workflow_call: {}
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      duration:
+        default: '10m'
+        description: Duration of the test
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -29,3 +35,4 @@ jobs:
       VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
     with:
       environment: devnet
+      duration: ${{ inputs.duration }}

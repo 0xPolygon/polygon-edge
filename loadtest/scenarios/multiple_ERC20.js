@@ -13,11 +13,11 @@ export const options = {
     scenarios: {
         constant_request_rate: {
             executor: 'constant-arrival-rate',
-            rate: 200,
+            rate: 1000,
             timeUnit: '1s',
             duration: duration,
-            preAllocatedVUs: 10,
-            maxVUs: 10,
+            preAllocatedVUs: 20,
+            maxVUs: 20,
         },
     },
 };
