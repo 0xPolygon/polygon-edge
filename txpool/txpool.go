@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -622,14 +621,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			metrics.IncrCounter([]string{txPoolMetrics, "tx_type"}, 1)
 
 			return ErrTxTypeNotSupported
-		}
-
-		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
-		blockNumber, err := forkmanager.GetInstance().GetForkBlock(chain.TxHashWithType)
-		if err == nil && blockNumber > currentBlockNumber {
-			metrics.IncrCounter([]string{txPoolMetrics, "dynamic_tx_not_allowed"}, 1)
-
-			return ErrDynamicTxNotAllowed
 		}
 
 		// Check EIP-1559-related fields and make sure they are correct
