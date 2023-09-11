@@ -82,6 +82,7 @@ This document outlines step necessary to perform a regenesis data migration.
     ```bash
     ./polygon-edge genesis --consensus polybft \
     --block-gas-limit 10000000 \
+    --proxy-contracts-admin 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed \
     --epoch-size 10 --trieroot 0xf5ef1a28c82226effb90f4465180ec3469226747818579673f4be929f1cd8663
 
     [GENESIS SUCCESS]

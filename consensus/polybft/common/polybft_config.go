@@ -63,6 +63,10 @@ type PolyBFTConfig struct {
 
 	// GovernanceConfig defines on chain governance configuration
 	GovernanceConfig *GovernanceConfig `json:"governanceConfig,omitempty"`
+
+	// ProxyContractsAdmin is the address that will have the privilege to change both the proxy
+	// implementation address and the admin
+	ProxyContractsAdmin types.Address `json:"proxyContractsAdmin,omitempty"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig
