@@ -129,7 +129,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeCh chan struct{}) error {
 	var err error
-	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv, dockerclient.WithAPIVersionNegotiation()); err != nil {
+	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv,
+		dockerclient.WithAPIVersionNegotiation()); err != nil {
 		return err
 	}
 
