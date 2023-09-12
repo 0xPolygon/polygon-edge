@@ -81,7 +81,7 @@ func DecodePrivateKey(rawKey string) (ethgo.Key, error) {
 }
 
 func GetRootchainID() (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", fmt.Errorf("rootchain id error: %w", err)
 	}

@@ -14,8 +14,8 @@ type containerStopResult struct {
 	Err    string `json:"err"`
 }
 
-func newContainerStopResult(status container.ContainerWaitOKBody) *containerStopResult {
-	var errMsg string
+func newContainerStopResult(status container.WaitResponse) *containerStopResult {
+	errMsg := ""
 	if status.Error != nil {
 		errMsg = status.Error.Message
 	}
