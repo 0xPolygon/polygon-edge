@@ -70,7 +70,7 @@ require (
 	github.com/sethvargo/go-retry v0.2.4
 	golang.org/x/sync v0.3.0
 	google.golang.org/genproto v0.0.0-20230530153820-e85fd2cbaebc
-	gopkg.in/DataDog/dd-trace-go.v1 v1.54.0
+	gopkg.in/DataDog/dd-trace-go.v1 v1.54.1
 	pgregory.net/rapid v1.1.0
 )
 
