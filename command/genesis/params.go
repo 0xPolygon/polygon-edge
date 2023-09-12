@@ -33,7 +33,7 @@ const (
 	epochRewardFlag           = "epoch-reward"
 	blockGasLimitFlag         = "block-gas-limit"
 	burnContractFlag          = "burn-contract"
-	genesisBaseFeeFlag        = "genesis-base-fee"
+	genesisBaseFeeConfigFlag  = "genesis-base-fee-config"
 	posFlag                   = "pos"
 	minValidatorCount         = "min-validator-count"
 	maxValidatorCount         = "max-validator-count"
@@ -92,8 +92,8 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	burnContract string
-	baseFee      uint64
+	burnContract  string
+	baseFeeConfig string
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -432,8 +432,9 @@ func (p *genesisParams) initGenesisConfig() error {
 
 	// burn contract can be set only for non mintable native token
 	if p.isBurnContractEnabled() {
-		chainConfig.Genesis.BaseFee = p.baseFee
-		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+		baseFeeInfo := parseBaseFeeConfig(p.baseFeeConfig)
+		chainConfig.Genesis.BaseFee = baseFeeInfo.baseFee
+		chainConfig.Genesis.BaseFeeEM = baseFeeInfo.baseFeeEM
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)

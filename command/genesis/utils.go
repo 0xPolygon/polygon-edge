@@ -164,6 +164,37 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polyCommon.BurnContract
 	}, nil
 }
 
+type baseFeeInfo struct {
+	baseFee   uint64
+	baseFeeEM uint64
+}
+
+// parseBaseFeeConfig parses provided base fee configuration and returns baseFeeInfo
+func parseBaseFeeConfig(baseFeeConfigRaw string) *baseFeeInfo {
+	baseFeeInfo := &baseFeeInfo{command.DefaultGenesisBaseFee, command.DefaultGenesisBaseFeeEM}
+
+	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
+	if len(baseFeeConfig) != 2 {
+		return baseFeeInfo
+	}
+
+	baseFee, err := strconv.ParseUint(baseFeeConfig[0], 10, 64)
+	if err != nil || baseFee == 0 {
+		baseFeeInfo.baseFee = command.DefaultGenesisBaseFee
+	} else {
+		baseFeeInfo.baseFee = baseFee
+	}
+
+	baseFeeEM, err := strconv.ParseUint(baseFeeConfig[1], 10, 64)
+	if err != nil || baseFee == 0 {
+		baseFeeInfo.baseFeeEM = command.DefaultGenesisBaseFeeEM
+	} else {
+		baseFeeInfo.baseFeeEM = baseFeeEM
+	}
+
+	return baseFeeInfo
+}
+
 // GetValidatorKeyFiles returns file names which has validator secrets
 func GetValidatorKeyFiles(rootDir, filePrefix string) ([]string, error) {
 	if rootDir == "" {
