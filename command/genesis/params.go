@@ -180,6 +180,10 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
+		if err := p.validateGenesisBaseFeeConfig(); err != nil {
+			return err
+		}
+
 		if err := p.validateRewardWallet(); err != nil {
 			return err
 		}
@@ -432,7 +436,7 @@ func (p *genesisParams) initGenesisConfig() error {
 
 	// burn contract can be set only for non mintable native token
 	if p.isBurnContractEnabled() {
-		baseFeeInfo := parseBaseFeeConfig(p.baseFeeConfig)
+		baseFeeInfo, _ := parseBaseFeeConfig(p.baseFeeConfig)
 		chainConfig.Genesis.BaseFee = baseFeeInfo.baseFee
 		chainConfig.Genesis.BaseFeeEM = baseFeeInfo.baseFeeEM
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
@@ -566,6 +570,27 @@ func (p *genesisParams) validateBurnContract() error {
 				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
 			}
 		}
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateGenesisBaseFeeConfig() error {
+	if p.baseFeeConfig == "" {
+		return nil
+	}
+
+	baseFeeInfo, err := parseBaseFeeConfig(p.baseFeeConfig)
+	if err != nil {
+		return err
+	}
+
+	if baseFeeInfo.baseFee <= 0 {
+		return errors.New("BaseFee should be greater than 0")
+	}
+
+	if baseFeeInfo.baseFeeEM <= 0 {
+		return errors.New("BaseFeeEM should be graeter than 0")
 	}
 
 	return nil

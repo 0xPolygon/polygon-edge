@@ -170,29 +170,33 @@ type baseFeeInfo struct {
 }
 
 // parseBaseFeeConfig parses provided base fee configuration and returns baseFeeInfo
-func parseBaseFeeConfig(baseFeeConfigRaw string) *baseFeeInfo {
+func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 	baseFeeInfo := &baseFeeInfo{command.DefaultGenesisBaseFee, command.DefaultGenesisBaseFeeEM}
 
 	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
 	if len(baseFeeConfig) != 2 {
-		return baseFeeInfo
+		return baseFeeInfo, nil
 	}
 
-	baseFee, err := strconv.ParseUint(baseFeeConfig[0], 10, 64)
-	if err != nil || baseFee == 0 {
-		baseFeeInfo.baseFee = command.DefaultGenesisBaseFee
-	} else {
+	if baseFeeConfig[0] != "" {
+		baseFee, err := strconv.ParseUint(baseFeeConfig[0], 10, 64)
+		if err != nil {
+			return baseFeeInfo, err
+		}
+
 		baseFeeInfo.baseFee = baseFee
 	}
 
-	baseFeeEM, err := strconv.ParseUint(baseFeeConfig[1], 10, 64)
-	if err != nil || baseFeeEM == 0 {
-		baseFeeInfo.baseFeeEM = command.DefaultGenesisBaseFeeEM
-	} else {
+	if baseFeeConfig[1] != "" {
+		baseFeeEM, err := strconv.ParseUint(baseFeeConfig[1], 10, 64)
+		if err != nil {
+			return baseFeeInfo, err
+		}
+
 		baseFeeInfo.baseFeeEM = baseFeeEM
 	}
 
-	return baseFeeInfo
+	return baseFeeInfo, nil
 }
 
 // GetValidatorKeyFiles returns file names which has validator secrets
