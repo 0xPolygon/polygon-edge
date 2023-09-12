@@ -486,7 +486,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 
-	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
+	transaction, err := DecodeTxn(arg, e.store, true)
 	if err != nil {
 		return nil, err
 	}
@@ -541,7 +541,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// testTransaction should execute tx with nonce always set to the current expected nonce for the account
-	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
+	transaction, err := DecodeTxn(arg, e.store, true)
 	if err != nil {
 		return nil, err
 	}

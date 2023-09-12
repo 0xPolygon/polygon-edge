@@ -25,7 +25,7 @@ func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 }
 
 // CalculateTransactionsRoot calculates the root of a list of transactions
-func CalculateTransactionsRoot(transactions []*types.Transaction, blockNumber uint64) types.Hash {
+func CalculateTransactionsRoot(transactions []*types.Transaction) types.Hash {
 	return CalculateRoot(len(transactions), func(indx int) []byte {
 		return transactions[indx].MarshalRLPTo(nil)
 	})

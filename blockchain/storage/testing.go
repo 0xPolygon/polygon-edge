@@ -279,7 +279,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		Input:    []byte{1, 2},
 		V:        big.NewInt(1),
 	}
-	t0.ComputeHash(1)
+	t0.ComputeHash()
 
 	addr2 := types.StringToAddress("22")
 	t1 := &types.Transaction{
@@ -291,7 +291,7 @@ func testBody(t *testing.T, m PlaceholderStorage) {
 		Input:    []byte{4, 5},
 		V:        big.NewInt(2),
 	}
-	t1.ComputeHash(1)
+	t1.ComputeHash()
 
 	block := types.Block{
 		Header:       header,

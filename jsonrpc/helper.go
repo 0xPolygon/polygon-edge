@@ -162,7 +162,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonce bool) (*types.Transaction, error) {
+func DecodeTxn(arg *txnArgs, store nonceGetter, forceSetNonce bool) (*types.Transaction, error) {
 	if arg == nil {
 		return nil, errors.New("missing value for required argument 0")
 	}
@@ -235,7 +235,7 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter, forceSetNonc
 		txn.To = arg.To
 	}
 
-	txn.ComputeHash(blockNumber)
+	txn.ComputeHash()
 
 	return txn, nil
 }

@@ -308,7 +308,7 @@ func newTestTransaction(nonce uint64, from types.Address) *types.Transaction {
 		S:        big.NewInt(1),
 	}
 
-	txn.ComputeHash(1)
+	txn.ComputeHash()
 
 	return txn
 }
@@ -330,7 +330,7 @@ func newTestDynamicFeeTransaction(nonce uint64, from types.Address) *types.Trans
 		S:         big.NewInt(1),
 	}
 
-	txn.ComputeHash(1)
+	txn.ComputeHash()
 
 	return txn
 }
