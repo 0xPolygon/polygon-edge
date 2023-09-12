@@ -186,7 +186,7 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) *baseFeeInfo {
 	}
 
 	baseFeeEM, err := strconv.ParseUint(baseFeeConfig[1], 10, 64)
-	if err != nil || baseFee == 0 {
+	if err != nil || baseFeeEM == 0 {
 		baseFeeInfo.baseFeeEM = command.DefaultGenesisBaseFeeEM
 	} else {
 		baseFeeInfo.baseFeeEM = baseFeeEM
