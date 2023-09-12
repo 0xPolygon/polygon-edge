@@ -52,8 +52,9 @@ const (
 )
 
 var (
-	startTime            int64
-	testRewardWalletAddr = types.StringToAddress("0xFFFFFFFF")
+	startTime              int64
+	testRewardWalletAddr   = types.StringToAddress("0xFFFFFFFF")
+	ProxyContractAdminAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
 )
 
 func init() {
@@ -129,6 +130,8 @@ type TestClusterConfig struct {
 	VotingPeriod uint64
 	VotingDelay  uint64
 
+	ProxyContractsAdmin string
+
 	logsDirOnce sync.Once
 }
 
@@ -189,6 +192,15 @@ func (c *TestClusterConfig) initLogsDir() {
 
 	c.t.Logf("logs enabled for e2e test: %s", logsDir)
 	c.LogsDir = logsDir
+}
+
+func (c *TestClusterConfig) GetProxyContractsAdmin() string {
+	proxyAdminAddr := c.ProxyContractsAdmin
+	if proxyAdminAddr == "" {
+		proxyAdminAddr = ProxyContractAdminAddr
+	}
+
+	return proxyAdminAddr
 }
 
 type TestCluster struct {
@@ -393,6 +405,12 @@ func WithGovernanceVotingPeriod(votingPeriod uint64) ClusterOption {
 func WithGovernanceVotingDelay(votingDelay uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.VotingDelay = votingDelay
+	}
+}
+
+func WithProxyContractsAdmin(address string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ProxyContractsAdmin = address
 	}
 }
 
@@ -601,6 +619,12 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			args = append(args, "--bridge-block-list-enabled",
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
 		}
+
+		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
+		if proxyAdminAddr == "" {
+			proxyAdminAddr = ProxyContractAdminAddr
+		}
+		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
 
 		// run genesis command with all the arguments
 		err = cluster.cmdRun(args...)

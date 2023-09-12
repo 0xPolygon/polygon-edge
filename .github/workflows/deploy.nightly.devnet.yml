@@ -8,12 +8,22 @@ on:  # yamllint disable-line rule:truthy
         description: The environment to run against
         required: false
         type: environment
+      duration:
+        default: '10m'
+        description: Duration of the test
+        required: false
+        type: string
   workflow_call:
     inputs:
       environment:
         description: The environment to run against
         type: string
         required: true
+      duration:
+        default: '10m'
+        description: Duration of the test
+        required: false
+        type: string
     outputs:
       workflow_output_loadtest1:
         description: "Loadtest output"
@@ -63,7 +73,7 @@ jobs:
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
-        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-terraform-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - name: Terraform Validate
         id: validate
         run: terraform validate -no-color
@@ -81,7 +91,7 @@ jobs:
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
           TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
       - name: Retrieve state file from s3
-        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+        run: aws s3 cp s3://polygon-edge-devnet-terraform-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Configure private keys
         run: |
           terraform output pk_ansible > ~/devnet_private.key
@@ -116,6 +126,7 @@ jobs:
           {% endfor %}
 
               BURN_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+              PROXY_CONTRACTS_ADMIN=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
 
               polygon-edge genesis \
                           --consensus polybft \
@@ -132,16 +143,19 @@ jobs:
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address' | sed 's/^0x//'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey') {% endif %}{% endfor %} \
                           --epoch-size 10 \
                           --native-token-config MyToken:MTK:18:true:{{ loadtest_account }} \
-                          --governor-admin {{ loadtest_account }}
+                          --governor-admin {{ loadtest_account }} \
+                          --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN
 
               polygon-edge polybft stake-manager-deploy \
                   --jsonrpc {{ rootchain_json_rpc }} \
+                  --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN \
                   --test
 
               polygon-edge rootchain deploy \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
                           --stake-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr') \
                           --json-rpc {{ rootchain_json_rpc }} \
+                          --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN \
                           --test
 
               polygon-edge rootchain fund \
@@ -204,7 +218,7 @@ jobs:
         run: |
           ansible-inventory --graph
           ansible-galaxy install -r requirements.yml
-          ansible-playbook site.yml
+          ansible-playbook site.yml --extra-vars "block_gas_limit=200000000 block_time=2"
       - name: Set rpc url value
         id: url
         run: |
@@ -227,6 +241,7 @@ jobs:
       runner: devnet
       environment: ${{ inputs.environment }}
       scenario: multiple_EOA
+      duration: ${{ inputs.duration }}
 
   loadtest2:
     needs: loadtest1
@@ -241,6 +256,7 @@ jobs:
       runner: devnet
       environment: ${{ inputs.environment }}
       scenario: multiple_ERC20
+      duration: ${{ inputs.duration }}
 
   destroy_devnet:
     needs: [loadtest1, loadtest2]
@@ -268,9 +284,9 @@ jobs:
           sed 's/# backend "s3" {}/backend "s3" {}/' main.tf > main.tf.tmp && mv main.tf.tmp main.tf
       - name: Terraform Init
         id: init
-        run: terraform init -backend-config="bucket=polygon-edge-devnet-tf-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
+        run: terraform init -backend-config="bucket=polygon-edge-devnet-terraform-states" -backend-config="key=state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }}" -backend-config="region=${{ secrets.AWS_REGION }}"
       - name: Retrieve state file from s3
-        run: aws s3 cp s3://polygon-edge-devnet-tf-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
+        run: aws s3 cp s3://polygon-edge-devnet-terraform-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Terraform Destroy
         id: destroy
         run: terraform destroy -auto-approve -state=state.json

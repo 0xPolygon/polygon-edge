@@ -204,6 +204,14 @@ func main() {
 			"child/governance/ChildTimelock.sol",
 			"ChildTimelock",
 		},
+		{
+			"lib/GenesisProxy.sol",
+			"GenesisProxy",
+		},
+		{
+			"../@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+			"TransparentUpgradeableProxy",
+		},
 	}
 
 	str := `// This is auto-generated file. DO NOT EDIT.

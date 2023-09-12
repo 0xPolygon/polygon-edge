@@ -472,6 +472,22 @@ func main() {
 			},
 			[]string{},
 		},
+		{
+			"GenesisProxy",
+			gensc.GenesisProxy,
+			false,
+			[]string{
+				"setUpProxy",
+			},
+			[]string{},
+		},
+		{
+			"TransparentUpgradeableProxy",
+			gensc.TransparentUpgradeableProxy,
+			true,
+			[]string{},
+			[]string{},
+		},
 	}
 
 	generatedData := &generatedData{}

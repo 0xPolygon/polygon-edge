@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -47,6 +48,7 @@ const (
 	voteProposalThresholdFlag = "vote-proposal-threshold"
 	governorAdminFlag         = "governor-admin"
 	proposalQuorumFlag        = "proposal-quorum"
+	proxyContractsAdminFlag   = "proxy-contracts-admin"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -152,6 +154,8 @@ type genesisParams struct {
 	proposalThreshold string
 	proposalQuorum    uint64
 	governorAdmin     string
+
+	proxyContractsAdmin string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -193,6 +197,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateGovernorAdminAddr(); err != nil {
+			return err
+		}
+
+		if err := p.validateProxyContractsAdmin(); err != nil {
 			return err
 		}
 	}
@@ -591,6 +599,23 @@ func (p *genesisParams) validateGenesisBaseFeeConfig() error {
 
 	if baseFeeInfo.baseFeeEM <= 0 {
 		return errors.New("BaseFeeEM should be graeter than 0")
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateProxyContractsAdmin() error {
+	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
+		return errors.New("proxy contracts admin address must be set")
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	if proxyContractsAdminAddr == contracts.SystemCaller {
+		return errors.New("proxy contracts admin address must not be system caller address")
 	}
 
 	return nil

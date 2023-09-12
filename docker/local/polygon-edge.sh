@@ -2,13 +2,6 @@
 
 set -e
 
-# Check if jq is installed. If not exit and inform user.
-if ! command -v jq >/dev/null 2>&1; then
-  echo "The jq utility is not installed or is not in the PATH. Please install it and run the script again."
-  exit 1
-fi
-
-
 POLYGON_EDGE_BIN=./polygon-edge
 CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
 --block-gas-limit 10000000
@@ -53,6 +46,8 @@ case "$1" in
 
               rm -f /data/genesis.json
 
+              proxyContractsAdmin=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
+
               echo "Generating PolyBFT genesis file..."
               "$POLYGON_EDGE_BIN" genesis $CHAIN_CUSTOM_OPTIONS \
                 --dir /data/genesis.json \
@@ -61,6 +56,8 @@ case "$1" in
                 --validators-prefix data- \
                 --reward-wallet 0xDEADBEEF:1000000 \
                 --native-token-config "Polygon:MATIC:18:true:$(echo "$secrets" | jq -r '.[0] | .address')" \
+                --governor-admin "$(echo "$secrets" | jq -r '.[0] | .address')" \
+                --proxy-contracts-admin ${proxyContractsAdmin} \
                 --bootnode "/dns4/node-1/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[0] | .node_id')" \
                 --bootnode "/dns4/node-2/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[1] | .node_id')" \
                 --bootnode "/dns4/node-3/tcp/1478/p2p/$(echo "$secrets" | jq -r '.[2] | .node_id')" \
@@ -70,6 +67,7 @@ case "$1" in
               "$POLYGON_EDGE_BIN" polybft stake-manager-deploy \
                 --jsonrpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
+                --proxy-contracts-admin ${proxyContractsAdmin} \
                 --test
 
               stakeManagerAddr=$(cat /data/genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr')
@@ -80,6 +78,7 @@ case "$1" in
                 --stake-token ${stakeToken} \
                 --json-rpc http://rootchain:8545 \
                 --genesis /data/genesis.json \
+                --proxy-contracts-admin ${proxyContractsAdmin} \
                 --test
 
               customSupernetManagerAddr=$(cat /data/genesis.json | jq -r '.params.engine.polybft.bridge.customSupernetManagerAddr')

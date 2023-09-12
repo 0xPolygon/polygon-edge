@@ -2219,3 +2219,39 @@ func (i *InitializeChildTimelockFn) EncodeAbi() ([]byte, error) {
 func (i *InitializeChildTimelockFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildTimelock.Abi.Methods["initialize"], buf, i)
 }
+
+type SetUpProxyGenesisProxyFn struct {
+	Logic types.Address `abi:"logic"`
+	Admin types.Address `abi:"admin"`
+	Data  []byte        `abi:"data"`
+}
+
+func (s *SetUpProxyGenesisProxyFn) Sig() []byte {
+	return GenesisProxy.Abi.Methods["setUpProxy"].ID()
+}
+
+func (s *SetUpProxyGenesisProxyFn) EncodeAbi() ([]byte, error) {
+	return GenesisProxy.Abi.Methods["setUpProxy"].Encode(s)
+}
+
+func (s *SetUpProxyGenesisProxyFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(GenesisProxy.Abi.Methods["setUpProxy"], buf, s)
+}
+
+type TransparentUpgradeableProxyConstructorFn struct {
+	Logic  types.Address `abi:"_logic"`
+	Admin_ types.Address `abi:"admin_"`
+	Data   []byte        `abi:"_data"`
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) Sig() []byte {
+	return TransparentUpgradeableProxy.Abi.Constructor.ID()
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) EncodeAbi() ([]byte, error) {
+	return TransparentUpgradeableProxy.Abi.Constructor.Inputs.Encode(t)
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(TransparentUpgradeableProxy.Abi.Constructor, buf, t)
+}
