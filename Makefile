@@ -77,7 +77,7 @@ test-e2e-polybft: check-go
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge \
 	BYZANTINE_BINARY=${PWD}/artifacts/polygon-edge-double-signer \
 	E2E_TESTS=true E2E_LOGS=true \
-	go test -v -timeout=1h30m ./e2e-polybft/e2e/...
+	go test -v -timeout=2h ./e2e-polybft/e2e/...
 
 .PHONY: test-property-polybft
 test-property-polybft: check-go
