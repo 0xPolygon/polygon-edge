@@ -338,10 +338,15 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 // Nonce
 
 // IncrNonce increases the nonce of the address
-func (txn *Txn) IncrNonce(addr types.Address) {
+func (txn *Txn) IncrNonce(addr types.Address) (err error) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
+		if object.Account.Nonce+1 < object.Account.Nonce {
+			err = errors.New("nonce uint64 overflow")
+		}
 		object.Account.Nonce++
 	})
+
+	return
 }
 
 // SetNonce reduces the balance
