@@ -5,16 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"math"
 	"math/big"
 	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/state"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/syndtr/goleveldb/leveldb"
 	ldbstorage "github.com/syndtr/goleveldb/leveldb/storage"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
 )
 
@@ -55,7 +64,7 @@ func (traceStore) Close() error                           { return nil }
 
 func LoadTrace() (*types.Trace, error) {
 	// Load Trace structure from JSON file.
-	traceFile, err := os.Open("7410_readable.json")
+	traceFile, err := os.Open("trace_10.json")
 	if err != nil {
 		return nil, err
 	}
@@ -148,8 +157,9 @@ func TestTrie_Load(t *testing.T) {
 	sn, err := s.NewSnapshotAt(ltr.ParentStateRoot)
 	require.NoError(t, err)
 
-	addr := types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429")
+	addr := types.StringToAddress("0x0000000000000000000000000000000000000101")
 	acc, err := sn.GetAccount(addr)
+	require.NotNil(t, acc)
 	require.NoError(t, err)
 
 	storageTracer := &tracer{
@@ -159,6 +169,7 @@ func TestTrie_Load(t *testing.T) {
 	ts = NewTraceStore(storageTracer)
 	s = NewState(ts)
 	tt, err := s.newTrieAt(acc.Root)
+	log.Println("root: ", acc.Root)
 	require.NoError(t, err)
 
 	// Load the trie from the trace.
@@ -166,18 +177,160 @@ func TestTrie_Load(t *testing.T) {
 
 	// txn.Insert(types.StringToBytes("0x0000000000000000000000000000000000000000000000000000000000000002"), types.StringToBytes("0x00000000000000000000000000000000000000000000000000000000000048d1"))
 
-	b := txn.Lookup(types.StringToBytes("0x04e2f49b914b2b5972f4e339e6dc75455852ed61bac5676f58a2b7036def7b18"))
+	b := txn.Lookup(types.StringToBytes("0x2c64b4c28102eb31817db0aae9385bd83769912689d15cb6b0f59dd7eff20613"))
 	t.Logf("value: %s\n", hex.EncodeToString(b))
 
-	for _, txt := range ltr.TxnTraces {
-		je := txt.Delta[addr]
-		for slot, _ := range je.StorageRead {
-			v := txn.Lookup(slot.Bytes())
-			if v == nil {
-				t.Logf("slot %s not found", slot)
-			}
+	// for _, txt := range ltr.TxnTraces {
+	// 	je := txt.Delta[addr]
+	// 	for slot, _ := range je.StorageRead {
+	// 		v := txn.Lookup(slot.Bytes())
+	// 		if v == nil {
+	// 			t.Logf("slot %s not found", slot)
+	// 		}
 
-			// assert.Equal(t, val.Bytes(), v)
+	// 		// assert.Equal(t, val.Bytes(), v)
+	// 	}
+	// }
+}
+
+func TestTrie_RandomOps(t *testing.T) {
+	addr1 := types.StringToAddress("1")
+	// addr2 := types.StringToAddress("2")
+
+	s := NewState(NewMemoryStorage())
+	snap := s.NewSnapshot()
+
+	radix := state.NewTxn(snap)
+	transition := state.NewTransition(chain.AllForksEnabled.At(0), snap, radix)
+
+	// Check if the generated trace includes all nodes
+	// txn := newTestTxn(defaultPreState)
+	radix.SetBalance(addr1, big.NewInt(1))
+	radix.SetBalance(addr1, big.NewInt(2)) // updates
+
+	radix.SetNonce(addr1, 1)
+	radix.SetNonce(addr1, 2) // updates
+
+	oneHash := types.Hash{0x1}
+	twoHash := types.Hash{0x2}
+	threeHash := types.Hash{0x3}
+
+	radix.SetState(addr1, types.ZeroHash, types.ZeroHash)
+	_ = radix.GetState(addr1, types.ZeroHash)
+	radix.SetState(addr1, types.ZeroHash, oneHash) // updates
+	_ = radix.GetState(addr1, types.ZeroHash)
+
+	_ = radix.GetState(addr1, twoHash)
+	_ = radix.GetState(addr1, threeHash)
+
+	radix.SetState(addr1, oneHash, oneHash)
+
+	_ = radix.GetCode(addr1)
+
+	radix.TouchAccount(addr1)
+
+	// objs, err := radix.Commit(false)
+	// require.NoError(t, err)
+
+	// _, tr, _ := snap.Commit(objs)
+
+	_, tr, _, err := transition.Commit()
+	require.NoError(t, err)
+	out, _ := json.MarshalIndent(tr, "", "  ")
+	log.Println(string(out))
+
+	snap = s.NewSnapshot()
+	radix = state.NewTxn(snap)
+	transition = state.NewTransition(chain.AllForksEnabled.At(0), snap, radix)
+
+	val1 := transition.GetStorage(addr1, types.ZeroHash)
+	assert.Equal(t, val1, oneHash)
+
+	_, tr, _, err = transition.Commit()
+	require.NoError(t, err)
+
+	log.Println(tr.StorageTrie)
+}
+
+func Test_Transition(t *testing.T) {
+	senderAddr := types.Address{1} // account that sends transactions
+	alloc := map[types.Address]*chain.GenesisAccount{
+		senderAddr: {Balance: ethgo.Ether(100)}, // give some ethers to sender
+	}
+	transition := newTestTransition(t, alloc, false)
+	code := contractsapi.TestSimple.Bytecode
+	// deploy contracts
+	contractAddr := transitionDeployContract(t, transition, code, senderAddr)
+	snap, tr, _, err := transition.Commit()
+	require.NoError(t, err)
+	log.Println(tr)
+
+	forks := chain.ForksInTime{}
+	forks.London = false
+	state.NewTransition(forks, snap, state.NewTxn(snap))
+	setValueFn := abi.MustNewMethod("function setValue(uint256 _val) public")
+	newVal := big.NewInt(1)
+	input, err := setValueFn.Encode([]interface{}{newVal})
+	require.NoError(t, err)
+	transitionCallContract(t, transition, contractAddr, senderAddr, input)
+	snap, tr, _, err = transition.Commit()
+
+	out, _ := json.MarshalIndent(tr, "", "  ")
+	log.Println(string(out))
+
+	//MissingSlot(trace, nil, t)
+	newVal = big.NewInt(2)
+	input, err = setValueFn.Encode([]interface{}{newVal})
+	require.NoError(t, err)
+	transitionCallContract(t, transition, contractAddr, senderAddr, input)
+	snap, tr, _, err = transition.Commit()
+	// MissingSlot(trace, nil, t)
+
+	out, _ = json.MarshalIndent(tr, "", "  ")
+	log.Println(string(out))
+}
+
+func transitionDeployContract(t *testing.T, transition *state.Transition, byteCode []byte,
+	sender types.Address) types.Address {
+	deployResult := transition.Create2(sender, byteCode, big.NewInt(0), 1e9)
+	require.NoError(t, deployResult.Err)
+	return deployResult.Address
+}
+
+func transitionCallContract(t *testing.T, transition *state.Transition, contractAddress types.Address,
+	sender types.Address, input []byte) *runtime.ExecutionResult {
+	t.Helper()
+	result := transition.Call2(sender, contractAddress, input, big.NewInt(0), math.MaxUint64)
+	require.NoError(t, result.Err)
+	return result
+}
+func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccount, disk bool) *state.Transition {
+	t.Helper()
+	var st *State
+	if disk {
+		stateStorage, err := NewLevelDBStorage(filepath.Join(t.TempDir(), "trie"), hclog.NewNullLogger())
+		require.NoError(t, err)
+		st = NewState(stateStorage)
+	} else {
+		st = NewState(NewMemoryStorage())
+	}
+	forks := chain.AllForksEnabled
+	forks.RemoveFork("london")
+	ex := state.NewExecutor(&chain.Params{
+		Forks: forks,
+	}, st, hclog.NewNullLogger())
+	rootHash, err := ex.WriteGenesis(alloc, types.Hash{})
+	require.NoError(t, err)
+	ex.GetHash = func(h *types.Header) state.GetHashByNumber {
+		return func(i uint64) types.Hash {
+			return rootHash
 		}
 	}
+	transition, err := ex.BeginTxn(
+		rootHash,
+		&types.Header{},
+		types.ZeroAddress,
+	)
+	require.NoError(t, err)
+	return transition
 }
