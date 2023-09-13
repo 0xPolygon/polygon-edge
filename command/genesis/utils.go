@@ -174,7 +174,7 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 	baseFeeInfo := &baseFeeInfo{command.DefaultGenesisBaseFee, command.DefaultGenesisBaseFeeEM}
 
 	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
-	if len(baseFeeConfig) != 2 {
+	if len(baseFeeConfig) > 2 {
 		return baseFeeInfo, nil
 	}
 
@@ -187,7 +187,7 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 		baseFeeInfo.baseFee = baseFee
 	}
 
-	if baseFeeConfig[1] != "" {
+	if len(baseFeeConfig) == 2 && baseFeeConfig[1] != "" {
 		baseFeeEM, err := strconv.ParseUint(baseFeeConfig[1], 10, 64)
 		if err != nil {
 			return baseFeeInfo, err
