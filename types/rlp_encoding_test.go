@@ -55,7 +55,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 		R:        big.NewInt(27),
 	}
 
-	txn.ComputeHash(1)
+	txn.ComputeHash()
 
 	unmarshalledTxn := new(Transaction)
 	marshaledRlp := txn.MarshalRLP()
@@ -64,7 +64,7 @@ func TestRLPMarshall_And_Unmarshall_Transaction(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	unmarshalledTxn.ComputeHash(1)
+	unmarshalledTxn.ComputeHash()
 
 	assert.Equal(t, txn, unmarshalledTxn, "[ERROR] Unmarshalled transaction not equal to base transaction")
 }
@@ -161,14 +161,14 @@ func TestRLPMarshall_And_Unmarshall_TypedTransaction(t *testing.T) {
 	for _, v := range txTypes {
 		t.Run(v.String(), func(t *testing.T) {
 			originalTx.Type = v
-			originalTx.ComputeHash(1)
+			originalTx.ComputeHash()
 
 			txRLP := originalTx.MarshalRLP()
 
 			unmarshalledTx := new(Transaction)
 			assert.NoError(t, unmarshalledTx.UnmarshalRLP(txRLP))
 
-			unmarshalledTx.ComputeHash(1)
+			unmarshalledTx.ComputeHash()
 			assert.Equal(t, originalTx.Type, unmarshalledTx.Type)
 			assert.Equal(t, originalTx.Hash, unmarshalledTx.Hash)
 		})

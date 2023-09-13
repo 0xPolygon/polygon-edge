@@ -3409,7 +3409,7 @@ func TestBatchTx_SingleAccount(t *testing.T) {
 		go func(i uint64) {
 			tx := newTx(addr, i, 1)
 
-			tx.ComputeHash(1)
+			tx.ComputeHash()
 
 			// add transaction hash to map
 			mux.Lock()
@@ -3614,7 +3614,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 		singedTx, err := poolSigner.SignTx(tx, key)
 		require.NoError(t, err)
 
-		singedTx.ComputeHash(0)
+		singedTx.ComputeHash()
 
 		return singedTx
 	}
@@ -3631,7 +3631,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 		singedTx, err := poolSigner.SignTx(tx, key)
 		require.NoError(t, err)
 
-		singedTx.ComputeHash(0)
+		singedTx.ComputeHash()
 
 		return singedTx
 	}

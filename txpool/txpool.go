@@ -9,7 +9,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
@@ -624,14 +623,6 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrTxTypeNotSupported
 		}
 
-		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
-		blockNumber, err := forkmanager.GetInstance().GetForkBlock(chain.TxHashWithType)
-		if err == nil && blockNumber > currentBlockNumber {
-			metrics.IncrCounter([]string{txPoolMetrics, "dynamic_tx_not_allowed"}, 1)
-
-			return ErrDynamicTxNotAllowed
-		}
-
 		// Check EIP-1559-related fields and make sure they are correct
 		if tx.GasFeeCap == nil || tx.GasTipCap == nil {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
@@ -782,7 +773,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// calculate tx hash
-	tx.ComputeHash(p.store.Header().Number)
+	tx.ComputeHash()
 
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)
