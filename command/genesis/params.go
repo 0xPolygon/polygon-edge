@@ -585,7 +585,7 @@ func (p *genesisParams) validateBurnContract() error {
 
 func (p *genesisParams) validateGenesisBaseFeeConfig() error {
 	if p.baseFeeConfig == "" {
-		return nil
+		return errors.New("genesis base fee config must be set")
 	}
 
 	baseFeeInfo, err := parseBaseFeeConfig(p.baseFeeConfig)

@@ -80,7 +80,7 @@ func setFlags(cmd *cobra.Command) {
 	cmd.Flags().StringVar(
 		&params.baseFeeConfig,
 		genesisBaseFeeConfigFlag,
-		"",
+		command.DefaultGenesisBaseFeeConfig,
 		`initial base fee(in wei) and baseFeeEM (format: <baseFee>[:<baseFeeEM>]). 
 		Default BaseFee is 1 Gwei and BaseFeeEM is 2.
 		Note: BaseFee and BaseFeeEM should be greater than 0.`,

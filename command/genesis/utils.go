@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -175,7 +176,7 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 
 	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
 	if len(baseFeeConfig) > 2 {
-		return baseFeeInfo, nil
+		return baseFeeInfo, errors.New("invalid number of arguments for base fee configuration")
 	}
 
 	if baseFeeConfig[0] != "" {

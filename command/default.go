@@ -1,6 +1,8 @@
 package command
 
 import (
+	"fmt"
+
 	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -18,9 +20,10 @@ const (
 )
 
 var (
-	DefaultStake          = ethgo.Ether(1e6)
-	DefaultPremineBalance = ethgo.Ether(1e6)
-	DefaultGenesisBaseFee = chain.GenesisBaseFee
+	DefaultStake                = ethgo.Ether(1e6)
+	DefaultPremineBalance       = ethgo.Ether(1e6)
+	DefaultGenesisBaseFee       = chain.GenesisBaseFee
+	DefaultGenesisBaseFeeConfig = fmt.Sprintf("%d,:,%d", DefaultGenesisBaseFee, DefaultGenesisBaseFeeEM)
 )
 
 const (
