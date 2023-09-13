@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
@@ -73,10 +74,12 @@ func TestSnapshotUpdateData(t *testing.T) {
 }
 
 func TestIncrNonce(t *testing.T) {
+	t.Parallel()
+
 	var (
 		address0               = types.StringToAddress("0")
 		address1               = types.StringToAddress("1")
-		maxUint64NonceValue    = uint64(18446744073709551615)
+		maxUint64NonceValue    = uint64(math.MaxUint64)
 		nonMaxUint64NonceValue = uint64(3)
 	)
 

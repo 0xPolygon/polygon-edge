@@ -507,6 +507,9 @@ var (
 	// ErrFeeCapTooLow is returned if the transaction fee cap is less than the
 	// the base fee of the block.
 	ErrFeeCapTooLow = errors.New("max fee per gas less than block base fee")
+
+	// ErrNonceUintOverflow is returned if uint64 overflow happens
+	ErrNonceUintOverflow = errors.New("nonce uint64 overflow")
 )
 
 type TransitionApplicationError struct {
