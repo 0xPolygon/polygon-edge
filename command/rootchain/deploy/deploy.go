@@ -560,7 +560,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 					return fmt.Errorf("deployment of %s contract failed", contract.name)
 				}
 
-				var deployResults []*deployContractResult
+				deployResults := make([]*deployContractResult, 0, 2)
 				implementationAddress := types.Address(receipt.ContractAddress)
 
 				deployResults = append(deployResults, newDeployContractsResult(contract.name,
