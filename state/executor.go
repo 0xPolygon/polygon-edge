@@ -408,6 +408,8 @@ func (t *Transition) Write(txn *types.Transaction) error {
 		Transaction: txn.MarshalRLP(),
 		Delta:       t.Txn().GetCompactJournal(),
 		Hash:        txn.Hash,
+		GasUsed:     result.GasUsed,
+		Bloom:       receipt.LogsBloom,
 		// This is not possible to do it here because of dependency cycle
 		// ReceiptRoot: buildroot.CalculateReceiptsRoot(t.receipts),
 		// TxnRoot:     buildroot.CalculateTransactionsRoot(transactions, blockNumber),

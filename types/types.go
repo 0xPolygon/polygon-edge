@@ -266,6 +266,12 @@ type TxnTrace struct {
 
 	// Hash is the hash of the transaction
 	Hash Hash `json:"hash"`
+
+	// GasUsed is the amount of gas used by the transaction
+	GasUsed uint64 `json:"gasUsed"`
+
+	// Bloom is the bloom filter for the transaction
+	Bloom Bloom `json:"bloom"`
 }
 
 type JournalEntry struct {
