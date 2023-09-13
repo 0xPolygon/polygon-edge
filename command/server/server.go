@@ -242,6 +242,13 @@ func setFlags(cmd *cobra.Command) {
 		"maximum size in bytes for a message read from the peer by websocket",
 	)
 
+	cmd.Flags().DurationVar(
+		&params.rawConfig.RelayerTrackerPollInterval,
+		relayerTrackerPollIntervalFlag,
+		defaultConfig.RelayerTrackerPollInterval,
+		"interval (number of seconds) at which relayer's tracker polls for latest block at childchain",
+	)
+
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)

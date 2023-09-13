@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 
@@ -43,7 +44,8 @@ type Config struct {
 
 	Relayer bool
 
-	NumBlockConfirmations uint64
+	NumBlockConfirmations      uint64
+	RelayerTrackerPollInterval time.Duration
 }
 
 // Telemetry holds the config details for metric services

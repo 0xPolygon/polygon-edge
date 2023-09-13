@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/hashicorp/hcl"
@@ -32,8 +33,9 @@ type Config struct {
 	JSONLogFormat            bool       `json:"json_log_format" yaml:"json_log_format"`
 	CorsAllowedOrigins       []string   `json:"cors_allowed_origins" yaml:"cors_allowed_origins"`
 
-	Relayer               bool   `json:"relayer" yaml:"relayer"`
-	NumBlockConfirmations uint64 `json:"num_block_confirmations" yaml:"num_block_confirmations"`
+	Relayer                    bool          `json:"relayer" yaml:"relayer"`
+	NumBlockConfirmations      uint64        `json:"num_block_confirmations" yaml:"num_block_confirmations"`
+	RelayerTrackerPollInterval time.Duration `json:"relayer_tracker_poll_interval" yaml:"relayer_tracker_poll_interval"`
 
 	ConcurrentRequestsDebug uint64 `json:"concurrent_requests_debug" yaml:"concurrent_requests_debug"`
 	WebSocketReadLimit      uint64 `json:"web_socket_read_limit" yaml:"web_socket_read_limit"`
@@ -90,6 +92,10 @@ const (
 	// If a message exceeds the limit,
 	// the connection sends a close message to the peer and returns ErrReadLimit to the application.
 	DefaultWebSocketReadLimit uint64 = 8192
+
+	// DefaultRelayerTrackerPollInterval specifies time interval after which relayer node's event tracker
+	// polls child chain to get the latest block
+	DefaultRelayerTrackerPollInterval time.Duration = time.Second
 )
 
 // DefaultConfig returns the default server configuration
@@ -122,13 +128,14 @@ func DefaultConfig() *Config {
 		Headers: &Headers{
 			AccessControlAllowOrigins: []string{"*"},
 		},
-		LogFilePath:              "",
-		JSONRPCBatchRequestLimit: DefaultJSONRPCBatchRequestLimit,
-		JSONRPCBlockRangeLimit:   DefaultJSONRPCBlockRangeLimit,
-		Relayer:                  false,
-		NumBlockConfirmations:    DefaultNumBlockConfirmations,
-		ConcurrentRequestsDebug:  DefaultConcurrentRequestsDebug,
-		WebSocketReadLimit:       DefaultWebSocketReadLimit,
+		LogFilePath:                "",
+		JSONRPCBatchRequestLimit:   DefaultJSONRPCBatchRequestLimit,
+		JSONRPCBlockRangeLimit:     DefaultJSONRPCBlockRangeLimit,
+		Relayer:                    false,
+		NumBlockConfirmations:      DefaultNumBlockConfirmations,
+		ConcurrentRequestsDebug:    DefaultConcurrentRequestsDebug,
+		WebSocketReadLimit:         DefaultWebSocketReadLimit,
+		RelayerTrackerPollInterval: DefaultRelayerTrackerPollInterval,
 	}
 }
 

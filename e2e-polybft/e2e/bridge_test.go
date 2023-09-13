@@ -1454,3 +1454,67 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		}
 	})
 }
+
+func TestE2E_Bridge_Transfers_WithBlockTrackerPollInterval(t *testing.T) {
+	var (
+		// amount                = ethgo.Gwei(10)
+		numBlockConfirmations = uint64(2)
+		epochSize             = 30
+		sprintSize            = uint64(5)
+		rootPollInterval      = 5 * time.Second
+		relayerPollInterval   = 5 * time.Second
+	)
+
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithEpochSize(epochSize),
+		framework.WithNumBlockConfirmations(numBlockConfirmations),
+		framework.WithRootTrackerPollInterval(rootPollInterval),
+		framework.WithRelayerTrackerPollInterval(relayerPollInterval),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	polybftCfg, err := polybft.LoadPolyBFTConfig(path.Join(cluster.Config.TmpDir, chainConfigFileName))
+	require.NoError(t, err)
+
+	validatorSrv := cluster.Servers[0]
+	senderAccount, err := sidechain.GetAccountFromDir(validatorSrv.DataDir())
+	require.NoError(t, err)
+
+	childEthEndpoint := validatorSrv.JSONRPC().Eth()
+
+	// bridge some tokens for first validator to child chain
+	tokensToDeposit := ethgo.Ether(10)
+
+	require.NoError(t, cluster.Bridge.Deposit(
+		common.ERC20,
+		polybftCfg.Bridge.RootNativeERC20Addr,
+		polybftCfg.Bridge.RootERC20PredicateAddr,
+		rootHelper.TestAccountPrivKey,
+		senderAccount.Address().String(),
+		tokensToDeposit.String(),
+		"",
+		cluster.Bridge.JSONRPCAddr(),
+		rootHelper.TestAccountPrivKey,
+		false),
+	)
+
+	// wait for a couple of sprints
+	finalBlockNum := 5 * sprintSize
+	require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
+
+	// the transaction is processed and there should be a success event
+	var stateSyncedResult contractsapi.StateSyncResultEvent
+
+	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
+	require.NoError(t, err)
+
+	// assert that all deposits are executed successfully
+	checkStateSyncResultLogs(t, logs, 1)
+
+	// check validator balance got increased by deposited amount
+	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
+	require.NoError(t, err)
+	require.Equal(t, tokensToDeposit, balance)
+}
