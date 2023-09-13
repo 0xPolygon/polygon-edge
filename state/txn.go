@@ -84,7 +84,7 @@ func (txn *Txn) RevertToSnapshot(id int) error {
 	return nil
 }
 
-func (txn *Txn) getCompactJournal() map[types.Address]*types.JournalEntry {
+func (txn *Txn) GetCompactJournal() map[types.Address]*types.JournalEntry {
 	// Instead of creating a new object to represent the aggregate on how
 	// an account has changed during the compaction, we piggyback the same
 	// journalEntry object for now.

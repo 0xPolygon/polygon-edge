@@ -201,12 +201,11 @@ func TestTrie_RandomOps(t *testing.T) {
 	snap := s.NewSnapshot()
 
 	radix := state.NewTxn(snap)
-	transition := state.NewTransition(chain.AllForksEnabled.At(0), snap, radix)
+	// transition := state.NewTransition(chain.AllForksEnabled.At(0), snap, radix)
 
 	// Check if the generated trace includes all nodes
 	// txn := newTestTxn(defaultPreState)
 	radix.SetBalance(addr1, big.NewInt(1))
-	radix.SetBalance(addr1, big.NewInt(2)) // updates
 
 	radix.SetNonce(addr1, 1)
 	radix.SetNonce(addr1, 2) // updates
@@ -229,27 +228,62 @@ func TestTrie_RandomOps(t *testing.T) {
 
 	radix.TouchAccount(addr1)
 
-	// objs, err := radix.Commit(false)
-	// require.NoError(t, err)
-
-	// _, tr, _ := snap.Commit(objs)
-
-	_, tr, _, err := transition.Commit()
+	objs, err := radix.Commit(false)
 	require.NoError(t, err)
+
+	snap, tr, _ := snap.Commit(objs)
+
+	radix = state.NewTxn(snap)
+	val1 := radix.GetState(addr1, types.ZeroHash)
+	assert.Equal(t, val1, oneHash)
+
+	// Perform some operations
+	_ = radix.GetState(addr1, oneHash)
+	radix.SetBalance(addr1, big.NewInt(2)) // updates
+
+	_ = radix.GetState(addr1, twoHash)
+	_ = radix.GetState(addr1, threeHash)
+
+	objs, err = radix.Commit(false)
+	require.NoError(t, err)
+
+	_, tr, _ = snap.Commit(objs)
+	// Get the journal at this point
+	journal := radix.GetCompactJournal()
+
+	tr.TxnTraces = []*types.TxnTrace{
+		{
+			Delta: journal,
+		},
+	}
+
 	out, _ := json.MarshalIndent(tr, "", "  ")
 	log.Println(string(out))
 
-	snap = s.NewSnapshot()
-	radix = state.NewTxn(snap)
-	transition = state.NewTransition(chain.AllForksEnabled.At(0), snap, radix)
+	acc1, _ := radix.GetAccount(addr1)
+	txn := NewTraceStoreTxn(t, tr, acc1.Root)
 
-	val1 := transition.GetStorage(addr1, types.ZeroHash)
-	assert.Equal(t, val1, oneHash)
+	// Loop through the StorageRead for addr1
+	for sk := range journal[addr1].StorageRead {
+		// Check if the entry is in the StorageTrie trace
+		val := txn.Lookup(sk.Bytes())
+		t.Log(hex.EncodeToString(val))
+		// assert.NotNil(t, val)
+	}
+}
 
-	_, tr, _, err = transition.Commit()
+func NewTraceStoreTxn(t *testing.T, trace *types.Trace, root types.Hash) *Txn {
+	storageTracer := &tracer{
+		isAccountTrie: false,
+		trace:         trace,
+	}
+	ts := NewTraceStore(storageTracer)
+	s := NewState(ts)
+	tt, err := s.newTrieAt(root)
 	require.NoError(t, err)
 
-	log.Println(tr.StorageTrie)
+	// Load the trie from the trace.
+	return tt.Txn(ts)
 }
 
 func Test_Transition(t *testing.T) {
@@ -267,7 +301,8 @@ func Test_Transition(t *testing.T) {
 
 	forks := chain.ForksInTime{}
 	forks.London = false
-	state.NewTransition(forks, snap, state.NewTxn(snap))
+	forks.Constantinople = true
+	transition = state.NewTransition(forks, snap, state.NewTxn(snap))
 	setValueFn := abi.MustNewMethod("function setValue(uint256 _val) public")
 	newVal := big.NewInt(1)
 	input, err := setValueFn.Encode([]interface{}{newVal})
@@ -282,8 +317,9 @@ func Test_Transition(t *testing.T) {
 	newVal = big.NewInt(2)
 	input, err = setValueFn.Encode([]interface{}{newVal})
 	require.NoError(t, err)
+	transition = state.NewTransition(forks, snap, state.NewTxn(snap))
 	transitionCallContract(t, transition, contractAddr, senderAddr, input)
-	snap, tr, _, err = transition.Commit()
+	_, tr, _, err = transition.Commit()
 	// MissingSlot(trace, nil, t)
 
 	out, _ = json.MarshalIndent(tr, "", "  ")

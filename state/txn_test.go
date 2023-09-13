@@ -94,7 +94,7 @@ func TestTxn_TracesCompaction(t *testing.T) {
 	txn.TouchAccount(addr)
 	require.Len(t, txn.journal, 18)
 
-	trace := txn.getCompactJournal()
+	trace := txn.GetCompactJournal()
 	require.Len(t, trace, 1)
 
 	nonce := uint64(2)
