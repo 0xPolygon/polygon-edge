@@ -343,7 +343,7 @@ func (txn *Txn) IncrNonce(addr types.Address) error {
 
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Account.Nonce+1 < object.Account.Nonce {
-			err = errors.New("nonce uint64 overflow")
+			err = ErrNonceUintOverflow
 
 			return
 		}
