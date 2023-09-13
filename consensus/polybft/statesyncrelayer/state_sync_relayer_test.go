@@ -3,6 +3,7 @@ package statesyncrelayer
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -123,7 +124,8 @@ func TestStateSyncRelayer_Stop(t *testing.T) {
 	key, err := wallet.GenerateKey()
 	require.NoError(t, err)
 
-	r := NewRelayer("test-chain-1", txrelayer.DefaultRPCAddress, ethgo.Address(contracts.StateReceiverContract), 0, hclog.NewNullLogger(), key)
+	r := NewRelayer("test-chain-1", txrelayer.DefaultRPCAddress, ethgo.Address(contracts.StateReceiverContract),
+		0, hclog.NewNullLogger(), key, time.Second)
 
 	require.NotPanics(t, func() { r.Stop() })
 }
