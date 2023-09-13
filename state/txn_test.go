@@ -79,6 +79,7 @@ func TestIncrNonce(t *testing.T) {
 		maxUint64NonceValue    = uint64(18446744073709551615)
 		nonMaxUint64NonceValue = uint64(3)
 	)
+
 	txn := newTestTxn(defaultPreState)
 
 	txn.SetNonce(address0, maxUint64NonceValue)
