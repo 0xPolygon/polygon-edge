@@ -280,7 +280,8 @@ func isNativeRewardToken(cfg common.PolyBFTConfig) bool {
 }
 
 // initNetworkParamsContract initializes NetworkParams contract on child chain
-func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Transition) error {
+func initNetworkParamsContract(baseFeeChangeDenom uint64, cfg common.PolyBFTConfig,
+	transition *state.Transition) error {
 	initFn := &contractsapi.InitializeNetworkParamsFn{
 		InitParams: &contractsapi.InitParams{
 			// only timelock controller can execute transactions on network params
@@ -298,6 +299,7 @@ func initNetworkParamsContract(cfg common.PolyBFTConfig, transition *state.Trans
 			NewVotingDelay:             new(big.Int).Set(cfg.GovernanceConfig.VotingDelay),
 			NewVotingPeriod:            new(big.Int).Set(cfg.GovernanceConfig.VotingPeriod),
 			NewProposalThreshold:       new(big.Int).Set(cfg.GovernanceConfig.ProposalThreshold),
+			NewBaseFeeChangeDenom:      new(big.Int).SetUint64(baseFeeChangeDenom),
 		},
 	}
 
@@ -361,7 +363,7 @@ func initChildGovernor(cfg common.PolyBFTConfig, transition *state.Transition) e
 	initFn := &contractsapi.InitializeChildGovernorFn{
 		Token_:           contracts.ValidatorSetContract,
 		Timelock_:        cfg.GovernanceConfig.ChildTimelockAddr,
-		NetworkParams_:   cfg.GovernanceConfig.NetworkParamsAddr,
+		NetworkParams:    cfg.GovernanceConfig.NetworkParamsAddr,
 		QuorumNumerator_: new(big.Int).SetUint64(cfg.GovernanceConfig.ProposalQuorumPercentage),
 	}
 

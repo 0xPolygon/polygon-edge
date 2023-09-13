@@ -243,7 +243,7 @@ func NewServer(config *Config) (*Server, error) {
 	var initialStateRoot = types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {
-		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config.Chain)
+		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config.Chain.Params)
 		if err != nil {
 			return nil, err
 		}
@@ -618,7 +618,7 @@ func (s *Server) setupRelayer() error {
 		return fmt.Errorf("failed to create account from secret: %w", err)
 	}
 
-	polyBFTConfig, err := polyCommon.GetPolyBFTConfig(s.config.Chain)
+	polyBFTConfig, err := polyCommon.GetPolyBFTConfig(s.config.Chain.Params)
 	if err != nil {
 		return fmt.Errorf("failed to extract polybft config: %w", err)
 	}

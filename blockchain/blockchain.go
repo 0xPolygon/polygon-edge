@@ -7,21 +7,18 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/hashicorp/go-hclog"
+	lru "github.com/hashicorp/golang-lru"
+
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/types/buildroot"
-
-	"github.com/hashicorp/go-hclog"
-	lru "github.com/hashicorp/golang-lru"
 )
 
 const (
-	// defaultBaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks.
-	defaultBaseFeeChangeDenom = 8
-
 	// blockGasTargetDivisor is the bound divisor of the gas limit, used in update calculations
 	blockGasTargetDivisor uint64 = 1024
 
@@ -92,6 +89,7 @@ type Verifier interface {
 	ProcessHeaders(headers []*types.Header) error
 	GetBlockCreator(header *types.Header) (types.Address, error)
 	PreCommitState(block *types.Block, txn *state.Transition) error
+	GetLatestChainConfig() (*chain.Params, error)
 }
 
 type Executor interface {
@@ -1362,7 +1360,7 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	}
 
 	// Check if this is the first London hardfork block.
-	// Should return chain.GenesisBaseFee ins this case.
+	// Should return chain.GenesisBaseFee in this case.
 	if parent.BaseFee == 0 {
 		if b.config.Genesis.BaseFee > 0 {
 			return b.config.Genesis.BaseFee
@@ -1381,22 +1379,37 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	// If the parent block used more gas than its target, the baseFee should increase.
 	if parent.GasUsed > parentGasTarget {
 		gasUsedDelta := parent.GasUsed - parentGasTarget
-		baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
+		baseFeeDelta := b.calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
 
 		return parent.BaseFee + common.Max(baseFeeDelta, 1)
 	}
 
 	// Otherwise, if the parent block used less gas than its target, the baseFee should decrease.
 	gasUsedDelta := parentGasTarget - parent.GasUsed
-	baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
+	baseFeeDelta := b.calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
 
 	return common.Max(parent.BaseFee-baseFeeDelta, 0)
 }
 
-func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
+func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
+	baseFeeChangeDenom := chain.BaseFeeChangeDenom
+
+	if b.Config().Forks.IsActive(chain.Governance, b.Header().Number) {
+		chainConfig, err := b.consensus.GetLatestChainConfig()
+		if err != nil {
+			b.logger.Error("failed to calculate base fee delta", "error", err)
+
+			return baseFeeChangeDenom
+		}
+
+		if chainConfig != nil {
+			baseFeeChangeDenom = chainConfig.BaseFeeChangeDenom
+		}
+	}
+
 	y := baseFee * gasUsedDelta / parentGasTarget
 
-	return y / defaultBaseFeeChangeDenom
+	return y / baseFeeChangeDenom
 }
 
 func (b *Blockchain) writeBatchAndUpdate(

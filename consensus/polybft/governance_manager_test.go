@@ -25,8 +25,10 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	}
 
 	// insert some governance event
-	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10_000)}
-	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(1, 7, []contractsapi.EventAbi{epochRewardEvent}))
+	baseFeeChangeDenomEvent := &contractsapi.NewBaseFeeChangeDenomEvent{BaseFeeChangeDenom: big.NewInt(100)}
+	epochRewardEvent := &contractsapi.NewEpochRewardEvent{Reward: big.NewInt(10000)}
+
+	require.NoError(t, state.GovernanceStore.insertGovernanceEvents(1, 7, []contractsapi.EventAbi{baseFeeChangeDenomEvent, epochRewardEvent}))
 	// insert last processed block
 	require.NoError(t, state.GovernanceStore.insertLastProcessed(20))
 
@@ -38,8 +40,13 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	}),
 		errClientConfigNotFound)
 
+	params := &chain.Params{
+		BaseFeeChangeDenom: 8,
+		Engine:             map[string]interface{}{common.ConsensusName: createTestPolybftConfig()},
+	}
+
 	// insert initial config
-	require.NoError(t, state.GovernanceStore.insertClientConfig(createTestPolybftConfig()))
+	require.NoError(t, state.GovernanceStore.insertClientConfig(params))
 
 	// PostEpoch will now update config with new epoch reward value
 	require.NoError(t, governanceManager.PostEpoch(&common.PostEpochRequest{
@@ -50,7 +57,12 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 
 	updatedConfig, err := state.GovernanceStore.getClientConfig()
 	require.NoError(t, err)
-	require.Equal(t, epochRewardEvent.Reward.Uint64(), updatedConfig.EpochReward)
+	require.Equal(t, baseFeeChangeDenomEvent.BaseFeeChangeDenom.Uint64(), updatedConfig.BaseFeeChangeDenom)
+
+	pbftConfig, err := common.GetPolyBFTConfig(updatedConfig)
+	require.NoError(t, err)
+
+	require.Equal(t, epochRewardEvent.Reward.Uint64(), pbftConfig.EpochReward)
 }
 
 func TestGovernanceManager_PostBlock(t *testing.T) {
@@ -78,7 +90,8 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Number: 0,
 		})
 
-		governanceManager, err := newGovernanceManager(genesisPolybftConfig,
+		chainParams := &chain.Params{Engine: map[string]interface{}{common.ConsensusName: genesisPolybftConfig}}
+		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
 
@@ -123,7 +136,8 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 			Number: 4,
 		})
 
-		governanceManager, err := newGovernanceManager(genesisPolybftConfig,
+		chainParams := &chain.Params{Engine: map[string]interface{}{common.ConsensusName: genesisPolybftConfig}}
+		governanceManager, err := newGovernanceManager(chainParams, genesisPolybftConfig,
 			hclog.NewNullLogger(), state, blockchainMock)
 		require.NoError(t, err)
 
