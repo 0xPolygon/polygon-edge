@@ -2,11 +2,13 @@ package state
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockSnapshot struct {
@@ -69,4 +71,24 @@ func TestSnapshotUpdateData(t *testing.T) {
 
 	assert.NoError(t, txn.RevertToSnapshot(ss))
 	assert.Equal(t, hash1, txn.GetState(addr1, hash1))
+}
+
+func TestIncrNonce(t *testing.T) {
+	t.Parallel()
+
+	var (
+		address0               = types.StringToAddress("0")
+		address1               = types.StringToAddress("1")
+		maxUint64NonceValue    = uint64(math.MaxUint64)
+		nonMaxUint64NonceValue = uint64(3)
+	)
+
+	txn := newTestTxn(defaultPreState)
+
+	txn.SetNonce(address0, maxUint64NonceValue)
+	txn.SetNonce(address1, nonMaxUint64NonceValue)
+
+	require.Error(t, txn.IncrNonce(address0))
+	require.NoError(t, txn.IncrNonce(address1))
+	require.Equal(t, nonMaxUint64NonceValue+1, txn.GetNonce(address1))
 }

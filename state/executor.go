@@ -507,6 +507,9 @@ var (
 	// ErrFeeCapTooLow is returned if the transaction fee cap is less than the
 	// the base fee of the block.
 	ErrFeeCapTooLow = errors.New("max fee per gas less than block base fee")
+
+	// ErrNonceUintOverflow is returned if uint64 overflow happens
+	ErrNonceUintOverflow = errors.New("nonce uint64 overflow")
 )
 
 type TransitionApplicationError struct {
@@ -581,7 +584,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
-		t.state.IncrNonce(msg.From)
+		if err := t.state.IncrNonce(msg.From); err != nil {
+			return nil, err
+		}
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
@@ -782,7 +787,9 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Increment the nonce of the caller
-	t.state.IncrNonce(c.Caller)
+	if err := t.state.IncrNonce(c.Caller); err != nil {
+		return &runtime.ExecutionResult{Err: err}
+	}
 
 	// Check if there is a collision and the address already exists
 	if t.hasCodeOrNonce(c.Address) {
@@ -798,7 +805,10 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	if t.config.EIP158 {
 		// Force the creation of the account
 		t.state.CreateAccount(c.Address)
-		t.state.IncrNonce(c.Address)
+
+		if err := t.state.IncrNonce(c.Address); err != nil {
+			return &runtime.ExecutionResult{Err: err}
+		}
 	}
 
 	// Transfer the value
