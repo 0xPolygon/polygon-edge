@@ -329,6 +329,13 @@ func setFlags(cmd *cobra.Command) {
 			"",
 			"owner for all allow and block lists",
 		)
+
+		cmd.Flags().DurationVar(
+			&params.blockTrackerPollInterval,
+			blockTrackerPollIntervalFlag,
+			defaultBlockTrackerPollInterval,
+			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
+		)
 	}
 }
 
