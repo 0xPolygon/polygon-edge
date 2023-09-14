@@ -161,8 +161,8 @@ func TestTrie_Load(t *testing.T) {
 	require.NotNil(t, acc)
 	require.NoError(t, err)
 
-	// b := sn.GetStorage(addr, acc.Root, types.StringToHash("0xb7d815cabb43222c333e6792c1a90fe7f30d238ce576408088a4ff29c49efc73"))
-	// t.Logf("-- VALUE --: %s\n", b.String())
+	b := sn.GetStorage(addr, acc.Root, types.StringToHash("0xb7d815cabb43222c333e6792c1a90fe7f30d238ce576408088a4ff29c49efc73"))
+	t.Logf("-- VALUE --: %s\n", b.String())
 
 	// for _, txt := range ltr.TxnTraces {
 	// 	je := txt.Delta[addr]
