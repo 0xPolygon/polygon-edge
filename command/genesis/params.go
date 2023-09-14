@@ -134,16 +134,6 @@ type genesisParams struct {
 	rewardTokenCode string
 	rewardWallet    string
 
-	checkpointInterval   uint64
-	withdrawalWaitPeriod uint64
-
-	// governance
-	voteDelay         string
-	votingPeriod      string
-	proposalThreshold string
-	proposalQuorum    uint64
-	governorAdmin     string
-
 	blockTrackerPollInterval time.Duration
 }
 

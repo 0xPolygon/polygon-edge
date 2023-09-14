@@ -236,20 +236,6 @@ func setFlags(cmd *cobra.Command) {
 			"configuration for block time drift value (in seconds)",
 		)
 
-		cmd.Flags().Uint64Var(
-			&params.checkpointInterval,
-			checkpointIntervalFlag,
-			defaultCheckpointInterval,
-			"checkpoint submission interval in blocks",
-		)
-
-		cmd.Flags().Uint64Var(
-			&params.withdrawalWaitPeriod,
-			withdrawalWaitPeriodFlag,
-			defaultWithdrawalWaitPeriod,
-			"number of epochs after which withdrawal can be done from child chain",
-		)
-
 		cmd.Flags().DurationVar(
 			&params.blockTrackerPollInterval,
 			blockTrackerPollIntervalFlag,
