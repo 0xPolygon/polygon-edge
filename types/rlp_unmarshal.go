@@ -113,7 +113,7 @@ func (b *Block) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) error {
 			return err
 		}
 
-		bTxn = bTxn.ComputeHash()
+		bTxn = bTxn.ComputeHash(b.Header.Number)
 
 		b.Transactions = append(b.Transactions, bTxn)
 

@@ -70,7 +70,7 @@ func generateTxs(t *testing.T, startNonce, count int, from types.Address, to *ty
 
 		require.NoError(t, err)
 
-		tx.ComputeHash()
+		tx.ComputeHash(1)
 
 		txs[i] = tx
 	}

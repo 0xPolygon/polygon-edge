@@ -594,7 +594,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 			},
 		}
 
-		tx.ComputeHash()
+		tx.ComputeHash(1)
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{}
@@ -625,7 +625,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 			},
 		}
 
-		tx.ComputeHash()
+		tx.ComputeHash(1)
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{}
@@ -657,7 +657,7 @@ func TestBlockchainWriteBody(t *testing.T) {
 			},
 		}
 
-		tx.ComputeHash()
+		tx.ComputeHash(1)
 		block.Header.ComputeHash()
 
 		txFromByTxHash := map[types.Hash]types.Address{
@@ -692,7 +692,7 @@ func Test_recoverFromFieldsInBlock(t *testing.T) {
 
 	computeTxHashes := func(txs ...*types.Transaction) {
 		for _, tx := range txs {
-			tx.ComputeHash()
+			tx.ComputeHash(1)
 		}
 	}
 
@@ -777,7 +777,7 @@ func Test_recoverFromFieldsInTransactions(t *testing.T) {
 
 	computeTxHashes := func(txs ...*types.Transaction) {
 		for _, tx := range txs {
-			tx.ComputeHash()
+			tx.ComputeHash(1)
 		}
 	}
 
@@ -896,7 +896,7 @@ func TestBlockchainReadBody(t *testing.T) {
 		V:     big.NewInt(1),
 	}
 
-	tx.ComputeHash()
+	tx.ComputeHash(1)
 
 	block := &types.Block{
 		Header: &types.Header{},
@@ -1595,7 +1595,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		Value: big.NewInt(1),
 	}
 
-	tx.ComputeHash()
+	tx.ComputeHash(1)
 	header.ComputeHash()
 	existingHeader.ComputeHash()
 	bc.currentHeader.Store(existingHeader)

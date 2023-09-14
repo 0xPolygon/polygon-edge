@@ -256,7 +256,7 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 		return nil, fmt.Errorf("failed to encode input data for bridge commitment registration: %w", err)
 	}
 
-	return createStateTransactionWithData(contracts.StateReceiverContract, inputData), nil
+	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
 }
 
 // applySlashingTx adds state transaction to the block to slash the double signing validators
@@ -285,7 +285,7 @@ func (f *fsm) createSlashingTx() (*types.Transaction, error) {
 		return nil, fmt.Errorf("failed to encode input data for slashing: %w", err)
 	}
 
-	return createStateTransactionWithData(contracts.ValidatorSetContract, inputData), nil
+	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
@@ -308,7 +308,7 @@ func (f *fsm) createCommitEpochTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.ValidatorSetContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, input), nil
 }
 
 // createDistributeRewardsTx create a StateTransaction, which invokes RewardPool smart contract
@@ -319,7 +319,7 @@ func (f *fsm) createDistributeRewardsTx() (*types.Transaction, error) {
 		return nil, err
 	}
 
-	return createStateTransactionWithData(contracts.RewardPoolContract, input), nil
+	return createStateTransactionWithData(f.Height(), contracts.RewardPoolContract, input), nil
 }
 
 // ValidateCommit is used to validate that a given commit is valid
@@ -793,7 +793,7 @@ func validateHeaderFields(parent *types.Header, header *types.Header, blockTimeD
 
 // createStateTransactionWithData creates a state transaction
 // with provided target address and inputData parameter which is ABI encoded byte array.
-func createStateTransactionWithData(target types.Address, inputData []byte) *types.Transaction {
+func createStateTransactionWithData(blockNumber uint64, target types.Address, inputData []byte) *types.Transaction {
 	tx := &types.Transaction{
 		From:     contracts.SystemCaller,
 		To:       &target,
@@ -803,7 +803,7 @@ func createStateTransactionWithData(target types.Address, inputData []byte) *typ
 		GasPrice: big.NewInt(0),
 	}
 
-	tx.ComputeHash()
+	tx.ComputeHash(blockNumber)
 
 	return tx
 }
