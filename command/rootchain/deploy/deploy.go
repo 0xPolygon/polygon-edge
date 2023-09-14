@@ -560,13 +560,15 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 					return fmt.Errorf("deployment of %s contract failed", contract.name)
 				}
 
-				deployResults := make([]*deployContractResult, 0, 2)
+				resultsLock.Lock()
+				defer resultsLock.Unlock()
+
 				implementationAddress := types.Address(receipt.ContractAddress)
 
-				deployResults = append(deployResults, newDeployContractsResult(contract.name,
+				results[contract.name] = newDeployContractsResult(contract.name,
 					implementationAddress,
 					receipt.TransactionHash,
-					receipt.GasUsed))
+					receipt.GasUsed)
 
 				if contract.hasProxy {
 					proxyContractName := getProxyNameForImpl(contract.name)
@@ -581,17 +583,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 						return fmt.Errorf("deployment of %s contract failed", proxyContractName)
 					}
 
-					deployResults = append(deployResults, newDeployContractsResult(proxyContractName,
+					results[proxyContractName] = newDeployContractsResult(proxyContractName,
 						types.Address(receipt.ContractAddress),
 						receipt.TransactionHash,
-						receipt.GasUsed))
-				}
-
-				resultsLock.Lock()
-				defer resultsLock.Unlock()
-
-				for _, deployResult := range deployResults {
-					results[deployResult.Name] = deployResult
+						receipt.GasUsed)
 				}
 
 				return nil
