@@ -585,20 +585,20 @@ func (p *genesisParams) validateBurnContract() error {
 
 func (p *genesisParams) validateGenesisBaseFeeConfig() error {
 	if p.baseFeeConfig == "" {
-		return errors.New("genesis base fee config must be set")
+		return errors.New("invalid input(empty string) for genesis base fee config flag")
 	}
 
 	baseFeeInfo, err := parseBaseFeeConfig(p.baseFeeConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse base fee config: %w, provided value %s", err, p.baseFeeConfig)
 	}
 
-	if baseFeeInfo.baseFee <= 0 {
-		return errors.New("BaseFee should be greater than 0")
+	if baseFeeInfo.baseFee == 0 {
+		return fmt.Errorf("BaseFee should be greater than 0, provided value %s", p.baseFeeConfig)
 	}
 
-	if baseFeeInfo.baseFeeEM <= 0 {
-		return errors.New("BaseFeeEM should be graeter than 0")
+	if baseFeeInfo.baseFeeEM == 0 {
+		return fmt.Errorf("BaseFeeEM should be graeter than 0, provided value %s", p.baseFeeConfig)
 	}
 
 	return nil
