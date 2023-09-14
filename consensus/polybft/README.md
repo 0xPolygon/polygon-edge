@@ -55,7 +55,6 @@ It has a native support for running bridge, which enables running cross-chain tr
     ```bash
     $ polygon-edge polybft stake-manager-deploy \
      --deployer-key <hex_encoded_rootchain_account_private_key> \
-     --proxy-contracts-admin 0xaddressOfProxyContractsAdmin \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--stake-token 0xaddressOfStakeToken] \
@@ -69,7 +68,6 @@ It has a native support for running bridge, which enables running cross-chain tr
     --deployer-key <hex_encoded_rootchain_account_private_key> \
     --stake-manager <address_of_stake_manager_contract> \
     --stake-token 0xaddressOfStakeToken \
-    --proxy-contracts-admin 0xaddressOfProxyContractsAdmin \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--test]

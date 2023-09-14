@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/spf13/cobra"
 	"github.com/umbracle/ethgo"
@@ -27,7 +26,6 @@ import (
 
 const (
 	contractsDeploymentTitle = "[ROOTCHAIN - CONTRACTS DEPLOYMENT]"
-	ProxySufix               = "Proxy"
 
 	stateSenderName                   = "StateSender"
 	checkpointManagerName             = "CheckpointManager"
@@ -45,7 +43,6 @@ const (
 	childERC1155MintablePredicateName = "ChildERC1155MintablePredicate"
 	erc1155TemplateName               = "ERC1155Template"
 	customSupernetManagerName         = "CustomSupernetManager"
-	stakeManagerName                  = "StakeManager"
 )
 
 var (
@@ -61,23 +58,22 @@ var (
 		stateSenderName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.StateSenderAddress = addr
 		},
-		getProxyNameForImpl(checkpointManagerName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		checkpointManagerName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.CheckpointManagerAddress = addr
 		},
-		getProxyNameForImpl(blsName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		blsName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.BLSAddress = addr
 		},
-		getProxyNameForImpl(bn256G2Name): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		bn256G2Name: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.BN256G2Address = addr
 		},
-		getProxyNameForImpl(exitHelperName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		exitHelperName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ExitHelperAddress = addr
 		},
-		getProxyNameForImpl(rootERC20PredicateName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC20PredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC20PredicateAddress = addr
 		},
-		getProxyNameForImpl(childERC20MintablePredicateName): func(
-			rootchainConfig *common.RootchainConfig, addr types.Address) {
+		childERC20MintablePredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC20PredicateAddress = addr
 		},
 		rootERC20Name: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
@@ -86,27 +82,25 @@ var (
 		erc20TemplateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC20Address = addr
 		},
-		getProxyNameForImpl(rootERC721PredicateName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC721PredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC721PredicateAddress = addr
 		},
-		getProxyNameForImpl(childERC721MintablePredicateName): func(
-			rootchainConfig *common.RootchainConfig, addr types.Address) {
+		childERC721MintablePredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC721PredicateAddress = addr
 		},
 		erc721TemplateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC721Address = addr
 		},
-		getProxyNameForImpl(rootERC1155PredicateName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC1155PredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155PredicateAddress = addr
 		},
-		getProxyNameForImpl(childERC1155MintablePredicateName): func(
-			rootchainConfig *common.RootchainConfig, addr types.Address) {
+		childERC1155MintablePredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC1155PredicateAddress = addr
 		},
 		erc1155TemplateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC1155Address = addr
 		},
-		getProxyNameForImpl(customSupernetManagerName): func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		customSupernetManagerName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
 			rootchainConfig.CustomSupernetManagerAddress = addr
 		},
 	}
@@ -114,7 +108,7 @@ var (
 	// initializersMap maps rootchain contract names to initializer function callbacks
 	initializersMap = map[string]func(command.OutputFormatter, txrelayer.TxRelayer,
 		*common.RootchainConfig, ethgo.Key) error{
-		getProxyNameForImpl(customSupernetManagerName): func(fmt command.OutputFormatter,
+		customSupernetManagerName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -131,7 +125,7 @@ var (
 			return initContract(fmt, relayer, initParams,
 				config.CustomSupernetManagerAddress, customSupernetManagerName, key)
 		},
-		getProxyNameForImpl(exitHelperName): func(fmt command.OutputFormatter,
+		exitHelperName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -141,7 +135,7 @@ var (
 
 			return initContract(fmt, relayer, inputParams, config.ExitHelperAddress, exitHelperName, key)
 		},
-		getProxyNameForImpl(rootERC20PredicateName): func(fmt command.OutputFormatter,
+		rootERC20PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -162,7 +156,7 @@ var (
 			return initContract(fmt, relayer, inputParams,
 				config.RootERC20PredicateAddress, rootERC20PredicateName, key)
 		},
-		getProxyNameForImpl(childERC20MintablePredicateName): func(fmt command.OutputFormatter,
+		childERC20MintablePredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -176,7 +170,7 @@ var (
 			return initContract(fmt, relayer, initParams,
 				config.ChildMintableERC20PredicateAddress, childERC20MintablePredicateName, key)
 		},
-		getProxyNameForImpl(rootERC721PredicateName): func(fmt command.OutputFormatter,
+		rootERC721PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -190,7 +184,7 @@ var (
 			return initContract(fmt, relayer, initParams,
 				config.RootERC721PredicateAddress, rootERC721PredicateName, key)
 		},
-		getProxyNameForImpl(childERC721MintablePredicateName): func(fmt command.OutputFormatter,
+		childERC721MintablePredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -204,7 +198,7 @@ var (
 			return initContract(fmt, relayer, initParams,
 				config.ChildMintableERC721PredicateAddress, childERC721MintablePredicateName, key)
 		},
-		getProxyNameForImpl(rootERC1155PredicateName): func(fmt command.OutputFormatter,
+		rootERC1155PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -218,7 +212,7 @@ var (
 			return initContract(fmt, relayer, initParams,
 				config.RootERC1155PredicateAddress, rootERC1155PredicateName, key)
 		},
-		getProxyNameForImpl(childERC1155MintablePredicateName): func(fmt command.OutputFormatter,
+		childERC1155MintablePredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
 			config *common.RootchainConfig,
 			key ethgo.Key) error {
@@ -298,13 +292,6 @@ func GetCommand() *cobra.Command {
 		helper.StakeManagerFlag,
 		"",
 		helper.StakeManagerFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.proxyContractsAdmin,
-		helper.ProxyContractsAdminFlag,
-		"",
-		helper.ProxyContractsAdminDesc,
 	)
 
 	cmd.MarkFlagsMutuallyExclusive(helper.TestModeFlag, deployerKeyFlag)
@@ -434,7 +421,6 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	type contractInfo struct {
 		name     string
 		artifact *artifact.Artifact
-		hasProxy bool
 	}
 
 	rootchainConfig := &common.RootchainConfig{
@@ -468,32 +454,26 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		{
 			name:     checkpointManagerName,
 			artifact: contractsapi.CheckpointManager,
-			hasProxy: true,
 		},
 		{
 			name:     blsName,
 			artifact: contractsapi.BLS,
-			hasProxy: true,
 		},
 		{
 			name:     bn256G2Name,
 			artifact: contractsapi.BLS256,
-			hasProxy: true,
 		},
 		{
 			name:     exitHelperName,
 			artifact: contractsapi.ExitHelper,
-			hasProxy: true,
 		},
 		{
 			name:     rootERC20PredicateName,
 			artifact: contractsapi.RootERC20Predicate,
-			hasProxy: true,
 		},
 		{
 			name:     childERC20MintablePredicateName,
 			artifact: contractsapi.ChildMintableERC20Predicate,
-			hasProxy: true,
 		},
 		{
 			name:     erc20TemplateName,
@@ -502,12 +482,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		{
 			name:     rootERC721PredicateName,
 			artifact: contractsapi.RootERC721Predicate,
-			hasProxy: true,
 		},
 		{
 			name:     childERC721MintablePredicateName,
 			artifact: contractsapi.ChildMintableERC721Predicate,
-			hasProxy: true,
 		},
 		{
 			name:     erc721TemplateName,
@@ -516,12 +494,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		{
 			name:     rootERC1155PredicateName,
 			artifact: contractsapi.RootERC1155Predicate,
-			hasProxy: true,
 		},
 		{
 			name:     childERC1155MintablePredicateName,
 			artifact: contractsapi.ChildMintableERC1155Predicate,
-			hasProxy: true,
 		},
 		{
 			name:     erc1155TemplateName,
@@ -530,18 +506,17 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		{
 			name:     customSupernetManagerName,
 			artifact: contractsapi.CustomSupernetManager,
-			hasProxy: true,
 		},
 	}
 
 	allContracts = append(tokenContracts, allContracts...)
 
 	g, ctx := errgroup.WithContext(cmdCtx)
-	results := make(map[string]*deployContractResult, len(allContracts))
-	resultsLock := sync.Mutex{}
-	proxyAdmin := types.StringToAddress(params.proxyContractsAdmin)
+	results := make([]*deployContractResult, len(allContracts))
+	commandResults := make([]command.CommandResult, len(allContracts))
 
-	for _, contract := range allContracts {
+	for i, contract := range allContracts {
+		i := i
 		contract := contract
 
 		g.Go(func() error {
@@ -560,34 +535,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 					return fmt.Errorf("deployment of %s contract failed", contract.name)
 				}
 
-				resultsLock.Lock()
-				defer resultsLock.Unlock()
-
-				implementationAddress := types.Address(receipt.ContractAddress)
-
-				results[contract.name] = newDeployContractsResult(contract.name,
-					implementationAddress,
+				results[i] = newDeployContractsResult(contract.name,
+					types.Address(receipt.ContractAddress),
 					receipt.TransactionHash,
 					receipt.GasUsed)
-
-				if contract.hasProxy {
-					proxyContractName := getProxyNameForImpl(contract.name)
-
-					receipt, err := helper.DeployProxyContract(
-						txRelayer, deployerKey, proxyContractName, proxyAdmin, implementationAddress)
-					if err != nil {
-						return err
-					}
-
-					if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-						return fmt.Errorf("deployment of %s contract failed", proxyContractName)
-					}
-
-					results[proxyContractName] = newDeployContractsResult(proxyContractName,
-						types.Address(receipt.ContractAddress),
-						receipt.TransactionHash,
-						receipt.GasUsed)
-				}
 
 				return nil
 			}
@@ -595,28 +546,43 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	if err := g.Wait(); err != nil {
-		return collectResultsOnError(results), err
+		messageResult := helper.MessageResult{
+			Message: "[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"}
+
+		for i, result := range results {
+			if result != nil {
+				// In case an error happened, some of the indices may not be populated.
+				// Filter those out.
+				commandResults[i] = result
+			}
+		}
+
+		commandResults = append([]command.CommandResult{messageResult}, commandResults...)
+
+		return deploymentResultInfo{
+			RootchainCfg:   nil,
+			SupernetID:     0,
+			CommandResults: commandResults}, err
 	}
 
-	commandResults := make([]command.CommandResult, 0, len(results))
-
-	for _, result := range results {
-		commandResults = append(commandResults, result)
-
-		populatorFn, exists := metadataPopulatorMap[result.Name]
-		if !exists {
-			continue
+	for i, result := range results {
+		populatorFn, ok := metadataPopulatorMap[result.Name]
+		if !ok {
+			return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil},
+				fmt.Errorf("rootchain metadata populator not registered for contract '%s'", result.Name)
 		}
 
 		populatorFn(rootchainConfig, result.Address)
+
+		commandResults[i] = result
 	}
 
 	g, ctx = errgroup.WithContext(cmdCtx)
 
-	for contractName := range results {
-		contractName := contractName
+	for _, contract := range allContracts {
+		contract := contract
 
-		initializer, exists := initializersMap[contractName]
+		initializer, exists := initializersMap[contract.name]
 		if !exists {
 			continue
 		}
@@ -683,7 +649,7 @@ func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
 	}
 
 	receipt, err := helper.SendTransaction(txRelayer, ethgo.Address(rootchainCfg.StakeManagerAddress),
-		encoded, stakeManagerName, deployerKey)
+		encoded, checkpointManagerName, deployerKey)
 	if err != nil {
 		return 0, err
 	}
@@ -738,28 +704,4 @@ func initContract(cmdOutput command.OutputFormatter, txRelayer txrelayer.TxRelay
 		})
 
 	return nil
-}
-
-func collectResultsOnError(results map[string]*deployContractResult) deploymentResultInfo {
-	commandResults := make([]command.CommandResult, 0, len(results)+1)
-	messageResult := helper.MessageResult{Message: "[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"}
-
-	for _, result := range results {
-		if result != nil {
-			// In case an error happened, some of the indices may not be populated.
-			// Filter those out.
-			commandResults = append(commandResults, result)
-		}
-	}
-
-	commandResults = append([]command.CommandResult{messageResult}, commandResults...)
-
-	return deploymentResultInfo{
-		RootchainCfg:   nil,
-		SupernetID:     0,
-		CommandResults: commandResults}
-}
-
-func getProxyNameForImpl(input string) string {
-	return input + ProxySufix
 }

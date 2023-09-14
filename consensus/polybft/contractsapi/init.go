@@ -55,7 +55,6 @@ var (
 	RootERC1155                     *artifact.Artifact
 	EIP1559Burn                     *artifact.Artifact
 	GenesisProxy                    *artifact.Artifact
-	TransparentUpgradeableProxy     *artifact.Artifact
 
 	// Governance
 	NetworkParams *artifact.Artifact
@@ -311,11 +310,6 @@ func init() {
 	}
 
 	GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	TransparentUpgradeableProxy, err = artifact.DecodeArtifact([]byte(TransparentUpgradeableProxyArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 )
 
@@ -16,14 +15,13 @@ const (
 )
 
 type deployParams struct {
-	genesisPath         string
-	deployerKey         string
-	jsonRPCAddress      string
-	stakeTokenAddr      string
-	rootERC20TokenAddr  string
-	stakeManagerAddr    string
-	proxyContractsAdmin string
-	isTestMode          bool
+	genesisPath        string
+	deployerKey        string
+	jsonRPCAddress     string
+	stakeTokenAddr     string
+	rootERC20TokenAddr string
+	stakeManagerAddr   string
+	isTestMode         bool
 }
 
 func (ip *deployParams) validateFlags() error {
@@ -51,5 +49,5 @@ func (ip *deployParams) validateFlags() error {
 		return errors.New("stake token address is not provided")
 	}
 
-	return helper.ValidateProxyContractsAdmin(ip.proxyContractsAdmin)
+	return nil
 }
