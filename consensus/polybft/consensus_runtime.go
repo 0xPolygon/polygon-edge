@@ -387,6 +387,16 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		c.logger.Error("failed to post block in governance manager", "err", err)
 	}
 
+	// handle governance events that happened in block
+	if err := c.governanceManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in governance manager", "err", err)
+	}
+
+	// handle governance events that happened in block
+	if err := c.governanceManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in governance manager", "err", err)
+	}
+
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
