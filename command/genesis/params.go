@@ -50,11 +50,10 @@ const (
 	proposalQuorumFlag           = "proposal-quorum"
 	proxyContractsAdminFlag      = "proxy-contracts-admin"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
-
-	defaultNativeTokenName     = "Polygon"
-	defaultNativeTokenSymbol   = "MATIC"
-	defaultNativeTokenDecimals = uint8(18)
-	minNativeTokenParamsNumber = 4
+	defaultNativeTokenName       = "Polygon"
+	defaultNativeTokenSymbol     = "MATIC"
+	defaultNativeTokenDecimals   = uint8(18)
+	minNativeTokenParamsNumber   = 4
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -76,7 +75,6 @@ var (
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
 	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
-	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 )
 
@@ -149,7 +147,6 @@ type genesisParams struct {
 
 	checkpointInterval   uint64
 	withdrawalWaitPeriod uint64
-	baseFeeChangeDenom   uint64
 
 	// governance
 	voteDelay         string
@@ -177,10 +174,6 @@ func (p *genesisParams) validateFlags() error {
 
 	if err := p.parsePremineInfo(); err != nil {
 		return err
-	}
-
-	if p.baseFeeChangeDenom == 0 {
-		return errBaseFeeChangeDenomZero
 	}
 
 	if p.isPolyBFTConsensus() {
@@ -443,10 +436,9 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID:            int64(p.chainID),
-			Forks:              enabledForks,
-			Engine:             p.consensusEngineConfig,
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
+			ChainID: int64(p.chainID),
+			Forks:   enabledForks,
+			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}

@@ -264,8 +264,6 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 func TestIntegration_CommitEpoch(t *testing.T) {
 	t.Parallel()
 
-	baseFeeChangeDenom := uint64(25)
-
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100}
 
@@ -368,7 +366,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, err)
 
 		// init NetworkParams
-		err = initNetworkParamsContract(baseFeeChangeDenom, polyBFTConfig, transition)
+		err = initNetworkParamsContract(polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch

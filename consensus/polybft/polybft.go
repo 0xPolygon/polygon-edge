@@ -64,7 +64,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig); err != nil {
+	err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig)
+	if err != nil {
 		return nil, err
 	}
 
@@ -126,7 +127,7 @@ type Polybft struct {
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config.Params)
+		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
@@ -165,7 +166,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		}
 
 		// initialize NetworkParams SC
-		if err = initNetworkParamsContract(config.Params.BaseFeeChangeDenom, polyBFTConfig, transition); err != nil {
+		if err = initNetworkParamsContract(polyBFTConfig, transition); err != nil {
 			return err
 		}
 
@@ -510,7 +511,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
-	pbftConfig, err := polyCommon.GetPolyBFTConfig(config.Params)
+	pbftConfig, err := polyCommon.GetPolyBFTConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -563,8 +564,7 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		genesisParams:         p.config.Config.Params,
-		GenesisConfig:         p.genesisClientConfig,
+		GenesisPolyBFTConfig:  p.genesisClientConfig,
 		Forks:                 p.config.Config.Params.Forks,
 		Key:                   p.key,
 		DataDir:               p.dataDir,
@@ -802,15 +802,6 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 	}
 
 	return nil
-}
-
-// GetLatestChainConfig returns the latest chain configuration
-func (p *Polybft) GetLatestChainConfig() (*chain.Params, error) {
-	if p.runtime != nil {
-		return p.runtime.governanceManager.GetClientConfig()
-	}
-
-	return nil, nil
 }
 
 // GetBridgeProvider is an implementation of Consensus interface

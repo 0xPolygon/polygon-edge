@@ -59,24 +59,18 @@ func getLookbackSizeForRewardDistribution(forks *chain.Forks, blockNumber uint64
 type GovernanceManager interface {
 	PostBlock(req *polyCommon.PostBlockRequest) error
 	PostEpoch(req *polyCommon.PostEpochRequest) error
-	GetClientConfig() (*chain.Params, error)
+	GetClientConfig() (*polyCommon.PolyBFTConfig, error)
 }
 
 var _ GovernanceManager = (*dummyGovernanceManager)(nil)
 
 // dummyStakeManager is a dummy implementation of GovernanceManager interface
 // used only for unit testing
-type dummyGovernanceManager struct {
-	getClientConfigFn func() (*chain.Params, error)
-}
+type dummyGovernanceManager struct{}
 
 func (d *dummyGovernanceManager) PostBlock(req *polyCommon.PostBlockRequest) error { return nil }
 func (d *dummyGovernanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error { return nil }
-func (d *dummyGovernanceManager) GetClientConfig() (*chain.Params, error) {
-	if d.getClientConfigFn != nil {
-		return d.getClientConfigFn()
-	}
-
+func (d *dummyGovernanceManager) GetClientConfig() (*polyCommon.PolyBFTConfig, error) {
 	return nil, nil
 }
 
@@ -92,7 +86,7 @@ type governanceManager struct {
 }
 
 // newGovernanceManager is a constructor function for governance manager
-func newGovernanceManager(genesisParams *chain.Params, genesisConfig *polyCommon.PolyBFTConfig,
+func newGovernanceManager(genesisConfig *polyCommon.PolyBFTConfig,
 	logger hclog.Logger,
 	state *State,
 	blockhain blockchainBackend) (*governanceManager, error) {
@@ -108,7 +102,7 @@ func newGovernanceManager(genesisParams *chain.Params, genesisConfig *polyCommon
 	config, err := state.GovernanceStore.getClientConfig()
 	if config == nil || errors.Is(err, errClientConfigNotFound) {
 		// insert initial config to db if not already inserted
-		if err = state.GovernanceStore.insertClientConfig(genesisParams); err != nil {
+		if err = state.GovernanceStore.insertClientConfig(genesisConfig); err != nil {
 			return nil, err
 		}
 	} else if err != nil {
@@ -153,7 +147,7 @@ func newGovernanceManager(genesisParams *chain.Params, genesisConfig *polyCommon
 }
 
 // GetClientConfig returns latest client configuration from boltdb
-func (g *governanceManager) GetClientConfig() (*chain.Params, error) {
+func (g *governanceManager) GetClientConfig() (*polyCommon.PolyBFTConfig, error) {
 	return g.state.GovernanceStore.getClientConfig()
 }
 
@@ -211,12 +205,7 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 	}
 
 	// get last saved config
-	latestChainParams, err := g.state.GovernanceStore.getClientConfig()
-	if err != nil {
-		return err
-	}
-
-	latestPolybftConfig, err := polyCommon.GetPolyBFTConfig(latestChainParams)
+	lastConfig, err := g.state.GovernanceStore.getClientConfig()
 	if err != nil {
 		return err
 	}
@@ -234,7 +223,6 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 		votingPeriodEvent        contractsapi.NewVotingPeriodEvent
 		proposalThresholdEvent   contractsapi.NewProposalThresholdEvent
 		sprintSizeEvent          contractsapi.NewSprintSizeEvent
-		baseFeeChangeDenomEvent  contractsapi.NewBaseFeeChangeDenomEvent
 	)
 
 	// unmarshal events that happened in previous epoch and update last saved config
@@ -246,9 +234,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewCheckpointBlockIntervalEvent: %w", err)
 			}
 
-			latestPolybftConfig.CheckpointInterval = event.CheckpointInterval.Uint64()
+			lastConfig.CheckpointInterval = event.CheckpointInterval.Uint64()
 			g.logger.Debug("Post epoch - Checkpoint block interval changed in governance",
-				"epoch", previousEpoch, "checkpointBlockInterval", latestPolybftConfig.CheckpointInterval)
+				"epoch", previousEpoch, "checkpointBlockInterval", lastConfig.CheckpointInterval)
 
 		case epochSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewEpochSizeEvent](e)
@@ -256,9 +244,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewEpochSizeEvent: %w", err)
 			}
 
-			latestPolybftConfig.EpochSize = event.Size.Uint64()
+			lastConfig.EpochSize = event.Size.Uint64()
 			g.logger.Debug("Post epoch - Epoch size changed in governance",
-				"epoch", previousEpoch, "epochSize", latestPolybftConfig.EpochSize)
+				"epoch", previousEpoch, "epochSize", lastConfig.EpochSize)
 
 		case epochRewardEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewEpochRewardEvent](e)
@@ -266,9 +254,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewEpochRewardEvent: %w", err)
 			}
 
-			latestPolybftConfig.EpochReward = event.Reward.Uint64()
+			lastConfig.EpochReward = event.Reward.Uint64()
 			g.logger.Debug("Post epoch - Epoch reward changed in governance",
-				"epoch", previousEpoch, "epochReward", latestPolybftConfig.EpochReward)
+				"epoch", previousEpoch, "epochReward", lastConfig.EpochReward)
 
 		case minValidatorSetSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewMinValidatorSetSizeEvent](e)
@@ -276,9 +264,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewMinValidatorSetSizeEvent: %w", err)
 			}
 
-			latestPolybftConfig.MinValidatorSetSize = event.MinValidatorSet.Uint64()
+			lastConfig.MinValidatorSetSize = event.MinValidatorSet.Uint64()
 			g.logger.Debug("Post epoch - Min validator set size changed in governance",
-				"epoch", previousEpoch, "minValidatorSetSize", latestPolybftConfig.MinValidatorSetSize)
+				"epoch", previousEpoch, "minValidatorSetSize", lastConfig.MinValidatorSetSize)
 
 		case maxValidatorSetSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewMaxValidatorSetSizeEvent](e)
@@ -286,9 +274,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewMaxValdidatorSetSizeEvent: %w", err)
 			}
 
-			latestPolybftConfig.MaxValidatorSetSize = event.MaxValidatorSet.Uint64()
+			lastConfig.MaxValidatorSetSize = event.MaxValidatorSet.Uint64()
 			g.logger.Debug("Post epoch - Max validator set size changed in governance",
-				"epoch", previousEpoch, "maxValidatorSetSize", latestPolybftConfig.MaxValidatorSetSize)
+				"epoch", previousEpoch, "maxValidatorSetSize", lastConfig.MaxValidatorSetSize)
 
 		case withdrawalPeriodEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewWithdrawalWaitPeriodEvent](e)
@@ -296,9 +284,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewWithdrawalWaitPeriodEvent: %w", err)
 			}
 
-			latestPolybftConfig.WithdrawalWaitPeriod = event.WithdrawalPeriod.Uint64()
+			lastConfig.WithdrawalWaitPeriod = event.WithdrawalPeriod.Uint64()
 			g.logger.Debug("Post epoch - Withdrawal wait period changed in governance",
-				"epoch", previousEpoch, "withdrawalWaitPeriod", latestPolybftConfig.WithdrawalWaitPeriod)
+				"epoch", previousEpoch, "withdrawalWaitPeriod", lastConfig.WithdrawalWaitPeriod)
 
 		case blockTimeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewBlockTimeEvent](e)
@@ -306,9 +294,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewBlockTimeEvent: %w", err)
 			}
 
-			latestPolybftConfig.BlockTime = common.Duration{Duration: time.Duration(event.BlockTime.Int64()) * time.Second}
+			lastConfig.BlockTime = common.Duration{Duration: time.Duration(event.BlockTime.Int64()) * time.Second}
 			g.logger.Debug("Post epoch - Block time changed in governance",
-				"epoch", previousEpoch, "blockTime", latestPolybftConfig.BlockTime)
+				"epoch", previousEpoch, "blockTime", lastConfig.BlockTime)
 
 		case blockTimeDriftEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewBlockTimeDriftEvent](e)
@@ -316,9 +304,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewBlockTimeDriftEvent: %w", err)
 			}
 
-			latestPolybftConfig.BlockTimeDrift = event.BlockTimeDrift.Uint64()
+			lastConfig.BlockTimeDrift = event.BlockTimeDrift.Uint64()
 			g.logger.Debug("Post epoch - Block time drift changed in governance",
-				"epoch", previousEpoch, "blockTimeDrift", latestPolybftConfig.BlockTimeDrift)
+				"epoch", previousEpoch, "blockTimeDrift", lastConfig.BlockTimeDrift)
 
 		case votingDelayEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewVotingDelayEvent](e)
@@ -326,9 +314,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewVotingDelayEvent: %w", err)
 			}
 
-			latestPolybftConfig.GovernanceConfig.VotingDelay = event.VotingDelay
+			lastConfig.GovernanceConfig.VotingDelay = event.VotingDelay
 			g.logger.Debug("Post epoch - Voting delay changed in governance",
-				"epoch", previousEpoch, "votingDelay", latestPolybftConfig.GovernanceConfig.VotingDelay)
+				"epoch", previousEpoch, "votingDelay", lastConfig.GovernanceConfig.VotingDelay)
 
 		case votingPeriodEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewVotingPeriodEvent](e)
@@ -336,9 +324,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewVotingPeriodEvent: %w", err)
 			}
 
-			latestPolybftConfig.GovernanceConfig.VotingPeriod = event.VotingPeriod
+			lastConfig.GovernanceConfig.VotingPeriod = event.VotingPeriod
 			g.logger.Debug("Post epoch - Voting period changed in governance",
-				"epoch", previousEpoch, "votingPeriod", latestPolybftConfig.GovernanceConfig.VotingPeriod)
+				"epoch", previousEpoch, "votingPeriod", lastConfig.GovernanceConfig.VotingPeriod)
 
 		case proposalThresholdEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewProposalThresholdEvent](e)
@@ -346,9 +334,9 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewProposalThresholdEvent: %w", err)
 			}
 
-			latestPolybftConfig.GovernanceConfig.ProposalThreshold = event.ProposalThreshold
+			lastConfig.GovernanceConfig.ProposalThreshold = event.ProposalThreshold
 			g.logger.Debug("Post epoch - Proposal threshold changed in governance",
-				"epoch", previousEpoch, "proposalThreshold", latestPolybftConfig.GovernanceConfig.ProposalThreshold)
+				"epoch", previousEpoch, "proposalThreshold", lastConfig.GovernanceConfig.ProposalThreshold)
 
 		case sprintSizeEvent.Sig():
 			event, err := unmarshalGovernanceEvent[*contractsapi.NewSprintSizeEvent](e)
@@ -356,29 +344,17 @@ func (g *governanceManager) PostEpoch(req *polyCommon.PostEpochRequest) error {
 				return fmt.Errorf("could not unmarshal NewSprintSizeEvent: %w", err)
 			}
 
-			latestPolybftConfig.SprintSize = event.Size.Uint64()
+			lastConfig.SprintSize = event.Size.Uint64()
 			g.logger.Debug("Post epoch - Sprint size changed in governance",
-				"epoch", previousEpoch, "sprintSize", latestPolybftConfig.SprintSize)
-
-		case baseFeeChangeDenomEvent.Sig():
-			event, err := unmarshalGovernanceEvent[*contractsapi.NewBaseFeeChangeDenomEvent](e)
-			if err != nil {
-				return fmt.Errorf("could not unmarshal NewBaseFeeChangeDenomEvent: %w", err)
-			}
-
-			latestChainParams.BaseFeeChangeDenom = event.BaseFeeChangeDenom.Uint64()
-			g.logger.Debug("Post epoch - Base fee change denominator changed in governance",
-				"epoch", previousEpoch, "baseFeeChangeDenom", latestChainParams.BaseFeeChangeDenom)
+				"epoch", previousEpoch, "sprintSize", lastConfig.SprintSize)
 
 		default:
 			return errUnknownGovernanceEvent
 		}
 	}
 
-	latestChainParams.Engine[polyCommon.ConsensusName] = latestPolybftConfig
-
 	// save updated config to db
-	return g.state.GovernanceStore.insertClientConfig(latestChainParams)
+	return g.state.GovernanceStore.insertClientConfig(lastConfig)
 }
 
 // PostBlock notifies governance manager that a block was finalized

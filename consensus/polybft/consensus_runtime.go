@@ -77,8 +77,7 @@ type guardedDataDTO struct {
 
 // runtimeConfig is a struct that holds configuration data for given consensus runtime
 type runtimeConfig struct {
-	genesisParams         *chain.Params
-	GenesisConfig         *common.PolyBFTConfig
+	GenesisPolyBFTConfig  *common.PolyBFTConfig
 	Forks                 *chain.Forks
 	DataDir               string
 	Key                   *wallet.Key
@@ -190,20 +189,20 @@ func (c *consensusRuntime) close() {
 // if bridge is not enabled, then a dummy state sync manager will be used
 func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
-		stateSenderAddr := c.config.GenesisConfig.Bridge.StateSenderAddr
+		stateSenderAddr := c.config.GenesisPolyBFTConfig.Bridge.StateSenderAddr
 		stateSyncManager := newStateSyncManager(
 			logger.Named("state-sync-manager"),
 			c.config.State,
 			&stateSyncConfig{
 				key:                      c.config.Key,
 				stateSenderAddr:          stateSenderAddr,
-				stateSenderStartBlock:    c.config.GenesisConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
-				jsonrpcAddr:              c.config.GenesisConfig.Bridge.JSONRPCEndpoint,
+				stateSenderStartBlock:    c.config.GenesisPolyBFTConfig.Bridge.EventTrackerStartBlocks[stateSenderAddr],
+				jsonrpcAddr:              c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint,
 				dataDir:                  c.config.DataDir,
 				topic:                    c.config.bridgeTopic,
 				maxCommitmentSize:        maxCommitmentSize,
 				numBlockConfirmations:    c.config.numBlockConfirmations,
-				blockTrackerPollInterval: c.config.GenesisConfig.BlockTrackerPollInterval.Duration,
+				blockTrackerPollInterval: c.config.GenesisPolyBFTConfig.BlockTrackerPollInterval.Duration,
 			},
 			c,
 		)
@@ -222,7 +221,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 	if c.IsBridgeEnabled() {
 		// enable checkpoint manager
 		txRelayer, err := txrelayer.NewTxRelayer(
-			txrelayer.WithIPAddress(c.config.GenesisConfig.Bridge.JSONRPCEndpoint),
+			txrelayer.WithIPAddress(c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint),
 			txrelayer.WithWriter(logger.StandardWriter(&hcf.StandardLoggerOptions{})))
 		if err != nil {
 			return err
@@ -230,7 +229,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 		c.checkpointManager = newCheckpointManager(
 			wallet.NewEcdsaSigner(c.config.Key),
-			c.config.GenesisConfig.Bridge.CheckpointManagerAddr,
+			c.config.GenesisPolyBFTConfig.Bridge.CheckpointManagerAddr,
 			txRelayer,
 			c.config.blockchain,
 			c.config.polybftBackend,
@@ -246,7 +245,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(
-		c.config.GenesisConfig.Bridge.JSONRPCEndpoint))
+		c.config.GenesisPolyBFTConfig.Bridge.JSONRPCEndpoint))
 	if err != nil {
 		return err
 	}
@@ -257,7 +256,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		rootRelayer,
 		wallet.NewEcdsaSigner(c.config.Key),
 		contracts.ValidatorSetContract,
-		c.config.GenesisConfig.Bridge.CustomSupernetManagerAddr,
+		c.config.GenesisPolyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		c.config.blockchain,
 	)
 
@@ -267,12 +266,12 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 // initGovernanceManager initializes governance manager
 func (c *consensusRuntime) initGovernanceManager(logger hcf.Logger) error {
 	governanceManager, err := newGovernanceManager(
-		c.config.genesisParams,
-		c.config.GenesisConfig,
+		c.config.GenesisPolyBFTConfig,
 		logger.Named("governance-manager"),
 		c.state,
 		c.config.blockchain,
 	)
+
 	if err != nil {
 		return err
 	}
@@ -320,7 +319,7 @@ func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 func (c *consensusRuntime) IsBridgeEnabled() bool {
 	// this is enough to check, because bridge config is not something
 	// that can be changed through governance
-	return c.config.GenesisConfig.IsBridgeEnabled()
+	return c.config.GenesisPolyBFTConfig.IsBridgeEnabled()
 }
 
 // OnBlockInserted is called whenever fsm or syncer inserts new block
@@ -385,7 +384,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 
 	// handle governance events that happened in block
 	if err := c.governanceManager.PostBlock(postBlock); err != nil {
-		c.logger.Error("post block callback failed in governance manager", "err", err)
+		c.logger.Error("failed to post block in governance manager", "err", err)
 	}
 
 	if isEndOfEpoch {
@@ -572,12 +571,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, err
 	}
 
-	currentParams, err := c.governanceManager.GetClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	currentPolyConfig, err := common.GetPolyBFTConfig(currentParams)
+	currentConfig, err := c.governanceManager.GetClientConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -586,7 +580,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		Number:              epochNumber,
 		Validators:          validatorSet,
 		FirstBlockInEpoch:   firstBlockInEpoch,
-		CurrentClientConfig: &currentPolyConfig,
+		CurrentClientConfig: currentConfig,
 	}, nil
 }
 

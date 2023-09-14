@@ -20,9 +20,6 @@ type Params struct {
 	Engine         map[string]interface{} `json:"engine"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
-	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
-	BaseFeeChangeDenom uint64 `json:"baseFeeChangeDenom,omitempty"`
-
 	// Access control configuration
 	AccessListsOwner          *types.Address     `json:"accessListsOwner,omitempty"`
 	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`

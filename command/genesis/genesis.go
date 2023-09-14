@@ -257,13 +257,6 @@ func setFlags(cmd *cobra.Command) {
 			"number of epochs after which withdrawal can be done from child chain",
 		)
 
-		cmd.Flags().Uint64Var(
-			&params.baseFeeChangeDenom,
-			baseFeeChangeDenomFlag,
-			command.DefaultGenesisBaseFeeChangeDenom,
-			"default base fee change denominator the value to bound the amount the base fee can change between blocks.",
-		)
-
 		cmd.Flags().DurationVar(
 			&params.blockTrackerPollInterval,
 			blockTrackerPollIntervalFlag,
