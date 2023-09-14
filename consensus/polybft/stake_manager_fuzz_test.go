@@ -63,8 +63,9 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		stakeManager := &stakeManager{
-			logger: hclog.NewNullLogger(),
-			state:  state,
+			logger:              hclog.NewNullLogger(),
+			state:               state,
+			maxValidatorSetSize: 10,
 		}
 
 		var data epochIDValidatorsF
@@ -169,6 +170,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			validatorSetAddr,
 			types.StringToAddress("0x0002"),
 			bcMock,
+			5,
 		)
 
 		// insert initial full validator set
@@ -201,9 +203,8 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 
 func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	var (
-		aliases             = []string{"A", "B", "C", "D", "E"}
-		stakes              = []uint64{10, 10, 10, 10, 10}
-		maxValidatorSetSize = uint64(10)
+		aliases = []string{"A", "B", "C", "D", "E"}
+		stakes  = []uint64{10, 10, 10, 10, 10}
 	)
 
 	validators := validator.NewTestValidatorsWithAliases(f, aliases, stakes)
@@ -216,6 +217,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		nil,
+		10,
 	)
 
 	seeds := []updateValidatorSetF{
@@ -263,16 +265,14 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 			Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
 		require.NoError(t, err)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, maxValidatorSetSize,
-			validators.GetPublicIdentities(aliases[data.Index:]...))
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities(aliases[data.Index:]...))
 		require.NoError(t, err)
 
 		fullValidatorSet := validators.GetPublicIdentities().Copy()
 		validatorToUpdate := fullValidatorSet[data.Index]
 		validatorToUpdate.VotingPower = big.NewInt(data.VotingPower)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities())
 		require.NoError(t, err)
 	})
 }

@@ -56,13 +56,13 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		txPool:  params.TxPool,
 	}
 
-	// initialize genesis polybft consensus config
+	// initialize polybft consensus config
 	customConfigJSON, err := json.Marshal(params.Config.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig)
+	err = json.Unmarshal(customConfigJSON, &polybft.consensusConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -83,8 +83,8 @@ type Polybft struct {
 	// consensus parameters
 	config *consensus.Params
 
-	// genesisClientConfig is genesis configuration for polybft consensus protocol
-	genesisClientConfig *PolyBFTConfig
+	// consensusConfig is genesis configuration for polybft consensus protocol
+	consensusConfig *PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -143,26 +143,6 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 		bridgeCfg := polyBFTConfig.Bridge
 		if bridgeCfg == nil {
 			return errMissingBridgeConfig
-		}
-
-		// initialize NetworkParams SC
-		if err = initNetworkParamsContract(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
-		// initialize ForkParams SC
-		if err = initForkParamsContract(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
-		// initialize ChildTimelock SC
-		if err = initChildTimelock(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
-		// initialize ChildGovernor SC
-		if err = initChildGovernor(polyBFTConfig, transition); err != nil {
-			return err
 		}
 
 		// initialize ValidatorSet SC
@@ -552,7 +532,7 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		GenesisPolyBFTConfig:  p.genesisClientConfig,
+		PolyBFTConfig:         p.consensusConfig,
 		Key:                   p.key,
 		DataDir:               p.dataDir,
 		State:                 p.state,
@@ -714,7 +694,7 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	return p.verifyHeaderImpl(parent, header, p.runtime.getCurrentBlockTimeDrift(), nil)
+	return p.verifyHeaderImpl(parent, header, p.consensusConfig.BlockTimeDrift, nil)
 }
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift uint64, parents []*types.Header) error {

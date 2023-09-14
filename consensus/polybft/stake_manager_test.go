@@ -23,8 +23,9 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 	state := newTestState(t)
 
 	stakeManager := &stakeManager{
-		logger: hclog.NewNullLogger(),
-		state:  state,
+		logger:              hclog.NewNullLogger(),
+		state:               state,
+		maxValidatorSetSize: 10,
 	}
 
 	t.Run("Not first epoch", func(t *testing.T) {
@@ -77,6 +78,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			validatorSetAddr, types.StringToAddress("0x0002"),
 			nil,
+			5,
 		)
 
 		// insert initial full validator set
@@ -132,6 +134,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			nil,
+			5,
 		)
 
 		// insert initial full validator set
@@ -197,6 +200,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			nil,
+			5,
 		)
 
 		// insert initial full validator set
@@ -257,6 +261,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
+			5,
 		)
 
 		// insert initial full validator set
@@ -304,10 +309,9 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	var (
-		aliases             = []string{"A", "B", "C", "D", "E"}
-		stakes              = []uint64{10, 10, 10, 10, 10}
-		epoch               = uint64(1)
-		maxValidatorSetSize = uint64(10)
+		aliases = []string{"A", "B", "C", "D", "E"}
+		stakes  = []uint64{10, 10, 10, 10, 10}
+		epoch   = uint64(1)
 	)
 
 	validators := validator.NewTestValidatorsWithAliases(t, aliases, stakes)
@@ -320,6 +324,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		nil,
+		10,
 	)
 
 	t.Run("UpdateValidatorSet - only update", func(t *testing.T) {
@@ -331,8 +336,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch, validators.GetPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 0)
 		require.Len(t, updateDelta.Updated, 1)
@@ -348,8 +352,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+1, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+1, validators.GetPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 0)
 		require.Len(t, updateDelta.Updated, 0)
@@ -363,7 +366,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(validators.GetPublicIdentities()),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+2, maxValidatorSetSize,
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+2,
 			validators.GetPublicIdentities(aliases[1:]...))
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 1)
@@ -380,8 +383,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+3, validators.GetPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 0)
 		require.Len(t, updateDelta.Updated, 1)
@@ -397,8 +399,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+4, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+4, validators.GetPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 0)
 		require.Len(t, updateDelta.Updated, 0)
@@ -412,8 +413,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+5, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+5, validators.GetPublicIdentities())
 		require.NoError(t, err)
 		require.Len(t, updateDelta.Added, 0)
 		require.Len(t, updateDelta.Updated, 0)
@@ -422,6 +422,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 
 	t.Run("UpdateValidatorSet - max validator set size reached", func(t *testing.T) {
 		// because we now have 5 validators, and the new validator has more stake
+		stakeManager.maxValidatorSetSize = 4
 
 		fullValidatorSet := validators.GetPublicIdentities().Copy()
 		validatorToAdd := fullValidatorSet[0]
@@ -431,7 +432,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 			Validators: newValidatorStakeMap(fullValidatorSet),
 		}))
 
-		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+6, 4,
+		updateDelta, err := stakeManager.UpdateValidatorSet(epoch+6,
 			validators.GetPublicIdentities(aliases[1:]...))
 
 		require.NoError(t, err)

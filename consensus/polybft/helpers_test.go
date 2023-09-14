@@ -74,7 +74,6 @@ func createTestCommitEpochInput(t *testing.T, epochID uint64,
 			EndBlock:   new(big.Int).SetUint64(epochSize * epochID),
 			EpochRoot:  types.Hash{},
 		},
-		EpochSize: new(big.Int).SetUint64(epochSize),
 	}
 
 	return commitEpoch
@@ -98,9 +97,8 @@ func createTestDistributeRewardsInput(t *testing.T, epochID uint64,
 	}
 
 	return &contractsapi.DistributeRewardForRewardPoolFn{
-		EpochID:   new(big.Int).SetUint64(epochID),
-		Uptime:    uptime,
-		EpochSize: new(big.Int).SetUint64(epochSize),
+		EpochID: new(big.Int).SetUint64(epochID),
+		Uptime:  uptime,
 	}
 }
 

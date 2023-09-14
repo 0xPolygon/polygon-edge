@@ -37,18 +37,12 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize                = uint64(10) // in blocks
-	defaultSprintSize               = uint64(5)  // in blocks
+	defaultEpochSize                = uint64(10)
+	defaultSprintSize               = uint64(5)
 	defaultValidatorSetSize         = 100
 	defaultBlockTime                = 2 * time.Second
-	defaultEpochReward              = 1           // in wei
-	defaultBlockTimeDrift           = uint64(10)  // in seconds
-	defaultCheckpointInterval       = uint64(900) // in blocks
-	defaultWithdrawalWaitPeriod     = uint64(1)   // in epochs
-	defaultVotingDelay              = "10"        // in blocks
-	defaultVotingPeriod             = "10000"     // in blocks
-	defaultVoteProposalThreshold    = "1000"      // in blocks
-	defaultProposalQuorumPercentage = uint64(67)  // percentage
+	defaultEpochReward              = 1
+	defaultBlockTimeDrift           = uint64(10)
 	defaultBlockTrackerPollInterval = time.Second
 
 	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
@@ -69,8 +63,6 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
-
-	proposalQuorumMax = uint64(100)
 )
 
 var (
@@ -143,39 +135,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	voteDelay, err := common.ParseUint256orHex(&p.voteDelay)
-	if err != nil {
-		return err
-	}
-
-	votingPeriod, err := common.ParseUint256orHex(&p.votingPeriod)
-	if err != nil {
-		return err
-	}
-
-	if votingPeriod.Cmp(big.NewInt(0)) == 0 {
-		return errInvalidVotingPeriod
-	}
-
-	proposalThreshold, err := common.ParseUint256orHex(&p.proposalThreshold)
-	if err != nil {
-		return err
-	}
-
-	governorAdminAddr := types.ZeroAddress
-	// if no admin is defined, zero address will be the owner,
-	// meaning no new proposers and executors besides genesis validator
-	// set can be added/removed later
-	if p.governorAdmin != "" {
-		governorAdminAddr = types.StringToAddress(p.governorAdmin)
-	}
-
-	proposalQuorum := p.proposalQuorum
-	if proposalQuorum > proposalQuorumMax {
-		// proposal can be from 0 to 100, so we sanitize the value
-		proposalQuorum = proposalQuorumMax
-	}
-
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
@@ -183,31 +142,17 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:           types.ZeroAddress,
-		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
-		NativeTokenConfig:    p.nativeTokenConfig,
-		MinValidatorSetSize:  p.minNumValidators,
-		MaxValidatorSetSize:  p.maxNumValidators,
-		CheckpointInterval:   p.checkpointInterval,
-		WithdrawalWaitPeriod: p.withdrawalWaitPeriod,
+		Governance:          types.ZeroAddress,
+		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:   p.nativeTokenConfig,
+		MinValidatorSetSize: p.minNumValidators,
+		MaxValidatorSetSize: p.maxNumValidators,
 		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
-		BlockTimeDrift: p.blockTimeDrift,
-		GovernanceConfig: &polybft.GovernanceConfig{
-			VotingDelay:              voteDelay,
-			VotingPeriod:             votingPeriod,
-			ProposalThreshold:        proposalThreshold,
-			ProposalQuorumPercentage: proposalQuorum,
-			GovernorAdmin:            governorAdminAddr,
-			// on genesis we deploy governance contracts on predefined addresses
-			ChildGovernorAddr: contracts.ChildGovernorContract,
-			ChildTimelockAddr: contracts.ChildTimelockContract,
-			NetworkParamsAddr: contracts.NetworkParamsContract,
-			ForkParamsAddr:    contracts.ForkParamsContract,
-		},
+		BlockTimeDrift:           p.blockTimeDrift,
 		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
 	}
 
@@ -422,22 +367,6 @@ func (p *genesisParams) deployContracts(
 		{
 			artifact: contractsapi.RewardPool,
 			address:  contracts.RewardPoolContract,
-		},
-		{
-			artifact: contractsapi.NetworkParams,
-			address:  contracts.NetworkParamsContract,
-		},
-		{
-			artifact: contractsapi.ForkParams,
-			address:  contracts.ForkParamsContract,
-		},
-		{
-			artifact: contractsapi.ChildGovernor,
-			address:  contracts.ChildGovernorContract,
-		},
-		{
-			artifact: contractsapi.ChildTimelock,
-			address:  contracts.ChildTimelockContract,
 		},
 	}
 

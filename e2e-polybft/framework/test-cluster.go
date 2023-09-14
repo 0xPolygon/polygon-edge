@@ -115,9 +115,6 @@ type TestClusterConfig struct {
 	IsPropertyTest  bool
 	TestRewardToken string
 
-	VotingPeriod uint64
-	VotingDelay  uint64
-
 	RootTrackerPollInterval    time.Duration
 	RelayerTrackerPollInterval time.Duration
 
@@ -369,18 +366,6 @@ func WithTestRewardToken() ClusterOption {
 	}
 }
 
-func WithGovernanceVotingPeriod(votingPeriod uint64) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.VotingPeriod = votingPeriod
-	}
-}
-
-func WithGovernanceVotingDelay(votingDelay uint64) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.VotingDelay = votingDelay
-	}
-}
-
 func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.RootTrackerPollInterval = pollInterval
@@ -419,7 +404,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		EpochReward:   1,
 		BlockGasLimit: 1e7, // 10M
 		StakeAmounts:  []*big.Int{},
-		VotingDelay:   10,
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -488,17 +472,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
-			"--governor-admin", addresses[0].String(), // set first validator as governor admin
-			"--vote-delay", fmt.Sprint(cluster.Config.VotingDelay),
 		}
 
 		if cluster.Config.RelayerTrackerPollInterval != 0 {
 			args = append(args, "--block-tracker-poll-interval",
 				cluster.Config.RelayerTrackerPollInterval.String())
-		}
-
-		if cluster.Config.VotingPeriod > 0 {
-			args = append(args, "--vote-period", fmt.Sprint(cluster.Config.VotingPeriod))
 		}
 
 		if cluster.Config.TestRewardToken != "" {

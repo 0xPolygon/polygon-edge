@@ -39,13 +39,6 @@ const (
 	nativeTokenConfigFlag        = "native-token-config"
 	rewardTokenCodeFlag          = "reward-token-code"
 	rewardWalletFlag             = "reward-wallet"
-	checkpointIntervalFlag       = "checkpoint-interval"
-	withdrawalWaitPeriodFlag     = "withdrawal-wait-period"
-	voteDelayFlag                = "vote-delay"
-	votePeriodFlag               = "vote-period"
-	voteProposalThresholdFlag    = "vote-proposal-threshold"
-	governorAdminFlag            = "governor-admin"
-	proposalQuorumFlag           = "proposal-quorum"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 
 	defaultNativeTokenName     = "Polygon"
@@ -71,8 +64,6 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
-	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
-	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 )
 
@@ -187,14 +178,6 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validatePremineInfo(); err != nil {
-			return err
-		}
-
-		if err := p.validateGovernorAdminAddr(); err != nil {
-			return err
-		}
-
-		if err := p.validateBlockTrackerPollInterval(); err != nil {
 			return err
 		}
 	}
@@ -541,15 +524,6 @@ func (p *genesisParams) validatePremineInfo() error {
 	}
 
 	return errReserveAccMustBePremined
-}
-
-// validateGovernorAdminAddr validates governor admin address
-func (p *genesisParams) validateGovernorAdminAddr() error {
-	if err := types.IsValidAddress(p.governorAdmin); err != nil {
-		return fmt.Errorf("governor admin address is not valid: %w", err)
-	}
-
-	return nil
 }
 
 // validateBlockTrackerPollInterval validates block tracker block interval

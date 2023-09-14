@@ -27,7 +27,17 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 	var allEvents []T
 
 	for i := lastProcessedBlock + 1; i < currentBlock.Block.Number(); i++ {
-		eventsFromBlock, err := e.getEvents(i)
+		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
+		if !found {
+			return nil, blockchain.ErrNoBlock
+		}
+
+		receipts, err := e.blockchain.GetReceiptsByHash(blockHeader.Hash)
+		if err != nil {
+			return nil, err
+		}
+
+		eventsFromBlock, err := e.getEventsFromReceipts(blockHeader, receipts)
 		if err != nil {
 			return nil, err
 		}
@@ -43,49 +53,6 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 	allEvents = append(allEvents, currentEvents...)
 
 	return allEvents, nil
-}
-
-// getFromBlocksWithToBlock returns required events starting from
-// lastProcessedBlock + 1, and finishing with specified toBlock
-func (e *eventsGetter[T]) getFromBlocksWithToBlock(lastProcessedBlock, toBlock uint64) ([]T, error) {
-	if lastProcessedBlock+1 == toBlock {
-		// nothing to do, we processed all blocks
-		return nil, nil
-	}
-
-	var allEvents []T
-
-	for i := lastProcessedBlock + 1; i <= toBlock; i++ {
-		eventsFromBlock, err := e.getEvents(i)
-		if err != nil {
-			return nil, err
-		}
-
-		allEvents = append(allEvents, eventsFromBlock...)
-	}
-
-	return allEvents, nil
-}
-
-// getEvents returns required events from given block
-// by first retrieving the block, and its receipts, and then events from receipts
-func (e *eventsGetter[T]) getEvents(blockNumber uint64) ([]T, error) {
-	blockHeader, found := e.blockchain.GetHeaderByNumber(blockNumber)
-	if !found {
-		return nil, blockchain.ErrNoBlock
-	}
-
-	receipts, err := e.blockchain.GetReceiptsByHash(blockHeader.Hash)
-	if err != nil {
-		return nil, err
-	}
-
-	eventsFromBlock, err := e.getEventsFromReceipts(blockHeader, receipts)
-	if err != nil {
-		return nil, err
-	}
-
-	return eventsFromBlock, nil
 }
 
 // getEventsFromReceipts returns events of specified type from block transaction receipts

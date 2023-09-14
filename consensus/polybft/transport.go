@@ -42,8 +42,7 @@ func (p *Polybft) subscribeToIbftTopic() error {
 
 // createTopics create all topics for a PolyBft instance
 func (p *Polybft) createTopics() (err error) {
-	if p.genesisClientConfig.IsBridgeEnabled() {
-		// this is ok to ask, since bridge configuration will not be changed through governance
+	if p.consensusConfig.IsBridgeEnabled() {
 		p.bridgeTopic, err = p.config.Network.NewTopic(bridgeProto, &polybftProto.TransportMessage{})
 		if err != nil {
 			return fmt.Errorf("failed to create bridge topic: %w", err)

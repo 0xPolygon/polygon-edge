@@ -30,11 +30,8 @@ var (
 type StakeManager interface {
 	PostBlock(req *PostBlockRequest) error
 	PostEpoch(req *PostEpochRequest) error
-	UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
-		currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
+	UpdateValidatorSet(epoch uint64, currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
-
-var _ StakeManager = (*dummyStakeManager)(nil)
 
 // dummyStakeManager is a dummy implementation of StakeManager interface
 // used only for unit testing
@@ -42,7 +39,7 @@ type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
 func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
-func (d *dummyStakeManager) UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
+func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
 }
@@ -57,6 +54,7 @@ type stakeManager struct {
 	rootChainRelayer        txrelayer.TxRelayer
 	key                     ethgo.Key
 	supernetManagerContract types.Address
+	maxValidatorSetSize     int
 	eventsGetter            *eventsGetter[*contractsapi.TransferEvent]
 }
 
@@ -68,6 +66,7 @@ func newStakeManager(
 	key ethgo.Key,
 	validatorSetAddr, supernetManagerAddr types.Address,
 	blockchain blockchainBackend,
+	maxValidatorSetSize int,
 ) *stakeManager {
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
 		blockchain: blockchain,
@@ -88,6 +87,7 @@ func newStakeManager(
 		rootChainRelayer:        rootchainRelayer,
 		key:                     key,
 		supernetManagerContract: supernetManagerAddr,
+		maxValidatorSetSize:     maxValidatorSetSize,
 		eventsGetter:            eventsGetter,
 	}
 }
@@ -184,8 +184,8 @@ func (s *stakeManager) updateWithReceipts(
 
 // UpdateValidatorSet returns an updated validator set
 // based on stake change (transfer) events from ValidatorSet contract
-func (s *stakeManager) UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
-	oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
+func (s *stakeManager) UpdateValidatorSet(
+	epoch uint64, oldValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	s.logger.Info("Calculating validators set update...", "epoch", epoch)
 
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
@@ -197,7 +197,7 @@ func (s *stakeManager) UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
 	stakeMap := fullValidatorSet.Validators
 
 	// slice of all validator set
-	newValidatorSet := stakeMap.getSorted(int(maxValidatorSetSize))
+	newValidatorSet := stakeMap.getSorted(s.maxValidatorSetSize)
 	// set of all addresses that will be in next validator set
 	addressesSet := make(map[types.Address]struct{}, len(newValidatorSet))
 

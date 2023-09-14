@@ -281,10 +281,8 @@ func TestCheckpointManager_IsCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)),
-				types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
-			require.Equal(t, c.isCheckpointBlock,
-				checkpointMgr.isCheckpointBlock(c.blockNumber, c.checkpointsOffset, c.isEpochEndingBlock))
+			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
+			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber, c.isEpochEndingBlock))
 		})
 	}
 }
@@ -317,12 +315,12 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	}
 
 	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}},
-		Epoch: epoch, CurrentClientConfig: createTestPolybftConfig()}
+		Epoch: epoch}
 
 	req.FullBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil)
 
 	blockchain := new(blockchainMock)
-	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), types.ZeroAddress,
+	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), 5, types.ZeroAddress,
 		nil, blockchain, nil, hclog.NewNullLogger(), state)
 
 	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
@@ -477,6 +475,7 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	// create checkpoint manager and insert exit events
 	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
 		createTestKey(t)),
+		0,
 		types.ZeroAddress,
 		dummyTxRelayer,
 		nil,

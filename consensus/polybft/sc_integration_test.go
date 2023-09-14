@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -266,8 +264,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100}
 
-	initialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
-	reward := uint64(math.Pow(10, 18))             // 1 token
+	intialBalance := uint64(5 * math.Pow(10, 18)) // 5 tokens
+	reward := uint64(math.Pow(10, 18))            // 1 token
 	walletAddress := types.StringToAddress("1234889893")
 
 	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
@@ -279,7 +277,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 
 		for j := 0; j < size; j++ {
 			aliases[j] = "v" + strconv.Itoa(j)
-			vps[j] = initialBalance
+			vps[j] = intialBalance
 		}
 
 		validatorSets[i] = validator.NewTestValidatorsWithAliases(t, aliases, vps)
@@ -302,11 +300,8 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			contracts.NativeERC20TokenContract: {
 				Code: contractsapi.NativeERC20.DeployedBytecode,
 			},
-			contracts.NetworkParamsContract: {
-				Code: contractsapi.NetworkParams.DeployedBytecode,
-			},
 			walletAddress: {
-				Balance: new(big.Int).SetUint64(initialBalance),
+				Balance: new(big.Int).SetUint64(intialBalance),
 			},
 		}
 
@@ -325,33 +320,16 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		}
 
 		polyBFTConfig := PolyBFTConfig{
-			InitialValidatorSet:  initValidators,
-			EpochSize:            24 * 60 * 60 / 2,
-			SprintSize:           5,
-			EpochReward:          reward,
-			BlockTime:            common.Duration{Duration: time.Second},
-			MinValidatorSetSize:  4,
-			MaxValidatorSetSize:  100,
-			CheckpointInterval:   900,
-			WithdrawalWaitPeriod: 1,
-			BlockTimeDrift:       10,
+			InitialValidatorSet: initValidators,
+			EpochSize:           24 * 60 * 60 / 2,
+			SprintSize:          5,
+			EpochReward:         reward,
 			// use 1st account as governance address
 			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],
 			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
 				WalletAddress: walletAddress,
-				WalletAmount:  new(big.Int).SetUint64(initialBalance),
-			},
-			GovernanceConfig: &GovernanceConfig{
-				VotingDelay:              big.NewInt(10),
-				VotingPeriod:             big.NewInt(10),
-				ProposalThreshold:        big.NewInt(25),
-				GovernorAdmin:            types.BytesToAddress([]byte{0, 1, 2, 3}),
-				ProposalQuorumPercentage: 67,
-				ChildGovernorAddr:        contracts.ChildGovernorContract,
-				ChildTimelockAddr:        contracts.ChildTimelockContract,
-				NetworkParamsAddr:        contracts.NetworkParamsContract,
-				ForkParamsAddr:           contracts.ForkParamsContract,
+				WalletAmount:  new(big.Int).SetUint64(intialBalance),
 			},
 			Bridge: &BridgeConfig{
 				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
@@ -364,8 +342,12 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		err := initValidatorSet(polyBFTConfig, transition)
 		require.NoError(t, err)
 
-		// init NetworkParams
-		err = initNetworkParamsContract(polyBFTConfig, transition)
+		// init RewardPool
+		err = initRewardPool(polyBFTConfig, transition)
+		require.NoError(t, err)
+
+		// approve reward pool as reward token spender
+		err = approveRewardPoolAsSpender(polyBFTConfig, transition)
 		require.NoError(t, err)
 
 		// create input for commit epoch
@@ -378,6 +360,16 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
 
+		// create input for distribute rewards
+		distributeRewards := createTestDistributeRewardsInput(t, 1, accSet, polyBFTConfig.EpochSize)
+		input, err = distributeRewards.EncodeAbi()
+		require.NoError(t, err)
+
+		// call reward distributor
+		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
+		require.NoError(t, result.Err)
+		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
+
 		commitEpoch = createTestCommitEpochInput(t, 2, polyBFTConfig.EpochSize)
 		input, err = commitEpoch.EncodeAbi()
 		require.NoError(t, err)
@@ -386,6 +378,15 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 		result = transition.Call2(contracts.SystemCaller, contracts.ValidatorSetContract, input, big.NewInt(0), 10000000000)
 		require.NoError(t, result.Err)
 		t.Logf("Number of validators %d on commit epoch, Gas used %+v\n", accSet.Len(), result.GasUsed)
+
+		distributeRewards = createTestDistributeRewardsInput(t, 2, accSet, polyBFTConfig.EpochSize)
+		input, err = distributeRewards.EncodeAbi()
+		require.NoError(t, err)
+
+		// call reward distributor
+		result = transition.Call2(contracts.SystemCaller, contracts.RewardPoolContract, input, big.NewInt(0), 10000000000)
+		require.NoError(t, result.Err)
+		t.Logf("Number of validators %d on reward distribution, Gas used %+v\n", accSet.Len(), result.GasUsed)
 	}
 }
 
