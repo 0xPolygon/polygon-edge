@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -180,8 +179,8 @@ func generateTestAccount(tb testing.TB) *wallet.Account {
 }
 
 // createTestBridgeConfig creates test bridge configuration with hard-coded addresses
-func createTestBridgeConfig() *polyCommon.BridgeConfig {
-	return &polyCommon.BridgeConfig{
+func createTestBridgeConfig() *BridgeConfig {
+	return &BridgeConfig{
 		StateSenderAddr:                   types.StringToAddress("1"),
 		CheckpointManagerAddr:             types.StringToAddress("2"),
 		ExitHelperAddr:                    types.StringToAddress("3"),

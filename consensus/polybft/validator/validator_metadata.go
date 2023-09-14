@@ -19,11 +19,6 @@ import (
 	"github.com/umbracle/fastrlp"
 )
 
-type ValidatorsProvider interface {
-	// GetAllValidators returns all validators ([]*ValidatorMetadata) regardless if they are active or not
-	GetAllValidators() (AccountSet, error)
-}
-
 var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4] blsKey, uint256 votingPower)[])`)
 
 // ValidatorMetadata represents a validator metadata (its public identity)

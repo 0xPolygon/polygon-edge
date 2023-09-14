@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -51,11 +50,10 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	setupHeaderHashFunc()
 
 	polybft := &Polybft{
-		config:          params,
-		closeCh:         make(chan struct{}),
-		logger:          logger,
-		txPool:          params.TxPool,
-		ibftMsgHandlers: []IBFTMessageHandler{},
+		config:  params,
+		closeCh: make(chan struct{}),
+		logger:  logger,
+		txPool:  params.TxPool,
 	}
 
 	// initialize genesis polybft consensus config
@@ -86,7 +84,7 @@ type Polybft struct {
 	config *consensus.Params
 
 	// genesisClientConfig is genesis configuration for polybft consensus protocol
-	genesisClientConfig *polyCommon.PolyBFTConfig
+	genesisClientConfig *PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -120,14 +118,11 @@ type Polybft struct {
 
 	// tx pool as interface
 	txPool txPoolInterface
-
-	// ibftMsgHandlers contains IBFT consensus messages handlers
-	ibftMsgHandlers []IBFTMessageHandler
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config)
+		polyBFTConfig, err := GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
@@ -481,7 +476,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger.Named("state"), p.closeCh)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -495,8 +490,6 @@ func (p *Polybft) Initialize() error {
 	}
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
-	// register IBFTConsensusWrapper as IBFT message handler
-	p.ibftMsgHandlers = append(p.ibftMsgHandlers, p.ibft)
 
 	if err = p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("IBFT topic subscription failed: %w", err)
@@ -506,7 +499,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
-	pbftConfig, err := polyCommon.GetPolyBFTConfig(config)
+	pbftConfig, err := GetPolyBFTConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -560,7 +553,6 @@ func (p *Polybft) Start() error {
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
 		GenesisPolyBFTConfig:  p.genesisClientConfig,
-		Forks:                 p.config.Config.Params.Forks,
 		Key:                   p.key,
 		DataDir:               p.dataDir,
 		State:                 p.state,
@@ -577,8 +569,6 @@ func (p *Polybft) initRuntime() error {
 	}
 
 	p.runtime = runtime
-	// register double signing tracker as IBFT messages handler
-	p.ibftMsgHandlers = append(p.ibftMsgHandlers, runtime.doubleSigningTracker)
 
 	return nil
 }

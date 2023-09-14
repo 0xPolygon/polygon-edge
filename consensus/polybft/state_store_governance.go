@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -179,7 +178,7 @@ func (g *GovernanceStore) getLastProcessed() (uint64, error) {
 }
 
 // insertClientConfig inserts client (polybft) config to bolt db
-func (g *GovernanceStore) insertClientConfig(config *polyCommon.PolyBFTConfig) error {
+func (g *GovernanceStore) insertClientConfig(config *PolyBFTConfig) error {
 	return g.db.Update(func(tx *bolt.Tx) error {
 		raw, err := json.Marshal(config)
 		if err != nil {
@@ -191,8 +190,8 @@ func (g *GovernanceStore) insertClientConfig(config *polyCommon.PolyBFTConfig) e
 }
 
 // getClientConfig returns client (polybft) config from bolt db
-func (g *GovernanceStore) getClientConfig() (*polyCommon.PolyBFTConfig, error) {
-	var config *polyCommon.PolyBFTConfig
+func (g *GovernanceStore) getClientConfig() (*PolyBFTConfig, error) {
+	var config *PolyBFTConfig
 
 	err := g.db.View(func(tx *bolt.Tx) error {
 		val := tx.Bucket(clientConfigBucket).Get(clientConfigKey)

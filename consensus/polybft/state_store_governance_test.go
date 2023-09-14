@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -130,8 +129,8 @@ func TestGovernanceStore_InsertAndGetClientConfig(t *testing.T) {
 	require.Equal(t, configFromDB.Governance, initialConfig.Governance)
 }
 
-func createTestPolybftConfig() *polyCommon.PolyBFTConfig {
-	return &polyCommon.PolyBFTConfig{
+func createTestPolybftConfig() *PolyBFTConfig {
+	return &PolyBFTConfig{
 		InitialValidatorSet: []*validator.GenesisValidator{
 			{
 				Address: types.BytesToAddress([]byte{0, 1, 2}),
@@ -150,7 +149,7 @@ func createTestPolybftConfig() *polyCommon.PolyBFTConfig {
 				Stake:   big.NewInt(100),
 			},
 		},
-		Bridge: &polyCommon.BridgeConfig{
+		Bridge: &BridgeConfig{
 			StateSenderAddr:                   types.StringToAddress("0xStateSenderAddr"),
 			CheckpointManagerAddr:             types.StringToAddress("0xCheckpointManagerAddr"),
 			ExitHelperAddr:                    types.StringToAddress("0xExitHelperAddr"),
@@ -184,7 +183,7 @@ func createTestPolybftConfig() *polyCommon.PolyBFTConfig {
 		CheckpointInterval:  900,
 		BlockTimeDrift:      10,
 		Governance:          types.ZeroAddress,
-		NativeTokenConfig: &polyCommon.TokenConfig{
+		NativeTokenConfig: &TokenConfig{
 			Name:       "Polygon_MATIC",
 			Symbol:     "MATIC",
 			Decimals:   18,
@@ -193,12 +192,12 @@ func createTestPolybftConfig() *polyCommon.PolyBFTConfig {
 		},
 		InitialTrieRoot:      types.ZeroHash,
 		WithdrawalWaitPeriod: 1,
-		RewardConfig: &polyCommon.RewardsConfig{
+		RewardConfig: &RewardsConfig{
 			TokenAddress:  types.StringToAddress("0xRewardTokenAddr"),
 			WalletAddress: types.StringToAddress("0xRewardWalletAddr"),
 			WalletAmount:  big.NewInt(1_000_000),
 		},
-		GovernanceConfig: &polyCommon.GovernanceConfig{
+		GovernanceConfig: &GovernanceConfig{
 			VotingDelay:              big.NewInt(1000),
 			VotingPeriod:             big.NewInt(10_0000),
 			ProposalThreshold:        big.NewInt(1000),

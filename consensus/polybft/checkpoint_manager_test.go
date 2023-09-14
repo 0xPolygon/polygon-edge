@@ -10,20 +10,19 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -317,15 +316,8 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		},
 	}
 
-	req := &polyCommon.PostBlockRequest{
-		FullBlock: &types.FullBlock{
-			Block: &types.Block{
-				Header: &types.Header{Number: block},
-			},
-		},
-		Epoch:               epoch,
-		CurrentClientConfig: createTestPolybftConfig(),
-	}
+	req := &PostBlockRequest{FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}}},
+		Epoch: epoch, CurrentClientConfig: createTestPolybftConfig()}
 
 	req.FullBlock.Block.Header.ExtraData = extra.MarshalRLPTo(nil)
 
@@ -334,12 +326,12 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		nil, blockchain, nil, hclog.NewNullLogger(), state)
 
 	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
-		require.NoError(t, state.ExitEventStore.updateLastSaved(block-1)) // we got everything till the current block
+		require.NoError(t, state.CheckpointStore.updateLastSaved(block-1)) // we got everything till the current block
 		req.IsEpochEndingBlock = false
 		req.FullBlock.Receipts = createReceipts(0, 5)
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.ExitEventStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block
 		})
 
@@ -349,7 +341,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	})
 
 	t.Run("PostBlock - epoch ending block (exit events are saved to the next epoch)", func(t *testing.T) {
-		require.NoError(t, state.ExitEventStore.updateLastSaved(block)) // we got everything till the current block
+		require.NoError(t, state.CheckpointStore.updateLastSaved(block)) // we got everything till the current block
 		req.IsEpochEndingBlock = true
 		req.FullBlock.Receipts = createReceipts(5, 10)
 		extra.Validators = &validator.ValidatorSetDelta{}
@@ -358,7 +350,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.ExitEventStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block+2 // they should be saved in the next epoch and its first block
 		})
 
@@ -369,7 +361,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 	})
 
 	t.Run("PostBlock - there are missing events", func(t *testing.T) {
-		require.NoError(t, state.ExitEventStore.updateLastSaved(block)) // we are missing one block
+		require.NoError(t, state.CheckpointStore.updateLastSaved(block)) // we are missing one block
 
 		missedReceipts := createReceipts(10, 13)
 		newReceipts := createReceipts(13, 15)
@@ -399,7 +391,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		req.FullBlock.Receipts = newReceipts
 		require.NoError(t, checkpointManager.PostBlock(req))
 
-		exitEvents, err := state.ExitEventStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err := state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block+2
 		})
 
@@ -409,7 +401,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 		require.Len(t, exitEvents, len(missedReceipts)+5)
 		require.Equal(t, extra.Checkpoint.EpochNumber, exitEvents[0].EpochNumber)
 
-		exitEvents, err = state.ExitEventStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
+		exitEvents, err = state.CheckpointStore.getExitEvents(epoch+1, func(exitEvent *ExitEvent) bool {
 			return exitEvent.BlockNumber == block+3
 		})
 
@@ -552,79 +544,6 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 	})
 }
 
-func TestCheckpointManager_GenerateSlashExitProofs(t *testing.T) {
-	t.Parallel()
-
-	const (
-		numOfBlocks           = 10
-		numOfEventsPerBlock   = 2
-		correctBlockToGetExit = 1
-		futureBlockToGetExit  = 2
-	)
-
-	state := newTestState(t)
-
-	// setup mocks for valid case
-	foundCheckpointReturn, err := contractsapi.GetCheckpointBlockABIResponse.Encode(map[string]interface{}{
-		"isFound":         true,
-		"checkpointBlock": 1,
-	})
-	require.NoError(t, err)
-
-	dummyTxRelayer := newDummyTxRelayer(t)
-	dummyTxRelayer.On("Call", mock.Anything, mock.Anything, mock.Anything).
-		Return(hex.EncodeToString(foundCheckpointReturn), error(nil))
-
-	// create checkpoint manager and insert exit events
-	checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(
-		createTestKey(t)),
-		types.ZeroAddress,
-		dummyTxRelayer,
-		nil,
-		nil,
-		hclog.NewNullLogger(),
-		state)
-
-	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
-	encodedEvents := encodeExitEvents(t, exitEvents)
-	checkpointEvents := encodedEvents[:numOfEventsPerBlock]
-
-	// manually create merkle tree for a desired checkpoint to verify the generated proof
-	tree, err := merkle.NewMerkleTree(checkpointEvents)
-	require.NoError(t, err)
-
-	proofs, err := checkpointMgr.GenerateSlashExitProofs()
-	require.NoError(t, err)
-	require.Len(t, proofs, len(checkpointEvents))
-
-	t.Run("Generate and validate exit proof", func(t *testing.T) {
-		t.Parallel()
-		// verify generated proof on desired tree
-		require.NoError(t, merkle.VerifyProof(correctBlockToGetExit, encodedEvents[1], proofs[1].Data, tree.Hash()))
-	})
-
-	t.Run("Generate and validate exit proof - invalid proof", func(t *testing.T) {
-		t.Parallel()
-
-		proof := proofs[0]
-		// copy and make proof invalid
-		invalidProof := make([]types.Hash, len(proof.Data))
-		copy(invalidProof, proof.Data)
-		invalidProof[0][0]++
-
-		// verify generated proof on desired tree
-		require.ErrorContains(t, merkle.VerifyProof(correctBlockToGetExit,
-			encodedEvents[1], invalidProof, tree.Hash()), "not a member of merkle tree")
-	})
-
-	t.Run("Generate exit proof - no event", func(t *testing.T) {
-		t.Parallel()
-
-		_, err := checkpointMgr.GenerateExitProof(21)
-		require.ErrorContains(t, err, "could not find any exit event that has an id")
-	})
-}
-
 var _ txrelayer.TxRelayer = (*dummyTxRelayer)(nil)
 
 type dummyTxRelayer struct {
@@ -680,12 +599,12 @@ func createTestLogForExitEvent(t *testing.T, exitEventID uint64) *types.Log {
 	var exitEvent contractsapi.L2StateSyncedEvent
 
 	topics := make([]types.Hash, 4)
-	topics[0] = types.Hash(exitEvent.Sig())                                // function signature
-	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID)) // ID
-	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes()) // Sender
-	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes()) // Receiver
-	sigType := abi.MustNewType("tuple(bytes signature)")                   // Data
-	encodedData, err := sigType.Encode(map[string]interface{}{"signature": slashSignature})
+	topics[0] = types.Hash(exitEvent.Sig())
+	topics[1] = types.BytesToHash(common.EncodeUint64ToBytes(exitEventID))
+	topics[2] = types.BytesToHash(types.StringToAddress("0x1111").Bytes())
+	topics[3] = types.BytesToHash(types.StringToAddress("0x2222").Bytes())
+	someType := abi.MustNewType("tuple(string firstName, string lastName)")
+	encodedData, err := someType.Encode(map[string]string{"firstName": "John", "lastName": "Doe"})
 	require.NoError(t, err)
 
 	return &types.Log{

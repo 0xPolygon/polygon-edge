@@ -5,8 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -31,10 +29,9 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	require.NoError(t, state.GovernanceStore.insertLastProcessed(20))
 
 	// no initial config was saved, so we expect an error
-	require.ErrorIs(t, governanceManager.PostEpoch(&common.PostEpochRequest{
+	require.ErrorIs(t, governanceManager.PostEpoch(&PostEpochRequest{
 		NewEpochID:        2,
 		FirstBlockOfEpoch: 21,
-		Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}),
 		errClientConfigNotFound)
 
@@ -42,10 +39,9 @@ func TestGovernanceManager_PostEpoch(t *testing.T) {
 	require.NoError(t, state.GovernanceStore.insertClientConfig(createTestPolybftConfig()))
 
 	// PostEpoch will now update config with new epoch reward value
-	require.NoError(t, governanceManager.PostEpoch(&common.PostEpochRequest{
+	require.NoError(t, governanceManager.PostEpoch(&PostEpochRequest{
 		NewEpochID:        2,
 		FirstBlockOfEpoch: 21,
-		Forks:             &chain.Forks{chain.Governance: chain.NewFork(0)},
 	}))
 
 	updatedConfig, err := state.GovernanceStore.getClientConfig()
@@ -65,12 +61,11 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		require.NoError(t, state.GovernanceStore.insertLastProcessed(4))
 
 		// no governance events in receipts
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: 5}},
 				Receipts: []*types.Receipt{},
 			},
 			Epoch: 1,
-			Forks: &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		blockchainMock := new(blockchainMock)
@@ -110,12 +105,11 @@ func TestGovernanceManager_PostBlock(t *testing.T) {
 		}
 		receipt.SetStatus(types.ReceiptSuccess)
 
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: 5}},
 				Receipts: []*types.Receipt{receipt},
 			},
 			Epoch: 1,
-			Forks: &chain.Forks{chain.Governance: chain.NewFork(0)},
 		}
 
 		blockchainMock := new(blockchainMock)

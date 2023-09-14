@@ -4,7 +4,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
@@ -29,7 +28,7 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 	}
 
 	t.Run("Not first epoch", func(t *testing.T) {
-		require.NoError(t, stakeManager.PostEpoch(&common.PostEpochRequest{
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
 			NewEpochID:   2,
 			ValidatorSet: validator.NewValidatorSet(validators, stakeManager.logger),
 		}))
@@ -39,7 +38,7 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 	})
 
 	t.Run("First epoch", func(t *testing.T) {
-		require.NoError(t, stakeManager.PostEpoch(&common.PostEpochRequest{
+		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
 			NewEpochID:   1,
 			ValidatorSet: validator.NewValidatorSet(validators, stakeManager.logger),
 		}))
@@ -100,7 +99,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 		receipt.SetStatus(types.ReceiptSuccess)
 
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
 				Receipts: []*types.Receipt{receipt},
 			},
@@ -155,7 +154,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 
 		receipt.SetStatus(types.ReceiptSuccess)
 
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
 				Receipts: []*types.Receipt{receipt},
 			},
@@ -220,7 +219,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			receipts[i].SetStatus(types.ReceiptSuccess)
 		}
 
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
 				Receipts: receipts},
 			Epoch: epoch,
@@ -277,7 +276,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		}
 		receipt.SetStatus(types.ReceiptSuccess)
 
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: block}},
 				Receipts: []*types.Receipt{receipt},
 			},

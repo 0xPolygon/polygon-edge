@@ -7,7 +7,7 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/wallet"
 
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -20,7 +20,7 @@ func TestE2E_BurnContract_Deployed(t *testing.T) {
 	destinationAddr := types.Address(destinationKey.Address())
 
 	cluster := framework.NewTestCluster(t, 5,
-		framework.WithBurnContract(&polyCommon.BurnContractInfo{
+		framework.WithBurnContract(&polybft.BurnContractInfo{
 			Address:            contractAddr,
 			DestinationAddress: destinationAddr,
 		}),

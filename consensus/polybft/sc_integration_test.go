@@ -14,7 +14,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -325,7 +324,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			}
 		}
 
-		polyBFTConfig := polyCommon.PolyBFTConfig{
+		polyBFTConfig := PolyBFTConfig{
 			InitialValidatorSet:  initValidators,
 			EpochSize:            24 * 60 * 60 / 2,
 			SprintSize:           5,
@@ -338,12 +337,12 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 			BlockTimeDrift:       10,
 			// use 1st account as governance address
 			Governance: currentValidators.ToValidatorSet().Accounts().GetAddresses()[0],
-			RewardConfig: &polyCommon.RewardsConfig{
+			RewardConfig: &RewardsConfig{
 				TokenAddress:  contracts.NativeERC20TokenContract,
 				WalletAddress: walletAddress,
 				WalletAmount:  new(big.Int).SetUint64(initialBalance),
 			},
-			GovernanceConfig: &polyCommon.GovernanceConfig{
+			GovernanceConfig: &GovernanceConfig{
 				VotingDelay:              big.NewInt(10),
 				VotingPeriod:             big.NewInt(10),
 				ProposalThreshold:        big.NewInt(25),
@@ -354,7 +353,7 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 				NetworkParamsAddr:        contracts.NetworkParamsContract,
 				ForkParamsAddr:           contracts.ForkParamsContract,
 			},
-			Bridge: &polyCommon.BridgeConfig{
+			Bridge: &BridgeConfig{
 				CustomSupernetManagerAddr: types.StringToAddress("0x12312451"),
 			},
 		}

@@ -16,30 +16,19 @@ type BridgeTransport interface {
 
 // subscribeToIbftTopic subscribes to ibft topic
 func (p *Polybft) subscribeToIbftTopic() error {
-	return p.consensusTopic.Subscribe(func(payload interface{}, _ peer.ID) {
+	return p.consensusTopic.Subscribe(func(obj interface{}, _ peer.ID) {
 		if !p.runtime.IsActiveValidator() {
 			return
 		}
 
-		msg, ok := payload.(*ibftProto.Message)
+		msg, ok := obj.(*ibftProto.Message)
 		if !ok {
 			p.logger.Error("consensus engine: invalid type assertion for message request")
 
 			return
 		}
 
-		for _, handler := range p.ibftMsgHandlers {
-			handler := handler
-
-			go func() {
-				select {
-				case <-p.closeCh:
-					return
-				default:
-					handler.Handle(msg)
-				}
-			}()
-		}
+		p.ibft.AddMessage(msg)
 
 		p.logger.Debug(
 			"validator message received",

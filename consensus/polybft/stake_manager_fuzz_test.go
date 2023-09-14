@@ -8,14 +8,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type epochIDValidatorsF struct {
@@ -84,7 +82,7 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 			t.Skip()
 		}
 
-		err := stakeManager.PostEpoch(&common.PostEpochRequest{
+		err := stakeManager.PostEpoch(&PostEpochRequest{
 			NewEpochID: data.EpochID,
 			ValidatorSet: validator.NewValidatorSet(
 				data.Validators,
@@ -190,7 +188,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			},
 		}
 
-		req := &common.PostBlockRequest{
+		req := &PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: data.BlockID}},
 				Receipts: []*types.Receipt{receipt},
 			},

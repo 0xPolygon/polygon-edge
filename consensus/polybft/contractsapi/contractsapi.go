@@ -1522,22 +1522,6 @@ func (i *InitializeValidatorSetFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ValidatorSet.Abi.Methods["initialize"], buf, i)
 }
 
-type SlashValidatorSetFn struct {
-	Validators []types.Address `abi:"validators"`
-}
-
-func (s *SlashValidatorSetFn) Sig() []byte {
-	return ValidatorSet.Abi.Methods["slash"].ID()
-}
-
-func (s *SlashValidatorSetFn) EncodeAbi() ([]byte, error) {
-	return ValidatorSet.Abi.Methods["slash"].Encode(s)
-}
-
-func (s *SlashValidatorSetFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(ValidatorSet.Abi.Methods["slash"], buf, s)
-}
-
 type TransferEvent struct {
 	From  types.Address `abi:"from"`
 	To    types.Address `abi:"to"`
@@ -1600,27 +1584,6 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
-}
-
-type SlashedEvent struct {
-	ExitID     *big.Int        `abi:"exitId"`
-	Validators []types.Address `abi:"validators"`
-}
-
-func (*SlashedEvent) Sig() ethgo.Hash {
-	return ValidatorSet.Abi.Events["Slashed"].ID()
-}
-
-func (*SlashedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return ValidatorSet.Abi.Events["Slashed"].Inputs.Encode(inputs)
-}
-
-func (s *SlashedEvent) ParseLog(log *ethgo.Log) (bool, error) {
-	if !ValidatorSet.Abi.Events["Slashed"].Match(log) {
-		return false, nil
-	}
-
-	return true, decodeEvent(ValidatorSet.Abi.Events["Slashed"], log, s)
 }
 
 type InitializeRewardPoolFn struct {

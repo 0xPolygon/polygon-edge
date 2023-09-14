@@ -14,7 +14,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -50,67 +50,67 @@ var (
 	params deployParams
 
 	// consensusCfg contains consensus protocol configuration parameters
-	consensusCfg common.PolyBFTConfig
+	consensusCfg polybft.PolyBFTConfig
 
 	// metadataPopulatorMap maps rootchain contract names to callback
 	// which populates appropriate field in the RootchainMetadata
-	metadataPopulatorMap = map[string]func(*common.RootchainConfig, types.Address){
-		stateSenderName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+	metadataPopulatorMap = map[string]func(*polybft.RootchainConfig, types.Address){
+		stateSenderName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.StateSenderAddress = addr
 		},
-		checkpointManagerName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		checkpointManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.CheckpointManagerAddress = addr
 		},
-		blsName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		blsName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.BLSAddress = addr
 		},
-		bn256G2Name: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		bn256G2Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.BN256G2Address = addr
 		},
-		exitHelperName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		exitHelperName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ExitHelperAddress = addr
 		},
-		rootERC20PredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC20PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC20PredicateAddress = addr
 		},
-		childERC20MintablePredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		childERC20MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC20PredicateAddress = addr
 		},
-		rootERC20Name: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC20Name: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootNativeERC20Address = addr
 		},
-		erc20TemplateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		erc20TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC20Address = addr
 		},
-		rootERC721PredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC721PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC721PredicateAddress = addr
 		},
-		childERC721MintablePredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		childERC721MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC721PredicateAddress = addr
 		},
-		erc721TemplateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		erc721TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC721Address = addr
 		},
-		rootERC1155PredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		rootERC1155PredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.RootERC1155PredicateAddress = addr
 		},
-		childERC1155MintablePredicateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		childERC1155MintablePredicateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildMintableERC1155PredicateAddress = addr
 		},
-		erc1155TemplateName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		erc1155TemplateName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.ChildERC1155Address = addr
 		},
-		customSupernetManagerName: func(rootchainConfig *common.RootchainConfig, addr types.Address) {
+		customSupernetManagerName: func(rootchainConfig *polybft.RootchainConfig, addr types.Address) {
 			rootchainConfig.CustomSupernetManagerAddress = addr
 		},
 	}
 
 	// initializersMap maps rootchain contract names to initializer function callbacks
 	initializersMap = map[string]func(command.OutputFormatter, txrelayer.TxRelayer,
-		*common.RootchainConfig, ethgo.Key) error{
+		*polybft.RootchainConfig, ethgo.Key) error{
 		customSupernetManagerName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			initParams := &contractsapi.InitializeCustomSupernetManagerFn{
 				NewStakeManager:      config.StakeManagerAddress,
@@ -127,7 +127,7 @@ var (
 		},
 		exitHelperName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			inputParams := &contractsapi.InitializeExitHelperFn{
 				NewCheckpointManager: config.CheckpointManagerAddress,
@@ -137,7 +137,7 @@ var (
 		},
 		rootERC20PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			// map root native token on rootchain only if it is non-mintable on a childchain
 			nativeTokenRootAddr := types.ZeroAddress
@@ -158,7 +158,7 @@ var (
 		},
 		childERC20MintablePredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			initParams := &contractsapi.InitializeChildMintableERC20PredicateFn{
 				NewStateSender:        config.StateSenderAddress,
@@ -172,7 +172,7 @@ var (
 		},
 		rootERC721PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			initParams := &contractsapi.InitializeRootERC721PredicateFn{
 				NewStateSender:          config.StateSenderAddress,
@@ -186,7 +186,7 @@ var (
 		},
 		childERC721MintablePredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			initParams := &contractsapi.InitializeChildMintableERC721PredicateFn{
 				NewStateSender:         config.StateSenderAddress,
@@ -200,7 +200,7 @@ var (
 		},
 		rootERC1155PredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			initParams := &contractsapi.InitializeRootERC1155PredicateFn{
 				NewStateSender:           config.StateSenderAddress,
@@ -214,7 +214,7 @@ var (
 		},
 		childERC1155MintablePredicateName: func(fmt command.OutputFormatter,
 			relayer txrelayer.TxRelayer,
-			config *common.RootchainConfig,
+			config *polybft.RootchainConfig,
 			key ethgo.Key) error {
 			initParams := &contractsapi.InitializeChildMintableERC1155PredicateFn{
 				NewStateSender:          config.StateSenderAddress,
@@ -230,7 +230,7 @@ var (
 )
 
 type deploymentResultInfo struct {
-	RootchainCfg   *common.RootchainConfig
+	RootchainCfg   *polybft.RootchainConfig
 	SupernetID     int64
 	CommandResults []command.CommandResult
 }
@@ -379,7 +379,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 	consensusCfg.SupernetID = deploymentResultInfo.SupernetID
 
 	// write updated consensus configuration
-	chainConfig.Params.Engine[common.ConsensusName] = consensusCfg
+	chainConfig.Params.Engine[polybft.ConsensusName] = consensusCfg
 
 	if err := cmdHelper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 		outputter.SetError(fmt.Errorf("failed to save chain configuration bridge data: %w", err))
@@ -423,7 +423,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		artifact *artifact.Artifact
 	}
 
-	rootchainConfig := &common.RootchainConfig{
+	rootchainConfig := &polybft.RootchainConfig{
 		JSONRPCAddr: params.jsonRPCAddress,
 		// update stake manager address in genesis in case if stake manager was deployed manually
 		StakeManagerAddress: types.StringToAddress(params.stakeManagerAddr),
@@ -616,7 +616,7 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 // populateExistingTokenAddr checks whether given token is deployed on the provided address.
 // If it is, then its address is set to the rootchain config, otherwise an error is returned
 func populateExistingTokenAddr(eth *jsonrpc.Eth, tokenAddr, tokenName string,
-	rootchainCfg *common.RootchainConfig) error {
+	rootchainCfg *polybft.RootchainConfig) error {
 	addr := types.StringToAddress(tokenAddr)
 
 	code, err := eth.GetCode(ethgo.Address(addr), ethgo.Latest)
@@ -638,7 +638,7 @@ func populateExistingTokenAddr(eth *jsonrpc.Eth, tokenAddr, tokenName string,
 
 // registerChainOnStakeManager registers child chain and its supernet manager on rootchain
 func registerChainOnStakeManager(txRelayer txrelayer.TxRelayer,
-	rootchainCfg *common.RootchainConfig, deployerKey ethgo.Key) (int64, error) {
+	rootchainCfg *polybft.RootchainConfig, deployerKey ethgo.Key) (int64, error) {
 	registerChainFn := &contractsapi.RegisterChildChainStakeManagerFn{
 		Manager: rootchainCfg.CustomSupernetManagerAddress,
 	}

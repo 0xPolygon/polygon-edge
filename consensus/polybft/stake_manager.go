@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -29,8 +28,8 @@ var (
 // StakeManager interface provides functions for handling stake change of validators
 // and updating validator set based on changed stake
 type StakeManager interface {
-	PostBlock(req *common.PostBlockRequest) error
-	PostEpoch(req *common.PostEpochRequest) error
+	PostBlock(req *PostBlockRequest) error
+	PostEpoch(req *PostEpochRequest) error
 	UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
 		currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
@@ -41,8 +40,8 @@ var _ StakeManager = (*dummyStakeManager)(nil)
 // used only for unit testing
 type dummyStakeManager struct{}
 
-func (d *dummyStakeManager) PostBlock(req *common.PostBlockRequest) error { return nil }
-func (d *dummyStakeManager) PostEpoch(req *common.PostEpochRequest) error { return nil }
+func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
+func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStakeManager) UpdateValidatorSet(epoch, maxValidatorSetSize uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
@@ -94,7 +93,7 @@ func newStakeManager(
 }
 
 // PostEpoch saves the initial validator set to db
-func (s *stakeManager) PostEpoch(req *common.PostEpochRequest) error {
+func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 	if req.NewEpochID != 1 {
 		return nil
 	}
@@ -110,7 +109,7 @@ func (s *stakeManager) PostEpoch(req *common.PostEpochRequest) error {
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any transfer event that happened in block and update full validator set in db
-func (s *stakeManager) PostBlock(req *common.PostBlockRequest) error {
+func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
 	if err != nil {
 		return err
@@ -355,7 +354,7 @@ func (sc *validatorStakeMap) removeStake(address types.Address, amount *big.Int)
 	stakeData.IsActive = stakeData.VotingPower.Cmp(bigZero) > 0
 }
 
-// getSorted returns validators ([]*ValidatorMetadata) in sorted order
+// getSorted returns validators (*ValidatorMetadata) in sorted order
 func (sc validatorStakeMap) getSorted(maxValidatorSetSize int) validator.AccountSet {
 	activeValidators := make(validator.AccountSet, 0, len(sc))
 
