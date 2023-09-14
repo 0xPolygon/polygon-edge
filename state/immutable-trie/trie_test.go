@@ -44,7 +44,7 @@ func (ts *traceStore) Get(k []byte) ([]byte, bool) {
 		v = ts.tr.trace.AccountTrie[hex.EncodeToString(k)]
 	} else {
 		v = ts.tr.trace.StorageTrie[hex.EncodeToString(k)]
-		// fmt.Printf("key: %s, value: %s\n", hex.EncodeToString(k), v)
+		fmt.Printf("-- GET FROM TRACE -- key: %s, value: %s\n", hex.EncodeToString(k), v)
 	}
 	val, _ := hex.DecodeString(v)
 
@@ -64,7 +64,7 @@ func (traceStore) Close() error                           { return nil }
 
 func LoadTrace() (*types.Trace, error) {
 	// Load Trace structure from JSON file.
-	traceFile, err := os.Open("trace_10.json")
+	traceFile, err := os.Open("71000_trace_readable.json")
 	if err != nil {
 		return nil, err
 	}
@@ -168,17 +168,20 @@ func TestTrie_Load(t *testing.T) {
 	}
 	ts = NewTraceStore(storageTracer)
 	s = NewState(ts)
-	tt, err := s.newTrieAt(acc.Root)
+	// tt, err := s.newTrieAt(acc.Root)
 	log.Println("root: ", acc.Root)
 	require.NoError(t, err)
 
 	// Load the trie from the trace.
-	txn := tt.Txn(ts)
+	// txn := tt.Txn(ts)
 
 	// txn.Insert(types.StringToBytes("0x0000000000000000000000000000000000000000000000000000000000000002"), types.StringToBytes("0x00000000000000000000000000000000000000000000000000000000000048d1"))
 
-	b := txn.Lookup(types.StringToBytes("0x2c64b4c28102eb31817db0aae9385bd83769912689d15cb6b0f59dd7eff20613"))
-	t.Logf("value: %s\n", hex.EncodeToString(b))
+	traceSnap := NewTraceStoreTxn(t, ltr, acc.Root)
+	b := traceSnap.GetStorage(addr, acc.Root, types.StringToHash("0xb7d815cabb43222c333e6792c1a90fe7f30d238ce576408088a4ff29c49efc73"))
+	// b := txn.Lookup(types.StringToBytes("0x2c64b4c28102eb31817db0aae9385bd83769912689d15cb6b0f59dd7eff20613"))
+	// t.Logf("value: %s\n", hex.EncodeToString(b))
+	t.Logf("-- VALUE --: %s\n", b.String())
 
 	// for _, txt := range ltr.TxnTraces {
 	// 	je := txt.Delta[addr]
@@ -207,7 +210,7 @@ func TestTrie_RandomOps(t *testing.T) {
 
 	oneHash := types.Hash{0x1}
 	twoHash := types.Hash{0xf}
-	// threeHash := types.Hash{0x3}
+	threeHash := types.Hash{0x3}
 
 	// radix.SetState(addr1, oneHash, twoHash)
 	// _ = radix.GetState(addr1, types.ZeroHash)
@@ -225,6 +228,7 @@ func TestTrie_RandomOps(t *testing.T) {
 
 	radix := state.NewTxn(snap)
 	radix.SetState(addr1, oneHash, twoHash)
+	radix.SetState(addr1, twoHash, threeHash)
 	objs, err := radix.Commit(false)
 	require.NoError(t, err)
 	snap, tr, _ := snap.Commit(objs)
@@ -232,6 +236,8 @@ func TestTrie_RandomOps(t *testing.T) {
 	radix = state.NewTxn(snap)
 	val1 := radix.GetState(addr1, oneHash)
 	assert.Equal(t, val1, twoHash)
+	val2 := radix.GetState(addr1, twoHash)
+	assert.Equal(t, val2, threeHash)
 
 	// Perform some operations
 	// _ = radix.GetState(addr1, oneHash)
@@ -258,30 +264,29 @@ func TestTrie_RandomOps(t *testing.T) {
 	log.Println(string(out))
 
 	acc1, _ := radix.GetAccount(addr1)
-	txn := NewTraceStoreTxn(t, tr, acc1.Root)
-	t.Log("root: ", acc1.Root)
+	traceSnap := NewTraceStoreTxn(t, tr, acc1.Root)
 
 	// Loop through the StorageRead for addr1
-	for sk := range journal[addr1].Storage {
+	for sk := range journal[addr1].StorageRead {
 		// Check if the entry is in the StorageTrie trace
-		val := txn.Lookup(sk.Bytes())
-		t.Log(hex.EncodeToString(val))
+		val := traceSnap.GetStorage(addr1, acc1.Root, sk)
+		// val := txn.Lookup(sk.Bytes())
+		t.Log("-- THE VAL --", val.String())
 		// assert.NotNil(t, val)
 	}
 }
 
-func NewTraceStoreTxn(t *testing.T, trace *types.Trace, root types.Hash) *Txn {
+func NewTraceStoreTxn(t *testing.T, trace *types.Trace, root types.Hash) state.Snapshot {
 	storageTracer := &tracer{
 		isAccountTrie: false,
 		trace:         trace,
 	}
 	ts := NewTraceStore(storageTracer)
 	s := NewState(ts)
-	tt, err := s.newTrieAt(root)
-	require.NoError(t, err)
+	return s.NewSnapshot()
 
 	// Load the trie from the trace.
-	return tt.Txn(ts)
+	// return tt.Txn(ts)
 }
 
 func Test_Transition(t *testing.T) {

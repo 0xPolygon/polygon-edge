@@ -3,6 +3,7 @@ package itrie
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -43,6 +44,7 @@ func (s *Snapshot) GetStorage(addr types.Address, root types.Hash, rawkey types.
 	if root == emptyStateHash {
 		trie = s.state.newTrie()
 	} else {
+		fmt.Println("-- NON EMPTY ROOT --", root)
 		trie, err = s.state.newTrieAt(root)
 		if err != nil {
 			return types.Hash{}
