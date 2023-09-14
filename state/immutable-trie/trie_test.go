@@ -175,7 +175,7 @@ func TestTrie_Load(t *testing.T) {
 
 	// 		// assert.Equal(t, val.Bytes(), v)
 	// 	}
-	}
+	// }
 }
 
 func TestTrie_RandomOps(t *testing.T) {
