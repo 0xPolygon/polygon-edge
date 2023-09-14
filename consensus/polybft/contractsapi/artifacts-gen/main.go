@@ -204,10 +204,6 @@ func main() {
 			"child/governance/ChildTimelock.sol",
 			"ChildTimelock",
 		},
-		{
-			"lib/GenesisProxy.sol",
-			"GenesisProxy",
-		},
 	}
 
 	str := `// This is auto-generated file. DO NOT EDIT.

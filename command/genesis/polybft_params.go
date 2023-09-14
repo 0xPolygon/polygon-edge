@@ -80,11 +80,6 @@ var (
 		"except for zero address and reward wallet if native token is used as reward token")
 )
 
-type contractInfo struct {
-	artifact *artifact.Artifact
-	address  types.Address
-}
-
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
 	// populate premine balance map
@@ -201,8 +196,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
-		BlockTimeDrift:      p.blockTimeDrift,
-		ProxyContractsAdmin: types.StringToAddress(p.proxyContractsAdmin),
+		BlockTimeDrift: p.blockTimeDrift,
 		GovernanceConfig: &polyCommon.GovernanceConfig{
 			VotingDelay:              voteDelay,
 			VotingPeriod:             votingPeriod,
@@ -381,18 +375,16 @@ func (p *genesisParams) deployContracts(
 	polybftConfig *polyCommon.PolyBFTConfig,
 	chainConfig *chain.Chain,
 	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
-	proxyToImplAddrMap := contracts.GetProxyImplementationMapping()
-	proxyAddresses := make([]types.Address, 0, len(proxyToImplAddrMap))
-
-	for proxyAddr := range proxyToImplAddrMap {
-		proxyAddresses = append(proxyAddresses, proxyAddr)
+	type contractInfo struct {
+		artifact *artifact.Artifact
+		address  types.Address
 	}
 
 	genesisContracts := []*contractInfo{
 		{
 			// State receiver contract
 			artifact: contractsapi.StateReceiver,
-			address:  contracts.StateReceiverContractV1,
+			address:  contracts.StateReceiverContract,
 		},
 		{
 			// ChildERC20 token contract
@@ -412,41 +404,41 @@ func (p *genesisParams) deployContracts(
 		{
 			// BLS contract
 			artifact: contractsapi.BLS,
-			address:  contracts.BLSContractV1,
+			address:  contracts.BLSContract,
 		},
 		{
 			// Merkle contract
 			artifact: contractsapi.Merkle,
-			address:  contracts.MerkleContractV1,
+			address:  contracts.MerkleContract,
 		},
 		{
 			// L2StateSender contract
 			artifact: contractsapi.L2StateSender,
-			address:  contracts.L2StateSenderContractV1,
+			address:  contracts.L2StateSenderContract,
 		},
 		{
 			artifact: contractsapi.ValidatorSet,
-			address:  contracts.ValidatorSetContractV1,
+			address:  contracts.ValidatorSetContract,
 		},
 		{
 			artifact: contractsapi.RewardPool,
-			address:  contracts.RewardPoolContractV1,
+			address:  contracts.RewardPoolContract,
 		},
 		{
 			artifact: contractsapi.NetworkParams,
-			address:  contracts.NetworkParamsContractV1,
+			address:  contracts.NetworkParamsContract,
 		},
 		{
 			artifact: contractsapi.ForkParams,
-			address:  contracts.ForkParamsContractV1,
+			address:  contracts.ForkParamsContract,
 		},
 		{
 			artifact: contractsapi.ChildGovernor,
-			address:  contracts.ChildGovernorContractV1,
+			address:  contracts.ChildGovernorContract,
 		},
 		{
 			artifact: contractsapi.ChildTimelock,
-			address:  contracts.ChildTimelockContractV1,
+			address:  contracts.ChildTimelockContract,
 		},
 	}
 
@@ -454,7 +446,7 @@ func (p *genesisParams) deployContracts(
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.NativeERC20,
-				address:  contracts.NativeERC20TokenContractV1,
+				address:  contracts.NativeERC20TokenContract,
 			})
 
 		// burn contract can be set only for non-mintable native token. If burn contract is set,
@@ -465,14 +457,12 @@ func (p *genesisParams) deployContracts(
 					artifact: contractsapi.EIP1559Burn,
 					address:  burnContractAddr,
 				})
-
-			proxyAddresses = append(proxyAddresses, contracts.DefaultBurnContract)
 		}
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.NativeERC20Mintable,
-				address:  contracts.NativeERC20TokenContractV1,
+				address:  contracts.NativeERC20TokenContract,
 			})
 	}
 
@@ -481,98 +471,94 @@ func (p *genesisParams) deployContracts(
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20PredicateACL,
-				address:  contracts.ChildERC20PredicateContractV1,
+				address:  contracts.ChildERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC721PredicateACL,
-				address:  contracts.ChildERC721PredicateContractV1,
+				address:  contracts.ChildERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC1155PredicateACL,
-				address:  contracts.ChildERC1155PredicateContractV1,
+				address:  contracts.ChildERC1155PredicateContract,
 			})
 
 		// childchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC20PredicateACL,
-				address:  contracts.RootMintableERC20PredicateContractV1,
+				address:  contracts.RootMintableERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC721PredicateACL,
-				address:  contracts.RootMintableERC721PredicateContractV1,
+				address:  contracts.RootMintableERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC1155PredicateACL,
-				address:  contracts.RootMintableERC1155PredicateContractV1,
+				address:  contracts.RootMintableERC1155PredicateContract,
 			})
 	} else {
 		// rootchain originated tokens predicates
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20Predicate,
-				address:  contracts.ChildERC20PredicateContractV1,
+				address:  contracts.ChildERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC721Predicate,
-				address:  contracts.ChildERC721PredicateContractV1,
+				address:  contracts.ChildERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC1155Predicate,
-				address:  contracts.ChildERC1155PredicateContractV1,
+				address:  contracts.ChildERC1155PredicateContract,
 			})
 
 		// childchain originated tokens predicates
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC20Predicate,
-				address:  contracts.RootMintableERC20PredicateContractV1,
+				address:  contracts.RootMintableERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC721Predicate,
-				address:  contracts.RootMintableERC721PredicateContractV1,
+				address:  contracts.RootMintableERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC1155Predicate,
-				address:  contracts.RootMintableERC1155PredicateContractV1,
+				address:  contracts.RootMintableERC1155PredicateContract,
 			})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
 
-	if rewardTokenByteCode != nil {
-		// if reward token is provided in genesis then, add it to allocations
-		// to RewardTokenContract address and update Polybft config
-		allocations[contracts.RewardTokenContractV1] = &chain.GenesisAccount{
-			Balance: big.NewInt(0),
-			Code:    rewardTokenByteCode,
-		}
-
-		proxyAddresses = append(proxyAddresses, contracts.RewardTokenContract)
-	}
-
-	genesisContracts = append(genesisContracts, getProxyContractsInfo(proxyAddresses)...)
-
 	for _, contract := range genesisContracts {
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
 			Code:    contract.artifact.DeployedBytecode,
+		}
+	}
+
+	if rewardTokenByteCode != nil {
+		// if reward token is provided in genesis then, add it to allocations
+		// to RewardTokenContract address and update Polybft config
+		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    rewardTokenByteCode,
 		}
 	}
 
@@ -638,17 +624,4 @@ func stringSliceToAddressSlice(addrs []string) []types.Address {
 	}
 
 	return res
-}
-
-func getProxyContractsInfo(addresses []types.Address) []*contractInfo {
-	result := make([]*contractInfo, len(addresses))
-
-	for i, proxyAddress := range addresses {
-		result[i] = &contractInfo{
-			artifact: contractsapi.GenesisProxy,
-			address:  proxyAddress,
-		}
-	}
-
-	return result
 }

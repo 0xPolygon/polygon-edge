@@ -54,7 +54,6 @@ var (
 	RootERC721                      *artifact.Artifact
 	RootERC1155                     *artifact.Artifact
 	EIP1559Burn                     *artifact.Artifact
-	GenesisProxy                    *artifact.Artifact
 
 	// Governance
 	NetworkParams *artifact.Artifact
@@ -305,11 +304,6 @@ func init() {
 	}
 
 	ChildTimelock, err = artifact.DecodeArtifact([]byte(ChildTimelockArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

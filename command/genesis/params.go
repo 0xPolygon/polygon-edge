@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -42,18 +41,17 @@ const (
 	rewardWalletFlag             = "reward-wallet"
 	checkpointIntervalFlag       = "checkpoint-interval"
 	withdrawalWaitPeriodFlag     = "withdrawal-wait-period"
-	baseFeeChangeDenomFlag       = "base-fee-change-denom"
 	voteDelayFlag                = "vote-delay"
 	votePeriodFlag               = "vote-period"
 	voteProposalThresholdFlag    = "vote-proposal-threshold"
 	governorAdminFlag            = "governor-admin"
 	proposalQuorumFlag           = "proposal-quorum"
-	proxyContractsAdminFlag      = "proxy-contracts-admin"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
-	defaultNativeTokenName       = "Polygon"
-	defaultNativeTokenSymbol     = "MATIC"
-	defaultNativeTokenDecimals   = uint8(18)
-	minNativeTokenParamsNumber   = 4
+
+	defaultNativeTokenName     = "Polygon"
+	defaultNativeTokenSymbol   = "MATIC"
+	defaultNativeTokenDecimals = uint8(18)
+	minNativeTokenParamsNumber = 4
 )
 
 // Legacy flags that need to be preserved for running clients
@@ -155,7 +153,6 @@ type genesisParams struct {
 	proposalQuorum    uint64
 	governorAdmin     string
 
-	proxyContractsAdmin      string
 	blockTrackerPollInterval time.Duration
 }
 
@@ -194,10 +191,6 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateGovernorAdminAddr(); err != nil {
-			return err
-		}
-
-		if err := p.validateProxyContractsAdmin(); err != nil {
 			return err
 		}
 
@@ -588,23 +581,6 @@ func (p *genesisParams) validateBurnContract() error {
 				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
 			}
 		}
-	}
-
-	return nil
-}
-
-func (p *genesisParams) validateProxyContractsAdmin() error {
-	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
-		return errors.New("proxy contracts admin address must be set")
-	}
-
-	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
-	if proxyContractsAdminAddr == types.ZeroAddress {
-		return errors.New("proxy contracts admin address must not be zero address")
-	}
-
-	if proxyContractsAdminAddr == contracts.SystemCaller {
-		return errors.New("proxy contracts admin address must not be system caller address")
 	}
 
 	return nil

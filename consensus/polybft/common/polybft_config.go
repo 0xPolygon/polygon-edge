@@ -64,10 +64,6 @@ type PolyBFTConfig struct {
 	// GovernanceConfig defines on chain governance configuration
 	GovernanceConfig *GovernanceConfig `json:"governanceConfig,omitempty"`
 
-	// ProxyContractsAdmin is the address that will have the privilege to change both the proxy
-	// implementation address and the admin
-	ProxyContractsAdmin types.Address `json:"proxyContractsAdmin,omitempty"`
-
 	// BlockTrackerPollInterval specifies interval
 	// at which block tracker polls for blocks on a rootchain
 	BlockTrackerPollInterval common.Duration `json:"blockTrackerPollInterval,omitempty"`

@@ -2219,21 +2219,3 @@ func (i *InitializeChildTimelockFn) EncodeAbi() ([]byte, error) {
 func (i *InitializeChildTimelockFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(ChildTimelock.Abi.Methods["initialize"], buf, i)
 }
-
-type SetUpProxyGenesisProxyFn struct {
-	Logic types.Address `abi:"logic"`
-	Admin types.Address `abi:"admin"`
-	Data  []byte        `abi:"data"`
-}
-
-func (s *SetUpProxyGenesisProxyFn) Sig() []byte {
-	return GenesisProxy.Abi.Methods["setUpProxy"].ID()
-}
-
-func (s *SetUpProxyGenesisProxyFn) EncodeAbi() ([]byte, error) {
-	return GenesisProxy.Abi.Methods["setUpProxy"].Encode(s)
-}
-
-func (s *SetUpProxyGenesisProxyFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(GenesisProxy.Abi.Methods["setUpProxy"], buf, s)
-}
