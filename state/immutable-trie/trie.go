@@ -169,9 +169,10 @@ func (t *Txn) Lookup(key []byte) []byte {
 
 func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
 	if t.tracer != nil {
-		fmt.Println("-- LOOKUP TRACE NODE --")
 		t.tracer.Trace(node)
 	}
+
+	fmt.Println("-- LOOKUP NODE KEY --", key)
 
 	switch n := node.(type) {
 	case nil:
@@ -207,6 +208,7 @@ func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
 
 		plen := len(n.key)
 		if plen > len(key) || !bytes.Equal(key[:plen], n.key) {
+			fmt.Println("-- NKEY KEY --", n.key, key)
 			return nil, nil
 		}
 

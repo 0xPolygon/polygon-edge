@@ -39,15 +39,15 @@ func NewTraceStore(tr *tracer) Storage {
 }
 
 func (ts *traceStore) Get(k []byte) ([]byte, bool) {
-	var v string
-	if ts.tr.isAccountTrie {
-		v = ts.tr.trace.AccountTrie[hex.EncodeToString(k)]
-	} else {
-		v = ts.tr.trace.StorageTrie[hex.EncodeToString(k)]
-		fmt.Printf("-- GET FROM TRACE -- key: %s, value: %s\n", hex.EncodeToString(k), v)
-	}
-	val, _ := hex.DecodeString(v)
 
+	v, ok := ts.tr.trace.AccountTrie[hex.EncodeToString(k)]
+	if !ok {
+		v = ts.tr.trace.StorageTrie[hex.EncodeToString(k)]
+	}
+
+	fmt.Printf("-- GET FROM TRACE -- key: %s, value: %s\n", hex.EncodeToString(k), v)
+
+	val, _ := hex.DecodeString(v)
 	if len(val) == 0 {
 		fmt.Printf("**** value not found for key: %s\n", hex.EncodeToString(k))
 		return nil, false
@@ -149,8 +149,7 @@ func TestTrie_Load(t *testing.T) {
 	require.NoError(t, err)
 
 	accountTracer := &tracer{
-		isAccountTrie: true,
-		trace:         ltr,
+		trace: ltr,
 	}
 	ts := NewTraceStore(accountTracer)
 	s := NewState(ts)
@@ -162,38 +161,21 @@ func TestTrie_Load(t *testing.T) {
 	require.NotNil(t, acc)
 	require.NoError(t, err)
 
-	storageTracer := &tracer{
-		isAccountTrie: false,
-		trace:         ltr,
-	}
-	ts = NewTraceStore(storageTracer)
-	s = NewState(ts)
-	// tt, err := s.newTrieAt(acc.Root)
-	log.Println("root: ", acc.Root)
-	require.NoError(t, err)
-
-	// Load the trie from the trace.
-	// txn := tt.Txn(ts)
-
-	// txn.Insert(types.StringToBytes("0x0000000000000000000000000000000000000000000000000000000000000002"), types.StringToBytes("0x00000000000000000000000000000000000000000000000000000000000048d1"))
-
-	traceSnap := NewTraceStoreTxn(t, ltr, acc.Root)
-	b := traceSnap.GetStorage(addr, acc.Root, types.StringToHash("0xb7d815cabb43222c333e6792c1a90fe7f30d238ce576408088a4ff29c49efc73"))
-	// b := txn.Lookup(types.StringToBytes("0x2c64b4c28102eb31817db0aae9385bd83769912689d15cb6b0f59dd7eff20613"))
-	// t.Logf("value: %s\n", hex.EncodeToString(b))
-	t.Logf("-- VALUE --: %s\n", b.String())
+	// b := sn.GetStorage(addr, acc.Root, types.StringToHash("0xb7d815cabb43222c333e6792c1a90fe7f30d238ce576408088a4ff29c49efc73"))
+	// t.Logf("-- VALUE --: %s\n", b.String())
 
 	// for _, txt := range ltr.TxnTraces {
 	// 	je := txt.Delta[addr]
-	// 	for slot, _ := range je.StorageRead {
-	// 		v := txn.Lookup(slot.Bytes())
-	// 		if v == nil {
-	// 			t.Logf("slot %s not found", slot)
-	// 		}
+	// 	if je == nil {
+	// 		continue
+	// 	}
+	// 	for slot := range je.StorageRead {
+	// 		b := sn.GetStorage(addr, acc.Root, slot)
+	// 		t.Logf("-- VALUE --: %s\n", b.String())
 
 	// 		// assert.Equal(t, val.Bytes(), v)
 	// 	}
-	// }
+	}
 }
 
 func TestTrie_RandomOps(t *testing.T) {
