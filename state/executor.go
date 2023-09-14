@@ -429,16 +429,6 @@ func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash, error) {
 
 	s2, snapTrace, root := t.snap.Commit(objs)
 
-	// txnTrace := &types.TxnTrace{
-	// 	// Transaction: txn.MarshalRLP(),
-	// 	Delta: t.Txn().getCompactJournal(),
-	// 	// Hash:        txn.Hash,
-	// 	// This is not possible to do it here because of dependency cycle
-	// 	// ReceiptRoot: buildroot.CalculateReceiptsRoot(t.receipts),
-	// 	// TxnRoot:     buildroot.CalculateTransactionsRoot(transactions, blockNumber),
-	// }
-
-	// t.trace.TxnTraces = append(t.trace.TxnTraces, txnTrace)
 	t.trace.AccountTrie = snapTrace.AccountTrie
 	t.trace.StorageTrie = snapTrace.StorageTrie
 

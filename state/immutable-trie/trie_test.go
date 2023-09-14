@@ -200,57 +200,54 @@ func TestTrie_RandomOps(t *testing.T) {
 	s := NewState(NewMemoryStorage())
 	snap := s.NewSnapshot()
 
-	radix := state.NewTxn(snap)
-	// transition := state.NewTransition(chain.AllForksEnabled.At(0), snap, radix)
-
 	// Check if the generated trace includes all nodes
-	// txn := newTestTxn(defaultPreState)
-	radix.SetBalance(addr1, big.NewInt(1))
-
-	radix.SetNonce(addr1, 1)
-	radix.SetNonce(addr1, 2) // updates
+	// radix.SetBalance(addr1, big.NewInt(1))
+	// radix.SetNonce(addr1, 1)
+	// radix.SetNonce(addr1, 2) // updates
 
 	oneHash := types.Hash{0x1}
-	twoHash := types.Hash{0x2}
-	threeHash := types.Hash{0x3}
+	twoHash := types.Hash{0xf}
+	// threeHash := types.Hash{0x3}
 
-	radix.SetState(addr1, types.ZeroHash, types.ZeroHash)
-	_ = radix.GetState(addr1, types.ZeroHash)
-	radix.SetState(addr1, types.ZeroHash, oneHash) // updates
-	_ = radix.GetState(addr1, types.ZeroHash)
+	// radix.SetState(addr1, oneHash, twoHash)
+	// _ = radix.GetState(addr1, types.ZeroHash)
+	// radix.SetState(addr1, types.ZeroHash, oneHash) // updates
+	// _ = radix.GetState(addr1, types.ZeroHash)
 
-	_ = radix.GetState(addr1, twoHash)
-	_ = radix.GetState(addr1, threeHash)
+	// _ = radix.GetState(addr1, twoHash)
+	// _ = radix.GetState(addr1, threeHash)
 
-	radix.SetState(addr1, oneHash, oneHash)
+	// radix.SetState(addr1, oneHash, oneHash)
 
-	_ = radix.GetCode(addr1)
+	// _ = radix.GetCode(addr1)
 
-	radix.TouchAccount(addr1)
+	// radix.TouchAccount(addr1)
 
+	radix := state.NewTxn(snap)
+	radix.SetState(addr1, oneHash, twoHash)
 	objs, err := radix.Commit(false)
 	require.NoError(t, err)
-
 	snap, tr, _ := snap.Commit(objs)
 
 	radix = state.NewTxn(snap)
-	val1 := radix.GetState(addr1, types.ZeroHash)
-	assert.Equal(t, val1, oneHash)
+	val1 := radix.GetState(addr1, oneHash)
+	assert.Equal(t, val1, twoHash)
 
 	// Perform some operations
-	_ = radix.GetState(addr1, oneHash)
-	radix.SetBalance(addr1, big.NewInt(2)) // updates
+	// _ = radix.GetState(addr1, oneHash)
+	// radix.SetBalance(addr1, big.NewInt(2)) // updates
 
-	_ = radix.GetState(addr1, twoHash)
-	_ = radix.GetState(addr1, threeHash)
+	// _ = radix.GetState(addr1, twoHash)
+	// _ = radix.GetState(addr1, threeHash)
+
+	// radix.SetState(addr1, oneHash, twoHash)
 
 	objs, err = radix.Commit(false)
 	require.NoError(t, err)
 
+	// Get the trace and add the journal for this transaction
 	_, tr, _ = snap.Commit(objs)
-	// Get the journal at this point
 	journal := radix.GetCompactJournal()
-
 	tr.TxnTraces = []*types.TxnTrace{
 		{
 			Delta: journal,
@@ -262,9 +259,10 @@ func TestTrie_RandomOps(t *testing.T) {
 
 	acc1, _ := radix.GetAccount(addr1)
 	txn := NewTraceStoreTxn(t, tr, acc1.Root)
+	t.Log("root: ", acc1.Root)
 
 	// Loop through the StorageRead for addr1
-	for sk := range journal[addr1].StorageRead {
+	for sk := range journal[addr1].Storage {
 		// Check if the entry is in the StorageTrie trace
 		val := txn.Lookup(sk.Bytes())
 		t.Log(hex.EncodeToString(val))
@@ -294,7 +292,7 @@ func Test_Transition(t *testing.T) {
 	transition := newTestTransition(t, alloc, false)
 	code := contractsapi.TestSimple.Bytecode
 	// deploy contracts
-	contractAddr := transitionDeployContract(t, transition, code, senderAddr)
+	contractAddr := transitionDeployContract(t, transition, []byte(code), senderAddr)
 	snap, tr, _, err := transition.Commit()
 	require.NoError(t, err)
 	log.Println(tr)
