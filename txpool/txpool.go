@@ -837,11 +837,14 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if slotsRequired(tx) > slotsFree {
 		return ErrTxPoolOverflow
 	}
+
 	slotsAllocated := slotsRequired(tx)
+
 	var slotsFreed uint64
 	if oldTxWithSameNonce != nil {
 		slotsFreed = slotsRequired(oldTxWithSameNonce)
 	}
+
 	var slotsIncreased uint64
 	if slotsAllocated > slotsFreed {
 		slotsIncreased = slotsAllocated - slotsFreed
