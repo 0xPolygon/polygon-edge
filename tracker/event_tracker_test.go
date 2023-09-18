@@ -51,8 +51,9 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 	server := testutil.DeployTestServer(t, nil)
 
 	tmpDir, err := os.MkdirTemp("/tmp", "test-event-tracker")
-	defer os.RemoveAll(tmpDir)
 	require.NoError(t, err)
+
+	defer os.RemoveAll(tmpDir)
 
 	cc := &testutil.Contract{}
 	cc.AddCallback(func() string {

@@ -76,10 +76,11 @@ func (e *EventTracker) Start(ctx context.Context) error {
 
 	jsonBlockTracker := blocktracker.NewJSONBlockTracker(provider.Eth())
 	jsonBlockTracker.PollInterval = e.pollInterval
-	blockTracker := blocktracker.NewBlockTracker(
+	blockTracker := NewBlockTracker(
 		provider.Eth(),
-		blocktracker.WithBlockMaxBacklog(blockMaxBacklog),
-		blocktracker.WithTracker(jsonBlockTracker),
+		e.logger.Named("blocktracker"),
+		WithBlockMaxBacklog(blockMaxBacklog),
+		WithTracker(jsonBlockTracker),
 	)
 
 	go func() {
