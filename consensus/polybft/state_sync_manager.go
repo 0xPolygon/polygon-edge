@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 )
@@ -125,7 +126,7 @@ func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 
 // Init subscribes to bridge topics (getting votes) and start the event tracker routine
 func (s *stateSyncManager) Init() error {
-	if err := s.initTracker(); err != nil {
+	if err := s.setupNewTracker(); err != nil {
 		return fmt.Errorf("failed to init event tracker. Error: %w", err)
 	}
 
@@ -138,6 +139,42 @@ func (s *stateSyncManager) Init() error {
 
 func (s *stateSyncManager) Close() {
 	close(s.closeCh)
+}
+
+// setupNewTracker sets up and starts the new tracker implementation
+func (s *stateSyncManager) setupNewTracker() error {
+	store, err := NewPolybftEventTrackerStore(path.Join(s.config.dataDir, "/deposit.db"))
+	if err != nil {
+		return err
+	}
+
+	clt, err := jsonrpc.NewClient(s.config.jsonrpcAddr)
+	if err != nil {
+		return err
+	}
+
+	var stateSyncEvent contractsapi.StateSyncedEvent
+
+	tracker, err := NewPolybftEventTracker(&PolybftTrackerConfig{
+		RpcEndpoint:           s.config.jsonrpcAddr,
+		StartBlockFromConfig:  s.config.stateSenderStartBlock,
+		NumBlockConfirmations: s.config.numBlockConfirmations,
+		SyncBatchSize:         5,      // this should be configurable
+		MaxBacklogSize:        10_000, // this should be configurable
+		PollInterval:          s.config.blockTrackerPollInterval,
+		Logger:                s.logger,
+		Store:                 store,
+		EventSubscriber:       s,
+		BlockProvider:         clt.Eth(),
+		LogFilter: map[ethgo.Address][]ethgo.Hash{
+			ethgo.Address(s.config.stateSenderAddr): {stateSyncEvent.Sig()},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return tracker.Start()
 }
 
 // initTracker starts a new event tracker (to receive new state sync events)
