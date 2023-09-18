@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"path"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -93,22 +94,32 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
 	const (
 		clusterSize = 5
-		bulkToDrop  = 3
+		bulkToDrop  = 4
 		epochSize   = 5
 	)
 
 	cluster := framework.NewTestCluster(t, clusterSize,
-		framework.WithEpochSize(epochSize))
+		framework.WithEpochSize(epochSize),
+		framework.WithBlockTime(time.Second))
 	defer cluster.Stop()
 
 	// wait for cluster to start
 	cluster.WaitForReady(t)
 
+	var wg sync.WaitGroup
 	// drop bulk of nodes from cluster
 	for i := 0; i < bulkToDrop; i++ {
 		node := cluster.Servers[i]
-		node.Stop()
+
+		wg.Add(1)
+
+		go func(node *framework.TestServer) {
+			defer wg.Done()
+			node.Stop()
+		}(node)
 	}
+
+	wg.Wait()
 
 	// start dropped nodes again
 	for i := 0; i < bulkToDrop; i++ {
