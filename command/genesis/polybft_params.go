@@ -45,7 +45,6 @@ const (
 	defaultBlockTimeDrift           = uint64(10)
 	defaultBlockTrackerPollInterval = time.Second
 
-	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
 	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
@@ -299,11 +298,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if p.accessListsOwner != "" {
-		value := types.StringToAddress(p.accessListsOwner)
-		chainConfig.Params.AccessListsOwner = &value
-	}
-
 	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
@@ -394,7 +388,7 @@ func (p *genesisParams) deployContracts(
 			})
 	}
 
-	if len(p.bridgeAllowListAdmin) != 0 || len(p.bridgeBlockListAdmin) != 0 || p.accessListsOwner != "" {
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		// rootchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{

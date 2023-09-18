@@ -329,13 +329,6 @@ func setFlags(cmd *cobra.Command) {
 			[]string{},
 			"list of addresses to enable by default in the bridge block list",
 		)
-
-		cmd.Flags().StringVar(
-			&params.accessListsOwner,
-			accessListsOwnerFlag,
-			"",
-			"owner for all allow and block lists",
-		)
 	}
 }
 

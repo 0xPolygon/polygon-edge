@@ -246,19 +246,11 @@ func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Add
 	out := cluster.Call(t, contract, addresslist.ReadAddressListFunc, addr)
 
 	num, ok := out["0"].(*big.Int)
+	if !ok {
+		t.Fatal("unexpected")
+	}
 
-	require.True(t, ok)
 	require.Equal(t, role.Uint64(), num.Uint64())
-}
-
-func expectIsEnabled(t *testing.T, cluster *framework.TestCluster, contract types.Address, value bool) {
-	t.Helper()
-	out := cluster.Call(t, contract, addresslist.GetListEnabledFunc)
-
-	num, ok := out["0"].(bool)
-
-	require.True(t, ok)
-	require.Equal(t, value, num)
 }
 
 // getFilteredLogs retrieves Ethereum logs, described by event signature within the block range
