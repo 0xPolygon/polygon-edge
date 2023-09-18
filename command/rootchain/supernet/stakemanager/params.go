@@ -1,15 +1,14 @@
 package stakemanager
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
 	"github.com/0xPolygon/polygon-edge/command/helper"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	sidechainHelper "github.com/0xPolygon/polygon-edge/command/sidechain"
+	"github.com/0xPolygon/polygon-edge/types"
 )
-
-var errMandatoryStakeToken = errors.New("stake token address is mandatory")
 
 type stakeManagerDeployParams struct {
 	accountDir          string
@@ -31,7 +30,11 @@ func (s *stakeManagerDeployParams) validateFlags() error {
 
 		// stake token address is mandatory
 		if s.stakeTokenAddress == "" {
-			return errMandatoryStakeToken
+			return rootHelper.ErrMandatoryStakeToken
+		}
+
+		if err := types.IsValidAddress(s.stakeTokenAddress); err != nil {
+			return fmt.Errorf("invalid stake token address is provided: %w", err)
 		}
 	}
 
