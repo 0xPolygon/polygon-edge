@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/blocktracker"
 	"github.com/umbracle/ethgo/testutil"
 )
@@ -34,16 +35,16 @@ func TestBlockTracker_Events(t *testing.T) {
 			Name: "Empty history",
 			Reconcile: []Reconcile{
 				{
-					block: testutil.Mock(0x1),
+					block: testutil.Mock(0x0),
 					event: &TestEvent{
 						Added: testutil.MockList{
-							testutil.Mock(0x1),
+							testutil.Mock(0x0),
 						},
 					},
 				},
 			},
 			Expected: []*testutil.MockBlock{
-				testutil.Mock(1),
+				testutil.Mock(0),
 			},
 		},
 		{
@@ -230,9 +231,23 @@ func TestBlockTracker_Events(t *testing.T) {
 					t.Fatal("block event timeout")
 				}
 
+				toBlocks := func(bls testutil.MockList) []*ethgo.Block {
+					if bls == nil {
+						return nil
+					}
+
+					e := []*ethgo.Block{}
+
+					for _, i := range bls {
+						e = append(e, i.Block())
+					}
+
+					return e
+				}
+
 				// check blocks
-				require.True(t, testutil.CompareBlocks(b.event.Added.ToBlocks(), blockEvnt.Added))
-				require.True(t, testutil.CompareBlocks(b.event.Removed.ToBlocks(), blockEvnt.Removed))
+				require.Equal(t, toBlocks(b.event.Added), blockEvnt.Added)
+				require.Equal(t, toBlocks(b.event.Removed), blockEvnt.Removed)
 			}
 
 			require.True(t, testutil.CompareBlocks(tt.blocks, c.Expected.ToBlocks()))

@@ -187,7 +187,7 @@ func (t *BlockTracker) handleReconcileImpl(block *ethgo.Block) ([]*ethgo.Block, 
 		err   error
 	)
 
-	for ; count < t.config.MaxBlockBacklog && block.Number > 1; count++ {
+	for ; count < t.config.MaxBlockBacklog && block.Number > 0; count++ {
 		parentHash := block.ParentHash
 
 		// if there is a parent at some index, break loop and update from where should we delete
