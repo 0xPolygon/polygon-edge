@@ -84,6 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
+	BlockTime            time.Duration
 	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
@@ -248,6 +249,12 @@ func WithEpochSize(epochSize int) ClusterOption {
 func WithEpochReward(epochReward int) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.EpochReward = epochReward
+	}
+}
+
+func WithBlockTime(blockTime time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BlockTime = blockTime
 	}
 }
 
@@ -465,6 +472,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+		}
+
+		if cluster.Config.BlockTime != 0 {
+			args = append(args, "--block-time",
+				cluster.Config.BlockTime.String())
 		}
 
 		if cluster.Config.RelayerTrackerPollInterval != 0 {
