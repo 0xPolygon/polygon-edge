@@ -141,7 +141,7 @@ func (t *BlockTracker) Start() error {
 func (t *BlockTracker) AddBlockLocked(block *ethgo.Block) error {
 	if uint64(len(t.blocks)) == t.config.MaxBlockBacklog {
 		// remove past blocks if there are more than maxReconcileBlocks
-		t.blocks = t.blocks[1:]
+		t.blocks = append([]*ethgo.Block{}, t.blocks[1:]...)
 	}
 
 	if len(t.blocks) != 0 {
@@ -176,8 +176,10 @@ func (t *BlockTracker) handleReconcileImpl(block *ethgo.Block) ([]*ethgo.Block, 
 		return nil, indx + 1, nil
 	}
 
-	// Backfill. We dont know the parent of the block.
-	// Need to query the chain until we find a known block
+	// Try to find parent of a block from the existing state blocks
+	// If there is no parent, then query the chain.
+	// If there is no parent for MaxBlockBacklog blocks, all the existing state blocks will be removed
+	// and replaced with retrieved blocks
 	var (
 		added        = []*ethgo.Block{block}
 		count uint64 = 0
@@ -246,10 +248,7 @@ func (t *BlockTracker) HandleBlockEvent(block *ethgo.Block) (*bt.BlockEvent, err
 	// include the new blocks
 	for _, block := range blocks {
 		blockEvnt.Added = append(blockEvnt.Added, block)
-
-		if err := t.AddBlockLocked(block); err != nil {
-			return nil, err
-		}
+		t.blocks = append(t.blocks, block)
 	}
 
 	return blockEvnt, nil
