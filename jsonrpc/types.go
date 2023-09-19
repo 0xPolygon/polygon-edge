@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -271,9 +272,9 @@ func (u argUint64) MarshalText() ([]byte, error) {
 }
 
 func (u *argUint64) UnmarshalText(input []byte) error {
-	str := strings.TrimPrefix(string(input), "0x")
-	num, err := strconv.ParseUint(str, 16, 64)
+	str := strings.Trim(string(input), "\"")
 
+	num, err := common.ParseUint64orHex(&str)
 	if err != nil {
 		return err
 	}
@@ -281,6 +282,10 @@ func (u *argUint64) UnmarshalText(input []byte) error {
 	*u = argUint64(num)
 
 	return nil
+}
+
+func (u *argUint64) UnmarshalJSON(buffer []byte) error {
+	return u.UnmarshalText(buffer)
 }
 
 type argBytes []byte
