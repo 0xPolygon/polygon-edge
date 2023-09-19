@@ -159,7 +159,7 @@ func IsValidAddress(address string) error {
 
 	// check if the address has the correct length
 	if len(decodedAddress) != AddressLength {
-		return fmt.Errorf("address %s has invalid length", address)
+		return fmt.Errorf("address %s has invalid length", string(decodedAddress))
 	}
 
 	return nil
