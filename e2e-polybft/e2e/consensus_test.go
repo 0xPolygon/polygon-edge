@@ -549,6 +549,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 			&ethgo.Transaction{
 				To:    &nativeTokenAddr,
 				Input: mintInput,
+				Type:  ethgo.TransactionDynamicFee,
 			}, minter)
 		require.NoError(t, err)
 		require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
@@ -576,6 +577,7 @@ func TestE2E_Consensus_MintableERC20NativeToken(t *testing.T) {
 		&ethgo.Transaction{
 			To:    &nativeTokenAddr,
 			Input: mintInput,
+			Type:  ethgo.TransactionDynamicFee,
 		}, nonMinterAcc.Ecdsa)
 	require.Error(t, err)
 	require.Nil(t, receipt)
