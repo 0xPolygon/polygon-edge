@@ -10,38 +10,6 @@ import (
 	"github.com/umbracle/ethgo/testutil"
 )
 
-func TestBlockTracker_PopulateBlocks(t *testing.T) {
-	t.Parallel()
-
-	// more than maxBackLog blocks
-	{
-		l := testutil.MockList{}
-		l.Create(0, 15, func(b *testutil.MockBlock) {})
-
-		m := &testutil.MockClient{}
-		m.AddScenario(l)
-
-		tt0 := NewBlockTracker(m, hclog.NewNullLogger())
-
-		require.NoError(t, tt0.Init())
-		require.True(t, testutil.CompareBlocks(l.ToBlocks()[5:], tt0.blocks))
-	}
-	// less than maxBackLog
-	{
-		l0 := testutil.MockList{}
-		l0.Create(0, 5, func(b *testutil.MockBlock) {})
-
-		m1 := &testutil.MockClient{}
-		m1.AddScenario(l0)
-
-		tt1 := NewBlockTracker(m1, hclog.NewNullLogger())
-		tt1.provider = m1
-
-		require.NoError(t, tt1.Init())
-		require.True(t, testutil.CompareBlocks(l0.ToBlocks(), tt1.blocks))
-	}
-}
-
 func TestBlockTracker_Events(t *testing.T) {
 	t.Parallel()
 

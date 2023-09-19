@@ -24,7 +24,6 @@ type BlockTracker struct {
 	blockChsLock sync.Mutex
 	provider     bt.BlockProvider
 	closeCh      chan struct{}
-	once         sync.Once
 	logger       hclog.Logger
 }
 
@@ -65,8 +64,8 @@ func NewBlockTracker(provider bt.BlockProvider, logger hclog.Logger, opts ...Con
 	}
 
 	return &BlockTracker{
-		blocks:       []*ethgo.Block{},
-		blockChs:     []chan *bt.BlockEvent{},
+		blocks:       nil,
+		blockChs:     nil,
 		config:       config,
 		subscriber:   tracker,
 		provider:     provider,
@@ -74,7 +73,6 @@ func NewBlockTracker(provider bt.BlockProvider, logger hclog.Logger, opts ...Con
 		logger:       logger,
 		blocksLock:   sync.Mutex{},
 		blockChsLock: sync.Mutex{},
-		once:         sync.Once{},
 	}
 }
 
@@ -93,50 +91,7 @@ func (t *BlockTracker) AcquireLock() bt.Lock {
 }
 
 func (t *BlockTracker) Init() error {
-	var (
-		block *ethgo.Block
-		err   error
-		i     uint64
-	)
-
-	t.once.Do(func() {
-		block, err = t.provider.GetBlockByNumber(ethgo.Latest, false)
-		if err != nil {
-			return
-		}
-
-		if block.Number == 0 {
-			return
-		}
-
-		blocks := make([]*ethgo.Block, t.config.MaxBlockBacklog)
-
-		for i = 0; i < t.config.MaxBlockBacklog; i++ {
-			blocks[t.config.MaxBlockBacklog-i-1] = block
-			if block.Number == 0 {
-				break
-			}
-
-			block, err = t.provider.GetBlockByHash(block.ParentHash, false)
-			if err != nil {
-				return
-			} else if block == nil {
-				// if block does not exist (for example reorg happened) GetBlockByHash will return nil, nil
-				err = fmt.Errorf("block with hash %s not found", block.ParentHash)
-
-				return
-			}
-		}
-
-		if i != t.config.MaxBlockBacklog {
-			// less than maxBacklog elements
-			blocks = blocks[t.config.MaxBlockBacklog-i-1:]
-		}
-
-		t.blocks = blocks
-	})
-
-	return err
+	return nil
 }
 
 func (t *BlockTracker) MaxBlockBacklog() uint64 {
@@ -144,12 +99,11 @@ func (t *BlockTracker) MaxBlockBacklog() uint64 {
 }
 
 func (t *BlockTracker) LastBlocked() *ethgo.Block {
-	target := t.blocks[len(t.blocks)-1]
-	if target == nil {
+	if len(t.blocks) == 0 {
 		return nil
 	}
 
-	return target.Copy()
+	return t.blocks[len(t.blocks)-1].Copy()
 }
 
 func (t *BlockTracker) BlocksBlocked() []*ethgo.Block {
@@ -212,13 +166,8 @@ func (t *BlockTracker) blockAtIndex(hash ethgo.Hash) int {
 }
 
 func (t *BlockTracker) handleReconcileImpl(block *ethgo.Block) ([]*ethgo.Block, int, error) {
-	// The state is empty
-	if len(t.blocks) == 0 {
-		return []*ethgo.Block{block}, -1, nil
-	}
-
 	// Append to the head of the chain
-	if t.blocks[len(t.blocks)-1].Hash == block.ParentHash {
+	if len(t.blocks) > 0 && t.blocks[len(t.blocks)-1].Hash == block.ParentHash {
 		return []*ethgo.Block{block}, -1, nil
 	}
 
@@ -227,38 +176,34 @@ func (t *BlockTracker) handleReconcileImpl(block *ethgo.Block) ([]*ethgo.Block, 
 		return nil, indx + 1, nil
 	}
 
-	// Fork in the middle of the chain
-	if indx := t.blockAtIndex(block.ParentHash); indx != -1 {
-		return []*ethgo.Block{block}, indx + 1, nil
-	}
-
 	// Backfill. We dont know the parent of the block.
 	// Need to query the chain until we find a known block
 	var (
 		added        = []*ethgo.Block{block}
 		count uint64 = 0
-		indx  int
+		indx         = 0 // if indx stays 0 - it means remove all from the current state
 		err   error
 	)
 
-	for ; count < t.config.MaxBlockBacklog; count++ {
-		hash := block.ParentHash
+	for ; count < t.config.MaxBlockBacklog && block.Number > 1; count++ {
+		parentHash := block.ParentHash
 
-		block, err = t.provider.GetBlockByHash(hash, false)
-		if err != nil {
-			return nil, -1, fmt.Errorf("parent with hash retrieving error: %w", err)
-		} else if block == nil {
-			// if block does not exist (for example reorg happened) GetBlockByHash will return nil, nil
-			return nil, -1, fmt.Errorf("parent with hash %s not found", hash)
-		}
-
-		added = append(added, block)
-
-		if indx = t.blockAtIndex(block.ParentHash); indx != -1 {
+		// if there is a parent at some index, break loop and update from where should we delete
+		if indx = t.blockAtIndex(parentHash); indx != -1 {
 			indx++
 
 			break
 		}
+
+		block, err = t.provider.GetBlockByHash(parentHash, false)
+		if err != nil {
+			return nil, -1, fmt.Errorf("parent with hash retrieving error: %w", err)
+		} else if block == nil {
+			// if block does not exist (for example reorg happened) GetBlockByHash will return nil, nil
+			return nil, -1, fmt.Errorf("parent with hash %s not found", parentHash)
+		}
+
+		added = append(added, block)
 	}
 
 	// need the blocks in reverse order
@@ -268,8 +213,6 @@ func (t *BlockTracker) handleReconcileImpl(block *ethgo.Block) ([]*ethgo.Block, 
 	}
 
 	if count == t.config.MaxBlockBacklog {
-		indx = 0 // remove all from the current state
-
 		t.logger.Info("reconcile did not found parent for new blocks", "hash", added[0].Hash)
 	}
 
@@ -292,7 +235,7 @@ func (t *BlockTracker) HandleBlockEvent(block *ethgo.Block) (*bt.BlockEvent, err
 	blockEvnt := &bt.BlockEvent{}
 
 	// there are some blocks to remove
-	if indx >= 0 {
+	if indx >= 0 && indx < len(t.blocks) {
 		for i := indx; i < len(t.blocks); i++ {
 			blockEvnt.Removed = append(blockEvnt.Removed, t.blocks[i])
 		}
