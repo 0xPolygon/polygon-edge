@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/server/proto"
@@ -39,7 +38,6 @@ type TestServerConfig struct {
 	Relayer                    bool
 	NumBlockConfirmations      uint64
 	BridgeJSONRPC              string
-	Byzantine                  bool
 	RelayerTrackerPollInterval time.Duration
 }
 
@@ -103,10 +101,6 @@ func (t *TestServer) TxnPoolOperator() txpoolProto.TxnPoolOperatorClient {
 	}
 
 	return txpoolProto.NewTxnPoolOperatorClient(conn)
-}
-
-func (t *TestServer) IsByzantine() bool {
-	return t.config.Byzantine
 }
 
 func NewTestServer(t *testing.T, clusterConfig *TestClusterConfig,
@@ -194,15 +188,8 @@ func (t *TestServer) Start() {
 
 	// Start the server
 	stdout := t.clusterConfig.GetStdout(t.config.Name)
-	binary := t.clusterConfig.Binary
 
-	if config.Byzantine && t.clusterConfig.ByzantineBinary == "" {
-		t.t.Fatal("no byzantine binary")
-	} else if config.Byzantine {
-		binary = t.clusterConfig.ByzantineBinary
-	}
-
-	node, err := newNode(binary, args, stdout)
+	node, err := newNode(t.clusterConfig.Binary, args, stdout)
 	if err != nil {
 		t.t.Fatal(err)
 	}
@@ -255,7 +242,7 @@ func (t *TestServer) RootchainFundFor(accounts []types.Address, amounts []*big.I
 }
 
 // Stake stakes given amount to validator account encapsulated by given server instance
-func (t *TestServer) Stake(polybftConfig common.PolyBFTConfig, amount *big.Int) error {
+func (t *TestServer) Stake(polybftConfig polybft.PolyBFTConfig, amount *big.Int) error {
 	args := []string{
 		"polybft",
 		"stake",

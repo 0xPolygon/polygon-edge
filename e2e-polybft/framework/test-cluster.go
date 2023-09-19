@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/command/genesis"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -52,9 +52,8 @@ const (
 )
 
 var (
-	startTime              int64
-	testRewardWalletAddr   = types.StringToAddress("0xFFFFFFFF")
-	ProxyContractAdminAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+	startTime            int64
+	testRewardWalletAddr = types.StringToAddress("0xFFFFFFFF")
 )
 
 func init() {
@@ -70,42 +69,30 @@ func resolveBinary() string {
 	return "polygon-edge"
 }
 
-func resolveByzantineBinary() string {
-	bin := os.Getenv("BYZANTINE_BINARY")
-	if bin != "" {
-		return bin
-	}
-	// fallback
-	return "polygon-edge-byzantine"
-}
-
 type TestClusterConfig struct {
 	t *testing.T
 
-	Name                     string
-	Premine                  []string // address[:amount]
-	PremineValidators        []string // address[:amount]
-	StakeAmounts             []*big.Int
-	WithoutBridge            bool
-	BootnodeCount            int
-	NonValidatorCount        int
-	WithLogs                 bool
-	WithStdout               bool
-	LogsDir                  string
-	TmpDir                   string
-	BlockGasLimit            uint64
-	BurnContract             *polyCommon.BurnContractInfo
-	ValidatorPrefix          string
-	Binary                   string
-	ValidatorSetSize         uint64
-	ByzantineBinary          string
-	ByzantineValidatorsCount uint64
-	EpochSize                int
-	EpochReward              int
-	NativeTokenConfigRaw     string
-	SecretsCallback          func([]types.Address, *TestClusterConfig)
+	Name                 string
+	Premine              []string // address[:amount]
+	PremineValidators    []string // address[:amount]
+	StakeAmounts         []*big.Int
+	WithoutBridge        bool
+	BootnodeCount        int
+	NonValidatorCount    int
+	WithLogs             bool
+	WithStdout           bool
+	LogsDir              string
+	TmpDir               string
+	BlockGasLimit        uint64
+	BurnContract         *polybft.BurnContractInfo
+	ValidatorPrefix      string
+	Binary               string
+	ValidatorSetSize     uint64
+	EpochSize            int
+	EpochReward          int
+	NativeTokenConfigRaw string
+	SecretsCallback      func([]types.Address, *TestClusterConfig)
 
-	AccessListsOwner                 *types.Address
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
 	ContractDeployerBlockListAdmin   []types.Address
@@ -127,10 +114,6 @@ type TestClusterConfig struct {
 	IsPropertyTest  bool
 	TestRewardToken string
 
-	VotingPeriod uint64
-	VotingDelay  uint64
-
-	ProxyContractsAdmin        string
 	RootTrackerPollInterval    time.Duration
 	RelayerTrackerPollInterval time.Duration
 
@@ -196,21 +179,11 @@ func (c *TestClusterConfig) initLogsDir() {
 	c.LogsDir = logsDir
 }
 
-func (c *TestClusterConfig) GetProxyContractsAdmin() string {
-	proxyAdminAddr := c.ProxyContractsAdmin
-	if proxyAdminAddr == "" {
-		proxyAdminAddr = ProxyContractAdminAddr
-	}
-
-	return proxyAdminAddr
-}
-
 type TestCluster struct {
-	Config                   *TestClusterConfig
-	Servers                  []*TestServer
-	Bridge                   *TestBridge
-	initialPort              int64
-	ByzantineValidatorsIndex []int
+	Config      *TestClusterConfig
+	Servers     []*TestServer
+	Bridge      *TestBridge
+	initialPort int64
 
 	once         sync.Once
 	failCh       chan struct{}
@@ -284,7 +257,7 @@ func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	}
 }
 
-func WithBurnContract(burnContract *polyCommon.BurnContractInfo) ClusterOption {
+func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BurnContract = burnContract
 	}
@@ -293,12 +266,6 @@ func WithBurnContract(burnContract *polyCommon.BurnContractInfo) ClusterOption {
 func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.NumBlockConfirmations = numBlockConfirmations
-	}
-}
-
-func WithAccessListsOwner(addr types.Address) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.AccessListsOwner = &addr
 	}
 }
 
@@ -392,30 +359,6 @@ func WithTestRewardToken() ClusterOption {
 	}
 }
 
-func WithByzantineValidators(num int) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.ByzantineValidatorsCount = uint64(num)
-	}
-}
-
-func WithGovernanceVotingPeriod(votingPeriod uint64) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.VotingPeriod = votingPeriod
-	}
-}
-
-func WithGovernanceVotingDelay(votingDelay uint64) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.VotingDelay = votingDelay
-	}
-}
-
-func WithProxyContractsAdmin(address string) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.ProxyContractsAdmin = address
-	}
-}
-
 func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.RootTrackerPollInterval = pollInterval
@@ -446,16 +389,14 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	var err error
 
 	config := &TestClusterConfig{
-		t:               t,
-		WithLogs:        isTrueEnv(envLogsEnabled),
-		WithStdout:      isTrueEnv(envStdoutEnabled),
-		Binary:          resolveBinary(),
-		ByzantineBinary: resolveByzantineBinary(),
-		EpochSize:       10,
-		EpochReward:     1,
-		BlockGasLimit:   1e7, // 10M
-		StakeAmounts:    []*big.Int{},
-		VotingDelay:     10,
+		t:             t,
+		WithLogs:      isTrueEnv(envLogsEnabled),
+		WithStdout:    isTrueEnv(envStdoutEnabled),
+		Binary:        resolveBinary(),
+		EpochSize:     10,
+		EpochReward:   1,
+		BlockGasLimit: 1e7, // 10M
+		StakeAmounts:  []*big.Int{},
 	}
 
 	if config.ValidatorPrefix == "" {
@@ -494,8 +435,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	}
 
 	// run init accounts for validators
-	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix,
-		int(cluster.Config.ValidatorSetSize)+int(config.ByzantineValidatorsCount))
+	addresses, err := cluster.InitSecrets(cluster.Config.ValidatorPrefix, int(cluster.Config.ValidatorSetSize))
 	require.NoError(t, err)
 
 	if cluster.Config.SecretsCallback != nil {
@@ -525,17 +465,11 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
-			"--governor-admin", addresses[0].String(), // set first validator as governor admin
-			"--vote-delay", fmt.Sprint(cluster.Config.VotingDelay),
 		}
 
 		if cluster.Config.RelayerTrackerPollInterval != 0 {
 			args = append(args, "--block-tracker-poll-interval",
 				cluster.Config.RelayerTrackerPollInterval.String())
-		}
-
-		if cluster.Config.VotingPeriod > 0 {
-			args = append(args, "--vote-period", fmt.Sprint(cluster.Config.VotingPeriod))
 		}
 
 		if cluster.Config.TestRewardToken != "" {
@@ -573,10 +507,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for i := 0; i < bootNodesCnt; i++ {
 				args = append(args, "--bootnode", validators[i].MultiAddr)
 			}
-		}
-
-		if cluster.Config.AccessListsOwner != nil {
-			args = append(args, "--access-lists-owner", cluster.Config.AccessListsOwner.String())
 		}
 
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
@@ -639,12 +569,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
 		}
 
-		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
-		if proxyAdminAddr == "" {
-			proxyAdminAddr = ProxyContractAdminAddr
-		}
-		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
-
 		// run genesis command with all the arguments
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
@@ -663,7 +587,7 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		err = cluster.Bridge.deployRootchainContracts(genesisPath)
 		require.NoError(t, err)
 
-		polybftConfig, err := polyCommon.LoadPolyBFTConfig(genesisPath)
+		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
 		require.NoError(t, err)
 
 		// fund validators on the rootchain
@@ -690,26 +614,20 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */, false /* byzantine */)
+			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			false, false /* relayer */, false /* byzantine */)
-	}
-
-	allValidatorSetSize := int(cluster.Config.ValidatorSetSize) + int(cluster.Config.ByzantineValidatorsCount)
-	for i := 1 + int(cluster.Config.ValidatorSetSize); i <= allValidatorSetSize; i++ {
-		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), true, false /* relayer */, true /* byzantine */)
+			false, false /* relayer */)
 	}
 
 	return cluster
 }
 
 func (c *TestCluster) InitTestServer(t *testing.T,
-	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool, byzantine bool) {
+	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -731,7 +649,6 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
-		config.Byzantine = byzantine
 		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
 	})
 
@@ -746,9 +663,6 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 	}(srv.node)
 
 	c.Servers = append(c.Servers, srv)
-	if byzantine {
-		c.ByzantineValidatorsIndex = append(c.ByzantineValidatorsIndex, len(c.Servers)-1)
-	}
 }
 
 func (c *TestCluster) cmdRun(args ...string) error {
@@ -1043,34 +957,6 @@ func (c *TestCluster) SendTxn(t *testing.T, sender ethgo.Key, txn *ethgo.Transac
 		txn:    txn,
 		hash:   hash,
 	}
-}
-
-func (c *TestCluster) GetByzantineValidators(t *testing.T) []*TestServer {
-	t.Helper()
-
-	var validators []*TestServer
-
-	for _, server := range c.Servers {
-		if server.config.Byzantine {
-			validators = append(validators, server)
-		}
-	}
-
-	return validators
-}
-
-func (c *TestCluster) GetByzantineAddresses(t *testing.T) []types.Address {
-	t.Helper()
-
-	var addresses []types.Address
-
-	for _, server := range c.Servers {
-		if server.config.Byzantine {
-			addresses = append(addresses, server.address)
-		}
-	}
-
-	return addresses
 }
 
 type TestTxn struct {

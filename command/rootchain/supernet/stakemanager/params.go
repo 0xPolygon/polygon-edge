@@ -9,14 +9,13 @@ import (
 )
 
 type stakeManagerDeployParams struct {
-	accountDir          string
-	accountConfig       string
-	privateKey          string
-	jsonRPC             string
-	genesisPath         string
-	stakeTokenAddress   string
-	proxyContractsAdmin string
-	isTestMode          bool
+	accountDir        string
+	accountConfig     string
+	privateKey        string
+	jsonRPC           string
+	genesisPath       string
+	stakeTokenAddress string
+	isTestMode        bool
 }
 
 func (s *stakeManagerDeployParams) validateFlags() error {
@@ -30,9 +29,6 @@ func (s *stakeManagerDeployParams) validateFlags() error {
 
 	// validate jsonrpc address
 	_, err := helper.ParseJSONRPCAddress(s.jsonRPC)
-	if err != nil {
-		return err
-	}
 
-	return helper.ValidateProxyContractsAdmin(s.proxyContractsAdmin)
+	return err
 }

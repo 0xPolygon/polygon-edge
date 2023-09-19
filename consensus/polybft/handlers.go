@@ -1,35 +1,17 @@
-package common
+package polybft
 
 import (
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-// SystemState is an interface to interact with the consensus system contracts in the chain
-type SystemState interface {
-	// GetEpoch retrieves current epoch number from the smart contract
-	GetEpoch() (uint64, error)
-
-	// GetNextCommittedIndex retrieves next committed bridge state sync index
-	GetNextCommittedIndex() (uint64, error)
-}
-
 type PostBlockRequest struct {
 	// FullBlock is a reference of the executed block
 	FullBlock *types.FullBlock
-
 	// Epoch is the epoch number of the executed block
 	Epoch uint64
-
 	// IsEpochEndingBlock indicates if this was the last block of given epoch
 	IsEpochEndingBlock bool
-
-	// CurrentClientConfig is the latest client configuration
-	CurrentClientConfig *PolyBFTConfig
-
-	// Forks holds forks configuration
-	Forks *chain.Forks
 }
 
 type PostEpochRequest struct {
@@ -45,7 +27,4 @@ type PostEpochRequest struct {
 
 	// ValidatorSet is the validator set for the new epoch
 	ValidatorSet validator.ValidatorSet
-
-	// Forks holds forks configuration
-	Forks *chain.Forks
 }

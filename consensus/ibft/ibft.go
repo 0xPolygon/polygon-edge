@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/proto"
@@ -498,11 +497,6 @@ func (i *backendIBFT) PreCommitState(block *types.Block, txn *state.Transition) 
 	hooks := i.forkManager.GetHooks(block.Number())
 
 	return hooks.PreCommitState(block.Header, txn)
-}
-
-// GetLatestChainConfig returns the latest chain configuration
-func (i *backendIBFT) GetLatestChainConfig() (*chain.Params, error) {
-	return nil, nil
 }
 
 // GetEpoch returns the current epoch

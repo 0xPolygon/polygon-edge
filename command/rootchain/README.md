@@ -34,8 +34,7 @@ $ polygon-edge rootchain deploy \
     --deployer-key <hex_encoded_rootchain_deployer_private_key> \
     --stake-manager <stake_manager_address> \
     --stake-token <stake_token_address> \
-    --json-rpc <json_rpc_endpoint> \
-    --proxy-contracts-admin <address of proxy contracts admin>
+    --json-rpc <json_rpc_endpoint> 
 ```
 
 **Note:** In case `test` flag is provided, it engages test mode, which uses predefined test account private key to send transactions to the rootchain.

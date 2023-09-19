@@ -1,7 +1,6 @@
 package stakemanager
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -9,7 +8,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -74,13 +73,6 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.StakeTokenFlag,
 		"",
 		rootHelper.StakeTokenFlagDesc,
-	)
-
-	cmd.Flags().StringVar(
-		&params.proxyContractsAdmin,
-		rootHelper.ProxyContractsAdminFlag,
-		"",
-		rootHelper.ProxyContractsAdminDesc,
 	)
 
 	cmd.Flags().BoolVar(
@@ -154,22 +146,11 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 				return err
 			}
 
-			// deploy stake manager proxy
-			receipt, err := rootHelper.DeployProxyContract(txRelayer, deployerKey, "StakeManagerProxy",
-				types.StringToAddress(params.proxyContractsAdmin), contractAddress)
-			if err != nil {
-				return err
-			}
-
-			if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
-				return errors.New("deployment of StakeManagerProxy contract failed")
-			}
-
 			outputter.WriteCommandResult(&rootHelper.MessageResult{
 				Message: "[STAKEMANAGER - DEPLOY] Successfully deployed StakeManager contract",
 			})
 
-			stakeManagerAddress = types.Address(receipt.ContractAddress)
+			stakeManagerAddress = contractAddress
 
 			return nil
 		}
@@ -217,20 +198,20 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to read chain configuration: %w", err)
 	}
 
-	consensusConfig, err := polyCommon.GetPolyBFTConfig(chainConfig.Params)
+	consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve consensus configuration: %w", err)
 	}
 
 	if consensusConfig.Bridge == nil {
-		consensusConfig.Bridge = &polyCommon.BridgeConfig{}
+		consensusConfig.Bridge = &polybft.BridgeConfig{}
 	}
 
 	consensusConfig.Bridge.StakeManagerAddr = stakeManagerAddress
 	consensusConfig.Bridge.StakeTokenAddr = stakeTokenAddress
 
 	// write updated chain configuration
-	chainConfig.Params.Engine[polyCommon.ConsensusName] = consensusConfig
+	chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
 
 	if err = helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
 		return fmt.Errorf("failed to save chain configuration bridge data: %w", err)
@@ -245,7 +226,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 	stakeManagerAddress types.Address,
 	stakeTokenAddress types.Address,
 	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeStakeManagerFn{NewStakingToken: stakeTokenAddress}
+	initFn := &contractsapi.InitializeStakeManagerFn{NewMatic: stakeTokenAddress}
 
 	input, err := initFn.EncodeAbi()
 	if err != nil {

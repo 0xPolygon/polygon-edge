@@ -16,30 +16,19 @@ type BridgeTransport interface {
 
 // subscribeToIbftTopic subscribes to ibft topic
 func (p *Polybft) subscribeToIbftTopic() error {
-	return p.consensusTopic.Subscribe(func(payload interface{}, _ peer.ID) {
+	return p.consensusTopic.Subscribe(func(obj interface{}, _ peer.ID) {
 		if !p.runtime.IsActiveValidator() {
 			return
 		}
 
-		msg, ok := payload.(*ibftProto.Message)
+		msg, ok := obj.(*ibftProto.Message)
 		if !ok {
 			p.logger.Error("consensus engine: invalid type assertion for message request")
 
 			return
 		}
 
-		for _, handler := range p.ibftMsgHandlers {
-			handler := handler
-
-			go func() {
-				select {
-				case <-p.closeCh:
-					return
-				default:
-					handler.Handle(msg)
-				}
-			}()
-		}
+		p.ibft.AddMessage(msg)
 
 		p.logger.Debug(
 			"validator message received",
@@ -53,8 +42,7 @@ func (p *Polybft) subscribeToIbftTopic() error {
 
 // createTopics create all topics for a PolyBft instance
 func (p *Polybft) createTopics() (err error) {
-	if p.genesisClientConfig.IsBridgeEnabled() {
-		// this is ok to ask, since bridge configuration will not be changed through governance
+	if p.consensusConfig.IsBridgeEnabled() {
 		p.bridgeTopic, err = p.config.Network.NewTopic(bridgeProto, &polybftProto.TransportMessage{})
 		if err != nil {
 			return fmt.Errorf("failed to create bridge topic: %w", err)
@@ -71,8 +59,6 @@ func (p *Polybft) createTopics() (err error) {
 
 // Multicast is implementation of core.Transport interface
 func (p *Polybft) Multicast(msg *ibftProto.Message) {
-	p.ibftMsgMulticast(msg)
-
 	if err := p.consensusTopic.Publish(msg); err != nil {
 		p.logger.Warn("failed to multicast consensus message", "error", err)
 	}

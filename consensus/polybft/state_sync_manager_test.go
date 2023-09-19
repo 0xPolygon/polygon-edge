@@ -15,7 +15,6 @@ import (
 	"github.com/umbracle/ethgo/testutil"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -305,9 +304,9 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 	txData, err := mockMsg.EncodeAbi()
 	require.NoError(t, err)
 
-	tx := createStateTransactionWithData(types.Address{}, txData)
+	tx := createStateTransactionWithData(1, types.Address{}, txData)
 
-	req := &common.PostBlockRequest{
+	req := &PostBlockRequest{
 		FullBlock: &types.FullBlock{
 			Block: &types.Block{
 				Transactions: []*types.Transaction{tx},

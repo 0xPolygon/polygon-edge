@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -56,14 +55,4 @@ func (s *StakeStore) getFullValidatorSet() (validatorSetState, error) {
 	})
 
 	return fullValidatorSet, err
-}
-
-// GetValidators returns all validators regardless if they are active or not
-func (s *StakeStore) GetAllValidators() (validator.AccountSet, error) {
-	fullValidatorSet, err := s.getFullValidatorSet()
-	if err != nil {
-		return nil, err
-	}
-
-	return fullValidatorSet.Validators.getSorted(len(fullValidatorSet.Validators)), nil
 }

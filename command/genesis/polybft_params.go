@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -38,21 +37,14 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize                = uint64(10) // in blocks
-	defaultSprintSize               = uint64(5)  // in blocks
+	defaultEpochSize                = uint64(10)
+	defaultSprintSize               = uint64(5)
 	defaultValidatorSetSize         = 100
 	defaultBlockTime                = 2 * time.Second
-	defaultEpochReward              = 1           // in wei
-	defaultBlockTimeDrift           = uint64(10)  // in seconds
-	defaultCheckpointInterval       = uint64(900) // in blocks
-	defaultWithdrawalWaitPeriod     = uint64(1)   // in epochs
-	defaultVotingDelay              = "10"        // in blocks
-	defaultVotingPeriod             = "10000"     // in blocks
-	defaultVoteProposalThreshold    = "1000"      // in blocks
-	defaultProposalQuorumPercentage = uint64(67)  // percentage
+	defaultEpochReward              = 1
+	defaultBlockTimeDrift           = uint64(10)
 	defaultBlockTrackerPollInterval = time.Second
 
-	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
 	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
@@ -70,8 +62,6 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
-
-	proposalQuorumMax = uint64(100)
 )
 
 var (
@@ -79,11 +69,6 @@ var (
 	errNoPremineAllowed    = errors.New("native token is not mintable, so no premine is allowed " +
 		"except for zero address and reward wallet if native token is used as reward token")
 )
-
-type contractInfo struct {
-	artifact *artifact.Artifact
-	address  types.Address
-}
 
 // generatePolyBftChainConfig creates and persists polybft chain configuration to the provided file path
 func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) error {
@@ -149,72 +134,24 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	voteDelay, err := common.ParseUint256orHex(&p.voteDelay)
-	if err != nil {
-		return err
-	}
-
-	votingPeriod, err := common.ParseUint256orHex(&p.votingPeriod)
-	if err != nil {
-		return err
-	}
-
-	if votingPeriod.Cmp(big.NewInt(0)) == 0 {
-		return errInvalidVotingPeriod
-	}
-
-	proposalThreshold, err := common.ParseUint256orHex(&p.proposalThreshold)
-	if err != nil {
-		return err
-	}
-
-	governorAdminAddr := types.ZeroAddress
-	// if no admin is defined, zero address will be the owner,
-	// meaning no new proposers and executors besides genesis validator
-	// set can be added/removed later
-	if p.governorAdmin != "" {
-		governorAdminAddr = types.StringToAddress(p.governorAdmin)
-	}
-
-	proposalQuorum := p.proposalQuorum
-	if proposalQuorum > proposalQuorumMax {
-		// proposal can be from 0 to 100, so we sanitize the value
-		proposalQuorum = proposalQuorumMax
-	}
-
-	polyBftConfig := &polyCommon.PolyBFTConfig{
+	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:           types.ZeroAddress,
-		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
-		NativeTokenConfig:    p.nativeTokenConfig,
-		MinValidatorSetSize:  p.minNumValidators,
-		MaxValidatorSetSize:  p.maxNumValidators,
-		CheckpointInterval:   p.checkpointInterval,
-		WithdrawalWaitPeriod: p.withdrawalWaitPeriod,
-		RewardConfig: &polyCommon.RewardsConfig{
+		Governance:          types.ZeroAddress,
+		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:   p.nativeTokenConfig,
+		MinValidatorSetSize: p.minNumValidators,
+		MaxValidatorSetSize: p.maxNumValidators,
+		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
-		BlockTimeDrift:      p.blockTimeDrift,
-		ProxyContractsAdmin: types.StringToAddress(p.proxyContractsAdmin),
-		GovernanceConfig: &polyCommon.GovernanceConfig{
-			VotingDelay:              voteDelay,
-			VotingPeriod:             votingPeriod,
-			ProposalThreshold:        proposalThreshold,
-			ProposalQuorumPercentage: proposalQuorum,
-			GovernorAdmin:            governorAdminAddr,
-			// on genesis we deploy governance contracts on predefined addresses
-			ChildGovernorAddr: contracts.ChildGovernorContract,
-			ChildTimelockAddr: contracts.ChildTimelockContract,
-			NetworkParamsAddr: contracts.NetworkParamsContract,
-			ForkParamsAddr:    contracts.ForkParamsContract,
-		},
+		BlockTimeDrift:           p.blockTimeDrift,
 		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
 	}
 
@@ -232,7 +169,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -362,11 +298,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if p.accessListsOwner != "" {
-		value := types.StringToAddress(p.accessListsOwner)
-		chainConfig.Params.AccessListsOwner = &value
-	}
-
 	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
@@ -379,21 +310,19 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 func (p *genesisParams) deployContracts(
 	rewardTokenByteCode []byte,
-	polybftConfig *polyCommon.PolyBFTConfig,
+	polybftConfig *polybft.PolyBFTConfig,
 	chainConfig *chain.Chain,
 	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
-	proxyToImplAddrMap := contracts.GetProxyImplementationMapping()
-	proxyAddresses := make([]types.Address, 0, len(proxyToImplAddrMap))
-
-	for proxyAddr := range proxyToImplAddrMap {
-		proxyAddresses = append(proxyAddresses, proxyAddr)
+	type contractInfo struct {
+		artifact *artifact.Artifact
+		address  types.Address
 	}
 
 	genesisContracts := []*contractInfo{
 		{
 			// State receiver contract
 			artifact: contractsapi.StateReceiver,
-			address:  contracts.StateReceiverContractV1,
+			address:  contracts.StateReceiverContract,
 		},
 		{
 			// ChildERC20 token contract
@@ -413,41 +342,25 @@ func (p *genesisParams) deployContracts(
 		{
 			// BLS contract
 			artifact: contractsapi.BLS,
-			address:  contracts.BLSContractV1,
+			address:  contracts.BLSContract,
 		},
 		{
 			// Merkle contract
 			artifact: contractsapi.Merkle,
-			address:  contracts.MerkleContractV1,
+			address:  contracts.MerkleContract,
 		},
 		{
 			// L2StateSender contract
 			artifact: contractsapi.L2StateSender,
-			address:  contracts.L2StateSenderContractV1,
+			address:  contracts.L2StateSenderContract,
 		},
 		{
 			artifact: contractsapi.ValidatorSet,
-			address:  contracts.ValidatorSetContractV1,
+			address:  contracts.ValidatorSetContract,
 		},
 		{
 			artifact: contractsapi.RewardPool,
-			address:  contracts.RewardPoolContractV1,
-		},
-		{
-			artifact: contractsapi.NetworkParams,
-			address:  contracts.NetworkParamsContractV1,
-		},
-		{
-			artifact: contractsapi.ForkParams,
-			address:  contracts.ForkParamsContractV1,
-		},
-		{
-			artifact: contractsapi.ChildGovernor,
-			address:  contracts.ChildGovernorContractV1,
-		},
-		{
-			artifact: contractsapi.ChildTimelock,
-			address:  contracts.ChildTimelockContractV1,
+			address:  contracts.RewardPoolContract,
 		},
 	}
 
@@ -455,7 +368,7 @@ func (p *genesisParams) deployContracts(
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.NativeERC20,
-				address:  contracts.NativeERC20TokenContractV1,
+				address:  contracts.NativeERC20TokenContract,
 			})
 
 		// burn contract can be set only for non-mintable native token. If burn contract is set,
@@ -466,114 +379,108 @@ func (p *genesisParams) deployContracts(
 					artifact: contractsapi.EIP1559Burn,
 					address:  burnContractAddr,
 				})
-
-			proxyAddresses = append(proxyAddresses, contracts.DefaultBurnContract)
 		}
 	} else {
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.NativeERC20Mintable,
-				address:  contracts.NativeERC20TokenContractV1,
+				address:  contracts.NativeERC20TokenContract,
 			})
 	}
 
-	if len(p.bridgeAllowListAdmin) != 0 || len(p.bridgeBlockListAdmin) != 0 || p.accessListsOwner != "" {
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		// rootchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20PredicateACL,
-				address:  contracts.ChildERC20PredicateContractV1,
+				address:  contracts.ChildERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC721PredicateACL,
-				address:  contracts.ChildERC721PredicateContractV1,
+				address:  contracts.ChildERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC1155PredicateACL,
-				address:  contracts.ChildERC1155PredicateContractV1,
+				address:  contracts.ChildERC1155PredicateContract,
 			})
 
 		// childchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC20PredicateACL,
-				address:  contracts.RootMintableERC20PredicateContractV1,
+				address:  contracts.RootMintableERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC721PredicateACL,
-				address:  contracts.RootMintableERC721PredicateContractV1,
+				address:  contracts.RootMintableERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC1155PredicateACL,
-				address:  contracts.RootMintableERC1155PredicateContractV1,
+				address:  contracts.RootMintableERC1155PredicateContract,
 			})
 	} else {
 		// rootchain originated tokens predicates
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC20Predicate,
-				address:  contracts.ChildERC20PredicateContractV1,
+				address:  contracts.ChildERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC721Predicate,
-				address:  contracts.ChildERC721PredicateContractV1,
+				address:  contracts.ChildERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.ChildERC1155Predicate,
-				address:  contracts.ChildERC1155PredicateContractV1,
+				address:  contracts.ChildERC1155PredicateContract,
 			})
 
 		// childchain originated tokens predicates
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC20Predicate,
-				address:  contracts.RootMintableERC20PredicateContractV1,
+				address:  contracts.RootMintableERC20PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC721Predicate,
-				address:  contracts.RootMintableERC721PredicateContractV1,
+				address:  contracts.RootMintableERC721PredicateContract,
 			})
 
 		genesisContracts = append(genesisContracts,
 			&contractInfo{
 				artifact: contractsapi.RootMintableERC1155Predicate,
-				address:  contracts.RootMintableERC1155PredicateContractV1,
+				address:  contracts.RootMintableERC1155PredicateContract,
 			})
 	}
 
 	allocations := make(map[types.Address]*chain.GenesisAccount, len(genesisContracts)+1)
 
-	if rewardTokenByteCode != nil {
-		// if reward token is provided in genesis then, add it to allocations
-		// to RewardTokenContract address and update Polybft config
-		allocations[contracts.RewardTokenContractV1] = &chain.GenesisAccount{
-			Balance: big.NewInt(0),
-			Code:    rewardTokenByteCode,
-		}
-
-		proxyAddresses = append(proxyAddresses, contracts.RewardTokenContract)
-	}
-
-	genesisContracts = append(genesisContracts, getProxyContractsInfo(proxyAddresses)...)
-
 	for _, contract := range genesisContracts {
 		allocations[contract.address] = &chain.GenesisAccount{
 			Balance: big.NewInt(0),
 			Code:    contract.artifact.DeployedBytecode,
+		}
+	}
+
+	if rewardTokenByteCode != nil {
+		// if reward token is provided in genesis then, add it to allocations
+		// to RewardTokenContract address and update Polybft config
+		allocations[contracts.RewardTokenContract] = &chain.GenesisAccount{
+			Balance: big.NewInt(0),
+			Code:    rewardTokenByteCode,
 		}
 	}
 
@@ -639,17 +546,4 @@ func stringSliceToAddressSlice(addrs []string) []types.Address {
 	}
 
 	return res
-}
-
-func getProxyContractsInfo(addresses []types.Address) []*contractInfo {
-	result := make([]*contractInfo, len(addresses))
-
-	for i, proxyAddress := range addresses {
-		result[i] = &contractInfo{
-			artifact: contractsapi.GenesisProxy,
-			address:  proxyAddress,
-		}
-	}
-
-	return result
 }
