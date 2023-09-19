@@ -48,7 +48,6 @@ require (
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/umbracle/ethgo v0.1.4-0.20230810113823-c9c19bcd8a1e
 	github.com/valyala/fastjson v1.6.3 // indirect
 	go.uber.org/zap v1.24.0 // indirect
 	golang.org/x/sys v0.12.0 // indirect
@@ -97,6 +96,7 @@ require (
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.7.0 // indirect
+	github.com/umbracle/ethgo v0.1.4-0.20230919101354-1000cf3e2fbd // indirect
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/fx v1.19.2 // indirect
 	golang.org/x/exp v0.0.0-20230725012225-302865e7556b // indirect
@@ -231,5 +231,3 @@ require (
 	gotest.tools/v3 v3.0.2 // indirect
 	inet.af/netaddr v0.0.0-20230525184311-b8eac61e914a // indirect
 )
-
-replace github.com/umbracle/ethgo => github.com/igorcrevar/ethgo v0.1.1000
