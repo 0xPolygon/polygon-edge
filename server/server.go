@@ -217,28 +217,40 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// apply allow list contracts deployer genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
-		m.config.Chain.Params.ContractDeployerAllowList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+			m.config.Chain.Params.ContractDeployerAllowList)
+	}
 
 	// apply block list contracts deployer genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
-		m.config.Chain.Params.ContractDeployerBlockList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.ContractDeployerBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
+			m.config.Chain.Params.ContractDeployerBlockList)
+	}
 
 	// apply transactions execution allow list genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
-		m.config.Chain.Params.TransactionsAllowList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.TransactionsAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+			m.config.Chain.Params.TransactionsAllowList)
+	}
 
 	// apply transactions execution block list genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
-		m.config.Chain.Params.TransactionsBlockList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.TransactionsBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
+			m.config.Chain.Params.TransactionsBlockList)
+	}
 
-	// apply bridge allow list genesis data (owner is omitted for bridge allow list)
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-		m.config.Chain.Params.BridgeAllowList, m.config.Chain.Params.AccessListsOwner)
+	// apply bridge allow list genesis data
+	if m.config.Chain.Params.BridgeAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
+			m.config.Chain.Params.BridgeAllowList)
+	}
 
-	// apply bridge block list genesis data (owner is omitted for bridge block list)
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-		m.config.Chain.Params.BridgeBlockList, m.config.Chain.Params.AccessListsOwner)
+	// apply bridge block list genesis data
+	if m.config.Chain.Params.BridgeBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
+			m.config.Chain.Params.BridgeBlockList)
+	}
 
 	var initialStateRoot = types.ZeroHash
 
@@ -636,6 +648,7 @@ func (s *Server) setupRelayer() error {
 		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		s.config.RelayerTrackerPollInterval,
 	)
 
 	// start relayer
@@ -898,6 +911,7 @@ func (s *Server) setupJSONRPC() error {
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
 		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 		ConcurrentRequestsDebug:  s.config.JSONRPC.ConcurrentRequestsDebug,
+		WebSocketReadLimit:       s.config.JSONRPC.WebSocketReadLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
@@ -1042,6 +1056,11 @@ func initForkManager(engineName string, config *chain.Chain) error {
 
 	// Register handlers and additional forks here
 	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
+		return err
+	}
+
+	// Register Handler for London fork fix
+	if err := state.RegisterLondonFixFork(chain.LondonFix); err != nil {
 		return err
 	}
 

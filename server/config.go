@@ -2,6 +2,7 @@ package server
 
 import (
 	"net"
+	"time"
 
 	"github.com/hashicorp/go-hclog"
 
@@ -43,7 +44,8 @@ type Config struct {
 
 	Relayer bool
 
-	NumBlockConfirmations uint64
+	NumBlockConfirmations      uint64
+	RelayerTrackerPollInterval time.Duration
 }
 
 // Telemetry holds the config details for metric services
@@ -58,4 +60,5 @@ type JSONRPC struct {
 	BatchLengthLimit         uint64
 	BlockRangeLimit          uint64
 	ConcurrentRequestsDebug  uint64
+	WebSocketReadLimit       uint64
 }

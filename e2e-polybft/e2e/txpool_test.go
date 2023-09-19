@@ -68,11 +68,8 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 				txn.MaxFeePerGas = big.NewInt(1000000000)
 				txn.MaxPriorityFeePerGas = big.NewInt(100000000)
 			} else {
-				gasPrice, err := client.GasPrice()
-				require.NoError(t, err)
-
 				txn.Type = ethgo.TransactionLegacy
-				txn.GasPrice = gasPrice
+				txn.GasPrice = ethgo.Gwei(2).Uint64()
 			}
 
 			sendTransaction(t, client, sender, txn)
@@ -115,10 +112,6 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 
 	client := cluster.Servers[0].JSONRPC().Eth()
 
-	// estimate gas price
-	gasPrice, err := client.GasPrice()
-	require.NoError(t, err)
-
 	waitUntilBalancesChanged := func(acct ethgo.Address) error {
 		err := cluster.WaitUntil(30*time.Second, 2*time.Second, func() bool {
 			balance, err := client.GetBalance(acct, ethgo.Latest)
@@ -136,10 +129,10 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		if i%2 == 0 {
 			txn.Type = ethgo.TransactionDynamicFee
 			txn.MaxFeePerGas = big.NewInt(1000000000)
-			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
+			txn.MaxPriorityFeePerGas = big.NewInt(1000000000)
 		} else {
 			txn.Type = ethgo.TransactionLegacy
-			txn.GasPrice = gasPrice
+			txn.GasPrice = ethgo.Gwei(1).Uint64()
 		}
 	}
 
@@ -177,11 +170,8 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 		populateTxFees(txn, i-1)
 
 		// Add remaining fees to finish the cycle
-		for j := i; j < num; j++ {
-			copyTxn := txn.Copy()
-			populateTxFees(copyTxn, j)
-			txn.Value = txn.Value.Add(txn.Value, txCost(copyTxn))
-		}
+		gasCostTotal := new(big.Int).Mul(txCost(txn), new(big.Int).SetInt64(int64(num-i-1)))
+		txn.Value = txn.Value.Add(txn.Value, gasCostTotal)
 
 		sendTransaction(t, client, receivers[i-1], txn)
 
@@ -274,11 +264,8 @@ func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 			txn.MaxFeePerGas = big.NewInt(1000000000)
 			txn.MaxPriorityFeePerGas = big.NewInt(100000000)
 		} else {
-			gasPrice, err := client.GasPrice()
-			require.NoError(t, err)
-
 			txn.Type = ethgo.TransactionLegacy
-			txn.GasPrice = gasPrice
+			txn.GasPrice = ethgo.Gwei(2).Uint64()
 		}
 
 		sendTransaction(t, client, sender, txn)

@@ -372,15 +372,15 @@ type InitializeChildERC20PredicateACLFn struct {
 }
 
 func (i *InitializeChildERC20PredicateACLFn) Sig() []byte {
-	return ChildERC20PredicateACL.Abi.Methods["initialize"].ID()
+	return ChildERC20PredicateACL.Abi.MethodsBySignature["initialize(address,address,address,address,address,bool,bool,address)"].ID()
 }
 
 func (i *InitializeChildERC20PredicateACLFn) EncodeAbi() ([]byte, error) {
-	return ChildERC20PredicateACL.Abi.Methods["initialize"].Encode(i)
+	return ChildERC20PredicateACL.Abi.MethodsBySignature["initialize(address,address,address,address,address,bool,bool,address)"].Encode(i)
 }
 
 func (i *InitializeChildERC20PredicateACLFn) DecodeAbi(buf []byte) error {
-	return decodeMethod(ChildERC20PredicateACL.Abi.Methods["initialize"], buf, i)
+	return decodeMethod(ChildERC20PredicateACL.Abi.MethodsBySignature["initialize(address,address,address,address,address,bool,bool,address)"], buf, i)
 }
 
 type WithdrawToChildERC20PredicateACLFn struct {

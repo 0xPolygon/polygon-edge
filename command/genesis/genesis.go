@@ -43,7 +43,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlag,
 		command.DefaultChainID,
-		"the ID of the chain (only used for IBFT consensus)",
+		"the ID of the chain",
 	)
 
 	cmd.Flags().StringVar(
@@ -235,6 +235,13 @@ func setFlags(cmd *cobra.Command) {
 			defaultBlockTimeDrift,
 			"configuration for block time drift value (in seconds)",
 		)
+
+		cmd.Flags().DurationVar(
+			&params.blockTrackerPollInterval,
+			blockTrackerPollIntervalFlag,
+			defaultBlockTrackerPollInterval,
+			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
+		)
 	}
 
 	// Access Control Lists
@@ -321,13 +328,6 @@ func setFlags(cmd *cobra.Command) {
 			bridgeBlockListEnabledFlag,
 			[]string{},
 			"list of addresses to enable by default in the bridge block list",
-		)
-
-		cmd.Flags().StringVar(
-			&params.accessListsOwner,
-			accessListsOwnerFlag,
-			"",
-			"owner for all allow and block lists",
 		)
 	}
 }

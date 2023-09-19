@@ -40,9 +40,10 @@ const (
 )
 
 var (
-	ErrRootchainNotFound = errors.New("rootchain not found")
-	ErrRootchainPortBind = errors.New("port 8545 is not bind with localhost")
-	errTestModeSecrets   = errors.New("rootchain test mode does not imply specifying secrets parameters")
+	ErrRootchainNotFound   = errors.New("rootchain not found")
+	ErrRootchainPortBind   = errors.New("port 8545 is not bind with localhost")
+	ErrMandatoryStakeToken = errors.New("stake token address is mandatory")
+	errTestModeSecrets     = errors.New("rootchain test mode does not imply specifying secrets parameters")
 
 	rootchainAccountKey *wallet.Key
 )
@@ -81,7 +82,7 @@ func DecodePrivateKey(rawKey string) (ethgo.Key, error) {
 }
 
 func GetRootchainID() (string, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		return "", fmt.Errorf("rootchain id error: %w", err)
 	}

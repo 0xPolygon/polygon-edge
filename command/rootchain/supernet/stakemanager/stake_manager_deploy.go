@@ -24,7 +24,7 @@ func GetCommand() *cobra.Command {
 	stakeMgrDeployCmd := &cobra.Command{
 		Use:     "stake-manager-deploy",
 		Short:   "Command for deploying stake manager contract on rootchain",
-		PreRunE: runPreRun,
+		PreRunE: preRunCommand,
 		RunE:    runCommand,
 	}
 
@@ -33,7 +33,7 @@ func GetCommand() *cobra.Command {
 	return stakeMgrDeployCmd
 }
 
-func runPreRun(cmd *cobra.Command, _ []string) error {
+func preRunCommand(cmd *cobra.Command, _ []string) error {
 	params.jsonRPC = helper.GetJSONRPCAddress(cmd)
 
 	return params.validateFlags()

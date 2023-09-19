@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/addresslist"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
@@ -221,40 +220,31 @@ func (e *Executor) BeginTxn(
 		},
 	}
 
-	// contract deployment access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListContractsAddr)
+	// enable contract deployment allow list (if any)
+	if e.config.ContractDeployerAllowList != nil {
+		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.ContractDeployerBlockList != nil {
-		txn.deploymentBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListContractsAddr)
+	if e.config.ContractDeployerBlockList != nil {
+		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
 	}
 
-	// transaction access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListTransactionsAddr)
+	// enable transactions allow list (if any)
+	if e.config.TransactionsAllowList != nil {
+		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.TransactionsBlockList != nil {
-		txn.txnBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListTransactionsAddr)
+	if e.config.TransactionsBlockList != nil {
+		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
 	}
 
-	// bridge access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.BridgeAllowList != nil {
-		txn.bridgeAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListBridgeAddr)
+	// enable transactions allow list (if any)
+	if e.config.BridgeAllowList != nil {
+		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.BridgeBlockList != nil {
-		txn.bridgeBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListBridgeAddr)
+	if e.config.BridgeBlockList != nil {
+		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
 	}
 
 	return txn, nil
@@ -478,18 +468,7 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	upfrontGasCost := new(big.Int).SetUint64(msg.Gas)
-
-	factor := new(big.Int)
-	if msg.GasFeeCap != nil && msg.GasFeeCap.BitLen() > 0 {
-		// Apply EIP-1559 tx cost calculation factor
-		factor = factor.Set(msg.GasFeeCap)
-	} else {
-		// Apply legacy tx cost calculation factor
-		factor = factor.Set(msg.GasPrice)
-	}
-
-	upfrontGasCost = upfrontGasCost.Mul(upfrontGasCost, factor)
+	upfrontGasCost := GetLondonFixHandler(uint64(t.ctx.Number)).getUpfrontGasCost(msg, t.ctx.BaseFee)
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
 		if errors.Is(err, runtime.ErrNotEnoughFunds) {
@@ -513,39 +492,9 @@ func (t *Transition) nonceCheck(msg *types.Transaction) error {
 }
 
 // checkDynamicFees checks correctness of the EIP-1559 feature-related fields.
-// Basically, makes sure gas tip cap and gas fee cap are good.
+// Basically, makes sure gas tip cap and gas fee cap are good for dynamic and legacy transactions
 func (t *Transition) checkDynamicFees(msg *types.Transaction) error {
-	if msg.Type != types.DynamicFeeTx {
-		return nil
-	}
-
-	if msg.GasFeeCap.BitLen() == 0 && msg.GasTipCap.BitLen() == 0 {
-		return nil
-	}
-
-	if l := msg.GasFeeCap.BitLen(); l > 256 {
-		return fmt.Errorf("%w: address %v, GasFeeCap bit length: %d", ErrFeeCapVeryHigh,
-			msg.From.String(), l)
-	}
-
-	if l := msg.GasTipCap.BitLen(); l > 256 {
-		return fmt.Errorf("%w: address %v, GasTipCap bit length: %d", ErrTipVeryHigh,
-			msg.From.String(), l)
-	}
-
-	if msg.GasFeeCap.Cmp(msg.GasTipCap) < 0 {
-		return fmt.Errorf("%w: address %v, GasTipCap: %s, GasFeeCap: %s", ErrTipAboveFeeCap,
-			msg.From.String(), msg.GasTipCap, msg.GasFeeCap)
-	}
-
-	// This will panic if baseFee is nil, but basefee presence is verified
-	// as part of header validation.
-	if msg.GasFeeCap.Cmp(t.ctx.BaseFee) < 0 {
-		return fmt.Errorf("%w: address %v, GasFeeCap: %s, BaseFee: %s", ErrFeeCapTooLow,
-			msg.From.String(), msg.GasFeeCap, t.ctx.BaseFee)
-	}
-
-	return nil
+	return GetLondonFixHandler(uint64(t.ctx.Number)).checkDynamicFees(msg, t)
 }
 
 // errors that can originate in the consensus rules checks of the apply method below
@@ -573,6 +522,9 @@ var (
 	// ErrFeeCapTooLow is returned if the transaction fee cap is less than the
 	// the base fee of the block.
 	ErrFeeCapTooLow = errors.New("max fee per gas less than block base fee")
+
+	// ErrNonceUintOverflow is returned if uint64 overflow happens
+	ErrNonceUintOverflow = errors.New("nonce uint64 overflow")
 )
 
 type TransitionApplicationError struct {
@@ -647,7 +599,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
-		t.state.IncrNonce(msg.From)
+		if err := t.state.IncrNonce(msg.From); err != nil {
+			return nil, err
+		}
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
@@ -666,13 +620,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	// Define effective tip based on tx type.
 	// We use EIP-1559 fields of the tx if the london hardfork is enabled.
 	// Effective tip became to be either gas tip cap or (gas fee cap - current base fee)
-	effectiveTip := new(big.Int).Set(gasPrice)
-	if t.config.London && msg.Type == types.DynamicFeeTx {
-		effectiveTip = common.BigMin(
-			new(big.Int).Sub(msg.GasFeeCap, t.ctx.BaseFee),
-			new(big.Int).Set(msg.GasTipCap),
-		)
-	}
+	effectiveTip := GetLondonFixHandler(uint64(t.ctx.Number)).getEffectiveTip(
+		msg, gasPrice, t.ctx.BaseFee, t.config.London,
+	)
 
 	// Pay the coinbase fee as a miner reward using the calculated effective tip.
 	coinbaseFee := new(big.Int).Mul(new(big.Int).SetUint64(result.GasUsed), effectiveTip)
@@ -721,7 +671,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 
 	// check txns access lists, allow list takes precedence over block list
-	if t.txnAllowList != nil && t.txnAllowList.IsEnabled() {
+	if t.txnAllowList != nil {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnAllowList.GetRole(contract.Caller)
 			if !role.Enabled() {
@@ -737,7 +687,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
-	} else if t.txnBlockList != nil && t.txnBlockList.IsEnabled() {
+	} else if t.txnBlockList != nil {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnBlockList.GetRole(contract.Caller)
 			if role == addresslist.EnabledRole {
@@ -852,7 +802,9 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Increment the nonce of the caller
-	t.state.IncrNonce(c.Caller)
+	if err := t.state.IncrNonce(c.Caller); err != nil {
+		return &runtime.ExecutionResult{Err: err}
+	}
 
 	// Check if there is a collision and the address already exists
 	if t.hasCodeOrNonce(c.Address) {
@@ -868,7 +820,10 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	if t.config.EIP158 {
 		// Force the creation of the account
 		t.state.CreateAccount(c.Address)
-		t.state.IncrNonce(c.Address)
+
+		if err := t.state.IncrNonce(c.Address); err != nil {
+			return &runtime.ExecutionResult{Err: err}
+		}
 	}
 
 	// Transfer the value
@@ -889,7 +844,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}()
 
 	// check if contract creation allow list is enabled
-	if t.deploymentAllowList != nil && t.deploymentAllowList.IsEnabled() {
+	if t.deploymentAllowList != nil {
 		role := t.deploymentAllowList.GetRole(c.Caller)
 
 		if !role.Enabled() {
@@ -904,7 +859,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				Err:     runtime.ErrNotAuth,
 			}
 		}
-	} else if t.deploymentBlockList != nil && t.deploymentBlockList.IsEnabled() {
+	} else if t.deploymentBlockList != nil {
 		role := t.deploymentBlockList.GetRole(c.Caller)
 
 		if role == addresslist.EnabledRole {

@@ -84,6 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
+	BlockTime            time.Duration
 	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
@@ -93,7 +94,6 @@ type TestClusterConfig struct {
 	NativeTokenConfigRaw string
 	SecretsCallback      func([]types.Address, *TestClusterConfig)
 
-	AccessListsOwner                 *types.Address
 	ContractDeployerAllowListAdmin   []types.Address
 	ContractDeployerAllowListEnabled []types.Address
 	ContractDeployerBlockListAdmin   []types.Address
@@ -114,6 +114,9 @@ type TestClusterConfig struct {
 
 	IsPropertyTest  bool
 	TestRewardToken string
+
+	RootTrackerPollInterval    time.Duration
+	RelayerTrackerPollInterval time.Duration
 
 	logsDirOnce sync.Once
 }
@@ -249,6 +252,12 @@ func WithEpochReward(epochReward int) ClusterOption {
 	}
 }
 
+func WithBlockTime(blockTime time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BlockTime = blockTime
+	}
+}
+
 func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BlockGasLimit = blockGasLimit
@@ -264,12 +273,6 @@ func WithBurnContract(burnContract *polybft.BurnContractInfo) ClusterOption {
 func WithNumBlockConfirmations(numBlockConfirmations uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.NumBlockConfirmations = numBlockConfirmations
-	}
-}
-
-func WithAccessListsOwner(addr types.Address) ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.AccessListsOwner = &addr
 	}
 }
 
@@ -360,6 +363,18 @@ func WithNativeTokenConfig(tokenConfigRaw string) ClusterOption {
 func WithTestRewardToken() ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.TestRewardToken = hex.EncodeToString(contractsapi.TestRewardToken.DeployedBytecode)
+	}
+}
+
+func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RootTrackerPollInterval = pollInterval
+	}
+}
+
+func WithRelayerTrackerPollInterval(pollInterval time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RelayerTrackerPollInterval = pollInterval
 	}
 }
 
@@ -459,6 +474,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
 		}
 
+		if cluster.Config.BlockTime != 0 {
+			args = append(args, "--block-time",
+				cluster.Config.BlockTime.String())
+		}
+
+		if cluster.Config.RelayerTrackerPollInterval != 0 {
+			args = append(args, "--block-tracker-poll-interval",
+				cluster.Config.RelayerTrackerPollInterval.String())
+		}
+
 		if cluster.Config.TestRewardToken != "" {
 			args = append(args, "--reward-token-code", cluster.Config.TestRewardToken)
 		}
@@ -494,10 +519,6 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			for i := 0; i < bootNodesCnt; i++ {
 				args = append(args, "--bootnode", validators[i].MultiAddr)
 			}
-		}
-
-		if cluster.Config.AccessListsOwner != nil {
-			args = append(args, "--access-lists-owner", cluster.Config.AccessListsOwner.String())
 		}
 
 		if len(cluster.Config.ContractDeployerAllowListAdmin) != 0 {
@@ -640,6 +661,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
+		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
 	})
 
 	// watch the server for stop signals. It is important to fix the specific
