@@ -80,7 +80,7 @@ jobs:
         continue-on-error: true
       - name: Terraform Apply
         id: apply
-        run: terraform apply -auto-approve tfplan
+        run: terraform apply -auto-approve
         env:
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
           TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
