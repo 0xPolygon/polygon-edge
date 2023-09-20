@@ -78,18 +78,13 @@ jobs:
         id: validate
         run: terraform validate -no-color
         continue-on-error: true
-      - name: Terraform Plan
-        id: plan
-        run: terraform plan -out=tfplan -no-color
-        env:
-          TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
-          TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve tfplan
         env:
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
           TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+          TF_VAR_base_instance_type: ${{ secrets.TF_VAR_BASE_INSTANCE_TYPE }}
       - name: Retrieve state file from s3
         run: aws s3 cp s3://polygon-edge-devnet-terraform-states/state/${{ secrets.TF_VAR_DEPLOYMENT_NAME }} state.json
       - name: Configure private keys
@@ -288,3 +283,4 @@ jobs:
         env:
           TF_VAR_deployment_name: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
           TF_VAR_owner: ${{ secrets.TF_VAR_OWNER }}
+          TF_VAR_base_instance_type: ${{ secrets.TF_VAR_BASE_INSTANCE_TYPE }}
