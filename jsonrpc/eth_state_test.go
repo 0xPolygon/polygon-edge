@@ -692,7 +692,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 				assert.ErrorIs(t, estimateErr, testCase.expectedError)
 
 				// Make sure the estimate is nullified
-				assert.Equal(t, 0, estimate)
+				assert.Equal(t, []byte{}, estimate)
 			} else {
 				// Make sure no errors occurred
 				assert.NoError(t, estimateErr)
@@ -734,7 +734,10 @@ func TestEth_EstimateGas_Reverts(t *testing.T) {
 		nil,
 	)
 
-	assert.Equal(t, 0, estimate)
+	responseData, ok := estimate.([]byte)
+	assert.True(t, ok)
+
+	assert.Equal(t, exampleReturnData, string(responseData))
 
 	// Make sure the EVM revert message is contained
 	assert.ErrorIs(t, estimateErr, runtime.ErrExecutionReverted)
