@@ -1273,7 +1273,7 @@ func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeStakeManagerFn struct {
-	NewMatic types.Address `abi:"newMatic"`
+	NewStakingToken types.Address `abi:"newStakingToken"`
 }
 
 func (i *InitializeStakeManagerFn) Sig() []byte {
@@ -1454,8 +1454,9 @@ func (e *Epoch) DecodeAbi(buf []byte) error {
 }
 
 type CommitEpochValidatorSetFn struct {
-	ID    *big.Int `abi:"id"`
-	Epoch *Epoch   `abi:"epoch"`
+	ID        *big.Int `abi:"id"`
+	Epoch     *Epoch   `abi:"epoch"`
+	EpochSize *big.Int `abi:"epochSize"`
 }
 
 func (c *CommitEpochValidatorSetFn) Sig() []byte {
@@ -1505,7 +1506,7 @@ type InitializeValidatorSetFn struct {
 	NewStateSender      types.Address    `abi:"newStateSender"`
 	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
 	NewRootChainManager types.Address    `abi:"newRootChainManager"`
-	NewEpochSize        *big.Int         `abi:"newEpochSize"`
+	NewNetworkParams    types.Address    `abi:"newNetworkParams"`
 	InitialValidators   []*ValidatorInit `abi:"initialValidators"`
 }
 
@@ -1586,10 +1587,10 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeRewardPoolFn struct {
-	NewRewardToken  types.Address `abi:"newRewardToken"`
-	NewRewardWallet types.Address `abi:"newRewardWallet"`
-	NewValidatorSet types.Address `abi:"newValidatorSet"`
-	NewBaseReward   *big.Int      `abi:"newBaseReward"`
+	NewRewardToken    types.Address `abi:"newRewardToken"`
+	NewRewardWallet   types.Address `abi:"newRewardWallet"`
+	NewValidatorSet   types.Address `abi:"newValidatorSet"`
+	NetworkParamsAddr types.Address `abi:"networkParamsAddr"`
 }
 
 func (i *InitializeRewardPoolFn) Sig() []byte {
@@ -1620,8 +1621,9 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 }
 
 type DistributeRewardForRewardPoolFn struct {
-	EpochID *big.Int  `abi:"epochId"`
-	Uptime  []*Uptime `abi:"uptime"`
+	EpochID   *big.Int  `abi:"epochId"`
+	Uptime    []*Uptime `abi:"uptime"`
+	EpochSize *big.Int  `abi:"epochSize"`
 }
 
 func (d *DistributeRewardForRewardPoolFn) Sig() []byte {

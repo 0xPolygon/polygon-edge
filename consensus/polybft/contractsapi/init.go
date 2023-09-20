@@ -284,11 +284,10 @@ func init() {
 		log.Fatal(err)
 	}
 
-	// TODO: @Stefan-Ethernal Re-run generate SC bindings, when GenesisProxy is again available
-	// GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	TransparentUpgradeableProxy, err = artifact.DecodeArtifact([]byte(TransparentUpgradeableProxyArtifact))
 	if err != nil {
