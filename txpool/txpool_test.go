@@ -3522,7 +3522,7 @@ func TestAddTxsInOrder(t *testing.T) {
 
 	wg.Wait()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(100 * time.Millisecond)
 
 	pool.Close()
 
@@ -3530,8 +3530,8 @@ func TestAddTxsInOrder(t *testing.T) {
 		acc := pool.accounts.get(addrtx.addr)
 		require.NotNil(t, acc)
 
-		assert.Equal(t, uint64(0), acc.enqueued.length())
-		assert.Equal(t, len(acc.nonceToTx.mapping), int(acc.promoted.length()))
+		assert.Equal(t, uint64(0), acc.enqueued.lengthWithLock())
+		assert.Len(t, acc.nonceToTx.mapping, int(acc.promoted.length()))
 	}
 }
 
