@@ -40,6 +40,23 @@ type ForkParams struct {
 	BlockTimeDrift *uint64 `json:"blockTimeDrift,omitempty"`
 }
 
+// Copy creates a deep copy of ForkParams
+func (fp *ForkParams) Copy() *ForkParams {
+	maxValSetSize := *fp.MaxValidatorSetSize
+	epochSize := *fp.EpochSize
+	sprintSize := *fp.SprintSize
+	blockTime := *fp.BlockTime
+	blockTimeDrift := *fp.BlockTimeDrift
+
+	return &ForkParams{
+		MaxValidatorSetSize: &maxValSetSize,
+		EpochSize:           &epochSize,
+		SprintSize:          &sprintSize,
+		BlockTime:           &blockTime,
+		BlockTimeDrift:      &blockTimeDrift,
+	}
+}
+
 // forkHandler defines one custom handler
 type forkHandler struct {
 	// Handler should be active from block `FromBlockNumber``

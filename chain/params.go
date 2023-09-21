@@ -129,6 +129,16 @@ func (f *Forks) At(block uint64) ForksInTime {
 	}
 }
 
+// Copy creates a deep copy of Forks map
+func (f Forks) Copy() *Forks {
+	copy := make(Forks, len(f))
+	for key, value := range f {
+		copy[key] = value.Copy()
+	}
+
+	return &copy
+}
+
 type Fork struct {
 	Block  uint64                  `json:"block"`
 	Params *forkmanager.ForkParams `json:"params,omitempty"`
@@ -140,6 +150,19 @@ func NewFork(n uint64) Fork {
 
 func (f Fork) Active(block uint64) bool {
 	return block >= f.Block
+}
+
+// Copy creates a deep copy of Fork
+func (f Fork) Copy() Fork {
+	var fp *forkmanager.ForkParams
+	if f.Params != nil {
+		fp = f.Params.Copy()
+	}
+
+	return Fork{
+		Block:  f.Block,
+		Params: fp,
+	}
 }
 
 // ForksInTime should contain all supported forks by current edge version

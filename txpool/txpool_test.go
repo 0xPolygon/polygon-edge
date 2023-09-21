@@ -34,14 +34,6 @@ const (
 	validGasLimit             uint64 = 4712350
 )
 
-var (
-	forks = (&chain.Forks{
-		chain.Homestead: chain.NewFork(0),
-		chain.Istanbul:  chain.NewFork(0),
-		chain.London:    chain.NewFork(0),
-	})
-)
-
 // addresses used in tests
 var (
 	addr1 = types.Address{0x1}
@@ -74,6 +66,7 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 	}
 }
 
+// TODO: @Stefan-Ethernal provide forks as a parameter, instead relying on global variable
 // returns a new txpool with default test config
 func newTestPool(mockStore ...store) (*TxPool, error) {
 	return newTestPoolWithSlots(defaultMaxSlots, mockStore...)
@@ -91,7 +84,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 
 	return NewTxPool(
 		hclog.NewNullLogger(),
-		forks,
+		getDefaultEnabledForks(),
 		storeToUse,
 		nil,
 		nil,
@@ -2137,7 +2130,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks = chain.AllForksEnabled
+		pool.forks = chain.AllForksEnabled.Copy()
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize+1)
 		_, err := rand.Read(input)
@@ -2156,7 +2149,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks = chain.AllForksEnabled
+		pool.forks = chain.AllForksEnabled.Copy()
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize)
 		_, err := rand.Read(input)
@@ -2165,6 +2158,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		tx := newTx(defaultAddr, 0, 1)
 		tx.To = nil
 		tx.Input = input
+		tx.GasPrice = new(big.Int).SetUint64(pool.GetBaseFee())
 
 		assert.NoError(t,
 			pool.validateTx(signTx(tx)),
@@ -2279,7 +2273,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("eip-1559 tx placed without eip-1559 fork enabled", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks = chain.AllForksEnabled
+		pool.forks = chain.AllForksEnabled.Copy()
 		pool.forks.RemoveFork(chain.London)
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -3696,6 +3690,16 @@ func TestAddTx_TxReplacement(t *testing.T) {
 	assert.Equal(t, ac2.nonceToTx.mapping[secondAccountNonce], tx1)
 	assert.Equal(t, ac1.enqueued.queue[0], tx2)
 	assert.Equal(t, ac2.enqueued.queue[0], tx1)
+}
+
+// getDefaultEnabledForks returns hardcoded set of forks
+// that are enabled by default from the genesis block
+func getDefaultEnabledForks() *chain.Forks {
+	return &chain.Forks{
+		chain.Homestead: chain.NewFork(0),
+		chain.Istanbul:  chain.NewFork(0),
+		chain.London:    chain.NewFork(0),
+	}
 }
 
 func BenchmarkAddTxTime(b *testing.B) {
