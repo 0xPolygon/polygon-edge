@@ -66,7 +66,6 @@ func newTx(addr types.Address, nonce, slots uint64) *types.Transaction {
 	}
 }
 
-// TODO: @Stefan-Ethernal provide forks as a parameter, instead relying on global variable
 // returns a new txpool with default test config
 func newTestPool(mockStore ...store) (*TxPool, error) {
 	return newTestPoolWithSlots(defaultMaxSlots, mockStore...)

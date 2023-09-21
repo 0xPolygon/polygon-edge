@@ -131,12 +131,12 @@ func (f *Forks) At(block uint64) ForksInTime {
 
 // Copy creates a deep copy of Forks map
 func (f Forks) Copy() *Forks {
-	copy := make(Forks, len(f))
+	copiedForks := make(Forks, len(f))
 	for key, value := range f {
-		copy[key] = value.Copy()
+		copiedForks[key] = value.Copy()
 	}
 
-	return &copy
+	return &copiedForks
 }
 
 type Fork struct {
