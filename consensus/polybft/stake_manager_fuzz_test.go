@@ -158,11 +158,12 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 
 		bcMock := new(blockchainMock)
 		for i := 0; i < int(data.BlockID); i++ {
+			bcMock.On("CurrentHeader").Return(&types.Header{Number: 0})
 			bcMock.On("GetHeaderByNumber", mock.Anything).Return(&types.Header{Hash: types.Hash{6, 4}}, true).Once()
 			bcMock.On("GetReceiptsByHash", mock.Anything).Return([]*types.Receipt{{}}, error(nil)).Once()
 		}
 
-		stakeManager := newStakeManager(
+		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
 			nil,
@@ -172,6 +173,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			bcMock,
 			5,
 		)
+		require.NoError(t, err)
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
@@ -190,14 +192,12 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			},
 		}
 
-		req := &PostBlockRequest{
+		require.NoError(t, stakeManager.PostBlock(&PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: data.BlockID}},
 				Receipts: []*types.Receipt{receipt},
 			},
 			Epoch: data.EpochID,
-		}
-		err := stakeManager.PostBlock(req)
-		require.NoError(t, err)
+		}))
 	})
 }
 
@@ -210,15 +210,19 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	validators := validator.NewTestValidatorsWithAliases(f, aliases, stakes)
 	state := newTestState(f)
 
-	stakeManager := newStakeManager(
+	bcMock := new(blockchainMock)
+	bcMock.On("CurrentHeader").Return(&types.Header{Number: 0})
+
+	stakeManager, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
 		nil,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
-		nil,
+		bcMock,
 		10,
 	)
+	require.NoError(f, err)
 
 	seeds := []updateValidatorSetF{
 		{
