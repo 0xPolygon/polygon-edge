@@ -7,13 +7,6 @@ on:  # yamllint disable-line rule:truthy
     branches:
       - jesse/fix-*
   workflow_call: {}
-  workflow_dispatch:
-    inputs:
-      duration:
-        default: '10m'
-        description: Duration of the test
-        required: false
-        type: string
 
 permissions:
   id-token: write
@@ -29,10 +22,10 @@ jobs:
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       TF_VAR_DEPLOYMENT_NAME: ${{ secrets.TF_VAR_DEPLOYMENT_NAME }}
       TF_VAR_OWNER: ${{ secrets.TF_VAR_OWNER }}
+      TF_VAR_BASE_INSTANCE_TYPE: ${{ secrets.TF_VAR_BASE_INSTANCE_TYPE }}
       SLACK_PERFORMANCE_WEBHOOK_URL: ${{ secrets.SLACK_PERFORMANCE_WEBHOOK_URL }}
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
       VAULT_PASSWORD_FILE: ${{ secrets.VAULT_PASSWORD_FILE }}
     with:
       environment: devnet
-      duration: ${{ inputs.duration }}
