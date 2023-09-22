@@ -778,8 +778,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)
-	// populate currently free slots
-	slotsFree := p.gauge.freeSlots()
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
@@ -818,8 +816,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 			return ErrUnderpriced
 		}
-
-		slotsFree += slotsRequired(oldTxWithSameNonce) // add old tx slots
 	} else {
 		if account.enqueued.length() == account.maxEnqueued && tx.Nonce != accountNonce {
 			return ErrMaxEnqueuedLimitReached
@@ -831,11 +827,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 			return ErrNonceTooLow
 		}
-	}
-
-	// check for overflow
-	if slotsRequired(tx) > slotsFree {
-		return ErrTxPoolOverflow
 	}
 
 	slotsAllocated := slotsRequired(tx)
