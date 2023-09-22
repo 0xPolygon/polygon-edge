@@ -87,8 +87,8 @@ func (*StateSyncResultEvent) Sig() ethgo.Hash {
 	return StateReceiver.Abi.Events["StateSyncResult"].ID()
 }
 
-func (*StateSyncResultEvent) Encode(inputs interface{}) ([]byte, error) {
-	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.Encode(inputs)
+func (s *StateSyncResultEvent) Encode() ([]byte, error) {
+	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.Encode(s)
 }
 
 func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -113,8 +113,8 @@ func (*NewCommitmentEvent) Sig() ethgo.Hash {
 	return StateReceiver.Abi.Events["NewCommitment"].ID()
 }
 
-func (*NewCommitmentEvent) Encode(inputs interface{}) ([]byte, error) {
-	return StateReceiver.Abi.Events["NewCommitment"].Inputs.Encode(inputs)
+func (n *NewCommitmentEvent) Encode() ([]byte, error) {
+	return StateReceiver.Abi.Events["NewCommitment"].Inputs.Encode(n)
 }
 
 func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -157,8 +157,8 @@ func (*StateSyncedEvent) Sig() ethgo.Hash {
 	return StateSender.Abi.Events["StateSynced"].ID()
 }
 
-func (*StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return StateSender.Abi.Events["StateSynced"].Inputs.Encode(inputs)
+func (s *StateSyncedEvent) Encode() ([]byte, error) {
+	return StateSender.Abi.Events["StateSynced"].Inputs.Encode(s)
 }
 
 func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -184,8 +184,8 @@ func (*L2StateSyncedEvent) Sig() ethgo.Hash {
 	return L2StateSender.Abi.Events["L2StateSynced"].ID()
 }
 
-func (*L2StateSyncedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return L2StateSender.Abi.Events["L2StateSynced"].Inputs.Encode(inputs)
+func (l *L2StateSyncedEvent) Encode() ([]byte, error) {
+	return L2StateSender.Abi.Events["L2StateSynced"].Inputs.Encode(l)
 }
 
 func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -564,8 +564,8 @@ func (*TokenMappedEvent) Sig() ethgo.Hash {
 	return RootERC20Predicate.Abi.Events["TokenMapped"].ID()
 }
 
-func (*TokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return RootERC20Predicate.Abi.Events["TokenMapped"].Inputs.Encode(inputs)
+func (t *TokenMappedEvent) Encode() ([]byte, error) {
+	return RootERC20Predicate.Abi.Events["TokenMapped"].Inputs.Encode(t)
 }
 
 func (t *TokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -608,8 +608,8 @@ func (*MintableTokenMappedEvent) Sig() ethgo.Hash {
 	return ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].ID()
 }
 
-func (*MintableTokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].Inputs.Encode(inputs)
+func (m *MintableTokenMappedEvent) Encode() ([]byte, error) {
+	return ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].Inputs.Encode(m)
 }
 
 func (m *MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -913,8 +913,8 @@ func (*L2MintableTokenMappedEvent) Sig() ethgo.Hash {
 	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].ID()
 }
 
-func (*L2MintableTokenMappedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Inputs.Encode(inputs)
+func (l *L2MintableTokenMappedEvent) Encode() ([]byte, error) {
+	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Inputs.Encode(l)
 }
 
 func (l *L2MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1284,8 +1284,8 @@ func (*ValidatorRegisteredEvent) Sig() ethgo.Hash {
 	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].ID()
 }
 
-func (*ValidatorRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
-	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].Inputs.Encode(inputs)
+func (v *ValidatorRegisteredEvent) Encode() ([]byte, error) {
+	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].Inputs.Encode(v)
 }
 
 func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1308,8 +1308,8 @@ func (*AddedToWhitelistEvent) Sig() ethgo.Hash {
 	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].ID()
 }
 
-func (*AddedToWhitelistEvent) Encode(inputs interface{}) ([]byte, error) {
-	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].Inputs.Encode(inputs)
+func (a *AddedToWhitelistEvent) Encode() ([]byte, error) {
+	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].Inputs.Encode(a)
 }
 
 func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1433,8 +1433,8 @@ func (*ChildManagerRegisteredEvent) Sig() ethgo.Hash {
 	return StakeManager.Abi.Events["ChildManagerRegistered"].ID()
 }
 
-func (*ChildManagerRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
-	return StakeManager.Abi.Events["ChildManagerRegistered"].Inputs.Encode(inputs)
+func (c *ChildManagerRegisteredEvent) Encode() ([]byte, error) {
+	return StakeManager.Abi.Events["ChildManagerRegistered"].Inputs.Encode(c)
 }
 
 func (c *ChildManagerRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1459,8 +1459,8 @@ func (*StakeAddedEvent) Sig() ethgo.Hash {
 	return StakeManager.Abi.Events["StakeAdded"].ID()
 }
 
-func (*StakeAddedEvent) Encode(inputs interface{}) ([]byte, error) {
-	return StakeManager.Abi.Events["StakeAdded"].Inputs.Encode(inputs)
+func (s *StakeAddedEvent) Encode() ([]byte, error) {
+	return StakeManager.Abi.Events["StakeAdded"].Inputs.Encode(s)
 }
 
 func (s *StakeAddedEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1485,8 +1485,8 @@ func (*StakeWithdrawnEvent) Sig() ethgo.Hash {
 	return StakeManager.Abi.Events["StakeWithdrawn"].ID()
 }
 
-func (*StakeWithdrawnEvent) Encode(inputs interface{}) ([]byte, error) {
-	return StakeManager.Abi.Events["StakeWithdrawn"].Inputs.Encode(inputs)
+func (s *StakeWithdrawnEvent) Encode() ([]byte, error) {
+	return StakeManager.Abi.Events["StakeWithdrawn"].Inputs.Encode(s)
 }
 
 func (s *StakeWithdrawnEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1595,8 +1595,8 @@ func (*TransferEvent) Sig() ethgo.Hash {
 	return ValidatorSet.Abi.Events["Transfer"].ID()
 }
 
-func (*TransferEvent) Encode(inputs interface{}) ([]byte, error) {
-	return ValidatorSet.Abi.Events["Transfer"].Inputs.Encode(inputs)
+func (t *TransferEvent) Encode() ([]byte, error) {
+	return ValidatorSet.Abi.Events["Transfer"].Inputs.Encode(t)
 }
 
 func (t *TransferEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1620,8 +1620,8 @@ func (*WithdrawalRegisteredEvent) Sig() ethgo.Hash {
 	return ValidatorSet.Abi.Events["WithdrawalRegistered"].ID()
 }
 
-func (*WithdrawalRegisteredEvent) Encode(inputs interface{}) ([]byte, error) {
-	return ValidatorSet.Abi.Events["WithdrawalRegistered"].Inputs.Encode(inputs)
+func (w *WithdrawalRegisteredEvent) Encode() ([]byte, error) {
+	return ValidatorSet.Abi.Events["WithdrawalRegistered"].Inputs.Encode(w)
 }
 
 func (w *WithdrawalRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
@@ -1645,8 +1645,8 @@ func (*WithdrawalEvent) Sig() ethgo.Hash {
 	return ValidatorSet.Abi.Events["Withdrawal"].ID()
 }
 
-func (*WithdrawalEvent) Encode(inputs interface{}) ([]byte, error) {
-	return ValidatorSet.Abi.Events["Withdrawal"].Inputs.Encode(inputs)
+func (w *WithdrawalEvent) Encode() ([]byte, error) {
+	return ValidatorSet.Abi.Events["Withdrawal"].Inputs.Encode(w)
 }
 
 func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {

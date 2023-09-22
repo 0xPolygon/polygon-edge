@@ -649,8 +649,8 @@ func (*{{.TName}}) Sig() ethgo.Hash {
 	return {{.ContractName}}.Abi.Events["{{.Name}}"].ID()
 }
 
-func (*{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
-	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
+func ({{.Sig}} *{{.TName}}) Encode() ([]byte, error) {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode({{.Sig}})
 }
 
 func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
