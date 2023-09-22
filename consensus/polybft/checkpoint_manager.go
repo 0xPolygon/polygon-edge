@@ -405,9 +405,9 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
 	}
 
-	var exitEventAPI contractsapi.L2StateSyncedEvent
+	var exitEventABI contractsapi.L2StateSyncedEvent
 
-	e, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
+	exitEventEncoded, err := exitEventABI.Encode(exitEvent.L2StateSyncedEvent)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -422,23 +422,25 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
-	leafIndex, err := tree.LeafIndex(e)
+	leafIndex, err := tree.LeafIndex(exitEventEncoded)
 	if err != nil {
 		return types.Proof{}, err
 	}
 
-	proof, err := tree.GenerateProof(e)
+	proof, err := tree.GenerateProof(exitEventEncoded)
 	if err != nil {
 		return types.Proof{}, err
 	}
 
 	c.logger.Debug("Generated proof for exit", "exitID", exitID, "leafIndex", leafIndex, "proofLen", len(proof))
 
+	exitEventHex := hex.EncodeToString(exitEventEncoded)
+
 	return types.Proof{
 		Data: proof,
 		Metadata: map[string]interface{}{
 			"LeafIndex":       leafIndex,
-			"ExitEvent":       exitEvent,
+			"ExitEvent":       exitEventHex,
 			"CheckpointBlock": checkpointBlock,
 		},
 	}, nil

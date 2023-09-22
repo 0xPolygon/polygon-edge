@@ -659,7 +659,12 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
-}`
+}
+
+func ({{.Sig}} *{{.TName}}) Decode(input []byte) error {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.DecodeStruct(input, &{{.Sig}})
+}
+`
 
 	inputs := map[string]interface{}{
 		"Structs":      res,

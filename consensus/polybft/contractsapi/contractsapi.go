@@ -99,6 +99,10 @@ func (s *StateSyncResultEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(StateReceiver.Abi.Events["StateSyncResult"], log, s)
 }
 
+func (s *StateSyncResultEvent) Decode(input []byte) error {
+	return StateReceiver.Abi.Events["StateSyncResult"].Inputs.DecodeStruct(input, &s)
+}
+
 type NewCommitmentEvent struct {
 	StartID *big.Int   `abi:"startId"`
 	EndID   *big.Int   `abi:"endId"`
@@ -119,6 +123,10 @@ func (n *NewCommitmentEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(StateReceiver.Abi.Events["NewCommitment"], log, n)
+}
+
+func (n *NewCommitmentEvent) Decode(input []byte) error {
+	return StateReceiver.Abi.Events["NewCommitment"].Inputs.DecodeStruct(input, &n)
 }
 
 type SyncStateStateSenderFn struct {
@@ -161,6 +169,10 @@ func (s *StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(StateSender.Abi.Events["StateSynced"], log, s)
 }
 
+func (s *StateSyncedEvent) Decode(input []byte) error {
+	return StateSender.Abi.Events["StateSynced"].Inputs.DecodeStruct(input, &s)
+}
+
 type L2StateSyncedEvent struct {
 	ID       *big.Int      `abi:"id"`
 	Sender   types.Address `abi:"sender"`
@@ -182,6 +194,10 @@ func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
+}
+
+func (l *L2StateSyncedEvent) Decode(input []byte) error {
+	return L2StateSender.Abi.Events["L2StateSynced"].Inputs.DecodeStruct(input, &l)
 }
 
 type CheckpointManagerConstructorFn struct {
@@ -560,6 +576,10 @@ func (t *TokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(RootERC20Predicate.Abi.Events["TokenMapped"], log, t)
 }
 
+func (t *TokenMappedEvent) Decode(input []byte) error {
+	return RootERC20Predicate.Abi.Events["TokenMapped"].Inputs.DecodeStruct(input, &t)
+}
+
 type InitializeChildMintableERC20PredicateFn struct {
 	NewStateSender        types.Address `abi:"newStateSender"`
 	NewExitHelper         types.Address `abi:"newExitHelper"`
@@ -598,6 +618,10 @@ func (m *MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"], log, m)
+}
+
+func (m *MintableTokenMappedEvent) Decode(input []byte) error {
+	return ChildMintableERC20Predicate.Abi.Events["MintableTokenMapped"].Inputs.DecodeStruct(input, &m)
 }
 
 type BalanceOfRootERC20Fn struct {
@@ -899,6 +923,10 @@ func (l *L2MintableTokenMappedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"], log, l)
+}
+
+func (l *L2MintableTokenMappedEvent) Decode(input []byte) error {
+	return RootMintableERC1155PredicateACL.Abi.Events["L2MintableTokenMapped"].Inputs.DecodeStruct(input, &l)
 }
 
 type InitializeChildERC1155Fn struct {
@@ -1268,6 +1296,10 @@ func (v *ValidatorRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(CustomSupernetManager.Abi.Events["ValidatorRegistered"], log, v)
 }
 
+func (v *ValidatorRegisteredEvent) Decode(input []byte) error {
+	return CustomSupernetManager.Abi.Events["ValidatorRegistered"].Inputs.DecodeStruct(input, &v)
+}
+
 type AddedToWhitelistEvent struct {
 	Validator types.Address `abi:"validator"`
 }
@@ -1286,6 +1318,10 @@ func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(CustomSupernetManager.Abi.Events["AddedToWhitelist"], log, a)
+}
+
+func (a *AddedToWhitelistEvent) Decode(input []byte) error {
+	return CustomSupernetManager.Abi.Events["AddedToWhitelist"].Inputs.DecodeStruct(input, &a)
 }
 
 type InitializeStakeManagerFn struct {
@@ -1409,6 +1445,10 @@ func (c *ChildManagerRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(StakeManager.Abi.Events["ChildManagerRegistered"], log, c)
 }
 
+func (c *ChildManagerRegisteredEvent) Decode(input []byte) error {
+	return StakeManager.Abi.Events["ChildManagerRegistered"].Inputs.DecodeStruct(input, &c)
+}
+
 type StakeAddedEvent struct {
 	ID        *big.Int      `abi:"id"`
 	Validator types.Address `abi:"validator"`
@@ -1431,6 +1471,10 @@ func (s *StakeAddedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(StakeManager.Abi.Events["StakeAdded"], log, s)
 }
 
+func (s *StakeAddedEvent) Decode(input []byte) error {
+	return StakeManager.Abi.Events["StakeAdded"].Inputs.DecodeStruct(input, &s)
+}
+
 type StakeWithdrawnEvent struct {
 	Validator types.Address `abi:"validator"`
 	Recipient types.Address `abi:"recipient"`
@@ -1451,6 +1495,10 @@ func (s *StakeWithdrawnEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(StakeManager.Abi.Events["StakeWithdrawn"], log, s)
+}
+
+func (s *StakeWithdrawnEvent) Decode(input []byte) error {
+	return StakeManager.Abi.Events["StakeWithdrawn"].Inputs.DecodeStruct(input, &s)
 }
 
 type Epoch struct {
@@ -1559,6 +1607,10 @@ func (t *TransferEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(ValidatorSet.Abi.Events["Transfer"], log, t)
 }
 
+func (t *TransferEvent) Decode(input []byte) error {
+	return ValidatorSet.Abi.Events["Transfer"].Inputs.DecodeStruct(input, &t)
+}
+
 type WithdrawalRegisteredEvent struct {
 	Account types.Address `abi:"account"`
 	Amount  *big.Int      `abi:"amount"`
@@ -1580,6 +1632,10 @@ func (w *WithdrawalRegisteredEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(ValidatorSet.Abi.Events["WithdrawalRegistered"], log, w)
 }
 
+func (w *WithdrawalRegisteredEvent) Decode(input []byte) error {
+	return ValidatorSet.Abi.Events["WithdrawalRegistered"].Inputs.DecodeStruct(input, &w)
+}
+
 type WithdrawalEvent struct {
 	Account types.Address `abi:"account"`
 	Amount  *big.Int      `abi:"amount"`
@@ -1599,6 +1655,10 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent(ValidatorSet.Abi.Events["Withdrawal"], log, w)
+}
+
+func (w *WithdrawalEvent) Decode(input []byte) error {
+	return ValidatorSet.Abi.Events["Withdrawal"].Inputs.DecodeStruct(input, &w)
 }
 
 type InitializeRewardPoolFn struct {
