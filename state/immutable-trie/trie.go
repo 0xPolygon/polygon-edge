@@ -180,9 +180,8 @@ func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
 		return nil, nil
 
 	case *ValueNode:
-		fmt.Println("value node")
-
 		if n.hash {
+			fmt.Println("hash node")
 			nc, ok, err := GetNode(n.buf, t.storage)
 			if err != nil {
 				panic(err) //nolint:gocritic

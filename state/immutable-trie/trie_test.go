@@ -64,7 +64,7 @@ func (traceStore) Close() error                           { return nil }
 
 func LoadTrace() (*types.Trace, error) {
 	// Load Trace structure from JSON file.
-	traceFile, err := os.Open("71000_trace_readable.json")
+	traceFile, err := os.Open("3302_trace_readable.json")
 	if err != nil {
 		return nil, err
 	}
@@ -156,12 +156,12 @@ func TestTrie_Load(t *testing.T) {
 	sn, err := s.NewSnapshotAt(ltr.ParentStateRoot)
 	require.NoError(t, err)
 
-	addr := types.StringToAddress("0x0000000000000000000000000000000000000101")
+	addr := types.StringToAddress("0x6FdA56C57B0Acadb96Ed5624aC500C0429d59429")
 	acc, err := sn.GetAccount(addr)
 	require.NotNil(t, acc)
 	require.NoError(t, err)
 
-	b := sn.GetStorage(addr, acc.Root, types.StringToHash("0xb7d815cabb43222c333e6792c1a90fe7f30d238ce576408088a4ff29c49efc73"))
+	b := sn.GetStorage(addr, acc.Root, types.StringToHash("0x6f84ba72e3c7119775dd4b9839e852d6f2c31195b0aa3948c4b73a01d4180d71"))
 	t.Logf("-- VALUE --: %s\n", b.String())
 
 	// for _, txt := range ltr.TxnTraces {
@@ -173,6 +173,7 @@ func TestTrie_Load(t *testing.T) {
 	// 		b := sn.GetStorage(addr, acc.Root, slot)
 	// 		t.Logf("-- VALUE --: %s\n", b.String())
 
+	// 		assert.NotEqual(t, types.ZeroHash, b)
 	// 		// assert.Equal(t, val.Bytes(), v)
 	// 	}
 	// }
