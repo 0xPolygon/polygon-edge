@@ -769,7 +769,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 // (only once) and an enqueueRequest is signaled.
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if p.logger.IsDebug() {
-		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash.String())
+		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.GetHash().String())
 	}
 
 	// validate incoming tx
@@ -816,7 +816,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// try to find if there is transaction with same nonce for this account
 	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce)
 	if oldTxWithSameNonce != nil {
-		if oldTxWithSameNonce.Hash == tx.Hash {
+		if oldTxWithSameNonce.GetHash() == tx.GetHash() {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
@@ -870,13 +870,14 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 }
 
 func (p *TxPool) invokePromotion(tx *types.Transaction, callPromote bool) {
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+	txHash := tx.GetHash()
+	p.eventManager.signalEvent(proto.EventType_ADDED, txHash)
 
 	if p.logger.IsDebug() {
-		p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+		p.logger.Debug("enqueue request", "hash", txHash.String())
 	}
 
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, txHash)
 
 	if callPromote {
 		select {

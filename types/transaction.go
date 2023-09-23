@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -65,6 +66,8 @@ type Transaction struct {
 
 	ChainID *big.Int
 
+	lock sync.RWMutex
+
 	// Cache
 	size atomic.Pointer[uint64]
 }
@@ -121,6 +124,22 @@ func (t *Transaction) Copy() *Transaction {
 	copy(tt.Input[:], t.Input[:])
 
 	return tt
+}
+
+// GetHash reads transaction hash in a thread-safe manner
+func (t *Transaction) GetHash() Hash {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.Hash
+}
+
+// SetHash sets transaction hash in a thread-safe manner
+func (t *Transaction) SetHash(hash Hash) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.Hash = hash
 }
 
 // Cost returns gas * gasPrice + value
