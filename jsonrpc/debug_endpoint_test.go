@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
@@ -821,12 +822,15 @@ func Test_newTracer(t *testing.T) {
 
 		assert.NoError(t, err)
 
+		st, ok := tracer.(*structtracer.StructTracer)
+		require.True(t, ok)
+
 		assert.Equal(t, structtracer.Config{
 			EnableMemory:     false,
 			EnableStack:      false,
 			EnableStorage:    false,
 			EnableReturnData: true,
 			EnableStructLogs: false,
-		}, tracer.(*structtracer.StructTracer).Config)
+		}, st.Config)
 	})
 }
