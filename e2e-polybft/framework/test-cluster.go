@@ -76,7 +76,6 @@ type TestClusterConfig struct {
 	Premine              []string // address[:amount]
 	PremineValidators    []string // address[:amount]
 	StakeAmounts         []*big.Int
-	WithoutBridge        bool
 	BootnodeCount        int
 	NonValidatorCount    int
 	WithLogs             bool
@@ -206,12 +205,6 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.SecretsCallback = fn
-	}
-}
-
-func WithoutBridge() ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.WithoutBridge = true
 	}
 }
 
@@ -586,47 +579,45 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 		require.NoError(t, err)
 	}
 
-	if !cluster.Config.WithoutBridge {
-		// start bridge
-		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
-		require.NoError(t, err)
+	// start bridge
+	cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+	require.NoError(t, err)
 
-		// deploy stake manager contract
-		err := cluster.Bridge.deployStakeManager(genesisPath)
-		require.NoError(t, err)
+	// deploy stake manager contract
+	err = cluster.Bridge.deployStakeManager(genesisPath)
+	require.NoError(t, err)
 
-		// deploy rootchain contracts
-		err = cluster.Bridge.deployRootchainContracts(genesisPath)
-		require.NoError(t, err)
+	// deploy rootchain contracts
+	err = cluster.Bridge.deployRootchainContracts(genesisPath)
+	require.NoError(t, err)
 
-		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
-		require.NoError(t, err)
+	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+	require.NoError(t, err)
 
-		// fund validators on the rootchain
-		err = cluster.Bridge.fundRootchainValidators(polybftConfig)
-		require.NoError(t, err)
+	// fund validators on the rootchain
+	err = cluster.Bridge.fundRootchainValidators(polybftConfig)
+	require.NoError(t, err)
 
-		// whitelist genesis validators on the rootchain
-		err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
-		require.NoError(t, err)
+	// whitelist genesis validators on the rootchain
+	err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
+	require.NoError(t, err)
 
-		// register genesis validators on the rootchain
-		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
-		require.NoError(t, err)
+	// register genesis validators on the rootchain
+	err = cluster.Bridge.registerGenesisValidators(polybftConfig)
+	require.NoError(t, err)
 
-		// do initial staking for genesis validators on the rootchain
-		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
-		require.NoError(t, err)
+	// do initial staking for genesis validators on the rootchain
+	err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
+	require.NoError(t, err)
 
-		// finalize genesis validators on the rootchain
-		err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
-		require.NoError(t, err)
-	}
+	// finalize genesis validators on the rootchain
+	err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
+	require.NoError(t, err)
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
+			true, i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
