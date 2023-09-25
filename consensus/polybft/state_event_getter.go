@@ -24,9 +24,26 @@ type eventsGetter[T contractsapi.EventAbi] struct {
 // and saves them using the provided saveEventsFn
 func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 	currentBlock *types.FullBlock) ([]T, error) {
+	allEvents, err := e.getEventsFromAllBlocks(lastProcessedBlock+1, currentBlock.Block.Number()-1)
+	if err != nil {
+		return nil, err
+	}
+
+	currentEvents, err := e.getEventsFromReceipts(currentBlock.Block.Header, currentBlock.Receipts)
+	if err != nil {
+		return nil, err
+	}
+
+	allEvents = append(allEvents, currentEvents...)
+
+	return allEvents, nil
+}
+
+// getEventsFromAllBlocks gets events of specified type from all the blocks specified [from, to]
+func (e *eventsGetter[T]) getEventsFromAllBlocks(from, to uint64) ([]T, error) {
 	var allEvents []T
 
-	for i := lastProcessedBlock + 1; i < currentBlock.Block.Number(); i++ {
+	for i := from; i <= to; i++ {
 		blockHeader, found := e.blockchain.GetHeaderByNumber(i)
 		if !found {
 			return nil, blockchain.ErrNoBlock
@@ -44,13 +61,6 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 
 		allEvents = append(allEvents, eventsFromBlock...)
 	}
-
-	currentEvents, err := e.getEventsFromReceipts(currentBlock.Block.Header, currentBlock.Receipts)
-	if err != nil {
-		return nil, err
-	}
-
-	allEvents = append(allEvents, currentEvents...)
 
 	return allEvents, nil
 }

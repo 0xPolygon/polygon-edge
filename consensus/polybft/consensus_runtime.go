@@ -227,7 +227,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		return err
 	}
 
-	c.stakeManager = newStakeManager(
+	c.stakeManager, err = newStakeManager(
 		logger.Named("stake-manager"),
 		c.state,
 		rootRelayer,
@@ -238,7 +238,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
 	)
 
-	return nil
+	return err
 }
 
 // getGuardedData returns last build block, proposer snapshot and current epochMetadata in a thread-safe manner.

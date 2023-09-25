@@ -480,6 +480,11 @@ func Test_NewConsensusRuntime(t *testing.T) {
 		blockchain:     blockchainMock,
 		bridgeTopic:    &mockTopic{},
 	}
+
+	require.NoError(t, config.State.StakeStore.insertFullValidatorSet(validatorSetState{
+		BlockNumber: 1,
+	}))
+
 	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	require.NoError(t, err)
 

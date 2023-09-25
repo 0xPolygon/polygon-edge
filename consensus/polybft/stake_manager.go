@@ -67,7 +67,7 @@ func newStakeManager(
 	validatorSetAddr, supernetManagerAddr types.Address,
 	blockchain blockchainBackend,
 	maxValidatorSetSize int,
-) *stakeManager {
+) (*stakeManager, error) {
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
@@ -81,7 +81,7 @@ func newStakeManager(
 		},
 	}
 
-	return &stakeManager{
+	sm := &stakeManager{
 		logger:                  logger,
 		state:                   state,
 		rootChainRelayer:        rootchainRelayer,
@@ -90,6 +90,12 @@ func newStakeManager(
 		maxValidatorSetSize:     maxValidatorSetSize,
 		eventsGetter:            eventsGetter,
 	}
+
+	if err := sm.init(blockchain); err != nil {
+		return nil, err
+	}
+
+	return sm, nil
 }
 
 // PostEpoch saves the initial validator set to db
@@ -115,30 +121,82 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	s.logger.Debug("Stake manager on post block", "block", req.FullBlock.Block.Number(),
-		"last saved", fullValidatorSet.BlockNumber, "last updated", fullValidatorSet.UpdatedAtBlockNumber)
+	blockNumber := req.FullBlock.Block.Number()
 
-	err = s.updateWithReceipts(&fullValidatorSet, req.FullBlock)
-	if err != nil {
-		return err
-	}
-
-	fullValidatorSet.EpochID = req.Epoch
-	fullValidatorSet.BlockNumber = req.FullBlock.Block.Number()
-
-	return s.state.StakeStore.insertFullValidatorSet(fullValidatorSet)
-}
-
-func (s *stakeManager) updateWithReceipts(
-	fullValidatorSet *validatorSetState, fullBlock *types.FullBlock) error {
-	var transferEvents []*contractsapi.TransferEvent
+	s.logger.Debug("Stake manager on post block",
+		"block", blockNumber,
+		"last saved", fullValidatorSet.BlockNumber,
+		"last updated", fullValidatorSet.UpdatedAtBlockNumber)
 
 	// get transfer currentBlockEvents from current block
-	transferEvents, err := s.eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber, fullBlock)
+	transferEvents, err := s.eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber, req.FullBlock)
 	if err != nil {
 		return fmt.Errorf("could not get transfer events from current block. Error: %w", err)
 	}
 
+	if err = s.updateWithReceipts(&fullValidatorSet, transferEvents, blockNumber); err != nil {
+		return err
+	}
+
+	// we should save new state even if number of events is zero
+	// because otherwise next time we will process more blocks
+	fullValidatorSet.EpochID = req.Epoch
+	fullValidatorSet.BlockNumber = blockNumber
+
+	return s.state.StakeStore.insertFullValidatorSet(fullValidatorSet)
+}
+
+func (s *stakeManager) init(blockchain blockchainBackend) error {
+	currentHeader := blockchain.CurrentHeader()
+	currentBlockNumber := currentHeader.Number
+
+	// early exit if this is genesis block
+	if currentBlockNumber == 0 {
+		return nil
+	}
+
+	validatorSet, err := s.state.StakeStore.getFullValidatorSet()
+	if err != nil {
+		return err
+	}
+
+	// early return if current block is already processed
+	if validatorSet.BlockNumber == currentBlockNumber {
+		return nil
+	}
+
+	// retrieve epoch needed for state
+	epochID, err := getEpochID(blockchain, currentHeader)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Debug("Stake manager on post block",
+		"block", currentBlockNumber,
+		"last saved", validatorSet.BlockNumber,
+		"last updated", validatorSet.UpdatedAtBlockNumber)
+
+	transferEvents, err := s.eventsGetter.getEventsFromAllBlocks(validatorSet.BlockNumber+1, currentBlockNumber)
+	if err != nil {
+		return err
+	}
+
+	if err := s.updateWithReceipts(&validatorSet, transferEvents, currentBlockNumber); err != nil {
+		return err
+	}
+
+	// we should save new state even if number of events is zero
+	// because otherwise next time we will process more blocks
+	validatorSet.EpochID = epochID
+	validatorSet.BlockNumber = currentBlockNumber
+
+	return s.state.StakeStore.insertFullValidatorSet(validatorSet)
+}
+
+func (s *stakeManager) updateWithReceipts(
+	fullValidatorSet *validatorSetState,
+	transferEvents []*contractsapi.TransferEvent,
+	blockNumber uint64) error {
 	if len(transferEvents) == 0 {
 		return nil
 	}
@@ -165,7 +223,7 @@ func (s *stakeManager) updateWithReceipts(
 			blsKey, err := s.getBlsKey(data.Address)
 			if err != nil {
 				s.logger.Warn("Could not get info for new validator",
-					"block", fullBlock.Block.Number(), "address", addr)
+					"block", blockNumber, "address", addr)
 			}
 
 			data.BlsKey = blsKey
@@ -175,9 +233,9 @@ func (s *stakeManager) updateWithReceipts(
 	}
 
 	// mark on which block validator set has been updated
-	fullValidatorSet.UpdatedAtBlockNumber = fullValidatorSet.BlockNumber
+	fullValidatorSet.UpdatedAtBlockNumber = blockNumber
 
-	s.logger.Debug("Full validator set after", "block", fullBlock.Block, "data", fullValidatorSet.Validators)
+	s.logger.Debug("Full validator set after", "block", blockNumber, "data", fullValidatorSet.Validators)
 
 	return nil
 }
@@ -398,4 +456,13 @@ func (sc validatorStakeMap) String() string {
 	}
 
 	return sb.String()
+}
+
+func getEpochID(blockchain blockchainBackend, header *types.Header) (uint64, error) {
+	provider, err := blockchain.GetStateProviderForBlock(header)
+	if err != nil {
+		return 0, err
+	}
+
+	return blockchain.GetSystemState(provider).GetEpoch()
 }
