@@ -121,8 +121,10 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
+	blockNumber := req.FullBlock.Block.Number()
+
 	s.logger.Debug("Stake manager on post block",
-		"block", req.FullBlock.Block.Number(),
+		"block", blockNumber,
 		"last saved", fullValidatorSet.BlockNumber,
 		"last updated", fullValidatorSet.UpdatedAtBlockNumber)
 
@@ -132,16 +134,14 @@ func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("could not get transfer events from current block. Error: %w", err)
 	}
 
-	// we should save new state even if number of events is zero
-	// because otherwise next time we will process more blocks
-	if len(transferEvents) > 0 {
-		if err = s.updateWithReceipts(&fullValidatorSet, transferEvents, req.FullBlock.Block.Number()); err != nil {
-			return err
-		}
+	if err = s.updateWithReceipts(&fullValidatorSet, transferEvents, blockNumber); err != nil {
+		return err
 	}
 
+	// we should save new state even if number of events is zero
+	// because otherwise next time we will process more blocks
 	fullValidatorSet.EpochID = req.Epoch
-	fullValidatorSet.BlockNumber = req.FullBlock.Block.Number()
+	fullValidatorSet.BlockNumber = blockNumber
 
 	return s.state.StakeStore.insertFullValidatorSet(fullValidatorSet)
 }
@@ -181,14 +181,12 @@ func (s *stakeManager) init(blockchain blockchainBackend) error {
 		return err
 	}
 
-	// we should save new state even if number of events is zero
-	// because otherwise next time we will process more blocks
-	if len(transferEvents) > 0 {
-		if err := s.updateWithReceipts(&validatorSet, transferEvents, currentBlockNumber); err != nil {
-			return err
-		}
+	if err := s.updateWithReceipts(&validatorSet, transferEvents, currentBlockNumber); err != nil {
+		return err
 	}
 
+	// we should save new state even if number of events is zero
+	// because otherwise next time we will process more blocks
 	validatorSet.EpochID = epochID
 	validatorSet.BlockNumber = currentBlockNumber
 
@@ -199,6 +197,10 @@ func (s *stakeManager) updateWithReceipts(
 	fullValidatorSet *validatorSetState,
 	transferEvents []*contractsapi.TransferEvent,
 	blockNumber uint64) error {
+	if len(transferEvents) == 0 {
+		return nil
+	}
+
 	for _, event := range transferEvents {
 		if event.IsStake() {
 			s.logger.Debug("Stake transfer event", "to", event.To, "value", event.Value)
