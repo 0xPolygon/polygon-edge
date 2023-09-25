@@ -5,13 +5,14 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -118,6 +119,7 @@ func TestStructTracerClear(t *testing.T) {
 			EnableStack:      true,
 			EnableStorage:    true,
 			EnableReturnData: true,
+			EnableStructLogs: true,
 		},
 		reason:    errors.New("timeout"),
 		interrupt: true,
@@ -154,6 +156,7 @@ func TestStructTracerClear(t *testing.T) {
 				EnableStack:      true,
 				EnableStorage:    true,
 				EnableReturnData: true,
+				EnableStructLogs: true,
 			},
 			reason:      nil,
 			interrupt:   false,
@@ -352,7 +355,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should capture memory",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableMemory: true,
+					EnableMemory:     true,
+					EnableStructLogs: true,
 				},
 				currentMemory: make([]([]byte), 1),
 			},
@@ -367,7 +371,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config: Config{
-					EnableMemory: true,
+					EnableMemory:     true,
+					EnableStructLogs: true,
 				},
 				currentMemory: memory,
 			},
@@ -377,7 +382,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should capture stack",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStack: true,
+					EnableStack:      true,
+					EnableStructLogs: true,
 				},
 				currentStack: make([]([]*big.Int), 1),
 			},
@@ -392,7 +398,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config: Config{
-					EnableStack: true,
+					EnableStack:      true,
+					EnableStructLogs: true,
 				},
 				currentStack: stack,
 			},
@@ -402,7 +409,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should capture storage by SLOAD",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
@@ -426,7 +434,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: [](map[types.Address]map[types.Hash]types.Hash){
 					map[types.Address]map[types.Hash]types.Hash{
@@ -442,7 +451,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should capture storage by SSTORE",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					{
@@ -463,7 +473,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					{
@@ -502,7 +513,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should not capture if sp is less than 1 in case op SLOAD",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
@@ -519,7 +531,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
@@ -531,7 +544,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			name: "should not capture if sp is less than 2 in case op SSTORE",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
@@ -548,7 +562,8 @@ func TestStructTracerCaptureState(t *testing.T) {
 			},
 			expectedTracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: []map[types.Address]map[types.Hash]types.Hash{
 					make(map[types.Address]map[types.Hash]types.Hash),
@@ -639,9 +654,31 @@ func TestStructTracerExecuteState(t *testing.T) {
 		expected []StructLog
 	}{
 		{
-			name: "should create minimal log",
+			name: "should create no log",
 			tracer: &StructTracer{
 				Config: testEmptyConfig,
+			},
+			contractAddress: contractAddress,
+			ip:              ip,
+			opCode:          opCode,
+			availableGas:    availableGas,
+			cost:            cost,
+			lastReturnData:  lastReturnData,
+			depth:           depth,
+			err:             err,
+			host: &mockHost{
+				getRefundFn: func() uint64 {
+					return refund
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "should create minimal log",
+			tracer: &StructTracer{
+				Config: Config{
+					EnableStructLogs: true,
+				},
 			},
 			contractAddress: contractAddress,
 			ip:              ip,
@@ -676,7 +713,8 @@ func TestStructTracerExecuteState(t *testing.T) {
 			name: "should save memory",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableMemory: true,
+					EnableMemory:     true,
+					EnableStructLogs: true,
 				},
 				currentMemory: memory,
 			},
@@ -713,7 +751,8 @@ func TestStructTracerExecuteState(t *testing.T) {
 			name: "should save stack",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStack: true,
+					EnableStack:      true,
+					EnableStructLogs: true,
 				},
 				currentStack: [][]*big.Int{{
 					big.NewInt(1),
@@ -772,27 +811,14 @@ func TestStructTracerExecuteState(t *testing.T) {
 					return refund
 				},
 			},
-			expected: []StructLog{
-				{
-					Pc:            ip,
-					Op:            opCode,
-					Gas:           availableGas,
-					GasCost:       cost,
-					Memory:        nil,
-					Stack:         nil,
-					ReturnData:    hex.EncodeToString(lastReturnData),
-					Storage:       nil,
-					Depth:         depth,
-					RefundCounter: refund,
-					Error:         err.Error(),
-				},
-			},
+			expected: nil,
 		},
 		{
 			name: "should save storage",
 			tracer: &StructTracer{
 				Config: Config{
-					EnableStorage: true,
+					EnableStorage:    true,
+					EnableStructLogs: true,
 				},
 				storage: storage,
 			},
@@ -832,10 +858,6 @@ func TestStructTracerExecuteState(t *testing.T) {
 
 	for _, test := range tests {
 		test := test
-
-		if test.name != "should save storage" {
-			continue
-		}
 
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
