@@ -235,7 +235,7 @@ func (s *stakeManager) updateWithReceipts(
 	// mark on which block validator set has been updated
 	fullValidatorSet.UpdatedAtBlockNumber = blockNumber
 
-	s.logger.Debug("Full validator set after", "data", fullValidatorSet.Validators)
+	s.logger.Debug("Full validator set after", "block", blockNumber, "data", fullValidatorSet.Validators)
 
 	return nil
 }
