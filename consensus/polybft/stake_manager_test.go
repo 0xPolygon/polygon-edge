@@ -18,40 +18,6 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 )
 
-func TestStakeManager_PostEpoch(t *testing.T) {
-	validators := validator.NewTestValidators(t, 5).GetPublicIdentities()
-	state := newTestState(t)
-
-	stakeManager := &stakeManager{
-		logger:              hclog.NewNullLogger(),
-		state:               state,
-		maxValidatorSetSize: 10,
-	}
-
-	t.Run("Not first epoch", func(t *testing.T) {
-		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID:   2,
-			ValidatorSet: validator.NewValidatorSet(validators, stakeManager.logger),
-		}))
-
-		_, err := state.StakeStore.getFullValidatorSet()
-		require.ErrorIs(t, errNoFullValidatorSet, err)
-	})
-
-	t.Run("First epoch", func(t *testing.T) {
-		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID:   1,
-			ValidatorSet: validator.NewValidatorSet(validators, stakeManager.logger),
-		}))
-
-		fullValidatorSet, err := state.StakeStore.getFullValidatorSet()
-		require.NoError(t, err)
-		require.Len(t, fullValidatorSet.Validators, len(validators))
-		require.Equal(t, uint64(0), fullValidatorSet.EpochID)
-		require.Equal(t, uint64(0), fullValidatorSet.BlockNumber)
-	})
-}
-
 func TestStakeManager_PostBlock(t *testing.T) {
 	t.Parallel()
 
@@ -66,14 +32,21 @@ func TestStakeManager_PostBlock(t *testing.T) {
 		validatorSetAddr  = types.StringToAddress("0x0001")
 	)
 
-	state := newTestState(t)
 	t.Run("PostBlock - unstake to zero", func(t *testing.T) {
 		t.Parallel()
 
+		state := newTestState(t)
+
 		bcMock := new(blockchainMock)
-		bcMock.On("CurrentHeader").Return(&types.Header{Number: 0}, true).Once()
+		bcMock.On("CurrentHeader").Return(&types.Header{Number: block - 1}, true).Once()
 
 		validators := validator.NewTestValidatorsWithAliases(t, allAliases)
+
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 1,
+		}))
 
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
@@ -82,15 +55,10 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			validatorSetAddr, types.StringToAddress("0x0002"),
 			bcMock,
+			nil,
 			5,
 		)
 		require.NoError(t, err)
-
-		// insert initial full validator set
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
-			BlockNumber: block - 1,
-		}))
 
 		receipt := &types.Receipt{
 			Logs: []*types.Log{
@@ -131,10 +99,18 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	t.Run("PostBlock - add stake to one validator", func(t *testing.T) {
 		t.Parallel()
 
+		state := newTestState(t)
+
 		bcMock := new(blockchainMock)
-		bcMock.On("CurrentHeader").Return(&types.Header{Number: 0}, true).Once()
+		bcMock.On("CurrentHeader").Return(&types.Header{Number: block - 1}, true).Once()
 
 		validators := validator.NewTestValidatorsWithAliases(t, allAliases)
+
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 1,
+		}))
 
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
@@ -143,15 +119,10 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
+			nil,
 			5,
 		)
 		require.NoError(t, err)
-
-		// insert initial full validator set
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
-			BlockNumber: block - 1,
-		}))
 
 		receipt := &types.Receipt{
 			Logs: []*types.Log{
@@ -193,6 +164,8 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	t.Run("PostBlock - add validator and stake", func(t *testing.T) {
 		t.Parallel()
 
+		state := newTestState(t)
+
 		validators := validator.NewTestValidatorsWithAliases(t, allAliases, []uint64{1, 2, 3, 4, 5, 6})
 
 		txRelayerMock := newDummyStakeTxRelayer(t, func() *validator.ValidatorMetadata {
@@ -204,7 +177,13 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			Return(nil, error(nil))
 
 		bcMock := new(blockchainMock)
-		bcMock.On("CurrentHeader").Return(&types.Header{Number: 0}, true).Once()
+		bcMock.On("CurrentHeader").Return(&types.Header{Number: block - 1}, true).Once()
+
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 1,
+		}))
 
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
@@ -213,15 +192,10 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
+			nil,
 			5,
 		)
 		require.NoError(t, err)
-
-		// insert initial full validator set
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
-			BlockNumber: block - 1,
-		}))
 
 		receipts := make([]*types.Receipt, len(allAliases))
 		for i := 0; i < len(allAliases); i++ {
@@ -258,17 +232,27 @@ func TestStakeManager_PostBlock(t *testing.T) {
 	t.Run("PostBlock - add stake to one validator + missing block", func(t *testing.T) {
 		t.Parallel()
 
+		state := newTestState(t)
+
 		receipt := &types.Receipt{}
-		header1, header2 := &types.Header{Hash: types.Hash{3, 2}, Number: 0}, &types.Header{Hash: types.Hash{6, 4}, Number: 0}
+		header0 := &types.Header{Hash: types.Hash{3, 5}, Number: block - 3}
+		header1 := &types.Header{Hash: types.Hash{3, 2}, Number: block - 2}
+		header2 := &types.Header{Hash: types.Hash{6, 4}, Number: block - 1}
 
 		bcMock := new(blockchainMock)
-		bcMock.On("CurrentHeader").Return(header1)
+		bcMock.On("CurrentHeader").Return(header0)
 		bcMock.On("GetHeaderByNumber", block-2).Return(header1, true).Once()
 		bcMock.On("GetHeaderByNumber", block-1).Return(header2, true).Once()
 		bcMock.On("GetReceiptsByHash", header1.Hash).Return([]*types.Receipt{receipt}, error(nil)).Once()
 		bcMock.On("GetReceiptsByHash", header2.Hash).Return([]*types.Receipt{}, error(nil)).Once()
 
 		validators := validator.NewTestValidatorsWithAliases(t, allAliases)
+
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+			BlockNumber: block - 3,
+		}))
 
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
@@ -277,15 +261,10 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
+			nil,
 			5,
 		)
 		require.NoError(t, err)
-
-		// insert initial full validator set
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators:  newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
-			BlockNumber: block - 3,
-		}))
 
 		receipt.Logs = []*types.Log{
 			createTestLogForTransferEvent(
@@ -337,6 +316,10 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 	bcMock := new(blockchainMock)
 	bcMock.On("CurrentHeader").Return(&types.Header{Number: 0}, true).Once()
 
+	require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+		Validators: newValidatorStakeMap(validators.ToValidatorSet().Accounts()),
+	}))
+
 	stakeManager, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
@@ -344,6 +327,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		bcMock,
+		nil,
 		10,
 	)
 	require.NoError(t, err)
@@ -518,6 +502,7 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 
 	success := types.ReceiptSuccess
 	contractProvider := &stateProvider{}
+	header1Hash := types.StringToHash("0x99aa")
 	header2Hash := types.StringToHash("0xffee")
 	header3Hash := types.StringToHash("0xeeff")
 	header4Hash := types.StringToHash("0xaaff")
@@ -527,21 +512,21 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 	addresses := accountSet.GetAddresses()
 	state := newTestState(t)
 
-	require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-		BlockNumber: 1,
-		Validators:  newValidatorStakeMap(accountSet),
-	}))
-
 	sysStateMock := &systemStateMock{}
 	sysStateMock.On("GetEpoch").Return(epochID, nil).Once()
+
+	polyBackendMock := new(polybftBackendMock)
+	polyBackendMock.On("GetValidators", uint64(0), []*types.Header(nil)).Return(accountSet, nil).Once()
 
 	bcMock := new(blockchainMock)
 	bcMock.On("GetStateProviderForBlock", currentHeader).Return(contractProvider, nil).Once()
 	bcMock.On("GetSystemState", contractProvider).Return(sysStateMock, nil).Once()
 	bcMock.On("CurrentHeader", mock.Anything).Return(currentHeader, true).Once()
+	bcMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{Number: 1, Hash: header1Hash}, true).Once()
 	bcMock.On("GetHeaderByNumber", uint64(2)).Return(&types.Header{Number: 2, Hash: header2Hash}, true).Once()
 	bcMock.On("GetHeaderByNumber", uint64(3)).Return(&types.Header{Number: 3, Hash: header3Hash}, true).Once()
 	bcMock.On("GetHeaderByNumber", uint64(4)).Return(&types.Header{Number: 4, Hash: header4Hash}, true).Once()
+	bcMock.On("GetReceiptsByHash", header1Hash).Return([]*types.Receipt(nil), nil).Once()
 	bcMock.On("GetReceiptsByHash", header2Hash).Return([]*types.Receipt{
 		{
 			Status: &success,
@@ -579,6 +564,7 @@ func TestStakeManager_UpdateOnInit(t *testing.T) {
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		validatorSetAddr, types.StringToAddress("0x0002"),
 		bcMock,
+		polyBackendMock,
 		5,
 	)
 	require.NoError(t, err)
