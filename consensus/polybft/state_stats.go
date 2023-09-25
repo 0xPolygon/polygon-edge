@@ -1,10 +1,14 @@
 package polybft
 
 import (
+	"math/big"
 	"time"
 
 	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-hclog"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 // startStatsReleasing starts the process that releases BoltDB stats into prometheus periodically.
@@ -152,5 +156,46 @@ func (s *State) startStatsReleasing() {
 
 		// Save stats for the next loop.
 		prev = stats
+	}
+}
+
+func polybftMetrics(rootnodeURL string,
+	validatorAddress ethgo.Address,
+	closeCh <-chan struct{},
+	logger hclog.Logger,
+	interval time.Duration) {
+	// zero means metrics are disabled
+	if interval <= 0 {
+		return
+	}
+
+	gweiPerWei := new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil) // 10^9
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	rpcClient, err := jsonrpc.NewClient(rootnodeURL)
+	if err != nil {
+		logger.Error("metrics - connection to root node failed", "err", err)
+
+		return
+	}
+
+	for {
+		select {
+		case <-closeCh:
+			return
+		case <-ticker.C:
+			balance, err := rpcClient.Eth().GetBalance(validatorAddress, ethgo.Latest)
+			if err != nil {
+				logger.Error("metrics get balance call failed", "err", err)
+
+				continue
+			}
+
+			balanceInGwei := new(big.Int).Div(balance, gweiPerWei).Uint64()
+			metrics.SetGauge([]string{"bridge", "validator_balance_gwei", validatorAddress.String()},
+				float32(balanceInGwei))
+		}
 	}
 }

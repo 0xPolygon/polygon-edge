@@ -39,6 +39,8 @@ type Config struct {
 
 	ConcurrentRequestsDebug uint64 `json:"concurrent_requests_debug" yaml:"concurrent_requests_debug"`
 	WebSocketReadLimit      uint64 `json:"web_socket_read_limit" yaml:"web_socket_read_limit"`
+
+	MetricsInterval time.Duration `json:"metrics_interval" yaml:"metrics_interval"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -96,6 +98,10 @@ const (
 	// DefaultRelayerTrackerPollInterval specifies time interval after which relayer node's event tracker
 	// polls child chain to get the latest block
 	DefaultRelayerTrackerPollInterval time.Duration = time.Second
+
+	// DefaultMetricsInterval specifies the time interval after which Prometheus metrics will be generated.
+	// A value of 0 means the metrics are disabled.
+	DefaultMetricsInterval time.Duration = time.Second * 8
 )
 
 // DefaultConfig returns the default server configuration
@@ -136,6 +142,7 @@ func DefaultConfig() *Config {
 		ConcurrentRequestsDebug:    DefaultConcurrentRequestsDebug,
 		WebSocketReadLimit:         DefaultWebSocketReadLimit,
 		RelayerTrackerPollInterval: DefaultRelayerTrackerPollInterval,
+		MetricsInterval:            DefaultMetricsInterval,
 	}
 }
 

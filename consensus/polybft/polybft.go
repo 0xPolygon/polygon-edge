@@ -527,6 +527,12 @@ func (p *Polybft) Start() error {
 	// start state DB process
 	go p.state.startStatsReleasing()
 
+	// additional polybft metrics
+	go polybftMetrics(
+		p.consensusConfig.Bridge.JSONRPCEndpoint,
+		p.key.Address(), p.closeCh,
+		p.logger, p.config.MetricsInterval)
+
 	return nil
 }
 
