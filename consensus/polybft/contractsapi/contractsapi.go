@@ -184,6 +184,22 @@ func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
 }
 
+type CheckpointManagerConstructorFn struct {
+	Initiator types.Address `abi:"initiator"`
+}
+
+func (c *CheckpointManagerConstructorFn) Sig() []byte {
+	return CheckpointManager.Abi.Constructor.ID()
+}
+
+func (c *CheckpointManagerConstructorFn) EncodeAbi() ([]byte, error) {
+	return CheckpointManager.Abi.Constructor.Inputs.Encode(c)
+}
+
+func (c *CheckpointManagerConstructorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CheckpointManager.Abi.Constructor, buf, c)
+}
+
 type CheckpointMetadata struct {
 	BlockHash               types.Hash `abi:"blockHash"`
 	BlockRound              *big.Int   `abi:"blockRound"`
@@ -1454,9 +1470,8 @@ func (e *Epoch) DecodeAbi(buf []byte) error {
 }
 
 type CommitEpochValidatorSetFn struct {
-	ID        *big.Int `abi:"id"`
-	Epoch     *Epoch   `abi:"epoch"`
-	EpochSize *big.Int `abi:"epochSize"`
+	ID    *big.Int `abi:"id"`
+	Epoch *Epoch   `abi:"epoch"`
 }
 
 func (c *CommitEpochValidatorSetFn) Sig() []byte {
@@ -1621,9 +1636,8 @@ func (u *Uptime) DecodeAbi(buf []byte) error {
 }
 
 type DistributeRewardForRewardPoolFn struct {
-	EpochID   *big.Int  `abi:"epochId"`
-	Uptime    []*Uptime `abi:"uptime"`
-	EpochSize *big.Int  `abi:"epochSize"`
+	EpochID *big.Int  `abi:"epochId"`
+	Uptime  []*Uptime `abi:"uptime"`
 }
 
 func (d *DistributeRewardForRewardPoolFn) Sig() []byte {

@@ -77,7 +77,7 @@ func main() {
 		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
-			false,
+			true,
 			[]string{
 				"submit",
 				"initialize",

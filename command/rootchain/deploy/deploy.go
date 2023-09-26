@@ -432,9 +432,10 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	type contractInfo struct {
-		name     string
-		artifact *artifact.Artifact
-		hasProxy bool
+		name            string
+		artifact        *artifact.Artifact
+		hasProxy        bool
+		byteCodeBuilder func() ([]byte, error)
 	}
 
 	rootchainConfig := &polybft.RootchainConfig{
@@ -469,6 +470,18 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			name:     checkpointManagerName,
 			artifact: contractsapi.CheckpointManager,
 			hasProxy: true,
+			byteCodeBuilder: func() ([]byte, error) {
+				constructorFn := &contractsapi.CheckpointManagerConstructorFn{
+					Initiator: types.Address(deployerKey.Address()),
+				}
+
+				input, err := constructorFn.EncodeAbi()
+				if err != nil {
+					return nil, err
+				}
+
+				return append(contractsapi.CheckpointManager.Bytecode, input...), nil
+			},
 		},
 		{
 			name:     blsName,
@@ -549,7 +562,15 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			case <-ctx.Done():
 				return ctx.Err()
 			default:
-				txn := helper.CreateTransaction(ethgo.ZeroAddress, nil, contract.artifact.Bytecode, nil, true)
+				bytecode := contract.artifact.Bytecode
+				if contract.byteCodeBuilder != nil {
+					bytecode, err = contract.byteCodeBuilder()
+					if err != nil {
+						return err
+					}
+				}
+
+				txn := helper.CreateTransaction(ethgo.ZeroAddress, nil, bytecode, nil, true)
 
 				receipt, err := txRelayer.SendTransaction(txn, deployerKey)
 				if err != nil {
