@@ -784,20 +784,32 @@ func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 func setUpProxies(transition *state.Transition, admin types.Address,
 	proxyToImplMap map[types.Address]types.Address) error {
 	for proxyAddress, implAddress := range proxyToImplMap {
+		protectSetupProxyFn := &contractsapi.ProtectSetUpProxyGenesisProxyFn{Initiator: contracts.SystemCaller}
+
+		proxyInput, err := protectSetupProxyFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("GenesisProxy.protectSetUpProxy params encoding failed: %w", err)
+		}
+
+		err = callContract(contracts.SystemCaller, proxyAddress, proxyInput, "GenesisProxy.protectSetUpProxy", transition)
+		if err != nil {
+			return err
+		}
+
 		setUpproxyFn := &contractsapi.SetUpProxyGenesisProxyFn{
 			Logic: implAddress,
 			Admin: admin,
 			Data:  []byte{},
 		}
 
-		proxyInput, err := setUpproxyFn.EncodeAbi()
+		proxyInput, err = setUpproxyFn.EncodeAbi()
 		if err != nil {
 			return fmt.Errorf("GenesisProxy.setUpProxy params encoding failed: %w", err)
 		}
 
 		err = callContract(contracts.SystemCaller, proxyAddress, proxyInput, "GenesisProxy.setUpProxy", transition)
 		if err != nil {
-			return fmt.Errorf("GenesisProxy.setUpProxy params encoding failed: %w", err)
+			return err
 		}
 	}
 

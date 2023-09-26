@@ -414,6 +414,7 @@ func main() {
 			gensc.GenesisProxy,
 			false,
 			[]string{
+				"protectSetUpProxy",
 				"setUpProxy",
 			},
 			[]string{},

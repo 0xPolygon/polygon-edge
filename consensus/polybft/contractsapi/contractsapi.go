@@ -1669,6 +1669,22 @@ func (i *InitializeEIP1559BurnFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(EIP1559Burn.Abi.Methods["initialize"], buf, i)
 }
 
+type ProtectSetUpProxyGenesisProxyFn struct {
+	Initiator types.Address `abi:"initiator"`
+}
+
+func (p *ProtectSetUpProxyGenesisProxyFn) Sig() []byte {
+	return GenesisProxy.Abi.Methods["protectSetUpProxy"].ID()
+}
+
+func (p *ProtectSetUpProxyGenesisProxyFn) EncodeAbi() ([]byte, error) {
+	return GenesisProxy.Abi.Methods["protectSetUpProxy"].Encode(p)
+}
+
+func (p *ProtectSetUpProxyGenesisProxyFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(GenesisProxy.Abi.Methods["protectSetUpProxy"], buf, p)
+}
+
 type SetUpProxyGenesisProxyFn struct {
 	Logic types.Address `abi:"logic"`
 	Admin types.Address `abi:"admin"`
