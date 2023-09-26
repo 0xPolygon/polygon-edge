@@ -7,6 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/grpc"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
@@ -15,11 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -824,7 +825,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 			// if tx with same nonce does exist and has same or better gas price -> return error
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
-			return ErrUnderpriced
+			return ErrReplacementUnderpriced
 		}
 
 		slotsFree += slotsRequired(oldTxWithSameNonce) // add old tx slots

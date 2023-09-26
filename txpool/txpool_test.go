@@ -12,6 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -19,10 +24,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -324,7 +325,7 @@ func TestAddTxErrors(t *testing.T) {
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
-			ErrUnderpriced,
+			ErrReplacementUnderpriced,
 		)
 	})
 
@@ -845,7 +846,7 @@ func TestAddTx(t *testing.T) {
 			// check the account nonce before promoting
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 
-			assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+			assert.ErrorIs(t, pool.addTx(local, tx1), ErrReplacementUnderpriced)
 
 			//	execute the enqueue handlers
 			<-pool.promoteReqCh
@@ -919,7 +920,7 @@ func TestAddTx(t *testing.T) {
 				pool.gauge.read(),
 			)
 
-			assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+			assert.ErrorIs(t, pool.addTx(local, tx1), ErrReplacementUnderpriced)
 
 			acc := pool.accounts.get(addr1)
 			acc.nonceToTx.lock()
@@ -3679,7 +3680,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 
 	assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
 	assert.ErrorIs(t, pool.addTx(local, tx2), ErrUnderpriced)
-	assert.ErrorIs(t, pool.addTx(local, tx3), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx3), ErrReplacementUnderpriced)
 	assert.ErrorIs(t, pool.addTx(local, tx4), ErrUnderpriced)
 
 	// Success
