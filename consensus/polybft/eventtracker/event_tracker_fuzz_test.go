@@ -1,4 +1,4 @@
-package polybft
+package eventtracker
 
 import (
 	"encoding/json"
@@ -57,7 +57,6 @@ func FuzzGetNewState(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-
 		var data getNewStateF
 		if err := json.Unmarshal(input, &data); err != nil {
 			t.Skip(err)
@@ -78,7 +77,7 @@ func FuzzGetNewState(f *testing.F) {
 		testConfig := createTestTrackerConfig(t, data.NumBlockConfirmations, data.BatchSize, data.MaxBackLogSize)
 		testConfig.BlockProvider = providerMock
 
-		eventTracker := &PolybftEventTracker{
+		eventTracker := &EventTracker{
 			config:         testConfig,
 			blockContainer: NewTrackerBlockContainer(data.LastProcessed),
 		}

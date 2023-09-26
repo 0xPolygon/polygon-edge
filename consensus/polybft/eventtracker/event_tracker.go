@@ -1,4 +1,4 @@
-package polybft
+package eventtracker
 
 import (
 	"context"
@@ -24,10 +24,10 @@ type BlockProvider interface {
 	GetLogs(filter *ethgo.LogFilter) ([]*ethgo.Log, error)
 }
 
-// PolybftTrackerConfig is a struct that holds configuration of a PolybftEventTracker
-type PolybftTrackerConfig struct {
-	// RpcEndpoint is the full json rpc url on some node on a tracked chain
-	RpcEndpoint string
+// EventTrackerConfig is a struct that holds configuration of a EventTracker
+type EventTrackerConfig struct {
+	// RPCEndpoint is the full json rpc url on some node on a tracked chain
+	RPCEndpoint string
 
 	// StartBlockFromConfig represents a starting block from which tracker starts to
 	// track events from a tracked chain.
@@ -78,9 +78,9 @@ type PolybftTrackerConfig struct {
 	EventSubscriber EventSubscriber
 }
 
-// PolybftEventTracker represents a tracker for events on desired contracts on some chain
-type PolybftEventTracker struct {
-	config *PolybftTrackerConfig
+// EventTracker represents a tracker for events on desired contracts on some chain
+type EventTracker struct {
+	config *EventTrackerConfig
 
 	closeCh chan struct{}
 	once    sync.Once
@@ -89,11 +89,11 @@ type PolybftEventTracker struct {
 	blockContainer *TrackerBlockContainer
 }
 
-// NewPolybftEventTracker is a constructor function that creates a new instance of the PolybftEventTracker struct.
+// NewEventTracker is a constructor function that creates a new instance of the EventTracker struct.
 //
 // Example Usage:
 //
-//	config := &PolybftEventTracker{
+//	config := &EventTracker{
 //		RpcEndpoint:           "http://some-json-rpc-url.com",
 //		StartBlockFromConfig:  100_000,
 //		NumBlockConfirmations: 10,
@@ -109,14 +109,14 @@ type PolybftEventTracker struct {
 //			IDs:       []ethgo.Hash{idHashOfSomeEvent},
 //		},
 //	}
-//		t := NewPolybftEventTracker(config)
+//		t := NewEventTracker(config)
 //
 // Inputs:
-//   - config (TrackerConfig): configuration of PolybftEventTracker.
+//   - config (TrackerConfig): configuration of EventTracker.
 //
 // Outputs:
-//   - A new instance of the PolybftEventTracker struct.
-func NewPolybftEventTracker(config *PolybftTrackerConfig) (*PolybftEventTracker, error) {
+//   - A new instance of the EventTracker struct.
+func NewEventTracker(config *EventTrackerConfig) (*EventTracker, error) {
 	lastProcessedBlock, err := config.Store.GetLastProcessedBlock()
 	if err != nil {
 		return nil, err
@@ -131,7 +131,7 @@ func NewPolybftEventTracker(config *PolybftTrackerConfig) (*PolybftEventTracker,
 		definiteLastProcessedBlock = lastProcessedBlock
 	}
 
-	return &PolybftEventTracker{
+	return &EventTracker{
 		config:         config,
 		closeCh:        make(chan struct{}),
 		blockTracker:   blocktracker.NewJSONBlockTracker(config.BlockProvider),
@@ -139,27 +139,27 @@ func NewPolybftEventTracker(config *PolybftTrackerConfig) (*PolybftEventTracker,
 	}, nil
 }
 
-// Close closes the PolybftEventTracker by closing the closeCh channel.
+// Close closes the EventTracker by closing the closeCh channel.
 // This method is used to signal the goroutines to stop.
 //
 // Example Usage:
 //
-//	tracker := NewPolybftEventTracker(config)
+//	tracker := NewEventTracker(config)
 //	tracker.Start()
 //	defer tracker.Close()
 //
 // Inputs: None
 //
 // Flow:
-//  1. The Close() method is called on an instance of PolybftEventTracker.
+//  1. The Close() method is called on an instance of EventTracker.
 //  2. The closeCh channel is closed, which signals the goroutines to stop.
 //
 // Outputs: None
-func (p *PolybftEventTracker) Close() {
-	close(p.closeCh)
+func (e *EventTracker) Close() {
+	close(e.closeCh)
 }
 
-// Start is a method in the PolybftEventTracker struct that starts the tracking of blocks
+// Start is a method in the EventTracker struct that starts the tracking of blocks
 // and retrieval of logs from given blocks from the tracked chain.
 // If the tracker was turned off (node was down) for some time, it will sync up all the missed
 // blocks and logs from the last start (in regards to MaxBacklogSize field in config).
@@ -167,34 +167,34 @@ func (p *PolybftEventTracker) Close() {
 // Returns:
 //   - nil if start passes successfully.
 //   - An error if there is an error on startup of blocks tracking on tracked chain.
-func (p *PolybftEventTracker) Start() error {
-	p.config.Logger.Info("Starting event tracker",
-		"jsonRpcEndpoint", p.config.RpcEndpoint,
-		"startBlockFromConfig", p.config.StartBlockFromConfig,
-		"numBlockConfirmations", p.config.NumBlockConfirmations,
-		"pollInterval", p.config.PollInterval,
-		"syncBatchSize", p.config.SyncBatchSize,
-		"maxBacklogSize", p.config.MaxBacklogSize,
-		"logFilter", p.config.LogFilter,
+func (e *EventTracker) Start() error {
+	e.config.Logger.Info("Starting event tracker",
+		"jsonRpcEndpoint", e.config.RPCEndpoint,
+		"startBlockFromConfig", e.config.StartBlockFromConfig,
+		"numBlockConfirmations", e.config.NumBlockConfirmations,
+		"pollInterval", e.config.PollInterval,
+		"syncBatchSize", e.config.SyncBatchSize,
+		"maxBacklogSize", e.config.MaxBacklogSize,
+		"logFilter", e.config.LogFilter,
 	)
 
 	ctx, cancelFn := context.WithCancel(context.Background())
 	go func() {
-		<-p.closeCh
+		<-e.closeCh
 		cancelFn()
 	}()
 
 	go common.RetryForever(ctx, time.Second, func(context.Context) error {
 		// sync up all missed blocks on start if it is not already sync up
-		if err := p.syncOnStart(); err != nil {
-			p.config.Logger.Error("Syncing up on start failed.", "err", err)
+		if err := e.syncOnStart(); err != nil {
+			e.config.Logger.Error("Syncing up on start failed.", "err", err)
 
 			return err
 		}
 
 		// start the polling of blocks
-		err := p.blockTracker.Track(ctx, func(block *ethgo.Block) error {
-			return p.trackBlock(block)
+		err := e.blockTracker.Track(ctx, func(block *ethgo.Block) error {
+			return e.trackBlock(block)
 		})
 
 		if common.IsContextDone(err) {
@@ -207,7 +207,7 @@ func (p *PolybftEventTracker) Start() error {
 	return nil
 }
 
-// trackBlock is a method in the PolybftEventTracker struct that is responsible for tracking blocks and processing their logs
+// trackBlock is a method in the EventTracker struct that is responsible for tracking blocks and processing their logs
 //
 // Inputs:
 // - block: An instance of the ethgo.Block struct representing a block to track.
@@ -215,50 +215,52 @@ func (p *PolybftEventTracker) Start() error {
 // Returns:
 //   - nil if tracking block passes successfully.
 //   - An error if there is an error on tracking given block.
-func (p *PolybftEventTracker) trackBlock(block *ethgo.Block) error {
-	if !p.blockContainer.IsOutOfSync(block) {
-		p.blockContainer.AcquireWriteLock()
-		defer p.blockContainer.ReleaseWriteLock()
+func (e *EventTracker) trackBlock(block *ethgo.Block) error {
+	if !e.blockContainer.IsOutOfSync(block) {
+		e.blockContainer.AcquireWriteLock()
+		defer e.blockContainer.ReleaseWriteLock()
 
-		if p.blockContainer.LastCachedBlock() < block.Number {
+		if e.blockContainer.LastCachedBlock() < block.Number {
 			// we are not out of sync, it's a sequential add of new block
-			if err := p.blockContainer.AddBlock(block); err != nil {
+			if err := e.blockContainer.AddBlock(block); err != nil {
 				return err
 			}
 		}
 
 		// check if some blocks reached confirmation level so that we can process their logs
-		return p.processLogs()
+		return e.processLogs()
 	}
 
 	// we are out of sync (either we missed some blocks, or a reorg happened)
 	// so we get remove the old pending state and get the new one
-	return p.getNewState(block)
+	return e.getNewState(block)
 }
 
-// syncOnStart is a method in the PolybftEventTracker struct that is responsible for syncing the event tracker on startup.
+// syncOnStart is a method in the EventTracker struct that is responsible
+// for syncing the event tracker on startup.
 // It retrieves the latest block and checks if the event tracker is out of sync.
 // If it is out of sync, it calls the getNewState method to update the state.
 //
 // Returns:
 //   - nil if sync passes successfully, or no sync is done.
 //   - An error if there is an error retrieving blocks or logs from the external provider or saving logs to the store.
-func (p *PolybftEventTracker) syncOnStart() (err error) {
+func (e *EventTracker) syncOnStart() (err error) {
 	var latestBlock *ethgo.Block
-	p.once.Do(func() {
-		p.config.Logger.Info("Syncing up on start...")
-		latestBlock, err = p.config.BlockProvider.GetBlockByNumber(ethgo.Latest, false)
+
+	e.once.Do(func() {
+		e.config.Logger.Info("Syncing up on start...")
+		latestBlock, err = e.config.BlockProvider.GetBlockByNumber(ethgo.Latest, false)
 		if err != nil {
 			return
 		}
 
-		if !p.blockContainer.IsOutOfSync(latestBlock) {
-			p.config.Logger.Info("Everything synced up on start")
+		if !e.blockContainer.IsOutOfSync(latestBlock) {
+			e.config.Logger.Info("Everything synced up on start")
 
 			return
 		}
 
-		err = p.getNewState(latestBlock)
+		err = e.getNewState(latestBlock)
 	})
 
 	return err
@@ -277,42 +279,42 @@ func (p *PolybftEventTracker) syncOnStart() (err error) {
 // Returns:
 //   - nil if there are no confirmed blocks.
 //   - An error if there is an error retrieving blocks or logs from the external provider or saving logs to the store.
-func (p *PolybftEventTracker) getNewState(latestBlock *ethgo.Block) error {
-	lastProcessedBlock := p.blockContainer.LastProcessedBlock()
+func (e *EventTracker) getNewState(latestBlock *ethgo.Block) error {
+	lastProcessedBlock := e.blockContainer.LastProcessedBlock()
 
-	p.config.Logger.Info("Getting new state, since some blocks were missed",
+	e.config.Logger.Info("Getting new state, since some blocks were missed",
 		"lastProcessedBlock", lastProcessedBlock, "latestBlockFromRpc", latestBlock.Number)
 
-	p.blockContainer.AcquireWriteLock()
-	defer p.blockContainer.ReleaseWriteLock()
+	e.blockContainer.AcquireWriteLock()
+	defer e.blockContainer.ReleaseWriteLock()
 
 	// clean old state
-	p.blockContainer.CleanState()
+	e.blockContainer.CleanState()
 
 	startBlock := lastProcessedBlock + 1
 
 	// sanitize startBlock from which we will start polling for blocks
-	if latestBlock.Number > p.config.MaxBacklogSize &&
-		latestBlock.Number-p.config.MaxBacklogSize > lastProcessedBlock {
-		startBlock = latestBlock.Number - p.config.MaxBacklogSize
+	if latestBlock.Number > e.config.MaxBacklogSize &&
+		latestBlock.Number-e.config.MaxBacklogSize > lastProcessedBlock {
+		startBlock = latestBlock.Number - e.config.MaxBacklogSize
 	}
 
 	// get blocks in batches
-	for i := startBlock; i < latestBlock.Number; i += p.config.SyncBatchSize {
-		end := i + p.config.SyncBatchSize - 1
+	for i := startBlock; i < latestBlock.Number; i += e.config.SyncBatchSize {
+		end := i + e.config.SyncBatchSize - 1
 		if end > latestBlock.Number {
 			// we go until the latest block, since we don't need to
 			// query for it using an rpc point, since we already have it
 			end = latestBlock.Number - 1
 		}
 
-		p.config.Logger.Info("Getting new state for block batch", "fromBlock", i, "toBlock", end)
+		e.config.Logger.Info("Getting new state for block batch", "fromBlock", i, "toBlock", end)
 
 		// get and add blocks in batch
 		for j := i; j <= end; j++ {
-			block, err := p.config.BlockProvider.GetBlockByNumber(ethgo.BlockNumber(j), false)
+			block, err := e.config.BlockProvider.GetBlockByNumber(ethgo.BlockNumber(j), false)
 			if err != nil {
-				p.config.Logger.Error("Getting new state for block batch failed on rpc call",
+				e.config.Logger.Error("Getting new state for block batch failed on rpc call",
 					"fromBlock", i,
 					"toBlock", end,
 					"currentBlock", j,
@@ -321,25 +323,25 @@ func (p *PolybftEventTracker) getNewState(latestBlock *ethgo.Block) error {
 				return err
 			}
 
-			if err := p.blockContainer.AddBlock(block); err != nil {
+			if err := e.blockContainer.AddBlock(block); err != nil {
 				return nil
 			}
 		}
 
 		// now process logs from confirmed blocks if any
-		if err := p.processLogs(); err != nil {
+		if err := e.processLogs(); err != nil {
 			return err
 		}
 	}
 
 	// add latest block
-	if err := p.blockContainer.AddBlock(latestBlock); err != nil {
+	if err := e.blockContainer.AddBlock(latestBlock); err != nil {
 		return err
 	}
 
 	// process logs if there are more confirmed events
-	if err := p.processLogs(); err != nil {
-		p.config.Logger.Error("Getting new state failed",
+	if err := e.processLogs(); err != nil {
+		e.config.Logger.Error("Getting new state failed",
 			"lastProcessedBlock", lastProcessedBlock,
 			"latestBlockFromRpc", latestBlock.Number,
 			"err", err)
@@ -347,8 +349,8 @@ func (p *PolybftEventTracker) getNewState(latestBlock *ethgo.Block) error {
 		return err
 	}
 
-	p.config.Logger.Info("Getting new state finished",
-		"newLastProcessedBlock", p.blockContainer.LastProcessedBlockLocked(),
+	e.config.Logger.Info("Getting new state finished",
+		"newLastProcessedBlock", e.blockContainer.LastProcessedBlockLocked(),
 		"latestBlockFromRpc", latestBlock.Number)
 
 	return nil
@@ -361,11 +363,11 @@ func (p *PolybftEventTracker) getNewState(latestBlock *ethgo.Block) error {
 // Returns:
 // - nil if there are no confirmed blocks.
 // - An error if there is an error retrieving logs from the external provider or saving logs to the store.
-func (p *PolybftEventTracker) processLogs() error {
-	confirmedBlocks := p.blockContainer.GetConfirmedBlocks(p.config.NumBlockConfirmations)
+func (e *EventTracker) processLogs() error {
+	confirmedBlocks := e.blockContainer.GetConfirmedBlocks(e.config.NumBlockConfirmations)
 	if confirmedBlocks == nil {
 		// no confirmed blocks, so nothing to process
-		p.config.Logger.Debug("No confirmed blocks. Nothing to process")
+		e.config.Logger.Debug("No confirmed blocks. Nothing to process")
 
 		return nil
 	}
@@ -373,11 +375,11 @@ func (p *PolybftEventTracker) processLogs() error {
 	fromBlock := confirmedBlocks[0]
 	toBlock := confirmedBlocks[len(confirmedBlocks)-1]
 
-	p.config.Logger.Debug("Processing logs for blocks", "fromBlock", fromBlock, "toBlock", toBlock)
+	e.config.Logger.Debug("Processing logs for blocks", "fromBlock", fromBlock, "toBlock", toBlock)
 
-	logs, err := p.config.BlockProvider.GetLogs(p.getLogsQuery(fromBlock, toBlock))
+	logs, err := e.config.BlockProvider.GetLogs(e.getLogsQuery(fromBlock, toBlock))
 	if err != nil {
-		p.config.Logger.Error("Process logs failed on getting logs from rpc",
+		e.config.Logger.Error("Process logs failed on getting logs from rpc",
 			"fromBlock", fromBlock,
 			"toBlock", toBlock,
 			"err", err)
@@ -386,8 +388,9 @@ func (p *PolybftEventTracker) processLogs() error {
 	}
 
 	filteredLogs := make([]*ethgo.Log, 0, len(logs))
+
 	for _, log := range logs {
-		logIDs, exist := p.config.LogFilter[log.Address]
+		logIDs, exist := e.config.LogFilter[log.Address]
 		if !exist {
 			continue
 		}
@@ -395,10 +398,11 @@ func (p *PolybftEventTracker) processLogs() error {
 		for _, id := range logIDs {
 			if log.Topics[0] == id {
 				filteredLogs = append(filteredLogs, log)
-				if err := p.config.EventSubscriber.AddLog(log); err != nil {
+
+				if err := e.config.EventSubscriber.AddLog(log); err != nil {
 					// we will only log this, since the store will have these logs
 					// and subscriber can just get what he missed from store
-					p.config.Logger.Error("An error occurred while passing event log to subscriber",
+					e.config.Logger.Error("An error occurred while passing event log to subscriber",
 						"err", err)
 				}
 
@@ -407,8 +411,8 @@ func (p *PolybftEventTracker) processLogs() error {
 		}
 	}
 
-	if err := p.config.Store.InsertLastProcessedBlock(toBlock); err != nil {
-		p.config.Logger.Error("Process logs failed on saving last processed block",
+	if err := e.config.Store.InsertLastProcessedBlock(toBlock); err != nil {
+		e.config.Logger.Error("Process logs failed on saving last processed block",
 			"fromBlock", fromBlock,
 			"toBlock", toBlock,
 			"err", err)
@@ -416,8 +420,8 @@ func (p *PolybftEventTracker) processLogs() error {
 		return err
 	}
 
-	if err := p.config.Store.InsertLogs(filteredLogs); err != nil {
-		p.config.Logger.Error("Process logs failed on saving logs to store",
+	if err := e.config.Store.InsertLogs(filteredLogs); err != nil {
+		e.config.Logger.Error("Process logs failed on saving logs to store",
 			"fromBlock", fromBlock,
 			"toBlock", toBlock,
 			"err", err)
@@ -425,11 +429,11 @@ func (p *PolybftEventTracker) processLogs() error {
 		return err
 	}
 
-	if err := p.blockContainer.RemoveBlocks(fromBlock, toBlock); err != nil {
+	if err := e.blockContainer.RemoveBlocks(fromBlock, toBlock); err != nil {
 		return fmt.Errorf("could not remove processed blocks. Err: %w", err)
 	}
 
-	p.config.Logger.Debug("Processing logs for blocks finished",
+	e.config.Logger.Debug("Processing logs for blocks finished",
 		"fromBlock", fromBlock,
 		"toBlock", toBlock,
 		"numOfLogs", len(filteredLogs))
@@ -437,7 +441,8 @@ func (p *PolybftEventTracker) processLogs() error {
 	return nil
 }
 
-// getLogsQuery is a method of the PolybftEventTracker struct that creates and returns a LogFilter object with the specified block range.
+// getLogsQuery is a method of the EventTracker struct that creates and returns
+// a LogFilter object with the specified block range.
 //
 // Input:
 //   - from (uint64): The starting block number for the log filter.
@@ -445,9 +450,9 @@ func (p *PolybftEventTracker) processLogs() error {
 //
 // Returns:
 //   - filter (*ethgo.LogFilter): The created LogFilter object with the specified block range.
-func (p *PolybftEventTracker) getLogsQuery(from, to uint64) *ethgo.LogFilter {
-	addresses := make([]ethgo.Address, 0, len(p.config.LogFilter))
-	for a := range p.config.LogFilter {
+func (e *EventTracker) getLogsQuery(from, to uint64) *ethgo.LogFilter {
+	addresses := make([]ethgo.Address, 0, len(e.config.LogFilter))
+	for a := range e.config.LogFilter {
 		addresses = append(addresses, a)
 	}
 

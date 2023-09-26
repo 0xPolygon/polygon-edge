@@ -1,4 +1,4 @@
-package polybft
+package eventtracker
 
 import (
 	"errors"
@@ -40,7 +40,7 @@ func (m *mockProvider) GetBlockByHash(hash ethgo.Hash, full bool) (*ethgo.Block,
 	return1 := args.Get(0)
 
 	if return1 != nil {
-		return return1.(*ethgo.Block), args.Error(1)
+		return return1.(*ethgo.Block), args.Error(1) //nolint:forcetypeassert
 	}
 
 	return nil, args.Error(1)
@@ -57,7 +57,7 @@ func (m *mockProvider) GetBlockByNumber(i ethgo.BlockNumber, full bool) (*ethgo.
 	return1 := args.Get(0)
 
 	if return1 != nil {
-		return return1.(*ethgo.Block), args.Error(1)
+		return return1.(*ethgo.Block), args.Error(1) //nolint:forcetypeassert
 	}
 
 	return nil, args.Error(1)
@@ -77,7 +77,7 @@ func (m *mockProvider) GetLogs(filter *ethgo.LogFilter) ([]*ethgo.Log, error) {
 	return1 := args.Get(0)
 
 	if return1 != nil {
-		return return1.([]*ethgo.Log), args.Error(1)
+		return return1.([]*ethgo.Log), args.Error(1) //nolint:forcetypeassert
 	}
 
 	return nil, args.Error(1)
@@ -89,7 +89,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 	t.Run("Add block by block - no confirmed blocks", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, 10, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, 10, 10, 1000))
 
 		require.NoError(t, err)
 
@@ -131,7 +131,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return([]*ethgo.Log{}, nil).Once()
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -197,7 +197,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return(logs, nil).Once()
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -263,9 +263,9 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 
 		// mock logs return so that no confirmed block has any logs we need
 		blockProviderMock := new(mockProvider)
-		blockProviderMock.On("GetLogs", mock.Anything).Return(nil, errors.New("some error ocurred")).Once()
+		blockProviderMock.On("GetLogs", mock.Anything).Return(nil, errors.New("some error occurred")).Once()
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -291,11 +291,11 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 			Hash:       ethgo.Hash{byte(block.Number + 1)},
 			ParentHash: block.Hash,
 		}
-		require.ErrorContains(t, tracker.trackBlock(latestBlock), "some error ocurred")
+		require.ErrorContains(t, tracker.trackBlock(latestBlock), "some error occurred")
 
 		// check if the last cached block is as expected
 		require.Equal(t, latestBlock.Number, tracker.blockContainer.LastCachedBlock())
-		// check if the last confirmed block processed is as expected, in this case 0, because an error ocurred
+		// check if the last confirmed block processed is as expected, in this case 0, because an error occurred
 		require.Equal(t, uint64(0), tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
 		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
@@ -335,7 +335,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfMissedBlocks))
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -420,7 +420,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfMissedBlocks + numOfCachedBlocks))
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -434,8 +434,9 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 				Hash:       ethgo.Hash{byte(i)},
 				ParentHash: ethgo.Hash{byte(i - 1)},
 			}
-			tracker.blockContainer.AddBlock(block)
+
 			blockProviderMock.blocks[i] = block
+			require.NoError(t, tracker.blockContainer.AddBlock(block))
 		}
 
 		// check that initially we have some cached blocks
@@ -443,7 +444,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		require.Len(t, tracker.blockContainer.numToHashMap, int(numOfCachedBlocks))
 
 		// mock getting missed blocks
-		for i := uint64(numOfCachedBlocks + 1); i <= numOfMissedBlocks+numOfCachedBlocks; i++ {
+		for i := numOfCachedBlocks + 1; i <= numOfMissedBlocks+numOfCachedBlocks; i++ {
 			block = &ethgo.Block{
 				Number:     i,
 				Hash:       ethgo.Hash{byte(i)},
@@ -514,7 +515,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfCachedBlocks))
 
-		tracker, err := NewPolybftEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -528,7 +529,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 				Hash:       ethgo.Hash{byte(i + numOfCachedBlocks)},
 				ParentHash: ethgo.Hash{byte(i + numOfCachedBlocks - 1)},
 			}
-			tracker.blockContainer.AddBlock(block)
+			require.NoError(t, tracker.blockContainer.AddBlock(block))
 		}
 
 		// check that initially we have some cached blocks
@@ -581,11 +582,13 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 	})
 }
 
-func createTestTrackerConfig(t *testing.T, numBlockConfirmations, batchSize, maxBacklogSize uint64) *PolybftTrackerConfig {
+func createTestTrackerConfig(t *testing.T, numBlockConfirmations, batchSize, maxBacklogSize uint64) *EventTrackerConfig {
+	t.Helper()
+
 	var stateSyncEvent contractsapi.StateSyncedEvent
 
-	return &PolybftTrackerConfig{
-		RpcEndpoint:           "http://some-rpc-url.com",
+	return &EventTrackerConfig{
+		RPCEndpoint:           "http://some-rpc-url.com",
 		StartBlockFromConfig:  0,
 		NumBlockConfirmations: numBlockConfirmations,
 		SyncBatchSize:         batchSize,

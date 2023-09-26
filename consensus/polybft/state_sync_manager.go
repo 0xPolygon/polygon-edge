@@ -12,6 +12,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/eventtracker"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -143,7 +144,7 @@ func (s *stateSyncManager) Close() {
 
 // setupNewTracker sets up and starts the new tracker implementation
 func (s *stateSyncManager) setupNewTracker() error {
-	store, err := NewPolybftEventTrackerStore(path.Join(s.config.dataDir, "/deposit.db"))
+	store, err := eventtracker.NewBoltDBEventTrackerStore(path.Join(s.config.dataDir, "/deposit.db"))
 	if err != nil {
 		return err
 	}
@@ -155,8 +156,8 @@ func (s *stateSyncManager) setupNewTracker() error {
 
 	var stateSyncEvent contractsapi.StateSyncedEvent
 
-	tracker, err := NewPolybftEventTracker(&PolybftTrackerConfig{
-		RpcEndpoint:           s.config.jsonrpcAddr,
+	tracker, err := eventtracker.NewEventTracker(&eventtracker.EventTrackerConfig{
+		RPCEndpoint:           s.config.jsonrpcAddr,
 		StartBlockFromConfig:  s.config.stateSenderStartBlock,
 		NumBlockConfirmations: s.config.numBlockConfirmations,
 		SyncBatchSize:         5,      // this should be configurable

@@ -1,4 +1,4 @@
-package polybft
+package eventtracker
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 )
 
 // newTestState creates new instance of state used by tests.
-func newTestTrackerStore(tb testing.TB) *PolybftEventTrackerStore {
+func newTestTrackerStore(tb testing.TB) *BoltDBEventTrackerStore {
 	tb.Helper()
 
 	dir := fmt.Sprintf("/tmp/even-tracker-temp_%v", time.Now().UTC().Format(time.RFC3339Nano))
@@ -26,7 +26,7 @@ func newTestTrackerStore(tb testing.TB) *PolybftEventTrackerStore {
 		tb.Fatal(err)
 	}
 
-	store, err := NewPolybftEventTrackerStore(path.Join(dir, "tracker.db"))
+	store, err := NewBoltDBEventTrackerStore(path.Join(dir, "tracker.db"))
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -360,16 +360,14 @@ func TestTrackerBlockContainer_RemoveBlocks(t *testing.T) {
 	t.Run("Remove blocks from 'from' to 'last' index, where given already removed", func(t *testing.T) {
 		t.Parallel()
 
-		tbc := NewTrackerBlockContainer(10)
+		tbc := NewTrackerBlockContainer(30)
 
 		// Add some blocks to the container
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 11, Hash: ethgo.Hash{11}, ParentHash: ethgo.Hash{10}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 12, Hash: ethgo.Hash{12}, ParentHash: ethgo.Hash{11}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 13, Hash: ethgo.Hash{13}, ParentHash: ethgo.Hash{12}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 14, Hash: ethgo.Hash{14}, ParentHash: ethgo.Hash{13}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 15, Hash: ethgo.Hash{15}, ParentHash: ethgo.Hash{14}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 21, Hash: ethgo.Hash{21}, ParentHash: ethgo.Hash{20}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 22, Hash: ethgo.Hash{22}, ParentHash: ethgo.Hash{21}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 23, Hash: ethgo.Hash{23}, ParentHash: ethgo.Hash{22}}))
 
-		require.ErrorContains(t, tbc.RemoveBlocks(1, 2), "are already processed and removed")
+		require.ErrorContains(t, tbc.RemoveBlocks(18, 19), "are already processed and removed")
 	})
 
 	t.Run("Remove blocks from 'from' to 'last' index, where last does not exist in cached blocks", func(t *testing.T) {
@@ -382,9 +380,8 @@ func TestTrackerBlockContainer_RemoveBlocks(t *testing.T) {
 		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 12, Hash: ethgo.Hash{12}, ParentHash: ethgo.Hash{11}}))
 		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 13, Hash: ethgo.Hash{13}, ParentHash: ethgo.Hash{12}}))
 		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 14, Hash: ethgo.Hash{14}, ParentHash: ethgo.Hash{13}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 15, Hash: ethgo.Hash{15}, ParentHash: ethgo.Hash{14}}))
 
-		require.ErrorContains(t, tbc.RemoveBlocks(11, 16), "could not find last block")
+		require.ErrorContains(t, tbc.RemoveBlocks(11, 15), "could not find last block")
 	})
 
 	t.Run("Remove all blocks", func(t *testing.T) {
@@ -426,17 +423,19 @@ func TestTrackerBlockContainer_RemoveBlocks(t *testing.T) {
 	t.Run("Try to do non-sequential removal of blocks", func(t *testing.T) {
 		t.Parallel()
 
-		tbc := NewTrackerBlockContainer(0)
+		tbc := NewTrackerBlockContainer(110)
 
 		// Add some blocks to the container
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 1, Hash: ethgo.Hash{1}, ParentHash: ethgo.Hash{0}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 2, Hash: ethgo.Hash{2}, ParentHash: ethgo.Hash{1}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 3, Hash: ethgo.Hash{3}, ParentHash: ethgo.Hash{2}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 4, Hash: ethgo.Hash{4}, ParentHash: ethgo.Hash{3}}))
-		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 5, Hash: ethgo.Hash{5}, ParentHash: ethgo.Hash{4}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 111, Hash: ethgo.Hash{111}, ParentHash: ethgo.Hash{110}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 112, Hash: ethgo.Hash{112}, ParentHash: ethgo.Hash{111}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 113, Hash: ethgo.Hash{113}, ParentHash: ethgo.Hash{112}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 114, Hash: ethgo.Hash{114}, ParentHash: ethgo.Hash{113}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 115, Hash: ethgo.Hash{115}, ParentHash: ethgo.Hash{114}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 116, Hash: ethgo.Hash{116}, ParentHash: ethgo.Hash{115}}))
+		require.NoError(t, tbc.AddBlock(&ethgo.Block{Number: 117, Hash: ethgo.Hash{117}, ParentHash: ethgo.Hash{116}}))
 
 		// Try to remove last 2 blocks without first removing first 3
-		require.ErrorContains(t, tbc.RemoveBlocks(4, 5), "trying to do non-sequential removal")
+		require.ErrorContains(t, tbc.RemoveBlocks(113, 115), "trying to do non-sequential removal")
 	})
 }
 
@@ -465,7 +464,7 @@ func createTestLogForStateSyncEvent(t *testing.T, blockNumber, logIndex uint64) 
 	var transferEvent contractsapi.StateSyncedEvent
 
 	topics := make([]ethgo.Hash, 3)
-	topics[0] = ethgo.Hash(transferEvent.Sig())
+	topics[0] = transferEvent.Sig()
 	topics[1] = ethgo.BytesToHash(types.ZeroAddress.Bytes())
 	topics[2] = ethgo.BytesToHash(types.ZeroAddress.Bytes())
 	encodedData, err := abi.MustNewType("tuple(string a)").Encode([]string{"data"})
