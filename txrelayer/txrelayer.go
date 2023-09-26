@@ -187,9 +187,15 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	}
 
 	if t.writer != nil {
-		_, _ = t.writer.Write([]byte(
-			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\n",
-				txn.From, txn.Gas, txn.GasPrice)))
+		msg := fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s\nGas = %d\nGas Price = %d\n",
+			txn.From, txn.Gas, txn.GasPrice)
+		if txn.Type == ethgo.TransactionDynamicFee {
+			msg = fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s\nGas = %d\n"+
+				"Max Fee Per Gas = %d\nMax Priority Fee Per Gas = %d\n",
+				txn.From, txn.Gas, txn.MaxFeePerGas, txn.MaxPriorityFeePerGas)
+		}
+
+		_, _ = t.writer.Write([]byte(msg))
 	}
 
 	return t.client.Eth().SendRawTransaction(data)
