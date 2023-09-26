@@ -1587,10 +1587,10 @@ func (w *WithdrawalEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeRewardPoolFn struct {
-	NewRewardToken    types.Address `abi:"newRewardToken"`
-	NewRewardWallet   types.Address `abi:"newRewardWallet"`
-	NewValidatorSet   types.Address `abi:"newValidatorSet"`
-	NetworkParamsAddr types.Address `abi:"networkParamsAddr"`
+	NewRewardToken  types.Address `abi:"newRewardToken"`
+	NewRewardWallet types.Address `abi:"newRewardWallet"`
+	NewValidatorSet types.Address `abi:"newValidatorSet"`
+	NewBaseReward   *big.Int      `abi:"newBaseReward"`
 }
 
 func (i *InitializeRewardPoolFn) Sig() []byte {
