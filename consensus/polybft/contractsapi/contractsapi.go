@@ -1506,7 +1506,7 @@ type InitializeValidatorSetFn struct {
 	NewStateSender      types.Address    `abi:"newStateSender"`
 	NewStateReceiver    types.Address    `abi:"newStateReceiver"`
 	NewRootChainManager types.Address    `abi:"newRootChainManager"`
-	NewNetworkParams    types.Address    `abi:"newNetworkParams"`
+	NewEpochSize        *big.Int         `abi:"newEpochSize"`
 	InitialValidators   []*ValidatorInit `abi:"initialValidators"`
 }
 
