@@ -242,6 +242,13 @@ func setFlags(cmd *cobra.Command) {
 			defaultBlockTrackerPollInterval,
 			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
 		)
+
+		cmd.Flags().Uint64Var(
+			&params.baseFeeChangeDenom,
+			baseFeeChangeDenomFlag,
+			command.DefaultGenesisBaseFeeChangeDenom,
+			"default base fee change denominator the value to bound the amount the base fee can change between blocks.",
+		)
 	}
 
 	// Access Control Lists

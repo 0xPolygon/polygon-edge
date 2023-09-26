@@ -19,9 +19,6 @@ import (
 )
 
 const (
-	// defaultBaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks.
-	defaultBaseFeeChangeDenom = 8
-
 	// blockGasTargetDivisor is the bound divisor of the gas limit, used in update calculations
 	blockGasTargetDivisor uint64 = 1024
 
@@ -1381,22 +1378,22 @@ func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	// If the parent block used more gas than its target, the baseFee should increase.
 	if parent.GasUsed > parentGasTarget {
 		gasUsedDelta := parent.GasUsed - parentGasTarget
-		baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
+		baseFeeDelta := b.calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
 
 		return parent.BaseFee + common.Max(baseFeeDelta, 1)
 	}
 
 	// Otherwise, if the parent block used less gas than its target, the baseFee should decrease.
 	gasUsedDelta := parentGasTarget - parent.GasUsed
-	baseFeeDelta := calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
+	baseFeeDelta := b.calcBaseFeeDelta(gasUsedDelta, parentGasTarget, parent.BaseFee)
 
 	return common.Max(parent.BaseFee-baseFeeDelta, 0)
 }
 
-func calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
+func (b *Blockchain) calcBaseFeeDelta(gasUsedDelta, parentGasTarget, baseFee uint64) uint64 {
 	y := baseFee * gasUsedDelta / parentGasTarget
 
-	return y / defaultBaseFeeChangeDenom
+	return y / b.config.Params.BaseFeeChangeDenom
 }
 
 func (b *Blockchain) writeBatchAndUpdate(
