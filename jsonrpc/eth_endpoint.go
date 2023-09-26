@@ -652,11 +652,17 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Run the transaction with the specified gas value.
-	// Returns a status indicating if the transaction failed and the accompanying error
+	// Returns a status indicating if the transaction failed, return value (data), and the accompanying error
 	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, interface{}, error) {
+		var data interface{}
+
 		transaction.Gas = gas
 
 		result, applyErr := e.store.ApplyTxn(header, transaction, nil)
+
+		if result != nil {
+			data = []byte(hex.EncodeToString(result.ReturnValue))
+		}
 
 		if applyErr != nil {
 			// Check the application error.
@@ -665,10 +671,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
-				return true, []byte(hex.EncodeToString(result.ReturnValue)), nil
+				return true, data, nil
 			}
 
-			return true, []byte(hex.EncodeToString(result.ReturnValue)), applyErr
+			return true, data, applyErr
 		}
 
 		// Check if an out of gas error happened during EVM execution
@@ -677,19 +683,19 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
-				return true, []byte(hex.EncodeToString(result.ReturnValue)), nil
+				return true, data, nil
 			}
 
 			if isEVMRevertError(result.Err) {
 				// The EVM reverted during execution, attempt to extract the
 				// error message and return it
-				return true, []byte(hex.EncodeToString(result.ReturnValue)), constructErrorFromRevert(result)
+				return true, data, constructErrorFromRevert(result)
 			}
 
-			return true, []byte(hex.EncodeToString(result.ReturnValue)), result.Err
+			return true, data, result.Err
 		}
 
-		return false, []byte(hex.EncodeToString(result.ReturnValue)), nil
+		return false, nil, nil
 	}
 
 	// Start the binary search for the lowest possible gas price
