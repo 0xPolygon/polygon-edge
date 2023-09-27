@@ -140,6 +140,7 @@ type genesisParams struct {
 	blockTrackerPollInterval time.Duration
 
 	proxyContractsAdmin string
+
 	baseFeeChangeDenom uint64
 }
 
