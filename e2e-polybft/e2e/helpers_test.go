@@ -16,9 +16,7 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
-	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -248,19 +246,11 @@ func expectRole(t *testing.T, cluster *framework.TestCluster, contract types.Add
 	out := cluster.Call(t, contract, addresslist.ReadAddressListFunc, addr)
 
 	num, ok := out["0"].(*big.Int)
+	if !ok {
+		t.Fatal("unexpected")
+	}
 
-	require.True(t, ok)
 	require.Equal(t, role.Uint64(), num.Uint64())
-}
-
-func expectIsEnabled(t *testing.T, cluster *framework.TestCluster, contract types.Address, value bool) {
-	t.Helper()
-	out := cluster.Call(t, contract, addresslist.GetListEnabledFunc)
-
-	num, ok := out["0"].(bool)
-
-	require.True(t, ok)
-	require.Equal(t, value, num)
 }
 
 // getFilteredLogs retrieves Ethereum logs, described by event signature within the block range
@@ -356,97 +346,4 @@ func getLastExitEventID(t *testing.T, relayer txrelayer.TxRelayer) uint64 {
 	require.NoError(t, err)
 
 	return exitEventID
-}
-
-func getSlashExitEventWithProof(t *testing.T, jsonRPCAddress string,
-	blockNumber uint64) (*polybft.ExitEvent, *types.Proof, error) {
-	t.Helper()
-
-	var (
-		pendingSlashProofs []types.Proof
-		exitEvent          *polybft.ExitEvent
-	)
-
-	childClient, err := jsonrpc.NewClient(jsonRPCAddress)
-	require.NoError(t, err)
-	err = childClient.Call("bridge_getPendingSlashProofs", &pendingSlashProofs, "")
-	require.NoError(t, err)
-	require.True(t, len(pendingSlashProofs) > 0)
-
-	for _, proof := range pendingSlashProofs {
-		exitEventMap, ok := proof.Metadata["ExitEvent"].(map[string]interface{})
-		if !ok {
-			t.Fatal(errors.New("could not get exit event from proof"))
-		}
-
-		raw, err := json.Marshal(exitEventMap)
-		require.NoError(t, err)
-
-		err = json.Unmarshal(raw, &exitEvent)
-		require.NoError(t, err)
-
-		if exitEvent.BlockNumber == blockNumber {
-			return exitEvent, &proof, nil
-		}
-	}
-
-	return nil, nil, fmt.Errorf("no slashing exit event proof found for block number %v", blockNumber)
-}
-
-// execute slashing on the root chain by calling ExitHelper contract with the provided exit event and its proof
-func executeSlashingOnRootChain(t *testing.T, polybftConfig polyCommon.PolyBFTConfig,
-	rootRelayer txrelayer.TxRelayer, exitEvent *polybft.ExitEvent, exitEventProof *types.Proof) {
-	t.Helper()
-
-	var exitEventAPI contractsapi.L2StateSyncedEvent
-
-	exitEventEncoded, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
-	require.NoError(t, err)
-
-	leafIndex, ok := exitEventProof.Metadata["LeafIndex"].(float64)
-	if !ok {
-		t.Fatal("failed to extract LeafIndex from exit event metadata")
-	}
-
-	checkpointBlock, ok := exitEventProof.Metadata["CheckpointBlock"].(float64)
-	if !ok {
-		t.Fatal("failed to extract CheckpointBlock from exit event metadata")
-	}
-
-	exitFn := &contractsapi.ExitExitHelperFn{
-		BlockNumber:  new(big.Int).SetUint64(uint64(checkpointBlock)),
-		LeafIndex:    new(big.Int).SetUint64(uint64(leafIndex)),
-		UnhashedLeaf: exitEventEncoded,
-		Proof:        exitEventProof.Data,
-	}
-
-	exitFnInput, err := exitFn.EncodeAbi()
-	require.NoError(t, err)
-
-	rootchainDeployer, err := rootHelper.DecodePrivateKey("")
-	require.NoError(t, err)
-
-	exitHelperContract := ethgo.Address(polybftConfig.Bridge.ExitHelperAddr)
-	exitTxn := &ethgo.Transaction{To: &exitHelperContract, Input: exitFnInput}
-	_, err = rootRelayer.SendTransaction(exitTxn, rootchainDeployer)
-	require.NoError(t, err)
-}
-
-func getValidatorsWithdrawableStakeOnRoot(
-	t *testing.T, txRelayer txrelayer.TxRelayer,
-	stakeManagerAddress, validatorAddress types.Address) *big.Int {
-	t.Helper()
-
-	withdrawableStakeMethod := contractsapi.StakeManager.Abi.GetMethod("withdrawableStake")
-
-	encoded, err := withdrawableStakeMethod.Encode([]interface{}{validatorAddress})
-	require.NoError(t, err)
-
-	response, err := txRelayer.Call(ethgo.Address(types.ZeroAddress), ethgo.Address(stakeManagerAddress), encoded)
-	require.NoError(t, err)
-
-	withdrawableStake, err := common.ParseUint256orHex(&response)
-	require.NoError(t, err)
-
-	return withdrawableStake
 }

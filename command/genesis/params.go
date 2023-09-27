@@ -16,7 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
@@ -40,16 +40,8 @@ const (
 	nativeTokenConfigFlag        = "native-token-config"
 	rewardTokenCodeFlag          = "reward-token-code"
 	rewardWalletFlag             = "reward-wallet"
-	checkpointIntervalFlag       = "checkpoint-interval"
-	withdrawalWaitPeriodFlag     = "withdrawal-wait-period"
-	baseFeeChangeDenomFlag       = "base-fee-change-denom"
-	voteDelayFlag                = "vote-delay"
-	votePeriodFlag               = "vote-period"
-	voteProposalThresholdFlag    = "vote-proposal-threshold"
-	governorAdminFlag            = "governor-admin"
-	proposalQuorumFlag           = "proposal-quorum"
-	proxyContractsAdminFlag      = "proxy-contracts-admin"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
+	proxyContractsAdminFlag      = "proxy-contracts-admin"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -74,9 +66,6 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
-	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
-	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
-	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 )
 
@@ -136,10 +125,9 @@ type genesisParams struct {
 	bridgeAllowListEnabled           []string
 	bridgeBlockListAdmin             []string
 	bridgeBlockListEnabled           []string
-	accessListsOwner                 string
 
 	nativeTokenConfigRaw string
-	nativeTokenConfig    *common.TokenConfig
+	nativeTokenConfig    *polybft.TokenConfig
 
 	premineInfos []*premineInfo
 
@@ -147,19 +135,9 @@ type genesisParams struct {
 	rewardTokenCode string
 	rewardWallet    string
 
-	checkpointInterval   uint64
-	withdrawalWaitPeriod uint64
-	baseFeeChangeDenom   uint64
-
-	// governance
-	voteDelay         string
-	votingPeriod      string
-	proposalThreshold string
-	proposalQuorum    uint64
-	governorAdmin     string
-
-	proxyContractsAdmin      string
 	blockTrackerPollInterval time.Duration
+
+	proxyContractsAdmin string
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -179,10 +157,6 @@ func (p *genesisParams) validateFlags() error {
 		return err
 	}
 
-	if p.baseFeeChangeDenom == 0 {
-		return errBaseFeeChangeDenomZero
-	}
-
 	if p.isPolyBFTConsensus() {
 		if err := p.extractNativeTokenMetadata(); err != nil {
 			return err
@@ -200,15 +174,7 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
-		if err := p.validateGovernorAdminAddr(); err != nil {
-			return err
-		}
-
 		if err := p.validateProxyContractsAdmin(); err != nil {
-			return err
-		}
-
-		if err := p.validateBlockTrackerPollInterval(); err != nil {
 			return err
 		}
 	}
@@ -443,10 +409,9 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID:            int64(p.chainID),
-			Forks:              enabledForks,
-			Engine:             p.consensusEngineConfig,
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
+			ChainID: int64(p.chainID),
+			Forks:   enabledForks,
+			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -558,15 +523,6 @@ func (p *genesisParams) validatePremineInfo() error {
 	return errReserveAccMustBePremined
 }
 
-// validateGovernorAdminAddr validates governor admin address
-func (p *genesisParams) validateGovernorAdminAddr() error {
-	if err := types.IsValidAddress(p.governorAdmin); err != nil {
-		return fmt.Errorf("governor admin address is not valid: %w", err)
-	}
-
-	return nil
-}
-
 // validateBlockTrackerPollInterval validates block tracker block interval
 // which can not be 0
 func (p *genesisParams) validateBlockTrackerPollInterval() error {
@@ -626,7 +582,7 @@ func (p *genesisParams) isBurnContractEnabled() bool {
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
 func (p *genesisParams) extractNativeTokenMetadata() error {
 	if p.nativeTokenConfigRaw == "" {
-		p.nativeTokenConfig = &common.TokenConfig{
+		p.nativeTokenConfig = &polybft.TokenConfig{
 			Name:       defaultNativeTokenName,
 			Symbol:     defaultNativeTokenSymbol,
 			Decimals:   defaultNativeTokenDecimals,
@@ -677,7 +633,7 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		owner = types.StringToAddress(strings.TrimSpace(params[4]))
 	}
 
-	p.nativeTokenConfig = &common.TokenConfig{
+	p.nativeTokenConfig = &polybft.TokenConfig{
 		Name:       name,
 		Symbol:     symbol,
 		Decimals:   uint8(decimals),

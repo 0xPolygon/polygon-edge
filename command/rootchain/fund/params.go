@@ -2,9 +2,11 @@ package fund
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	cmdhelper "github.com/0xPolygon/polygon-edge/command/helper"
+	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -54,6 +56,16 @@ func (fp *fundParams) validateFlags() error {
 		}
 
 		fp.amountValues[i] = amountValue
+	}
+
+	if fp.mintStakeToken {
+		if fp.stakeTokenAddr == "" {
+			return rootHelper.ErrMandatoryStakeToken
+		}
+
+		if err := types.IsValidAddress(fp.stakeTokenAddr); err != nil {
+			return fmt.Errorf("invalid stake token address is provided: %w", err)
+		}
 	}
 
 	return nil

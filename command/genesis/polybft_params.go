@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -38,21 +37,14 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize                = uint64(10) // in blocks
-	defaultSprintSize               = uint64(5)  // in blocks
+	defaultEpochSize                = uint64(10)
+	defaultSprintSize               = uint64(5)
 	defaultValidatorSetSize         = 100
 	defaultBlockTime                = 2 * time.Second
-	defaultEpochReward              = 1           // in wei
-	defaultBlockTimeDrift           = uint64(10)  // in seconds
-	defaultCheckpointInterval       = uint64(900) // in blocks
-	defaultWithdrawalWaitPeriod     = uint64(1)   // in epochs
-	defaultVotingDelay              = "10"        // in blocks
-	defaultVotingPeriod             = "10000"     // in blocks
-	defaultVoteProposalThreshold    = "1000"      // in blocks
-	defaultProposalQuorumPercentage = uint64(67)  // percentage
+	defaultEpochReward              = 1
+	defaultBlockTimeDrift           = uint64(10)
 	defaultBlockTrackerPollInterval = time.Second
 
-	accessListsOwnerFlag                 = "access-lists-owner" // #nosec G101
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
 	contractDeployerBlockListAdminFlag   = "contract-deployer-block-list-admin"
@@ -70,8 +62,6 @@ const (
 
 	ecdsaAddressLength = 40
 	blsKeyLength       = 256
-
-	proposalQuorumMax = uint64(100)
 )
 
 var (
@@ -149,73 +139,26 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	voteDelay, err := common.ParseUint256orHex(&p.voteDelay)
-	if err != nil {
-		return err
-	}
-
-	votingPeriod, err := common.ParseUint256orHex(&p.votingPeriod)
-	if err != nil {
-		return err
-	}
-
-	if votingPeriod.Cmp(big.NewInt(0)) == 0 {
-		return errInvalidVotingPeriod
-	}
-
-	proposalThreshold, err := common.ParseUint256orHex(&p.proposalThreshold)
-	if err != nil {
-		return err
-	}
-
-	governorAdminAddr := types.ZeroAddress
-	// if no admin is defined, zero address will be the owner,
-	// meaning no new proposers and executors besides genesis validator
-	// set can be added/removed later
-	if p.governorAdmin != "" {
-		governorAdminAddr = types.StringToAddress(p.governorAdmin)
-	}
-
-	proposalQuorum := p.proposalQuorum
-	if proposalQuorum > proposalQuorumMax {
-		// proposal can be from 0 to 100, so we sanitize the value
-		proposalQuorum = proposalQuorumMax
-	}
-
-	polyBftConfig := &polyCommon.PolyBFTConfig{
+	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
 		EpochReward:         p.epochReward,
 		// use 1st account as governance address
-		Governance:           types.ZeroAddress,
-		InitialTrieRoot:      types.StringToHash(p.initialStateRoot),
-		NativeTokenConfig:    p.nativeTokenConfig,
-		MinValidatorSetSize:  p.minNumValidators,
-		MaxValidatorSetSize:  p.maxNumValidators,
-		CheckpointInterval:   p.checkpointInterval,
-		WithdrawalWaitPeriod: p.withdrawalWaitPeriod,
-		RewardConfig: &polyCommon.RewardsConfig{
+		Governance:          types.ZeroAddress,
+		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
+		NativeTokenConfig:   p.nativeTokenConfig,
+		MinValidatorSetSize: p.minNumValidators,
+		MaxValidatorSetSize: p.maxNumValidators,
+		RewardConfig: &polybft.RewardsConfig{
 			TokenAddress:  rewardTokenAddr,
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
-		BlockTimeDrift:      p.blockTimeDrift,
-		ProxyContractsAdmin: types.StringToAddress(p.proxyContractsAdmin),
-		GovernanceConfig: &polyCommon.GovernanceConfig{
-			VotingDelay:              voteDelay,
-			VotingPeriod:             votingPeriod,
-			ProposalThreshold:        proposalThreshold,
-			ProposalQuorumPercentage: proposalQuorum,
-			GovernorAdmin:            governorAdminAddr,
-			// on genesis we deploy governance contracts on predefined addresses
-			ChildGovernorAddr: contracts.ChildGovernorContract,
-			ChildTimelockAddr: contracts.ChildTimelockContract,
-			NetworkParamsAddr: contracts.NetworkParamsContract,
-			ForkParamsAddr:    contracts.ForkParamsContract,
-		},
+		BlockTimeDrift:           p.blockTimeDrift,
 		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
+		ProxyContractsAdmin:      types.StringToAddress(p.proxyContractsAdmin),
 	}
 
 	// Disable london hardfork if burn contract address is not provided
@@ -232,7 +175,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -362,11 +304,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
-	if p.accessListsOwner != "" {
-		value := types.StringToAddress(p.accessListsOwner)
-		chainConfig.Params.AccessListsOwner = &value
-	}
-
 	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
@@ -379,7 +316,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 
 func (p *genesisParams) deployContracts(
 	rewardTokenByteCode []byte,
-	polybftConfig *polyCommon.PolyBFTConfig,
+	polybftConfig *polybft.PolyBFTConfig,
 	chainConfig *chain.Chain,
 	burnContractAddr types.Address) (map[types.Address]*chain.GenesisAccount, error) {
 	proxyToImplAddrMap := contracts.GetProxyImplementationMapping()
@@ -433,22 +370,6 @@ func (p *genesisParams) deployContracts(
 			artifact: contractsapi.RewardPool,
 			address:  contracts.RewardPoolContractV1,
 		},
-		{
-			artifact: contractsapi.NetworkParams,
-			address:  contracts.NetworkParamsContractV1,
-		},
-		{
-			artifact: contractsapi.ForkParams,
-			address:  contracts.ForkParamsContractV1,
-		},
-		{
-			artifact: contractsapi.ChildGovernor,
-			address:  contracts.ChildGovernorContractV1,
-		},
-		{
-			artifact: contractsapi.ChildTimelock,
-			address:  contracts.ChildTimelockContractV1,
-		},
 	}
 
 	if !params.nativeTokenConfig.IsMintable {
@@ -477,7 +398,7 @@ func (p *genesisParams) deployContracts(
 			})
 	}
 
-	if len(p.bridgeAllowListAdmin) != 0 || len(p.bridgeBlockListAdmin) != 0 || p.accessListsOwner != "" {
+	if len(params.bridgeAllowListAdmin) != 0 || len(params.bridgeBlockListAdmin) != 0 {
 		// rootchain originated tokens predicates (with access lists)
 		genesisContracts = append(genesisContracts,
 			&contractInfo{

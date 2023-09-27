@@ -20,11 +20,7 @@ type Params struct {
 	Engine         map[string]interface{} `json:"engine"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
-	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
-	BaseFeeChangeDenom uint64 `json:"baseFeeChangeDenom,omitempty"`
-
 	// Access control configuration
-	AccessListsOwner          *types.Address     `json:"accessListsOwner,omitempty"`
 	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
 	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
 	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
@@ -92,9 +88,8 @@ const (
 	EIP158              = "EIP158"
 	EIP155              = "EIP155"
 	QuorumCalcAlignment = "quorumcalcalignment"
+	TxHashWithType      = "txHashWithType"
 	LondonFix           = "londonfix"
-	Governance          = "governance"
-	DoubleSignSlashing  = "doubleSignSlashing"
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
@@ -129,9 +124,8 @@ func (f *Forks) At(block uint64) ForksInTime {
 		EIP158:              f.IsActive(EIP158, block),
 		EIP155:              f.IsActive(EIP155, block),
 		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
+		TxHashWithType:      f.IsActive(TxHashWithType, block),
 		LondonFix:           f.IsActive(LondonFix, block),
-		Governance:          f.IsActive(Governance, block),
-		DoubleSignSlashing:  f.IsActive(DoubleSignSlashing, block),
 	}
 }
 
@@ -160,9 +154,8 @@ type ForksInTime struct {
 	EIP158,
 	EIP155,
 	QuorumCalcAlignment,
-	LondonFix,
-	Governance,
-	DoubleSignSlashing bool
+	TxHashWithType,
+	LondonFix bool
 }
 
 // AllForksEnabled should contain all supported forks by current edge version
@@ -177,7 +170,6 @@ var AllForksEnabled = &Forks{
 	Istanbul:            NewFork(0),
 	London:              NewFork(0),
 	QuorumCalcAlignment: NewFork(0),
+	TxHashWithType:      NewFork(0),
 	LondonFix:           NewFork(0),
-	Governance:          NewFork(0),
-	DoubleSignSlashing:  NewFork(0),
 }

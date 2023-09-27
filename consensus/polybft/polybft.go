@@ -12,7 +12,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -51,20 +50,20 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	setupHeaderHashFunc()
 
 	polybft := &Polybft{
-		config:          params,
-		closeCh:         make(chan struct{}),
-		logger:          logger,
-		txPool:          params.TxPool,
-		ibftMsgHandlers: []IBFTMessageHandler{},
+		config:  params,
+		closeCh: make(chan struct{}),
+		logger:  logger,
+		txPool:  params.TxPool,
 	}
 
-	// initialize genesis polybft consensus config
+	// initialize polybft consensus config
 	customConfigJSON, err := json.Marshal(params.Config.Config)
 	if err != nil {
 		return nil, err
 	}
 
-	if err = json.Unmarshal(customConfigJSON, &polybft.genesisClientConfig); err != nil {
+	err = json.Unmarshal(customConfigJSON, &polybft.consensusConfig)
+	if err != nil {
 		return nil, err
 	}
 
@@ -84,8 +83,8 @@ type Polybft struct {
 	// consensus parameters
 	config *consensus.Params
 
-	// genesisClientConfig is genesis configuration for polybft consensus protocol
-	genesisClientConfig *polyCommon.PolyBFTConfig
+	// consensusConfig is genesis configuration for polybft consensus protocol
+	consensusConfig *PolyBFTConfig
 
 	// blockchain is a reference to the blockchain object
 	blockchain blockchainBackend
@@ -119,14 +118,11 @@ type Polybft struct {
 
 	// tx pool as interface
 	txPool txPoolInterface
-
-	// ibftMsgHandlers contains IBFT consensus messages handlers
-	ibftMsgHandlers []IBFTMessageHandler
 }
 
 func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *state.Transition) error {
 	return func(transition *state.Transition) error {
-		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config.Params)
+		polyBFTConfig, err := GetPolyBFTConfig(config)
 		if err != nil {
 			return err
 		}
@@ -149,38 +145,18 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return errMissingBridgeConfig
 		}
 
-		proxyAddr := contracts.GetProxyImplementationMapping()
+		proxyAddrMapping := contracts.GetProxyImplementationMapping()
 
 		burnContractAddress, isBurnContractSet := getBurnContractAddress(config, polyBFTConfig)
 		if isBurnContractSet {
-			proxyAddr[contracts.DefaultBurnContract] = burnContractAddress
+			proxyAddrMapping[contracts.DefaultBurnContract] = burnContractAddress
 		}
 
 		if _, ok := config.Genesis.Alloc[contracts.RewardTokenContract]; ok {
-			proxyAddr[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
+			proxyAddrMapping[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
 		}
 
-		if err = setUpProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddr); err != nil {
-			return err
-		}
-
-		// initialize NetworkParams SC
-		if err = initNetworkParamsContract(config.Params.BaseFeeChangeDenom, polyBFTConfig, transition); err != nil {
-			return err
-		}
-
-		// initialize ForkParams SC
-		if err = initForkParamsContract(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
-		// initialize ChildTimelock SC
-		if err = initChildTimelock(polyBFTConfig, transition); err != nil {
-			return err
-		}
-
-		// initialize ChildGovernor SC
-		if err = initChildGovernor(polyBFTConfig, transition); err != nil {
+		if err = setUpProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddrMapping); err != nil {
 			return err
 		}
 
@@ -216,20 +192,16 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			bridgeBlockListAdmin = config.Params.BridgeBlockList.AdminAddresses[0]
 		}
 
-		hasOwner := config.Params.AccessListsOwner != nil
-		useBridgeAllowList := bridgeAllowListAdmin != types.ZeroAddress
-		useBridgeBlockList := bridgeBlockListAdmin != types.ZeroAddress
-
 		// initialize Predicate SCs
-		if hasOwner || useBridgeAllowList || useBridgeBlockList {
+		if bridgeAllowListAdmin != types.ZeroAddress || bridgeBlockListAdmin != types.ZeroAddress {
 			// The owner of the contract will be the allow list admin or the block list admin, if any of them is set.
-			var owner types.Address
+			owner := contracts.SystemCaller
+			useBridgeAllowList := bridgeAllowListAdmin != types.ZeroAddress
+			useBridgeBlockList := bridgeBlockListAdmin != types.ZeroAddress
 
-			if hasOwner {
-				owner = *config.Params.AccessListsOwner
-			} else if useBridgeAllowList {
+			if bridgeAllowListAdmin != types.ZeroAddress {
 				owner = bridgeAllowListAdmin
-			} else {
+			} else if bridgeBlockListAdmin != types.ZeroAddress {
 				owner = bridgeBlockListAdmin
 			}
 
@@ -485,7 +457,7 @@ func (p *Polybft) Initialize() error {
 		return fmt.Errorf("failed to create data directory. Error: %w", err)
 	}
 
-	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger.Named("state"), p.closeCh)
+	stt, err := newState(filepath.Join(p.dataDir, stateFileName), p.logger, p.closeCh)
 	if err != nil {
 		return fmt.Errorf("failed to create state instance. Error: %w", err)
 	}
@@ -499,8 +471,6 @@ func (p *Polybft) Initialize() error {
 	}
 
 	p.ibft = newIBFTConsensusWrapper(p.logger, p.runtime, p)
-	// register IBFTConsensusWrapper as IBFT message handler
-	p.ibftMsgHandlers = append(p.ibftMsgHandlers, p.ibft)
 
 	if err = p.subscribeToIbftTopic(); err != nil {
 		return fmt.Errorf("IBFT topic subscription failed: %w", err)
@@ -510,7 +480,7 @@ func (p *Polybft) Initialize() error {
 }
 
 func ForkManagerInitialParamsFactory(config *chain.Chain) (*forkmanager.ForkParams, error) {
-	pbftConfig, err := polyCommon.GetPolyBFTConfig(config.Params)
+	pbftConfig, err := GetPolyBFTConfig(config)
 	if err != nil {
 		return nil, err
 	}
@@ -563,9 +533,7 @@ func (p *Polybft) Start() error {
 // initRuntime creates consensus runtime
 func (p *Polybft) initRuntime() error {
 	runtimeConfig := &runtimeConfig{
-		genesisParams:         p.config.Config.Params,
-		GenesisConfig:         p.genesisClientConfig,
-		Forks:                 p.config.Config.Params.Forks,
+		PolyBFTConfig:         p.consensusConfig,
 		Key:                   p.key,
 		DataDir:               p.dataDir,
 		State:                 p.state,
@@ -582,8 +550,6 @@ func (p *Polybft) initRuntime() error {
 	}
 
 	p.runtime = runtime
-	// register double signing tracker as IBFT messages handler
-	p.ibftMsgHandlers = append(p.ibftMsgHandlers, runtime.doubleSigningTracker)
 
 	return nil
 }
@@ -729,7 +695,7 @@ func (p *Polybft) VerifyHeader(header *types.Header) error {
 		)
 	}
 
-	return p.verifyHeaderImpl(parent, header, p.runtime.getCurrentBlockTimeDrift(), nil)
+	return p.verifyHeaderImpl(parent, header, p.consensusConfig.BlockTimeDrift, nil)
 }
 
 func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift uint64, parents []*types.Header) error {
@@ -804,15 +770,6 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 	return nil
 }
 
-// GetLatestChainConfig returns the latest chain configuration
-func (p *Polybft) GetLatestChainConfig() (*chain.Params, error) {
-	if p.runtime != nil {
-		return p.runtime.governanceManager.GetClientConfig()
-	}
-
-	return nil, nil
-}
-
 // GetBridgeProvider is an implementation of Consensus interface
 // Returns an instance of BridgeDataProvider
 func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
@@ -827,27 +784,39 @@ func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 func setUpProxies(transition *state.Transition, admin types.Address,
 	proxyToImplMap map[types.Address]types.Address) error {
 	for proxyAddress, implAddress := range proxyToImplMap {
+		protectSetupProxyFn := &contractsapi.ProtectSetUpProxyGenesisProxyFn{Initiator: contracts.SystemCaller}
+
+		proxyInput, err := protectSetupProxyFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("GenesisProxy.protectSetUpProxy params encoding failed: %w", err)
+		}
+
+		err = callContract(contracts.SystemCaller, proxyAddress, proxyInput, "GenesisProxy.protectSetUpProxy", transition)
+		if err != nil {
+			return err
+		}
+
 		setUpproxyFn := &contractsapi.SetUpProxyGenesisProxyFn{
 			Logic: implAddress,
 			Admin: admin,
 			Data:  []byte{},
 		}
 
-		proxyInput, err := setUpproxyFn.EncodeAbi()
+		proxyInput, err = setUpproxyFn.EncodeAbi()
 		if err != nil {
 			return fmt.Errorf("GenesisProxy.setUpProxy params encoding failed: %w", err)
 		}
 
 		err = callContract(contracts.SystemCaller, proxyAddress, proxyInput, "GenesisProxy.setUpProxy", transition)
 		if err != nil {
-			return fmt.Errorf("GenesisProxy.setUpProxy params encoding failed: %w", err)
+			return err
 		}
 	}
 
 	return nil
 }
 
-func getBurnContractAddress(config *chain.Chain, polyBFTConfig polyCommon.PolyBFTConfig) (types.Address, bool) {
+func getBurnContractAddress(config *chain.Chain, polyBFTConfig PolyBFTConfig) (types.Address, bool) {
 	if config.Params.BurnContract != nil &&
 		len(config.Params.BurnContract) == 1 &&
 		!polyBFTConfig.NativeTokenConfig.IsMintable {

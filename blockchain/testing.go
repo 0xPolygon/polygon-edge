@@ -231,14 +231,12 @@ type verifyHeaderDelegate func(*types.Header) error
 type processHeadersDelegate func([]*types.Header) error
 type getBlockCreatorDelegate func(*types.Header) (types.Address, error)
 type preStateCommitDelegate func(*types.Block, *state.Transition) error
-type getChainConfigDelegate func() (*chain.Params, error)
 
 type MockVerifier struct {
 	verifyHeaderFn    verifyHeaderDelegate
 	processHeadersFn  processHeadersDelegate
 	getBlockCreatorFn getBlockCreatorDelegate
 	preStateCommitFn  preStateCommitDelegate
-	getChainConfigFn  getChainConfigDelegate
 }
 
 func (m *MockVerifier) VerifyHeader(header *types.Header) error {
@@ -271,14 +269,6 @@ func (m *MockVerifier) GetBlockCreator(header *types.Header) (types.Address, err
 	}
 
 	return types.BytesToAddress(header.Miner), nil
-}
-
-func (m *MockVerifier) GetLatestChainConfig() (*chain.Params, error) {
-	if m.getChainConfigFn != nil {
-		return m.getChainConfigFn()
-	}
-
-	return &chain.Params{}, nil
 }
 
 func (m *MockVerifier) HookGetBlockCreator(fn getBlockCreatorDelegate) {

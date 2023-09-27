@@ -8,14 +8,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type epochIDValidatorsF struct {
@@ -65,8 +63,9 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		stakeManager := &stakeManager{
-			logger: hclog.NewNullLogger(),
-			state:  state,
+			logger:              hclog.NewNullLogger(),
+			state:               state,
+			maxValidatorSetSize: 10,
 		}
 
 		var data epochIDValidatorsF
@@ -84,7 +83,7 @@ func FuzzTestStakeManagerPostEpoch(f *testing.F) {
 			t.Skip()
 		}
 
-		err := stakeManager.PostEpoch(&common.PostEpochRequest{
+		err := stakeManager.PostEpoch(&PostEpochRequest{
 			NewEpochID: data.EpochID,
 			ValidatorSet: validator.NewValidatorSet(
 				data.Validators,
@@ -159,11 +158,12 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 
 		bcMock := new(blockchainMock)
 		for i := 0; i < int(data.BlockID); i++ {
+			bcMock.On("CurrentHeader").Return(&types.Header{Number: 0})
 			bcMock.On("GetHeaderByNumber", mock.Anything).Return(&types.Header{Hash: types.Hash{6, 4}}, true).Once()
 			bcMock.On("GetReceiptsByHash", mock.Anything).Return([]*types.Receipt{{}}, error(nil)).Once()
 		}
 
-		stakeManager := newStakeManager(
+		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
 			nil,
@@ -171,7 +171,9 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			validatorSetAddr,
 			types.StringToAddress("0x0002"),
 			bcMock,
+			5,
 		)
+		require.NoError(t, err)
 
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
@@ -190,35 +192,37 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			},
 		}
 
-		req := &common.PostBlockRequest{
+		require.NoError(t, stakeManager.PostBlock(&PostBlockRequest{
 			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: data.BlockID}},
 				Receipts: []*types.Receipt{receipt},
 			},
 			Epoch: data.EpochID,
-		}
-		err := stakeManager.PostBlock(req)
-		require.NoError(t, err)
+		}))
 	})
 }
 
 func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	var (
-		aliases             = []string{"A", "B", "C", "D", "E"}
-		stakes              = []uint64{10, 10, 10, 10, 10}
-		maxValidatorSetSize = uint64(10)
+		aliases = []string{"A", "B", "C", "D", "E"}
+		stakes  = []uint64{10, 10, 10, 10, 10}
 	)
 
 	validators := validator.NewTestValidatorsWithAliases(f, aliases, stakes)
 	state := newTestState(f)
 
-	stakeManager := newStakeManager(
+	bcMock := new(blockchainMock)
+	bcMock.On("CurrentHeader").Return(&types.Header{Number: 0})
+
+	stakeManager, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
 		nil,
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
-		nil,
+		bcMock,
+		10,
 	)
+	require.NoError(f, err)
 
 	seeds := []updateValidatorSetF{
 		{
@@ -265,16 +269,14 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 			Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
 		require.NoError(t, err)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, maxValidatorSetSize,
-			validators.GetPublicIdentities(aliases[data.Index:]...))
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities(aliases[data.Index:]...))
 		require.NoError(t, err)
 
 		fullValidatorSet := validators.GetPublicIdentities().Copy()
 		validatorToUpdate := fullValidatorSet[data.Index]
 		validatorToUpdate.VotingPower = big.NewInt(data.VotingPower)
 
-		_, err = stakeManager.UpdateValidatorSet(data.EpochID, maxValidatorSetSize,
-			validators.GetPublicIdentities())
+		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities())
 		require.NoError(t, err)
 	})
 }

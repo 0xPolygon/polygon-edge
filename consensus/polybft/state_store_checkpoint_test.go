@@ -14,8 +14,6 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-var dataWithSigABIType = abi.MustNewType("tuple(bytes32 signature, bytes data)")
-
 func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
 	const (
 		numOfEpochs         = 11
@@ -27,14 +25,14 @@ func TestState_Insert_And_Get_ExitEvents_PerEpoch(t *testing.T) {
 	insertTestExitEvents(t, state, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
 
 	t.Run("Get events for existing epoch", func(t *testing.T) {
-		events, err := state.ExitEventStore.getExitEventsByEpoch(1)
+		events, err := state.CheckpointStore.getExitEventsByEpoch(1)
 
 		assert.NoError(t, err)
 		assert.Len(t, events, numOfBlocksPerEpoch*numOfEventsPerBlock)
 	})
 
 	t.Run("Get events for non-existing epoch", func(t *testing.T) {
-		events, err := state.ExitEventStore.getExitEventsByEpoch(12)
+		events, err := state.CheckpointStore.getExitEventsByEpoch(12)
 
 		assert.NoError(t, err)
 		assert.Len(t, events, 0)
@@ -67,7 +65,7 @@ func TestState_Insert_And_Get_ExitEvents_ForProof(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		events, err := state.ExitEventStore.getExitEventsForProof(c.epoch, c.checkpointBlockNumber)
+		events, err := state.CheckpointStore.getExitEventsForProof(c.epoch, c.checkpointBlockNumber)
 
 		assert.NoError(t, err)
 		assert.Len(t, events, c.expectedNumberOfEvents)
@@ -80,7 +78,7 @@ func TestState_Insert_And_Get_ExitEvents_ForProof_NoEvents(t *testing.T) {
 	state := newTestState(t)
 	insertTestExitEvents(t, state, 1, 10, 1)
 
-	events, err := state.ExitEventStore.getExitEventsForProof(2, 11)
+	events, err := state.CheckpointStore.getExitEventsForProof(2, 11)
 
 	assert.NoError(t, err)
 	assert.Nil(t, events)
@@ -98,7 +96,7 @@ func TestState_NoEpochForExitEventInLookup(t *testing.T) {
 	state := newTestState(t)
 	insertTestExitEvents(t, state, 3, 10, 1)
 
-	exitEventFromDB, err := state.ExitEventStore.getExitEvent(exitToTest)
+	exitEventFromDB, err := state.CheckpointStore.getExitEvent(exitToTest)
 	require.NoError(t, err)
 	require.Equal(t, exitToTest, exitEventFromDB.ID.Uint64())
 	require.Equal(t, epochToMatch, exitEventFromDB.EpochNumber)
@@ -111,7 +109,7 @@ func TestState_NoEpochForExitEventInLookup(t *testing.T) {
 
 	require.NoError(t, err)
 
-	_, err = state.ExitEventStore.getExitEvent(exitToTest)
+	_, err = state.CheckpointStore.getExitEvent(exitToTest)
 	require.ErrorContains(t, err, "epoch was not found in lookup table")
 }
 
@@ -149,7 +147,7 @@ func TestState_decodeExitEvent(t *testing.T) {
 	require.Equal(t, uint64(epoch), event.EpochNumber)
 	require.Equal(t, uint64(blockNumber), event.BlockNumber)
 
-	require.NoError(t, state.ExitEventStore.insertExitEvents([]*ExitEvent{event}))
+	require.NoError(t, state.CheckpointStore.insertExitEvents([]*ExitEvent{event}))
 }
 
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
@@ -170,75 +168,26 @@ func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
 	require.Nil(t, event)
 }
 
-func Test_getPendingSlashExitIDs(t *testing.T) {
-	t.Parallel()
-
-	state := newTestState(t)
-	exitEvents := generateTestExitEvents(t, 2, 4, 2)
-
-	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
-
-	exitEventIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
-	require.NoError(t, err)
-	require.Len(t, exitEventIDs, len(exitEvents))
-
-	for i, event := range exitEvents {
-		require.Equal(t, event.ID.Uint64(), exitEventIDs[i])
-	}
-}
-
-func Test_removeSlashExitEvents(t *testing.T) {
-	t.Parallel()
-
-	const (
-		exitEventsCount    = 5
-		exitEventsToRemove = 3
-	)
-
-	state := newTestState(t)
-	exitEvents := generateTestExitEvents(t, 1, exitEventsCount, 1)
-
-	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
-
-	exitEventIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
-	require.NoError(t, err)
-	require.Len(t, exitEventIDs, len(exitEvents))
-
-	idsToRemove := exitEventIDs[:exitEventsToRemove]
-	require.NoError(t, state.ExitEventStore.removeSlashExitEvents(idsToRemove...))
-
-	remainingExitIDs, err := state.ExitEventStore.getPendingSlashExitIDs()
-	require.NoError(t, err)
-	require.Len(t, remainingExitIDs, exitEventsCount-exitEventsToRemove)
-
-	expRemainingExitIDs := exitEventIDs[exitEventsToRemove:]
-	require.Len(t, remainingExitIDs, len(expRemainingExitIDs))
-	require.Equal(t, expRemainingExitIDs, remainingExitIDs)
-}
-
-func generateTestExitEvents(t *testing.T, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
+func insertTestExitEvents(t *testing.T, state *State,
+	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
 	t.Helper()
 
-	index := uint64(0)
-	block := uint64(1)
-	exitEvents := make([]*ExitEvent, numOfEpochs*numOfBlocksPerEpoch*numOfEventsPerBlock)
+	var (
+		index      = uint64(0)
+		block      = uint64(1)
+		exitEvents = make([]*ExitEvent, numOfEpochs*numOfBlocksPerEpoch*numOfEventsPerBlock)
+	)
 
 	for i := uint64(1); i <= uint64(numOfEpochs); i++ {
 		for j := 1; j <= numOfBlocksPerEpoch; j++ {
 			for k := 1; k <= numOfEventsPerBlock; k++ {
-				abiData, err := dataWithSigABIType.Encode(map[string]interface{}{
-					"signature": slashSignature,
-					"data":      generateRandomBytes(t),
-				})
-				require.NoError(t, err)
-
 				exitEvents[index] =
 					&ExitEvent{
 						L2StateSyncedEvent: &contractsapi.L2StateSyncedEvent{
 							ID:       new(big.Int).SetUint64(index),
 							Sender:   types.ZeroAddress,
 							Receiver: types.ZeroAddress,
-							Data:     abiData,
+							Data:     generateRandomBytes(t),
 						},
 						EpochNumber: i,
 						BlockNumber: block,
@@ -248,16 +197,7 @@ func generateTestExitEvents(t *testing.T, numOfEpochs, numOfBlocksPerEpoch, numO
 			block++
 		}
 	}
-
-	return exitEvents
-}
-
-func insertTestExitEvents(t *testing.T, state *State,
-	numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock int) []*ExitEvent {
-	t.Helper()
-
-	exitEvents := generateTestExitEvents(t, numOfEpochs, numOfBlocksPerEpoch, numOfEventsPerBlock)
-	require.NoError(t, state.ExitEventStore.insertExitEvents(exitEvents))
+	require.NoError(t, state.CheckpointStore.insertExitEvents(exitEvents))
 
 	return exitEvents
 }

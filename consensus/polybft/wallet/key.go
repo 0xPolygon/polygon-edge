@@ -3,13 +3,12 @@ package wallet
 import (
 	"fmt"
 
-	ibftProto "github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/umbracle/ethgo"
-	protobuf "google.golang.org/protobuf/proto"
-
+	"github.com/0xPolygon/go-ibft/messages/proto"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/umbracle/ethgo"
+	protobuf "google.golang.org/protobuf/proto"
 )
 
 type Key struct {
@@ -49,7 +48,7 @@ func (k *Key) SignWithDomain(digest, domain []byte) ([]byte, error) {
 }
 
 // SignIBFTMessage signs the IBFT consensus message with ECDSA key
-func (k *Key) SignIBFTMessage(msg *ibftProto.Message) (*ibftProto.Message, error) {
+func (k *Key) SignIBFTMessage(msg *proto.Message) (*proto.Message, error) {
 	msgRaw, err := protobuf.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal message: %w", err)
@@ -60,22 +59,6 @@ func (k *Key) SignIBFTMessage(msg *ibftProto.Message) (*ibftProto.Message, error
 	}
 
 	return msg, nil
-}
-
-// RecoverSignerFromIBFTMessage recovers signer address from provided IBFT message based
-// on signed message and its signature
-func RecoverSignerFromIBFTMessage(msg *ibftProto.Message) (types.Address, error) {
-	msgNoSig, err := msg.PayloadNoSig()
-	if err != nil {
-		return types.ZeroAddress, err
-	}
-
-	signerAddress, err := RecoverAddressFromSignature(msg.Signature, msgNoSig)
-	if err != nil {
-		return types.ZeroAddress, fmt.Errorf("failed to recover address from signature: %w", err)
-	}
-
-	return signerAddress, nil
 }
 
 // RecoverAddressFromSignature calculates keccak256 hash of provided rawContent

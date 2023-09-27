@@ -11,7 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -148,7 +148,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("failed to read chain configuration: %w", err)
 		}
 
-		consensusConfig, err := polyCommon.GetPolyBFTConfig(chainConfig.Params)
+		consensusConfig, err := polybft.GetPolyBFTConfig(chainConfig)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve consensus configuration: %w", err)
 		}
@@ -185,7 +185,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		}
 
 		chainConfig.Genesis.ExtraData = genesisExtraData
-		chainConfig.Params.Engine[polyCommon.ConsensusName] = consensusConfig
+		chainConfig.Params.Engine[polybft.ConsensusName] = consensusConfig
 
 		// save updated stake and genesis extra to genesis file on disk
 		if err := helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath); err != nil {
@@ -292,7 +292,7 @@ func validatorSetToABISlice(o command.OutputFormatter,
 // based on finalized stake (voting power) of genesis validators on root
 func initializeCheckpointManager(outputter command.OutputFormatter,
 	txRelayer txrelayer.TxRelayer,
-	consensusConfig polyCommon.PolyBFTConfig, chainID int64,
+	consensusConfig polybft.PolyBFTConfig, chainID int64,
 	deployerKey ethgo.Key) error {
 	validatorSet, err := validatorSetToABISlice(outputter, consensusConfig.InitialValidatorSet)
 	if err != nil {
