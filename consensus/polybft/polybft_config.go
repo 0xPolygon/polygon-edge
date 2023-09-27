@@ -58,6 +58,10 @@ type PolyBFTConfig struct {
 	// BlockTrackerPollInterval specifies interval
 	// at which block tracker polls for blocks on a rootchain
 	BlockTrackerPollInterval common.Duration `json:"blockTrackerPollInterval,omitempty"`
+
+	// ProxyContractsAdmin is the address that will have the privilege to change both the proxy
+	// implementation address and the admin
+	ProxyContractsAdmin types.Address `json:"proxyContractsAdmin,omitempty"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig

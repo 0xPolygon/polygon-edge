@@ -98,6 +98,13 @@ func setFlags(cmd *cobra.Command) {
 		"the epoch size for the chain",
 	)
 
+	cmd.Flags().StringVar(
+		&params.proxyContractsAdmin,
+		proxyContractsAdminFlag,
+		"",
+		"admin for proxy contracts",
+	)
+
 	// IBFT Validators
 	{
 		cmd.Flags().StringVar(

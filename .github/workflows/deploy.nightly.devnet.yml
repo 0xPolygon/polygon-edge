@@ -123,6 +123,7 @@ jobs:
           {% endfor %}
 
               BURN_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
+              PROXY_CONTRACTS_ADMIN=0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed
 
               polygon-edge genesis \
                           --consensus polybft \
@@ -138,16 +139,19 @@ jobs:
                           --block-time {{ block_time }}s \
                           {% for item in hostvars %}{% if (hostvars[item].tags.Role == "validator") %} --validators /dns4/{{ hostvars[item].tags["Name"] }}/tcp/{{ edge_p2p_port }}/p2p/$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].node_id'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].address' | sed 's/^0x//'):$(cat {{ hostvars[item].tags["Name"] }}.json | jq -r '.[0].bls_pubkey') {% endif %}{% endfor %} \
                           --epoch-size 10 \
-                          --native-token-config MyToken:MTK:18:true:0x0000000000000000000000000000000000001010
+                          --native-token-config MyToken:MTK:18:true:{{ loadtest_account }} \
+                          --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN
 
               polygon-edge polybft stake-manager-deploy \
                   --jsonrpc {{ rootchain_json_rpc }} \
+                  --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN \
                   --test
 
               polygon-edge rootchain deploy \
                           --stake-manager $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeManagerAddr') \
                           --stake-token $(cat genesis.json | jq -r '.params.engine.polybft.bridge.stakeTokenAddr') \
                           --json-rpc {{ rootchain_json_rpc }} \
+                          --proxy-contracts-admin $PROXY_CONTRACTS_ADMIN \
                           --test
 
               polygon-edge rootchain fund \

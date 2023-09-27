@@ -184,6 +184,22 @@ func (l *L2StateSyncedEvent) ParseLog(log *ethgo.Log) (bool, error) {
 	return true, decodeEvent(L2StateSender.Abi.Events["L2StateSynced"], log, l)
 }
 
+type CheckpointManagerConstructorFn struct {
+	Initiator types.Address `abi:"initiator"`
+}
+
+func (c *CheckpointManagerConstructorFn) Sig() []byte {
+	return CheckpointManager.Abi.Constructor.ID()
+}
+
+func (c *CheckpointManagerConstructorFn) EncodeAbi() ([]byte, error) {
+	return CheckpointManager.Abi.Constructor.Inputs.Encode(c)
+}
+
+func (c *CheckpointManagerConstructorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(CheckpointManager.Abi.Constructor, buf, c)
+}
+
 type CheckpointMetadata struct {
 	BlockHash               types.Hash `abi:"blockHash"`
 	BlockRound              *big.Int   `abi:"blockRound"`
@@ -1273,7 +1289,7 @@ func (a *AddedToWhitelistEvent) ParseLog(log *ethgo.Log) (bool, error) {
 }
 
 type InitializeStakeManagerFn struct {
-	NewMatic types.Address `abi:"newMatic"`
+	NewStakingToken types.Address `abi:"newStakingToken"`
 }
 
 func (i *InitializeStakeManagerFn) Sig() []byte {
@@ -1651,4 +1667,56 @@ func (i *InitializeEIP1559BurnFn) EncodeAbi() ([]byte, error) {
 
 func (i *InitializeEIP1559BurnFn) DecodeAbi(buf []byte) error {
 	return decodeMethod(EIP1559Burn.Abi.Methods["initialize"], buf, i)
+}
+
+type ProtectSetUpProxyGenesisProxyFn struct {
+	Initiator types.Address `abi:"initiator"`
+}
+
+func (p *ProtectSetUpProxyGenesisProxyFn) Sig() []byte {
+	return GenesisProxy.Abi.Methods["protectSetUpProxy"].ID()
+}
+
+func (p *ProtectSetUpProxyGenesisProxyFn) EncodeAbi() ([]byte, error) {
+	return GenesisProxy.Abi.Methods["protectSetUpProxy"].Encode(p)
+}
+
+func (p *ProtectSetUpProxyGenesisProxyFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(GenesisProxy.Abi.Methods["protectSetUpProxy"], buf, p)
+}
+
+type SetUpProxyGenesisProxyFn struct {
+	Logic types.Address `abi:"logic"`
+	Admin types.Address `abi:"admin"`
+	Data  []byte        `abi:"data"`
+}
+
+func (s *SetUpProxyGenesisProxyFn) Sig() []byte {
+	return GenesisProxy.Abi.Methods["setUpProxy"].ID()
+}
+
+func (s *SetUpProxyGenesisProxyFn) EncodeAbi() ([]byte, error) {
+	return GenesisProxy.Abi.Methods["setUpProxy"].Encode(s)
+}
+
+func (s *SetUpProxyGenesisProxyFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(GenesisProxy.Abi.Methods["setUpProxy"], buf, s)
+}
+
+type TransparentUpgradeableProxyConstructorFn struct {
+	Logic  types.Address `abi:"_logic"`
+	Admin_ types.Address `abi:"admin_"`
+	Data   []byte        `abi:"_data"`
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) Sig() []byte {
+	return TransparentUpgradeableProxy.Abi.Constructor.ID()
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) EncodeAbi() ([]byte, error) {
+	return TransparentUpgradeableProxy.Abi.Constructor.Inputs.Encode(t)
+}
+
+func (t *TransparentUpgradeableProxyConstructorFn) DecodeAbi(buf []byte) error {
+	return decodeMethod(TransparentUpgradeableProxy.Abi.Constructor, buf, t)
 }

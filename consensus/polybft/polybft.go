@@ -145,6 +145,21 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			return errMissingBridgeConfig
 		}
 
+		proxyAddrMapping := contracts.GetProxyImplementationMapping()
+
+		burnContractAddress, isBurnContractSet := getBurnContractAddress(config, polyBFTConfig)
+		if isBurnContractSet {
+			proxyAddrMapping[contracts.DefaultBurnContract] = burnContractAddress
+		}
+
+		if _, ok := config.Genesis.Alloc[contracts.RewardTokenContract]; ok {
+			proxyAddrMapping[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
+		}
+
+		if err = setUpProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddrMapping); err != nil {
+			return err
+		}
+
 		// initialize ValidatorSet SC
 		if err = initValidatorSet(polyBFTConfig, transition); err != nil {
 			return err
@@ -372,31 +387,21 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			}
 
 			// initialize EIP1559Burn SC
-			if config.Params.BurnContract != nil &&
-				len(config.Params.BurnContract) == 1 &&
-				!polyBFTConfig.NativeTokenConfig.IsMintable {
-				var contractAddress types.Address
-				for _, address := range config.Params.BurnContract {
-					contractAddress = address
+			if isBurnContractSet {
+				burnParams := &contractsapi.InitializeEIP1559BurnFn{
+					NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
+					NewBurnDestination:     config.Params.BurnContractDestinationAddress,
 				}
 
-				// contract address exists in allocations
-				if _, ok := config.Genesis.Alloc[contractAddress]; ok {
-					burnParams := &contractsapi.InitializeEIP1559BurnFn{
-						NewChildERC20Predicate: contracts.ChildERC20PredicateContract,
-						NewBurnDestination:     config.Params.BurnContractDestinationAddress,
-					}
+				input, err = burnParams.EncodeAbi()
+				if err != nil {
+					return err
+				}
 
-					input, err = burnParams.EncodeAbi()
-					if err != nil {
-						return err
-					}
-
-					if err = callContract(contracts.SystemCaller,
-						contractAddress,
-						input, "EIP1559Burn", transition); err != nil {
-						return err
-					}
+				if err = callContract(contracts.SystemCaller,
+					burnContractAddress,
+					input, "EIP1559Burn", transition); err != nil {
+					return err
 				}
 			}
 		}
@@ -771,8 +776,56 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 	return p.runtime
 }
 
-// GetBridgeProvider is an implementation of Consensus interface
-// Filters extra data to not contain Committed field
+// FilterExtra is an implementation of Consensus interface
 func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
+}
+
+func setUpProxies(transition *state.Transition, admin types.Address,
+	proxyToImplMap map[types.Address]types.Address) error {
+	for proxyAddress, implAddress := range proxyToImplMap {
+		protectSetupProxyFn := &contractsapi.ProtectSetUpProxyGenesisProxyFn{Initiator: contracts.SystemCaller}
+
+		proxyInput, err := protectSetupProxyFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("GenesisProxy.protectSetUpProxy params encoding failed: %w", err)
+		}
+
+		err = callContract(contracts.SystemCaller, proxyAddress, proxyInput, "GenesisProxy.protectSetUpProxy", transition)
+		if err != nil {
+			return err
+		}
+
+		setUpproxyFn := &contractsapi.SetUpProxyGenesisProxyFn{
+			Logic: implAddress,
+			Admin: admin,
+			Data:  []byte{},
+		}
+
+		proxyInput, err = setUpproxyFn.EncodeAbi()
+		if err != nil {
+			return fmt.Errorf("GenesisProxy.setUpProxy params encoding failed: %w", err)
+		}
+
+		err = callContract(contracts.SystemCaller, proxyAddress, proxyInput, "GenesisProxy.setUpProxy", transition)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func getBurnContractAddress(config *chain.Chain, polyBFTConfig PolyBFTConfig) (types.Address, bool) {
+	if config.Params.BurnContract != nil &&
+		len(config.Params.BurnContract) == 1 &&
+		!polyBFTConfig.NativeTokenConfig.IsMintable {
+		for _, address := range config.Params.BurnContract {
+			if _, ok := config.Genesis.Alloc[address]; ok {
+				return address, true
+			}
+		}
+	}
+
+	return types.ZeroAddress, false
 }
