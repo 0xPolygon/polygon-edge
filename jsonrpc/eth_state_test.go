@@ -692,7 +692,7 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 				assert.ErrorIs(t, estimateErr, testCase.expectedError)
 
 				// Make sure the estimate is nullified
-				assert.Equal(t, 0, estimate)
+				assert.Equal(t, []byte{}, estimate)
 			} else {
 				// Make sure no errors occurred
 				assert.NoError(t, estimateErr)
@@ -705,42 +705,71 @@ func TestEth_EstimateGas_GasLimit(t *testing.T) {
 }
 
 func TestEth_EstimateGas_Reverts(t *testing.T) {
-	// Example revert data that has the string "revert reason" as the revert reason
-	exampleReturnData := "08c379a000000000000000000000000000000000000000000000000000000000000000" +
-		"20000000000000000000000000000000000000000000000000000000000000000d72657665727420726561736f6e" +
-		"00000000000000000000000000000000000000"
-	rawReturnData, err := hex.DecodeHex(exampleReturnData)
-	assert.NoError(t, err)
-
-	revertReason := errors.New("revert reason")
+	testTable := []struct {
+		name              string
+		exampleReturnData string
+		revertReason      error
+		err               error
+	}{
+		{
+			"revert with string message 'revert reason'",
+			// Example revert data that has the string "revert reason" as the revert reason
+			"08c379a000000000000000000000000000000000000000000000000000000000000000" +
+				"20000000000000000000000000000000000000000000000000000000000000000d72657665727420726561736f6e" +
+				"00000000000000000000000000000000000000",
+			errors.New("revert reason"),
+			runtime.ErrExecutionReverted,
+		},
+		{
+			"revert with custom solidity error",
+			// First 4 bytes of ABI encoded custom solidity error PermissionedContractAccessDenied()
+			"8cd01c38",
+			errors.New(""), // revert reason in this case doesn't exist, reason is decoded in response data
+			runtime.ErrExecutionReverted,
+		},
+		{
+			"revert with empty response",
+			"",
+			errors.New(""),
+			runtime.ErrExecutionReverted,
+		},
+	}
 
 	store := getExampleStore()
 	ethEndpoint := newTestEthEndpoint(store)
 
-	// We want to simulate an EVM revert here
-	store.applyTxnHook = func(
-		header *types.Header,
-		txn *types.Transaction,
-	) (*runtime.ExecutionResult, error) {
-		return &runtime.ExecutionResult{
-			ReturnValue: rawReturnData,
-			Err:         runtime.ErrExecutionReverted,
-		}, nil
+	for _, test := range testTable {
+		rawReturnData, err := hex.DecodeHex(test.exampleReturnData)
+		assert.NoError(t, err)
+
+		// We want to simulate an EVM revert here
+		store.applyTxnHook = func(
+			header *types.Header,
+			txn *types.Transaction,
+		) (*runtime.ExecutionResult, error) {
+			return &runtime.ExecutionResult{
+				ReturnValue: rawReturnData,
+				Err:         runtime.ErrExecutionReverted,
+			}, nil
+		}
+
+		// Run the estimation
+		estimate, estimateErr := ethEndpoint.EstimateGas(
+			constructMockTx(nil, nil),
+			nil,
+		)
+
+		responseData, ok := estimate.([]byte)
+		assert.True(t, ok)
+
+		assert.Equal(t, test.exampleReturnData, string(responseData))
+
+		// Make sure the EVM revert message is contained
+		assert.ErrorIs(t, estimateErr, runtime.ErrExecutionReverted)
+
+		// Make sure the EVM revert reason is contained
+		assert.ErrorAs(t, estimateErr, &test.revertReason)
 	}
-
-	// Run the estimation
-	estimate, estimateErr := ethEndpoint.EstimateGas(
-		constructMockTx(nil, nil),
-		nil,
-	)
-
-	assert.Equal(t, 0, estimate)
-
-	// Make sure the EVM revert message is contained
-	assert.ErrorIs(t, estimateErr, runtime.ErrExecutionReverted)
-
-	// Make sure the EVM revert reason is contained
-	assert.ErrorAs(t, estimateErr, &revertReason)
 }
 
 func TestEth_EstimateGas_Errors(t *testing.T) {
