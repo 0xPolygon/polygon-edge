@@ -857,7 +857,9 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if ok := p.index.add(tx); !ok {
 		metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
-		p.gauge.decrease(slotsIncreased)
+		if slotsIncreased > 0 {
+			p.gauge.decrease(slotsIncreased)
+		}
 
 		return ErrAlreadyKnown
 	}
