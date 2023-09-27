@@ -1,6 +1,7 @@
 package stakemanager
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -75,6 +76,13 @@ func setFlags(cmd *cobra.Command) {
 		rootHelper.StakeTokenFlagDesc,
 	)
 
+	cmd.Flags().StringVar(
+		&params.proxyContractsAdmin,
+		rootHelper.ProxyContractsAdminFlag,
+		"",
+		rootHelper.ProxyContractsAdminDesc,
+	)
+
 	cmd.Flags().BoolVar(
 		&params.isTestMode,
 		rootHelper.TestModeFlag,
@@ -146,11 +154,22 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 				return err
 			}
 
+			// deploy stake manager proxy
+			receipt, err := rootHelper.DeployProxyContract(txRelayer, deployerKey, "StakeManagerProxy",
+				types.StringToAddress(params.proxyContractsAdmin), contractAddress)
+			if err != nil {
+				return err
+			}
+
+			if receipt == nil || receipt.Status != uint64(types.ReceiptSuccess) {
+				return errors.New("deployment of StakeManagerProxy contract failed")
+			}
+
 			outputter.WriteCommandResult(&rootHelper.MessageResult{
 				Message: "[STAKEMANAGER - DEPLOY] Successfully deployed StakeManager contract",
 			})
 
-			stakeManagerAddress = contractAddress
+			stakeManagerAddress = types.Address(receipt.ContractAddress)
 
 			return nil
 		}
@@ -226,7 +245,7 @@ func initializeStakeManager(cmdOutput command.OutputFormatter,
 	stakeManagerAddress types.Address,
 	stakeTokenAddress types.Address,
 	deployerKey ethgo.Key) error {
-	initFn := &contractsapi.InitializeStakeManagerFn{NewMatic: stakeTokenAddress}
+	initFn := &contractsapi.InitializeStakeManagerFn{NewStakingToken: stakeTokenAddress}
 
 	input, err := initFn.EncodeAbi()
 	if err != nil {

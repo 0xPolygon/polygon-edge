@@ -16,6 +16,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/server/proto"
 	txpoolOp "github.com/0xPolygon/polygon-edge/txpool/proto"
+	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/ryanuber/columnize"
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
@@ -208,7 +209,7 @@ func ParseGRPCAddress(grpcAddress string) (*net.TCPAddr, error) {
 func RegisterJSONRPCFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.JSONRPCFlag,
-		fmt.Sprintf("%s:%d", AllInterfacesBinding, server.DefaultJSONRPCPort),
+		fmt.Sprintf("http://%s:%d", AllInterfacesBinding, server.DefaultJSONRPCPort),
 		"the JSON-RPC interface",
 	)
 }
@@ -261,4 +262,17 @@ func ParseAmount(amount string) (*big.Int, error) {
 	}
 
 	return result, nil
+}
+
+func ValidateProxyContractsAdmin(proxyContractsAdmin string) error {
+	if err := types.IsValidAddress(proxyContractsAdmin); err != nil {
+		return fmt.Errorf("proxy contracts admin address is not valid: %w", err)
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	return nil
 }

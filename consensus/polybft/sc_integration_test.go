@@ -14,7 +14,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -24,7 +23,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func TestIntegratoin_PerformExit(t *testing.T) {
+func TestIntegration_PerformExit(t *testing.T) {
 	t.Parallel()
 
 	const gasLimit = 1000000000000
@@ -62,7 +61,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 	}
 
 	// deploy MockERC20 as root chain ERC 20 token
-	rootERC20Addr := deployAndInitContract(t, transition, contractsapi.RootERC20, deployerAddress, nil)
+	rootERC20Addr := deployAndInitContract(t, transition, contractsapi.RootERC20.Bytecode, deployerAddress, nil)
 
 	// deploy CheckpointManager
 	checkpointManagerInit := func() ([]byte, error) {
@@ -73,13 +72,18 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 			ChainID_:        big.NewInt(0),
 		}).EncodeAbi()
 	}
-	checkpointManagerAddr := deployAndInitContract(t, transition, contractsapi.CheckpointManager, deployerAddress, checkpointManagerInit)
+
+	checkpointMgrConstructor := &contractsapi.CheckpointManagerConstructorFn{Initiator: deployerAddress}
+	constructorInput, err := checkpointMgrConstructor.EncodeAbi()
+	require.NoError(t, err)
+
+	checkpointManagerAddr := deployAndInitContract(t, transition, append(contractsapi.CheckpointManager.Bytecode, constructorInput...), deployerAddress, checkpointManagerInit)
 
 	// deploy ExitHelper
 	exitHelperInit := func() ([]byte, error) {
 		return (&contractsapi.InitializeExitHelperFn{NewCheckpointManager: checkpointManagerAddr}).EncodeAbi()
 	}
-	exitHelperContractAddress := deployAndInitContract(t, transition, contractsapi.ExitHelper, deployerAddress, exitHelperInit)
+	exitHelperContractAddress := deployAndInitContract(t, transition, contractsapi.ExitHelper.Bytecode, deployerAddress, exitHelperInit)
 
 	// deploy RootERC20Predicate
 	rootERC20PredicateInit := func() ([]byte, error) {
@@ -91,7 +95,7 @@ func TestIntegratoin_PerformExit(t *testing.T) {
 			NativeTokenRootAddress: contracts.NativeERC20TokenContract,
 		}).EncodeAbi()
 	}
-	rootERC20PredicateAddr := deployAndInitContract(t, transition, contractsapi.RootERC20Predicate, deployerAddress, rootERC20PredicateInit)
+	rootERC20PredicateAddr := deployAndInitContract(t, transition, contractsapi.RootERC20Predicate.Bytecode, deployerAddress, rootERC20PredicateInit)
 
 	// validate initialization of CheckpointManager
 	require.Equal(t, getField(checkpointManagerAddr, contractsapi.CheckpointManager.Abi, "currentCheckpointBlockNumber")[31], uint8(0))
@@ -390,11 +394,11 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	}
 }
 
-func deployAndInitContract(t *testing.T, transition *state.Transition, scArtifact *artifact.Artifact, sender types.Address,
+func deployAndInitContract(t *testing.T, transition *state.Transition, bytecode []byte, sender types.Address,
 	initCallback func() ([]byte, error)) types.Address {
 	t.Helper()
 
-	deployResult := transition.Create2(sender, scArtifact.Bytecode, big.NewInt(0), 1e9)
+	deployResult := transition.Create2(sender, bytecode, big.NewInt(0), 1e9)
 	assert.NoError(t, deployResult.Err)
 
 	if initCallback != nil {

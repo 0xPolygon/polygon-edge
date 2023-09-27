@@ -52,8 +52,9 @@ const (
 )
 
 var (
-	startTime            int64
-	testRewardWalletAddr = types.StringToAddress("0xFFFFFFFF")
+	startTime              int64
+	testRewardWalletAddr   = types.StringToAddress("0xFFFFFFFF")
+	ProxyContractAdminAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
 )
 
 func init() {
@@ -76,7 +77,6 @@ type TestClusterConfig struct {
 	Premine              []string // address[:amount]
 	PremineValidators    []string // address[:amount]
 	StakeAmounts         []*big.Int
-	WithoutBridge        bool
 	BootnodeCount        int
 	NonValidatorCount    int
 	WithLogs             bool
@@ -117,6 +117,8 @@ type TestClusterConfig struct {
 
 	RootTrackerPollInterval    time.Duration
 	RelayerTrackerPollInterval time.Duration
+
+	ProxyContractsAdmin string
 
 	logsDirOnce sync.Once
 }
@@ -180,6 +182,15 @@ func (c *TestClusterConfig) initLogsDir() {
 	c.LogsDir = logsDir
 }
 
+func (c *TestClusterConfig) GetProxyContractsAdmin() string {
+	proxyAdminAddr := c.ProxyContractsAdmin
+	if proxyAdminAddr == "" {
+		proxyAdminAddr = ProxyContractAdminAddr
+	}
+
+	return proxyAdminAddr
+}
+
 type TestCluster struct {
 	Config      *TestClusterConfig
 	Servers     []*TestServer
@@ -206,12 +217,6 @@ func WithPremine(addresses ...types.Address) ClusterOption {
 func WithSecretsCallback(fn func([]types.Address, *TestClusterConfig)) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.SecretsCallback = fn
-	}
-}
-
-func WithoutBridge() ClusterOption {
-	return func(h *TestClusterConfig) {
-		h.WithoutBridge = true
 	}
 }
 
@@ -375,6 +380,12 @@ func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
 func WithRelayerTrackerPollInterval(pollInterval time.Duration) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.RelayerTrackerPollInterval = pollInterval
+	}
+}
+
+func WithProxyContractsAdmin(address string) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.ProxyContractsAdmin = address
 	}
 }
 
@@ -581,52 +592,56 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 				strings.Join(sliceAddressToSliceString(cluster.Config.BridgeBlockListEnabled), ","))
 		}
 
+		proxyAdminAddr := cluster.Config.ProxyContractsAdmin
+		if proxyAdminAddr == "" {
+			proxyAdminAddr = ProxyContractAdminAddr
+		}
+		args = append(args, "--proxy-contracts-admin", proxyAdminAddr)
+
 		// run genesis command with all the arguments
 		err = cluster.cmdRun(args...)
 		require.NoError(t, err)
 	}
 
-	if !cluster.Config.WithoutBridge {
-		// start bridge
-		cluster.Bridge, err = NewTestBridge(t, cluster.Config)
-		require.NoError(t, err)
+	// start bridge
+	cluster.Bridge, err = NewTestBridge(t, cluster.Config)
+	require.NoError(t, err)
 
-		// deploy stake manager contract
-		err := cluster.Bridge.deployStakeManager(genesisPath)
-		require.NoError(t, err)
+	// deploy stake manager contract
+	err = cluster.Bridge.deployStakeManager(genesisPath)
+	require.NoError(t, err)
 
-		// deploy rootchain contracts
-		err = cluster.Bridge.deployRootchainContracts(genesisPath)
-		require.NoError(t, err)
+	// deploy rootchain contracts
+	err = cluster.Bridge.deployRootchainContracts(genesisPath)
+	require.NoError(t, err)
 
-		polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
-		require.NoError(t, err)
+	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
+	require.NoError(t, err)
 
-		// fund validators on the rootchain
-		err = cluster.Bridge.fundRootchainValidators(polybftConfig)
-		require.NoError(t, err)
+	// fund validators on the rootchain
+	err = cluster.Bridge.fundRootchainValidators(polybftConfig)
+	require.NoError(t, err)
 
-		// whitelist genesis validators on the rootchain
-		err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
-		require.NoError(t, err)
+	// whitelist genesis validators on the rootchain
+	err = cluster.Bridge.whitelistValidators(addresses, polybftConfig)
+	require.NoError(t, err)
 
-		// register genesis validators on the rootchain
-		err = cluster.Bridge.registerGenesisValidators(polybftConfig)
-		require.NoError(t, err)
+	// register genesis validators on the rootchain
+	err = cluster.Bridge.registerGenesisValidators(polybftConfig)
+	require.NoError(t, err)
 
-		// do initial staking for genesis validators on the rootchain
-		err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
-		require.NoError(t, err)
+	// do initial staking for genesis validators on the rootchain
+	err = cluster.Bridge.initialStakingOfGenesisValidators(polybftConfig)
+	require.NoError(t, err)
 
-		// finalize genesis validators on the rootchain
-		err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
-		require.NoError(t, err)
-	}
+	// finalize genesis validators on the rootchain
+	err = cluster.Bridge.finalizeGenesis(genesisPath, polybftConfig)
+	require.NoError(t, err)
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
 		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			true, !cluster.Config.WithoutBridge && i == 1 /* relayer */)
+			true, i == 1 /* relayer */)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {

@@ -54,6 +54,8 @@ var (
 	RootERC721                      *artifact.Artifact
 	RootERC1155                     *artifact.Artifact
 	EIP1559Burn                     *artifact.Artifact
+	GenesisProxy                    *artifact.Artifact
+	TransparentUpgradeableProxy     *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -278,6 +280,16 @@ func init() {
 	}
 
 	EIP1559Burn, err = artifact.DecodeArtifact([]byte(EIP1559BurnArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	TransparentUpgradeableProxy, err = artifact.DecodeArtifact([]byte(TransparentUpgradeableProxyArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

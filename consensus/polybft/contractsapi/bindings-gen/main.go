@@ -77,7 +77,7 @@ func main() {
 		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
-			false,
+			true,
 			[]string{
 				"submit",
 				"initialize",
@@ -407,6 +407,23 @@ func main() {
 			[]string{
 				"initialize",
 			},
+			[]string{},
+		},
+		{
+			"GenesisProxy",
+			gensc.GenesisProxy,
+			false,
+			[]string{
+				"protectSetUpProxy",
+				"setUpProxy",
+			},
+			[]string{},
+		},
+		{
+			"TransparentUpgradeableProxy",
+			gensc.TransparentUpgradeableProxy,
+			true,
+			[]string{},
 			[]string{},
 		},
 	}

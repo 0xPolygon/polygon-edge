@@ -17,6 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -40,6 +41,7 @@ const (
 	rewardTokenCodeFlag          = "reward-token-code"
 	rewardWalletFlag             = "reward-wallet"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
+	proxyContractsAdminFlag      = "proxy-contracts-admin"
 	baseFeeChangeDenomFlag       = "base-fee-change-denom"
 
 	defaultNativeTokenName     = "Polygon"
@@ -137,6 +139,7 @@ type genesisParams struct {
 
 	blockTrackerPollInterval time.Duration
 
+	proxyContractsAdmin string
 	baseFeeChangeDenom uint64
 }
 
@@ -175,6 +178,10 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validatePremineInfo(); err != nil {
+			return err
+		}
+
+		if err := p.validateProxyContractsAdmin(); err != nil {
 			return err
 		}
 	}
@@ -553,6 +560,23 @@ func (p *genesisParams) validateBurnContract() error {
 				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
 			}
 		}
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateProxyContractsAdmin() error {
+	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
+		return errors.New("proxy contracts admin address must be set")
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	if proxyContractsAdminAddr == contracts.SystemCaller {
+		return errors.New("proxy contracts admin address must not be system caller address")
 	}
 
 	return nil
