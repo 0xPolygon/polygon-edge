@@ -150,7 +150,7 @@ func NewMockBlockchain(
 	var (
 		mockVerifier = &MockVerifier{}
 		executor     = &mockExecutor{}
-		config       = &chain.Chain{
+		chainConfig  = &chain.Chain{
 			Genesis: &chain.Genesis{
 				Number:   0,
 				GasLimit: 0,
@@ -191,7 +191,7 @@ func NewMockBlockchain(
 				return nil, errInvalidTypeAssertion
 			}
 
-			callback(config)
+			callback(chainConfig)
 		}
 
 		// Execute the storage callback
@@ -210,7 +210,7 @@ func NewMockBlockchain(
 		db:        mockStorage,
 		consensus: mockVerifier,
 		executor:  executor,
-		config:    config,
+		config:    &Config{Chain: chainConfig},
 		stream:    &eventStream{},
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
@@ -353,7 +353,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 		return nil, err
 	}
 
-	b, err := NewBlockchain(hclog.NewNullLogger(), db, config, &MockVerifier{}, executor, &mockSigner{})
+	b, err := NewBlockchain(hclog.NewNullLogger(), db, &Config{Chain: config}, &MockVerifier{}, executor, &mockSigner{})
 	if err != nil {
 		return nil, err
 	}

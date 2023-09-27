@@ -211,7 +211,7 @@ func buildState(
 		return nil, nil, types.ZeroHash, err
 	}
 
-	snap, root := snap.Commit(objs)
+	snap, _, root := snap.Commit(objs)
 
 	return s, snap, types.BytesToHash(root), nil
 }

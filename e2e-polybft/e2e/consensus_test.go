@@ -1,13 +1,17 @@
 package e2e
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"path"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
@@ -20,6 +24,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
+	"github.com/0xPolygon/polygon-edge/server/proto"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -92,22 +97,32 @@ func TestE2E_Consensus_Basic_WithNonValidators(t *testing.T) {
 func TestE2E_Consensus_BulkDrop(t *testing.T) {
 	const (
 		clusterSize = 5
-		bulkToDrop  = 3
+		bulkToDrop  = 4
 		epochSize   = 5
 	)
 
 	cluster := framework.NewTestCluster(t, clusterSize,
-		framework.WithEpochSize(epochSize))
+		framework.WithEpochSize(epochSize),
+		framework.WithBlockTime(time.Second))
 	defer cluster.Stop()
 
 	// wait for cluster to start
 	cluster.WaitForReady(t)
 
+	var wg sync.WaitGroup
 	// drop bulk of nodes from cluster
 	for i := 0; i < bulkToDrop; i++ {
 		node := cluster.Servers[i]
-		node.Stop()
+
+		wg.Add(1)
+
+		go func(node *framework.TestServer) {
+			defer wg.Done()
+			node.Stop()
+		}(node)
 	}
+
+	wg.Wait()
 
 	// start dropped nodes again
 	for i := 0; i < bulkToDrop; i++ {
@@ -617,4 +632,208 @@ func TestE2E_Consensus_CustomRewardToken(t *testing.T) {
 
 	require.NoError(t, err)
 	require.True(t, validatorInfo.WithdrawableRewards.Cmp(big.NewInt(0)) > 0)
+}
+
+// TestE2E_Consensus_EIP1559Check sends a legacy and a dynamic tx to the cluster
+// and check if balance of sender, receiver, burn contract and miner is updates correctly
+// in accordance with EIP-1559 specifications
+func TestE2E_Consensus_EIP1559Check(t *testing.T) {
+	sender1, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	sender2, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	recipientKey, err := wallet.GenerateKey()
+	require.NoError(t, err)
+
+	recipient := recipientKey.Address()
+
+	// first account should have some matics premined
+	cluster := framework.NewTestCluster(t, 5,
+		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender1.Address())),
+		framework.WithPremine(types.Address(sender1.Address()), types.Address(sender2.Address())),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+	)
+	defer cluster.Stop()
+
+	cluster.WaitForReady(t)
+
+	client := cluster.Servers[0].JSONRPC().Eth()
+
+	waitUntilBalancesChanged := func(acct ethgo.Address, bal *big.Int) error {
+		err := cluster.WaitUntil(30*time.Second, 2*time.Second, func() bool {
+			balance, err := client.GetBalance(recipient, ethgo.Latest)
+			if err != nil {
+				return true
+			}
+
+			return balance.Cmp(bal) > 0
+		})
+
+		return err
+	}
+
+	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	// create and send tx
+	sendAmount := ethgo.Gwei(1)
+
+	txn := []*ethgo.Transaction{
+		{
+			Value:    sendAmount,
+			To:       &recipient,
+			Gas:      21000,
+			Nonce:    uint64(0),
+			GasPrice: ethgo.Gwei(1).Uint64(),
+		},
+		{
+			Value:                sendAmount,
+			To:                   &recipient,
+			Gas:                  21000,
+			Nonce:                uint64(0),
+			Type:                 ethgo.TransactionDynamicFee,
+			MaxFeePerGas:         ethgo.Gwei(1),
+			MaxPriorityFeePerGas: ethgo.Gwei(1),
+		},
+	}
+
+	initialMinerBalance := big.NewInt(0)
+
+	var prevMiner ethgo.Address
+
+	for i := 0; i < 2; i++ {
+		curTxn := txn[i]
+
+		senderInitialBalance, _ := client.GetBalance(sender1.Address(), ethgo.Latest)
+		receiverInitialBalance, _ := client.GetBalance(recipient, ethgo.Latest)
+		burnContractInitialBalance, _ := client.GetBalance(ethgo.Address(types.ZeroAddress), ethgo.Latest)
+
+		receipt, err := relayer.SendTransaction(curTxn, sender1)
+		require.NoError(t, err)
+
+		// wait for balance to get changed
+		err = waitUntilBalancesChanged(recipient, receiverInitialBalance)
+		require.NoError(t, err)
+
+		// Retrieve the transaction receipt
+		txReceipt, err := client.GetTransactionByHash(receipt.TransactionHash)
+		require.NoError(t, err)
+
+		block, _ := client.GetBlockByHash(txReceipt.BlockHash, true)
+		finalMinerFinalBalance, _ := client.GetBalance(block.Miner, ethgo.Latest)
+
+		if i == 0 {
+			prevMiner = block.Miner
+		}
+
+		senderFinalBalance, _ := client.GetBalance(sender1.Address(), ethgo.Latest)
+		receiverFinalBalance, _ := client.GetBalance(recipient, ethgo.Latest)
+		burnContractFinalBalance, _ := client.GetBalance(ethgo.Address(types.ZeroAddress), ethgo.Latest)
+
+		diffReciverBalance := new(big.Int).Sub(receiverFinalBalance, receiverInitialBalance)
+		assert.Equal(t, sendAmount, diffReciverBalance, "Receiver balance should be increased by send amount")
+
+		if i == 1 && prevMiner != block.Miner {
+			initialMinerBalance = big.NewInt(0)
+		}
+
+		diffBurnContractBalance := new(big.Int).Sub(burnContractFinalBalance, burnContractInitialBalance)
+		diffSenderBalance := new(big.Int).Sub(senderInitialBalance, senderFinalBalance)
+		diffMinerBalance := new(big.Int).Sub(finalMinerFinalBalance, initialMinerBalance)
+
+		diffSenderBalance.Sub(diffSenderBalance, diffReciverBalance)
+		diffSenderBalance.Sub(diffSenderBalance, diffBurnContractBalance)
+		diffSenderBalance.Sub(diffSenderBalance, diffMinerBalance)
+
+		assert.Zero(t, diffSenderBalance.Int64(), "Sender balance should be decreased by send amount + gas")
+
+		initialMinerBalance = finalMinerFinalBalance
+	}
+}
+
+func TestE2E_Consensus_Trace(t *testing.T) {
+	const (
+		validatorSecrets = "test-chain-1"
+		newAccSecrets    = "test-chain-newAcc"
+		epochSize        = 5
+		validatorCount   = 5
+	)
+
+	cluster := framework.NewTestCluster(t, validatorCount,
+		framework.WithEpochReward(100000),
+		framework.WithEpochSize(epochSize))
+	defer cluster.Stop()
+
+	// init new account
+	_, err := cluster.InitSecrets(newAccSecrets, 1)
+	require.NoError(t, err)
+
+	cluster.WaitForReady(t)
+
+	// extract new acc secrets
+	newAccSecretsPath := path.Join(cluster.Config.TmpDir, newAccSecrets)
+	newAcc, err := sidechain.GetAccountFromDir(newAccSecretsPath)
+	require.NoError(t, err)
+
+	newAccAddr := newAcc.Ecdsa.Address()
+
+	// extract validator's secrets
+	validatorSecretsPath := path.Join(cluster.Config.TmpDir, validatorSecrets)
+
+	validatorAcc, err := sidechain.GetAccountFromDir(validatorSecretsPath)
+	require.NoError(t, err)
+
+	validatorAddr := validatorAcc.Ecdsa.Address()
+
+	// transfer funds to the new account
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(cluster.Servers[0].JSONRPCAddr()))
+	require.NoError(t, err)
+
+	receipt, err := txRelayer.SendTransaction(&ethgo.Transaction{
+		From:  validatorAddr,
+		To:    &newAccAddr,
+		Value: ethgo.Ether(2),
+	}, validatorAcc.Ecdsa)
+	require.NoError(t, err)
+	require.Equal(t, uint64(types.ReceiptSuccess), receipt.Status)
+	require.NotNil(t, receipt.TransactionHash)
+
+	// verify trace existence on all validators
+	for i := 0; i < validatorCount; i++ {
+		ethEndpoint := cluster.Servers[i].JSONRPC().Eth()
+
+		blockResponse, err := ethEndpoint.GetBlockByNumber(ethgo.BlockNumber(receipt.BlockNumber), false)
+		require.NoError(t, err)
+		require.NotEqual(t, blockResponse.Miner, ethgo.ZeroAddress)
+
+		parentBlock, err := ethEndpoint.GetBlockByHash(blockResponse.ParentHash, false)
+		require.NoError(t, err)
+
+		sysClient := cluster.Servers[i].Conn()
+		traceResp, err := sysClient.GetTrace(context.Background(), &proto.GetTraceRequest{Number: receipt.BlockNumber})
+		require.NoError(t, err)
+
+		var trace *types.Trace
+		err = json.Unmarshal(traceResp.Trace, &trace)
+		require.NoError(t, err)
+		require.Equal(t, parentBlock.StateRoot.Bytes(), trace.ParentStateRoot.Bytes())
+
+		containsCoinbaseAddr, containsSenderAddr, containsReceiverAddr := false, false, false
+
+		var journalEntry *types.JournalEntry
+
+		for _, tr := range trace.TxnTraces {
+			_, containsCoinbaseAddr = tr.Delta[types.Address(blockResponse.Miner)]
+			_, containsSenderAddr = tr.Delta[types.Address(validatorAddr)]
+
+			journalEntry, containsReceiverAddr = tr.Delta[types.Address(newAccAddr)]
+			require.True(t, journalEntry.Balance.Cmp(ethgo.Ether(2)) == 0)
+		}
+
+		require.True(t, containsCoinbaseAddr)
+		require.True(t, containsSenderAddr)
+		require.True(t, containsReceiverAddr)
+	}
 }

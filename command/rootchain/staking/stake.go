@@ -103,7 +103,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	approveTxn, err := rootHelper.CreateApproveERC20Txn(params.amountValue,
-		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.stakeTokenAddr))
+		types.StringToAddress(params.stakeManagerAddr), types.StringToAddress(params.stakeTokenAddr), true)
 	if err != nil {
 		return err
 	}
@@ -128,11 +128,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	stakeManagerAddr := ethgo.Address(types.StringToAddress(params.stakeManagerAddr))
-	txn := &ethgo.Transaction{
-		From:  validatorAccount.Ecdsa.Address(),
-		Input: encoded,
-		To:    &stakeManagerAddr,
-	}
+
+	txn := rootHelper.CreateTransaction(validatorAccount.Ecdsa.Address(), &stakeManagerAddr, encoded, nil, true)
 
 	receipt, err = txRelayer.SendTransaction(txn, validatorAccount.Ecdsa)
 	if err != nil {
@@ -144,7 +141,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	result := &stakeResult{
-		validatorAddress: validatorAccount.Ecdsa.Address().String(),
+		ValidatorAddress: validatorAccount.Ecdsa.Address().String(),
 	}
 
 	var (
@@ -163,8 +160,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 			continue
 		}
 
-		result.amount = stakeAddedEvent.Amount
-		result.validatorAddress = stakeAddedEvent.Validator.String()
+		result.Amount = stakeAddedEvent.Amount
+		result.ValidatorAddress = stakeAddedEvent.Validator.String()
 		foundLog = true
 
 		break

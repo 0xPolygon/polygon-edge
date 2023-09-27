@@ -1,7 +1,10 @@
 package dev
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
@@ -29,6 +32,8 @@ type Dev struct {
 
 	blockchain *blockchain.Blockchain
 	executor   *state.Executor
+
+	dataDir string
 }
 
 // Factory implements the base factory method
@@ -44,6 +49,7 @@ func Factory(
 		blockchain: params.Blockchain,
 		executor:   params.Executor,
 		txpool:     params.TxPool,
+		dataDir:    params.Config.Path,
 	}
 
 	rawInterval, ok := params.Config.Config["interval"]
@@ -184,9 +190,23 @@ func (d *Dev) writeNewBlock(parent *types.Header) error {
 	txns := d.writeTransactions(gasLimit, transition)
 
 	// Commit the changes
-	_, root, err := transition.Commit()
+	_, trace, root, err := transition.Commit()
 	if err != nil {
 		return fmt.Errorf("failed to commit the state changes: %w", err)
+	}
+	trace.ParentStateRoot = parent.StateRoot
+
+	// write the trace
+	{
+		raw, err := json.Marshal(trace)
+		if err != nil {
+			return err
+		}
+
+		if err := ioutil.WriteFile(
+			filepath.Join(d.dataDir, fmt.Sprintf("trace_%d", header.Number))+".json", raw, 0600); err != nil {
+			return err
+		}
 	}
 
 	// Update the header

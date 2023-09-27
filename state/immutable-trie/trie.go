@@ -91,8 +91,9 @@ func (f *FullNode) getEdge(idx byte) Node {
 }
 
 type Trie struct {
-	root  Node
-	epoch uint32
+	root   Node
+	epoch  uint32
+	tracer Tracer
 }
 
 func NewTrie() *Trie {
@@ -101,6 +102,8 @@ func NewTrie() *Trie {
 
 func (t *Trie) Get(k []byte, storage Storage) ([]byte, bool) {
 	txn := t.Txn(storage)
+	txn.tracer = t.tracer
+
 	res := txn.Lookup(k)
 
 	return res, res != nil
@@ -143,11 +146,15 @@ type Putter interface {
 	Put(k, v []byte)
 }
 
+type Tracer interface {
+	Trace(node Node)
+}
 type Txn struct {
 	root    Node
 	epoch   uint32
 	storage Storage
 	batch   Putter
+	tracer  Tracer
 }
 
 func (t *Txn) Commit() *Trie {
@@ -160,13 +167,21 @@ func (t *Txn) Lookup(key []byte) []byte {
 	return res
 }
 
-func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
+func (t *Txn) lookup(node Node, key []byte) (Node, []byte) {
+	if t.tracer != nil {
+		t.tracer.Trace(node)
+	}
+
+	fmt.Println("-- LOOKUP NODE KEY --", key)
+
 	switch n := node.(type) {
 	case nil:
+		fmt.Println("nil node")
 		return nil, nil
 
 	case *ValueNode:
 		if n.hash {
+			fmt.Println("hash node")
 			nc, ok, err := GetNode(n.buf, t.storage)
 			if err != nil {
 				panic(err) //nolint:gocritic
@@ -188,8 +203,11 @@ func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
 		}
 
 	case *ShortNode:
+		fmt.Println("short node")
+
 		plen := len(n.key)
 		if plen > len(key) || !bytes.Equal(key[:plen], n.key) {
+			fmt.Println("-- NKEY KEY --", n.key, key)
 			return nil, nil
 		}
 
@@ -202,9 +220,12 @@ func (t *Txn) lookup(node interface{}, key []byte) (Node, []byte) {
 		return nil, res
 
 	case *FullNode:
+
 		if len(key) == 0 {
 			return t.lookup(n.value, key)
 		}
+
+		fmt.Println("full node")
 
 		child, res := t.lookup(n.getEdge(key[0]), key[1:])
 
@@ -241,6 +262,11 @@ func (t *Txn) Insert(key, value []byte) {
 }
 
 func (t *Txn) insert(node Node, search, value []byte) Node {
+	if t.tracer != nil {
+		fmt.Println("-- INSERT TRACE NODE --", types.BytesToHash(search))
+		t.tracer.Trace(node)
+	}
+
 	switch n := node.(type) {
 	case nil:
 		// NOTE, this only happens with the full node
@@ -457,6 +483,10 @@ func (t *Txn) delete(node Node, search []byte) (Node, bool) {
 			}
 
 			nc = aux
+		}
+
+		if t.tracer != nil {
+			t.tracer.Trace(nc)
 		}
 
 		obj, ok := nc.(*ShortNode)

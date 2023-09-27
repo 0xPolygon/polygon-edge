@@ -980,7 +980,7 @@ func TestCalculateGasLimit(t *testing.T) {
 				t.Fatalf("unable to construct the blockchain, %v", blockchainErr)
 			}
 
-			b.config.Params = &chain.Params{
+			b.config.Chain.Params = &chain.Params{
 				BlockGasTarget: tt.blockGasTarget,
 			}
 
@@ -1391,14 +1391,16 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 			t.Parallel()
 
 			blockchain := Blockchain{
-				config: &chain.Chain{
-					Params: &chain.Params{
-						Forks: &chain.Forks{
-							chain.London: chain.NewFork(5),
+				config: &Config{
+					Chain: &chain.Chain{
+						Params: &chain.Params{
+							Forks: &chain.Forks{
+								chain.London: chain.NewFork(5),
+							},
 						},
-					},
-					Genesis: &chain.Genesis{
-						BaseFeeEM: test.elasticityMultiplier,
+						Genesis: &chain.Genesis{
+							BaseFeeEM: test.elasticityMultiplier,
+						},
 					},
 				},
 			}
@@ -1443,14 +1445,16 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 		logger:    hclog.NewNullLogger(),
 		db:        storageMock,
 		consensus: consensusMock,
-		config: &chain.Chain{
-			Params: &chain.Params{
-				Forks: &chain.Forks{
-					chain.London: chain.NewFork(5),
+		config: &Config{
+			Chain: &chain.Chain{
+				Params: &chain.Params{
+					Forks: &chain.Forks{
+						chain.London: chain.NewFork(5),
+					},
 				},
-			},
-			Genesis: &chain.Genesis{
-				BaseFeeEM: 4,
+				Genesis: &chain.Genesis{
+					BaseFeeEM: 4,
+				},
 			},
 		},
 		stream: &eventStream{},

@@ -2,13 +2,6 @@
 
 set -e
 
-# Check if jq is installed. If not exit and inform user.
-if ! command -v jq >/dev/null 2>&1; then
-  echo "The jq utility is not installed or is not in the PATH. Please install it and run the script again."
-  exit 1
-fi
-
-
 POLYGON_EDGE_BIN=./polygon-edge
 CHAIN_CUSTOM_OPTIONS=$(tr "\n" " " << EOL
 --block-gas-limit 10000000

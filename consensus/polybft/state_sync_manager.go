@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -60,14 +61,15 @@ func (n *dummyStateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Pro
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr       types.Address
-	stateSenderStartBlock uint64
-	jsonrpcAddr           string
-	dataDir               string
-	topic                 topic
-	key                   *wallet.Key
-	maxCommitmentSize     uint64
-	numBlockConfirmations uint64
+	stateSenderAddr          types.Address
+	stateSenderStartBlock    uint64
+	jsonrpcAddr              string
+	dataDir                  string
+	topic                    topic
+	key                      *wallet.Key
+	maxCommitmentSize        uint64
+	numBlockConfirmations    uint64
+	blockTrackerPollInterval time.Duration
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -137,7 +139,8 @@ func (s *stateSyncManager) initTracker() error {
 		s,
 		s.config.numBlockConfirmations,
 		s.config.stateSenderStartBlock,
-		s.logger)
+		s.logger,
+		s.config.blockTrackerPollInterval)
 
 	go func() {
 		<-s.closeCh

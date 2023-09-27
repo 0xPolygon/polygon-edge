@@ -142,6 +142,7 @@ func (p *predeployParams) updateGenesisConfig() error {
 		p.artifactsPath,
 		p.constructorArgs,
 		p.address,
+		p.genesisConfig.Params.ChainID,
 	)
 	if err != nil {
 		return err

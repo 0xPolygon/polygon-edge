@@ -37,12 +37,13 @@ const (
 
 	blockTimeDriftFlag = "block-time-drift"
 
-	defaultEpochSize        = uint64(10)
-	defaultSprintSize       = uint64(5)
-	defaultValidatorSetSize = 100
-	defaultBlockTime        = 2 * time.Second
-	defaultEpochReward      = 1
-	defaultBlockTimeDrift   = uint64(10)
+	defaultEpochSize                = uint64(10)
+	defaultSprintSize               = uint64(5)
+	defaultValidatorSetSize         = 100
+	defaultBlockTime                = 2 * time.Second
+	defaultEpochReward              = 1
+	defaultBlockTimeDrift           = uint64(10)
+	defaultBlockTrackerPollInterval = time.Second
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
 	contractDeployerAllowListEnabledFlag = "contract-deployer-allow-list-enabled"
@@ -150,7 +151,8 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			WalletAddress: walletPremineInfo.address,
 			WalletAmount:  walletPremineInfo.amount,
 		},
-		BlockTimeDrift: p.blockTimeDrift,
+		BlockTimeDrift:           p.blockTimeDrift,
+		BlockTrackerPollInterval: common.Duration{Duration: p.blockTrackerPollInterval},
 	}
 
 	// Disable london hardfork if burn contract address is not provided

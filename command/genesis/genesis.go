@@ -43,7 +43,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.chainID,
 		chainIDFlag,
 		command.DefaultChainID,
-		"the ID of the chain (only used for IBFT consensus)",
+		"the ID of the chain",
 	)
 
 	cmd.Flags().StringVar(
@@ -234,6 +234,13 @@ func setFlags(cmd *cobra.Command) {
 			blockTimeDriftFlag,
 			defaultBlockTimeDrift,
 			"configuration for block time drift value (in seconds)",
+		)
+
+		cmd.Flags().DurationVar(
+			&params.blockTrackerPollInterval,
+			blockTrackerPollIntervalFlag,
+			defaultBlockTrackerPollInterval,
+			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
 		)
 	}
 

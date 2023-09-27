@@ -129,7 +129,8 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 func runRootchain(ctx context.Context, outputter command.OutputFormatter, closeCh chan struct{}) error {
 	var err error
-	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv); err != nil {
+	if dockerClient, err = dockerclient.NewClientWithOpts(dockerclient.FromEnv,
+		dockerclient.WithAPIVersionNegotiation()); err != nil {
 		return err
 	}
 
@@ -289,7 +290,7 @@ func handleSignals(ctx context.Context, closeCh <-chan struct{}) error {
 
 	// close the container if possible
 	if stop {
-		if err := dockerClient.ContainerStop(ctx, dockerContainerID, nil); err != nil {
+		if err := dockerClient.ContainerStop(ctx, dockerContainerID, container.StopOptions{}); err != nil {
 			return fmt.Errorf("failed to stop container: %w", err)
 		}
 	}

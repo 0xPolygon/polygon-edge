@@ -169,7 +169,7 @@ func TestEthTransfer(t *testing.T) {
 			txn := &framework.PreparedTransaction{
 				From:     testCase.sender,
 				To:       &testCase.recipient,
-				GasPrice: big.NewInt(1048576),
+				GasPrice: big.NewInt(1000000000),
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}

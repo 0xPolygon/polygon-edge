@@ -20,7 +20,7 @@ on:  # yamllint disable-line rule:truthy
         description: The scenario to run
         type: string
       duration:
-        default: '2m'
+        default: '5m'
         description: Duration of the test
         required: false
         type: string
@@ -39,7 +39,7 @@ on:  # yamllint disable-line rule:truthy
         description: The mode for the stress test
         type: string
       duration:
-        default: '2m'
+        default: '5m'
         description: Duration of the test
         required: false
         type: string
@@ -79,7 +79,7 @@ jobs:
       - name: Install xk6
         run: |
           go install go.k6.io/xk6/cmd/xk6@latest
-          xk6 build --with github.com/distribworks/xk6-ethereum@v1.0.2
+          xk6 build --with github.com/distribworks/xk6-ethereum@v1.0.3
       
       - name: Install JQ
         run: |

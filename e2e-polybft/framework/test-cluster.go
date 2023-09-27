@@ -84,6 +84,7 @@ type TestClusterConfig struct {
 	LogsDir              string
 	TmpDir               string
 	BlockGasLimit        uint64
+	BlockTime            time.Duration
 	BurnContract         *polybft.BurnContractInfo
 	ValidatorPrefix      string
 	Binary               string
@@ -113,6 +114,9 @@ type TestClusterConfig struct {
 
 	IsPropertyTest  bool
 	TestRewardToken string
+
+	RootTrackerPollInterval    time.Duration
+	RelayerTrackerPollInterval time.Duration
 
 	logsDirOnce sync.Once
 }
@@ -248,6 +252,12 @@ func WithEpochReward(epochReward int) ClusterOption {
 	}
 }
 
+func WithBlockTime(blockTime time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.BlockTime = blockTime
+	}
+}
+
 func WithBlockGasLimit(blockGasLimit uint64) ClusterOption {
 	return func(h *TestClusterConfig) {
 		h.BlockGasLimit = blockGasLimit
@@ -356,6 +366,18 @@ func WithTestRewardToken() ClusterOption {
 	}
 }
 
+func WithRootTrackerPollInterval(pollInterval time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RootTrackerPollInterval = pollInterval
+	}
+}
+
+func WithRelayerTrackerPollInterval(pollInterval time.Duration) ClusterOption {
+	return func(h *TestClusterConfig) {
+		h.RelayerTrackerPollInterval = pollInterval
+	}
+}
+
 func isTrueEnv(e string) bool {
 	return strings.ToLower(os.Getenv(e)) == "true"
 }
@@ -450,6 +472,16 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 			"--premine", "0x0000000000000000000000000000000000000000",
 			"--reward-wallet", testRewardWalletAddr.String(),
 			"--trieroot", cluster.Config.InitialStateRoot.String(),
+		}
+
+		if cluster.Config.BlockTime != 0 {
+			args = append(args, "--block-time",
+				cluster.Config.BlockTime.String())
+		}
+
+		if cluster.Config.RelayerTrackerPollInterval != 0 {
+			args = append(args, "--block-tracker-poll-interval",
+				cluster.Config.RelayerTrackerPollInterval.String())
 		}
 
 		if cluster.Config.TestRewardToken != "" {
@@ -629,6 +661,7 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 		config.Relayer = relayer
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
+		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
 	})
 
 	// watch the server for stop signals. It is important to fix the specific

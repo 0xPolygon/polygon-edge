@@ -51,7 +51,9 @@ func (h *Header) IsGenesis() bool {
 	return h.Hash != ZeroHash && h.Number == 0
 }
 
-type Nonce [8]byte
+const NonceLength = 8
+
+type Nonce [NonceLength]byte
 
 func (n Nonce) String() string {
 	return hex.EncodeToHex(n[:])
@@ -60,6 +62,28 @@ func (n Nonce) String() string {
 // MarshalText implements encoding.TextMarshaler
 func (n Nonce) MarshalText() ([]byte, error) {
 	return []byte(n.String()), nil
+}
+
+func (n *Nonce) UnmarshalText(input []byte) error {
+	buf := StringToBytes(string(input))
+	if len(buf) != NonceLength {
+		return fmt.Errorf("incorrect length")
+	}
+
+	*n = BytesToNonce(buf)
+
+	return nil
+}
+
+func BytesToNonce(b []byte) Nonce {
+	var n Nonce
+
+	size := len(b)
+	min := min(size, NonceLength)
+
+	copy(n[NonceLength-min:], b[len(b)-min:])
+
+	return n
 }
 
 func (h *Header) Copy() *Header {
@@ -98,6 +122,7 @@ type Body struct {
 type FullBlock struct {
 	Block    *Block
 	Receipts []*Receipt
+	Trace    *Trace
 }
 
 type Block struct {
