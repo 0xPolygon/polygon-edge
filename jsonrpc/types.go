@@ -68,7 +68,7 @@ func toTransaction(
 		V:           argBig(*t.V),
 		R:           argBig(*t.R),
 		S:           argBig(*t.S),
-		Hash:        t.Hash,
+		Hash:        t.GetHash(),
 		From:        t.From,
 		Type:        argUint64(t.Type),
 		BlockNumber: blockNumber,
@@ -180,7 +180,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		} else {
 			res.Transactions = append(
 				res.Transactions,
-				transactionHash(txn.Hash),
+				transactionHash(txn.GetHash()),
 			)
 		}
 	}

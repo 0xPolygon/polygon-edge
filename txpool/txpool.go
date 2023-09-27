@@ -441,7 +441,7 @@ func (p *TxPool) dropAccount(account *account, nextNonce uint64, tx *types.Trans
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.GetHash())
 
 	if p.logger.IsDebug() {
 		p.logger.Debug("dropped account txs",
@@ -475,7 +475,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 
 	account.incrementDemotions()
 
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.GetHash())
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -943,13 +943,13 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if err := p.addTx(gossip, tx); err != nil {
 		if errors.Is(err, ErrAlreadyKnown) {
 			if p.logger.IsDebug() {
-				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.GetHash().String())
 			}
 
 			return
 		}
 
-		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.GetHash().String())
 	}
 }
 
@@ -1071,7 +1071,7 @@ func (p *TxPool) Length() uint64 {
 // toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
-		hashes = append(hashes, tx.Hash)
+		hashes = append(hashes, tx.GetHash())
 	}
 
 	return

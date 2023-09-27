@@ -1005,7 +1005,7 @@ func (b *Blockchain) writeBody(batchWriter *storage.BatchWriter, block *types.Bl
 
 	// Write txn lookups (txHash -> block)
 	for _, txn := range block.Transactions {
-		batchWriter.PutTxLookup(txn.Hash, block.Hash())
+		batchWriter.PutTxLookup(txn.GetHash(), block.Hash())
 	}
 
 	return nil
@@ -1049,7 +1049,7 @@ func (b *Blockchain) recoverFromFieldsInTransactions(transactions []*types.Trans
 
 		sender, err := b.txSigner.Sender(tx)
 		if err != nil {
-			b.logger.Warn("failed to recover from address in Tx", "hash", tx.Hash, "err", err)
+			b.logger.Warn("failed to recover from address in Tx", "hash", tx.GetHash(), "err", err)
 
 			continue
 		}
