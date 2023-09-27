@@ -169,7 +169,7 @@ func polybftMetrics(rootnodeURL string,
 		return
 	}
 
-	gweiPerWei := new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil) // 10^9
+	gweiPerWei := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)) // 10^9
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -193,9 +193,10 @@ func polybftMetrics(rootnodeURL string,
 				continue
 			}
 
-			balanceInGwei := new(big.Int).Div(balance, gweiPerWei).Uint64()
-			metrics.SetGauge([]string{"bridge", "validator_balance_gwei", validatorAddress.String()},
-				float32(balanceInGwei))
+			balanceInGwei := new(big.Float).Quo(new(big.Float).SetInt(balance), gweiPerWei)
+			balanceInGweiFloat, _ := balanceInGwei.Float32()
+
+			metrics.SetGauge([]string{"bridge", "validator_root_balance_gwei", validatorAddress.String()}, balanceInGweiFloat)
 		}
 	}
 }
