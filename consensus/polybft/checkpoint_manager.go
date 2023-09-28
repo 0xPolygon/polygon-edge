@@ -15,7 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	metrics "github.com/armon/go-metrics"
 	hclog "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
@@ -98,33 +97,31 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	}
 }
 
-// getLatestCheckpointBlock queries CheckpointManager smart contract and retrieves latest checkpoint block number
-func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
-	checkpointBlockNumMethodEncoded, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
+// getCurrentCheckpointBlock queries CheckpointManager smart contract and retrieves the current checkpoint block number
+func getCurrentCheckpointBlock(relayer txrelayer.TxRelayer, checkpointManagerAddr types.Address) (uint64, error) {
+	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	if err != nil {
-		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
+		return 0, fmt.Errorf("failed to encode currentCheckpointBlockNumber function parameters: %w", err)
 	}
 
-	latestCheckpointBlockRaw, err := c.rootChainRelayer.Call(
-		c.key.Address(),
-		ethgo.Address(c.checkpointManagerAddr),
-		checkpointBlockNumMethodEncoded)
+	currentCheckpointBlockRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(checkpointManagerAddr),
+		checkpointBlockNumInput)
 	if err != nil {
-		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
+		return 0, fmt.Errorf("failed to invoke currentCheckpointBlockNumber function on the rootchain: %w", err)
 	}
 
-	latestCheckpointBlockNum, err := strconv.ParseUint(latestCheckpointBlockRaw, 0, 64)
+	currentCheckpointBlock, err := strconv.ParseUint(currentCheckpointBlockRaw, 0, 64)
 	if err != nil {
-		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number: %w",
-			latestCheckpointBlockRaw, err)
+		return 0, fmt.Errorf("failed to convert current checkpoint block number '%s' to number: %w",
+			currentCheckpointBlockRaw, err)
 	}
 
-	return latestCheckpointBlockNum, nil
+	return currentCheckpointBlock, nil
 }
 
 // submitCheckpoint sends a transaction with checkpoint data to the rootchain
 func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOfEpoch bool) error {
-	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
+	lastCheckpointBlockNumber, err := getCurrentCheckpointBlock(c.rootChainRelayer, c.checkpointManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -234,8 +231,6 @@ func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra 
 		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
 
-	// update checkpoint block number metrics
-	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
 	c.logger.Debug("send checkpoint txn success", "block number", header.Number, "gasUsed", receipt.GasUsed)
 
 	return nil
