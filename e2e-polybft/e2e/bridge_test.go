@@ -190,31 +190,40 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		successfullExitTransactions := make([]bool, transfersCount)
 
 		for i := 0; i < numberOfAttempts; i++ {
+			t.Log("Number of attempts: ", i+1)
+
 			require.NoError(t, waitForRootchainEpoch(currentEpoch+uint64(i), 3*time.Minute,
 				rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 			for exitEventID := uint64(1); exitEventID <= transfersCount; exitEventID++ {
+				if successfullExitTransactions[exitEventID-1] {
+					continue
+				}
+
 				// send exit transaction to exit helper
-				if !successfullExitTransactions[exitEventID-1] {
-					err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
-				}
-				if err == nil {
+				if err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC); err == nil {
 					successfullExitTransactions[exitEventID-1] = true
+
+					continue
 				}
+
 				if i == numberOfAttempts-1 {
 					require.NoError(t, err)
 				}
 			}
-			isExistFalse := false
-			for _, check := range successfullExitTransactions {
-				if !check {
-					isExistFalse = true
+
+			allExitsSuccessfull := true
+			for _, isSuccessfull := range successfullExitTransactions {
+				if !isSuccessfull {
+					allExitsSuccessfull = false
+
+					break
 				}
 			}
-			if !isExistFalse {
+
+			if allExitsSuccessfull {
 				break
 			}
-			t.Log("Number of attempts: ", i)
 		}
 
 		// assert that receiver's balances on RootERC20 smart contract are expected
