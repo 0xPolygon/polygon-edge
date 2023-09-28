@@ -254,7 +254,7 @@ func setFlags(cmd *cobra.Command) {
 			&params.baseFeeChangeDenom,
 			baseFeeChangeDenomFlag,
 			command.DefaultGenesisBaseFeeChangeDenom,
-			"default base fee change denominator the value to bound the amount the base fee can change between blocks.",
+			"represents the value to bound the amount the base fee can change between blocks.",
 		)
 	}
 
