@@ -42,7 +42,7 @@ build: check-go check-git
 	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
 	$(eval TIME = $(shell date))
-	go build -o polygon-edge -ldflags="\
+	go build -race -o polygon-edge -ldflags="\
     	-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)' \
 		-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
 		-X 'github.com/0xPolygon/polygon-edge/versioning.Branch=$(BRANCH)'\
@@ -72,13 +72,13 @@ test-e2e: check-go
 
 .PHONY: test-e2e-polybft
 test-e2e-polybft: check-go
-	go build -o artifacts/polygon-edge .
+	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true \
 	go test -v -timeout=1h30m ./e2e-polybft/e2e/...
 
 .PHONY: test-property-polybft
 test-property-polybft: check-go
-	go build -o artifacts/polygon-edge .
+	go build -race -o artifacts/polygon-edge .
 	env EDGE_BINARY=${PWD}/artifacts/polygon-edge E2E_TESTS=true E2E_LOGS=true go test -v -timeout=30m ./e2e-polybft/property/... \
 	-rapid.checks=10
 
