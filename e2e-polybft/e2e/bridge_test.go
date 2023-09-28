@@ -38,8 +38,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		amount                = 100
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
-		epochSize  = 30
-		sprintSize = uint64(5)
+		epochSize        = 30
+		sprintSize       = uint64(5)
+		numberOfAttempts = 5
 	)
 
 	receiversAddrs := make([]types.Address, transfersCount)
@@ -183,16 +184,46 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 		currentEpoch := currentExtra.Checkpoint.EpochNumber
 
-		require.NoError(t, waitForRootchainEpoch(currentEpoch, 3*time.Minute,
-			rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
-
 		exitHelper := polybftCfg.Bridge.ExitHelperAddr
 		childJSONRPC := validatorSrv.JSONRPCAddr()
 
-		for exitEventID := uint64(1); exitEventID <= transfersCount; exitEventID++ {
-			// send exit transaction to exit helper
-			err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC)
-			require.NoError(t, err)
+		successfullExitTransactions := make([]bool, transfersCount)
+
+		for i := 0; i < numberOfAttempts; i++ {
+			t.Log("Number of attempts: ", i+1)
+
+			require.NoError(t, waitForRootchainEpoch(currentEpoch+uint64(i), 3*time.Minute,
+				rootchainTxRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
+
+			for exitEventID := uint64(1); exitEventID <= transfersCount; exitEventID++ {
+				if successfullExitTransactions[exitEventID-1] {
+					continue
+				}
+
+				// send exit transaction to exit helper
+				if err = cluster.Bridge.SendExitTransaction(exitHelper, exitEventID, childJSONRPC); err == nil {
+					successfullExitTransactions[exitEventID-1] = true
+
+					continue
+				}
+
+				if i == numberOfAttempts-1 {
+					require.NoError(t, err)
+				}
+			}
+
+			allExitsSuccessfull := true
+			for _, isSuccessfull := range successfullExitTransactions {
+				if !isSuccessfull {
+					allExitsSuccessfull = false
+
+					break
+				}
+			}
+
+			if allExitsSuccessfull {
+				break
+			}
 		}
 
 		// assert that receiver's balances on RootERC20 smart contract are expected
