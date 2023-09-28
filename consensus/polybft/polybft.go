@@ -10,9 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
@@ -27,7 +25,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -836,57 +833,4 @@ func getBurnContractAddress(config *chain.Chain, polyBFTConfig PolyBFTConfig) (t
 	}
 
 	return types.ZeroAddress, false
-}
-
-// publishRootchainMetrics publishes rootchain related metrics
-func (p *Polybft) publishRootchainMetrics(logger hclog.Logger) {
-	interval := p.config.MetricsInterval
-	validatorAddr := p.key.Address()
-	bridgeCfg := p.consensusConfig.Bridge
-
-	// zero means metrics are disabled
-	if interval <= 0 {
-		return
-	}
-
-	gweiPerWei := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)) // 10^9
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(bridgeCfg.JSONRPCEndpoint))
-	if err != nil {
-		logger.Error("failed to connect to the rootchain node", "err", err, "JSON RPC", bridgeCfg.JSONRPCEndpoint)
-
-		return
-	}
-
-	for {
-		select {
-		case <-p.closeCh:
-			return
-		case <-ticker.C:
-			// rootchain validator balance
-			balance, err := relayer.Client().Eth().GetBalance(p.key.Address(), ethgo.Latest)
-			if err != nil {
-				logger.Error("failed to query eth_getBalance", "err", err)
-			}
-
-			if balance != nil {
-				balanceInGwei := new(big.Float).Quo(new(big.Float).SetInt(balance), gweiPerWei)
-				balanceInGweiFloat, _ := balanceInGwei.Float32()
-
-				metrics.SetGauge([]string{"bridge", "validator_root_balance_gwei", validatorAddr.String()}, balanceInGweiFloat)
-			}
-
-			checkpointBlock, err := getCurrentCheckpointBlock(relayer, bridgeCfg.CheckpointManagerAddr)
-			if err != nil {
-				logger.Error("failed to query latest checkpoint block", "err", err)
-
-				continue
-			}
-
-			metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(checkpointBlock))
-		}
-	}
 }
