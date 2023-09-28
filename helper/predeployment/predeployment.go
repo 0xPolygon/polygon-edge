@@ -136,6 +136,7 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 		big.NewInt(0),
 		math.MaxInt64,
 		input,
+		runtime.NewAccessList(),
 	)
 
 	// Enable all forks
