@@ -304,7 +304,7 @@ func TestDispatcherFuncDecode(t *testing.T) {
 		{
 			"filter",
 			`[{"fromBlock": "pending", "toBlock": "earliest"}]`,
-			LogQuery{fromBlock: LatestBlockNumber, toBlock: EarliestBlockNumber}, // pending = latest
+			LogQuery{fromBlock: LatestBlockNumber, toBlock: EarliestBlockNumber}, // pending == latest
 		},
 	}
 
@@ -557,11 +557,11 @@ func TestDispatcher_WebsocketConnection_Unsubscribe(t *testing.T) {
 	assert.Equal(t, "true", string(resp.Result))
 }
 
-func newTestDispatcher(t *testing.T, logger hclog.Logger, store JSONRPCStore, params *dispatcherParams) *Dispatcher {
-	t.Helper()
+func newTestDispatcher(tb testing.TB, logger hclog.Logger, store JSONRPCStore, params *dispatcherParams) *Dispatcher {
+	tb.Helper()
 
 	d, err := newDispatcher(logger, store, params)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return d
 }

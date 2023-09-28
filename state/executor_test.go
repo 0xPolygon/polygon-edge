@@ -114,7 +114,7 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 			},
 			wantErr: func(t assert.TestingT, err error, i ...interface{}) bool {
 				expectedError := fmt.Sprintf("max fee per gas less than block base fee: "+
-					"address %s, GasFeeCap: 10, BaseFee: 20", types.ZeroAddress)
+					"address %s, GasFeeCap/GasPrice: 10, BaseFee: 20", types.ZeroAddress)
 				assert.EqualError(t, err, expectedError, i)
 
 				return true
@@ -147,6 +147,9 @@ func Test_Transition_checkDynamicFees(t *testing.T) {
 			tr := &Transition{
 				ctx: runtime.TxContext{
 					BaseFee: tt.baseFee,
+				},
+				config: chain.ForksInTime{
+					London: true,
 				},
 			}
 

@@ -142,10 +142,13 @@ func (bp *ERC1155BridgeParams) Validate() error {
 	return nil
 }
 
-// ExtractExitEventID tries to extract exit event id from provided receipt
-func ExtractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
-	var exitEvent contractsapi.L2StateSyncedEvent
+// ExtractExitEventIDs tries to extract all exit event ids from provided receipt
+func ExtractExitEventIDs(receipt *ethgo.Receipt) ([]*big.Int, error) {
+	exitEventIDs := make([]*big.Int, 0, len(receipt.Logs))
+
 	for _, log := range receipt.Logs {
+		var exitEvent contractsapi.L2StateSyncedEvent
+
 		doesMatch, err := exitEvent.ParseLog(log)
 		if err != nil {
 			return nil, err
@@ -155,7 +158,11 @@ func ExtractExitEventID(receipt *ethgo.Receipt) (*big.Int, error) {
 			continue
 		}
 
-		return exitEvent.ID, nil
+		exitEventIDs = append(exitEventIDs, exitEvent.ID)
+	}
+
+	if len(exitEventIDs) != 0 {
+		return exitEventIDs, nil
 	}
 
 	return nil, errors.New("failed to find exit event log")

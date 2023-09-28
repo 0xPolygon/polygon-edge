@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"go/format"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"text/template"
@@ -21,6 +22,10 @@ const (
 	abiTypeNameFormat  = "var %sABIType = abi.MustNewType(\"%s\")"
 	eventNameFormat    = "%sEvent"
 	functionNameFormat = "%sFn"
+)
+
+var (
+	signatureFunctionFormat = regexp.MustCompile(`^(.*)\((.*)\)$`)
 )
 
 type generatedData struct {
@@ -105,7 +110,7 @@ func main() {
 			gensc.ChildERC20PredicateACL,
 			false,
 			[]string{
-				"initialize",
+				"initialize(address,address,address,address,address,bool,bool,address)",
 				"withdrawTo",
 			},
 			[]string{},
@@ -415,8 +420,23 @@ func main() {
 			}
 		}
 
-		for _, method := range c.functions {
-			if err := generateFunction(generatedData, c.contractName, c.artifact.Abi.Methods[method]); err != nil {
+		for _, methodRaw := range c.functions {
+			// There could be two objects with the same name in the generated JSON ABI (hardhat bug).
+			// This case can be fixed by specifying a function signature instead of just name
+			// e.g. "myFunc(address,bool,uint256)" instead of just "myFunc"
+			var (
+				method              *abi.Method
+				resolvedBySignature = false
+			)
+
+			if signatureFunctionFormat.MatchString(methodRaw) {
+				method = c.artifact.Abi.GetMethodBySignature(methodRaw)
+				resolvedBySignature = true
+			} else {
+				method = c.artifact.Abi.GetMethod(methodRaw)
+			}
+
+			if err := generateFunction(generatedData, c.contractName, method, resolvedBySignature); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -689,7 +709,8 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 }
 
 // generateFunction generates code for smart contract function and its parameters
-func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) error {
+func generateFunction(generatedData *generatedData, contractName string,
+	method *abi.Method, fnSigResolution bool) error {
 	methodName := fmt.Sprintf(functionNameFormat, strings.Title(method.Name+contractName))
 	res := []string{}
 
@@ -699,22 +720,28 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 	}
 
 	// write encode/decode functions
-	tmplStr := `
-{{range .Structs}}
-	{{.}}
-{{ end }}
 
-func ({{.Sig}} *{{.TName}}) Sig() []byte {
-	return {{.ContractName}}.Abi.Methods["{{.Name}}"].ID()
-}
+	tmplString := `
+	{{range .Structs}}
+		{{.}}
+	{{ end }}
+	
+	func ({{.Sig}} *{{.TName}}) Sig() []byte {
+		return {{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"].ID()
+	}
+	
+	func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+		return {{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"].Encode({{.Sig}})
+	}
+	
+	func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+		return decodeMethod({{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"], buf, {{.Sig}})
+	}`
 
-func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
-	return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})
-}
-
-func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
-	return decodeMethod({{.ContractName}}.Abi.Methods["{{.Name}}"], buf, {{.Sig}})
-}`
+	methodGetter := "Methods"
+	if fnSigResolution {
+		methodGetter = "MethodsBySignature"
+	}
 
 	inputs := map[string]interface{}{
 		"Structs":      res,
@@ -722,9 +749,14 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 		"Name":         method.Name,
 		"ContractName": contractName,
 		"TName":        strings.Title(methodName),
+		"MethodGetter": methodGetter,
 	}
 
-	renderedString, err := renderTmpl(tmplStr, inputs)
+	if fnSigResolution {
+		inputs["Name"] = method.Sig()
+	}
+
+	renderedString, err := renderTmpl(tmplString, inputs)
 	if err != nil {
 		return err
 	}

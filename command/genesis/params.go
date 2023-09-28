@@ -25,20 +25,21 @@ import (
 )
 
 const (
-	dirFlag               = "dir"
-	nameFlag              = "name"
-	premineFlag           = "premine"
-	chainIDFlag           = "chain-id"
-	epochSizeFlag         = "epoch-size"
-	epochRewardFlag       = "epoch-reward"
-	blockGasLimitFlag     = "block-gas-limit"
-	burnContractFlag      = "burn-contract"
-	posFlag               = "pos"
-	minValidatorCount     = "min-validator-count"
-	maxValidatorCount     = "max-validator-count"
-	nativeTokenConfigFlag = "native-token-config"
-	rewardTokenCodeFlag   = "reward-token-code"
-	rewardWalletFlag      = "reward-wallet"
+	dirFlag                      = "dir"
+	nameFlag                     = "name"
+	premineFlag                  = "premine"
+	chainIDFlag                  = "chain-id"
+	epochSizeFlag                = "epoch-size"
+	epochRewardFlag              = "epoch-reward"
+	blockGasLimitFlag            = "block-gas-limit"
+	burnContractFlag             = "burn-contract"
+	posFlag                      = "pos"
+	minValidatorCount            = "min-validator-count"
+	maxValidatorCount            = "max-validator-count"
+	nativeTokenConfigFlag        = "native-token-config"
+	rewardTokenCodeFlag          = "reward-token-code"
+	rewardWalletFlag             = "reward-wallet"
+	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -63,6 +64,7 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
+	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 )
 
 type genesisParams struct {
@@ -130,6 +132,8 @@ type genesisParams struct {
 	// rewards
 	rewardTokenCode string
 	rewardWallet    string
+
+	blockTrackerPollInterval time.Duration
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -509,6 +513,16 @@ func (p *genesisParams) validatePremineInfo() error {
 	}
 
 	return errReserveAccMustBePremined
+}
+
+// validateBlockTrackerPollInterval validates block tracker block interval
+// which can not be 0
+func (p *genesisParams) validateBlockTrackerPollInterval() error {
+	if p.blockTrackerPollInterval == 0 {
+		return helper.ErrBlockTrackerPollInterval
+	}
+
+	return nil
 }
 
 // validateBurnContract validates burn contract. If native token is mintable,

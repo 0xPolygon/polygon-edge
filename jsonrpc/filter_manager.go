@@ -82,8 +82,10 @@ type filterBase struct {
 
 // newFilterBase initializes filterBase with unique ID
 func newFilterBase(ws wsConn) filterBase {
+	uuidObj := uuid.New()
+
 	return filterBase{
-		id:        uuid.New().String(),
+		id:        string(encodeToHex(uuidObj[:])),
 		ws:        ws,
 		heapIndex: NoIndexInHeap,
 	}

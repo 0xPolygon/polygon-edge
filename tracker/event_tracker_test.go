@@ -84,6 +84,7 @@ func TestEventTracker_TrackSyncEvents(t *testing.T) {
 		rpcEndpoint:           server.HTTPAddr(),
 		contractAddr:          addr,
 		numBlockConfirmations: numBlockConfirmations,
+		pollInterval:          time.Second,
 	}
 
 	err = tracker.Start(context.Background())

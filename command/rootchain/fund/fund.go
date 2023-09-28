@@ -118,10 +118,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 			default:
 				validatorAddr := types.StringToAddress(params.addresses[i])
 				fundAddr := ethgo.Address(validatorAddr)
-				txn := &ethgo.Transaction{
-					To:    &fundAddr,
-					Value: params.amountValues[i],
-				}
+				txn := helper.CreateTransaction(ethgo.ZeroAddress, &fundAddr, nil, params.amountValues[i], true)
 
 				var receipt *ethgo.Receipt
 
@@ -141,7 +138,7 @@ func runCommand(cmd *cobra.Command, _ []string) {
 
 				if params.mintStakeToken {
 					// mint tokens to validator, so he is able to send them
-					mintTxn, err := helper.CreateMintTxn(validatorAddr, stakeTokenAddr, params.amountValues[i])
+					mintTxn, err := helper.CreateMintTxn(validatorAddr, stakeTokenAddr, params.amountValues[i], true)
 					if err != nil {
 						return fmt.Errorf("failed to create mint native tokens transaction for validator '%s'. err: %w",
 							validatorAddr, err)

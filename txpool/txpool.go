@@ -57,6 +57,7 @@ var (
 	ErrMaxEnqueuedLimitReached = errors.New("maximum number of enqueued transactions reached")
 	ErrRejectFutureTx          = errors.New("rejected future tx due to low slots")
 	ErrInvalidTxType           = errors.New("invalid tx type")
+	ErrTxTypeNotSupported      = types.ErrTxTypeNotSupported
 	ErrTipAboveFeeCap          = errors.New("max priority fee per gas higher than max fee per gas")
 	ErrTipVeryHigh             = errors.New("max priority fee per gas higher than 2^256-1")
 	ErrFeeCapVeryHigh          = errors.New("max fee per gas higher than 2^256-1")
@@ -392,9 +393,14 @@ func (p *TxPool) Pop(tx *types.Transaction) {
 // Drop clears the entire account associated with the given transaction
 // and reverts its next (expected) nonce.
 func (p *TxPool) Drop(tx *types.Transaction) {
-	// fetch associated account
 	account := p.accounts.get(tx.From)
+	p.dropAccount(account, tx.Nonce, tx)
+}
 
+// dropAccount clears all promoted and enqueued tx from the account
+// signals EventType_DROPPED for provided hash, clears all the slots and metrics
+// and sets nonce to provided nonce
+func (p *TxPool) dropAccount(account *account, nextNonce uint64, tx *types.Transaction) {
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
 	account.nonceToTx.lock()
@@ -418,7 +424,6 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 	}
 
 	// rollback nonce
-	nextNonce := tx.Nonce
 	account.setNonce(nextNonce)
 
 	// reset accounts nonce map
@@ -614,9 +619,9 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	if tx.Type == types.DynamicFeeTx {
 		// Reject dynamic fee tx if london hardfork is not enabled
 		if !forks.London {
-			metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
+			metrics.IncrCounter([]string{txPoolMetrics, "tx_type"}, 1)
 
-			return ErrInvalidTxType
+			return ErrTxTypeNotSupported
 		}
 
 		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
@@ -659,12 +664,19 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 			return ErrUnderpriced
 		}
 	} else {
-		// Legacy approach to check if the given tx is not underpriced
-		if tx.GetGasPrice(baseFee).Cmp(big.NewInt(0).SetUint64(p.priceLimit)) < 0 {
+		// Legacy approach to check if the given tx is not underpriced when london hardfork is enabled
+		if forks.London && tx.GasPrice.Cmp(new(big.Int).SetUint64(baseFee)) < 0 {
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
 			return ErrUnderpriced
 		}
+	}
+
+	// Check if the given tx is not underpriced
+	if tx.GetGasPrice(baseFee).Cmp(new(big.Int).SetUint64(p.priceLimit)) < 0 {
+		metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+
+		return ErrUnderpriced
 	}
 
 	// Check nonce ordering
@@ -807,8 +819,11 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
-		} else if oldTxWithSameNonce.GasPrice.Cmp(tx.GasPrice) >= 0 {
+		} else if oldTxWithSameNonce.GetGasPrice(p.baseFee).Cmp(
+			tx.GetGasPrice(p.baseFee)) >= 0 {
 			// if tx with same nonce does exist and has same or better gas price -> return error
+			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
+
 			return ErrUnderpriced
 		}
 
@@ -820,6 +835,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 		// reject low nonce tx
 		if tx.Nonce < accountNonce {
+			metrics.IncrCounter([]string{txPoolMetrics, "nonce_too_low_tx"}, 1)
+
 			return ErrNonceTooLow
 		}
 	}
@@ -995,6 +1012,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 // updateAccountSkipsCounts update the accounts' skips,
 // the number of the consecutive blocks that doesn't have the account's transactions
 func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address]uint64) {
+	stateRoot := p.store.Header().StateRoot
 	p.accounts.Range(
 		func(key, value interface{}) bool {
 			address, _ := key.(types.Address)
@@ -1013,14 +1031,13 @@ func (p *TxPool) updateAccountSkipsCounts(latestActiveAccounts map[types.Address
 				return true
 			}
 
-			account.incrementSkips()
-
-			if account.skips < maxAccountSkips {
+			if account.incrementSkips() < maxAccountSkips {
 				return true
 			}
 
 			// account has been skipped too many times
-			p.Drop(firstTx)
+			nextNonce := p.store.GetNonce(stateRoot, firstTx.From)
+			p.dropAccount(account, nextNonce, firstTx)
 
 			account.resetSkips()
 

@@ -58,6 +58,10 @@ func (p *serverParams) initRawParams() error {
 
 	p.relayer = p.rawConfig.Relayer
 
+	if p.relayer && p.rawConfig.RelayerTrackerPollInterval == 0 {
+		return helper.ErrBlockTrackerPollInterval
+	}
+
 	return p.initAddresses()
 }
 

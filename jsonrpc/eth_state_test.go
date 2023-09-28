@@ -589,6 +589,7 @@ func constructMockTx(gasLimit *argUint64, data *argBytes) *txnArgs {
 
 func getExampleStore() *mockSpecialStore {
 	return &mockSpecialStore{
+		ethStore: newMockBlockStore(),
 		account: &mockAccount{
 			address: addr0,
 			account: &Account{

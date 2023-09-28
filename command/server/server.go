@@ -228,6 +228,27 @@ func setFlags(cmd *cobra.Command) {
 		"minimal number of child blocks required for the parent block to be considered final",
 	)
 
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.ConcurrentRequestsDebug,
+		concurrentRequestsDebugFlag,
+		defaultConfig.ConcurrentRequestsDebug,
+		"maximal number of concurrent requests for debug endpoints",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.WebSocketReadLimit,
+		webSocketReadLimitFlag,
+		defaultConfig.WebSocketReadLimit,
+		"maximum size in bytes for a message read from the peer by websocket",
+	)
+
+	cmd.Flags().DurationVar(
+		&params.rawConfig.RelayerTrackerPollInterval,
+		relayerTrackerPollIntervalFlag,
+		defaultConfig.RelayerTrackerPollInterval,
+		"interval (number of seconds) at which relayer's tracker polls for latest block at childchain",
+	)
+
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)

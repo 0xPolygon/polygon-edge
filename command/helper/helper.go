@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+var ErrBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
+
 type ClientCloseResult struct {
 	Message string `json:"message"`
 }

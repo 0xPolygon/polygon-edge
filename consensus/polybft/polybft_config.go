@@ -54,6 +54,10 @@ type PolyBFTConfig struct {
 
 	// BlockTimeDrift defines the time slot in which a new block can be created
 	BlockTimeDrift uint64 `json:"blockTimeDrift"`
+
+	// BlockTrackerPollInterval specifies interval
+	// at which block tracker polls for blocks on a rootchain
+	BlockTrackerPollInterval common.Duration `json:"blockTrackerPollInterval,omitempty"`
 }
 
 // LoadPolyBFTConfig loads chain config from provided path and unmarshals PolyBFTConfig

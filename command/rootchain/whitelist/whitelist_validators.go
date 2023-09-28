@@ -104,11 +104,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	supernetAddr := ethgo.Address(types.StringToAddress(params.supernetManagerAddress))
-	txn := &ethgo.Transaction{
-		From:  ecdsaKey.Address(),
-		Input: encoded,
-		To:    &supernetAddr,
-	}
+	txn := rootHelper.CreateTransaction(ecdsaKey.Address(), &supernetAddr, encoded, nil, true)
 
 	receipt, err := txRelayer.SendTransaction(txn, ecdsaKey)
 	if err != nil {

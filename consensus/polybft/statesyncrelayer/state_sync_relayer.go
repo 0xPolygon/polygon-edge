@@ -8,6 +8,7 @@ import (
 	"net"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
@@ -30,6 +31,7 @@ type StateSyncRelayer struct {
 	txRelayer              txrelayer.TxRelayer
 	key                    ethgo.Key
 	closeCh                chan struct{}
+	pollInterval           time.Duration
 }
 
 func sanitizeRPCEndpoint(rpcEndpoint string) string {
@@ -52,6 +54,7 @@ func NewRelayer(
 	stateReceiverTrackerStartBlock uint64,
 	logger hcf.Logger,
 	key ethgo.Key,
+	pollInterval time.Duration,
 ) *StateSyncRelayer {
 	endpoint := sanitizeRPCEndpoint(rpcEndpoint)
 
@@ -78,6 +81,7 @@ func NewRelayer(
 		key:                    key,
 		closeCh:                make(chan struct{}),
 		eventTrackerStartBlock: stateReceiverTrackerStartBlock,
+		pollInterval:           pollInterval,
 	}
 }
 
@@ -90,6 +94,7 @@ func (r *StateSyncRelayer) Start() error {
 		0, // sidechain (Polygon POS) is instant finality, so no need to wait
 		r.eventTrackerStartBlock,
 		r.logger,
+		r.pollInterval,
 	)
 
 	ctx, cancelFn := context.WithCancel(context.Background())

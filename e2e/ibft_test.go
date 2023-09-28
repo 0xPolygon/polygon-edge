@@ -77,7 +77,7 @@ func TestIbft_Transfer(t *testing.T) {
 			txn := &framework.PreparedTransaction{
 				From:     senderAddr,
 				To:       &receiverAddr,
-				GasPrice: big.NewInt(10000),
+				GasPrice: big.NewInt(2000000000),
 				Gas:      1000000,
 				Value:    framework.EthToWei(1),
 			}
@@ -141,7 +141,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 			txn := &framework.PreparedTransaction{
 				From:     senderAddr,
 				To:       &receiverAddr,
-				GasPrice: big.NewInt(10000),
+				GasPrice: big.NewInt(1000000000),
 				Gas:      1000000,
 				Value:    tc.txAmount,
 			}
@@ -150,7 +150,7 @@ func TestIbft_TransactionFeeRecipient(t *testing.T) {
 				// Deploy contract
 				deployTx := &framework.PreparedTransaction{
 					From:     senderAddr,
-					GasPrice: big.NewInt(0), // don't want gas fee to paid to a proposer
+					GasPrice: big.NewInt(1000000000), // fees should be greater than base fee
 					Gas:      1000000,
 					Value:    big.NewInt(0),
 					Input:    framework.MethodSig("setA1"),

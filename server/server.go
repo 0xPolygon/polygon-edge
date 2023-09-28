@@ -318,10 +318,11 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// blockchain object
+	blockchainConfig := &blockchain.Config{Chain: config.Chain, DataDir: config.DataDir}
 	m.blockchain, err = blockchain.NewBlockchain(
 		logger,
 		db,
-		config.Chain,
+		blockchainConfig,
 		nil,
 		m.executor,
 		signer,
@@ -647,6 +648,7 @@ func (s *Server) setupRelayer() error {
 		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		s.config.RelayerTrackerPollInterval,
 	)
 
 	// start relayer
@@ -908,6 +910,8 @@ func (s *Server) setupJSONRPC() error {
 		PriceLimit:               s.config.PriceLimit,
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
 		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
+		ConcurrentRequestsDebug:  s.config.JSONRPC.ConcurrentRequestsDebug,
+		WebSocketReadLimit:       s.config.JSONRPC.WebSocketReadLimit,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)
@@ -1052,6 +1056,11 @@ func initForkManager(engineName string, config *chain.Chain) error {
 
 	// Register handlers and additional forks here
 	if err := types.RegisterTxHashFork(chain.TxHashWithType); err != nil {
+		return err
+	}
+
+	// Register Handler for London fork fix
+	if err := state.RegisterLondonFixFork(chain.LondonFix); err != nil {
 		return err
 	}
 
