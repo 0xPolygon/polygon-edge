@@ -170,17 +170,17 @@ func (p *Polybft) publishRootchainMetrics(logger hclog.Logger) {
 		return
 	}
 
-	gweiPerWei := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)) // 10^9
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
 	relayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(bridgeCfg.JSONRPCEndpoint))
 	if err != nil {
 		logger.Error("failed to connect to the rootchain node", "err", err, "JSON RPC", bridgeCfg.JSONRPCEndpoint)
 
 		return
 	}
+
+	gweiPerWei := new(big.Float).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil)) // 10^9
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -202,11 +202,9 @@ func (p *Polybft) publishRootchainMetrics(logger hclog.Logger) {
 			checkpointBlock, err := getCurrentCheckpointBlock(relayer, bridgeCfg.CheckpointManagerAddr)
 			if err != nil {
 				logger.Error("failed to query latest checkpoint block", "err", err)
-
-				continue
+			} else {
+				metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(checkpointBlock))
 			}
-
-			metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(checkpointBlock))
 		}
 	}
 }

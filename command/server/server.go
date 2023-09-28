@@ -253,7 +253,7 @@ func setFlags(cmd *cobra.Command) {
 		&params.rawConfig.MetricsInterval,
 		metricsIntervalFlag,
 		defaultConfig.MetricsInterval,
-		"interval (number of seconds) at which special metrics is generated. zero means the metrics is disabled",
+		"the interval (in seconds) at which special metrics are generated. a value of zero means the metrics are disabled",
 	)
 
 	setLegacyFlags(cmd)
