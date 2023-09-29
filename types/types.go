@@ -261,6 +261,9 @@ type TxnTrace struct {
 	// ReceiptRoot is the root of the trie of receipts for this transaction
 	ReceiptRoot Hash `json:"receiptRoot"`
 
+	// Receipt is the RLP encoding of the receipt for this transaction
+	Receipt ArgBytes `json:"receipt"`
+
 	// TxnRoot is the root of the trie of transactions for this block
 	TxnRoot Hash `json:"txnRoot,omitempty"`
 

@@ -396,6 +396,7 @@ func (t *Transition) Write(txn *types.Transaction) error {
 
 	txnTrace := &types.TxnTrace{
 		Transaction: txn.MarshalRLP(),
+		Receipt:     receipt.MarshalRLP(),
 		Delta:       t.Txn().GetCompactJournal(),
 		Hash:        txn.Hash,
 		GasUsed:     result.GasUsed,
