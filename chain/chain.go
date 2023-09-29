@@ -24,6 +24,9 @@ const (
 
 	// GenesisDifficulty is the default difficulty of the Genesis block.
 	GenesisDifficulty uint64 = 131072
+
+	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
+	BaseFeeChangeDenom = uint64(8)
 )
 
 var (

@@ -8,13 +8,14 @@ import (
 )
 
 const (
-	DefaultGenesisFileName  = "genesis.json"
-	DefaultChainName        = "polygon-edge"
-	DefaultChainID          = 100
-	DefaultConsensus        = server.PolyBFTConsensus
-	DefaultGenesisGasUsed   = 458752  // 0x70000
-	DefaultGenesisGasLimit  = 5242880 // 0x500000
-	DefaultGenesisBaseFeeEM = chain.GenesisBaseFeeEM
+	DefaultGenesisFileName           = "genesis.json"
+	DefaultChainName                 = "polygon-edge"
+	DefaultChainID                   = 100
+	DefaultConsensus                 = server.PolyBFTConsensus
+	DefaultGenesisGasUsed            = 458752  // 0x70000
+	DefaultGenesisGasLimit           = 5242880 // 0x500000
+	DefaultGenesisBaseFeeEM          = chain.GenesisBaseFeeEM
+	DefaultGenesisBaseFeeChangeDenom = chain.BaseFeeChangeDenom
 )
 
 var (

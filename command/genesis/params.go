@@ -42,6 +42,7 @@ const (
 	rewardWalletFlag             = "reward-wallet"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 	proxyContractsAdminFlag      = "proxy-contracts-admin"
+	baseFeeChangeDenomFlag       = "base-fee-change-denom"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -67,6 +68,7 @@ var (
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
+	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
 )
 
 type genesisParams struct {
@@ -138,6 +140,8 @@ type genesisParams struct {
 	blockTrackerPollInterval time.Duration
 
 	proxyContractsAdmin string
+
+	baseFeeChangeDenom uint64
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -155,6 +159,10 @@ func (p *genesisParams) validateFlags() error {
 
 	if err := p.parsePremineInfo(); err != nil {
 		return err
+	}
+
+	if p.baseFeeChangeDenom == 0 {
+		return errBaseFeeChangeDenomZero
 	}
 
 	if p.isPolyBFTConsensus() {
@@ -409,9 +417,10 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID: int64(p.chainID),
-			Forks:   enabledForks,
-			Engine:  p.consensusEngineConfig,
+			ChainID:            int64(p.chainID),
+			Forks:              enabledForks,
+			Engine:             p.consensusEngineConfig,
+			BaseFeeChangeDenom: p.baseFeeChangeDenom,
 		},
 		Bootnodes: p.bootnodes,
 	}
