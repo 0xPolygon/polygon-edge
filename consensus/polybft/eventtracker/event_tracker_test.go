@@ -89,7 +89,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 	t.Run("Add block by block - no confirmed blocks", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, 10, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, 10, 10, 0))
 
 		require.NoError(t, err)
 
@@ -131,7 +131,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return([]*ethgo.Log{}, nil).Once()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -197,7 +197,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return(logs, nil).Once()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -265,7 +265,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return(nil, errors.New("some error occurred")).Once()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -335,7 +335,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfMissedBlocks))
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -420,7 +420,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfMissedBlocks + numOfCachedBlocks))
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -515,7 +515,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfCachedBlocks))
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 1000))
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0))
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -582,19 +582,19 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 	})
 }
 
-func createTestTrackerConfig(t *testing.T, numBlockConfirmations, batchSize, maxBacklogSize uint64) *EventTrackerConfig {
+func createTestTrackerConfig(t *testing.T, numBlockConfirmations, batchSize,
+	numOfBlocksToReconcile uint64) *EventTrackerConfig {
 	t.Helper()
 
 	var stateSyncEvent contractsapi.StateSyncedEvent
 
 	return &EventTrackerConfig{
-		RPCEndpoint:           "http://some-rpc-url.com",
-		StartBlockFromConfig:  0,
-		NumBlockConfirmations: numBlockConfirmations,
-		SyncBatchSize:         batchSize,
-		MaxBacklogSize:        maxBacklogSize,
-		PollInterval:          2 * time.Second,
-		Logger:                hclog.NewNullLogger(),
+		RPCEndpoint:            "http://some-rpc-url.com",
+		NumBlockConfirmations:  numBlockConfirmations,
+		SyncBatchSize:          batchSize,
+		NumOfBlocksToReconcile: numOfBlocksToReconcile,
+		PollInterval:           2 * time.Second,
+		Logger:                 hclog.NewNullLogger(),
 		LogFilter: map[ethgo.Address][]ethgo.Hash{
 			ethgo.ZeroAddress: {stateSyncEvent.Sig()},
 		},

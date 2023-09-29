@@ -157,16 +157,15 @@ func (s *stateSyncManager) setupNewTracker() error {
 	var stateSyncEvent contractsapi.StateSyncedEvent
 
 	tracker, err := eventtracker.NewEventTracker(&eventtracker.EventTrackerConfig{
-		RPCEndpoint:           s.config.jsonrpcAddr,
-		StartBlockFromConfig:  s.config.stateSenderStartBlock,
-		NumBlockConfirmations: s.config.numBlockConfirmations,
-		SyncBatchSize:         5,      // this should be configurable
-		MaxBacklogSize:        10_000, // this should be configurable
-		PollInterval:          s.config.blockTrackerPollInterval,
-		Logger:                s.logger,
-		Store:                 store,
-		EventSubscriber:       s,
-		BlockProvider:         clt.Eth(),
+		RPCEndpoint:            s.config.jsonrpcAddr,
+		NumBlockConfirmations:  s.config.numBlockConfirmations,
+		SyncBatchSize:          5, // this should be configurable
+		NumOfBlocksToReconcile: 0, // this should be configurable
+		PollInterval:           s.config.blockTrackerPollInterval,
+		Logger:                 s.logger,
+		Store:                  store,
+		EventSubscriber:        s,
+		BlockProvider:          clt.Eth(),
 		LogFilter: map[ethgo.Address][]ethgo.Hash{
 			ethgo.Address(s.config.stateSenderAddr): {stateSyncEvent.Sig()},
 		},

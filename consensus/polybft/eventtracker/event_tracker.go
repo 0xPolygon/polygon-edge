@@ -29,12 +29,6 @@ type EventTrackerConfig struct {
 	// RPCEndpoint is the full json rpc url on some node on a tracked chain
 	RPCEndpoint string
 
-	// StartBlockFromConfig represents a starting block from which tracker starts to
-	// track events from a tracked chain.
-	// This is only relevant on the first start of the tracker. After it processes blocks,
-	// it will start from the last processed block, and not from the StartBlockFromConfig.
-	StartBlockFromConfig uint64
-
 	// NumBlockConfirmations defines how many blocks must pass from a certain block,
 	// to consider that block as final on the tracked chain.
 	// This is very important for reorgs, and events from the given block will only be
@@ -50,13 +44,13 @@ type EventTrackerConfig struct {
 	// from memory, and continue to the next batch)
 	SyncBatchSize uint64
 
-	// MaxBacklogSize defines how many blocks we will sync up from the latest block on tracked chain.
+	// NumOfBlocksToReconcile defines how many blocks we will sync up from the latest block on tracked chain.
 	// If a node that has tracker, was offline for days, months, a year, it will miss a lot of blocks.
 	// In the meantime, we expect the rest of nodes to have collected the desired events and did their
 	// logic with them, continuing consensus and relayer stuff.
-	// In order to not waste too much unnecessary time in syncing all those blocks, with MaxBacklogSize,
-	// we tell the tracker to sync only latestBlock.Number - MaxBacklogSize number of blocks.
-	MaxBacklogSize uint64
+	// In order to not waste too much unnecessary time in syncing all those blocks, with NumOfBlocksToReconcile,
+	// we tell the tracker to sync only latestBlock.Number - NumOfBlocksToReconcile number of blocks.
+	NumOfBlocksToReconcile uint64
 
 	// PollInterval defines a time interval in which tracker polls json rpc node
 	// for latest block on the tracked chain.
@@ -122,13 +116,19 @@ func NewEventTracker(config *EventTrackerConfig) (*EventTracker, error) {
 		return nil, err
 	}
 
-	var definiteLastProcessedBlock uint64
-	if config.StartBlockFromConfig > 0 {
-		definiteLastProcessedBlock = config.StartBlockFromConfig - 1
-	}
+	definiteLastProcessedBlock := lastProcessedBlock
 
-	if lastProcessedBlock > definiteLastProcessedBlock {
-		definiteLastProcessedBlock = lastProcessedBlock
+	if lastProcessedBlock == 0 && config.NumOfBlocksToReconcile > 0 {
+		latestBlock, err := config.BlockProvider.GetBlockByNumber(ethgo.Latest, false)
+		if err != nil {
+			return nil, err
+		}
+
+		if latestBlock.Number > config.NumOfBlocksToReconcile {
+			// if this is a fresh start, then we should start syncing from
+			// latestBlock.Number - NumOfBlocksToReconcile
+			definiteLastProcessedBlock = latestBlock.Number - config.NumOfBlocksToReconcile
+		}
 	}
 
 	return &EventTracker{
@@ -170,11 +170,10 @@ func (e *EventTracker) Close() {
 func (e *EventTracker) Start() error {
 	e.config.Logger.Info("Starting event tracker",
 		"jsonRpcEndpoint", e.config.RPCEndpoint,
-		"startBlockFromConfig", e.config.StartBlockFromConfig,
 		"numBlockConfirmations", e.config.NumBlockConfirmations,
 		"pollInterval", e.config.PollInterval,
 		"syncBatchSize", e.config.SyncBatchSize,
-		"maxBacklogSize", e.config.MaxBacklogSize,
+		"numOfBlocksToReconcile", e.config.NumOfBlocksToReconcile,
 		"logFilter", e.config.LogFilter,
 	)
 
@@ -294,9 +293,10 @@ func (e *EventTracker) getNewState(latestBlock *ethgo.Block) error {
 	startBlock := lastProcessedBlock + 1
 
 	// sanitize startBlock from which we will start polling for blocks
-	if latestBlock.Number > e.config.MaxBacklogSize &&
-		latestBlock.Number-e.config.MaxBacklogSize > lastProcessedBlock {
-		startBlock = latestBlock.Number - e.config.MaxBacklogSize
+	if e.config.NumOfBlocksToReconcile > 0 &&
+		latestBlock.Number > e.config.NumOfBlocksToReconcile &&
+		latestBlock.Number-e.config.NumOfBlocksToReconcile > lastProcessedBlock {
+		startBlock = latestBlock.Number - e.config.NumOfBlocksToReconcile
 	}
 
 	// get blocks in batches
