@@ -249,6 +249,13 @@ func setFlags(cmd *cobra.Command) {
 		"interval (number of seconds) at which relayer's tracker polls for latest block at childchain",
 	)
 
+	cmd.Flags().DurationVar(
+		&params.rawConfig.MetricsInterval,
+		metricsIntervalFlag,
+		defaultConfig.MetricsInterval,
+		"the interval (in seconds) at which special metrics are generated. a value of zero means the metrics are disabled",
+	)
+
 	setLegacyFlags(cmd)
 
 	setDevFlags(cmd)
