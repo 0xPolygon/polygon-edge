@@ -3,6 +3,7 @@ package polybft
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"sort"
@@ -29,7 +30,6 @@ var (
 // and updating validator set based on changed stake
 type StakeManager interface {
 	PostBlock(req *PostBlockRequest) error
-	PostEpoch(req *PostEpochRequest) error
 	UpdateValidatorSet(epoch uint64, currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error)
 }
 
@@ -38,7 +38,6 @@ type StakeManager interface {
 type dummyStakeManager struct{}
 
 func (d *dummyStakeManager) PostBlock(req *PostBlockRequest) error { return nil }
-func (d *dummyStakeManager) PostEpoch(req *PostEpochRequest) error { return nil }
 func (d *dummyStakeManager) UpdateValidatorSet(epoch uint64,
 	currentValidatorSet validator.AccountSet) (*validator.ValidatorSetDelta, error) {
 	return &validator.ValidatorSetDelta{}, nil
@@ -56,6 +55,7 @@ type stakeManager struct {
 	supernetManagerContract types.Address
 	maxValidatorSetSize     int
 	eventsGetter            *eventsGetter[*contractsapi.TransferEvent]
+	polybftBackend          polybftBackend
 }
 
 // newStakeManager returns a new instance of stake manager
@@ -66,6 +66,7 @@ func newStakeManager(
 	key ethgo.Key,
 	validatorSetAddr, supernetManagerAddr types.Address,
 	blockchain blockchainBackend,
+	polybftBackend polybftBackend,
 	maxValidatorSetSize int,
 ) (*stakeManager, error) {
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
@@ -89,6 +90,7 @@ func newStakeManager(
 		supernetManagerContract: supernetManagerAddr,
 		maxValidatorSetSize:     maxValidatorSetSize,
 		eventsGetter:            eventsGetter,
+		polybftBackend:          polybftBackend,
 	}
 
 	if err := sm.init(blockchain); err != nil {
@@ -98,25 +100,10 @@ func newStakeManager(
 	return sm, nil
 }
 
-// PostEpoch saves the initial validator set to db
-func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
-	if req.NewEpochID != 1 {
-		return nil
-	}
-
-	// save initial validator set as full validator set in db
-	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
-		BlockNumber:          0,
-		EpochID:              0,
-		UpdatedAtBlockNumber: 0,
-		Validators:           newValidatorStakeMap(req.ValidatorSet.Accounts()),
-	})
-}
-
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any transfer event that happened in block and update full validator set in db
 func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
-	fullValidatorSet, err := s.state.StakeStore.getFullValidatorSet()
+	fullValidatorSet, err := s.getOrInitValidatorSet()
 	if err != nil {
 		return err
 	}
@@ -150,12 +137,7 @@ func (s *stakeManager) init(blockchain blockchainBackend) error {
 	currentHeader := blockchain.CurrentHeader()
 	currentBlockNumber := currentHeader.Number
 
-	// early exit if this is genesis block
-	if currentBlockNumber == 0 {
-		return nil
-	}
-
-	validatorSet, err := s.state.StakeStore.getFullValidatorSet()
+	validatorSet, err := s.getOrInitValidatorSet()
 	if err != nil {
 		return err
 	}
@@ -191,6 +173,33 @@ func (s *stakeManager) init(blockchain blockchainBackend) error {
 	validatorSet.BlockNumber = currentBlockNumber
 
 	return s.state.StakeStore.insertFullValidatorSet(validatorSet)
+}
+
+func (s *stakeManager) getOrInitValidatorSet() (validatorSetState, error) {
+	validatorSet, err := s.state.StakeStore.getFullValidatorSet()
+	if err != nil {
+		if !errors.Is(err, errNoFullValidatorSet) {
+			return validatorSetState{}, err
+		}
+
+		validators, err := s.polybftBackend.GetValidators(0, nil)
+		if err != nil {
+			return validatorSetState{}, err
+		}
+
+		validatorSet = validatorSetState{
+			BlockNumber:          0,
+			EpochID:              0,
+			UpdatedAtBlockNumber: 0,
+			Validators:           newValidatorStakeMap(validators),
+		}
+
+		if err = s.state.StakeStore.insertFullValidatorSet(validatorSet); err != nil {
+			return validatorSetState{}, err
+		}
+	}
+
+	return validatorSet, nil
 }
 
 func (s *stakeManager) updateWithReceipts(

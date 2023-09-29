@@ -46,6 +46,7 @@ type Config struct {
 
 	NumBlockConfirmations      uint64
 	RelayerTrackerPollInterval time.Duration
+	MetricsInterval            time.Duration
 }
 
 // Telemetry holds the config details for metric services

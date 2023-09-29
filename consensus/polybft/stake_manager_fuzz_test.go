@@ -34,66 +34,6 @@ type updateValidatorSetF struct {
 	VotingPower int64
 }
 
-func FuzzTestStakeManagerPostEpoch(f *testing.F) {
-	state := newTestState(f)
-
-	seeds := []epochIDValidatorsF{
-		{
-			EpochID:    0,
-			Validators: validator.NewTestValidators(f, 6).GetPublicIdentities(),
-		},
-		{
-			EpochID:    1,
-			Validators: validator.NewTestValidators(f, 42).GetPublicIdentities(),
-		},
-		{
-			EpochID:    42,
-			Validators: validator.NewTestValidators(f, 6).GetPublicIdentities(),
-		},
-	}
-
-	for _, seed := range seeds {
-		data, err := json.Marshal(seed)
-		if err != nil {
-			return
-		}
-
-		f.Add(data)
-	}
-
-	f.Fuzz(func(t *testing.T, input []byte) {
-		stakeManager := &stakeManager{
-			logger:              hclog.NewNullLogger(),
-			state:               state,
-			maxValidatorSetSize: 10,
-		}
-
-		var data epochIDValidatorsF
-		if err := json.Unmarshal(input, &data); err != nil {
-			t.Skip(err)
-		}
-
-		invalidDataFormat := false
-		for _, v := range data.Validators {
-			if err := ValidateStruct(*v); err != nil {
-				invalidDataFormat = true
-			}
-		}
-		if invalidDataFormat {
-			t.Skip()
-		}
-
-		err := stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID: data.EpochID,
-			ValidatorSet: validator.NewValidatorSet(
-				data.Validators,
-				stakeManager.logger,
-			),
-		})
-		require.NoError(t, err)
-	})
-}
-
 func FuzzTestStakeManagerPostBlock(f *testing.F) {
 	var (
 		allAliases        = []string{"A", "B", "C", "D", "E", "F"}
@@ -163,6 +103,11 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			bcMock.On("GetReceiptsByHash", mock.Anything).Return([]*types.Receipt{{}}, error(nil)).Once()
 		}
 
+		// insert initial full validator set
+		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
+			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
+		}))
+
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
 			state,
@@ -171,14 +116,10 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			validatorSetAddr,
 			types.StringToAddress("0x0002"),
 			bcMock,
+			nil,
 			5,
 		)
 		require.NoError(t, err)
-
-		// insert initial full validator set
-		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
-		}))
 
 		receipt := &types.Receipt{
 			Logs: []*types.Log{
@@ -213,6 +154,10 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	bcMock := new(blockchainMock)
 	bcMock.On("CurrentHeader").Return(&types.Header{Number: 0})
 
+	err := state.StakeStore.insertFullValidatorSet(validatorSetState{
+		Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
+	require.NoError(f, err)
+
 	stakeManager, err := newStakeManager(
 		hclog.NewNullLogger(),
 		state,
@@ -220,6 +165,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		wallet.NewEcdsaSigner(validators.GetValidator("A").Key()),
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		bcMock,
+		nil,
 		10,
 	)
 	require.NoError(f, err)

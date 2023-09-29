@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -24,7 +26,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -156,7 +157,7 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 			proxyAddrMapping[contracts.RewardTokenContract] = contracts.RewardTokenContractV1
 		}
 
-		if err = setUpProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddrMapping); err != nil {
+		if err = initProxies(transition, polyBFTConfig.ProxyContractsAdmin, proxyAddrMapping); err != nil {
 			return err
 		}
 
@@ -527,6 +528,9 @@ func (p *Polybft) Start() error {
 	// start state DB process
 	go p.state.startStatsReleasing()
 
+	// polybft rootchain metrics
+	go p.publishRootchainMetrics(p.logger.Named("rootchain_metrics"))
+
 	return nil
 }
 
@@ -781,7 +785,8 @@ func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
 }
 
-func setUpProxies(transition *state.Transition, admin types.Address,
+// initProxies initializes proxy contracts, that allow upgradeability of contracts implementation
+func initProxies(transition *state.Transition, admin types.Address,
 	proxyToImplMap map[types.Address]types.Address) error {
 	for proxyAddress, implAddress := range proxyToImplMap {
 		protectSetupProxyFn := &contractsapi.ProtectSetUpProxyGenesisProxyFn{Initiator: contracts.SystemCaller}

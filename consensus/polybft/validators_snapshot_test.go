@@ -264,6 +264,24 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 	assertions.ErrorContains(err, "failed to apply delta to the validators snapshot, block#10")
 }
 
+func TestValidatorsSnapshotCache_Empty(t *testing.T) {
+	t.Parallel()
+
+	headersMap := &testHeadersMap{headersByNumber: make(map[uint64]*types.Header)}
+
+	createHeaders(t, headersMap, 0, 1, 1, nil, nil)
+
+	blockchainMock := new(blockchainMock)
+	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
+
+	testValidatorsCache := &testValidatorsCache{
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+	}
+
+	_, err := testValidatorsCache.GetSnapshot(1, nil)
+	assert.ErrorContains(t, err, "validator snapshot is empty for block")
+}
+
 func createHeaders(t *testing.T, headersMap *testHeadersMap,
 	fromBlock, toBlock, epoch uint64, oldValidators, newValidators validator.AccountSet) {
 	t.Helper()

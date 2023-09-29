@@ -19,7 +19,7 @@ type EventAbi interface {
 	// Sig returns the event ABI signature or ID (which is unique for all event types)
 	Sig() ethgo.Hash
 	// Encode does abi encoding of given event
-	Encode(inputs interface{}) ([]byte, error)
+	Encode() ([]byte, error)
 	// ParseLog parses the provided receipt log to given event type
 	ParseLog(log *ethgo.Log) (bool, error)
 }

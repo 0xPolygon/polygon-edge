@@ -195,13 +195,13 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 			name:         "Rootchain call returns an error",
 			checkpointID: "",
 			returnError:  errors.New("internal error"),
-			errSubstring: "failed to invoke currentCheckpointId function on the rootchain",
+			errSubstring: "failed to invoke currentCheckpointBlockNumber function on the rootchain",
 		},
 		{
 			name:         "Failed to parse return value from rootchain",
 			checkpointID: "Hello World!",
 			returnError:  error(nil),
-			errSubstring: "failed to convert current checkpoint id",
+			errSubstring: "failed to convert current checkpoint block number",
 		},
 	}
 
@@ -222,7 +222,8 @@ func TestCheckpointManager_getCurrentCheckpointID(t *testing.T) {
 				key:              acc.Ecdsa,
 				logger:           hclog.NewNullLogger(),
 			}
-			actualCheckpointID, err := checkpointMgr.getLatestCheckpointBlock()
+			actualCheckpointID, err := getCurrentCheckpointBlock(checkpointMgr.rootChainRelayer,
+				checkpointMgr.checkpointManagerAddr)
 			if c.errSubstring == "" {
 				expectedCheckpointID, err := strconv.ParseUint(c.checkpointID, 0, 64)
 				require.NoError(t, err)
