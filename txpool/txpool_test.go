@@ -2606,10 +2606,10 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 				newTx(addr1, 4, 1),
 			},
 			addr2: {
-				newTx(addr2, 3, 1),
-				newTx(addr2, 4, 1),
-				newTx(addr2, 5, 1),
-				newTx(addr2, 6, 1),
+				newTx(addr2, 3, 3),
+				newTx(addr2, 4, 3),
+				newTx(addr2, 5, 3),
+				newTx(addr2, 6, 3),
 			},
 			addr3: {
 				newTx(addr3, 7, 1),
