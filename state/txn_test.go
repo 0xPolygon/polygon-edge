@@ -44,11 +44,11 @@ func (m *mockSnapshot) GetAccount(addr types.Address) (*Account, error) {
 }
 
 func (m *mockSnapshot) GetCode(hash types.Hash) ([]byte, bool) {
-	return nil, false
+	return []byte{0x1}, true
 }
 
-func (m *mockSnapshot) Commit(objs []*Object) (Snapshot, []byte) {
-	return nil, nil
+func (m *mockSnapshot) Commit(objs []*Object) (Snapshot, *types.Trace, []byte) {
+	return nil, nil, nil
 }
 
 func newStateWithPreState(preState map[types.Address]*PreState) Snapshot {
@@ -91,4 +91,89 @@ func TestIncrNonce(t *testing.T) {
 	require.Error(t, txn.IncrNonce(address0))
 	require.NoError(t, txn.IncrNonce(address1))
 	require.Equal(t, nonMaxUint64NonceValue+1, txn.GetNonce(address1))
+}
+
+func TestTxn_TracesCompaction(t *testing.T) {
+	txn := newTestTxn(defaultPreState)
+
+	addr := types.Address{}
+
+	txn.SetBalance(addr, big.NewInt(1))
+	txn.SetBalance(addr, big.NewInt(2)) // updates
+
+	txn.SetNonce(addr, 1)
+	txn.SetNonce(addr, 2) // updates
+
+	oneHash := types.Hash{0x1}
+
+	txn.SetState(addr, types.ZeroHash, types.ZeroHash)
+	txn.SetState(addr, types.ZeroHash, oneHash) // updates
+	txn.SetState(addr, oneHash, types.ZeroHash)
+
+	txn.GetCode(addr)
+
+	txn.TouchAccount(addr)
+	require.Len(t, txn.journal, 18)
+
+	trace := txn.GetCompactJournal()
+	require.Len(t, trace, 1)
+
+	nonce := uint64(2)
+
+	require.Equal(t, &types.JournalEntry{
+		Balance: big.NewInt(2),
+		Nonce:   &nonce,
+		Storage: map[types.Hash]types.Hash{
+			types.ZeroHash: oneHash,
+			oneHash:        types.ZeroHash,
+		},
+		CodeRead: []byte{0x1},
+		Touched:  boolTruePtr(),
+		Read:     boolTruePtr(),
+	}, trace[addr])
+}
+
+func TestJournalEntry_Merge(t *testing.T) {
+	one := uint64(1)
+
+	entryAllSet := func() *types.JournalEntry {
+		// use a function because the merge function
+		// modifies the caller and the test would
+		// have side effects.
+		return &types.JournalEntry{
+			Nonce:   &one,
+			Balance: big.NewInt(1),
+			Storage: map[types.Hash]types.Hash{
+				types.ZeroHash: types.ZeroHash,
+			},
+			Code:     []byte{0x1},
+			CodeRead: []byte{0x1},
+			Suicide:  boolTruePtr(),
+			Touched:  boolTruePtr(),
+			Read:     boolTruePtr(),
+			StorageRead: map[types.Hash]struct{}{
+				types.ZeroHash: {},
+			},
+		}
+	}
+
+	cases := []struct {
+		a, b, c *types.JournalEntry // a.merge(b) = c
+	}{
+		{
+			&types.JournalEntry{},
+			entryAllSet(),
+			entryAllSet(),
+		},
+		{
+			entryAllSet(),
+			&types.JournalEntry{},
+			entryAllSet(),
+		},
+	}
+
+	for _, c := range cases {
+		c.a.Merge(c.b)
+		require.Equal(t, c.c, c.a)
+	}
 }

@@ -136,6 +136,7 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 		big.NewInt(0),
 		math.MaxInt64,
 		input,
+		runtime.NewAccessList(),
 	)
 
 	// Enable all forks
@@ -155,7 +156,7 @@ func getPredeployAccount(address types.Address, input []byte, chainID int64) (*c
 	// the state needs to be walked to collect all touched all storage slots
 	storageMap := getModifiedStorageMap(radix, address)
 
-	_, _, err := transition.Commit()
+	_, _, _, err := transition.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to commit the state changes: %w", err)
 	}

@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -190,6 +191,170 @@ func (h Hash) MarshalText() ([]byte, error) {
 
 func (a Address) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
+}
+
+// TODO: Replace jsonrpc/types/argByte with this?
+// Still unsure if the codification will be done on protobuf side more
+// than marshaling in json and if this will become necessary.
+//
+//nolint:godox
+type ArgBytes []byte
+
+func (b ArgBytes) MarshalText() ([]byte, error) {
+	return encodeToHex(b), nil
+}
+
+func (b *ArgBytes) UnmarshalText(input []byte) error {
+	hh, err := decodeToHex(input)
+	if err != nil {
+		return nil
+	}
+
+	aux := make([]byte, len(hh))
+	copy(aux[:], hh[:])
+	*b = aux
+
+	return nil
+}
+
+func decodeToHex(b []byte) ([]byte, error) {
+	str := string(b)
+	str = strings.TrimPrefix(str, "0x")
+
+	if len(str)%2 != 0 {
+		str = "0" + str
+	}
+
+	return hex.DecodeString(str)
+}
+
+func encodeToHex(b []byte) []byte {
+	str := hex.EncodeToString(b)
+	if len(str)%2 != 0 {
+		str = "0" + str
+	}
+
+	return []byte("0x" + str)
+}
+
+type Trace struct {
+	// AccountTrie is the partial trie for the account merkle trie touched during the block
+	AccountTrie map[string]string `json:"accountTrie"`
+
+	// StorageTrie is the partial trie for the storage tries touched during the block
+	StorageTrie map[string]string `json:"storageTrie"`
+
+	// ParentStateRoot is the parent state root for this block
+	ParentStateRoot Hash `json:"parentStateRoot"`
+
+	// TxnTraces is the list of traces per transaction in the block
+	TxnTraces []*TxnTrace `json:"transactionTraces"`
+}
+
+type TxnTrace struct {
+	// Transaction is the RLP encoding of the transaction
+	Transaction ArgBytes `json:"txn"`
+
+	// Delta is the list of updates per account during this transaction
+	Delta map[Address]*JournalEntry `json:"delta"`
+
+	// ReceiptRoot is the root of the trie of receipts for this transaction
+	ReceiptRoot Hash `json:"receiptRoot"`
+
+	// TxnRoot is the root of the trie of transactions for this block
+	TxnRoot Hash `json:"txnRoot,omitempty"`
+
+	// Hash is the hash of the transaction
+	Hash Hash `json:"hash"`
+
+	// GasUsed is the amount of gas used by the transaction
+	GasUsed uint64 `json:"gasUsed"`
+
+	// Bloom is the bloom filter for the transaction
+	Bloom Bloom `json:"bloom"`
+}
+
+type JournalEntry struct {
+	// Addr is the address of the account affected by the
+	// journal change
+	Addr Address `json:"address"`
+
+	// Balance tracks changes in the account Balance
+	Balance *big.Int `json:"-"`
+
+	// Nonce tracks changes in the account Nonce
+	Nonce *uint64 `json:"nonce,omitempty"`
+
+	// Storage track changes in the storage
+	Storage map[Hash]Hash `json:"storage,omitempty"`
+
+	// StorageRead is the list of storage slots read
+	StorageRead map[Hash]struct{} `json:"storage_read,omitempty"`
+
+	// Code tracks the initialization of the contract Code
+	Code []byte `json:"code,omitempty"`
+
+	// CodeRead tracks whether the contract Code was read
+	CodeRead []byte `json:"code_read,omitempty"`
+
+	// Suicide tracks whether the contract has been self destructed
+	Suicide *bool `json:"suicide,omitempty"`
+
+	// Touched tracks whether the account has been touched/created
+	Touched *bool `json:"touched,omitempty"`
+
+	// Read signals whether the account was read
+	Read *bool `json:"read,omitempty"`
+}
+
+func (j *JournalEntry) Merge(jj *JournalEntry) {
+	if jj.Nonce != nil && jj.Nonce != j.Nonce {
+		j.Nonce = jj.Nonce
+	}
+
+	if jj.Balance != nil && jj.Balance != j.Balance {
+		j.Balance = jj.Balance
+	}
+
+	if jj.Storage != nil {
+		if j.Storage == nil {
+			j.Storage = map[Hash]Hash{}
+		}
+
+		for k, v := range jj.Storage {
+			j.Storage[k] = v
+		}
+	}
+
+	if jj.Code != nil && !bytes.Equal(jj.Code, j.Code) {
+		j.Code = jj.Code
+	}
+
+	if jj.CodeRead != nil && !bytes.Equal(jj.CodeRead, j.CodeRead) {
+		j.CodeRead = jj.CodeRead
+	}
+
+	if jj.Suicide != nil && jj.Suicide != j.Suicide {
+		j.Suicide = jj.Suicide
+	}
+
+	if jj.Touched != nil && jj.Touched != j.Touched {
+		j.Touched = jj.Touched
+	}
+
+	if jj.Read != nil && jj.Read != j.Read {
+		j.Read = jj.Read
+	}
+
+	if jj.StorageRead != nil {
+		if j.StorageRead == nil {
+			j.StorageRead = map[Hash]struct{}{}
+		}
+
+		for k := range jj.StorageRead {
+			j.StorageRead[k] = struct{}{}
+		}
+	}
 }
 
 type Proof struct {

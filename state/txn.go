@@ -36,6 +36,9 @@ type Txn struct {
 	snapshots []*iradix.Tree
 	txn       *iradix.Txn
 	codeCache *lru.Cache
+
+	// tracing
+	journal []*types.JournalEntry
 }
 
 func NewTxn(snapshot Snapshot) *Txn {
@@ -81,6 +84,69 @@ func (txn *Txn) RevertToSnapshot(id int) error {
 	return nil
 }
 
+func (txn *Txn) GetCompactJournal() map[types.Address]*types.JournalEntry {
+	// Instead of creating a new object to represent the aggregate on how
+	// an account has changed during the compaction, we piggyback the same
+	// journalEntry object for now.
+	res := map[types.Address]*types.JournalEntry{}
+
+	for _, entry := range txn.journal {
+		obj, ok := res[entry.Addr]
+		if !ok {
+			obj = &types.JournalEntry{Addr: entry.Addr}
+			res[entry.Addr] = obj
+		}
+
+		obj.Merge(entry)
+	}
+
+	// reset the journal
+	txn.journal = txn.journal[:0]
+
+	return res
+}
+
+func (txn *Txn) addJournalEntry(j *types.JournalEntry) {
+	txn.journal = append(txn.journal, j)
+}
+
+const (
+	nonceChange   = "nonce"
+	codeChange    = "code"
+	balanceChange = "balance"
+)
+
+func (txn *Txn) trackAccountChange(addr types.Address, changeType string, object *StateObject) {
+	entry := &types.JournalEntry{
+		Addr: addr,
+	}
+
+	if changeType == nonceChange {
+		// the node has changed
+		entry.Nonce = &object.Account.Nonce
+	} else if changeType == codeChange {
+		// the code has been initialized
+		entry.Code = object.Code
+	} else if changeType == balanceChange {
+		// the balance has changed
+		entry.Balance = object.Account.Balance
+	} else {
+		// this is covered on unit tests
+		panic(fmt.Sprintf("BUG: Not expected change '%s'", changeType)) //nolint:gocritic
+	}
+
+	txn.addJournalEntry(entry)
+}
+
+func (txn *Txn) trackCodeRead(addr types.Address, code []byte) {
+	entry := &types.JournalEntry{
+		Addr:     addr,
+		CodeRead: code,
+	}
+
+	txn.addJournalEntry(entry)
+}
+
 // GetAccount returns an account
 func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 	object, exists := txn.getStateObject(addr)
@@ -92,6 +158,11 @@ func (txn *Txn) GetAccount(addr types.Address) (*Account, bool) {
 }
 
 func (txn *Txn) getStateObject(addr types.Address) (*StateObject, bool) {
+	txn.addJournalEntry(&types.JournalEntry{
+		Addr: addr,
+		Read: boolTruePtr(),
+	})
+
 	// Try to get state from radix tree which holds transient states during block processing first
 	val, exists := txn.txn.Get(addr.Bytes())
 	if exists {
@@ -142,11 +213,13 @@ func (txn *Txn) upsertAccount(addr types.Address, create bool, f func(object *St
 func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		if object.Suicide {
-			*object = *newStateObject(txn)
+			*object = *newStateObject()
 			object.Account.Balance.SetBytes(balance.Bytes())
 		} else {
 			object.Account.Balance.Add(object.Account.Balance, balance)
 		}
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 }
 
@@ -154,6 +227,8 @@ func (txn *Txn) AddSealingReward(addr types.Address, balance *big.Int) {
 func (txn *Txn) AddBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Add(object.Account.Balance, balance)
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 }
 
@@ -171,6 +246,8 @@ func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
 
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.Sub(object.Account.Balance, amount)
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 
 	return nil
@@ -180,6 +257,8 @@ func (txn *Txn) SubBalance(addr types.Address, amount *big.Int) error {
 func (txn *Txn) SetBalance(addr types.Address, balance *big.Int) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Balance.SetBytes(balance.Bytes())
+
+		txn.trackAccountChange(addr, balanceChange, object)
 	})
 }
 
@@ -272,13 +351,19 @@ func (txn *Txn) SetStorage(
 	if original == value {
 		if original == types.ZeroHash { // reset to original nonexistent slot (2.2.2.1)
 			// Storage was used as memory (allocation and deallocation occurred within the same contract)
-			if config.Istanbul {
+			if config.EIP2929 {
+				// Refund: SstoreSetGasEIP2200 - WarmStorageReadCostEIP2929
+				txn.AddRefund(19900)
+			} else if config.Istanbul {
 				txn.AddRefund(19200)
 			} else {
 				txn.AddRefund(19800)
 			}
 		} else { // reset to original existing slot (2.2.2.2)
-			if config.Istanbul {
+			if config.EIP2929 {
+				// Refund: SstoreResetGasEIP2200 - ColdStorageReadCostEIP2929 - WarmStorageReadCostEIP2929
+				txn.AddRefund(2800)
+			} else if config.Istanbul {
 				txn.AddRefund(4200)
 			} else {
 				txn.AddRefund(4800)
@@ -305,6 +390,13 @@ func (txn *Txn) SetState(
 		} else {
 			object.Txn.Insert(key.Bytes(), value.Bytes())
 		}
+
+		txn.addJournalEntry(&types.JournalEntry{
+			Addr: addr,
+			Storage: map[types.Hash]types.Hash{
+				key: value,
+			},
+		})
 	})
 }
 
@@ -314,6 +406,13 @@ func (txn *Txn) GetState(addr types.Address, key types.Hash) types.Hash {
 	if !exists {
 		return types.Hash{}
 	}
+
+	txn.addJournalEntry(&types.JournalEntry{
+		Addr: addr,
+		StorageRead: map[types.Hash]struct{}{
+			key: {},
+		},
+	})
 
 	// Try to get account state from radix tree first
 	// Because the latest account state should be in in-memory radix tree
@@ -348,6 +447,8 @@ func (txn *Txn) IncrNonce(addr types.Address) error {
 			return
 		}
 		object.Account.Nonce++
+
+		txn.trackAccountChange(addr, nonceChange, object)
 	})
 
 	return err
@@ -357,6 +458,8 @@ func (txn *Txn) IncrNonce(addr types.Address) error {
 func (txn *Txn) SetNonce(addr types.Address, nonce uint64) {
 	txn.upsertAccount(addr, true, func(object *StateObject) {
 		object.Account.Nonce = nonce
+
+		txn.trackAccountChange(addr, nonceChange, object)
 	})
 }
 
@@ -378,6 +481,8 @@ func (txn *Txn) SetCode(addr types.Address, code []byte) {
 		object.Account.CodeHash = crypto.Keccak256(code)
 		object.DirtyCode = true
 		object.Code = code
+
+		txn.trackAccountChange(addr, codeChange, object)
 	})
 }
 
@@ -389,6 +494,8 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	}
 
 	if object.DirtyCode {
+		txn.trackCodeRead(addr, object.Code)
+
 		return object.Code
 	}
 	//nolint:godox
@@ -396,12 +503,16 @@ func (txn *Txn) GetCode(addr types.Address) []byte {
 	v, ok := txn.codeCache.Get(addr)
 
 	if ok {
+		code := v.([]byte)
+		txn.trackCodeRead(addr, code)
+
 		//nolint:forcetypeassert
-		return v.([]byte)
+		return code
 	}
 
 	code, _ := txn.snapshot.GetCode(types.BytesToHash(object.Account.CodeHash))
 	txn.codeCache.Add(addr, code)
+	txn.trackCodeRead(addr, code)
 
 	return code
 }
@@ -419,6 +530,12 @@ func (txn *Txn) GetCodeHash(addr types.Address) types.Hash {
 	return types.BytesToHash(object.Account.CodeHash)
 }
 
+func boolTruePtr() *bool {
+	t := true
+
+	return &t
+}
+
 // Suicide marks the given account as suicided
 func (txn *Txn) Suicide(addr types.Address) bool {
 	var suicided bool
@@ -429,6 +546,11 @@ func (txn *Txn) Suicide(addr types.Address) bool {
 		} else {
 			suicided = true
 			object.Suicide = true
+
+			txn.addJournalEntry(&types.JournalEntry{
+				Addr:    addr,
+				Suicide: boolTruePtr(),
+			})
 		}
 		if object != nil {
 			object.Account.Balance = new(big.Int)
@@ -501,7 +623,10 @@ func (txn *Txn) SetFullStorage(addr types.Address, state map[types.Hash]types.Ha
 
 func (txn *Txn) TouchAccount(addr types.Address) {
 	txn.upsertAccount(addr, true, func(obj *StateObject) {
-
+		txn.addJournalEntry(&types.JournalEntry{
+			Addr:    addr,
+			Touched: boolTruePtr(),
+		})
 	})
 }
 
@@ -520,7 +645,7 @@ func (txn *Txn) Empty(addr types.Address) bool {
 	return obj.Empty()
 }
 
-func newStateObject(txn *Txn) *StateObject {
+func newStateObject() *StateObject {
 	return &StateObject{
 		Account: &Account{
 			Balance:  big.NewInt(0),

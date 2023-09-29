@@ -318,10 +318,11 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// blockchain object
+	blockchainConfig := &blockchain.Config{Chain: config.Chain, DataDir: config.DataDir}
 	m.blockchain, err = blockchain.NewBlockchain(
 		logger,
 		db,
-		config.Chain,
+		blockchainConfig,
 		nil,
 		m.executor,
 		signer,

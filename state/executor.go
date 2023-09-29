@@ -116,7 +116,7 @@ func (e *Executor) WriteGenesis(
 		return types.Hash{}, err
 	}
 
-	_, root := snap.Commit(objs)
+	_, _, root := snap.Commit(objs)
 
 	return types.BytesToHash(root), nil
 }
@@ -215,6 +215,9 @@ func (e *Executor) BeginTxn(
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 
 	// enable contract deployment allow list (if any)
@@ -266,6 +269,8 @@ type Transition struct {
 
 	PostHook func(t *Transition)
 
+	trace *types.Trace
+
 	// runtimes
 	evm         *evm.EVM
 	precompiles *precompiled.Precompiled
@@ -286,6 +291,9 @@ func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transit
 		snap:        snap,
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
+		trace: &types.Trace{
+			TxnTraces: []*types.TxnTrace{},
+		},
 	}
 }
 
@@ -386,19 +394,35 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	receipt.LogsBloom = types.CreateBloom([]*types.Receipt{receipt})
 	t.receipts = append(t.receipts, receipt)
 
+	txnTrace := &types.TxnTrace{
+		Transaction: txn.MarshalRLP(),
+		Delta:       t.Txn().GetCompactJournal(),
+		Hash:        txn.Hash,
+		GasUsed:     result.GasUsed,
+		Bloom:       receipt.LogsBloom,
+		// This is not possible to do it here because of dependency cycle
+		// ReceiptRoot: buildroot.CalculateReceiptsRoot(t.receipts),
+		// TxnRoot:     buildroot.CalculateTransactionsRoot(transactions, blockNumber),
+	}
+
+	t.trace.TxnTraces = append(t.trace.TxnTraces, txnTrace)
+
 	return nil
 }
 
 // Commit commits the final result
-func (t *Transition) Commit() (Snapshot, types.Hash, error) {
+func (t *Transition) Commit() (Snapshot, *types.Trace, types.Hash, error) {
 	objs, err := t.state.Commit(t.config.EIP155)
 	if err != nil {
-		return nil, types.ZeroHash, err
+		return nil, nil, types.Hash{}, err
 	}
 
-	s2, root := t.snap.Commit(objs)
+	s2, snapTrace, root := t.snap.Commit(objs)
 
-	return s2, types.BytesToHash(root), nil
+	t.trace.AccountTrie = snapTrace.AccountTrie
+	t.trace.StorageTrie = snapTrace.StorageTrie
+
+	return s2, t.trace, types.BytesToHash(root), nil
 }
 
 func (t *Transition) subGasPool(amount uint64) error {
@@ -624,7 +648,13 @@ func (t *Transition) Create2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
-	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
+	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, runtime.NewAccessList())
+
+	if t.config.EIP2929 {
+		contract.AccessList.AddAddress(caller)
+		// add all precompiles to access list
+		contract.AccessList.AddAddress(t.precompiles.ContractAddr...)
+	}
 
 	return t.applyCreate(contract, t)
 }
@@ -636,7 +666,14 @@ func (t *Transition) Call2(
 	value *big.Int,
 	gas uint64,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, runtime.NewAccessList())
+
+	if t.config.EIP2929 {
+		c.AccessList.AddAddress(caller)
+		c.AccessList.AddAddress(to)
+		// add all precompiles to access list
+		c.AccessList.AddAddress(t.precompiles.ContractAddr...)
+	}
 
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -742,8 +779,15 @@ func (t *Transition) applyCall(
 
 	t.captureCallStart(c, callType)
 
+	// create a deep copy of access list for reverted transaction
+	al := c.AccessList.Copy()
+
 	result = t.run(c, host)
 	if result.Failed() {
+		if result.Reverted() {
+			c.AccessList = al
+		}
+
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,
@@ -780,6 +824,13 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	// Increment the nonce of the caller
 	if err := t.state.IncrNonce(c.Caller); err != nil {
 		return &runtime.ExecutionResult{Err: err}
+	}
+
+	//EIP2929: check
+	// we add this to the access-list before taking a snapshot. Even if the creation fails,
+	// the access-list change should not be rolled back according to EIP2929 specs
+	if t.config.EIP2929 {
+		c.AccessList.AddAddress(c.Address)
 	}
 
 	// Check if there is a collision and the address already exists
