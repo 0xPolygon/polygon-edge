@@ -539,13 +539,16 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	for i := 0; i < numberOfAttempts; i++ {
 		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, uint64(50+i*epochSize), childEthEndpoint)
 		require.NoError(t, err)
+
 		if len(logs) == 2 || i == numberOfAttempts-1 {
 			// assert that all deposits are executed successfully.
 			// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
 			// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
 			checkStateSyncResultLogs(t, logs, 2)
+
 			break
 		}
+
 		require.NoError(t, cluster.WaitForBlock(uint64(50+(i+1)*epochSize), 1*time.Minute))
 	}
 
@@ -700,13 +703,16 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	for i := 0; i < numberOfAttempts; i++ {
 		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, uint64(50+i*epochSize), childEthEndpoint)
 		require.NoError(t, err)
+
 		if len(logs) == 2 || i == numberOfAttempts-1 {
 			// assert that all deposits are executed successfully.
 			// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
 			// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
 			checkStateSyncResultLogs(t, logs, 2)
+
 			break
 		}
+
 		require.NoError(t, cluster.WaitForBlock(uint64(50+(i+1)*epochSize), 1*time.Minute))
 	}
 
@@ -972,44 +978,30 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		isEqual := make([]bool, len(depositors))
+		allSuccessful := false
 
-		var allSuccuessfull bool
-
-		for i := 0; i < numberOfAttempts; i++ {
-
+		for it := 0; it < numberOfAttempts && !allSuccessful; it++ {
 			blockNum, err := childEthEndpoint.BlockNumber()
 			require.NoError(t, err)
 
 			// wait a couple of sprints to finalize state sync events
 			require.NoError(t, cluster.WaitForBlock(blockNum+3*sprintSize, 2*time.Minute))
 
+			allSuccessful = true
+
 			// check that balances on the child chain are correct
 			for i, receiver := range depositors {
 				balance := erc20BalanceOf(t, receiver, contracts.NativeERC20TokenContract, childchainTxRelayer)
 				t.Log("Balance before", balancesBefore[i], "Balance after", balance)
-				if balance.Cmp(balancesBefore[i].Add(balancesBefore[i], big.NewInt(amount))) == 0 {
-					isEqual[i] = true
-				}
-			}
+				if balance.Cmp(balancesBefore[i].Add(balancesBefore[i], big.NewInt(amount))) != 0 {
+					allSuccessful = false
 
-			allSuccuessfull = true
-			for _, equal := range isEqual {
-				if !equal {
-					allSuccuessfull = false
 					break
 				}
 			}
-
-			if allSuccuessfull {
-				break
-			}
 		}
 
-		if !allSuccuessfull {
-			t.Fail()
-		}
-
+		require.True(t, allSuccessful)
 	})
 
 	t.Run("bridge ERC 721 tokens", func(t *testing.T) {
