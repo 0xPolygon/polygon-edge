@@ -457,8 +457,9 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	const (
-		transfersCount = 4
-		epochSize      = 5
+		transfersCount   = 4
+		epochSize        = 5
+		numberOfAttempts = 4
 	)
 
 	minter, err := ethgow.GenerateKey()
@@ -535,16 +536,21 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	// the transactions are processed and there should be a success events
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
-	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, 50, childEthEndpoint)
-	require.NoError(t, err)
+	for i := 0; i < numberOfAttempts; i++ {
+		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, uint64(50+i*epochSize), childEthEndpoint)
+		require.NoError(t, err)
+		if len(logs) == 2 || i == numberOfAttempts-1 {
+			// assert that all deposits are executed successfully.
+			// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
+			// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
+			checkStateSyncResultLogs(t, logs, 2)
+			break
+		}
+		require.NoError(t, cluster.WaitForBlock(uint64(50+(i+1)*epochSize), 1*time.Minute))
+	}
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(validatorSrv.JSONRPC()))
 	require.NoError(t, err)
-
-	// assert that all deposits are executed successfully.
-	// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
-	// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
-	checkStateSyncResultLogs(t, logs, 2)
 
 	// retrieve child token address (from both chains, and assert they are the same)
 	l1ChildTokenAddr := getChildToken(t, contractsapi.RootERC721Predicate.Abi, polybftCfg.Bridge.RootERC721PredicateAddr,
@@ -694,7 +700,7 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	for i := 0; i < numberOfAttempts; i++ {
 		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, uint64(50+i*epochSize), childEthEndpoint)
 		require.NoError(t, err)
-		if len(logs) == 2 || i == 3 {
+		if len(logs) == 2 || i == numberOfAttempts-1 {
 			// assert that all deposits are executed successfully.
 			// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
 			// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
