@@ -444,6 +444,10 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
+	if t.ctx.NoBaseFee {
+		return nil
+	}
+
 	upfrontGasCost := GetLondonFixHandler(uint64(t.ctx.Number)).getUpfrontGasCost(msg, t.ctx.BaseFee)
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
@@ -1042,6 +1046,11 @@ func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
 	t.state.SetCode(addr, code)
 
 	return nil
+}
+
+// SetNoBaseFee sets no base fee flag to the transition runtime context
+func (t *Transition) SetNoBaseFee(noBaseFee bool) {
+	t.ctx.NoBaseFee = noBaseFee
 }
 
 // SetTracer sets tracer to the context in order to enable it
