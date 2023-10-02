@@ -120,7 +120,10 @@ func runCommand(cmd *cobra.Command, _ []string) {
 				fundAddr := ethgo.Address(validatorAddr)
 				txn := helper.CreateTransaction(ethgo.ZeroAddress, &fundAddr, nil, params.amountValues[i], true)
 
-				var receipt *ethgo.Receipt
+				var (
+					receipt *ethgo.Receipt
+					err     error
+				)
 
 				if params.deployerPrivateKey != "" {
 					receipt, err = txRelayer.SendTransaction(txn, deployerKey)
