@@ -104,6 +104,14 @@ func (q *accountQueue) length() uint64 {
 	return uint64(q.queue.Len())
 }
 
+// lengthWithLock returns the number of transactions in the queue (thread-safe)
+func (q *accountQueue) lengthWithLock() uint64 {
+	q.lock(false)
+	defer q.unlock()
+
+	return q.length()
+}
+
 // transactions sorted by nonce (ascending)
 type minNonceQueue []*types.Transaction
 
