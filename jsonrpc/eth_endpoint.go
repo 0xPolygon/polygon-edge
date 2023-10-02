@@ -66,7 +66,12 @@ type ethBlockchainStore interface {
 	GetAvgGasPrice() *big.Int
 
 	// ApplyTxn applies a transaction object to the blockchain
-	ApplyTxn(header *types.Header, txn *types.Transaction, override types.StateOverride, noBaseFee bool) (*runtime.ExecutionResult, error)
+	ApplyTxn(
+		header *types.Header,
+		txn *types.Transaction,
+		override types.StateOverride,
+		noBaseFee bool,
+	) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
