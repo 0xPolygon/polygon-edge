@@ -41,7 +41,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		target := deployTxn.Receipt().ContractAddress
 
-		input := abi.MustNewMethod("function getValue() public returns (uint256)").ID()
+		input := contractsapi.TestSimple.Abi.GetMethod("getValue").ID()
 
 		resp, err := client.Call(&ethgo.CallMsg{To: &target, Data: input}, ethgo.Latest)
 		require.NoError(t, err)
@@ -60,6 +60,28 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, "0x0300000000000000000000000000000000000000000000000000000000000000", resp)
+	})
+
+	// Test eth_call with zero account balance
+	t.Run("eth_call with zero-balance account", func(t *testing.T) {
+		deployTxn := cluster.Deploy(t, acct, contractsapi.TestSimple.Bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Succeed())
+
+		target := deployTxn.Receipt().ContractAddress
+
+		input := contractsapi.TestSimple.Abi.GetMethod("getValue").ID()
+
+		acctZeroBalance, err := wallet.GenerateKey()
+		require.NoError(t, err)
+
+		resp, err := client.Call(&ethgo.CallMsg{
+			From: acctZeroBalance.Address(),
+			To:   &target,
+			Data: input,
+		}, ethgo.Latest)
+		require.NoError(t, err)
+		require.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", resp)
 	})
 
 	t.Run("eth_getBalance", func(t *testing.T) {
