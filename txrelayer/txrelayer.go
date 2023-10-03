@@ -207,38 +207,31 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 // SendTransactionLocal sends non-signed transaction
 // (this function is meant only for testing purposes and is about to be removed at some point)
 func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
-	txnHash, err := t.sendTransactionLocalLocked(txn)
+	accounts, err := t.client.Eth().Accounts()
 	if err != nil {
 		return nil, err
 	}
 
-	return t.waitForReceipt(txnHash)
-}
-
-func (t *TxRelayerImpl) sendTransactionLocalLocked(txn *ethgo.Transaction) (ethgo.Hash, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	accounts, err := t.client.Eth().Accounts()
-	if err != nil {
-		return ethgo.ZeroHash, err
-	}
-
 	if len(accounts) == 0 {
-		return ethgo.ZeroHash, errNoAccounts
+		return nil, errNoAccounts
 	}
 
 	txn.From = accounts[0]
 
 	gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
 	if err != nil {
-		return ethgo.ZeroHash, err
+		return nil, err
 	}
 
 	txn.Gas = gasLimit
 	txn.GasPrice = defaultGasPrice
 
-	return t.client.Eth().SendTransaction(txn)
+	txnHash, err := t.client.Eth().SendTransaction(txn)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.waitForReceipt(txnHash)
 }
 
 func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {

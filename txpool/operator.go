@@ -43,7 +43,7 @@ func (p *TxPool) AddTxn(ctx context.Context, raw *proto.AddTxnReq) (*proto.AddTx
 	}
 
 	return &proto.AddTxnResp{
-		TxHash: txn.GetHash().String(),
+		TxHash: txn.Hash.String(),
 	}, nil
 }
 
