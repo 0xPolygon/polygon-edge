@@ -70,7 +70,7 @@ type ethBlockchainStore interface {
 		header *types.Header,
 		txn *types.Transaction,
 		override types.StateOverride,
-		noBaseFee bool,
+		nonPayable bool,
 	) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
