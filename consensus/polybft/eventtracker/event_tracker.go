@@ -324,7 +324,7 @@ func (e *EventTracker) getNewState(latestBlock *ethgo.Block) error {
 			}
 
 			if err := e.blockContainer.AddBlock(block); err != nil {
-				return nil
+				return err
 			}
 		}
 
