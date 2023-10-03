@@ -38,9 +38,10 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		amount                = 100
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
-		epochSize        = 30
-		sprintSize       = uint64(5)
-		numberOfAttempts = 5
+		epochSize            = 30
+		sprintSize           = uint64(5)
+		numberOfAttempts     = 5
+		stateSyncedLogsCount = 1
 	)
 
 	receiversAddrs := make([]types.Address, transfersCount)
@@ -106,7 +107,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert that all deposits are executed successfully
-	checkStateSyncResultLogs(t, logs, 1)
+	checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
 
 	// check validator balance got increased by deposited amount
 	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
@@ -457,9 +458,10 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 
 func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 	const (
-		transfersCount   = 4
-		epochSize        = 5
-		numberOfAttempts = 4
+		transfersCount       = 4
+		epochSize            = 5
+		numberOfAttempts     = 4
+		stateSyncedLogsCount = 2
 	)
 
 	minter, err := ethgow.GenerateKey()
@@ -540,11 +542,11 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, uint64(50+i*epochSize), childEthEndpoint)
 		require.NoError(t, err)
 
-		if len(logs) == 2 || i == numberOfAttempts-1 {
+		if len(logs) == stateSyncedLogsCount || i == numberOfAttempts-1 {
 			// assert that all deposits are executed successfully.
 			// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
 			// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
-			checkStateSyncResultLogs(t, logs, 2)
+			checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
 
 			break
 		}
@@ -617,10 +619,11 @@ func TestE2E_Bridge_ERC721Transfer(t *testing.T) {
 
 func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 	const (
-		transfersCount   = 5
-		amount           = 100
-		epochSize        = 5
-		numberOfAttempts = 4
+		transfersCount       = 5
+		amount               = 100
+		epochSize            = 5
+		numberOfAttempts     = 4
+		stateSyncedLogsCount = 2
 	)
 
 	minter, err := ethgow.GenerateKey()
@@ -704,11 +707,11 @@ func TestE2E_Bridge_ERC1155Transfer(t *testing.T) {
 		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, uint64(50+i*epochSize), childEthEndpoint)
 		require.NoError(t, err)
 
-		if len(logs) == 2 || i == numberOfAttempts-1 {
+		if len(logs) == stateSyncedLogsCount || i == numberOfAttempts-1 {
 			// assert that all deposits are executed successfully.
 			// All deposits are sent using a single transaction, so arbitrary message bridge emits two state sync events:
 			// MAP_TOKEN_SIG and DEPOSIT_BATCH_SIG state sync events
-			checkStateSyncResultLogs(t, logs, 2)
+			checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
 
 			break
 		}
@@ -992,7 +995,7 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 			// check that balances on the child chain are correct
 			for i, receiver := range depositors {
 				balance := erc20BalanceOf(t, receiver, contracts.NativeERC20TokenContract, childchainTxRelayer)
-				t.Log("Balance before", balancesBefore[i], "Balance after", balance)
+				t.Log("Attempt", it+1, "Balance before", balancesBefore[i], "Balance after", balance)
 				if balance.Cmp(balancesBefore[i].Add(balancesBefore[i], big.NewInt(amount))) != 0 {
 					allSuccessful = false
 
@@ -1306,8 +1309,9 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 		depositAmount  = ethgo.Ether(5)
 		withdrawAmount = ethgo.Ether(1)
 		// make epoch size long enough, so that all exit events are processed within the same epoch
-		epochSize  = 30
-		sprintSize = uint64(5)
+		epochSize            = 30
+		sprintSize           = uint64(5)
+		stateSyncedLogsCount = 1
 	)
 
 	receivers := make([]string, transfersCount)
@@ -1374,7 +1378,7 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert that all deposits are executed successfully
-	checkStateSyncResultLogs(t, logs, 1)
+	checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
 
 	// check admin balance got increased by deposited amount
 	balance, err := childEthEndpoint.GetBalance(ethgo.Address(adminAddr), ethgo.Latest)
@@ -1519,12 +1523,12 @@ func TestE2E_Bridge_Transfers_AccessLists(t *testing.T) {
 
 func TestE2E_Bridge_Transfers_WithBlockTrackerPollInterval(t *testing.T) {
 	var (
-		// amount                = ethgo.Gwei(10)
 		numBlockConfirmations = uint64(2)
 		epochSize             = 30
 		sprintSize            = uint64(5)
 		rootPollInterval      = 5 * time.Second
 		relayerPollInterval   = 5 * time.Second
+		stateSyncedLogsCount  = 1
 	)
 
 	cluster := framework.NewTestCluster(t, 5,
@@ -1573,7 +1577,7 @@ func TestE2E_Bridge_Transfers_WithBlockTrackerPollInterval(t *testing.T) {
 	require.NoError(t, err)
 
 	// assert that all deposits are executed successfully
-	checkStateSyncResultLogs(t, logs, 1)
+	checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
 
 	// check validator balance got increased by deposited amount
 	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
