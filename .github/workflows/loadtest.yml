@@ -9,8 +9,7 @@ on:  # yamllint disable-line rule:truthy
         type: choice
         options:
           - ubuntu-latest
-          - devnet
-          - testnet
+          - loadtester
       environment:
         description: The environment to run against
         required: false
@@ -60,7 +59,7 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   run_k6:
     environment: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
+    runs-on: "${{ inputs.runner }}"
     outputs:
       loadtest_output_success: ${{ steps.run_k6_success.outputs.test_output }}
     steps:
