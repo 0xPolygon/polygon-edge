@@ -175,7 +175,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -311,6 +310,7 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		baseFeeInfo, _ := parseBaseFeeConfig(p.baseFeeConfig)
 		chainConfig.Genesis.BaseFee = baseFeeInfo.baseFee
 		chainConfig.Genesis.BaseFeeEM = baseFeeInfo.baseFeeEM
+		chainConfig.Params.BaseFeeChangeDenom = baseFeeInfo.baseFeeChangeDenom
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)

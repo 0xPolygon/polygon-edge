@@ -43,7 +43,6 @@ const (
 	rewardWalletFlag             = "reward-wallet"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 	proxyContractsAdminFlag      = "proxy-contracts-admin"
-	baseFeeChangeDenomFlag       = "base-fee-change-denom"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -70,6 +69,8 @@ var (
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
+	errBaseFeeEMZero            = errors.New("base fee elasticity multiplier must be greater than 0")
+	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
 )
 
 type genesisParams struct {
@@ -142,8 +143,6 @@ type genesisParams struct {
 	blockTrackerPollInterval time.Duration
 
 	proxyContractsAdmin string
-
-	baseFeeChangeDenom uint64
 }
 
 func (p *genesisParams) validateFlags() error {
@@ -161,10 +160,6 @@ func (p *genesisParams) validateFlags() error {
 
 	if err := p.parsePremineInfo(); err != nil {
 		return err
-	}
-
-	if p.baseFeeChangeDenom == 0 {
-		return errBaseFeeChangeDenomZero
 	}
 
 	if p.isPolyBFTConsensus() {
@@ -423,10 +418,9 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID:            int64(p.chainID),
-			Forks:              enabledForks,
-			Engine:             p.consensusEngineConfig,
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
+			ChainID: int64(p.chainID),
+			Forks:   enabledForks,
+			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -436,6 +430,7 @@ func (p *genesisParams) initGenesisConfig() error {
 		baseFeeInfo, _ := parseBaseFeeConfig(p.baseFeeConfig)
 		chainConfig.Genesis.BaseFee = baseFeeInfo.baseFee
 		chainConfig.Genesis.BaseFeeEM = baseFeeInfo.baseFeeEM
+		chainConfig.Params.BaseFeeChangeDenom = baseFeeInfo.baseFeeChangeDenom
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
@@ -584,11 +579,15 @@ func (p *genesisParams) validateGenesisBaseFeeConfig() error {
 	}
 
 	if baseFeeInfo.baseFee == 0 {
-		return fmt.Errorf("BaseFee should be greater than 0, provided value %s", p.baseFeeConfig)
+		return errBaseFeeZero
 	}
 
 	if baseFeeInfo.baseFeeEM == 0 {
-		return fmt.Errorf("BaseFeeEM should be graeter than 0, provided value %s", p.baseFeeConfig)
+		return errBaseFeeEMZero
+	}
+
+	if baseFeeInfo.baseFeeChangeDenom == 0 {
+		return errBaseFeeChangeDenomZero
 	}
 
 	return nil

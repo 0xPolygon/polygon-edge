@@ -165,16 +165,17 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 }
 
 type baseFeeInfo struct {
-	baseFee   uint64
-	baseFeeEM uint64
+	baseFee            uint64
+	baseFeeEM          uint64
+	baseFeeChangeDenom uint64
 }
 
 // parseBaseFeeConfig parses provided base fee configuration and returns baseFeeInfo
 func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
-	baseFeeInfo := &baseFeeInfo{command.DefaultGenesisBaseFee, command.DefaultGenesisBaseFeeEM}
+	baseFeeInfo := &baseFeeInfo{command.DefaultGenesisBaseFee, command.DefaultGenesisBaseFeeEM, command.DefaultGenesisBaseFeeChangeDenom}
 
 	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
-	if len(baseFeeConfig) > 2 {
+	if len(baseFeeConfig) > 3 {
 		return baseFeeInfo, errors.New("invalid number of arguments for base fee configuration")
 	}
 
@@ -194,6 +195,15 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 		}
 
 		baseFeeInfo.baseFeeEM = baseFeeEM
+	}
+
+	if len(baseFeeConfig) == 3 && baseFeeConfig[2] != "" {
+		baseFeeChangeDenom, err := strconv.ParseUint(baseFeeConfig[2], 10, 64)
+		if err != nil {
+			return baseFeeInfo, err
+		}
+
+		baseFeeInfo.baseFeeChangeDenom = baseFeeChangeDenom
 	}
 
 	return baseFeeInfo, nil
