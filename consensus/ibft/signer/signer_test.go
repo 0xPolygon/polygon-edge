@@ -737,6 +737,8 @@ func TestVerifyCommittedSeal(t *testing.T) {
 }
 
 func TestSignerWriteCommittedSeals(t *testing.T) {
+	t.Parallel()
+
 	var round0 uint64 = 0
 
 	tests := []struct {
@@ -847,6 +849,8 @@ func TestSignerWriteCommittedSeals(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			signer := newTestSingleKeyManagerSigner(test.keyManager)
 
 			header, err := signer.WriteCommittedSeals(test.header, test.roundNumber, test.sealMap)

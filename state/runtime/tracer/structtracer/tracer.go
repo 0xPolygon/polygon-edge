@@ -80,9 +80,6 @@ func (t *StructTracer) cancelled() bool {
 }
 
 func (t *StructTracer) Clear() {
-	t.cancelLock.Lock()
-	defer t.cancelLock.Unlock()
-
 	t.reason = nil
 	t.interrupt = false
 	t.logs = t.logs[:0]
@@ -331,9 +328,6 @@ type StructTraceResult struct {
 }
 
 func (t *StructTracer) GetResult() (interface{}, error) {
-	t.cancelLock.RLock()
-	defer t.cancelLock.RUnlock()
-
 	if t.reason != nil {
 		return nil, t.reason
 	}

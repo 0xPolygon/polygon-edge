@@ -195,8 +195,6 @@ func runCommand(cmd *cobra.Command, _ []string) {
 					return fmt.Errorf("failed to create tx input: %w", err)
 				}
 
-				var receipt *ethgo.Receipt
-
 				receipt, err = txRelayer.SendTransaction(depositTxn, depositorKey)
 				if err != nil {
 					return fmt.Errorf("receiver: %s, amount: %s, error: %w", receiver, amount, err)
