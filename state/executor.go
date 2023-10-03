@@ -444,10 +444,6 @@ func (t *Transition) ContextPtr() *runtime.TxContext {
 }
 
 func (t *Transition) subGasLimitPrice(msg *types.Transaction) error {
-	if t.ctx.NoBaseFee {
-		return nil
-	}
-
 	upfrontGasCost := GetLondonFixHandler(uint64(t.ctx.Number)).getUpfrontGasCost(msg, t.ctx.BaseFee)
 
 	if err := t.state.SubBalance(msg.From, upfrontGasCost); err != nil {
@@ -1126,8 +1122,12 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 	}
 
 	// 3. caller has enough balance to cover transaction
-	if err := t.subGasLimitPrice(msg); err != nil {
-		return NewTransitionApplicationError(err, true)
+	// Skip this check if the given flag is provided.
+	// It happens for eth_call and for other operations that do not change the state.
+	if t.ctx.NoBaseFee {
+		if err := t.subGasLimitPrice(msg); err != nil {
+			return NewTransitionApplicationError(err, true)
+		}
 	}
 
 	return nil
