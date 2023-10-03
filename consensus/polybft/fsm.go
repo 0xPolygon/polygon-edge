@@ -426,24 +426,26 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			continue
 		}
 
+		txHash := tx.GetHash()
+
 		decodedStateTx, err := decodeStateTransaction(tx.Input)
 		if err != nil {
-			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
+			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", txHash, err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if !f.isEndOfSprint {
-				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", tx.Hash)
+				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", txHash)
 			}
 
 			if commitmentTxExists {
-				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", tx.Hash)
+				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", txHash)
 			}
 
 			commitmentTxExists = true
 
-			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash, stateTxData, f.validators); err != nil {
+			if err = verifyBridgeCommitmentTx(f.Height(), txHash, stateTxData, f.validators); err != nil {
 				return err
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
