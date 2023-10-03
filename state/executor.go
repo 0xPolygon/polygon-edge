@@ -1044,8 +1044,7 @@ func (t *Transition) SetCodeDirectly(addr types.Address, code []byte) error {
 	return nil
 }
 
-// SetNonPayable sets activates an indicator that deactivates a check of
-// tx cost against tx executor balance.
+// SetNonPayable deactivates the check of tx cost against tx executor balance.
 func (t *Transition) SetNonPayable(nonPayable bool) {
 	t.ctx.NonPayable = nonPayable
 }
