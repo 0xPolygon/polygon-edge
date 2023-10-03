@@ -21,6 +21,8 @@ func JSONMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
 }
 
 func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name  string
 		extra *IstanbulExtra
@@ -97,6 +99,8 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			// create original data
 			originalExtraJSON := JSONMarshalHelper(t, test.extra)
 
@@ -115,6 +119,8 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 }
 
 func Test_packProposerSealIntoExtra(t *testing.T) {
+	t.Parallel()
+
 	newProposerSeal := []byte("new proposer seal")
 
 	tests := []struct {
@@ -191,6 +197,8 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			originalProposerSeal := test.extra.ProposerSeal
 
 			// create expected data
@@ -225,6 +233,8 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 }
 
 func Test_packCommittedSealsAndRoundNumberIntoExtra(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name              string
 		extra             *IstanbulExtra
@@ -321,6 +331,8 @@ func Test_packCommittedSealsAndRoundNumberIntoExtra(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			originalCommittedSeals := test.extra.CommittedSeals
 
 			// create expected data
@@ -358,6 +370,8 @@ func Test_packCommittedSealsAndRoundNumberIntoExtra(t *testing.T) {
 }
 
 func Test_unmarshalRLPForParentCS(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		extra       *IstanbulExtra
@@ -409,6 +423,8 @@ func Test_unmarshalRLPForParentCS(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			bytesData := test.extra.MarshalRLPTo(nil)
 
 			assert.NoError(t, test.targetExtra.unmarshalRLPForParentCS(bytesData))
@@ -424,6 +440,8 @@ func Test_unmarshalRLPForParentCS(t *testing.T) {
 }
 
 func Test_putIbftExtra(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		header *types.Header
@@ -475,6 +493,8 @@ func Test_putIbftExtra(t *testing.T) {
 		test := test
 
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
 			putIbftExtra(test.header, test.extra)
 
 			expectedExtraHeader := make([]byte, IstanbulExtraVanity)

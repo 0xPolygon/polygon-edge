@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getAllTestPeers() []*NoForkPeer {
-	return []*NoForkPeer{
+var (
+	peers = []*NoForkPeer{
 		{
 			ID:       peer.ID("A"),
 			Number:   10,
@@ -27,7 +27,7 @@ func getAllTestPeers() []*NoForkPeer {
 			Distance: big.NewInt(1),
 		},
 	}
-}
+)
 
 func cloneNoForkPeers(peers []*NoForkPeer) []*NoForkPeer {
 	clone := make([]*NoForkPeer, len(peers))
@@ -75,11 +75,14 @@ func peerMapToPeers(peerMap *PeerMap) []*NoForkPeer {
 func TestConstructor(t *testing.T) {
 	t.Parallel()
 
-	peers := getAllTestPeers()
+	peers := peers
+
 	peerMap := NewPeerMap(peers)
+
 	expected := sortNoForkPeers(
 		cloneNoForkPeers(peers),
 	)
+
 	actual := peerMapToPeers(peerMap)
 
 	assert.Equal(
@@ -92,9 +95,8 @@ func TestConstructor(t *testing.T) {
 func TestPutPeer(t *testing.T) {
 	t.Parallel()
 
-	allPeers := getAllTestPeers()
-	initialPeers := allPeers[:1]
-	peers := allPeers[1:]
+	initialPeers := peers[:1]
+	peers := peers[1:]
 
 	peerMap := NewPeerMap(initialPeers)
 
@@ -116,8 +118,6 @@ func TestPutPeer(t *testing.T) {
 func TestBestPeer(t *testing.T) {
 	t.Parallel()
 
-	allPeers := getAllTestPeers()
-
 	tests := []struct {
 		name     string
 		skipList map[peer.ID]bool
@@ -127,8 +127,8 @@ func TestBestPeer(t *testing.T) {
 		{
 			name:     "should return best peer",
 			skipList: nil,
-			peers:    allPeers,
-			result:   allPeers[2],
+			peers:    peers,
+			result:   peers[2],
 		},
 		{
 			name:     "should return null in case of empty map",
@@ -141,8 +141,8 @@ func TestBestPeer(t *testing.T) {
 			skipList: map[peer.ID]bool{
 				peer.ID("C"): true,
 			},
-			peers:  allPeers,
-			result: allPeers[1],
+			peers:  peers,
+			result: peers[1],
 		},
 	}
 

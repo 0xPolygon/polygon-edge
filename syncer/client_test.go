@@ -45,7 +45,6 @@ func newTestSyncPeerClient(network Network, blockchain Blockchain) *syncPeerClie
 		id:                     network.AddrInfo().ID.String(),
 		peerStatusUpdateCh:     make(chan *NoForkPeer, 1),
 		peerConnectionUpdateCh: make(chan *event.PeerEvent, 1),
-		closeCh:                make(chan struct{}),
 	}
 
 	// need to register protocol
@@ -212,7 +211,7 @@ func TestStatusPubSub(t *testing.T) {
 	assert.NoError(t, err)
 
 	// close channel and wait for events
-	close(client.closeCh)
+	close(client.peerConnectionUpdateCh)
 
 	wg.Wait()
 
