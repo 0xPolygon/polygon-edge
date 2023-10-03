@@ -19,7 +19,7 @@ Running `polygon-edge` from local binary can be done very easily by using provid
 
 Use `scripts/cluster` script to customize chain parameters.
 It already has some default parameters, which can be easily modified.
-These are the `genesis` parameters from the official [docs](https://wiki.polygon.technology/docs/supernets/operate/supernets-param-reference).
+These are the `genesis` parameters from the official [docs](https://wiki.polygon.technology/docs/edge/operate/param-reference/).
 
 Primarily, the `--premine` parameter needs to be edited (`createGenesis` function) to include the accounts that the user has access to.
 
@@ -34,4 +34,4 @@ To interact with the chain use another terminal or run a dockerized environment 
 ### Production
 
 This is **NOT** a production ready deployment. It is to be used in *development* / *test* environments only.
-For production usage, please check out the official [docs](https://wiki.polygon.technology/docs/supernets).
+For production usage, please check out the official [docs](https://wiki.polygon.technology/docs/edge/).
