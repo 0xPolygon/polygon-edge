@@ -54,7 +54,7 @@ func (m *mockHost) SetStorage(
 	panic("Not implemented in tests") //nolint:gocritic
 }
 
-func (m *mockHost) SetNoBaseFee(noBaseFee bool) {
+func (m *mockHost) SetNonPayable(bool) {
 	panic("Not implemented in tests") //nolint:gocritic
 }
 

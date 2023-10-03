@@ -102,8 +102,8 @@ func (d dummyHost) SetStorage(addr types.Address, key types.Hash, value types.Ha
 	return runtime.StorageAdded
 }
 
-func (d dummyHost) SetNoBaseFee(noBaseFee bool) {
-	d.t.Fatalf("SetNoBaseFee is not implemented")
+func (d dummyHost) SetNonPayable(nonPayable bool) {
+	d.t.Fatalf("SetNonPayable is not implemented")
 }
 
 func (d dummyHost) GetBalance(addr types.Address) *big.Int {

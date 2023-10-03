@@ -61,7 +61,7 @@ func (m *mockHostF) SetState(addr types.Address, key types.Hash, value types.Has
 	return
 }
 
-func (m *mockHostF) SetNoBaseFee(noBaseFee bool) {
+func (m *mockHostF) SetNonPayable(nonPayable bool) {
 	return
 }
 
