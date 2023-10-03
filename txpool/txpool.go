@@ -557,7 +557,8 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 	if tx.Type == types.StateTx {
 		metrics.IncrCounter([]string{txPoolMetrics, "invalid_tx_type"}, 1)
 
-		return ErrInvalidTxType
+		return fmt.Errorf("%w: type %d rejected, state transactions are not expected to be added to the pool",
+			ErrInvalidTxType, tx.Type)
 	}
 
 	// Check the transaction size to overcome DOS Attacks
@@ -622,7 +623,7 @@ func (p *TxPool) validateTx(tx *types.Transaction) error {
 		if !forks.London {
 			metrics.IncrCounter([]string{txPoolMetrics, "tx_type"}, 1)
 
-			return ErrTxTypeNotSupported
+			return fmt.Errorf("%w: type %d rejected, london hardfork is not enabled", ErrTxTypeNotSupported, tx.Type)
 		}
 
 		// DynamicFeeTx should be rejected if TxHashWithType fork is registered but not enabled for current block
