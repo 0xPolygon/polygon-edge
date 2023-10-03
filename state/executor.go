@@ -1124,7 +1124,7 @@ func checkAndProcessTx(msg *types.Transaction, t *Transition) error {
 	// 3. caller has enough balance to cover transaction
 	// Skip this check if the given flag is provided.
 	// It happens for eth_call and for other operations that do not change the state.
-	if t.ctx.NoBaseFee {
+	if !t.ctx.NoBaseFee {
 		if err := t.subGasLimitPrice(msg); err != nil {
 			return NewTransitionApplicationError(err, true)
 		}
