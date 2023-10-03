@@ -172,7 +172,11 @@ type baseFeeInfo struct {
 
 // parseBaseFeeConfig parses provided base fee configuration and returns baseFeeInfo
 func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
-	baseFeeInfo := &baseFeeInfo{command.DefaultGenesisBaseFee, command.DefaultGenesisBaseFeeEM, command.DefaultGenesisBaseFeeChangeDenom}
+	baseFeeInfo := &baseFeeInfo{
+		command.DefaultGenesisBaseFee,
+		command.DefaultGenesisBaseFeeEM,
+		command.DefaultGenesisBaseFeeChangeDenom,
+	}
 
 	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
 	if len(baseFeeConfig) > 3 {

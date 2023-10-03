@@ -24,7 +24,12 @@ var (
 	DefaultStake                = ethgo.Ether(1e6)
 	DefaultPremineBalance       = ethgo.Ether(1e6)
 	DefaultGenesisBaseFee       = chain.GenesisBaseFee
-	DefaultGenesisBaseFeeConfig = fmt.Sprintf("%d:%d:%d", DefaultGenesisBaseFee, DefaultGenesisBaseFeeEM, DefaultGenesisBaseFeeChangeDenom)
+	DefaultGenesisBaseFeeConfig = fmt.Sprintf(
+		"%d:%d:%d",
+		DefaultGenesisBaseFee,
+		DefaultGenesisBaseFeeEM,
+		DefaultGenesisBaseFeeChangeDenom,
+	)
 )
 
 const (
