@@ -187,9 +187,18 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	}
 
 	if t.writer != nil {
-		_, _ = t.writer.Write([]byte(
-			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\n",
-				txn.From, txn.Gas, txn.GasPrice)))
+		var msg string
+
+		if txn.Type == ethgo.TransactionDynamicFee {
+			msg = fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s\nGas = %d\n"+
+				"Max Fee Per Gas = %d\nMax Priority Fee Per Gas = %d\n",
+				txn.From, txn.Gas, txn.MaxFeePerGas, txn.MaxPriorityFeePerGas)
+		} else {
+			msg = fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s\nGas = %d\nGas Price = %d\n",
+				txn.From, txn.Gas, txn.GasPrice)
+		}
+
+		_, _ = t.writer.Write([]byte(msg))
 	}
 
 	return t.client.Eth().SendRawTransaction(data)
@@ -198,31 +207,38 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 // SendTransactionLocal sends non-signed transaction
 // (this function is meant only for testing purposes and is about to be removed at some point)
 func (t *TxRelayerImpl) SendTransactionLocal(txn *ethgo.Transaction) (*ethgo.Receipt, error) {
-	accounts, err := t.client.Eth().Accounts()
+	txnHash, err := t.sendTransactionLocalLocked(txn)
 	if err != nil {
 		return nil, err
 	}
 
+	return t.waitForReceipt(txnHash)
+}
+
+func (t *TxRelayerImpl) sendTransactionLocalLocked(txn *ethgo.Transaction) (ethgo.Hash, error) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	accounts, err := t.client.Eth().Accounts()
+	if err != nil {
+		return ethgo.ZeroHash, err
+	}
+
 	if len(accounts) == 0 {
-		return nil, errNoAccounts
+		return ethgo.ZeroHash, errNoAccounts
 	}
 
 	txn.From = accounts[0]
 
 	gasLimit, err := t.client.Eth().EstimateGas(ConvertTxnToCallMsg(txn))
 	if err != nil {
-		return nil, err
+		return ethgo.ZeroHash, err
 	}
 
 	txn.Gas = gasLimit
 	txn.GasPrice = defaultGasPrice
 
-	txnHash, err := t.client.Eth().SendTransaction(txn)
-	if err != nil {
-		return nil, err
-	}
-
-	return t.waitForReceipt(txnHash)
+	return t.client.Eth().SendTransaction(txn)
 }
 
 func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) {

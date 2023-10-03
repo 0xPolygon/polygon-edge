@@ -7,37 +7,20 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-func ApplyGenesisAllocs(
-	chain *chain.Genesis,
-	addressListAddr types.Address,
-	config *chain.AddressListConfig,
-	owner *types.Address) {
-	if owner == nil && config == nil {
-		return
-	}
-
+func ApplyGenesisAllocs(chain *chain.Genesis, addressListAddr types.Address, config *chain.AddressListConfig) {
 	allocList := &AddressList{
 		addr:  addressListAddr,
 		state: &genesisState{chain},
 	}
 
-	// if owner is nil nothing will be written to the storage
-	allocList.SetOwner(owner)
+	// enabled addr
+	for _, addr := range config.EnabledAddresses {
+		allocList.SetRole(addr, EnabledRole)
+	}
 
-	if config == nil {
-		allocList.SetEnabled(false)
-	} else {
-		allocList.SetEnabled(true)
-
-		// enabled addr
-		for _, addr := range config.EnabledAddresses {
-			allocList.SetRole(addr, EnabledRole)
-		}
-
-		// admin addr
-		for _, addr := range config.AdminAddresses {
-			allocList.SetRole(addr, AdminRole)
-		}
+	// admin addr
+	for _, addr := range config.AdminAddresses {
+		allocList.SetRole(addr, AdminRole)
 	}
 }
 

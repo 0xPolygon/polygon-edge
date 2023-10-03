@@ -168,7 +168,7 @@ func (d *Debug) TraceTransaction(
 
 			defer cancel()
 
-			return d.store.TraceTxn(block, tx.Hash, tracer)
+			return d.store.TraceTxn(block, tx.GetHash(), tracer)
 		},
 	)
 }

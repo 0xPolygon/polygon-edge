@@ -3,6 +3,7 @@ package types
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -65,6 +66,8 @@ type Transaction struct {
 
 	ChainID *big.Int
 
+	lock sync.RWMutex
+
 	// Cache
 	size atomic.Pointer[uint64]
 }
@@ -83,7 +86,16 @@ func (t *Transaction) ComputeHash(blockNumber uint64) *Transaction {
 
 func (t *Transaction) Copy() *Transaction {
 	tt := new(Transaction)
-	*tt = *t
+	tt.Nonce = t.Nonce
+	tt.From = t.From
+	tt.Gas = t.Gas
+	tt.Type = t.Type
+	tt.Hash = t.Hash
+
+	if t.To != nil {
+		newAddress := *t.To
+		tt.To = &newAddress
+	}
 
 	tt.GasPrice = new(big.Int)
 	if t.GasPrice != nil {
@@ -117,10 +129,30 @@ func (t *Transaction) Copy() *Transaction {
 		tt.S = new(big.Int).Set(t.S)
 	}
 
+	if t.ChainID != nil {
+		tt.ChainID = new(big.Int).Set(t.ChainID)
+	}
+
 	tt.Input = make([]byte, len(t.Input))
 	copy(tt.Input[:], t.Input[:])
 
 	return tt
+}
+
+// GetHash reads transaction hash in a thread-safe manner
+func (t *Transaction) GetHash() Hash {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return t.Hash
+}
+
+// SetHash sets transaction hash in a thread-safe manner
+func (t *Transaction) SetHash(hash Hash) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.Hash = hash
 }
 
 // Cost returns gas * gasPrice + value

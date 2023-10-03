@@ -23,6 +23,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+var ErrBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
+
 type ClientCloseResult struct {
 	Message string `json:"message"`
 }
@@ -207,7 +209,7 @@ func ParseGRPCAddress(grpcAddress string) (*net.TCPAddr, error) {
 func RegisterJSONRPCFlag(cmd *cobra.Command) {
 	cmd.PersistentFlags().String(
 		command.JSONRPCFlag,
-		fmt.Sprintf("%s:%d", AllInterfacesBinding, server.DefaultJSONRPCPort),
+		fmt.Sprintf("http://%s:%d", AllInterfacesBinding, server.DefaultJSONRPCPort),
 		"the JSON-RPC interface",
 	)
 }

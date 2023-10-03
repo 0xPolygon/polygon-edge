@@ -21,7 +21,6 @@ type Params struct {
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
 
 	// Access control configuration
-	AccessListsOwner          *types.Address     `json:"accessListsOwner,omitempty"`
 	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
 	ContractDeployerBlockList *AddressListConfig `json:"contractDeployerBlockList,omitempty"`
 	TransactionsAllowList     *AddressListConfig `json:"transactionsAllowList,omitempty"`
@@ -33,6 +32,9 @@ type Params struct {
 	BurnContract map[uint64]types.Address `json:"burnContract"`
 	// Destination address to initialize default burn contract with
 	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
+
+	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
+	BaseFeeChangeDenom uint64 `json:"baseFeeChangeDenom,omitempty"`
 }
 
 type AddressListConfig struct {
@@ -91,8 +93,6 @@ const (
 	QuorumCalcAlignment = "quorumcalcalignment"
 	TxHashWithType      = "txHashWithType"
 	LondonFix           = "londonfix"
-	Governance          = "governance"
-	DoubleSignSlashing  = "doubleSignSlashing"
 )
 
 // Forks is map which contains all forks and their starting blocks from genesis
@@ -129,9 +129,17 @@ func (f *Forks) At(block uint64) ForksInTime {
 		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
 		TxHashWithType:      f.IsActive(TxHashWithType, block),
 		LondonFix:           f.IsActive(LondonFix, block),
-		Governance:          f.IsActive(Governance, block),
-		DoubleSignSlashing:  f.IsActive(DoubleSignSlashing, block),
 	}
+}
+
+// Copy creates a deep copy of Forks map
+func (f Forks) Copy() *Forks {
+	copiedForks := make(Forks, len(f))
+	for key, value := range f {
+		copiedForks[key] = value.Copy()
+	}
+
+	return &copiedForks
 }
 
 type Fork struct {
@@ -147,6 +155,19 @@ func (f Fork) Active(block uint64) bool {
 	return block >= f.Block
 }
 
+// Copy creates a deep copy of Fork
+func (f Fork) Copy() Fork {
+	var fp *forkmanager.ForkParams
+	if f.Params != nil {
+		fp = f.Params.Copy()
+	}
+
+	return Fork{
+		Block:  f.Block,
+		Params: fp,
+	}
+}
+
 // ForksInTime should contain all supported forks by current edge version
 type ForksInTime struct {
 	Homestead,
@@ -160,9 +181,7 @@ type ForksInTime struct {
 	EIP155,
 	QuorumCalcAlignment,
 	TxHashWithType,
-	LondonFix,
-	Governance,
-	DoubleSignSlashing bool
+	LondonFix bool
 }
 
 // AllForksEnabled should contain all supported forks by current edge version
@@ -179,6 +198,4 @@ var AllForksEnabled = &Forks{
 	QuorumCalcAlignment: NewFork(0),
 	TxHashWithType:      NewFork(0),
 	LondonFix:           NewFork(0),
-	Governance:          NewFork(0),
-	DoubleSignSlashing:  NewFork(0),
 }

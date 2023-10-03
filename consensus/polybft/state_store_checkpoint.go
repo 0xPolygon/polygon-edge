@@ -7,26 +7,22 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	bolt "go.etcd.io/bbolt"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
+	// bucket to store exit contract events
 	exitEventsBucket                  = []byte("exitEvent")
-	slashingExitEventsBucket          = []byte("slashingExitEvent")
 	exitEventToEpochLookupBucket      = []byte("exitIdToEpochLookup")
 	exitEventLastProcessedBlockBucket = []byte("lastProcessedBlock")
 
 	lastProcessedBlockKey = []byte("lastProcessedBlock")
 	errNoLastSavedEntry   = errors.New("there is no last saved block in last saved bucket")
-
-	slashSignature = crypto.Keccak256([]byte("SLASH"))
 )
 
 type exitEventNotFoundError struct {
@@ -38,7 +34,7 @@ func (e *exitEventNotFoundError) Error() string {
 	return fmt.Sprintf("could not find any exit event that has an id: %v and epoch: %v", e.exitID, e.epoch)
 }
 
-// ExitEvent is an event emitted by L2StateSender contract
+// ExitEvent is an event emitted by Exit contract
 type ExitEvent struct {
 	*contractsapi.L2StateSyncedEvent
 	// EpochNumber is the epoch number in which exit event was added
@@ -51,24 +47,18 @@ type ExitEvent struct {
 Bolt DB schema:
 
 exit events/
-|--> (epoch+exit event id+blockNumber) -> *ExitEvent (json marshalled)
-|--> (exit event id) -> nil (slashing exit events)
+|--> (id+epoch+blockNumber) -> *ExitEvent (json marshalled)
 |--> (exitEventID) -> epochNumber
 |--> (lastProcessedBlockKey) -> block number
 */
-type ExitEventStore struct {
-	db     *bolt.DB
-	logger hclog.Logger
+type CheckpointStore struct {
+	db *bolt.DB
 }
 
 // initialize creates necessary buckets in DB if they don't already exist
-func (s *ExitEventStore) initialize(tx *bolt.Tx) error {
+func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 	if _, err := tx.CreateBucketIfNotExists(exitEventsBucket); err != nil {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventsBucket), err)
-	}
-
-	if _, err := tx.CreateBucketIfNotExists(slashingExitEventsBucket); err != nil {
-		return fmt.Errorf("failed to create bucket=%s: %w", string(slashingExitEventsBucket), err)
 	}
 
 	if _, err := tx.CreateBucketIfNotExists(exitEventToEpochLookupBucket); err != nil {
@@ -79,15 +69,11 @@ func (s *ExitEventStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventLastProcessedBlockBucket), err)
 	}
 
-	if val := tx.Bucket(exitEventLastProcessedBlockBucket).Get(lastProcessedBlockKey); val == nil {
-		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
-	}
-
-	return nil
+	return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db
-func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
+func (s *CheckpointStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	if len(exitEvents) == 0 {
 		// small optimization
 		return nil
@@ -96,28 +82,8 @@ func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		exitEventBucket := tx.Bucket(exitEventsBucket)
 		lookupBucket := tx.Bucket(exitEventToEpochLookupBucket)
-
-		var slashExitEventBucket *bolt.Bucket
-		for _, exitEvent := range exitEvents {
-			exitIDRaw := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
-
-			if len(exitEvent.Data) >= types.HashLength {
-				signature := exitEvent.Data[:types.HashLength]
-				if bytes.Equal(signature, slashSignature) {
-					// access to the slash exit events bucket lazily
-					if slashExitEventBucket == nil {
-						slashExitEventBucket = tx.Bucket(slashingExitEventsBucket)
-					}
-
-					if err := slashExitEventBucket.Put(exitIDRaw, nil); err != nil {
-						return err
-					}
-				}
-			} else {
-				s.logger.Info(fmt.Sprintf("invalid exit event (ID=%d), it does not contain signature encoded", exitEvent.ID))
-			}
-
-			if err := insertExitEvent(exitEventBucket, lookupBucket, exitIDRaw, exitEvent); err != nil {
+		for i := 0; i < len(exitEvents); i++ {
+			if err := insertExitEventToBucket(exitEventBucket, lookupBucket, exitEvents[i]); err != nil {
 				return err
 			}
 		}
@@ -126,25 +92,27 @@ func (s *ExitEventStore) insertExitEvents(exitEvents []*ExitEvent) error {
 	})
 }
 
-// insertExitEvent inserts exit event to exit event bucket
-func insertExitEvent(exitEventBucket, lookupBucket *bolt.Bucket, exitIDRaw []byte, exitEvent *ExitEvent) error {
+// insertExitEventToBucket inserts exit event to exit event bucket
+func insertExitEventToBucket(exitEventBucket, lookupBucket *bolt.Bucket, exitEvent *ExitEvent) error {
 	raw, err := json.Marshal(exitEvent)
 	if err != nil {
 		return err
 	}
 
-	epochRaw := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
-	blockNumRaw := common.EncodeUint64ToBytes(exitEvent.BlockNumber)
+	epochBytes := common.EncodeUint64ToBytes(exitEvent.EpochNumber)
+	exitIDBytes := common.EncodeUint64ToBytes(exitEvent.ID.Uint64())
 
-	if err = exitEventBucket.Put(bytes.Join([][]byte{epochRaw, exitIDRaw, blockNumRaw}, nil), raw); err != nil {
+	err = exitEventBucket.Put(bytes.Join([][]byte{epochBytes,
+		exitIDBytes, common.EncodeUint64ToBytes(exitEvent.BlockNumber)}, nil), raw)
+	if err != nil {
 		return err
 	}
 
-	return lookupBucket.Put(exitIDRaw, epochRaw)
+	return lookupBucket.Put(exitIDBytes, epochBytes)
 }
 
 // getExitEvent returns exit event with given id, which happened in given epoch and given block number
-func (s *ExitEventStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
+func (s *CheckpointStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
 	var exitEvent *ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -176,7 +144,7 @@ func (s *ExitEventStore) getExitEvent(exitEventID uint64) (*ExitEvent, error) {
 }
 
 // getExitEventsByEpoch returns all exit events that happened in the given epoch
-func (s *ExitEventStore) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
+func (s *CheckpointStore) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error) {
 	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 		return exitEvent.EpochNumber == epoch
 	})
@@ -184,14 +152,14 @@ func (s *ExitEventStore) getExitEventsByEpoch(epoch uint64) ([]*ExitEvent, error
 
 // getExitEventsForProof returns all exit events that happened in and prior to the given checkpoint block number
 // with respect to the epoch in which block is added
-func (s *ExitEventStore) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
+func (s *CheckpointStore) getExitEventsForProof(epoch, checkpointBlock uint64) ([]*ExitEvent, error) {
 	return s.getExitEvents(epoch, func(exitEvent *ExitEvent) bool {
 		return exitEvent.EpochNumber == epoch && exitEvent.BlockNumber <= checkpointBlock
 	})
 }
 
 // getExitEvents returns exit events for given epoch and provided filter
-func (s *ExitEventStore) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
+func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *ExitEvent) bool) ([]*ExitEvent, error) {
 	var events []*ExitEvent
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -220,50 +188,8 @@ func (s *ExitEventStore) getExitEvents(epoch uint64, filter func(exitEvent *Exit
 	return events, err
 }
 
-// getPendingSlashExitIDs returns pending slash exit event ids
-func (s *ExitEventStore) getPendingSlashExitIDs() ([]uint64, error) {
-	var exitIds []uint64
-
-	if err := s.db.View(func(tx *bolt.Tx) error {
-		slashingEventsBucket := tx.Bucket(slashingExitEventsBucket)
-
-		return slashingEventsBucket.ForEach(func(k, _ []byte) error {
-			exitIds = append(exitIds, common.EncodeBytesToUint64(k))
-
-			return nil
-		})
-	}); err != nil {
-		return nil, err
-	}
-
-	sort.Slice(exitIds, func(i, j int) bool {
-		return exitIds[i] < exitIds[j]
-	})
-
-	return exitIds, nil
-}
-
-// removeSlashExitEvents removes exit events from slashing bucket for provided exit ids
-func (s *ExitEventStore) removeSlashExitEvents(exitIDs ...uint64) error {
-	err := s.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(slashingExitEventsBucket)
-
-		for _, exitID := range exitIDs {
-			if err := b.Delete(common.EncodeUint64ToBytes(exitID)); err != nil {
-				s.logger.Warn(fmt.Sprintf("failed to remove slash exit event (ID=%d): %v", exitID, err))
-
-				continue
-			}
-		}
-
-		return nil
-	})
-
-	return err
-}
-
 // updateLastSaved saves the last block processed for exit events
-func (s *ExitEventStore) updateLastSaved(blockNumber uint64) error {
+func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
 	return s.db.Update(func(tx *bolt.Tx) error {
 		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey,
 			common.EncodeUint64ToBytes(blockNumber))
@@ -271,7 +197,7 @@ func (s *ExitEventStore) updateLastSaved(blockNumber uint64) error {
 }
 
 // updateLastSaved saves the last block processed for exit events
-func (s *ExitEventStore) getLastSaved() (uint64, error) {
+func (s *CheckpointStore) getLastSaved() (uint64, error) {
 	var lastSavedBlock uint64
 
 	err := s.db.View(func(tx *bolt.Tx) error {
@@ -306,4 +232,21 @@ func decodeExitEvent(log *ethgo.Log, epoch, block uint64) (*ExitEvent, error) {
 		EpochNumber:        epoch,
 		BlockNumber:        block,
 	}, nil
+}
+
+// convertLog converts types.Log to ethgo.Log
+func convertLog(log *types.Log) *ethgo.Log {
+	l := &ethgo.Log{
+		Address: ethgo.Address(log.Address),
+		Data:    make([]byte, len(log.Data)),
+		Topics:  make([]ethgo.Hash, len(log.Topics)),
+	}
+
+	copy(l.Data, log.Data)
+
+	for i, topic := range log.Topics {
+		l.Topics[i] = ethgo.Hash(topic)
+	}
+
+	return l
 }

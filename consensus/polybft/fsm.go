@@ -9,20 +9,16 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
-	"github.com/armon/go-metrics"
-	hcf "github.com/hashicorp/go-hclog"
-
-	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/slashing"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/armon/go-metrics"
+	hcf "github.com/hashicorp/go-hclog"
 )
 
 type blockBuilder interface {
@@ -40,27 +36,21 @@ var (
 	errCommitEpochTxSingleExpected = errors.New("only one commit epoch transaction is allowed " +
 		"in an epoch ending block")
 	errDistributeRewardsTxDoesNotExist = errors.New("distribute rewards transaction is " +
-		"not found in the given block, though it is expected to be present")
-	errDistributeRewardsTxNotExpected = errors.New("distribute rewards transaction " +
-		"is not expected at this block")
+		"not found in the epoch ending block")
+	errDistributeRewardsTxNotExpected = errors.New("didn't expect distribute rewards transaction " +
+		"in a non epoch ending block")
 	errDistributeRewardsTxSingleExpected = errors.New("only one distribute rewards transaction is " +
-		"allowed in the given block")
+		"allowed in an epoch ending block")
 	errProposalDontMatch = errors.New("failed to insert proposal, because the validated proposal " +
 		"is either nil or it does not match the received one")
 	errValidatorSetDeltaMismatch           = errors.New("validator set delta mismatch")
 	errValidatorsUpdateInNonEpochEnding    = errors.New("trying to update validator set in a non epoch ending block")
 	errValidatorDeltaNilInEpochEndingBlock = errors.New("validator set delta is nil in epoch ending block")
-	errSlashingTxSingleExpected            = errors.New("only one slashing transaction is allowed in block")
-	errSlashingTxNotExpected               = errors.New("didn't expect slashing transaction in block")
-	errSlashingTxDoesNotExist              = errors.New("slashing transaction is not found in the block")
 )
 
 type fsm struct {
 	// PolyBFT consensus protocol configuration
-	config *common.PolyBFTConfig
-
-	// forks holds forks configuration
-	forks *chain.Forks
+	config *PolyBFTConfig
 
 	// parent block header
 	parent *types.Header
@@ -98,9 +88,6 @@ type fsm struct {
 	// isEndOfSprint indicates if sprint reached its end
 	isEndOfSprint bool
 
-	// isFirstBlockOfEpoch indicates if this is the start of new epoch
-	isFirstBlockOfEpoch bool
-
 	// proposerCommitmentToRegister is a commitment that is registered via state transaction by proposer
 	proposerCommitmentToRegister *CommitmentMessageSigned
 
@@ -115,9 +102,6 @@ type fsm struct {
 
 	// newValidatorsDelta carries the updates of validator set on epoch ending block
 	newValidatorsDelta *validator.ValidatorSetDelta
-
-	// doubleSigners contains addresses of double signing validators for previous block
-	doubleSigners slashing.DoubleSigners
 }
 
 // BuildProposal builds a proposal for the current round (used if proposer)
@@ -150,10 +134,8 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		if err := f.blockBuilder.WriteTx(tx); err != nil {
 			return nil, fmt.Errorf("failed to apply commit epoch transaction: %w", err)
 		}
-	}
 
-	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
-		tx, err := f.createDistributeRewardsTx()
+		tx, err = f.createDistributeRewardsTx()
 		if err != nil {
 			return nil, err
 		}
@@ -165,12 +147,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 
 	if f.config.IsBridgeEnabled() {
 		if err := f.applyBridgeCommitmentTx(); err != nil {
-			return nil, err
-		}
-	}
-
-	if f.forks.IsActive(chain.DoubleSignSlashing, f.Height()) {
-		if err := f.applySlashingTx(); err != nil {
 			return nil, err
 		}
 	}
@@ -257,35 +233,6 @@ func (f *fsm) createBridgeCommitmentTx() (*types.Transaction, error) {
 	}
 
 	return createStateTransactionWithData(f.Height(), contracts.StateReceiverContract, inputData), nil
-}
-
-// applySlashingTx adds state transaction to the block to slash the double signing validators
-func (f *fsm) applySlashingTx() error {
-	if len(f.doubleSigners) == 0 {
-		return nil
-	}
-
-	slashingTx, err := f.createSlashingTx()
-	if err != nil {
-		return fmt.Errorf("creation of slashing transaction failed: %w", err)
-	}
-
-	if err = f.blockBuilder.WriteTx(slashingTx); err != nil {
-		return fmt.Errorf("failed to apply slashing state transaction: %w", err)
-	}
-
-	return nil
-}
-
-// createSlashingTx creates a state transaction which invokes the ValidatorSet smart contract
-// to slash the double signing validators for the provided height
-func (f *fsm) createSlashingTx() (*types.Transaction, error) {
-	inputData, err := f.doubleSigners.EncodeAbi()
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode input data for slashing: %w", err)
-	}
-
-	return createStateTransactionWithData(f.Height(), contracts.ValidatorSetContract, inputData), nil
 }
 
 // getValidatorsTransition applies delta to the current validators,
@@ -444,19 +391,24 @@ func (f *fsm) Validate(proposal []byte) error {
 
 // ValidateSender validates sender address and signature
 func (f *fsm) ValidateSender(msg *proto.Message) error {
-	signerAddress, err := wallet.RecoverSignerFromIBFTMessage(msg)
+	msgNoSig, err := msg.PayloadNoSig()
 	if err != nil {
 		return err
 	}
 
+	signerAddress, err := wallet.RecoverAddressFromSignature(msg.Signature, msgNoSig)
+	if err != nil {
+		return fmt.Errorf("failed to recover address from signature: %w", err)
+	}
+
 	// verify the signature came from the sender
 	if !bytes.Equal(msg.From, signerAddress.Bytes()) {
-		return fmt.Errorf("signer address %s doesn't match From field", signerAddress)
+		return fmt.Errorf("signer address %s doesn't match From field", signerAddress.String())
 	}
 
 	// verify the sender is in the active validator set
 	if !f.validators.Includes(signerAddress) {
-		return fmt.Errorf("signer address %s is not included in validator set", signerAddress)
+		return fmt.Errorf("signer address %s is not included in validator set", signerAddress.String())
 	}
 
 	return nil
@@ -467,7 +419,6 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 		commitmentTxExists        bool
 		commitEpochTxExists       bool
 		distributeRewardsTxExists bool
-		slashingTxExists          bool
 	)
 
 	for _, tx := range transactions {
@@ -475,24 +426,26 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			continue
 		}
 
+		txHash := tx.GetHash()
+
 		decodedStateTx, err := decodeStateTransaction(tx.Input)
 		if err != nil {
-			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", tx.Hash, err)
+			return fmt.Errorf("unknown state transaction: tx = %v, err = %w", txHash, err)
 		}
 
 		switch stateTxData := decodedStateTx.(type) {
 		case *CommitmentMessageSigned:
 			if !f.isEndOfSprint {
-				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", tx.Hash)
+				return fmt.Errorf("found commitment tx in block which should not contain it (tx hash=%s)", txHash)
 			}
 
 			if commitmentTxExists {
-				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", tx.Hash)
+				return fmt.Errorf("only one commitment tx is allowed per block (tx hash=%s)", txHash)
 			}
 
 			commitmentTxExists = true
 
-			if err = verifyBridgeCommitmentTx(f.Height(), tx.Hash, stateTxData, f.validators); err != nil {
+			if err = verifyBridgeCommitmentTx(f.Height(), txHash, stateTxData, f.validators); err != nil {
 				return err
 			}
 		case *contractsapi.CommitEpochValidatorSetFn:
@@ -506,7 +459,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			commitEpochTxExists = true
 
 			if err := f.verifyCommitEpochTx(tx); err != nil {
-				return fmt.Errorf("error while verifying commit epoch transaction: %w", err)
+				return fmt.Errorf("error while verifying commit epoch transaction. error: %w", err)
 			}
 		case *contractsapi.DistributeRewardForRewardPoolFn:
 			if distributeRewardsTxExists {
@@ -519,29 +472,11 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			distributeRewardsTxExists = true
 
 			if err := f.verifyDistributeRewardsTx(tx); err != nil {
-				return fmt.Errorf("error while verifying distribute rewards transaction: %w", err)
-			}
-		case *contractsapi.SlashValidatorSetFn:
-			if !f.forks.IsActive(chain.DoubleSignSlashing, f.Height()) {
-				return errSlashingTxNotExpected
-			}
-
-			if slashingTxExists {
-				return errSlashingTxSingleExpected
-			}
-
-			slashingTxExists = true
-
-			if err := f.verifySlashingTx(tx); err != nil {
-				return fmt.Errorf("error while verifying slashing transaction: %w", err)
+				return fmt.Errorf("error while verifying distribute rewards transaction. error: %w", err)
 			}
 		default:
 			return fmt.Errorf("invalid state transaction data type: %v", stateTxData)
 		}
-	}
-
-	if f.forks.IsActive(chain.DoubleSignSlashing, f.Height()) && len(f.doubleSigners) > 0 && !slashingTxExists {
-		return errSlashingTxDoesNotExist
 	}
 
 	if f.isEndOfEpoch {
@@ -550,9 +485,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			// but it should be
 			return errCommitEpochTxDoesNotExist
 		}
-	}
 
-	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
 		if !distributeRewardsTxExists {
 			// this is a check if distribute rewards transaction is not in the list of transactions at all
 			// but it should be
@@ -671,8 +604,7 @@ func (f *fsm) verifyCommitEpochTx(commitEpochTx *types.Transaction) error {
 // verifyDistributeRewardsTx creates distribute rewards transaction
 // and compares its hash with the one extracted from the block.
 func (f *fsm) verifyDistributeRewardsTx(distributeRewardsTx *types.Transaction) error {
-	// we don't have distribute rewards tx if we just started the chain
-	if isRewardDistributionBlock(f.forks, f.isFirstBlockOfEpoch, f.isEndOfEpoch, f.Height()) {
+	if f.isEndOfEpoch {
 		localDistributeRewardsTx, err := f.createDistributeRewardsTx()
 		if err != nil {
 			return err
@@ -718,28 +650,6 @@ func verifyBridgeCommitmentTx(blockNumber uint64, txHash types.Hash,
 	verified := signature.VerifyAggregated(signers.GetBlsKeys(), commitmentHash.Bytes(), bls.DomainStateReceiver)
 	if !verified {
 		return fmt.Errorf("invalid signature for state tx (%s)", txHash)
-	}
-
-	return nil
-}
-
-// verifySlashTx creates slash transaction and compares its hash with the one extracted from the block.
-func (f *fsm) verifySlashingTx(slashingTx *types.Transaction) error {
-	if len(f.doubleSigners) == 0 {
-		return errSlashingTxNotExpected
-	}
-
-	localSlashingTx, err := f.createSlashingTx()
-	if err != nil {
-		return err
-	}
-
-	if slashingTx.Hash != localSlashingTx.Hash {
-		return fmt.Errorf(
-			"invalid slashing transaction. Expected '%s', but got '%s' hash",
-			localSlashingTx.Hash,
-			slashingTx.Hash,
-		)
 	}
 
 	return nil

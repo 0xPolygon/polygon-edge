@@ -86,6 +86,19 @@ func (p *BridgeParams) RegisterCommonFlags(cmd *cobra.Command) {
 	)
 }
 
+func (p *BridgeParams) Validate() error {
+	if p == nil {
+		return nil
+	}
+
+	_, err := cmdHelper.ParseJSONRPCAddress(p.JSONRPCAddr)
+	if err != nil {
+		return fmt.Errorf("failed to parse json rpc address. Error: %w", err)
+	}
+
+	return nil
+}
+
 type ERC20BridgeParams struct {
 	*BridgeParams
 	Amounts []string
@@ -96,6 +109,10 @@ func NewERC20BridgeParams() *ERC20BridgeParams {
 }
 
 func (bp *ERC20BridgeParams) Validate() error {
+	if err := bp.BridgeParams.Validate(); err != nil {
+		return err
+	}
+
 	if len(bp.Receivers) != len(bp.Amounts) {
 		return errInconsistentAmounts
 	}
@@ -113,6 +130,10 @@ func NewERC721BridgeParams() *ERC721BridgeParams {
 }
 
 func (bp *ERC721BridgeParams) Validate() error {
+	if err := bp.BridgeParams.Validate(); err != nil {
+		return err
+	}
+
 	if len(bp.Receivers) != len(bp.TokenIDs) {
 		return errInconsistentTokenIds
 	}
@@ -131,6 +152,10 @@ func NewERC1155BridgeParams() *ERC1155BridgeParams {
 }
 
 func (bp *ERC1155BridgeParams) Validate() error {
+	if err := bp.BridgeParams.Validate(); err != nil {
+		return err
+	}
+
 	if len(bp.Receivers) != len(bp.Amounts) {
 		return errInconsistentAmounts
 	}

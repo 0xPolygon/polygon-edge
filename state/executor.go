@@ -217,40 +217,31 @@ func (e *Executor) BeginTxn(
 		PostHook:    e.PostHook,
 	}
 
-	// contract deployment access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.ContractDeployerAllowList != nil {
-		txn.deploymentAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListContractsAddr)
+	// enable contract deployment allow list (if any)
+	if e.config.ContractDeployerAllowList != nil {
+		txn.deploymentAllowList = addresslist.NewAddressList(txn, contracts.AllowListContractsAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.ContractDeployerBlockList != nil {
-		txn.deploymentBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListContractsAddr)
+	if e.config.ContractDeployerBlockList != nil {
+		txn.deploymentBlockList = addresslist.NewAddressList(txn, contracts.BlockListContractsAddr)
 	}
 
-	// transaction access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.TransactionsAllowList != nil {
-		txn.txnAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListTransactionsAddr)
+	// enable transactions allow list (if any)
+	if e.config.TransactionsAllowList != nil {
+		txn.txnAllowList = addresslist.NewAddressList(txn, contracts.AllowListTransactionsAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.TransactionsBlockList != nil {
-		txn.txnBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListTransactionsAddr)
+	if e.config.TransactionsBlockList != nil {
+		txn.txnBlockList = addresslist.NewAddressList(txn, contracts.BlockListTransactionsAddr)
 	}
 
-	// bridge access list should be enabled
-	// either if access lists super admin is defined or access lists are defined in the genesis
-	if e.config.AccessListsOwner != nil || e.config.BridgeAllowList != nil {
-		txn.bridgeAllowList = addresslist.NewAddressList(
-			txn, contracts.AllowListBridgeAddr)
+	// enable transactions allow list (if any)
+	if e.config.BridgeAllowList != nil {
+		txn.bridgeAllowList = addresslist.NewAddressList(txn, contracts.AllowListBridgeAddr)
 	}
 
-	if e.config.AccessListsOwner != nil || e.config.BridgeBlockList != nil {
-		txn.bridgeBlockList = addresslist.NewAddressList(
-			txn, contracts.BlockListBridgeAddr)
+	if e.config.BridgeBlockList != nil {
+		txn.bridgeBlockList = addresslist.NewAddressList(txn, contracts.BlockListBridgeAddr)
 	}
 
 	return txn, nil
@@ -507,6 +498,9 @@ var (
 	// ErrFeeCapTooLow is returned if the transaction fee cap is less than the
 	// the base fee of the block.
 	ErrFeeCapTooLow = errors.New("max fee per gas less than block base fee")
+
+	// ErrNonceUintOverflow is returned if uint64 overflow happens
+	ErrNonceUintOverflow = errors.New("nonce uint64 overflow")
 )
 
 type TransitionApplicationError struct {
@@ -581,7 +575,9 @@ func (t *Transition) apply(msg *types.Transaction) (*runtime.ExecutionResult, er
 	if msg.IsContractCreation() {
 		result = t.Create2(msg.From, msg.Input, value, gasLeft)
 	} else {
-		t.state.IncrNonce(msg.From)
+		if err := t.state.IncrNonce(msg.From); err != nil {
+			return nil, err
+		}
 		result = t.Call2(msg.From, *msg.To, msg.Input, value, gasLeft)
 	}
 
@@ -651,7 +647,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 	}
 
 	// check txns access lists, allow list takes precedence over block list
-	if t.txnAllowList != nil && t.txnAllowList.IsEnabled() {
+	if t.txnAllowList != nil {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnAllowList.GetRole(contract.Caller)
 			if !role.Enabled() {
@@ -667,7 +663,7 @@ func (t *Transition) run(contract *runtime.Contract, host runtime.Host) *runtime
 				}
 			}
 		}
-	} else if t.txnBlockList != nil && t.txnBlockList.IsEnabled() {
+	} else if t.txnBlockList != nil {
 		if contract.Caller != contracts.SystemCaller {
 			role := t.txnBlockList.GetRole(contract.Caller)
 			if role == addresslist.EnabledRole {
@@ -782,7 +778,9 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}
 
 	// Increment the nonce of the caller
-	t.state.IncrNonce(c.Caller)
+	if err := t.state.IncrNonce(c.Caller); err != nil {
+		return &runtime.ExecutionResult{Err: err}
+	}
 
 	// Check if there is a collision and the address already exists
 	if t.hasCodeOrNonce(c.Address) {
@@ -798,7 +796,10 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	if t.config.EIP158 {
 		// Force the creation of the account
 		t.state.CreateAccount(c.Address)
-		t.state.IncrNonce(c.Address)
+
+		if err := t.state.IncrNonce(c.Address); err != nil {
+			return &runtime.ExecutionResult{Err: err}
+		}
 	}
 
 	// Transfer the value
@@ -819,7 +820,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 	}()
 
 	// check if contract creation allow list is enabled
-	if t.deploymentAllowList != nil && t.deploymentAllowList.IsEnabled() {
+	if t.deploymentAllowList != nil {
 		role := t.deploymentAllowList.GetRole(c.Caller)
 
 		if !role.Enabled() {
@@ -834,7 +835,7 @@ func (t *Transition) applyCreate(c *runtime.Contract, host runtime.Host) *runtim
 				Err:     runtime.ErrNotAuth,
 			}
 		}
-	} else if t.deploymentBlockList != nil && t.deploymentBlockList.IsEnabled() {
+	} else if t.deploymentBlockList != nil {
 		role := t.deploymentBlockList.GetRole(c.Caller)
 
 		if role == addresslist.EnabledRole {

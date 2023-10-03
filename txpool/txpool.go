@@ -7,6 +7,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/grpc"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/forkmanager"
@@ -15,11 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -440,7 +441,7 @@ func (p *TxPool) dropAccount(account *account, nextNonce uint64, tx *types.Trans
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.GetHash())
 
 	if p.logger.IsDebug() {
 		p.logger.Debug("dropped account txs",
@@ -474,7 +475,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 
 	account.incrementDemotions()
 
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.GetHash())
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -768,7 +769,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 // (only once) and an enqueueRequest is signaled.
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if p.logger.IsDebug() {
-		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash.String())
+		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.GetHash().String())
 	}
 
 	// validate incoming tx
@@ -786,8 +787,6 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 
 	// initialize account for this address once or retrieve existing one
 	account := p.getOrCreateAccount(tx.From)
-	// populate currently free slots
-	slotsFree := p.gauge.freeSlots()
 
 	account.promoted.lock(true)
 	account.enqueued.lock(true)
@@ -815,7 +814,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// try to find if there is transaction with same nonce for this account
 	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce)
 	if oldTxWithSameNonce != nil {
-		if oldTxWithSameNonce.Hash == tx.Hash {
+		if oldTxWithSameNonce.GetHash() == tx.GetHash() {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
@@ -824,10 +823,8 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 			// if tx with same nonce does exist and has same or better gas price -> return error
 			metrics.IncrCounter([]string{txPoolMetrics, "underpriced_tx"}, 1)
 
-			return ErrUnderpriced
+			return ErrReplacementUnderpriced
 		}
-
-		slotsFree += slotsRequired(oldTxWithSameNonce) // add old tx slots
 	} else {
 		if account.enqueued.length() == account.maxEnqueued && tx.Nonce != accountNonce {
 			return ErrMaxEnqueuedLimitReached
@@ -841,27 +838,43 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 		}
 	}
 
-	// check for overflow
-	if slotsRequired(tx) > slotsFree {
-		return ErrTxPoolOverflow
+	slotsAllocated := slotsRequired(tx)
+
+	var slotsFreed uint64
+	if oldTxWithSameNonce != nil {
+		slotsFreed = slotsRequired(oldTxWithSameNonce)
+	}
+
+	var slotsIncreased uint64
+	if slotsAllocated > slotsFreed {
+		slotsIncreased = slotsAllocated - slotsFreed
+		if !p.gauge.increaseWithinLimit(slotsIncreased) {
+			return ErrTxPoolOverflow
+		}
 	}
 
 	// add to index
 	if ok := p.index.add(tx); !ok {
 		metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
+		if slotsIncreased > 0 {
+			p.gauge.decrease(slotsIncreased)
+		}
+
 		return ErrAlreadyKnown
+	}
+
+	if slotsFreed > slotsAllocated {
+		p.gauge.decrease(slotsFreed - slotsAllocated)
 	}
 
 	if oldTxWithSameNonce != nil {
 		p.index.remove(oldTxWithSameNonce)
-		p.gauge.decrease(slotsRequired(oldTxWithSameNonce))
 	} else {
 		metrics.SetGauge([]string{txPoolMetrics, "added_tx"}, 1)
 	}
 
 	account.enqueue(tx, oldTxWithSameNonce != nil) // add or replace tx into account
-	p.gauge.increase(slotsRequired(tx))
 
 	go p.invokePromotion(tx, tx.Nonce <= accountNonce) // don't signal promotion for higher nonce txs
 
@@ -869,13 +882,14 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 }
 
 func (p *TxPool) invokePromotion(tx *types.Transaction, callPromote bool) {
-	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
+	txHash := tx.GetHash()
+	p.eventManager.signalEvent(proto.EventType_ADDED, txHash)
 
 	if p.logger.IsDebug() {
-		p.logger.Debug("enqueue request", "hash", tx.Hash.String())
+		p.logger.Debug("enqueue request", "hash", txHash.String())
 	}
 
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, txHash)
 
 	if callPromote {
 		select {
@@ -941,13 +955,13 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if err := p.addTx(gossip, tx); err != nil {
 		if errors.Is(err, ErrAlreadyKnown) {
 			if p.logger.IsDebug() {
-				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
+				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.GetHash().String())
 			}
 
 			return
 		}
 
-		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.GetHash().String())
 	}
 }
 
@@ -1069,7 +1083,7 @@ func (p *TxPool) Length() uint64 {
 // toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
-		hashes = append(hashes, tx.Hash)
+		hashes = append(hashes, tx.GetHash())
 	}
 
 	return

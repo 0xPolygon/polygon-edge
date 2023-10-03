@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo"
@@ -21,7 +20,15 @@ type ValidatorInfo struct {
 	IsWhitelisted       bool          `json:"isWhitelisted"`
 }
 
-var _ common.SystemState = &SystemStateImpl{}
+// SystemState is an interface to interact with the consensus system contracts in the chain
+type SystemState interface {
+	// GetEpoch retrieves current epoch number from the smart contract
+	GetEpoch() (uint64, error)
+	// GetNextCommittedIndex retrieves next committed bridge state sync index
+	GetNextCommittedIndex() (uint64, error)
+}
+
+var _ SystemState = &SystemStateImpl{}
 
 // SystemStateImpl is implementation of SystemState interface
 type SystemStateImpl struct {

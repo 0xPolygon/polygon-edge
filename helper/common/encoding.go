@@ -47,22 +47,6 @@ func ParseUint256orHex(val *string) (*big.Int, error) {
 	return b, nil
 }
 
-func ParseUint8orHex(val *string) (uint64, error) {
-	if val == nil {
-		return 0, nil
-	}
-
-	str := *val
-	base := 10
-
-	if strings.HasPrefix(str, "0x") {
-		str = str[2:]
-		base = 16
-	}
-
-	return strconv.ParseUint(str, base, 8)
-}
-
 func ParseBytes(val *string) ([]byte, error) {
 	if val == nil {
 		return []byte{}, nil

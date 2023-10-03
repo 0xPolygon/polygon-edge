@@ -503,7 +503,7 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 					Data:        log.Data,
 					BlockNumber: argUint64(block.Header.Number),
 					BlockHash:   block.Header.Hash,
-					TxHash:      block.Transactions[idx].Hash,
+					TxHash:      block.Transactions[idx].GetHash(),
 					TxIndex:     argUint64(idx),
 					LogIndex:    argUint64(logIdx),
 				})
@@ -813,7 +813,7 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 	for indx, receipt := range receipts {
 		if receipt.TxHash == types.ZeroHash {
 			// Extract tx Hash
-			receipt.TxHash = block.Transactions[indx].Hash
+			receipt.TxHash = block.Transactions[indx].GetHash()
 		}
 		// check the logs with the filters
 		for _, log := range receipt.Logs {

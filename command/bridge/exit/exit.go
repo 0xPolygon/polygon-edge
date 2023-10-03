@@ -2,7 +2,7 @@ package exit
 
 import (
 	"bytes"
-	"encoding/json"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -16,7 +16,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/bridge/common"
 	cmdHelper "github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/helper"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -168,29 +167,8 @@ func run(cmd *cobra.Command, _ []string) {
 }
 
 // createExitTxn encodes parameters for exit function on root chain ExitHelper contract
-func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction, *polybft.ExitEvent, error) {
-	exitEventMap, ok := proof.Metadata["ExitEvent"].(map[string]interface{})
-	if !ok {
-		return nil, nil, errors.New("could not get exit event from proof")
-	}
-
-	raw, err := json.Marshal(exitEventMap)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal exit event map to JSON. Error: %w", err)
-	}
-
-	var exitEvent *polybft.ExitEvent
-	if err = json.Unmarshal(raw, &exitEvent); err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal exit event from JSON. Error: %w", err)
-	}
-
-	var exitEventAPI contractsapi.L2StateSyncedEvent
-
-	exitEventEncoded, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to encode exit event: %w", err)
-	}
-
+func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
+	*contractsapi.L2StateSyncedEvent, error) {
 	leafIndex, ok := proof.Metadata["LeafIndex"].(float64)
 	if !ok {
 		return nil, nil, errors.New("failed to convert proof leaf index")
@@ -199,6 +177,21 @@ func createExitTxn(sender ethgo.Address, proof types.Proof) (*ethgo.Transaction,
 	checkpointBlock, ok := proof.Metadata["CheckpointBlock"].(float64)
 	if !ok {
 		return nil, nil, errors.New("failed to convert proof checkpoint block")
+	}
+
+	exitEventHex, ok := proof.Metadata["ExitEvent"].(string)
+	if !ok {
+		return nil, nil, errors.New("failed to convert exit event")
+	}
+
+	exitEventEncoded, err := hex.DecodeString(exitEventHex)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode hex-encoded exit event '%s': %w", exitEventHex, err)
+	}
+
+	exitEvent := new(contractsapi.L2StateSyncedEvent)
+	if err := exitEvent.Decode(exitEventEncoded); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode exit event: %w", err)
 	}
 
 	exitFn := &contractsapi.ExitExitHelperFn{

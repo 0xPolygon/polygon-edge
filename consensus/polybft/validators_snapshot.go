@@ -196,6 +196,10 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 		return nil, fmt.Errorf("failed to apply delta to the validators snapshot, block#%d: %w", header.Number, err)
 	}
 
+	if len(snapshot) == 0 {
+		return nil, fmt.Errorf("validator snapshot is empty for block: %d", header.Number)
+	}
+
 	v.logger.Debug("Computed snapshot",
 		"blockNumber", nextEpochEndBlockNumber,
 		"snapshot", snapshot.String(),

@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"log"
+	"time"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -78,6 +79,7 @@ type Params struct {
 	BlockTime      uint64
 
 	NumBlockConfirmations uint64
+	MetricsInterval       time.Duration
 }
 
 // Factory is the factory function to create a discovery consensus
@@ -90,7 +92,4 @@ type BridgeDataProvider interface {
 
 	// GetStateSyncProof retrieves the StateSync proof
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
-
-	// GetPendingSlashProofs retrieves executable slashing exit event proofs
-	GetPendingSlashProofs() ([]types.Proof, error)
 }

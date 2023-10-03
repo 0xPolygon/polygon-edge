@@ -78,10 +78,6 @@ func (q *accountQueue) push(tx *types.Transaction) {
 
 // peek returns the first transaction from the queue without removing it.
 func (q *accountQueue) peek() *types.Transaction {
-	if q.length() == 0 {
-		return nil
-	}
-
 	return q.queue.Peek()
 }
 
@@ -102,6 +98,14 @@ func (q *accountQueue) pop() *types.Transaction {
 // length returns the number of transactions in the queue.
 func (q *accountQueue) length() uint64 {
 	return uint64(q.queue.Len())
+}
+
+// lengthWithLock returns the number of transactions in the queue (thread-safe)
+func (q *accountQueue) lengthWithLock() uint64 {
+	q.lock(false)
+	defer q.unlock()
+
+	return q.length()
 }
 
 // transactions sorted by nonce (ascending)
