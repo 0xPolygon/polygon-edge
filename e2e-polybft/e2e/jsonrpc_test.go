@@ -11,7 +11,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/wallet"
 )
 
@@ -32,6 +31,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 	cluster.WaitForReady(t)
 
 	client := cluster.Servers[0].JSONRPC().Eth()
+	debug := cluster.Servers[0].JSONRPC().Debug()
 
 	// Test eth_call with override in state diff
 	t.Run("eth_call state override", func(t *testing.T) {
@@ -84,11 +84,50 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", resp)
 	})
 
+	t.Run("eth_estimateGas", func(t *testing.T) {
+		deployTxn := cluster.Deploy(t, acct, contractsapi.TestSimple.Bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Succeed())
+
+		target := deployTxn.Receipt().ContractAddress
+
+		input := contractsapi.TestSimple.Abi.GetMethod("getValue").ID()
+
+		estimatedGas, err := client.EstimateGas(&ethgo.CallMsg{
+			From: acct.Address(),
+			To:   &target,
+			Data: input,
+		})
+		require.NoError(t, err)
+		require.Equal(t, uint64(0x56a3), estimatedGas)
+	})
+
+	t.Run("eth_estimateGas by zero-balance account", func(t *testing.T) {
+		deployTxn := cluster.Deploy(t, acct, contractsapi.TestSimple.Bytecode)
+		require.NoError(t, deployTxn.Wait())
+		require.True(t, deployTxn.Succeed())
+
+		target := deployTxn.Receipt().ContractAddress
+
+		input := contractsapi.TestSimple.Abi.GetMethod("getValue").ID()
+
+		acctZeroBalance, err := wallet.GenerateKey()
+		require.NoError(t, err)
+
+		resp, err := client.EstimateGas(&ethgo.CallMsg{
+			From: acctZeroBalance.Address(),
+			To:   &target,
+			Data: input,
+		})
+		require.NoError(t, err)
+		require.Equal(t, uint64(0x56a3), resp)
+	})
+
 	t.Run("eth_getBalance", func(t *testing.T) {
 		key1, err := wallet.GenerateKey()
 		require.NoError(t, err)
 
-		// Test. return zero if the account does not exists
+		// Test. return zero if the account does not exist
 		balance1, err := client.GetBalance(key1.Address(), ethgo.Latest)
 		require.NoError(t, err)
 		require.Equal(t, balance1, big.NewInt(0))
@@ -108,13 +147,12 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.NoError(t, err)
 
 		toAddr := key1.Address()
-		msg := &ethgo.CallMsg{
+
+		estimatedGas, err := client.EstimateGas(&ethgo.CallMsg{
 			From:  acct.Address(),
 			To:    &toAddr,
 			Value: newBalance,
-		}
-
-		estimatedGas, err := client.EstimateGas(msg)
+		})
 		require.NoError(t, err)
 		txPrice := gasPrice * estimatedGas
 		// subtract gasPrice * estimatedGas from the balance and transfer the rest to the other account
@@ -185,7 +223,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "0x0000000000000000000000000000000000000000000000000000000000000000", resp.String())
 
-		setValueFn := abi.MustNewMethod("function setValue(uint256 _val) public")
+		setValueFn := contractsapi.TestSimple.Abi.GetMethod("setValue")
 
 		newVal := big.NewInt(1)
 
@@ -326,5 +364,21 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		// Test. The dynamic 'from' field is populated
 		require.NotEqual(t, ethTxn.From, ethgo.ZeroAddress)
+	})
+
+	t.Run("debug_traceTransaction", func(t *testing.T) {
+		key1, err := wallet.GenerateKey()
+		require.NoError(t, err)
+
+		// Test. We should be able to query the transaction by its hash
+		txn := cluster.Transfer(t, acct, types.Address(key1.Address()), one)
+		require.NoError(t, txn.Wait())
+		require.True(t, txn.Succeed())
+
+		txReceipt := txn.Receipt()
+
+		trace, err := debug.TraceTransaction(txReceipt.TransactionHash)
+		require.NoError(t, err)
+		require.NotEqual(t, txReceipt.GasUsed, trace.Gas)
 	})
 }
