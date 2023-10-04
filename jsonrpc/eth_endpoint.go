@@ -66,7 +66,12 @@ type ethBlockchainStore interface {
 	GetAvgGasPrice() *big.Int
 
 	// ApplyTxn applies a transaction object to the blockchain
-	ApplyTxn(header *types.Header, txn *types.Transaction, override types.StateOverride) (*runtime.ExecutionResult, error)
+	ApplyTxn(
+		header *types.Header,
+		txn *types.Transaction,
+		override types.StateOverride,
+		nonPayable bool,
+	) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
@@ -510,7 +515,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 	}
 
 	// The return value of the execution is saved in the transition (returnValue field)
-	result, err := e.store.ApplyTxn(header, transaction, override)
+	result, err := e.store.ApplyTxn(header, transaction, override, true)
 	if err != nil {
 		return nil, err
 	}
@@ -658,7 +663,7 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 		transaction.Gas = gas
 
-		result, applyErr := e.store.ApplyTxn(header, transaction, nil)
+		result, applyErr := e.store.ApplyTxn(header, transaction, nil, false)
 
 		if result != nil {
 			data = []byte(hex.EncodeToString(result.ReturnValue))

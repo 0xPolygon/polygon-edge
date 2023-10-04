@@ -729,6 +729,7 @@ func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
 	override types.StateOverride,
+	nonPayable bool,
 ) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
@@ -745,6 +746,8 @@ func (j *jsonRPCHub) ApplyTxn(
 			return
 		}
 	}
+
+	transition.SetNonPayable(nonPayable)
 
 	result, err = transition.Apply(txn)
 

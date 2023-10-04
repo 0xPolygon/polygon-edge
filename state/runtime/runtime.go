@@ -21,6 +21,7 @@ type TxContext struct {
 	ChainID      int64
 	Difficulty   types.Hash
 	Tracer       tracer.Tracer
+	NonPayable   bool
 	BaseFee      *big.Int
 	BurnContract types.Address
 }
@@ -64,6 +65,7 @@ type Host interface {
 	GetStorage(addr types.Address, key types.Hash) types.Hash
 	SetStorage(addr types.Address, key types.Hash, value types.Hash, config *chain.ForksInTime) StorageStatus
 	SetState(addr types.Address, key types.Hash, value types.Hash)
+	SetNonPayable(nonPayable bool)
 	GetBalance(addr types.Address) *big.Int
 	GetCodeSize(addr types.Address) int
 	GetCodeHash(addr types.Address) types.Hash

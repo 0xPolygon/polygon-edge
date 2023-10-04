@@ -628,7 +628,7 @@ func (m *mockBlockStore) GetAvgGasPrice() *big.Int {
 	return big.NewInt(m.averageGasPrice)
 }
 
-func (m *mockBlockStore) ApplyTxn(header *types.Header, txn *types.Transaction, overrides types.StateOverride) (*runtime.ExecutionResult, error) {
+func (m *mockBlockStore) ApplyTxn(_ *types.Header, _ *types.Transaction, _ types.StateOverride, _ bool) (*runtime.ExecutionResult, error) {
 	return &runtime.ExecutionResult{
 		Err:         m.ethCallError,
 		ReturnValue: m.returnValue,
