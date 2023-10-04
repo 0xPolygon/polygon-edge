@@ -20,7 +20,6 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	testKey := createTestKey(t)
 	successStatus := types.ReceiptSuccess
 	block1Hash := types.StringToHash("x087887823ff23423")
-	block2Hash := types.StringToHash("x08ffeee23ff23423")
 	stateSyncAddr := types.StringToAddress("0x56563")
 	commitment1Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 1, 2, types.StringToHash("0x1"))
 	commitment2Log := createTestLogForNewCommitmentEvent(t, stateSyncAddr, 3, 3, types.StringToHash("0x2"))
@@ -86,6 +85,10 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 		hclog.Default(),
 	)
 
+	blockhainMock.On("CurrentHeader").Return(&types.Header{
+		Hash:   block1Hash,
+		Number: 1,
+	})
 	// post block 2, last state sync fails
 	blockhainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{
 		Hash: block1Hash,
@@ -120,14 +123,11 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 
 	blockhainMock.AssertExpectations(t)
 	require.NoError(t, err)
-	require.Equal(t, uint64(2), ssrStateData.NextBlockNumber)
-	require.Equal(t, uint64(6), ssrStateData.NextEventID)
+	require.Equal(t, uint64(2), ssrStateData.LastBlockNumber)
+
+	time.Sleep(time.Second * 2) // wait for some time
 
 	// post block 3, all the events should be processed and everything should pass
-	blockhainMock.On("GetHeaderByNumber", uint64(2)).Return(&types.Header{
-		Hash: block2Hash,
-	}).Once()
-	blockhainMock.On("GetReceiptsByHash", block2Hash).Return(receiptsBlock2, nil).Once()
 	dummyTxRelayer.On("SendTransaction", mock.Anything, testKey).Return(
 		&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Times(2)
 
@@ -152,8 +152,12 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 
 	blockhainMock.AssertExpectations(t)
 	require.NoError(t, err)
-	require.Equal(t, uint64(4), ssrStateData.NextBlockNumber)
-	require.Equal(t, uint64(8), ssrStateData.NextEventID)
+	require.Equal(t, uint64(3), ssrStateData.LastBlockNumber)
+
+	events, err := state.StateSyncStore.getAllAvailableEvents()
+
+	require.NoError(t, err)
+	require.Len(t, events, 0)
 }
 
 type mockStateSyncProofRetriever struct {

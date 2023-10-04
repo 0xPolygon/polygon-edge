@@ -312,8 +312,11 @@ func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
 	// insert
 	require.NoError(t, state.StateSyncStore.insertStateSyncRelayerStateData(
 		&StateSyncRelayerStateData{
-			NextBlockNumber: 100,
-			NextEventID:     200,
+			LastBlockNumber: 100,
+		},
+		[]*StateSyncRelayerEventData{
+			{EventID: 2},
+			{EventID: 4},
 		},
 	))
 
@@ -321,6 +324,13 @@ func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
 	ssrStateData, err = state.StateSyncStore.getStateSyncRelayerStateData()
 
 	require.NoError(t, err)
-	assert.Equal(t, uint64(100), ssrStateData.NextBlockNumber)
-	assert.Equal(t, uint64(200), ssrStateData.NextEventID)
+	assert.Equal(t, uint64(100), ssrStateData.LastBlockNumber)
+
+	// get available events
+	events, err := state.StateSyncStore.getAllAvailableEvents()
+
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	require.Equal(t, uint64(2), events[0].EventID)
+	require.Equal(t, uint64(4), events[1].EventID)
 }

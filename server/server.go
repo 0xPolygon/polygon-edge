@@ -23,7 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -86,9 +85,6 @@ type Server struct {
 
 	// restore
 	restoreProgression *progress.ProgressionWrapper
-
-	// stateSyncRelayer is handling state syncs execution (Polybft exclusive)
-	stateSyncRelayer *statesyncrelayer.StateSyncRelayer
 
 	// gasHelper is providing functions regarding gas and fees
 	gasHelper *gasprice.GasHelper
@@ -942,11 +938,6 @@ func (s *Server) Close() {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {
 			s.logger.Error("Prometheus server shutdown error", err)
 		}
-	}
-
-	// Stop state sync relayer
-	if s.stateSyncRelayer != nil {
-		s.stateSyncRelayer.Stop()
 	}
 
 	// Close the txpool's main loop
