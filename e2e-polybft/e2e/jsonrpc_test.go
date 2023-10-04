@@ -5,15 +5,15 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
+	"github.com/umbracle/ethgo/wallet"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/wallet"
 )
 
 var (
@@ -380,7 +380,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		txReceipt := txn.Receipt()
 
-		// FIXME: Use a wrapper function from "jsonrpc" package when the config is introduced.
+		// Use a wrapper function from "jsonrpc" package when the config is introduced.
 		var trace *jsonrpc.TransactionTrace
 		err = jsonRpc.Call("debug_traceTransaction", &trace, txReceipt.TransactionHash, map[string]interface{}{
 			"tracer": "callTracer",
