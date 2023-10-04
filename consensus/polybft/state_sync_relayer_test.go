@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
@@ -103,7 +102,7 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	require.NoError(t, stateSyncRelayer.Init())
 
 	// post first block
-	require.NoError(t, stateSyncRelayer.PostBlock(&common.PostBlockRequest{
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
 		FullBlock: &types.FullBlock{
 			Block: &types.Block{
 				Header: &types.Header{
@@ -133,7 +132,7 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 		&ethgo.Receipt{Status: uint64(types.ReceiptSuccess)}, nil).Times(2)
 
 	// post another block
-	require.NoError(t, stateSyncRelayer.PostBlock(&common.PostBlockRequest{
+	require.NoError(t, stateSyncRelayer.PostBlock(&PostBlockRequest{
 		FullBlock: &types.FullBlock{
 			Block: &types.Block{
 				Header: &types.Header{

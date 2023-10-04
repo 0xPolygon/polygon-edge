@@ -7,13 +7,12 @@ import (
 	"net"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	hclog "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 )
 
@@ -21,7 +20,7 @@ var errFailedToExecuteStateSync = errors.New("failed to execute state sync")
 
 // StateSyncRelayer is an interface that defines functions for state sync relayer
 type StateSyncRelayer interface {
-	PostBlock(req *common.PostBlockRequest) error
+	PostBlock(req *PostBlockRequest) error
 	Init() error
 	Close()
 }
@@ -36,7 +35,7 @@ var _ StateSyncRelayer = (*dummyStakeSyncRelayer)(nil)
 // dummyStakeSyncRelayer is a dummy implementation of a StateSyncRelayer
 type dummyStakeSyncRelayer struct{}
 
-func (d *dummyStakeSyncRelayer) PostBlock(req *common.PostBlockRequest) error { return nil }
+func (d *dummyStakeSyncRelayer) PostBlock(req *PostBlockRequest) error { return nil }
 
 func (d *dummyStakeSyncRelayer) Init() error { return nil }
 func (d *dummyStakeSyncRelayer) Close()      {}
@@ -57,7 +56,7 @@ type stateSyncRelayerImpl struct {
 	eventsGetter *eventsGetter[*contractsapi.NewCommitmentEvent]
 	logger       hclog.Logger
 
-	dataCh  chan *common.PostBlockRequest
+	dataCh  chan *PostBlockRequest
 	closeCh chan struct{}
 }
 
@@ -76,7 +75,7 @@ func NewStateSyncRelayer(
 		store:     store,
 		state:     state,
 		closeCh:   make(chan struct{}),
-		dataCh:    make(chan *common.PostBlockRequest, 32),
+		dataCh:    make(chan *PostBlockRequest, 32),
 		eventsGetter: &eventsGetter[*contractsapi.NewCommitmentEvent]{
 			blockchain: blockchain,
 			isValidLogFn: func(l *types.Log) bool {
@@ -148,7 +147,7 @@ func (ssr *stateSyncRelayerImpl) Close() {
 	close(ssr.closeCh)
 }
 
-func (ssr *stateSyncRelayerImpl) PostBlock(req *common.PostBlockRequest) error {
+func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 	ssr.dataCh <- req // add to consumer queue
 
 	return nil
