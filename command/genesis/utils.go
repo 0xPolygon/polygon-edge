@@ -183,8 +183,8 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 		return baseFeeInfo, errors.New("invalid number of arguments for base fee configuration")
 	}
 
-	if baseFeeConfig[0] != "" {
-		baseFee, err := strconv.ParseUint(baseFeeConfig[0], 10, 64)
+	if len(baseFeeConfig) >= 1 && baseFeeConfig[0] != "" {
+		baseFee, err := common.ParseUint64orHex(&baseFeeConfig[0])
 		if err != nil {
 			return baseFeeInfo, err
 		}
@@ -192,8 +192,8 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 		baseFeeInfo.baseFee = baseFee
 	}
 
-	if len(baseFeeConfig) == 2 && baseFeeConfig[1] != "" {
-		baseFeeEM, err := strconv.ParseUint(baseFeeConfig[1], 10, 64)
+	if len(baseFeeConfig) >= 2 && baseFeeConfig[1] != "" {
+		baseFeeEM, err := common.ParseUint64orHex(&baseFeeConfig[1])
 		if err != nil {
 			return baseFeeInfo, err
 		}
@@ -202,7 +202,7 @@ func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
 	}
 
 	if len(baseFeeConfig) == 3 && baseFeeConfig[2] != "" {
-		baseFeeChangeDenom, err := strconv.ParseUint(baseFeeConfig[2], 10, 64)
+		baseFeeChangeDenom, err := common.ParseUint64orHex(&baseFeeConfig[2])
 		if err != nil {
 			return baseFeeInfo, err
 		}
