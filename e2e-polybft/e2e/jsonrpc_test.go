@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/umbracle/ethgo/jsonrpc"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -30,8 +32,9 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	client := cluster.Servers[0].JSONRPC().Eth()
-	debug := cluster.Servers[0].JSONRPC().Debug()
+	jsonRpc := cluster.Servers[0].JSONRPC()
+	client := jsonRpc.Eth()
+	//debug := jsonRpc.Debug()
 
 	// Test eth_call with override in state diff
 	t.Run("eth_call state override", func(t *testing.T) {
@@ -377,8 +380,12 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		txReceipt := txn.Receipt()
 
-		trace, err := debug.TraceTransaction(txReceipt.TransactionHash)
+		// FIXME: Use a wrapper function from "jsonrpc" package when the config is introduced.
+		var trace *jsonrpc.TransactionTrace
+		err = jsonRpc.Call("debug_traceTransaction", &trace, txReceipt.TransactionHash, map[string]interface{}{
+			"tracer": "callTracer",
+		})
 		require.NoError(t, err)
-		require.NotEqual(t, txReceipt.GasUsed, trace.Gas)
+		require.Equal(t, txReceipt.GasUsed, trace.Gas)
 	})
 }
