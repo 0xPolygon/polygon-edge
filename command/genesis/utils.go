@@ -2,6 +2,7 @@ package genesis
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -161,6 +162,55 @@ func parseBurnContractInfo(burnContractInfoRaw string) (*polybft.BurnContractInf
 		Address:            types.StringToAddress(contractAddress),
 		DestinationAddress: types.StringToAddress(destinationAddress),
 	}, nil
+}
+
+type baseFeeInfo struct {
+	baseFee            uint64
+	baseFeeEM          uint64
+	baseFeeChangeDenom uint64
+}
+
+// parseBaseFeeConfig parses provided base fee configuration and returns baseFeeInfo
+func parseBaseFeeConfig(baseFeeConfigRaw string) (*baseFeeInfo, error) {
+	baseFeeInfo := &baseFeeInfo{
+		command.DefaultGenesisBaseFee,
+		command.DefaultGenesisBaseFeeEM,
+		command.DefaultGenesisBaseFeeChangeDenom,
+	}
+
+	baseFeeConfig := strings.Split(baseFeeConfigRaw, ":")
+	if len(baseFeeConfig) > 3 {
+		return baseFeeInfo, errors.New("invalid number of arguments for base fee configuration")
+	}
+
+	if len(baseFeeConfig) >= 1 && baseFeeConfig[0] != "" {
+		baseFee, err := common.ParseUint64orHex(&baseFeeConfig[0])
+		if err != nil {
+			return baseFeeInfo, err
+		}
+
+		baseFeeInfo.baseFee = baseFee
+	}
+
+	if len(baseFeeConfig) >= 2 && baseFeeConfig[1] != "" {
+		baseFeeEM, err := common.ParseUint64orHex(&baseFeeConfig[1])
+		if err != nil {
+			return baseFeeInfo, err
+		}
+
+		baseFeeInfo.baseFeeEM = baseFeeEM
+	}
+
+	if len(baseFeeConfig) == 3 && baseFeeConfig[2] != "" {
+		baseFeeChangeDenom, err := common.ParseUint64orHex(&baseFeeConfig[2])
+		if err != nil {
+			return baseFeeInfo, err
+		}
+
+		baseFeeInfo.baseFeeChangeDenom = baseFeeChangeDenom
+	}
+
+	return baseFeeInfo, nil
 }
 
 // GetValidatorKeyFiles returns file names which has validator secrets

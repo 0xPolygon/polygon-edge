@@ -1396,10 +1396,10 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 						Forks: &chain.Forks{
 							chain.London: chain.NewFork(5),
 						},
-						BaseFeeChangeDenom: chain.BaseFeeChangeDenom,
 					},
 					Genesis: &chain.Genesis{
-						BaseFeeEM: test.elasticityMultiplier,
+						BaseFeeEM:          test.elasticityMultiplier,
+						BaseFeeChangeDenom: chain.BaseFeeChangeDenom,
 					},
 				},
 			}

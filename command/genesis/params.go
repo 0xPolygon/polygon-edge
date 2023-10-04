@@ -34,6 +34,7 @@ const (
 	epochRewardFlag              = "epoch-reward"
 	blockGasLimitFlag            = "block-gas-limit"
 	burnContractFlag             = "burn-contract"
+	genesisBaseFeeConfigFlag     = "base-fee-config"
 	posFlag                      = "pos"
 	minValidatorCount            = "min-validator-count"
 	maxValidatorCount            = "max-validator-count"
@@ -42,7 +43,6 @@ const (
 	rewardWalletFlag             = "reward-wallet"
 	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
 	proxyContractsAdminFlag      = "proxy-contracts-admin"
-	baseFeeChangeDenomFlag       = "base-fee-change-denom"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -69,6 +69,8 @@ var (
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
 	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
 	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
+	errBaseFeeEMZero            = errors.New("base fee elasticity multiplier must be greater than 0")
+	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
 )
 
 type genesisParams struct {
@@ -88,7 +90,9 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	burnContract string
+	burnContract        string
+	baseFeeConfig       string
+	parsedBaseFeeConfig *baseFeeInfo
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -140,14 +144,16 @@ type genesisParams struct {
 	blockTrackerPollInterval time.Duration
 
 	proxyContractsAdmin string
-
-	baseFeeChangeDenom uint64
 }
 
 func (p *genesisParams) validateFlags() error {
 	// Check if the consensusRaw is supported
 	if !server.ConsensusSupported(p.consensusRaw) {
 		return errUnsupportedConsensus
+	}
+
+	if err := p.validateGenesisBaseFeeConfig(); err != nil {
+		return err
 	}
 
 	// Check if validator information is set at all
@@ -159,10 +165,6 @@ func (p *genesisParams) validateFlags() error {
 
 	if err := p.parsePremineInfo(); err != nil {
 		return err
-	}
-
-	if p.baseFeeChangeDenom == 0 {
-		return errBaseFeeChangeDenomZero
 	}
 
 	if p.isPolyBFTConsensus() {
@@ -417,18 +419,18 @@ func (p *genesisParams) initGenesisConfig() error {
 			GasUsed:    command.DefaultGenesisGasUsed,
 		},
 		Params: &chain.Params{
-			ChainID:            int64(p.chainID),
-			Forks:              enabledForks,
-			Engine:             p.consensusEngineConfig,
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
+			ChainID: int64(p.chainID),
+			Forks:   enabledForks,
+			Engine:  p.consensusEngineConfig,
 		},
 		Bootnodes: p.bootnodes,
 	}
 
 	// burn contract can be set only for non mintable native token
 	if p.isBurnContractEnabled() {
-		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
-		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
+		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
@@ -561,6 +563,33 @@ func (p *genesisParams) validateBurnContract() error {
 				return errors.New("it is not allowed to deploy burn contract to 0x0 address")
 			}
 		}
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateGenesisBaseFeeConfig() error {
+	if p.baseFeeConfig == "" {
+		return errors.New("invalid input(empty string) for genesis base fee config flag")
+	}
+
+	baseFeeInfo, err := parseBaseFeeConfig(p.baseFeeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to parse base fee config: %w, provided value %s", err, p.baseFeeConfig)
+	}
+
+	p.parsedBaseFeeConfig = baseFeeInfo
+
+	if baseFeeInfo.baseFee == 0 {
+		return errBaseFeeZero
+	}
+
+	if baseFeeInfo.baseFeeEM == 0 {
+		return errBaseFeeEMZero
+	}
+
+	if baseFeeInfo.baseFeeChangeDenom == 0 {
+		return errBaseFeeChangeDenomZero
 	}
 
 	return nil

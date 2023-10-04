@@ -77,6 +77,17 @@ func setFlags(cmd *cobra.Command) {
 		"the burn contract block and address (format: <block>:<address>[:<burn destination>])",
 	)
 
+	cmd.Flags().StringVar(
+		&params.baseFeeConfig,
+		genesisBaseFeeConfigFlag,
+		command.DefaultGenesisBaseFeeConfig,
+		`initial base fee(in wei), base fee elasticity multiplier, and base fee change denominator
+		(provided in the following format: [<baseFee>][:<baseFeeEM>][:<baseFeeChangeDenom>]). 
+		BaseFeeChangeDenom represents the value to bound the amount the base fee can change between blocks.
+		Default BaseFee is 1 Gwei, BaseFeeEM is 2 and BaseFeeChangeDenom is 8.
+		Note: BaseFee, BaseFeeEM, and BaseFeeChangeDenom should be greater than 0.`,
+	)
+
 	cmd.Flags().StringArrayVar(
 		&params.bootnodes,
 		command.BootnodeFlag,
@@ -248,13 +259,6 @@ func setFlags(cmd *cobra.Command) {
 			blockTrackerPollIntervalFlag,
 			defaultBlockTrackerPollInterval,
 			"interval (number of seconds) at which block tracker polls for latest block at rootchain",
-		)
-
-		cmd.Flags().Uint64Var(
-			&params.baseFeeChangeDenom,
-			baseFeeChangeDenomFlag,
-			command.DefaultGenesisBaseFeeChangeDenom,
-			"represents the value to bound the amount the base fee can change between blocks.",
 		)
 	}
 

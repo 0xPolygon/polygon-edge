@@ -175,7 +175,6 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 			Engine: map[string]interface{}{
 				string(server.PolyBFTConsensus): polyBftConfig,
 			},
-			BaseFeeChangeDenom: p.baseFeeChangeDenom,
 		},
 		Bootnodes: p.bootnodes,
 	}
@@ -308,8 +307,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
-		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
-		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
+		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)
