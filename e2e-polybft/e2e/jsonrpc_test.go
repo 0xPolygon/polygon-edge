@@ -32,9 +32,8 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 	cluster.WaitForReady(t)
 
-	jsonRpc := cluster.Servers[0].JSONRPC()
-	client := jsonRpc.Eth()
-	//debug := jsonRpc.Debug()
+	jsonRPC := cluster.Servers[0].JSONRPC()
+	client := jsonRPC.Eth()
 
 	// Test eth_call with override in state diff
 	t.Run("eth_call state override", func(t *testing.T) {
@@ -382,7 +381,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		// Use a wrapper function from "jsonrpc" package when the config is introduced.
 		var trace *jsonrpc.TransactionTrace
-		err = jsonRpc.Call("debug_traceTransaction", &trace, txReceipt.TransactionHash, map[string]interface{}{
+		err = jsonRPC.Call("debug_traceTransaction", &trace, txReceipt.TransactionHash, map[string]interface{}{
 			"tracer": "callTracer",
 		})
 		require.NoError(t, err)
