@@ -307,10 +307,9 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 	if p.isBurnContractEnabled() {
 		// only populate base fee and base fee multiplier values if burn contract(s)
 		// is provided
-		baseFeeInfo, _ := parseBaseFeeConfig(p.baseFeeConfig)
-		chainConfig.Genesis.BaseFee = baseFeeInfo.baseFee
-		chainConfig.Genesis.BaseFeeEM = baseFeeInfo.baseFeeEM
-		chainConfig.Params.BaseFeeChangeDenom = baseFeeInfo.baseFeeChangeDenom
+		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
+		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 	}
 
 	return helper.WriteGenesisConfigToDisk(chainConfig, params.genesisPath)

@@ -34,7 +34,7 @@ const (
 	epochRewardFlag              = "epoch-reward"
 	blockGasLimitFlag            = "block-gas-limit"
 	burnContractFlag             = "burn-contract"
-	genesisBaseFeeConfigFlag     = "genesis-base-fee-config"
+	genesisBaseFeeConfigFlag     = "base-fee-config"
 	posFlag                      = "pos"
 	minValidatorCount            = "min-validator-count"
 	maxValidatorCount            = "max-validator-count"
@@ -90,8 +90,9 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	burnContract  string
-	baseFeeConfig string
+	burnContract        string
+	baseFeeConfig       string
+	parsedBaseFeeConfig *baseFeeInfo
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -151,6 +152,10 @@ func (p *genesisParams) validateFlags() error {
 		return errUnsupportedConsensus
 	}
 
+	if err := p.validateGenesisBaseFeeConfig(); err != nil {
+		return err
+	}
+
 	// Check if validator information is set at all
 	if p.isIBFTConsensus() &&
 		!p.areValidatorsSetManually() &&
@@ -168,10 +173,6 @@ func (p *genesisParams) validateFlags() error {
 		}
 
 		if err := p.validateBurnContract(); err != nil {
-			return err
-		}
-
-		if err := p.validateGenesisBaseFeeConfig(); err != nil {
 			return err
 		}
 
@@ -427,10 +428,9 @@ func (p *genesisParams) initGenesisConfig() error {
 
 	// burn contract can be set only for non mintable native token
 	if p.isBurnContractEnabled() {
-		baseFeeInfo, _ := parseBaseFeeConfig(p.baseFeeConfig)
-		chainConfig.Genesis.BaseFee = baseFeeInfo.baseFee
-		chainConfig.Genesis.BaseFeeEM = baseFeeInfo.baseFeeEM
-		chainConfig.Params.BaseFeeChangeDenom = baseFeeInfo.baseFeeChangeDenom
+		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
+		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
@@ -577,6 +577,8 @@ func (p *genesisParams) validateGenesisBaseFeeConfig() error {
 	if err != nil {
 		return fmt.Errorf("failed to parse base fee config: %w, provided value %s", err, p.baseFeeConfig)
 	}
+
+	p.parsedBaseFeeConfig = baseFeeInfo
 
 	if baseFeeInfo.baseFee == 0 {
 		return errBaseFeeZero

@@ -55,6 +55,9 @@ type Genesis struct {
 	BaseFee    uint64                            `json:"baseFee"`
 	BaseFeeEM  uint64                            `json:"baseFeeEM"`
 
+	// BaseFeeChangeDenom is the value to bound the amount the base fee can change between blocks
+	BaseFeeChangeDenom uint64 `json:"baseFeeChangeDenom,omitempty"`
+
 	// Override
 	StateRoot types.Hash
 
