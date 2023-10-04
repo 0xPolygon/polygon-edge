@@ -151,9 +151,35 @@ func TestAddTxErrors(t *testing.T) {
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.StateTx
 
-		assert.ErrorIs(t,
-			pool.addTx(local, signTx(tx)),
-			ErrInvalidTxType,
+		err := pool.addTx(local, signTx(tx))
+
+		assert.ErrorContains(t,
+			err,
+			ErrInvalidTxType.Error(),
+		)
+		assert.ErrorContains(t,
+			err,
+			"state transactions are not expected to be added to the pool",
+		)
+	})
+
+	t.Run("ErrTxTypeNotSupported London hardfork not enabled", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.RemoveFork(chain.London)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+
+		err := pool.addTx(local, signTx(tx))
+
+		assert.ErrorContains(t,
+			err,
+			ErrTxTypeNotSupported.Error(),
+		)
+		assert.ErrorContains(t,
+			err,
+			"london hardfork is not enabled",
 		)
 	})
 
