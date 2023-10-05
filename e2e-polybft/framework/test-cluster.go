@@ -51,13 +51,20 @@ const (
 	nonValidatorPrefix = "test-non-validator-"
 )
 
+type NodeType int
+
 const (
-	Validator = 1 << iota
-	Relayer
+	None      NodeType = 0
+	Validator NodeType = 1 << iota
+	Relayer   NodeType = 2
 )
 
-func HasFlag(flags int, flag int) bool {
-	return flags&flag == flag
+func (nt NodeType) IsSet(value NodeType) bool {
+	return nt&value == value
+}
+
+func (nt *NodeType) Append(value NodeType) {
+	*nt |= value
 }
 
 var (
@@ -648,25 +655,25 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	require.NoError(t, err)
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
-		flags := Validator
+		nodeType := Validator
 		if i == 1 {
-			flags = flags | Relayer
+			nodeType.Append(Relayer)
 		}
 
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), flags)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), nodeType)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), 0 /* no flags */)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), None)
 	}
 
 	return cluster
 }
 
 func (c *TestCluster) InitTestServer(t *testing.T,
-	dataDir string, bridgeJSONRPC string, flags int) {
+	dataDir string, bridgeJSONRPC string, nodeType NodeType) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -681,11 +688,11 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 
 	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
 		config.DataDir = dataDir
-		config.Seal = HasFlag(flags, Validator)
+		config.Seal = nodeType.IsSet(Validator)
 		config.Chain = c.Config.Dir("genesis.json")
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
-		config.Relayer = HasFlag(flags, Relayer)
+		config.Relayer = nodeType.IsSet(Relayer)
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
 		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
