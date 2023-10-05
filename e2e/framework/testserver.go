@@ -571,8 +571,8 @@ func (t *TestServer) DeployContract(
 }
 
 const (
-	DefaultGasPrice = 1879048192 // 0x70000000
-	DefaultGasLimit = 5242880    // 0x500000
+	DefaultGasPrice = 10e9    // 0x2540BE400
+	DefaultGasLimit = 5242880 // 0x500000
 )
 
 type PreparedTransaction struct {

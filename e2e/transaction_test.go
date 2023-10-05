@@ -169,7 +169,7 @@ func TestEthTransfer(t *testing.T) {
 			txn := &framework.PreparedTransaction{
 				From:     testCase.sender,
 				To:       &testCase.recipient,
-				GasPrice: big.NewInt(1000000000),
+				GasPrice: ethgo.Gwei(1),
 				Gas:      1000000,
 				Value:    testCase.amount,
 			}
@@ -396,7 +396,7 @@ func Test_TransactionIBFTLoop(t *testing.T) {
 
 		deployTx := &framework.PreparedTransaction{
 			From:     sender,
-			GasPrice: big.NewInt(framework.DefaultGasPrice),
+			GasPrice: ethgo.Gwei(1),
 			Gas:      framework.DefaultGasLimit,
 			Value:    big.NewInt(0),
 			Input:    buf,
