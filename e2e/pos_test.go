@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
@@ -170,6 +172,20 @@ func TestPoS_ValidatorBoundaries(t *testing.T) {
 	}
 }
 
+func init() {
+	wd, err := os.Getwd()
+	if err != nil {
+		return
+	}
+
+	parent := filepath.Dir(wd)
+	wd = filepath.Join(parent, "artifacts/polygon-edge")
+	os.Setenv("EDGE_BINARY", wd)
+	os.Setenv("E2E_TESTS", "true")
+	os.Setenv("E2E_LOGS", "true")
+	os.Setenv("E2E_LOG_LEVEL", "debug")
+}
+
 func TestPoS_Stake(t *testing.T) {
 	stakerKey, stakerAddr := tests.GenerateKeyAndAddr(t)
 	defaultBalance := framework.EthToWei(100)
@@ -306,7 +322,7 @@ func TestPoS_Unstake(t *testing.T) {
 	// Check the address balance
 	fee := new(big.Int).Mul(
 		big.NewInt(int64(receipt.GasUsed)),
-		big.NewInt(framework.DefaultGasPrice),
+		big.NewInt(1000000000),
 	)
 
 	accountBalance := framework.GetAccountBalance(t, unstakerAddr, client)
