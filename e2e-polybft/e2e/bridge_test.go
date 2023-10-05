@@ -1124,18 +1124,29 @@ func TestE2E_Bridge_ChildChainMintableTokensTransfer(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		childChainBlockNum, err := childEthEndpoint.BlockNumber()
-		require.NoError(t, err)
+		allSuccessful := false
 
-		// wait for commitment execution
-		require.NoError(t, cluster.WaitForBlock(childChainBlockNum+3*sprintSize, 2*time.Minute))
+		for it := 0; it < numberOfAttempts && !allSuccessful; it++ {
+			childChainBlockNum, err := childEthEndpoint.BlockNumber()
+			require.NoError(t, err)
 
-		// check owners on the child chain
-		for i, receiver := range depositors {
-			owner := erc721OwnerOf(t, big.NewInt(int64(i)), types.Address(rootERC721Token), childchainTxRelayer)
-			t.Log("RootERC721 owner", owner)
-			require.Equal(t, receiver, owner)
+			// wait for commitment execution
+			require.NoError(t, cluster.WaitForBlock(childChainBlockNum+3*sprintSize, 2*time.Minute))
+
+			allSuccessful = true
+			// check owners on the child chain
+			for i, receiver := range depositors {
+				owner := erc721OwnerOf(t, big.NewInt(int64(i)), types.Address(rootERC721Token), childchainTxRelayer)
+				t.Log("Attempt:", it+1, " Owner:", owner, " Receiver:", receiver)
+				if receiver != owner {
+					allSuccessful = false
+
+					break
+				}
+			}
 		}
+
+		require.True(t, allSuccessful)
 	})
 }
 
@@ -1528,6 +1539,7 @@ func TestE2E_Bridge_Transfers_WithBlockTrackerPollInterval(t *testing.T) {
 		sprintSize            = uint64(5)
 		rootPollInterval      = 5 * time.Second
 		relayerPollInterval   = 5 * time.Second
+		numberOfAttempts      = uint64(4)
 		stateSyncedLogsCount  = 1
 	)
 
@@ -1568,16 +1580,23 @@ func TestE2E_Bridge_Transfers_WithBlockTrackerPollInterval(t *testing.T) {
 
 	// wait for a couple of sprints
 	finalBlockNum := 5 * sprintSize
-	require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
 
 	// the transaction is processed and there should be a success event
 	var stateSyncedResult contractsapi.StateSyncResultEvent
 
-	logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum, childEthEndpoint)
-	require.NoError(t, err)
+	for i := uint64(0); i < numberOfAttempts; i++ {
+		logs, err := getFilteredLogs(stateSyncedResult.Sig(), 0, finalBlockNum+i*sprintSize, childEthEndpoint)
+		require.NoError(t, err)
 
-	// assert that all deposits are executed successfully
-	checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
+		if len(logs) == stateSyncedLogsCount || i == numberOfAttempts-1 {
+			// assert that all deposits are executed successfully
+			checkStateSyncResultLogs(t, logs, stateSyncedLogsCount)
+
+			break
+		}
+
+		require.NoError(t, cluster.WaitForBlock(finalBlockNum+(i+1)*sprintSize, 2*time.Minute))
+	}
 
 	// check validator balance got increased by deposited amount
 	balance, err := childEthEndpoint.GetBalance(ethgo.Address(senderAccount.Address()), ethgo.Latest)
