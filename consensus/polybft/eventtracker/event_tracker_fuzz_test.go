@@ -16,7 +16,7 @@ type getNewStateF struct {
 	LastProcessed         uint64
 	BatchSize             uint64
 	NumBlockConfirmations uint64
-	MaxBackLogSize        uint64
+	NumBlocksToReconcile  uint64
 }
 
 func FuzzGetNewState(f *testing.F) {
@@ -27,7 +27,7 @@ func FuzzGetNewState(f *testing.F) {
 			LastProcessed:         9,
 			BatchSize:             5,
 			NumBlockConfirmations: 3,
-			MaxBackLogSize:        1000,
+			NumBlocksToReconcile:  1000,
 		},
 		{
 			Address:               types.Address(types.StringToAddress("1").Bytes()),
@@ -35,7 +35,7 @@ func FuzzGetNewState(f *testing.F) {
 			LastProcessed:         29,
 			BatchSize:             5,
 			NumBlockConfirmations: 3,
-			MaxBackLogSize:        1000,
+			NumBlocksToReconcile:  1000,
 		},
 		{
 			Address:               types.Address(types.StringToAddress("2").Bytes()),
@@ -43,7 +43,7 @@ func FuzzGetNewState(f *testing.F) {
 			LastProcessed:         10,
 			BatchSize:             10,
 			NumBlockConfirmations: 3,
-			MaxBackLogSize:        15,
+			NumBlocksToReconcile:  15,
 		},
 	}
 
@@ -74,12 +74,13 @@ func FuzzGetNewState(f *testing.F) {
 		}
 		providerMock.On("GetLogs", mock.Anything).Return(logs, nil)
 
-		testConfig := createTestTrackerConfig(t, data.NumBlockConfirmations, data.BatchSize, data.MaxBackLogSize)
+		testConfig := createTestTrackerConfig(t, data.NumBlockConfirmations, data.BatchSize, data.NumBlocksToReconcile)
 		testConfig.BlockProvider = providerMock
 
 		eventTracker := &EventTracker{
 			config:         testConfig,
 			blockContainer: NewTrackerBlockContainer(data.LastProcessed),
+			store:          newTestTrackerStore(t),
 		}
 
 		require.NoError(t, eventTracker.getNewState(&ethgo.Block{Number: data.Number}))

@@ -89,7 +89,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 	t.Run("Add block by block - no confirmed blocks", func(t *testing.T) {
 		t.Parallel()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, 10, 10, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, 10, 10, 0), newTestTrackerStore(t), 0)
 
 		require.NoError(t, err)
 
@@ -112,7 +112,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 
 		// check that the last processed block is 0, since we did not have any confirmed blocks
 		require.Equal(t, uint64(0), tracker.blockContainer.LastProcessedBlockLocked())
-		lastProcessedBlockInStore, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedBlockInStore, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), lastProcessedBlockInStore)
 
@@ -131,7 +131,8 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return([]*ethgo.Log{}, nil).Once()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0),
+			newTestTrackerStore(t), 0)
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -164,7 +165,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// check if the last confirmed block processed is as expected
 		require.Equal(t, numOfConfirmedBlocks, tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
-		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedConfirmedBlock, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, numOfConfirmedBlocks, lastProcessedConfirmedBlock)
 		// check that in memory cache removed processed confirmed logs
@@ -197,7 +198,8 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return(logs, nil).Once()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0),
+			newTestTrackerStore(t), 0)
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -230,12 +232,12 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// check if the last confirmed block processed is as expected
 		require.Equal(t, numOfConfirmedBlocks, tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
-		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedConfirmedBlock, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, numOfConfirmedBlocks, lastProcessedConfirmedBlock)
 		// check if we have logs in store
 		for _, log := range logs {
-			logFromDB, err := tracker.config.Store.GetLog(log.BlockNumber, log.LogIndex)
+			logFromDB, err := tracker.store.GetLog(log.BlockNumber, log.LogIndex)
 			require.NoError(t, err)
 			require.Equal(t, log.Address, logFromDB.Address)
 			require.Equal(t, log.BlockNumber, log.BlockNumber)
@@ -265,7 +267,8 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		blockProviderMock := new(mockProvider)
 		blockProviderMock.On("GetLogs", mock.Anything).Return(nil, errors.New("some error occurred")).Once()
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, 10, 0),
+			newTestTrackerStore(t), 0)
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -298,7 +301,7 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// check if the last confirmed block processed is as expected, in this case 0, because an error occurred
 		require.Equal(t, uint64(0), tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
-		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedConfirmedBlock, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), lastProcessedConfirmedBlock)
 		// check that in memory cache nothing got removed, and that we have the latest block as well
@@ -335,7 +338,8 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfMissedBlocks))
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0),
+			newTestTrackerStore(t), 0)
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -369,11 +373,11 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		expectedLastProcessed := numOfMissedBlocks + 1 - numBlockConfirmations
 		require.Equal(t, expectedLastProcessed, tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
-		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedConfirmedBlock, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, expectedLastProcessed, lastProcessedConfirmedBlock)
 		// check if we have logs in store
-		logsFromDB, err := tracker.config.Store.GetAllLogs()
+		logsFromDB, err := tracker.store.GetAllLogs()
 		require.NoError(t, err)
 		require.Len(t, logsFromDB, len(logs))
 
@@ -420,7 +424,8 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfMissedBlocks + numOfCachedBlocks))
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0),
+			newTestTrackerStore(t), 0)
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -467,11 +472,11 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		expectedLastProcessed := numOfMissedBlocks + numOfCachedBlocks + 1 - numBlockConfirmations
 		require.Equal(t, expectedLastProcessed, tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
-		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedConfirmedBlock, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, expectedLastProcessed, lastProcessedConfirmedBlock)
 		// check if we have logs in store
-		logsFromDB, err := tracker.config.Store.GetAllLogs()
+		logsFromDB, err := tracker.store.GetAllLogs()
 		require.NoError(t, err)
 		require.Len(t, logsFromDB, len(logs))
 
@@ -515,7 +520,8 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		// just mock the call, it will use the provider.blocks map to handle proper returns
 		blockProviderMock.On("GetBlockByNumber", mock.Anything, mock.Anything).Return(nil, nil).Times(int(numOfCachedBlocks))
 
-		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0), 0)
+		tracker, err := NewEventTracker(createTestTrackerConfig(t, numBlockConfirmations, batchSize, 0),
+			newTestTrackerStore(t), 0)
 		require.NoError(t, err)
 
 		tracker.config.BlockProvider = blockProviderMock
@@ -560,11 +566,11 @@ func TestEventTracker_TrackBlock(t *testing.T) {
 		expectedLastProcessed := numOfCachedBlocks + 1 - numBlockConfirmations
 		require.Equal(t, expectedLastProcessed, tracker.blockContainer.LastProcessedBlock())
 		// check if the last confirmed block is saved in db as well
-		lastProcessedConfirmedBlock, err := tracker.config.Store.GetLastProcessedBlock()
+		lastProcessedConfirmedBlock, err := tracker.store.GetLastProcessedBlock()
 		require.NoError(t, err)
 		require.Equal(t, expectedLastProcessed, lastProcessedConfirmedBlock)
 		// check if we have logs in store
-		logsFromDB, err := tracker.config.Store.GetAllLogs()
+		logsFromDB, err := tracker.store.GetAllLogs()
 		require.NoError(t, err)
 		require.Len(t, logsFromDB, len(logs))
 
@@ -598,7 +604,6 @@ func createTestTrackerConfig(t *testing.T, numBlockConfirmations, batchSize,
 		LogFilter: map[ethgo.Address][]ethgo.Hash{
 			ethgo.ZeroAddress: {stateSyncEvent.Sig()},
 		},
-		Store:           newTestTrackerStore(t),
 		EventSubscriber: new(mockEventSubscriber),
 		BlockProvider:   new(mockProvider),
 	}

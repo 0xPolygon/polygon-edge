@@ -106,6 +106,7 @@ type stateSyncManager struct {
 	nextCommittedIndex uint64
 
 	runtime Runtime
+	tracker *eventtracker.EventTracker
 }
 
 // topic is an interface for p2p message gossiping
@@ -141,6 +142,10 @@ func (s *stateSyncManager) Init() error {
 
 func (s *stateSyncManager) Close() {
 	close(s.closeCh)
+
+	if s.tracker != nil {
+		s.tracker.Close()
+	}
 }
 
 // initTracker sets up and starts the event tracker implementation
@@ -164,16 +169,17 @@ func (s *stateSyncManager) initTracker() error {
 		NumOfBlocksToReconcile: s.config.trackerBlocksToReconcile,
 		PollInterval:           s.config.blockTrackerPollInterval,
 		Logger:                 s.logger,
-		Store:                  store,
 		EventSubscriber:        s,
 		BlockProvider:          clt.Eth(),
 		LogFilter: map[ethgo.Address][]ethgo.Hash{
 			ethgo.Address(s.config.stateSenderAddr): {stateSyncEvent.Sig()},
 		},
-	}, s.config.stateSenderStartBlock)
+	}, store, s.config.stateSenderStartBlock)
 	if err != nil {
 		return err
 	}
+
+	s.tracker = tracker
 
 	return tracker.Start()
 }

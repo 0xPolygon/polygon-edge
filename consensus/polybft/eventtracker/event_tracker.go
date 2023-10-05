@@ -62,9 +62,6 @@ type EventTrackerConfig struct {
 	// LogFilter defines which events are tracked and from which contracts on the tracked chain
 	LogFilter map[ethgo.Address][]ethgo.Hash
 
-	// Store is the store implementation for data that tracker saves (lastProcessedBlock and logs)
-	Store EventTrackerStore
-
 	// BlockProvider is the implementation of a provider that returns blocks and logs from tracked chain
 	BlockProvider BlockProvider
 
@@ -81,6 +78,9 @@ type EventTracker struct {
 
 	blockTracker   blocktracker.BlockTrackerInterface
 	blockContainer *TrackerBlockContainer
+
+	// store is the store implementation for data that tracker saves (lastProcessedBlock and logs)
+	store EventTrackerStore
 }
 
 // NewEventTracker is a constructor function that creates a new instance of the EventTracker struct.
@@ -89,10 +89,9 @@ type EventTracker struct {
 //
 //	config := &EventTrackerConfig{
 //		RpcEndpoint:           "http://some-json-rpc-url.com",
-//		StartBlockFromConfig:  100_000,
 //		NumBlockConfirmations: 10,
 //		SyncBatchSize:         20,
-//		MaxBacklogSize:        10_000,
+//		NumOfBlocksToReconcile:10_000,
 //		PollInterval:          2 * time.Second,
 //		Logger:                logger,
 //		Store:                 store,
@@ -103,15 +102,16 @@ type EventTracker struct {
 //			IDs:       []ethgo.Hash{idHashOfSomeEvent},
 //		},
 //	}
-//		t := NewEventTracker(config)
+//		t := NewEventTracker(config, store)
 //
 // Inputs:
 //   - config (TrackerConfig): configuration of EventTracker.
 //
 // Outputs:
 //   - A new instance of the EventTracker struct.
-func NewEventTracker(config *EventTrackerConfig, startBlockFromGenesis uint64) (*EventTracker, error) {
-	lastProcessedBlock, err := config.Store.GetLastProcessedBlock()
+func NewEventTracker(config *EventTrackerConfig, store EventTrackerStore,
+	startBlockFromGenesis uint64) (*EventTracker, error) {
+	lastProcessedBlock, err := store.GetLastProcessedBlock()
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +137,7 @@ func NewEventTracker(config *EventTrackerConfig, startBlockFromGenesis uint64) (
 
 	return &EventTracker{
 		config:         config,
+		store:          store,
 		closeCh:        make(chan struct{}),
 		blockTracker:   blocktracker.NewJSONBlockTracker(config.BlockProvider),
 		blockContainer: NewTrackerBlockContainer(lastProcessedBlock),
@@ -166,7 +167,7 @@ func (e *EventTracker) Close() {
 // Start is a method in the EventTracker struct that starts the tracking of blocks
 // and retrieval of logs from given blocks from the tracked chain.
 // If the tracker was turned off (node was down) for some time, it will sync up all the missed
-// blocks and logs from the last start (in regards to MaxBacklogSize field in config).
+// blocks and logs from the last start (in regards to NumOfBlocksToReconcile field in config).
 //
 // Returns:
 //   - nil if start passes successfully.
@@ -416,7 +417,7 @@ func (e *EventTracker) processLogs() error {
 		}
 	}
 
-	if err := e.config.Store.InsertLastProcessedBlock(toBlock); err != nil {
+	if err := e.store.InsertLastProcessedBlock(toBlock); err != nil {
 		e.config.Logger.Error("Process logs failed on saving last processed block",
 			"fromBlock", fromBlock,
 			"toBlock", toBlock,
@@ -425,7 +426,7 @@ func (e *EventTracker) processLogs() error {
 		return err
 	}
 
-	if err := e.config.Store.InsertLogs(filteredLogs); err != nil {
+	if err := e.store.InsertLogs(filteredLogs); err != nil {
 		e.config.Logger.Error("Process logs failed on saving logs to store",
 			"fromBlock", fromBlock,
 			"toBlock", toBlock,
