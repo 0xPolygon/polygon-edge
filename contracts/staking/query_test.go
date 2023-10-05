@@ -66,6 +66,10 @@ func (m *TxMock) GetNonce(addr types.Address) uint64 {
 	return 0
 }
 
+func (m *TxMock) SetNonPayable(nonPayable bool) {
+	panic("not implemented")
+}
+
 func Test_decodeValidators(t *testing.T) {
 	tests := []struct {
 		name     string

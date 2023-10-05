@@ -349,7 +349,7 @@ func (t *TestServer) GenerateGenesis() error {
 
 	// add base fee
 	if t.Config.BaseFee != 0 {
-		args = append(args, "--base-fee", *common.EncodeUint64(t.Config.BaseFee))
+		args = append(args, "--base-fee-config", *common.EncodeUint64(t.Config.BaseFee))
 	}
 
 	// add burn contracts
