@@ -12,6 +12,9 @@ type PostBlockRequest struct {
 	Epoch uint64
 	// IsEpochEndingBlock indicates if this was the last block of given epoch
 	IsEpochEndingBlock bool
+	// DBTx is the opened transaction on state store (in our case boltDB)
+	// used to save necessary data on PostBlock
+	DBTx DBTransaction
 }
 
 type PostEpochRequest struct {
@@ -27,4 +30,8 @@ type PostEpochRequest struct {
 
 	// ValidatorSet is the validator set for the new epoch
 	ValidatorSet validator.ValidatorSet
+
+	// DBTx is the opened transaction on state store (in our case boltDB)
+	// used to save necessary data on PostEpoch
+	DBTx DBTransaction
 }

@@ -106,7 +106,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		// insert initial full validator set
 		require.NoError(t, state.StakeStore.insertFullValidatorSet(validatorSetState{
 			Validators: newValidatorStakeMap(validators.GetPublicIdentities(initialSetAliases...)),
-		}))
+		}, nil))
 
 		stakeManager, err := newStakeManager(
 			hclog.NewNullLogger(),
@@ -118,6 +118,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			bcMock,
 			nil,
 			5,
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -155,7 +156,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 	bcMock.On("CurrentHeader").Return(&types.Header{Number: 0})
 
 	err := state.StakeStore.insertFullValidatorSet(validatorSetState{
-		Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
+		Validators: newValidatorStakeMap(validators.GetPublicIdentities())}, nil)
 	require.NoError(f, err)
 
 	stakeManager, err := newStakeManager(
@@ -167,6 +168,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		bcMock,
 		nil,
 		10,
+		nil,
 	)
 	require.NoError(f, err)
 
@@ -212,7 +214,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		}
 
 		err := state.StakeStore.insertFullValidatorSet(validatorSetState{
-			Validators: newValidatorStakeMap(validators.GetPublicIdentities())})
+			Validators: newValidatorStakeMap(validators.GetPublicIdentities())}, nil)
 		require.NoError(t, err)
 
 		_, err = stakeManager.UpdateValidatorSet(data.EpochID, validators.GetPublicIdentities(aliases[data.Index:]...))

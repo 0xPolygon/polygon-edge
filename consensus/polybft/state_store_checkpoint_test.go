@@ -147,7 +147,7 @@ func TestState_decodeExitEvent(t *testing.T) {
 	require.Equal(t, uint64(epoch), event.EpochNumber)
 	require.Equal(t, uint64(blockNumber), event.BlockNumber)
 
-	require.NoError(t, state.CheckpointStore.insertExitEvents([]*ExitEvent{event}))
+	require.NoError(t, state.CheckpointStore.insertExitEvent(event, nil))
 }
 
 func TestState_decodeExitEvent_NotAnExitEvent(t *testing.T) {
@@ -197,7 +197,10 @@ func insertTestExitEvents(t *testing.T, state *State,
 			block++
 		}
 	}
-	require.NoError(t, state.CheckpointStore.insertExitEvents(exitEvents))
+
+	for _, ee := range exitEvents {
+		require.NoError(t, state.CheckpointStore.insertExitEvent(ee, nil))
+	}
 
 	return exitEvents
 }

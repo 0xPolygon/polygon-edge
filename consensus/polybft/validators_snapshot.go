@@ -51,7 +51,7 @@ func newValidatorsSnapshotCache(
 // applies pending validator set deltas to it.
 // Otherwise, it builds a snapshot from scratch and applies pending validator set deltas.
 func (v *validatorsSnapshotCache) GetSnapshot(
-	blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
+	blockNumber uint64, parents []*types.Header, dbTx DBTransaction) (validator.AccountSet, error) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
@@ -75,7 +75,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 
 	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochToGetSnapshot)
 
-	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot)
+	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot, dbTx)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
 		}
 
-		err = v.storeSnapshot(genesisBlockSnapshot)
+		err = v.storeSnapshot(genesisBlockSnapshot, dbTx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %w", err)
 		}
@@ -123,7 +123,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		}
 
 		latestValidatorSnapshot = intermediateSnapshot
-		if err = v.storeSnapshot(latestValidatorSnapshot); err != nil {
+		if err = v.storeSnapshot(latestValidatorSnapshot, dbTx); err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch %d: %w", latestValidatorSnapshot.Epoch, err)
 		}
 
@@ -135,7 +135,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		"Epoch", latestValidatorSnapshot.Epoch,
 	)
 
-	if err := v.cleanup(); err != nil {
+	if err := v.cleanup(dbTx); err != nil {
 		// error on cleanup should not block or fail any action
 		v.logger.Error("could not clean validator snapshots from cache and db", "err", err)
 	}
@@ -213,11 +213,11 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 }
 
 // storeSnapshot stores given snapshot to the in-memory cache and database
-func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot) error {
+func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot, dbTx DBTransaction) error {
 	copySnap := snapshot.copy()
 	v.snapshots[copySnap.Epoch] = copySnap
 
-	if err := v.state.EpochStore.insertValidatorSnapshot(copySnap); err != nil {
+	if err := v.state.EpochStore.insertValidatorSnapshot(copySnap, dbTx); err != nil {
 		return fmt.Errorf("failed to insert validator snapshot for epoch %d to the database: %w", copySnap.Epoch, err)
 	}
 
@@ -227,7 +227,7 @@ func (v *validatorsSnapshotCache) storeSnapshot(snapshot *validatorSnapshot) err
 }
 
 // Cleanup cleans the validators cache in memory and db
-func (v *validatorsSnapshotCache) cleanup() error {
+func (v *validatorsSnapshotCache) cleanup(dbTx DBTransaction) error {
 	if len(v.snapshots) >= validatorSnapshotLimit {
 		latestEpoch := uint64(0)
 
@@ -250,7 +250,7 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 		v.snapshots = cache
 
-		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
+		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch, dbTx)
 	}
 
 	return nil
@@ -258,7 +258,7 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 // getLastCachedSnapshot gets the latest snapshot cached
 // If it doesn't have snapshot cached for desired epoch, it will return the latest one it has
-func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*validatorSnapshot, error) {
+func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64, dbTx DBTransaction) (*validatorSnapshot, error) {
 	cachedSnapshot := v.snapshots[currentEpoch]
 	if cachedSnapshot != nil {
 		return cachedSnapshot, nil
@@ -278,7 +278,7 @@ func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*v
 		}
 	}
 
-	dbSnapshot, err := v.state.EpochStore.getLastSnapshot()
+	dbSnapshot, err := v.state.EpochStore.getLastSnapshot(dbTx)
 	if err != nil {
 		return nil, err
 	}

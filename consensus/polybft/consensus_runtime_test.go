@@ -201,7 +201,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validatorSet).Times(3)
+	polybftBackendMock.On("GetValidatorsWithTx", mock.Anything, mock.Anything, mock.Anything).Return(validatorSet).Times(3)
 
 	txPool := new(txPoolMock)
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
@@ -216,6 +216,8 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		txPool:         txPool,
 		State:          newTestState(t),
 	}
+	require.NoError(t, config.State.insertLastProcessedEventsBlock(builtBlock.Number()-1, nil))
+
 	runtime := &consensusRuntime{
 		proposerCalculator: NewProposerCalculatorFromSnapshot(snapshot, config, hclog.NewNullLogger()),
 		logger:             hclog.NewNullLogger(),
@@ -229,6 +231,7 @@ func TestConsensusRuntime_OnBlockInserted_EndOfEpoch(t *testing.T) {
 		stateSyncManager:  &dummyStateSyncManager{},
 		checkpointManager: &dummyCheckpointManager{},
 		stakeManager:      &dummyStakeManager{},
+		eventProvider:     NewEventProvider(blockchainMock),
 	}
 	runtime.OnBlockInserted(&types.FullBlock{Block: builtBlock})
 
@@ -258,7 +261,7 @@ func TestConsensusRuntime_OnBlockInserted_MiddleOfEpoch(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(builtBlock.Header, true).Once()
 
 	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(nil).Once()
+	polybftBackendMock.On("GetValidatorsWithTx", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
 	txPool := new(txPoolMock)
 	txPool.On("ResetWithHeaders", mock.Anything).Once()
@@ -395,7 +398,7 @@ func TestConsensusRuntime_FSM_EndOfEpoch_BuildCommitEpoch(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headerMap.getHeader)
 
 	state := newTestState(t)
-	require.NoError(t, state.EpochStore.insertEpoch(epoch))
+	require.NoError(t, state.EpochStore.insertEpoch(epoch, nil))
 
 	metadata := &epochMetadata{
 		Validators:        validators,
@@ -467,7 +470,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", uint64(1)).Return(&types.Header{Number: 1, ExtraData: createTestExtraForAccounts(t, 1, validators, nil)})
 
 	polybftBackendMock := new(polybftBackendMock)
-	polybftBackendMock.On("GetValidators", mock.Anything, mock.Anything).Return(validators).Times(3)
+	polybftBackendMock.On("GetValidatorsWithTx", mock.Anything, mock.Anything, mock.Anything).Return(validators).Times(3)
 
 	tmpDir := t.TempDir()
 	config := &runtimeConfig{
@@ -482,7 +485,7 @@ func Test_NewConsensusRuntime(t *testing.T) {
 
 	require.NoError(t, config.State.StakeStore.insertFullValidatorSet(validatorSetState{
 		BlockNumber: 1,
-	}))
+	}, nil))
 
 	runtime, err := newConsensusRuntime(hclog.NewNullLogger(), config)
 	require.NoError(t, err)
@@ -533,7 +536,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 	}
 	runtime.setIsActiveValidator(true)
 
-	epoch, err := runtime.restartEpoch(newCurrentHeader)
+	epoch, err := runtime.restartEpoch(newCurrentHeader, nil)
 
 	require.NoError(t, err)
 

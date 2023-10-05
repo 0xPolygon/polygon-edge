@@ -218,7 +218,7 @@ func (s *stateSyncManager) saveVote(msg *TransportMessage) error {
 		Signature: msg.Signature,
 	}
 
-	numSignatures, err := s.state.StateSyncStore.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote)
+	numSignatures, err := s.state.StateSyncStore.insertMessageVote(msg.EpochNumber, msg.Hash, msgVote, nil)
 	if err != nil {
 		return fmt.Errorf("error inserting message vote: %w", err)
 	}
@@ -281,7 +281,7 @@ func (s *stateSyncManager) AddLog(eventLog *ethgo.Log) error {
 		return err
 	}
 
-	if err := s.buildCommitment(); err != nil {
+	if err := s.buildCommitment(nil); err != nil {
 		// we don't return an error here. If state sync event is inserted in db,
 		// we will just try to build a commitment on next block or next event arrival
 		s.logger.Error("could not build a commitment on arrival of new state sync", "err", err, "stateSyncID", event.ID)
@@ -413,7 +413,7 @@ func (s *stateSyncManager) PostEpoch(req *PostEpochRequest) error {
 
 	s.lock.Unlock()
 
-	return s.buildCommitment()
+	return s.buildCommitment(req.DBTx)
 }
 
 // PostBlock notifies state sync manager that a block was finalized,
@@ -448,11 +448,11 @@ func (s *stateSyncManager) PostBlock(req *PostBlockRequest) error {
 		return nil
 	}
 
-	if err := s.state.StateSyncStore.insertCommitmentMessage(commitment); err != nil {
+	if err := s.state.StateSyncStore.insertCommitmentMessage(commitment, req.DBTx); err != nil {
 		return fmt.Errorf("insert commitment message error: %w", err)
 	}
 
-	if err := s.buildProofs(commitment.Message); err != nil {
+	if err := s.buildProofs(commitment.Message, req.DBTx); err != nil {
 		return fmt.Errorf("build commitment proofs error: %w", err)
 	}
 
@@ -482,7 +482,7 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 			return types.Proof{}, fmt.Errorf("cannot find commitment for StateSync id %d: %w", stateSyncID, err)
 		}
 
-		if err := s.buildProofs(commitment.Message); err != nil {
+		if err := s.buildProofs(commitment.Message, nil); err != nil {
 			return types.Proof{}, fmt.Errorf("cannot build proofs for commitment for StateSync id %d: %w", stateSyncID, err)
 		}
 
@@ -501,7 +501,8 @@ func (s *stateSyncManager) GetStateSyncProof(stateSyncID uint64) (types.Proof, e
 }
 
 // buildProofs builds state sync proofs for the submitted commitment and saves them in boltDb for later execution
-func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncCommitment) error {
+func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncCommitment,
+	dbTx DBTransaction) error {
 	from := commitmentMsg.StartID.Uint64()
 	to := commitmentMsg.EndID.Uint64()
 
@@ -511,7 +512,7 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 		"toIndex", to,
 	)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(from, to)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(from, to, dbTx)
 	if err != nil {
 		return fmt.Errorf("failed to get state sync events for commitment to build proofs. Error: %w", err)
 	}
@@ -546,11 +547,11 @@ func (s *stateSyncManager) buildProofs(commitmentMsg *contractsapi.StateSyncComm
 		"toIndex", to,
 	)
 
-	return s.state.StateSyncStore.insertStateSyncProofs(stateSyncProofs)
+	return s.state.StateSyncStore.insertStateSyncProofs(stateSyncProofs, dbTx)
 }
 
 // buildCommitment builds a new commitment, signs it and gossips its vote for it
-func (s *stateSyncManager) buildCommitment() error {
+func (s *stateSyncManager) buildCommitment(dbTx DBTransaction) error {
 	if !s.runtime.IsActiveValidator() {
 		// don't build commitment if not a validator
 		return nil
@@ -560,7 +561,7 @@ func (s *stateSyncManager) buildCommitment() error {
 	defer s.lock.Unlock()
 
 	stateSyncEvents, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(s.nextCommittedIndex,
-		s.nextCommittedIndex+s.config.maxCommitmentSize-1)
+		s.nextCommittedIndex+s.config.maxCommitmentSize-1, dbTx)
 	if err != nil && !errors.Is(err, errNotEnoughStateSyncs) {
 		return fmt.Errorf("failed to get state sync events for commitment. Error: %w", err)
 	}
@@ -598,7 +599,7 @@ func (s *stateSyncManager) buildCommitment() error {
 		Signature: signature,
 	}
 
-	if _, err = s.state.StateSyncStore.insertMessageVote(s.epoch, hashBytes, sig); err != nil {
+	if _, err = s.state.StateSyncStore.insertMessageVote(s.epoch, hashBytes, sig, dbTx); err != nil {
 		return fmt.Errorf(
 			"failed to insert signature for hash=%v to the state. Error: %w",
 			hex.EncodeToString(hashBytes),

@@ -39,25 +39,47 @@ func (s *ProposerSnapshotStore) getProposerSnapshot() (*ProposerSnapshot, error)
 	var snapshot *ProposerSnapshot
 
 	err := s.db.View(func(tx *bolt.Tx) error {
-		value := tx.Bucket(proposerSnapshotBucket).Get(proposerSnapshotKey)
-		if value == nil {
-			return nil
+		s, err := s.getProposerSnapshotWithTx(tx)
+		if err != nil {
+			return err
 		}
 
-		return json.Unmarshal(value, &snapshot)
+		snapshot = s
+
+		return nil
 	})
 
 	return snapshot, err
 }
 
+func (s *ProposerSnapshotStore) getProposerSnapshotWithTx(dbTx DBTransaction) (*ProposerSnapshot, error) {
+	value := dbTx.Bucket(proposerSnapshotBucket).Get(proposerSnapshotKey)
+	if value == nil {
+		return nil, nil
+	}
+
+	var snapshot *ProposerSnapshot
+	if err := json.Unmarshal(value, &snapshot); err != nil {
+		return nil, err
+	}
+
+	return snapshot, nil
+}
+
 // writeProposerSnapshot writes proposer snapshot
 func (s *ProposerSnapshotStore) writeProposerSnapshot(snapshot *ProposerSnapshot) error {
+	return s.db.Update(func(tx *bolt.Tx) error {
+		return s.writeProposerSnapshotWithTx(snapshot, tx)
+	})
+}
+
+// writeProposerSnapshot writes proposer snapshot
+// Note that function assumes that db tx is already open
+func (s *ProposerSnapshotStore) writeProposerSnapshotWithTx(snapshot *ProposerSnapshot, dbTx DBTransaction) error {
 	raw, err := json.Marshal(snapshot)
 	if err != nil {
 		return err
 	}
 
-	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(proposerSnapshotBucket).Put(proposerSnapshotKey, raw)
-	})
+	return dbTx.Bucket(proposerSnapshotBucket).Put(proposerSnapshotKey, raw)
 }

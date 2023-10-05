@@ -58,15 +58,23 @@ func (s *EpochStore) initialize(tx *bolt.Tx) error {
 }
 
 // insertValidatorSnapshot inserts a validator snapshot for the given block to its bucket in db
-func (s *EpochStore) insertValidatorSnapshot(validatorSnapshot *validatorSnapshot) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+func (s *EpochStore) insertValidatorSnapshot(validatorSnapshot *validatorSnapshot, dbTx DBTransaction) error {
+	insertFn := func(tx DBTransaction) error {
 		raw, err := json.Marshal(validatorSnapshot)
 		if err != nil {
 			return err
 		}
 
 		return tx.Bucket(validatorSnapshotsBucket).Put(common.EncodeUint64ToBytes(validatorSnapshot.Epoch), raw)
-	})
+	}
+
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return insertFn(tx)
+		})
+	}
+
+	return insertFn(dbTx)
 }
 
 // getValidatorSnapshot queries the validator snapshot for given block from db
@@ -88,10 +96,10 @@ func (s *EpochStore) getValidatorSnapshot(epoch uint64) (*validatorSnapshot, err
 // getLastSnapshot returns the last snapshot saved in db
 // since they are stored by epoch number (uint64), they are sequentially stored,
 // so the latest epoch will be the last snapshot in db
-func (s *EpochStore) getLastSnapshot() (*validatorSnapshot, error) {
+func (s *EpochStore) getLastSnapshot(dbTx DBTransaction) (*validatorSnapshot, error) {
 	var snapshot *validatorSnapshot
 
-	err := s.db.View(func(tx *bolt.Tx) error {
+	getFn := func(tx DBTransaction) error {
 		c := tx.Bucket(validatorSnapshotsBucket).Cursor()
 		k, v := c.Last()
 		if k == nil {
@@ -100,14 +108,24 @@ func (s *EpochStore) getLastSnapshot() (*validatorSnapshot, error) {
 		}
 
 		return json.Unmarshal(v, &snapshot)
-	})
+	}
+
+	if dbTx == nil {
+		err := s.db.View(func(tx *bolt.Tx) error {
+			return getFn(tx)
+		})
+
+		return snapshot, err
+	}
+
+	err := getFn(dbTx)
 
 	return snapshot, err
 }
 
 // insertEpoch inserts a new epoch to db with its meta data
-func (s *EpochStore) insertEpoch(epoch uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+func (s *EpochStore) insertEpoch(epoch uint64, dbTx DBTransaction) error {
+	insertFn := func(tx DBTransaction) error {
 		epochBucket, err := tx.Bucket(epochsBucket).CreateBucketIfNotExists(common.EncodeUint64ToBytes(epoch))
 		if err != nil {
 			return err
@@ -118,7 +136,15 @@ func (s *EpochStore) insertEpoch(epoch uint64) error {
 		}
 
 		return err
-	})
+	}
+
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return insertFn(tx)
+		})
+	}
+
+	return insertFn(dbTx)
 }
 
 // isEpochInserted checks if given epoch is present in db
@@ -131,7 +157,7 @@ func (s *EpochStore) isEpochInserted(epoch uint64) bool {
 }
 
 // getEpochBucket returns bucket from db associated with given epoch
-func getEpochBucket(tx *bolt.Tx, epoch uint64) (*bolt.Bucket, error) {
+func getEpochBucket(tx DBTransaction, epoch uint64) (*bolt.Bucket, error) {
 	epochBucket := tx.Bucket(epochsBucket).Bucket(common.EncodeUint64ToBytes(epoch))
 	if epochBucket == nil {
 		return nil, fmt.Errorf("could not find bucket for epoch: %v", epoch)
@@ -141,21 +167,29 @@ func getEpochBucket(tx *bolt.Tx, epoch uint64) (*bolt.Bucket, error) {
 }
 
 // cleanEpochsFromDB cleans epoch buckets from db
-func (s *EpochStore) cleanEpochsFromDB() error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+func (s *EpochStore) cleanEpochsFromDB(dbTx DBTransaction) error {
+	cleanFn := func(tx DBTransaction) error {
 		if err := tx.DeleteBucket(epochsBucket); err != nil {
 			return err
 		}
 		_, err := tx.CreateBucket(epochsBucket)
 
 		return err
-	})
+	}
+
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return cleanFn(tx)
+		})
+	}
+
+	return cleanFn(dbTx)
 }
 
 // cleanValidatorSnapshotsFromDB cleans the validator snapshots bucket if a limit is reached,
 // but it leaves the latest (n) number of snapshots
-func (s *EpochStore) cleanValidatorSnapshotsFromDB(epoch uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+func (s *EpochStore) cleanValidatorSnapshotsFromDB(epoch uint64, dbTx DBTransaction) error {
+	cleanFn := func(tx DBTransaction) error {
 		bucket := tx.Bucket(validatorSnapshotsBucket)
 
 		// paired list
@@ -192,7 +226,15 @@ func (s *EpochStore) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 		}
 
 		return nil
-	})
+	}
+
+	if dbTx == nil {
+		return s.db.Update(func(tx *bolt.Tx) error {
+			return cleanFn(tx)
+		})
+	}
+
+	return cleanFn(dbTx)
 }
 
 // removeAllValidatorSnapshots drops a validator snapshot bucket and re-creates it in bolt database
@@ -225,7 +267,7 @@ func (s *EpochStore) validatorSnapshotsDBStats() (*bolt.BucketStats, error) {
 }
 
 // getNestedBucketInEpoch returns a nested (child) bucket from db associated with given epoch
-func getNestedBucketInEpoch(tx *bolt.Tx, epoch uint64, bucketKey []byte) (*bolt.Bucket, error) {
+func getNestedBucketInEpoch(tx DBTransaction, epoch uint64, bucketKey []byte) (*bolt.Bucket, error) {
 	epochBucket, err := getEpochBucket(tx, epoch)
 	if err != nil {
 		return nil, err

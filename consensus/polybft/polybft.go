@@ -42,6 +42,11 @@ var (
 type polybftBackend interface {
 	// GetValidators retrieves validator set for the given block
 	GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error)
+
+	// GetValidators retrieves validator set for the given block
+	// Function expects that db tx is already open
+	GetValidatorsWithTx(blockNumber uint64, parents []*types.Header,
+		dbTx DBTransaction) (validator.AccountSet, error)
 }
 
 // Factory is the factory function to create a discovery consensus
@@ -720,7 +725,12 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
-	return p.validatorsCache.GetSnapshot(blockNumber, parents)
+	return p.validatorsCache.GetSnapshot(blockNumber, parents, nil)
+}
+
+func (p *Polybft) GetValidatorsWithTx(blockNumber uint64, parents []*types.Header,
+	dbTx DBTransaction) (validator.AccountSet, error) {
+	return p.validatorsCache.GetSnapshot(blockNumber, parents, dbTx)
 }
 
 // ProcessHeaders updates the snapshot based on the verified headers

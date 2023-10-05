@@ -40,7 +40,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		// make epoch size long enough, so that all exit events are processed within the same epoch
 		epochSize            = 30
 		sprintSize           = uint64(5)
-		numberOfAttempts     = 5
+		numberOfAttempts     = 7
 		stateSyncedLogsCount = 1
 	)
 

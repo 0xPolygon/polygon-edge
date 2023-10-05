@@ -31,7 +31,7 @@ func newTestStateSyncManager(t *testing.T, key *validator.TestValidator, runtime
 	require.NoError(t, err)
 
 	state := newTestState(t)
-	require.NoError(t, state.EpochStore.insertEpoch(0))
+	require.NoError(t, state.EpochStore.insertEpoch(0, nil))
 
 	topic := &mockTopic{}
 
@@ -64,7 +64,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 		s := newTestStateSyncManager(t, vals.GetValidator("0"), &mockRuntime{isActiveValidator: true})
 
 		// there are no state syncs
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Nil(t, s.pendingCommitments)
 
 		stateSyncs10 := generateStateSyncEvents(t, 10, 0)
@@ -74,7 +74,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
 		}
 
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Len(t, s.pendingCommitments, 1)
 		require.Equal(t, uint64(0), s.pendingCommitments[0].StartID.Uint64())
 		require.Equal(t, uint64(4), s.pendingCommitments[0].EndID.Uint64())
@@ -85,7 +85,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 			require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(stateSyncs10[i]))
 		}
 
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Len(t, s.pendingCommitments, 2)
 		require.Equal(t, uint64(0), s.pendingCommitments[1].StartID.Uint64())
 		require.Equal(t, uint64(9), s.pendingCommitments[1].EndID.Uint64())
@@ -108,7 +108,7 @@ func TestStateSyncManager_PostEpoch_BuildCommitment(t *testing.T) {
 		}
 
 		// I am not a validator so no commitments should be built
-		require.NoError(t, s.buildCommitment())
+		require.NoError(t, s.buildCommitment(nil))
 		require.Len(t, s.pendingCommitments, 0)
 	})
 }
@@ -294,7 +294,7 @@ func TestStateSyncerManager_BuildProofs(t *testing.T) {
 		require.NoError(t, s.state.StateSyncStore.insertStateSyncEvent(evnt))
 	}
 
-	require.NoError(t, s.buildCommitment())
+	require.NoError(t, s.buildCommitment(nil))
 	require.Len(t, s.pendingCommitments, 1)
 
 	mockMsg := &CommitmentMessageSigned{
@@ -455,7 +455,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 
 		require.NoError(t, s.AddLog(goodLog))
 
-		stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
+		stateSyncs, err = s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0, nil)
 		require.NoError(t, err)
 		require.Len(t, stateSyncs, 1)
 		require.Len(t, s.pendingCommitments, 1)
@@ -509,7 +509,7 @@ func TestStateSyncerManager_AddLog_BuildCommitments(t *testing.T) {
 		require.NoError(t, s.AddLog(goodLog))
 
 		// node should have inserted given state sync event, but it shouldn't build any commitment
-		stateSyncs, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0)
+		stateSyncs, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(0, 0, nil)
 		require.NoError(t, err)
 		require.Len(t, stateSyncs, 1)
 		require.Equal(t, uint64(0), stateSyncs[0].ID.Uint64())
@@ -555,7 +555,7 @@ func TestStateSyncerManager_EventTracker_Sync(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
-	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10)
+	events, err := s.state.StateSyncStore.getStateSyncEventsForCommitment(1, 10, nil)
 	require.NoError(t, err)
 	require.Len(t, events, 10)
 }
@@ -609,7 +609,7 @@ func TestStateSyncManager_GetProofs_NoProof_HasCommitment_NoStateSyncs(t *testin
 	)
 
 	state := newTestState(t)
-	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(createTestCommitmentMessage(t, 1)))
+	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(createTestCommitmentMessage(t, 1), nil))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 
@@ -643,7 +643,7 @@ func TestStateSyncManager_GetProofs_NoProof_BuildProofs(t *testing.T) {
 		require.NoError(t, state.StateSyncStore.insertStateSyncEvent(sse))
 	}
 
-	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(commitment))
+	require.NoError(t, state.StateSyncStore.insertCommitmentMessage(commitment, nil))
 
 	stateSyncManager := &stateSyncManager{state: state, logger: hclog.NewNullLogger()}
 
