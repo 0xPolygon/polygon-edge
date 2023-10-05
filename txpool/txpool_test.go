@@ -654,7 +654,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 
 	// send tx as gossip (will be discarded)
 	assert.ErrorIs(t,
-		pool.addTx(gossip, tx),
+		pool.addTx(gossip, tx.Copy()),
 		ErrAlreadyKnown,
 	)
 

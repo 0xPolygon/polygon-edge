@@ -441,7 +441,7 @@ func (p *TxPool) dropAccount(account *account, nextNonce uint64, tx *types.Trans
 	dropped = account.enqueued.clear()
 	clearAccountQueue(dropped)
 
-	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.GetHash())
+	p.eventManager.signalEvent(proto.EventType_DROPPED, tx.Hash)
 
 	if p.logger.IsDebug() {
 		p.logger.Debug("dropped account txs",
@@ -475,7 +475,7 @@ func (p *TxPool) Demote(tx *types.Transaction) {
 
 	account.incrementDemotions()
 
-	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.GetHash())
+	p.eventManager.signalEvent(proto.EventType_DEMOTED, tx.Hash)
 }
 
 // ResetWithHeaders processes the transactions from the new
@@ -770,7 +770,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 // (only once) and an enqueueRequest is signaled.
 func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	if p.logger.IsDebug() {
-		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.GetHash().String())
+		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash.String())
 	}
 
 	// validate incoming tx
@@ -815,7 +815,7 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	// try to find if there is transaction with same nonce for this account
 	oldTxWithSameNonce := account.nonceToTx.get(tx.Nonce)
 	if oldTxWithSameNonce != nil {
-		if oldTxWithSameNonce.GetHash() == tx.GetHash() {
+		if oldTxWithSameNonce.Hash == tx.Hash {
 			metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 			return ErrAlreadyKnown
@@ -883,14 +883,13 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 }
 
 func (p *TxPool) invokePromotion(tx *types.Transaction, callPromote bool) {
-	txHash := tx.GetHash()
-	p.eventManager.signalEvent(proto.EventType_ADDED, txHash)
+	p.eventManager.signalEvent(proto.EventType_ADDED, tx.Hash)
 
 	if p.logger.IsDebug() {
-		p.logger.Debug("enqueue request", "hash", txHash.String())
+		p.logger.Debug("enqueue request", "hash", tx.Hash.String())
 	}
 
-	p.eventManager.signalEvent(proto.EventType_ENQUEUED, txHash)
+	p.eventManager.signalEvent(proto.EventType_ENQUEUED, tx.Hash)
 
 	if callPromote {
 		select {
@@ -956,13 +955,13 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	if err := p.addTx(gossip, tx); err != nil {
 		if errors.Is(err, ErrAlreadyKnown) {
 			if p.logger.IsDebug() {
-				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.GetHash().String())
+				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
 			}
 
 			return
 		}
 
-		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.GetHash().String())
+		p.logger.Error("failed to add broadcast tx", "err", err, "hash", tx.Hash.String())
 	}
 }
 
@@ -1084,7 +1083,7 @@ func (p *TxPool) Length() uint64 {
 // toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
-		hashes = append(hashes, tx.GetHash())
+		hashes = append(hashes, tx.Hash)
 	}
 
 	return

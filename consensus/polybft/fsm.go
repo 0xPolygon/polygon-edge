@@ -426,7 +426,7 @@ func (f *fsm) VerifyStateTransactions(transactions []*types.Transaction) error {
 			continue
 		}
 
-		txHash := tx.GetHash()
+		txHash := tx.Hash
 
 		decodedStateTx, err := decodeStateTransaction(tx.Input)
 		if err != nil {

@@ -49,7 +49,7 @@ func (th *TransactionHashForkV1) ComputeHash(t *Transaction) {
 	v := t.MarshalRLPWith(ar)
 	hashTmp := ZeroHash
 	hash.WriteRlp(hashTmp[:0], v)
-	t.SetHash(hashTmp)
+	t.Hash = hashTmp
 
 	t.ChainID = chainID
 
@@ -68,7 +68,7 @@ func (th *TransactionHashForkV2) ComputeHash(t *Transaction) {
 	hash := keccak.DefaultKeccakPool.Get()
 	hashTmp := ZeroHash
 	hash.WriteFn(hashTmp[:0], t.MarshalRLPTo)
-	t.SetHash(hashTmp)
+	t.Hash = hashTmp
 	keccak.DefaultKeccakPool.Put(hash)
 }
 

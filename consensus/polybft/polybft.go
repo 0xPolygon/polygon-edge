@@ -749,7 +749,7 @@ func (p *Polybft) PreCommitState(block *types.Block, _ *state.Transition) error 
 			continue
 		}
 
-		txHash := tx.GetHash()
+		txHash := tx.Hash
 
 		decodedStateTx, err := decodeStateTransaction(tx.Input)
 		if err != nil {
