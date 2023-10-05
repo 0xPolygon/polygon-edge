@@ -87,7 +87,7 @@ type EventTracker struct {
 //
 // Example Usage:
 //
-//	config := &EventTracker{
+//	config := &EventTrackerConfig{
 //		RpcEndpoint:           "http://some-json-rpc-url.com",
 //		StartBlockFromConfig:  100_000,
 //		NumBlockConfirmations: 10,
@@ -110,24 +110,28 @@ type EventTracker struct {
 //
 // Outputs:
 //   - A new instance of the EventTracker struct.
-func NewEventTracker(config *EventTrackerConfig) (*EventTracker, error) {
+func NewEventTracker(config *EventTrackerConfig, startBlockFromGenesis uint64) (*EventTracker, error) {
 	lastProcessedBlock, err := config.Store.GetLastProcessedBlock()
 	if err != nil {
 		return nil, err
 	}
 
-	definiteLastProcessedBlock := lastProcessedBlock
+	if lastProcessedBlock == 0 {
+		lastProcessedBlock = startBlockFromGenesis
 
-	if lastProcessedBlock == 0 && config.NumOfBlocksToReconcile > 0 {
-		latestBlock, err := config.BlockProvider.GetBlockByNumber(ethgo.Latest, false)
-		if err != nil {
-			return nil, err
-		}
+		if config.NumOfBlocksToReconcile > 0 {
+			latestBlock, err := config.BlockProvider.GetBlockByNumber(ethgo.Latest, false)
+			if err != nil {
+				return nil, err
+			}
 
-		if latestBlock.Number > config.NumOfBlocksToReconcile {
-			// if this is a fresh start, then we should start syncing from
-			// latestBlock.Number - NumOfBlocksToReconcile
-			definiteLastProcessedBlock = latestBlock.Number - config.NumOfBlocksToReconcile
+			if latestBlock.Number > config.NumOfBlocksToReconcile &&
+				startBlockFromGenesis < latestBlock.Number-config.NumOfBlocksToReconcile {
+				// if this is a fresh start, and we missed too much blocks,
+				// then we should start syncing from
+				// latestBlock.Number - NumOfBlocksToReconcile
+				lastProcessedBlock = latestBlock.Number - config.NumOfBlocksToReconcile
+			}
 		}
 	}
 
@@ -135,7 +139,7 @@ func NewEventTracker(config *EventTrackerConfig) (*EventTracker, error) {
 		config:         config,
 		closeCh:        make(chan struct{}),
 		blockTracker:   blocktracker.NewJSONBlockTracker(config.BlockProvider),
-		blockContainer: NewTrackerBlockContainer(definiteLastProcessedBlock),
+		blockContainer: NewTrackerBlockContainer(lastProcessedBlock),
 	}, nil
 }
 
@@ -175,6 +179,7 @@ func (e *EventTracker) Start() error {
 		"syncBatchSize", e.config.SyncBatchSize,
 		"numOfBlocksToReconcile", e.config.NumOfBlocksToReconcile,
 		"logFilter", e.config.LogFilter,
+		"lastBlockProcessed", e.blockContainer.LastProcessedBlock(),
 	)
 
 	ctx, cancelFn := context.WithCancel(context.Background())

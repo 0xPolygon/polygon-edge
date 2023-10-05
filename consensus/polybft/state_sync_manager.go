@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -75,14 +73,17 @@ func (d *dummyStateSyncManager) ProcessLog(header *types.Header,
 
 // stateSyncConfig holds the configuration data of state sync manager
 type stateSyncConfig struct {
-	stateSenderAddr          types.Address
-	stateSenderStartBlock    uint64
-	jsonrpcAddr              string
-	dataDir                  string
-	topic                    topic
-	key                      *wallet.Key
-	maxCommitmentSize        uint64
+	stateSenderAddr       types.Address
+	stateSenderStartBlock uint64
+	jsonrpcAddr           string
+	dataDir               string
+	topic                 topic
+	key                   *wallet.Key
+	maxCommitmentSize     uint64
+	// event tracker
 	numBlockConfirmations    uint64
+	trackerSyncBatchSize     uint64
+	trackerBlocksToReconcile uint64
 	blockTrackerPollInterval time.Duration
 }
 
@@ -127,7 +128,7 @@ func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 
 // Init subscribes to bridge topics (getting votes) and start the event tracker routine
 func (s *stateSyncManager) Init() error {
-	if err := s.setupNewTracker(); err != nil {
+	if err := s.initTracker(); err != nil {
 		return fmt.Errorf("failed to init event tracker. Error: %w", err)
 	}
 
@@ -142,8 +143,8 @@ func (s *stateSyncManager) Close() {
 	close(s.closeCh)
 }
 
-// setupNewTracker sets up and starts the new tracker implementation
-func (s *stateSyncManager) setupNewTracker() error {
+// initTracker sets up and starts the event tracker implementation
+func (s *stateSyncManager) initTracker() error {
 	store, err := eventtracker.NewBoltDBEventTrackerStore(path.Join(s.config.dataDir, "/deposit.db"))
 	if err != nil {
 		return err
@@ -159,8 +160,8 @@ func (s *stateSyncManager) setupNewTracker() error {
 	tracker, err := eventtracker.NewEventTracker(&eventtracker.EventTrackerConfig{
 		RPCEndpoint:            s.config.jsonrpcAddr,
 		NumBlockConfirmations:  s.config.numBlockConfirmations,
-		SyncBatchSize:          5, // this should be configurable
-		NumOfBlocksToReconcile: 0, // this should be configurable
+		SyncBatchSize:          s.config.trackerSyncBatchSize,
+		NumOfBlocksToReconcile: s.config.trackerBlocksToReconcile,
 		PollInterval:           s.config.blockTrackerPollInterval,
 		Logger:                 s.logger,
 		Store:                  store,
@@ -169,34 +170,12 @@ func (s *stateSyncManager) setupNewTracker() error {
 		LogFilter: map[ethgo.Address][]ethgo.Hash{
 			ethgo.Address(s.config.stateSenderAddr): {stateSyncEvent.Sig()},
 		},
-	})
+	}, s.config.stateSenderStartBlock)
 	if err != nil {
 		return err
 	}
 
 	return tracker.Start()
-}
-
-// initTracker starts a new event tracker (to receive new state sync events)
-func (s *stateSyncManager) initTracker() error {
-	ctx, cancelFn := context.WithCancel(context.Background())
-
-	evtTracker := tracker.NewEventTracker(
-		path.Join(s.config.dataDir, "/deposit.db"),
-		s.config.jsonrpcAddr,
-		ethgo.Address(s.config.stateSenderAddr),
-		s,
-		s.config.numBlockConfirmations,
-		s.config.stateSenderStartBlock,
-		s.logger,
-		s.config.blockTrackerPollInterval)
-
-	go func() {
-		<-s.closeCh
-		cancelFn()
-	}()
-
-	return evtTracker.Start(ctx)
 }
 
 // initTransport subscribes to bridge topics (getting votes for commitments)
