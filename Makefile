@@ -42,7 +42,7 @@ build: check-go check-git
 	$(eval COMMIT_HASH = $(shell git rev-parse HEAD))
 	$(eval BRANCH = $(shell git rev-parse --abbrev-ref HEAD | tr -d '\040\011\012\015\n'))
 	$(eval TIME = $(shell date))
-	go build -race -o polygon-edge -ldflags="\
+	go build -o polygon-edge -ldflags="\
     	-X 'github.com/0xPolygon/polygon-edge/versioning.Version=$(LATEST_VERSION)' \
 		-X 'github.com/0xPolygon/polygon-edge/versioning.Commit=$(COMMIT_HASH)'\
 		-X 'github.com/0xPolygon/polygon-edge/versioning.Branch=$(BRANCH)'\
