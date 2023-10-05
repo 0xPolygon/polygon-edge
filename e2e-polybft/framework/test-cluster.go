@@ -51,6 +51,15 @@ const (
 	nonValidatorPrefix = "test-non-validator-"
 )
 
+const (
+	Validator = 1 << iota
+	Relayer
+)
+
+func HasFlag(flags int, flag int) bool {
+	return flags&flag == flag
+}
+
 var (
 	startTime              int64
 	testRewardWalletAddr   = types.StringToAddress("0xFFFFFFFF")
@@ -639,22 +648,25 @@ func NewTestCluster(t *testing.T, validatorsCount int, opts ...ClusterOption) *T
 	require.NoError(t, err)
 
 	for i := 1; i <= int(cluster.Config.ValidatorSetSize); i++ {
+		flags := Validator
+		if i == 1 {
+			flags = flags | Relayer
+		}
+
 		dir := cluster.Config.ValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			true, i == 1 /* relayer */)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), flags)
 	}
 
 	for i := 1; i <= cluster.Config.NonValidatorCount; i++ {
 		dir := nonValidatorPrefix + strconv.Itoa(i)
-		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(),
-			false, false /* relayer */)
+		cluster.InitTestServer(t, dir, cluster.Bridge.JSONRPCAddr(), 0 /* no flags */)
 	}
 
 	return cluster
 }
 
 func (c *TestCluster) InitTestServer(t *testing.T,
-	dataDir string, bridgeJSONRPC string, isValidator bool, relayer bool) {
+	dataDir string, bridgeJSONRPC string, flags int) {
 	t.Helper()
 
 	logLevel := os.Getenv(envLogLevel)
@@ -669,11 +681,11 @@ func (c *TestCluster) InitTestServer(t *testing.T,
 
 	srv := NewTestServer(t, c.Config, bridgeJSONRPC, func(config *TestServerConfig) {
 		config.DataDir = dataDir
-		config.Seal = isValidator
+		config.Seal = HasFlag(flags, Validator)
 		config.Chain = c.Config.Dir("genesis.json")
 		config.P2PPort = c.getOpenPort()
 		config.LogLevel = logLevel
-		config.Relayer = relayer
+		config.Relayer = HasFlag(flags, Relayer)
 		config.NumBlockConfirmations = c.Config.NumBlockConfirmations
 		config.BridgeJSONRPC = bridgeJSONRPC
 		config.RelayerTrackerPollInterval = c.Config.RelayerTrackerPollInterval
