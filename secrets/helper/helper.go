@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/go-hclog"
+	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/peer"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/network"
@@ -13,13 +17,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets/hashicorpvault"
 	"github.com/0xPolygon/polygon-edge/secrets/local"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	libp2pCrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/umbracle/ethgo/abi"
 )
-
-var addressTypeABI = abi.MustNewType("address")
 
 // SetupLocalSecretsManager is a helper method for boilerplate local secrets manager setup
 func SetupLocalSecretsManager(dataDir string) (secrets.SecretsManager, error) {
@@ -102,6 +100,21 @@ func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) 
 	blsSecretKey, blsSecretKeyEncoded, err := crypto.GenerateAndEncodeBLSSecretKey()
 	if err != nil {
 		return nil, err
+	}
+
+	// This section converts the given "blsSecretKeyEncoded" hex encoded private key
+	// into a raw big integer bytes in order to be consistent with the account object
+	// that is used to work with big numbers.
+	{
+		blsSecretKeyInt, err := hex.DecodeHexToBig(string(blsSecretKeyEncoded))
+		if err != nil {
+			return nil, err
+		}
+
+		blsSecretKeyEncoded, err = blsSecretKeyInt.MarshalText()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Write the validator private key to the secrets manager storage
