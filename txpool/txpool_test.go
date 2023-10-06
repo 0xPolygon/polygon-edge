@@ -3555,8 +3555,16 @@ func TestAddTxsInOrder(t *testing.T) {
 		acc := pool.accounts.get(addrtx.addr)
 		require.NotNil(t, acc)
 
-		assert.Equal(t, uint64(0), acc.enqueued.lengthWithLock())
-		assert.Len(t, acc.nonceToTx.mapping, int(acc.promoted.length()))
+		acc.enqueued.lock(false)
+		enqueuedCount := acc.enqueued.length()
+		acc.enqueued.unlock()
+
+		acc.promoted.lock(false)
+		promotedCount := acc.promoted.length()
+		acc.promoted.unlock()
+
+		assert.Equal(t, uint64(0), enqueuedCount)
+		assert.Len(t, acc.nonceToTx.mapping, int(promotedCount))
 	}
 }
 
