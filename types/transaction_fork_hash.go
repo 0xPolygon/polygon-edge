@@ -47,9 +47,7 @@ func (th *TransactionHashForkV1) ComputeHash(t *Transaction) {
 	t.ChainID = big.NewInt(0)
 
 	v := t.MarshalRLPWith(ar)
-	hashTmp := ZeroHash
-	hash.WriteRlp(hashTmp[:0], v)
-	t.Hash = hashTmp
+	hash.WriteRlp(t.Hash[:0], v)
 
 	t.ChainID = chainID
 
@@ -66,9 +64,7 @@ func (th *TransactionHashForkV2) SerializeForRootCalculation(t *Transaction, _ *
 
 func (th *TransactionHashForkV2) ComputeHash(t *Transaction) {
 	hash := keccak.DefaultKeccakPool.Get()
-	hashTmp := ZeroHash
-	hash.WriteFn(hashTmp[:0], t.MarshalRLPTo)
-	t.Hash = hashTmp
+	hash.WriteFn(t.Hash[:0], t.MarshalRLPTo)
 	keccak.DefaultKeccakPool.Put(hash)
 }
 
