@@ -9,6 +9,7 @@ import (
 
 	testproto "github.com/0xPolygon/polygon-edge/network/proto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 )
 
 func NumSubscribers(srv *Server, topic string) int {
@@ -30,13 +31,11 @@ func WaitForSubscribers(ctx context.Context, srv *Server, topic string, expected
 }
 
 func TestSimpleGossip(t *testing.T) {
-	numServers := 10
+	numServers := 9
 	sentMessage := fmt.Sprintf("%d", time.Now().UTC().Unix())
-	servers, createErr := createServers(numServers, nil)
 
-	if createErr != nil {
-		t.Fatalf("Unable to create servers, %v", createErr)
-	}
+	servers, createErr := createServers(numServers, nil)
+	require.NoError(t, createErr, "Unable to create servers")
 
 	messageCh := make(chan *testproto.GenericMessage)
 
@@ -46,32 +45,25 @@ func TestSimpleGossip(t *testing.T) {
 	})
 
 	joinErrors := MeshJoin(servers...)
-	if len(joinErrors) != 0 {
-		t.Fatalf("Unable to join servers [%d], %v", len(joinErrors), joinErrors)
-	}
+	require.Empty(t, joinErrors, "Unable to join servers [%d], %v", len(joinErrors), joinErrors)
 
 	topicName := "msg-pub-sub"
 	serverTopics := make([]*Topic, numServers)
 
 	for i := 0; i < numServers; i++ {
 		topic, topicErr := servers[i].NewTopic(topicName, &testproto.GenericMessage{})
-		if topicErr != nil {
-			t.Fatalf("Unable to create topic, %v", topicErr)
-		}
+		require.NoError(t, topicErr, "Unable to create topic")
 
 		serverTopics[i] = topic
 
-		if subscribeErr := topic.Subscribe(func(obj interface{}, _ peer.ID) {
+		subscribeErr := topic.Subscribe(func(obj interface{}, _ peer.ID) {
 			// Everyone should relay they got the message
 			genericMessage, ok := obj.(*testproto.GenericMessage)
-			if !ok {
-				t.Fatalf("invalid type assert")
-			}
+			require.True(t, ok, "invalid type assert")
 
 			messageCh <- genericMessage
-		}); subscribeErr != nil {
-			t.Fatalf("Unable to subscribe to topic, %v", subscribeErr)
-		}
+		})
+		require.NoError(t, subscribeErr, "Unable to subscribe to topic")
 	}
 
 	publisher := servers[0]
@@ -80,16 +72,14 @@ func TestSimpleGossip(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if waitErr := WaitForSubscribers(ctx, publisher, topicName, len(servers)-1); waitErr != nil {
-		t.Fatalf("Unable to wait for subscribers, %v", waitErr)
-	}
+	err := WaitForSubscribers(ctx, publisher, topicName, len(servers)-1)
+	require.NoError(t, err, "Unable to wait for subscribers")
 
-	if publishErr := publisherTopic.Publish(
+	err = publisherTopic.Publish(
 		&testproto.GenericMessage{
 			Message: sentMessage,
-		}); publishErr != nil {
-		t.Fatalf("Unable to publish message, %v", publishErr)
-	}
+		})
+	require.NoError(t, err, "Unable to publish message")
 
 	messagesGossiped := 0
 

@@ -340,9 +340,9 @@ func MeshJoin(servers ...*Server) []error {
 
 	var wg sync.WaitGroup
 
-	for indx := 0; indx < numServers; indx++ {
-		for innerIndx := 0; innerIndx < numServers; innerIndx++ {
-			if innerIndx > indx {
+	for sourceIdx := 0; sourceIdx < numServers; sourceIdx++ {
+		for destIdx := 0; destIdx < numServers; destIdx++ {
+			if destIdx > sourceIdx {
 				wg.Add(1)
 
 				go func(src, dest int) {
@@ -354,9 +354,9 @@ func MeshJoin(servers ...*Server) []error {
 						DefaultBufferTimeout,
 						DefaultJoinTimeout,
 					); joinErr != nil {
-						appendJoinError(fmt.Errorf("unable to join peers, %w", joinErr))
+						appendJoinError(fmt.Errorf("unable to join peers %d -> %d, %w", src, dest, joinErr))
 					}
-				}(indx, innerIndx)
+				}(sourceIdx, destIdx)
 			}
 		}
 	}
