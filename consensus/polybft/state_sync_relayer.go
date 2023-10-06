@@ -10,6 +10,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -19,12 +20,12 @@ import (
 )
 
 const (
-	// maxParallelTxWorkers how many transactions can be sent in parallel
+	// maxParallelTxWorkers specifies how many transactions can be sent in parallel
 	maxParallelTxWorkers = 10
-	// maxAttemptsToSend how many sending retries for one transaction
+	// maxAttemptsToSend specifies how many sending retries for one transaction
 	maxAttemptsToSend = 6
-	// maxBlocksToWaitForResend specifies how many blocks should be wait in order to try again to send transaction
-	maxBlocksToWaitForResend = uint64(50)
+	// maxBlocksToWaitForResend specifies how many blocks should be wait in order to try sending transaction again
+	maxBlocksToWaitForResend = uint64(75)
 )
 
 var (
@@ -207,6 +208,8 @@ func (ssr *stateSyncRelayerImpl) processBatch() {
 }
 
 func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventData) error {
+	ssr.logger.Info("state sync relayer processing event", "eventID", eventData.EventID)
+
 	eventData.CountTries++
 
 	if eventData.CountTries > maxAttemptsToSend {
@@ -239,26 +242,17 @@ func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventDa
 	go func() {
 		defer ssr.sem.Release(1)
 
-		err := ssr.sendTx(tx)
 		// it is successful if there is no error or if it was successful first time we sent it but db update failed
-		isSuccessful := err == nil || errors.Is(err, errAlreadyProcessedStateSync)
-
-		if err != nil {
-			ssr.logger.Error("failed to execute tx", "eventID", eventData.EventID, "err", err)
-		}
-
-		if isSuccessful {
+		if err := ssr.sendTx(tx, eventData.EventID); err == nil || errors.Is(err, errAlreadyProcessedStateSync) {
 			ssr.logger.Info("state sync relayer has successfully sent the event", "eventID", eventData.EventID)
 
 			if err := ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID); err != nil {
 				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
 			}
 		} else {
-			eventData.SentStatus = false
-
-			if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData); err != nil {
-				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
-			}
+			// do not update database on error (change SentStatus for example)
+			// event sending will be retried eventually after maxBlocksToWaitForResend blocks
+			ssr.logger.Error("failed to execute tx", "eventID", eventData.EventID, "err", err)
 		}
 	}()
 
@@ -303,7 +297,9 @@ func (ssr *stateSyncRelayerImpl) createTx(eventID uint64) (*ethgo.Transaction, e
 	}, nil
 }
 
-func (ssr *stateSyncRelayerImpl) sendTx(txn *ethgo.Transaction) error {
+func (ssr *stateSyncRelayerImpl) sendTx(txn *ethgo.Transaction, eventID uint64) error {
+	ssr.logger.Info("state sync relayer sending event", "eventID", eventID)
+
 	receipt, err := ssr.txRelayer.SendTransaction(txn, ssr.key)
 	if err != nil {
 		return err
@@ -325,7 +321,8 @@ func (ssr *stateSyncRelayerImpl) sendTx(txn *ethgo.Transaction) error {
 		}
 
 		if !stateSyncResult.Status {
-			return errFailedToExecuteStateSync
+			return fmt.Errorf("Error: %w, Message: %s", errFailedToExecuteStateSync,
+				hex.EncodeToString(stateSyncResult.Message))
 		}
 	}
 
