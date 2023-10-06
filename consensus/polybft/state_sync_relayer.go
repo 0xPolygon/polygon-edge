@@ -27,7 +27,10 @@ const (
 	maxBlocksToWaitForResend = uint64(50)
 )
 
-var errFailedToExecuteStateSync = errors.New("failed to execute state sync")
+var (
+	errFailedToExecuteStateSync  = errors.New("failed to execute state sync")
+	errAlreadyProcessedStateSync = errors.New("StateReceiver: STATE_SYNC_IS_PROCESSED")
+)
 
 // StateSyncRelayer is an interface that defines functions for state sync relayer
 type StateSyncRelayer interface {
@@ -206,7 +209,7 @@ func (ssr *stateSyncRelayerImpl) processBatch() {
 func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventData) error {
 	eventData.CountTries++
 
-	if eventData.CountTries >= maxAttemptsToSend {
+	if eventData.CountTries > maxAttemptsToSend {
 		_ = ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID)
 
 		return fmt.Errorf("failed to send event too many times: %d", eventData.EventID)
@@ -236,18 +239,24 @@ func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventDa
 	go func() {
 		defer ssr.sem.Release(1)
 
-		if err := ssr.sendTx(tx); err != nil {
+		err := ssr.sendTx(tx)
+		// it is successful if there is no error or if it was successful first time we sent it but db update failed
+		isSuccessful := err == nil || errors.Is(err, errAlreadyProcessedStateSync)
+
+		if err != nil {
 			ssr.logger.Error("failed to execute tx", "eventID", eventData.EventID, "err", err)
+		}
 
-			eventData.SentStatus = false
-
-			if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData); err != nil {
-				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
-			}
-		} else {
+		if isSuccessful {
 			ssr.logger.Info("state sync relayer has successfully sent the event", "eventID", eventData.EventID)
 
 			if err := ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID); err != nil {
+				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
+			}
+		} else {
+			eventData.SentStatus = false
+
+			if err := ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData); err != nil {
 				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
 			}
 		}
