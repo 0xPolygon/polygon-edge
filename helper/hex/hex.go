@@ -37,6 +37,7 @@ func DecodeHex(str string) ([]byte, error) {
 // IsHex returns true if the given string is a valid hex
 func IsHex(str string) bool {
 	_, err := DecodeHex(str)
+
 	return err == nil
 }
 
