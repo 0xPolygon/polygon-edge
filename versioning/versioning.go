@@ -2,7 +2,8 @@ package versioning
 
 var (
 	// Version is the main version at the moment.
-	// Commit is the git commit that the binary was built on
+	// Branch is the current branch name.
+	// Commit is the git commit that the binary was built on.
 	// BuildTime is the timestamp of the build
 	// Embedded by --ldflags on build time
 	// Versioning should follow the SemVer guidelines

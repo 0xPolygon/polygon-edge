@@ -34,6 +34,12 @@ func DecodeHex(str string) ([]byte, error) {
 	return hex.DecodeString(str)
 }
 
+// IsHex returns true if the given string is a valid hex
+func IsHex(str string) bool {
+	_, err := DecodeHex(str)
+	return err == nil
+}
+
 // MustDecodeHex type-checks and converts a hex string to a byte array
 func MustDecodeHex(str string) []byte {
 	buf, err := DecodeHex(str)

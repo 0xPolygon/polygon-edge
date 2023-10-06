@@ -4,6 +4,8 @@ import (
 	"math/big"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 // PrivateKey holds private key for bls implementation
@@ -39,7 +41,17 @@ func (p *PrivateKey) Sign(message, domain []byte) (*Signature, error) {
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	s := new(big.Int)
 
-	if err := s.UnmarshalText(data); err != nil {
+	var err error
+
+	// The given data might be a hex string either with 0x or without 0x prefix.
+	// Both cases must be handled properly.
+	if hex.IsHex(string(data)) {
+		s, err = hex.DecodeHexToBig(string(data))
+	} else {
+		err = s.UnmarshalText(data)
+	}
+
+	if err != nil {
 		return nil, err
 	}
 

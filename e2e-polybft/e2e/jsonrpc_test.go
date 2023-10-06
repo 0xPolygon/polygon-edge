@@ -381,9 +381,7 @@ func TestE2E_JsonRPC(t *testing.T) {
 
 		// Use a wrapper function from "jsonrpc" package when the config is introduced.
 		var trace *jsonrpc.TransactionTrace
-		err = jsonRPC.Call("debug_traceTransaction", &trace, txReceipt.TransactionHash, map[string]interface{}{
-			"tracer": "callTracer",
-		})
+		err = jsonRPC.Call("debug_traceTransaction", &trace, txReceipt.TransactionHash, map[string]interface{}{})
 		require.NoError(t, err)
 		require.Equal(t, txReceipt.GasUsed, trace.Gas)
 	})
