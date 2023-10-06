@@ -395,7 +395,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 	transactions := []*types.Transaction{
 		{
 			Nonce:    0,
-			GasPrice: big.NewInt(1000000000),
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      22000,
 			To:       &receiverAddress,
 			Value:    oneEth,
@@ -404,7 +404,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		},
 		{
 			Nonce:    1,
-			GasPrice: big.NewInt(1000000000),
+			GasPrice: big.NewInt(framework.DefaultGasPrice),
 			Gas:      22000,
 			To:       &receiverAddress,
 			Value:    oneEth,
@@ -414,7 +414,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 		{
 			Type:      types.DynamicFeeTx,
 			Nonce:     2,
-			GasFeeCap: big.NewInt(10000000000),
+			GasFeeCap: big.NewInt(framework.DefaultGasPrice),
 			GasTipCap: big.NewInt(1000000000),
 			Gas:       22000,
 			To:        &receiverAddress,
@@ -445,7 +445,7 @@ func TestTxPool_RecoverableError(t *testing.T) {
 			},
 			From: types.ZeroAddress.String(),
 		})
-		assert.NoError(t, err, "Unable to send transaction, %v", err)
+		require.NoError(t, err, "Unable to send transaction, %v", err)
 
 		txHash := ethgo.Hash(types.StringToHash(response.TxHash))
 
@@ -458,28 +458,28 @@ func TestTxPool_RecoverableError(t *testing.T) {
 
 	// wait for the last tx to be included in a block
 	receipt, err := tests.WaitForReceipt(ctx, client.Eth(), hashes[2])
-	assert.NoError(t, err)
-	assert.NotNil(t, receipt)
+	require.NoError(t, err)
+	require.NotNil(t, receipt)
 
 	// assert balance moved
 	balance, err := client.Eth().GetBalance(ethgo.Address(receiverAddress), ethgo.Latest)
-	assert.NoError(t, err, "failed to retrieve receiver account balance")
-	assert.Equal(t, framework.EthToWei(3).String(), balance.String())
+	require.NoError(t, err, "failed to retrieve receiver account balance")
+	require.Equal(t, framework.EthToWei(3).String(), balance.String())
 
 	// Query 1st and 2nd txs
 	firstTx, err := client.Eth().GetTransactionByHash(hashes[0])
-	assert.NoError(t, err)
-	assert.NotNil(t, firstTx)
+	require.NoError(t, err)
+	require.NotNil(t, firstTx)
 
 	secondTx, err := client.Eth().GetTransactionByHash(hashes[1])
-	assert.NoError(t, err)
-	assert.NotNil(t, secondTx)
+	require.NoError(t, err)
+	require.NotNil(t, secondTx)
 
 	// first two are in one block
-	assert.Equal(t, firstTx.BlockNumber, secondTx.BlockNumber)
+	require.Equal(t, firstTx.BlockNumber, secondTx.BlockNumber)
 
 	// last tx is included in next block
-	assert.NotEqual(t, secondTx.BlockNumber, receipt.BlockNumber)
+	require.NotEqual(t, secondTx.BlockNumber, receipt.BlockNumber)
 }
 
 func TestTxPool_GetPendingTx(t *testing.T) {

@@ -306,7 +306,7 @@ func TestPoS_Unstake(t *testing.T) {
 	// Check the address balance
 	fee := new(big.Int).Mul(
 		big.NewInt(int64(receipt.GasUsed)),
-		big.NewInt(framework.DefaultGasPrice),
+		ethgo.Gwei(1),
 	)
 
 	accountBalance := framework.GetAccountBalance(t, unstakerAddr, client)
@@ -625,7 +625,7 @@ func TestPoS_StakeUnstakeWithinSameBlock(t *testing.T) {
 
 	stakingContractAddr := staking.AddrStakingContract
 	defaultBalance := framework.EthToWei(100)
-	bigGasPrice := big.NewInt(10000000000)
+	bigGasPrice := big.NewInt(framework.DefaultGasPrice)
 
 	senderKey, senderAddr := tests.GenerateKeyAndAddr(t)
 	numDummyStakers := 10
@@ -818,7 +818,7 @@ func TestSnapshotUpdating(t *testing.T) {
 		&framework.PreparedTransaction{
 			From:     faucetAddr,
 			To:       &firstNonValidatorAddr,
-			GasPrice: big.NewInt(1000000000),
+			GasPrice: ethgo.Gwei(1),
 			Gas:      1000000,
 			Value:    framework.EthToWei(300),
 		}, faucetKey)
