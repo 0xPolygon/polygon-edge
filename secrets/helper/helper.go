@@ -102,21 +102,6 @@ func InitBLSValidatorKey(secretsManager secrets.SecretsManager) ([]byte, error) 
 		return nil, err
 	}
 
-	// This section converts the given "blsSecretKeyEncoded" hex encoded private key
-	// into a raw big integer bytes in order to be consistent with the account object
-	// that is used to work with big numbers.
-	{
-		blsSecretKeyInt, err := hex.DecodeHexToBig(string(blsSecretKeyEncoded))
-		if err != nil {
-			return nil, err
-		}
-
-		blsSecretKeyEncoded, err = blsSecretKeyInt.MarshalText()
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	// Write the validator private key to the secrets manager storage
 	if setErr := secretsManager.SetSecret(
 		secrets.ValidatorBLSKey,

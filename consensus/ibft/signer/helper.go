@@ -122,7 +122,7 @@ func verifyIBFTExtraSize(header *types.Header) error {
 	return nil
 }
 
-// UseIstanbulHeaderHash is a helper function for the test
+// UseIstanbulHeaderHashInTest is a helper function for the test
 func UseIstanbulHeaderHashInTest(t *testing.T, signer Signer) {
 	t.Helper()
 
