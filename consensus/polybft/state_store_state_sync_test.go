@@ -317,6 +317,8 @@ func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
 		[]*StateSyncRelayerEventData{
 			{EventID: 2},
 			{EventID: 4},
+			{EventID: 6, SentStatus: true, BlockNumber: 101},
+			{EventID: 7, SentStatus: true, BlockNumber: 100},
 		},
 	))
 
@@ -327,10 +329,11 @@ func TestState_StateSync_StateSyncRelayerStateData(t *testing.T) {
 	assert.Equal(t, uint64(100), ssrStateData.LastBlockNumber)
 
 	// get available events
-	events, err := state.StateSyncStore.getAllAvailableEvents()
+	events, err := state.StateSyncStore.getAllAvailableEvents(100)
 
 	require.NoError(t, err)
-	require.Len(t, events, 2)
+	require.Len(t, events, 3)
 	require.Equal(t, uint64(2), events[0].EventID)
 	require.Equal(t, uint64(4), events[1].EventID)
+	require.Equal(t, uint64(7), events[2].EventID)
 }

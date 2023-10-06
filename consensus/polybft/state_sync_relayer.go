@@ -23,6 +23,8 @@ const (
 	maxParallelTxWorkers = 10
 	// maxAttemptsToSend how many sending retries for one transaction
 	maxAttemptsToSend = 6
+	// maxBlocksToWaitForResend specifies how many blocks should be wait in order to try again to send transaction
+	maxBlocksToWaitForResend = uint64(50)
 )
 
 var errFailedToExecuteStateSync = errors.New("failed to execute state sync")
@@ -182,7 +184,12 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 }
 
 func (ssr *stateSyncRelayerImpl) processBatch() {
-	events, err := ssr.state.StateSyncStore.getAllAvailableEvents()
+	staleBlockNumber := uint64(0)
+	if bn := ssr.blockchain.CurrentHeader().Number; bn > maxBlocksToWaitForResend {
+		staleBlockNumber = bn - maxBlocksToWaitForResend
+	}
+
+	events, err := ssr.state.StateSyncStore.getAllAvailableEvents(staleBlockNumber)
 	if err != nil {
 		ssr.logger.Error("error while reading available events", "err", err)
 
@@ -205,14 +212,7 @@ func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventDa
 		return fmt.Errorf("failed to send event too many times: %d", eventData.EventID)
 	}
 
-	proof, err := ssr.store.GetStateSyncProof(eventData.EventID)
-	if err != nil {
-		_ = ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData)
-
-		return fmt.Errorf("failed to query proof: %d, %w", eventData.EventID, err)
-	}
-
-	tx, err := ssr.createTx(proof)
+	tx, err := ssr.createTx(eventData.EventID)
 	if err != nil {
 		_ = ssr.state.StateSyncStore.updateStateSyncRelayerEvent(eventData)
 
@@ -245,7 +245,7 @@ func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventDa
 				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
 			}
 		} else {
-			ssr.logger.Info("state sync relayer has sent event", "eventID", eventData.EventID)
+			ssr.logger.Info("state sync relayer has successfully sent the event", "eventID", eventData.EventID)
 
 			if err := ssr.state.StateSyncStore.removeStateSyncRelayerEvent(eventData.EventID); err != nil {
 				ssr.logger.Error("failed to update store", "eventID", eventData.EventID, "err", err)
@@ -256,8 +256,13 @@ func (ssr *stateSyncRelayerImpl) processEvent(eventData *StateSyncRelayerEventDa
 	return nil
 }
 
-func (ssr *stateSyncRelayerImpl) createTx(proof types.Proof) (*ethgo.Transaction, error) {
+func (ssr *stateSyncRelayerImpl) createTx(eventID uint64) (*ethgo.Transaction, error) {
 	var sse *contractsapi.StateSync
+
+	proof, err := ssr.store.GetStateSyncProof(eventID)
+	if err != nil {
+		return nil, err
+	}
 
 	// since state sync event is a map in the jsonrpc response,
 	// to not have custom logic of converting the map to state sync event
