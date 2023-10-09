@@ -80,6 +80,8 @@ require (
 	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.48.0-devel.0.20230725154044-2549ba9058df // indirect
 	github.com/DataDog/go-libddwaf v1.5.0 // indirect
 	github.com/DataDog/go-tuf v1.0.2-0.5.2 // indirect
+	github.com/bits-and-blooms/bitset v1.7.0 // indirect
+	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/ebitengine/purego v0.5.0-alpha.1 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
@@ -87,6 +89,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.3 // indirect
 	github.com/ipfs/boxo v0.8.1 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
+	github.com/mmcloughlin/addchain v0.4.0 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
@@ -102,6 +105,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
+	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
 require (
@@ -123,7 +127,7 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/consensys/gnark-crypto v0.5.3 // indirect
+	github.com/consensys/gnark-crypto v0.12.0 // indirect
 	github.com/containerd/continuity v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
