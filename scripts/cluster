@@ -160,7 +160,7 @@ function initRootchain() {
     --jsonrpc http://127.0.0.1:8545
 }
 
-function startServerFromBinary() {
+function startNodes() {
   write_logs_arg=""
   if [ "$2" == "write-logs" ]; then
     echo "Writing validators logs to the files..."
@@ -248,7 +248,7 @@ case "$2" in
     initIbftConsensus
     # Create genesis file and start the server from binary
     createGenesis
-    startServerFromBinary $1 $2
+    startNodes $1 $2
     exit 0
   elif [ "$1" == "polybft" ]; then
     # Initialize polybft consensus
@@ -256,7 +256,7 @@ case "$2" in
     # Create genesis file and start the server from binary
     createGenesis
     initRootchain $2
-    startServerFromBinary $1 $2
+    startNodes $1 $2
     exit 0
   else
     echo "Unsupported consensus mode. Supported modes are: ibft and polybft."
