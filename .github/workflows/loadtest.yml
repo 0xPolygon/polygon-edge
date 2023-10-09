@@ -74,6 +74,7 @@ jobs:
       - uses: datadog/agent-github-action@v1.3
         with:
           api_key: ${{ secrets.DD_API_KEY }}
+          container_name: "datadog-agent-${{ github.run_id }}"
       
       - name: Install xk6
         run: |
