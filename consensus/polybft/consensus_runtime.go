@@ -414,6 +414,12 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		}
 	}
 
+	if err := c.state.insertLastProcessedEventsBlock(fullBlock.Block.Number(), dbTx); err != nil {
+		c.logger.Error("failed to update the last processed events block in db", "error", err)
+
+		return
+	}
+
 	// commit DB transaction
 	if err := dbTx.Commit(); err != nil {
 		c.logger.Error("failed to commit transaction on PostBlock",
