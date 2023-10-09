@@ -125,7 +125,7 @@ func StakeAmount(
 	txn := &PreparedTransaction{
 		From:     from,
 		To:       &staking.AddrStakingContract,
-		GasPrice: big.NewInt(1000000000),
+		GasPrice: ethgo.Gwei(1),
 		Gas:      1000000,
 		Value:    amount,
 		Input:    MethodSig("stake"),
@@ -153,7 +153,7 @@ func UnstakeAmount(
 	txn := &PreparedTransaction{
 		From:     from,
 		To:       &staking.AddrStakingContract,
-		GasPrice: big.NewInt(1000000000),
+		GasPrice: ethgo.Gwei(1),
 		Gas:      DefaultGasLimit,
 		Value:    big.NewInt(0),
 		Input:    MethodSig("unstake"),

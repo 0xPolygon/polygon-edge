@@ -41,8 +41,6 @@ func (m *mockEventSubscriber) len() int {
 }
 
 func TestEventTracker_TrackSyncEvents(t *testing.T) {
-	t.Parallel()
-
 	const (
 		numBlockConfirmations = 6
 		eventsPerStep         = 8

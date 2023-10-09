@@ -83,7 +83,16 @@ func (t *Transaction) ComputeHash(blockNumber uint64) *Transaction {
 
 func (t *Transaction) Copy() *Transaction {
 	tt := new(Transaction)
-	*tt = *t
+	tt.Nonce = t.Nonce
+	tt.From = t.From
+	tt.Gas = t.Gas
+	tt.Type = t.Type
+	tt.Hash = t.Hash
+
+	if t.To != nil {
+		newAddress := *t.To
+		tt.To = &newAddress
+	}
 
 	tt.GasPrice = new(big.Int)
 	if t.GasPrice != nil {
@@ -115,6 +124,10 @@ func (t *Transaction) Copy() *Transaction {
 
 	if t.S != nil {
 		tt.S = new(big.Int).Set(t.S)
+	}
+
+	if t.ChainID != nil {
+		tt.ChainID = new(big.Int).Set(t.ChainID)
 	}
 
 	tt.Input = make([]byte, len(t.Input))

@@ -32,6 +32,7 @@ var (
 type TxQueryHandler interface {
 	Apply(*types.Transaction) (*runtime.ExecutionResult, error)
 	GetNonce(types.Address) uint64
+	SetNonPayable(nonPayable bool)
 }
 
 // decodeWeb3ArrayOfBytes is a helper function to parse the data
@@ -103,6 +104,7 @@ func QueryValidators(t TxQueryHandler, from types.Address) ([]types.Address, err
 		return nil, ErrMethodNotFoundInABI
 	}
 
+	t.SetNonPayable(true)
 	res, err := t.Apply(createCallViewTx(
 		from,
 		AddrStakingContract,
@@ -146,6 +148,7 @@ func QueryBLSPublicKeys(t TxQueryHandler, from types.Address) ([][]byte, error) 
 		return nil, ErrMethodNotFoundInABI
 	}
 
+	t.SetNonPayable(true)
 	res, err := t.Apply(createCallViewTx(
 		from,
 		AddrStakingContract,
