@@ -57,39 +57,27 @@ func insertFullValidatorSetWithTx(fullValidatorSet validatorSetState, tx DBTrans
 // If the passed tx is already open (not nil), it will use it to get full validator set
 // If the passed tx is not open (it is nil), it will open a new transaction on db and get full validator set
 func (s *StakeStore) getFullValidatorSet(dbTx DBTransaction) (validatorSetState, error) {
-	var fullValidatorSet validatorSetState
+	var (
+		fullValidatorSet validatorSetState
+		err              error
+	)
+
+	getFn := func(tx DBTransaction) error {
+		raw := tx.Bucket(validatorSetBucket).Get(fullValidatorSetKey)
+		if raw == nil {
+			return errNoFullValidatorSet
+		}
+
+		return fullValidatorSet.Unmarshal(raw)
+	}
 
 	if dbTx == nil {
-		err := s.db.View(func(tx *bolt.Tx) error {
-			fvs, err := getFullValidatorSetWithTx(tx)
-			if err != nil {
-				return err
-			}
-
-			fullValidatorSet = fvs
-
-			return nil
+		err = s.db.View(func(tx *bolt.Tx) error {
+			return getFn(tx)
 		})
-
-		return fullValidatorSet, err
+	} else {
+		err = getFn(dbTx)
 	}
 
-	return getFullValidatorSetWithTx(dbTx)
-}
-
-// getFullValidatorSetWithTx returns full validator set from its bucket if exists
-// Function expects that db transaction is already open
-func getFullValidatorSetWithTx(dbTx DBTransaction) (validatorSetState, error) {
-	var fullValidatorSet validatorSetState
-
-	raw := dbTx.Bucket(validatorSetBucket).Get(fullValidatorSetKey)
-	if raw == nil {
-		return fullValidatorSet, errNoFullValidatorSet
-	}
-
-	if err := fullValidatorSet.Unmarshal(raw); err != nil {
-		return fullValidatorSet, err
-	}
-
-	return fullValidatorSet, nil
+	return fullValidatorSet, err
 }

@@ -280,7 +280,7 @@ func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingB
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
-// It will read any exit event that happened in block and insert it to state boltDb
+// It sends a checkpoint if given block is checkpoint block and block proposer is given validator
 func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock) &&
 		bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner) {

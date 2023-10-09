@@ -97,7 +97,10 @@ func (s *EpochStore) getValidatorSnapshot(epoch uint64) (*validatorSnapshot, err
 // since they are stored by epoch number (uint64), they are sequentially stored,
 // so the latest epoch will be the last snapshot in db
 func (s *EpochStore) getLastSnapshot(dbTx DBTransaction) (*validatorSnapshot, error) {
-	var snapshot *validatorSnapshot
+	var (
+		snapshot *validatorSnapshot
+		err      error
+	)
 
 	getFn := func(tx DBTransaction) error {
 		c := tx.Bucket(validatorSnapshotsBucket).Cursor()
@@ -112,14 +115,12 @@ func (s *EpochStore) getLastSnapshot(dbTx DBTransaction) (*validatorSnapshot, er
 	}
 
 	if dbTx == nil {
-		err := s.db.View(func(tx *bolt.Tx) error {
+		err = s.db.View(func(tx *bolt.Tx) error {
 			return getFn(tx)
 		})
-
-		return snapshot, err
+	} else {
+		err = getFn(dbTx)
 	}
-
-	err := getFn(dbTx)
 
 	return snapshot, err
 }

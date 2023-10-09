@@ -100,7 +100,8 @@ func newStakeManager(
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
-// It will read any transfer event that happened in block and update full validator set in db
+// It will update the fullValidatorSet in db to the current block number
+// Note that EventSubscriber - AddLog will get all the transfer events that happened in block
 func (s *stakeManager) PostBlock(req *PostBlockRequest) error {
 	fullValidatorSet, err := s.getOrInitValidatorSet(req.DBTx)
 	if err != nil {
@@ -147,6 +148,8 @@ func (s *stakeManager) init(blockchain blockchainBackend, dbTx DBTransaction) er
 		"last saved", validatorSet.BlockNumber,
 		"last updated", validatorSet.UpdatedAtBlockNumber)
 
+	// we will use eventsGetter to update the fullValidatorSet if
+	// for any reason, we don't have the correct state
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
@@ -374,6 +377,13 @@ func (s *stakeManager) getBlsKey(address types.Address) (*bls.PublicKey, error) 
 }
 
 // EventSubscriber implementation
+
+// EventSubscriber implementation
+
+// GetLogFilters returns a map of log filters for getting desired events,
+// where the key is the address of contract that emits desired events,
+// and the value is a slice of signatures of events we want to get.
+// This function is the implementation of EventSubscriber interface
 func (s *stakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	var transferEvent contractsapi.TransferEvent
 
@@ -382,6 +392,8 @@ func (s *stakeManager) GetLogFilters() map[types.Address][]types.Hash {
 	}
 }
 
+// AddLog is the implementation of EventSubscriber interface,
+// used to handle a log defined in GetLogFilters, provided by event provider
 func (s *stakeManager) AddLog(header *types.Header, log *ethgo.Log, dbTx DBTransaction) error {
 	var transferEvent contractsapi.TransferEvent
 

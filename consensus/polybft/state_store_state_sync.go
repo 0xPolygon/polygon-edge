@@ -123,43 +123,39 @@ func (s *StateSyncStore) list() ([]*contractsapi.StateSyncedEvent, error) {
 // getStateSyncEventsForCommitment returns state sync events for commitment
 func (s *StateSyncStore) getStateSyncEventsForCommitment(
 	fromIndex, toIndex uint64, dbTx DBTransaction) ([]*contractsapi.StateSyncedEvent, error) {
-	getFn := func(tx DBTransaction) ([]*contractsapi.StateSyncedEvent, error) {
-		var events []*contractsapi.StateSyncedEvent
+	var (
+		events []*contractsapi.StateSyncedEvent
+		err    error
+	)
 
+	getFn := func(tx DBTransaction) error {
 		bucket := tx.Bucket(stateSyncEventsBucket)
 		for i := fromIndex; i <= toIndex; i++ {
 			v := bucket.Get(common.EncodeUint64ToBytes(i))
 			if v == nil {
-				return events, errNotEnoughStateSyncs
+				return errNotEnoughStateSyncs
 			}
 
 			var event *contractsapi.StateSyncedEvent
 			if err := json.Unmarshal(v, &event); err != nil {
-				return events, err
+				return err
 			}
 
 			events = append(events, event)
 		}
 
-		return events, nil
+		return nil
 	}
 
 	if dbTx == nil {
-		var events []*contractsapi.StateSyncedEvent
-
-		err := s.db.View(func(tx *bolt.Tx) error {
-			ev, err := getFn(tx)
-			// we need to return all the events we can
-			// even if there is an error
-			events = ev
-
-			return err
+		err = s.db.View(func(tx *bolt.Tx) error {
+			return getFn(tx)
 		})
-
-		return events, err
+	} else {
+		err = getFn(dbTx)
 	}
 
-	return getFn(dbTx)
+	return events, err
 }
 
 // getCommitmentForStateSync returns the commitment that contains given state sync event if it exists
