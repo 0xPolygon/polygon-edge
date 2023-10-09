@@ -233,10 +233,10 @@ func TestE2E_Consensus_RegisterValidator(t *testing.T) {
 
 	// start the first and the second validator
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+1),
-		cluster.Bridge.JSONRPCAddr(), true, false)
+		cluster.Bridge.JSONRPCAddr(), framework.Validator)
 
 	cluster.InitTestServer(t, cluster.Config.ValidatorPrefix+strconv.Itoa(validatorSetSize+2),
-		cluster.Bridge.JSONRPCAddr(), true, false)
+		cluster.Bridge.JSONRPCAddr(), framework.Validator)
 
 	// collect the first and the second validator from the cluster
 	firstValidator := cluster.Servers[validatorSetSize]
