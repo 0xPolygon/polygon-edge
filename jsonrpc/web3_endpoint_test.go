@@ -62,9 +62,8 @@ func TestWeb3EndpointClientVersion(t *testing.T) {
 
 	assert.NoError(t, expectJSONResult(resp, &res))
 	assert.Contains(t, res,
-		fmt.Sprintf("%s-%d/%s/%s-%s/%s",
+		fmt.Sprintf("%s/%s/%s-%s/%s",
 			chainName,
-			chainID,
 			versioning.Version,
 			runtime.GOOS,
 			runtime.GOARCH,

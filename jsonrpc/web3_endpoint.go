@@ -10,11 +10,10 @@ import (
 
 // Web3 is the web3 jsonrpc endpoint
 type Web3 struct {
-	chainID   uint64
 	chainName string
 }
 
-var clientVersionTemplate = "%s-%d/%s/%s-%s/%s"
+var clientVersionTemplate = "%s/%s/%s-%s/%s"
 
 // ClientVersion returns the version of the web3 client (web3_clientVersion)
 // Example: "polygon-edge-53105/v1.1.0/linux-amd64/go1.20.0"
@@ -30,7 +29,6 @@ func (w *Web3) ClientVersion() (interface{}, error) {
 	return fmt.Sprintf(
 		clientVersionTemplate,
 		w.chainName,
-		w.chainID,
 		version,
 		runtime.GOOS,
 		runtime.GOARCH,
