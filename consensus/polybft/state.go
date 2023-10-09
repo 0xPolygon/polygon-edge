@@ -49,7 +49,7 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 	s := &State{
 		db:                    db,
 		close:                 closeCh,
-		StateSyncStore:        &StateSyncStore{db: db},
+		StateSyncStore:        &StateSyncStore{db: db, logger: logger.Named("state-sync-store")},
 		CheckpointStore:       &CheckpointStore{db: db},
 		EpochStore:            &EpochStore{db: db},
 		ProposerSnapshotStore: &ProposerSnapshotStore{db: db},
