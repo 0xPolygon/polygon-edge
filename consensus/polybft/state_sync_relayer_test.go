@@ -154,7 +154,7 @@ func TestStateSyncRelayer_PostBlock(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, uint64(3), ssrStateData.LastBlockNumber)
 
-	events, err := state.StateSyncStore.getAllAvailableEvents(0)
+	events, err := state.StateSyncStore.getAllAvailableEvents()
 
 	require.NoError(t, err)
 	require.Len(t, events, 0)

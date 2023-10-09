@@ -455,8 +455,7 @@ func (s *StateSyncStore) updateStateSyncRelayerEvent(evnt *StateSyncRelayerEvent
 }
 
 // getAllAvailableEvents retrieves all StateSyncRelayerEventData that should be sent as a transactions
-func (s *StateSyncStore) getAllAvailableEvents(
-	staleBlockNumber uint64) (result []*StateSyncRelayerEventData, err error) {
+func (s *StateSyncStore) getAllAvailableEvents() (result []*StateSyncRelayerEventData, err error) {
 	if err = s.db.View(func(tx *bolt.Tx) error {
 		return tx.Bucket(stateSyncRelayerEventsBucket).ForEach(func(k, v []byte) error {
 			var event *StateSyncRelayerEventData
@@ -465,10 +464,7 @@ func (s *StateSyncStore) getAllAvailableEvents(
 				return err
 			}
 
-			// event that is sent way long before should be resent again
-			if !event.SentStatus || (staleBlockNumber > 0 && event.BlockNumber <= staleBlockNumber) {
-				result = append(result, event)
-			}
+			result = append(result, event)
 
 			return nil
 		})

@@ -19,8 +19,6 @@ import (
 const (
 	// maxAttemptsToSend specifies how many sending retries for one transaction
 	maxAttemptsToSend = 6
-	// maxBlocksToWaitForResend specifies how many blocks should be wait in order to try sending transaction again
-	maxBlocksToWaitForResend = uint64(75)
 )
 
 var (
@@ -181,12 +179,7 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 }
 
 func (ssr *stateSyncRelayerImpl) processBatch() {
-	staleBlockNumber := uint64(0)
-	if bn := ssr.blockchain.CurrentHeader().Number; bn > maxBlocksToWaitForResend {
-		staleBlockNumber = bn - maxBlocksToWaitForResend
-	}
-
-	events, err := ssr.state.StateSyncStore.getAllAvailableEvents(staleBlockNumber)
+	events, err := ssr.state.StateSyncStore.getAllAvailableEvents()
 	if err != nil {
 		ssr.logger.Error("error while reading available events", "err", err)
 
