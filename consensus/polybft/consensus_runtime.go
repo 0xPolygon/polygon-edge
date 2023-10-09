@@ -127,13 +127,11 @@ type consensusRuntime struct {
 
 // newConsensusRuntime creates and starts a new consensus runtime instance with event tracking
 func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRuntime, error) {
-	log.Debug("[Runtime] Initializing consensus runtime...")
 	dbTx, err := config.State.beginDBTransaction(true)
 	if err != nil {
 		return nil, fmt.Errorf("could not begin dbTx to init consensus runtime: %w", err)
 	}
 
-	log.Debug("[Runtime] Initializing proposer calculator...")
 	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"), dbTx)
 	if err != nil {
 		dbTx.Rollback()
@@ -150,28 +148,24 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		eventProvider:      NewEventProvider(config.blockchain),
 	}
 
-	log.Debug("[Runtime] Initializing state sync manager...")
 	if err := runtime.initStateSyncManager(log); err != nil {
 		dbTx.Rollback()
 
 		return nil, err
 	}
 
-	log.Debug("[Runtime] Initializing checkpoint manager...")
 	if err := runtime.initCheckpointManager(log); err != nil {
 		dbTx.Rollback()
 
 		return nil, err
 	}
 
-	log.Debug("[Runtime] Initializing stake manager...")
 	if err := runtime.initStakeManager(log, dbTx); err != nil {
 		dbTx.Rollback()
 
 		return nil, err
 	}
 
-	log.Debug("[Runtime] Restarting epoch...")
 	// we need to call restart epoch on runtime to initialize epoch state
 	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, dbTx)
 	if err != nil {
@@ -180,12 +174,9 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
 
-	log.Debug("[Runtime] Committing transaction...")
 	if err := dbTx.Commit(); err != nil {
 		return nil, fmt.Errorf("could not commit db tx to init consensus runtime: %w", err)
 	}
-
-	log.Debug("[Runtime] Initializing consensus runtime finished.")
 
 	return runtime, nil
 }
