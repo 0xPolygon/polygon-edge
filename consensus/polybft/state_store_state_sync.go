@@ -146,6 +146,7 @@ func (s *StateSyncStore) getStateSyncEventsForCommitment(
 
 	if dbTx == nil {
 		var events []*contractsapi.StateSyncedEvent
+
 		err := s.db.View(func(tx *bolt.Tx) error {
 			ev, err := getFn(tx)
 			// we need to return all the events we can
@@ -266,6 +267,7 @@ func (s *StateSyncStore) insertMessageVote(epoch uint64, key []byte,
 
 	if dbTx == nil {
 		var numOfSignatures int
+
 		err := s.db.Update(func(tx *bolt.Tx) error {
 			numOfSig, err := insertFn(tx)
 			if err != nil {
@@ -329,6 +331,7 @@ func (s *StateSyncStore) getMessageVotesLocked(tx DBTransaction, epoch uint64,
 func (s *StateSyncStore) insertStateSyncProofs(stateSyncProof []*StateSyncProof, dbTx DBTransaction) error {
 	insertFn := func(tx DBTransaction) error {
 		bucket := tx.Bucket(stateSyncProofsBucket)
+
 		for _, ssp := range stateSyncProof {
 			raw, err := json.Marshal(ssp)
 			if err != nil {

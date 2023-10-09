@@ -134,7 +134,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 
 	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"), dbTx)
 	if err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
 
 		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
 	}
@@ -149,19 +149,19 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if err := runtime.initStateSyncManager(log); err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
 
 		return nil, err
 	}
 
 	if err := runtime.initCheckpointManager(log); err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
 
 		return nil, err
 	}
 
 	if err := runtime.initStakeManager(log, dbTx); err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
 
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	// we need to call restart epoch on runtime to initialize epoch state
 	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, dbTx)
 	if err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
 
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
@@ -337,7 +337,8 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 
 	lastProcessedEventsBlock, err := c.state.getLastProcessedEventsBlock(dbTx)
 	if err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
+
 		c.logger.Error("failed to get last processed events block on block finalization",
 			"block", fullBlock.Block.Number(), "err", err)
 
@@ -345,7 +346,8 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	}
 
 	if err := c.eventProvider.GetEventsFromBlocks(lastProcessedEventsBlock, fullBlock, dbTx); err != nil {
-		dbTx.Rollback()
+		_ = dbTx.Rollback()
+
 		c.logger.Error("failed to process events on block finalization", "block", fullBlock.Block.Number(), "err", err)
 
 		return
@@ -386,6 +388,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		// update proposer priorities
 		if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 			c.logger.Error("Could not update proposer calculator", "err", err)
+
 			return err
 		}
 
@@ -396,6 +399,7 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		// handle transfer events that happened in block
 		if err := c.stakeManager.PostBlock(postBlock); err != nil {
 			c.logger.Error("failed to post block in stake manager", "err", err)
+
 			return err
 		}
 

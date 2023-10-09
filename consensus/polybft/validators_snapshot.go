@@ -258,7 +258,8 @@ func (v *validatorsSnapshotCache) cleanup(dbTx DBTransaction) error {
 
 // getLastCachedSnapshot gets the latest snapshot cached
 // If it doesn't have snapshot cached for desired epoch, it will return the latest one it has
-func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64, dbTx DBTransaction) (*validatorSnapshot, error) {
+func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64,
+	dbTx DBTransaction) (*validatorSnapshot, error) {
 	cachedSnapshot := v.snapshots[currentEpoch]
 	if cachedSnapshot != nil {
 		return cachedSnapshot, nil

@@ -160,7 +160,8 @@ type ProposerCalculator struct {
 }
 
 // NewProposerCalculator creates a new proposer calculator object
-func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger, dbTx DBTransaction) (*ProposerCalculator, error) {
+func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger,
+	dbTx DBTransaction) (*ProposerCalculator, error) {
 	snap, err := NewProposerSnapshotFromState(config, dbTx)
 
 	if err != nil {

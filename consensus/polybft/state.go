@@ -85,7 +85,6 @@ func newState(path string, logger hclog.Logger, closeCh chan struct{}) (*State, 
 func (s *State) initStorages() error {
 	// init the buckets
 	return s.db.Update(func(tx *bolt.Tx) error {
-
 		if err := s.StateSyncStore.initialize(tx); err != nil {
 			return err
 		}
@@ -156,6 +155,7 @@ func (s *State) getLastProcessedEventsBlock(dbTx DBTransaction) (uint64, error) 
 
 	if dbTx == nil {
 		var lastProcessed uint64
+
 		err := s.db.View(func(tx *bolt.Tx) error {
 			lastProcessed = getFn(tx)
 
