@@ -102,7 +102,6 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) error {
 		d.params.chainID,
 	}
 	d.endpoints.Web3 = &Web3{
-		d.params.chainID,
 		d.params.chainName,
 	}
 	d.endpoints.TxPool = &TxPool{
