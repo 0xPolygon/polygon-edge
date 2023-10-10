@@ -74,7 +74,7 @@ func (p *Precompiled) setupContracts() {
 	p.register(contracts.NativeTransferPrecompile.String(), &nativeTransfer{})
 
 	// Console precompile
-	// p.register(contracts.ConsolePrecompile.String(), &console{})
+	p.register(contracts.ConsolePrecompile.String(), &console{})
 
 	// BLS aggregated signatures verification precompile
 	p.register(contracts.BLSAggSigsVerificationPrecompile.String(), &blsAggSignsVerification{})
