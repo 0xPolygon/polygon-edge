@@ -143,7 +143,7 @@ case "$1" in
       --libp2p 0.0.0.0:1478 \
       --jsonrpc 0.0.0.0:8545 \
       --prometheus 0.0.0.0:5001 \
-      --seal $relayer_flag
+      $relayer_flag
    ;;
    *)
       echo "Executing polygon-edge..."

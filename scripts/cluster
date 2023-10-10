@@ -186,12 +186,12 @@ function startNodes() {
 
       ./polygon-edge server --data-dir "$data_dir" --chain genesis.json \
         --grpc-address ":$grpc_port" --libp2p ":$libp2p_port" --jsonrpc ":$jsonrpc_port" \
-        --num-block-confirmations 2 --seal $relayer_arg \
+        --num-block-confirmations 2 $relayer_arg \
         --log-level DEBUG 2>&1 | tee $log_file &
     else
       ./polygon-edge server --data-dir "$data_dir" --chain genesis.json \
         --grpc-address ":$grpc_port" --libp2p ":$libp2p_port" --jsonrpc ":$jsonrpc_port" \
-        --num-block-confirmations 2 --seal $relayer_arg \
+        --num-block-confirmations 2 $relayer_arg \
         --log-level DEBUG &
     fi
 
