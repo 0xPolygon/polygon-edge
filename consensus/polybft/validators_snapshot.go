@@ -56,6 +56,13 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 	isPassedTxNil := dbTx == nil
 
 	if isPassedTxNil {
+		// if no tx is passed, we need to open one, because,
+		// GetSnapshot is called from multiple routines (new sequence, fsm, OnBlockInserted, etc)
+		// and what can happen is that one routine takes its lock, and without a global tx,
+		// a deadlock can happen between that routine and OnBlockInserted, because it to
+		// is calling GetSnapshot, but it also opens a global db tx, resulting in a deadlock
+		// between one routine waiting to get a transaction on db, and OnBlockInserted waiting
+		// to get the validatorsSnapshotCache lock
 		t, err := v.state.beginDBTransaction(true)
 		if err != nil {
 			return nil, err

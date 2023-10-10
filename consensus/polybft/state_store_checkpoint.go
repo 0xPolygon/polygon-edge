@@ -179,14 +179,6 @@ func (s *CheckpointStore) getExitEvents(epoch uint64, filter func(exitEvent *Exi
 }
 
 // updateLastSaved saves the last block processed for exit events
-func (s *CheckpointStore) updateLastSaved(blockNumber uint64) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey,
-			common.EncodeUint64ToBytes(blockNumber))
-	})
-}
-
-// updateLastSaved saves the last block processed for exit events
 func (s *CheckpointStore) getLastSaved(dbTx DBTransaction) (uint64, error) {
 	var (
 		lastSavedBlock uint64

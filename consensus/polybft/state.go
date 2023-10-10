@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/0xPolygon/polygon-edge/helper/common"
@@ -12,8 +11,6 @@ import (
 var (
 	edgeEventsLastProcessedBlockBucket = []byte("EdgeEventsLastProcessedBlock")
 	edgeEventsLastProcessedBlockKey    = []byte("EdgeEventsLastProcessedBlockKey")
-
-	errNotABoltDBTransaction = errors.New("transaction is not a boltDB transaction")
 )
 
 type DBTransaction interface {
@@ -130,42 +127,46 @@ func (s *State) initStorages() error {
 }
 
 // insertLastProcessedEventsBlock inserts the last processed block for events on Edge
-func (s *State) insertLastProcessedEventsBlock(block uint64, tx DBTransaction) error {
-	if tx == nil {
+func (s *State) insertLastProcessedEventsBlock(block uint64, dbTx DBTransaction) error {
+	insertFn := func(tx DBTransaction) error {
+		return tx.Bucket(edgeEventsLastProcessedBlockBucket).Put(
+			edgeEventsLastProcessedBlockKey, common.EncodeUint64ToBytes(block))
+	}
+
+	if dbTx == nil {
 		return s.db.Update(func(tx *bolt.Tx) error {
-			return tx.Bucket(edgeEventsLastProcessedBlockBucket).Put(
-				edgeEventsLastProcessedBlockKey, common.EncodeUint64ToBytes(block))
+			return insertFn(tx)
 		})
 	}
 
-	return tx.Bucket(edgeEventsLastProcessedBlockBucket).Put(
-		edgeEventsLastProcessedBlockKey, common.EncodeUint64ToBytes(block))
+	return insertFn(dbTx)
 }
 
 // getLastProcessedEventsBlock gets the last processed block for events on Edge
 func (s *State) getLastProcessedEventsBlock(dbTx DBTransaction) (uint64, error) {
-	getFn := func(tx DBTransaction) uint64 {
-		value := tx.Bucket(edgeEventsLastProcessedBlockBucket).Get(edgeEventsLastProcessedBlockKey)
-		if value == nil {
-			return 0
-		}
+	var (
+		lastProcessed uint64
+		err           error
+	)
 
-		return common.EncodeBytesToUint64(value)
+	getFn := func(tx DBTransaction) {
+		value := tx.Bucket(edgeEventsLastProcessedBlockBucket).Get(edgeEventsLastProcessedBlockKey)
+		if value != nil {
+			lastProcessed = common.EncodeBytesToUint64(value)
+		}
 	}
 
 	if dbTx == nil {
-		var lastProcessed uint64
-
-		err := s.db.View(func(tx *bolt.Tx) error {
-			lastProcessed = getFn(tx)
+		err = s.db.View(func(tx *bolt.Tx) error {
+			getFn(tx)
 
 			return nil
 		})
-
-		return lastProcessed, err
+	} else {
+		getFn(dbTx)
 	}
 
-	return getFn(dbTx), nil
+	return lastProcessed, err
 }
 
 // beginDBTransaction creates and begins a transaction on BoltDB

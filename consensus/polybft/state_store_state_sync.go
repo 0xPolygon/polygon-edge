@@ -229,16 +229,21 @@ func (s *StateSyncStore) getCommitmentMessage(toIndex uint64) (*CommitmentMessag
 // insertMessageVote inserts given vote to signatures bucket of given epoch
 func (s *StateSyncStore) insertMessageVote(epoch uint64, key []byte,
 	vote *MessageSignature, dbTx DBTransaction) (int, error) {
-	insertFn := func(tx DBTransaction) (int, error) {
+	var (
+		numOfSignatures int
+		err             error
+	)
+
+	insertFn := func(tx DBTransaction) error {
 		signatures, err := s.getMessageVotesLocked(tx, epoch, key)
 		if err != nil {
-			return 0, err
+			return err
 		}
 
 		// check if the signature has already being included
 		for _, sigs := range signatures {
 			if sigs.From == vote.From {
-				return len(signatures), nil
+				return nil
 			}
 		}
 
@@ -250,35 +255,28 @@ func (s *StateSyncStore) insertMessageVote(epoch uint64, key []byte,
 
 		raw, err := json.Marshal(signatures)
 		if err != nil {
-			return 0, err
+			return err
 		}
 
 		bucket, err := getNestedBucketInEpoch(tx, epoch, messageVotesBucket)
 		if err != nil {
-			return 0, err
+			return err
 		}
 
-		return len(signatures), bucket.Put(key, raw)
+		numOfSignatures = len(signatures)
+
+		return bucket.Put(key, raw)
 	}
 
 	if dbTx == nil {
-		var numOfSignatures int
-
-		err := s.db.Update(func(tx *bolt.Tx) error {
-			numOfSig, err := insertFn(tx)
-			if err != nil {
-				return err
-			}
-
-			numOfSignatures = numOfSig
-
-			return nil
+		err = s.db.Update(func(tx *bolt.Tx) error {
+			return insertFn(tx)
 		})
-
-		return numOfSignatures, err
+	} else {
+		err = insertFn(dbTx)
 	}
 
-	return insertFn(dbTx)
+	return numOfSignatures, err
 }
 
 // getMessageVotes gets all signatures from db associated with given epoch and hash

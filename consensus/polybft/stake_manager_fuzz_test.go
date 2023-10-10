@@ -122,23 +122,18 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 		)
 		require.NoError(t, err)
 
-		receipt := &types.Receipt{
-			Logs: []*types.Log{
-				createTestLogForTransferEvent(
-					t,
-					validatorSetAddr,
-					validators.GetValidator(initialSetAliases[data.ValidatorID]).Address(),
-					types.ZeroAddress,
-					data.StakeValue,
-				),
-			},
-		}
+		header := &types.Header{Number: data.BlockID}
+		require.NoError(t, stakeManager.AddLog(header, convertLog(createTestLogForTransferEvent(
+			t,
+			validatorSetAddr,
+			validators.GetValidator(initialSetAliases[data.ValidatorID]).Address(),
+			types.ZeroAddress,
+			data.StakeValue,
+		)), nil))
 
 		require.NoError(t, stakeManager.PostBlock(&PostBlockRequest{
-			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: data.BlockID}},
-				Receipts: []*types.Receipt{receipt},
-			},
-			Epoch: data.EpochID,
+			FullBlock: &types.FullBlock{Block: &types.Block{Header: &types.Header{Number: data.BlockID}}},
+			Epoch:     data.EpochID,
 		}))
 	})
 }
