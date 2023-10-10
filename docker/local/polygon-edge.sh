@@ -128,6 +128,23 @@ case "$1" in
               ;;
       esac
       ;;
+  "start-node-1")
+    relayer_flag=""
+    # Start relayer only when run in polybft
+    if [ "$2" == "polybft" ]; then
+      echo "Starting relayer..."
+      relayer_flag="--relayer"
+    fi
+
+    "$POLYGON_EDGE_BIN" server \
+      --data-dir /data/data-1 \
+      --chain /data/genesis.json \
+      --grpc-address 0.0.0.0:9632 \
+      --libp2p 0.0.0.0:1478 \
+      --jsonrpc 0.0.0.0:8545 \
+      --prometheus 0.0.0.0:5001 \
+      --seal $relayer_flag
+   ;;
    *)
       echo "Executing polygon-edge..."
       exec "$POLYGON_EDGE_BIN" "$@"

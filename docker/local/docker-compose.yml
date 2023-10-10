@@ -44,16 +44,7 @@ services:
   node-1:
     image: local/polygon-edge
     container_name: polygon-edge-validator-1
-    command: [
-      "server",
-      "--data-dir", "/data/data-1",
-      "--chain", "/data/genesis.json",
-      "--grpc-address", "0.0.0.0:9632",
-      "--libp2p", "0.0.0.0:1478",
-      "--jsonrpc", "0.0.0.0:8545",
-      "--prometheus", "0.0.0.0:5001",
-      "--relayer"
-    ]
+    command: [ "start-node-1", "${EDGE_CONSENSUS:-polybft}" ]
     depends_on:
       init:
         condition: service_completed_successfully
