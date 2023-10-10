@@ -22,7 +22,6 @@ type Config struct {
 	JSONRPCAddr              string     `json:"jsonrpc_addr" yaml:"jsonrpc_addr"`
 	Telemetry                *Telemetry `json:"telemetry" yaml:"telemetry"`
 	Network                  *Network   `json:"network" yaml:"network"`
-	ShouldSeal               bool       `json:"seal" yaml:"seal"`
 	TxPool                   *TxPool    `json:"tx_pool" yaml:"tx_pool"`
 	LogLevel                 string     `json:"log_level" yaml:"log_level"`
 	RestoreFile              string     `json:"restore_file" yaml:"restore_file"`
@@ -122,8 +121,7 @@ func DefaultConfig() *Config {
 				defaultNetworkConfig.Addr.Port,
 			),
 		},
-		Telemetry:  &Telemetry{},
-		ShouldSeal: true,
+		Telemetry: &Telemetry{},
 		TxPool: &TxPool{
 			PriceLimit:         0,
 			MaxSlots:           4096,
