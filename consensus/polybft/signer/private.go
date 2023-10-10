@@ -2,8 +2,11 @@ package bls
 
 import (
 	"math/big"
+	"strings"
 
 	bn256 "github.com/umbracle/go-eth-bn256"
+
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 // PrivateKey holds private key for bls implementation
@@ -18,9 +21,9 @@ func (p *PrivateKey) PublicKey() *PublicKey {
 	return &PublicKey{g2: g2}
 }
 
-// Marshal marshals private key to byte slice
+// Marshal marshals private key hex (without 0x prefix) represented as a byte slice
 func (p *PrivateKey) Marshal() ([]byte, error) {
-	return p.s.MarshalText()
+	return []byte(strings.TrimPrefix(hex.EncodeBig(p.s), "0x")), nil
 }
 
 // Sign generates a simple BLS signature of the given message
@@ -37,9 +40,8 @@ func (p *PrivateKey) Sign(message, domain []byte) (*Signature, error) {
 
 // UnmarshalPrivateKey unmarshals the private key from the given byte slice
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
-	s := new(big.Int)
-
-	if err := s.UnmarshalText(data); err != nil {
+	s, err := hex.DecodeHexToBig(string(data))
+	if err != nil {
 		return nil, err
 	}
 
