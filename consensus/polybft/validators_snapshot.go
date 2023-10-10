@@ -52,8 +52,23 @@ func newValidatorsSnapshotCache(
 // Otherwise, it builds a snapshot from scratch and applies pending validator set deltas.
 func (v *validatorsSnapshotCache) GetSnapshot(
 	blockNumber uint64, parents []*types.Header, dbTx DBTransaction) (validator.AccountSet, error) {
+	tx := dbTx
+	isPassedTxNil := dbTx == nil
+
+	if isPassedTxNil {
+		t, err := v.state.beginDBTransaction(true)
+		if err != nil {
+			return nil, err
+		}
+
+		tx = t
+		defer tx.Rollback() //nolint:errcheck
+	}
+
 	v.lock.Lock()
-	defer v.lock.Unlock()
+	defer func() {
+		v.lock.Unlock()
+	}()
 
 	_, extra, err := getBlockData(blockNumber, v.blockchain)
 	if err != nil {
@@ -75,7 +90,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 
 	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochToGetSnapshot)
 
-	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot, dbTx)
+	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +108,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
 		}
 
-		err = v.storeSnapshot(genesisBlockSnapshot, dbTx)
+		err = v.storeSnapshot(genesisBlockSnapshot, tx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %w", err)
 		}
@@ -123,7 +138,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		}
 
 		latestValidatorSnapshot = intermediateSnapshot
-		if err = v.storeSnapshot(latestValidatorSnapshot, dbTx); err != nil {
+		if err = v.storeSnapshot(latestValidatorSnapshot, tx); err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch %d: %w", latestValidatorSnapshot.Epoch, err)
 		}
 
@@ -135,9 +150,15 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		"Epoch", latestValidatorSnapshot.Epoch,
 	)
 
-	if err := v.cleanup(dbTx); err != nil {
+	if err := v.cleanup(tx); err != nil {
 		// error on cleanup should not block or fail any action
 		v.logger.Error("could not clean validator snapshots from cache and db", "err", err)
+	}
+
+	if isPassedTxNil {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
 	}
 
 	return latestValidatorSnapshot.Snapshot, nil

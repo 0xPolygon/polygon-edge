@@ -34,7 +34,7 @@ type ProposerSnapshot struct {
 
 // NewProposerSnapshotFromState create ProposerSnapshot from state if possible or from genesis block
 func NewProposerSnapshotFromState(config *runtimeConfig, dbTx DBTransaction) (*ProposerSnapshot, error) {
-	snapshot, err := config.State.ProposerSnapshotStore.getProposerSnapshotWithTx(dbTx)
+	snapshot, err := config.State.ProposerSnapshotStore.getProposerSnapshot(dbTx)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (pc *ProposerCalculator) update(blockNumber uint64, dbTx DBTransaction) err
 			"validators count", len(pc.snapshot.Validators))
 	}
 
-	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshotWithTx(pc.snapshot, dbTx); err != nil {
+	if err := pc.state.ProposerSnapshotStore.writeProposerSnapshot(pc.snapshot, dbTx); err != nil {
 		return fmt.Errorf("cannot save proposers snapshot for block %d: %w", blockNumber, err)
 	}
 

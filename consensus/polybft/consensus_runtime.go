@@ -17,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
@@ -132,10 +131,10 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 		return nil, fmt.Errorf("could not begin dbTx to init consensus runtime: %w", err)
 	}
 
+	defer dbTx.Rollback() //nolint:errcheck
+
 	proposerCalculator, err := NewProposerCalculator(config, log.Named("proposer_calculator"), dbTx)
 	if err != nil {
-		_ = dbTx.Rollback()
-
 		return nil, fmt.Errorf("failed to create consensus runtime, error while creating proposer calculator %w", err)
 	}
 
@@ -149,28 +148,20 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	}
 
 	if err := runtime.initStateSyncManager(log); err != nil {
-		_ = dbTx.Rollback()
-
 		return nil, err
 	}
 
 	if err := runtime.initCheckpointManager(log); err != nil {
-		_ = dbTx.Rollback()
-
 		return nil, err
 	}
 
 	if err := runtime.initStakeManager(log, dbTx); err != nil {
-		_ = dbTx.Rollback()
-
 		return nil, err
 	}
 
 	// we need to call restart epoch on runtime to initialize epoch state
 	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock, dbTx)
 	if err != nil {
-		_ = dbTx.Rollback()
-
 		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
 	}
 
@@ -335,10 +326,10 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		return
 	}
 
+	defer dbTx.Rollback() //nolint:errcheck
+
 	lastProcessedEventsBlock, err := c.state.getLastProcessedEventsBlock(dbTx)
 	if err != nil {
-		_ = dbTx.Rollback()
-
 		c.logger.Error("failed to get last processed events block on block finalization",
 			"block", fullBlock.Block.Number(), "err", err)
 
@@ -346,8 +337,6 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	}
 
 	if err := c.eventProvider.GetEventsFromBlocks(lastProcessedEventsBlock, fullBlock, dbTx); err != nil {
-		_ = dbTx.Rollback()
-
 		c.logger.Error("failed to process events on block finalization", "block", fullBlock.Block.Number(), "err", err)
 
 		return
@@ -360,54 +349,24 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 		DBTx:               dbTx,
 	}
 
-	var g errgroup.Group
+	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block state sync", "err", err)
 
-	g.Go(func() error {
-		// handle commitment and proofs creation
-		if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
-			c.logger.Error("failed to post block state sync", "err", err)
+		return
+	}
 
-			return err
-		}
+	// update proposer priorities
+	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
+		c.logger.Error("Could not update proposer calculator", "err", err)
 
-		return nil
-	})
+		return
+	}
 
-	g.Go(func() error {
-		// handle exit events that happened in block
-		if err := c.checkpointManager.PostBlock(postBlock); err != nil {
-			c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	// handle transfer events that happened in block
+	if err := c.stakeManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in stake manager", "err", err)
 
-			return err
-		}
-
-		return nil
-	})
-
-	g.Go(func() error {
-		// update proposer priorities
-		if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
-			c.logger.Error("Could not update proposer calculator", "err", err)
-
-			return err
-		}
-
-		return nil
-	})
-
-	g.Go(func() error {
-		// handle transfer events that happened in block
-		if err := c.stakeManager.PostBlock(postBlock); err != nil {
-			c.logger.Error("failed to post block in stake manager", "err", err)
-
-			return err
-		}
-
-		return nil
-	})
-
-	if err := g.Wait(); err != nil {
-		return // return, we already logged the error in go routines
+		return
 	}
 
 	if isEndOfEpoch {
@@ -435,6 +394,12 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
 	c.lastBuiltBlock = fullBlock.Block.Header
+
+	// we will do PostBlock on checkpoint manager at the end, because it only
+	// sends a checkpoint in a separate routine. It doesn't do any db operations
+	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
+		c.logger.Error("failed to post block in checkpoint manager", "err", err)
+	}
 
 	endTime := time.Now().UTC()
 
