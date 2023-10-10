@@ -35,7 +35,7 @@ func CreateIfNotExists(path string, create createFn) ([]byte, error) {
 		return nil, fmt.Errorf("unable to generate private key, %w", err)
 	}
 
-	// Encode it to a readable format (Base64) and write to disk
+	// Encode it to a readable format (hex) and write to disk
 	keyBuff = []byte(hex.EncodeToString(keyBuff))
 	if err = common.SaveFileSafe(path, keyBuff, 0440); err != nil {
 		return nil, fmt.Errorf("unable to write private key to disk (%s), %w", path, err)
@@ -50,6 +50,6 @@ func CreatePrivateKey(create createFn) ([]byte, error) {
 		return nil, fmt.Errorf("unable to generate private key, %w", err)
 	}
 
-	// Encode it to a readable format (Base64) and return
+	// Encode it to a readable format (hex) and return
 	return []byte(hex.EncodeToString(keyBuff)), nil
 }

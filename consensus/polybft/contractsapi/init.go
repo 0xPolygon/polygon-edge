@@ -54,12 +54,8 @@ var (
 	RootERC721                      *artifact.Artifact
 	RootERC1155                     *artifact.Artifact
 	EIP1559Burn                     *artifact.Artifact
-
-	// Governance
-	NetworkParams *artifact.Artifact
-	ForkParams    *artifact.Artifact
-	ChildGovernor *artifact.Artifact
-	ChildTimelock *artifact.Artifact
+	GenesisProxy                    *artifact.Artifact
+	TransparentUpgradeableProxy     *artifact.Artifact
 
 	// test smart contracts
 	//go:embed test-contracts/*
@@ -288,22 +284,12 @@ func init() {
 		log.Fatal(err)
 	}
 
-	NetworkParams, err = artifact.DecodeArtifact([]byte(NetworkParamsArtifact))
+	GenesisProxy, err = artifact.DecodeArtifact([]byte(GenesisProxyArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ForkParams, err = artifact.DecodeArtifact([]byte(ForkParamsArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ChildGovernor, err = artifact.DecodeArtifact([]byte(ChildGovernorArtifact))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	ChildTimelock, err = artifact.DecodeArtifact([]byte(ChildTimelockArtifact))
+	TransparentUpgradeableProxy, err = artifact.DecodeArtifact([]byte(TransparentUpgradeableProxyArtifact))
 	if err != nil {
 		log.Fatal(err)
 	}

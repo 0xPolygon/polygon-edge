@@ -27,6 +27,7 @@ It has a native support for running bridge, which enables running cross-chain tr
 
     ```bash
     $ polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10 \
+        --proxy-contracts-admin 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed \
         [--validators-path ./] [--validators-prefix test-chain-] \
         [--consensus polybft] \
         [--reward-wallet address:amount]
@@ -38,6 +39,7 @@ It has a native support for running bridge, which enables running cross-chain tr
 
     ```bash
     $ polygon-edge genesis --block-gas-limit 10000000 --epoch-size 10 \
+        --proxy-contracts-admin 0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed \
         --validators /ip4/127.0.0.1/tcp/30301/p2p/16Uiu2HAmV5hqAp77untfJRorxqKmyUxgaVn8YHFjBJm9gKMms3mr:0xDcBe0024206ec42b0Ef4214Ac7B71aeae1A11af0:1cf134e02c6b2afb2ceda50bf2c9a01da367ac48f7783ee6c55444e1cab418ec0f52837b90a4d8cf944814073fc6f2bd96f35366a3846a8393e3cb0b19197cde23e2b40c6401fa27ff7d0c36779d9d097d1393cab6fc1d332f92fb3df850b78703b2989d567d1344e219f0667a1863f52f7663092276770cf513f9704b5351c4:11b18bde524f4b02258a8d196b687f8d8e9490d536718666dc7babca14eccb631c238fb79aa2b44a5a4dceccad2dd797f537008dda185d952226a814c1acf7c2
         [--validators /ip4/127.0.0.1/tcp/30302/p2p/16Uiu2HAmGmidRQY5BGJPGVRF8p1pYFdfzuf1StHzXGLDizuxJxex:0x2da750eD4AE1D5A7F7c996Faec592F3d44060e90:088d92c25b5f278750534e8a902da604a1aa39b524b4511f5f47c3a386374ca3031b667beb424faef068a01cee3428a1bc8c1c8bab826f30a1ee03fbe90cb5f01abcf4abd7af3bbe83eaed6f82179b9cbdc417aad65d919b802d91c2e1aaefec27ba747158bc18a0556e39bfc9175c099dd77517a85731894bbea3d191a622bc:08dc3006352fdc01b331907fd3a68d4d68ed40329032598c1c0faa260421d66720965ace3ba29c6d6608ec1facdbf4624bca72df36c34afd4bdd753c4dfe049c]
     ```
@@ -53,6 +55,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     ```bash
     $ polygon-edge polybft stake-manager-deploy \
      --deployer-key <hex_encoded_rootchain_account_private_key> \
+     --proxy-contracts-admin 0xaddressOfProxyContractsAdmin \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--stake-token 0xaddressOfStakeToken] \
@@ -66,6 +69,7 @@ It has a native support for running bridge, which enables running cross-chain tr
     --deployer-key <hex_encoded_rootchain_account_private_key> \
     --stake-manager <address_of_stake_manager_contract> \
     --stake-token 0xaddressOfStakeToken \
+    --proxy-contracts-admin 0xaddressOfProxyContractsAdmin \
     [--genesis ./genesis.json] \
     [--json-rpc http://127.0.0.1:8545] \
     [--test]

@@ -1,5 +1,7 @@
 FROM golang:1.20-alpine AS builder
 
+RUN apk add make git
+
 WORKDIR /polygon-edge
 
 ADD go.mod go.sum ./
@@ -7,7 +9,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o polygon-edge main.go
+RUN make build
 
 FROM alpine:latest AS runner
 

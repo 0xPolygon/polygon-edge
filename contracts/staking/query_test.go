@@ -39,8 +39,9 @@ func appendAll(bytesArrays ...[]byte) []byte {
 }
 
 type TxMock struct {
-	hashToRes map[types.Hash]*runtime.ExecutionResult
-	nonce     map[types.Address]uint64
+	hashToRes  map[types.Hash]*runtime.ExecutionResult
+	nonce      map[types.Address]uint64
+	nonPayable bool
 }
 
 func (m *TxMock) Apply(tx *types.Transaction) (*runtime.ExecutionResult, error) {
@@ -64,6 +65,10 @@ func (m *TxMock) GetNonce(addr types.Address) uint64 {
 	}
 
 	return 0
+}
+
+func (m *TxMock) SetNonPayable(nonPayable bool) {
+	m.nonPayable = nonPayable
 }
 
 func Test_decodeValidators(t *testing.T) {

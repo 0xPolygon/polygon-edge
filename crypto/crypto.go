@@ -337,9 +337,9 @@ func generateBLSKeyAndMarshal() ([]byte, error) {
 	return buf, nil
 }
 
-// BytesToECDSAPrivateKey reads the input byte array and constructs a private key if possible
+// BytesToBLSSecretKey reads the input byte array and constructs a private key if possible
 func BytesToBLSSecretKey(input []byte) (*bls_sig.SecretKey, error) {
-	// The key file on disk should be encoded in Base64,
+	// The key file on disk should be encoded in hex,
 	// so it must be decoded before it can be parsed by ParsePrivateKey
 	decoded, err := hex.DecodeString(string(input))
 	if err != nil {

@@ -8,7 +8,6 @@ import (
 type bridgeStore interface {
 	GenerateExitProof(exitID uint64) (types.Proof, error)
 	GetStateSyncProof(stateSyncID uint64) (types.Proof, error)
-	GetPendingSlashProofs() ([]types.Proof, error)
 }
 
 // Bridge is the bridge jsonrpc endpoint
@@ -24,9 +23,4 @@ func (b *Bridge) GenerateExitProof(exitID argUint64) (interface{}, error) {
 // GetStateSyncProof retrieves the StateSync proof
 func (b *Bridge) GetStateSyncProof(stateSyncID argUint64) (interface{}, error) {
 	return b.store.GetStateSyncProof(uint64(stateSyncID))
-}
-
-// GetPendingSlashProofs retrieves executable slashing exit event proofs
-func (b *Bridge) GetPendingSlashProofs() (interface{}, error) {
-	return b.store.GetPendingSlashProofs()
 }

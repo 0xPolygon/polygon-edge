@@ -2,17 +2,11 @@ package polybft
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
 	"sort"
 	"strconv"
 
-	metrics "github.com/armon/go-metrics"
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
-
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -21,36 +15,34 @@ import (
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
+	hclog "github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
 )
 
 var (
 	// currentCheckpointBlockNumMethod is an ABI method object representation for
 	// currentCheckpointBlockNumber getter function on CheckpointManager contract
 	currentCheckpointBlockNumMethod, _ = contractsapi.CheckpointManager.Abi.Methods["currentCheckpointBlockNumber"]
-
-	errInvalidEvent = errors.New("invalid event retrieved")
+	// frequency at which checkpoints are sent to the rootchain (in blocks count)
+	defaultCheckpointsOffset = uint64(900)
 )
 
 type CheckpointManager interface {
-	PostBlock(req *common.PostBlockRequest) error
+	PostBlock(req *PostBlockRequest) error
 	BuildEventRoot(epoch uint64) (types.Hash, error)
 	GenerateExitProof(exitID uint64) (types.Proof, error)
-	GenerateSlashExitProofs() ([]types.Proof, error)
 }
 
 var _ CheckpointManager = (*dummyCheckpointManager)(nil)
 
 type dummyCheckpointManager struct{}
 
-func (d *dummyCheckpointManager) PostBlock(req *common.PostBlockRequest) error { return nil }
+func (d *dummyCheckpointManager) PostBlock(req *PostBlockRequest) error { return nil }
 func (d *dummyCheckpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 	return types.ZeroHash, nil
 }
 func (d *dummyCheckpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
 	return types.Proof{}, nil
-}
-func (d *dummyCheckpointManager) GenerateSlashExitProofs() ([]types.Proof, error) {
-	return nil, nil
 }
 
 var _ CheckpointManager = (*checkpointManager)(nil)
@@ -65,6 +57,8 @@ type checkpointManager struct {
 	consensusBackend polybftBackend
 	// rootChainRelayer abstracts rootchain interaction logic (Call and SendTransaction invocations to the rootchain)
 	rootChainRelayer txrelayer.TxRelayer
+	// checkpointsOffset represents offset between checkpoint blocks (applicable only for non-epoch ending blocks)
+	checkpointsOffset uint64
 	// checkpointManagerAddr is address of CheckpointManager smart contract
 	checkpointManagerAddr types.Address
 	// lastSentBlock represents the last block on which a checkpoint transaction was sent
@@ -73,22 +67,21 @@ type checkpointManager struct {
 	logger hclog.Logger
 	// state boltDb instance
 	state *State
-	// eventsGetter gets Ethereum events (missed or current) from blocks
-	eventsGetter *eventsGetter[contractsapi.EventAbi]
+	// eventGetter gets exit events (missed or current) from blocks
+	eventGetter *eventsGetter[*ExitEvent]
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
-func newCheckpointManager(key ethgo.Key,
+func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
 	state *State) *checkpointManager {
-	eventsGetter := &eventsGetter[contractsapi.EventAbi]{
+	retry := &eventsGetter[*ExitEvent]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
-			return l.Address == contracts.L2StateSenderContract ||
-				l.Address == contracts.ValidatorSetContract
+			return l.Address == contracts.L2StateSenderContract
 		},
-		parseEventFn: parseEvent,
+		parseEventFn: parseExitEvent,
 	}
 
 	return &checkpointManager{
@@ -96,40 +89,39 @@ func newCheckpointManager(key ethgo.Key,
 		blockchain:            blockchain,
 		consensusBackend:      backend,
 		rootChainRelayer:      txRelayer,
+		checkpointsOffset:     checkpointOffset,
 		checkpointManagerAddr: checkpointManagerSC,
 		logger:                logger,
 		state:                 state,
-		eventsGetter:          eventsGetter,
+		eventGetter:           retry,
 	}
 }
 
-// getLatestCheckpointBlock queries CheckpointManager smart contract and retrieves latest checkpoint block number
-func (c *checkpointManager) getLatestCheckpointBlock() (uint64, error) {
-	checkpointBlockNumMethodEncoded, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
+// getCurrentCheckpointBlock queries CheckpointManager smart contract and retrieves the current checkpoint block number
+func getCurrentCheckpointBlock(relayer txrelayer.TxRelayer, checkpointManagerAddr types.Address) (uint64, error) {
+	checkpointBlockNumInput, err := currentCheckpointBlockNumMethod.Encode([]interface{}{})
 	if err != nil {
-		return 0, fmt.Errorf("failed to encode currentCheckpointId function parameters: %w", err)
+		return 0, fmt.Errorf("failed to encode currentCheckpointBlockNumber function parameters: %w", err)
 	}
 
-	latestCheckpointBlockRaw, err := c.rootChainRelayer.Call(
-		c.key.Address(),
-		ethgo.Address(c.checkpointManagerAddr),
-		checkpointBlockNumMethodEncoded)
+	currentCheckpointBlockRaw, err := relayer.Call(ethgo.ZeroAddress, ethgo.Address(checkpointManagerAddr),
+		checkpointBlockNumInput)
 	if err != nil {
-		return 0, fmt.Errorf("failed to invoke currentCheckpointId function on the rootchain: %w", err)
+		return 0, fmt.Errorf("failed to invoke currentCheckpointBlockNumber function on the rootchain: %w", err)
 	}
 
-	latestCheckpointBlockNum, err := strconv.ParseUint(latestCheckpointBlockRaw, 0, 64)
+	currentCheckpointBlock, err := strconv.ParseUint(currentCheckpointBlockRaw, 0, 64)
 	if err != nil {
-		return 0, fmt.Errorf("failed to convert current checkpoint id '%s' to number: %w",
-			latestCheckpointBlockRaw, err)
+		return 0, fmt.Errorf("failed to convert current checkpoint block number '%s' to number: %w",
+			currentCheckpointBlockRaw, err)
 	}
 
-	return latestCheckpointBlockNum, nil
+	return currentCheckpointBlock, nil
 }
 
 // submitCheckpoint sends a transaction with checkpoint data to the rootchain
 func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOfEpoch bool) error {
-	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
+	lastCheckpointBlockNumber, err := getCurrentCheckpointBlock(c.rootChainRelayer, c.checkpointManagerAddr)
 	if err != nil {
 		return err
 	}
@@ -239,8 +231,6 @@ func (c *checkpointManager) encodeAndSendCheckpoint(header *types.Header, extra 
 		return fmt.Errorf("checkpoint submission transaction failed for block %d", header.Number)
 	}
 
-	// update checkpoint block number metrics
-	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
 	c.logger.Debug("send checkpoint txn success", "block number", header.Number, "gasUsed", receipt.GasUsed)
 
 	return nil
@@ -281,35 +271,23 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 // isCheckpointBlock returns true for blocks in the middle of the epoch
 // which are offset by predefined count of blocks
 // or if given block is an epoch ending block
-func (c *checkpointManager) isCheckpointBlock(blockNumber, checkpointsOffset uint64, isEpochEndingBlock bool) bool {
-	return isEpochEndingBlock || blockNumber == c.lastSentBlock+checkpointsOffset
+func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
+	return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
-func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
+func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	block := req.FullBlock.Block.Number()
 
-	lastBlock, err := c.state.ExitEventStore.getLastSaved()
+	lastBlock, err := c.state.CheckpointStore.getLastSaved()
 	if err != nil {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
-	events, err := c.eventsGetter.getFromBlocks(lastBlock, req.FullBlock)
+	exitEvents, err := c.eventGetter.getFromBlocks(lastBlock, req.FullBlock)
 	if err != nil {
 		return err
-	}
-
-	exitEvents := make([]*ExitEvent, 0, len(events))
-	slashedEvents := make([]*contractsapi.SlashedEvent, 0, len(events))
-
-	for _, e := range events {
-		switch specificEvent := e.(type) {
-		case *ExitEvent:
-			exitEvents = append(exitEvents, specificEvent)
-		case *contractsapi.SlashedEvent:
-			slashedEvents = append(slashedEvents, specificEvent)
-		}
 	}
 
 	sort.Slice(exitEvents, func(i, j int) bool {
@@ -317,25 +295,15 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 		return exitEvents[i].ID.Cmp(exitEvents[j].ID) < 0
 	})
 
-	if err := c.state.ExitEventStore.insertExitEvents(exitEvents); err != nil {
+	if err := c.state.CheckpointStore.insertExitEvents(exitEvents); err != nil {
 		return err
 	}
 
-	if err := c.state.ExitEventStore.updateLastSaved(block); err != nil {
+	if err := c.state.CheckpointStore.updateLastSaved(block); err != nil {
 		return err
 	}
 
-	processedExitIDs := make([]uint64, len(slashedEvents))
-	for i, event := range slashedEvents {
-		processedExitIDs[i] = event.ExitID.Uint64()
-	}
-
-	if err := c.state.ExitEventStore.removeSlashExitEvents(processedExitIDs...); err != nil {
-		return err
-	}
-
-	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number,
-		req.CurrentClientConfig.CheckpointInterval, req.IsEpochEndingBlock) &&
+	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock) &&
 		bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner) {
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {
@@ -354,7 +322,7 @@ func (c *checkpointManager) PostBlock(req *common.PostBlockRequest) error {
 
 // BuildEventRoot returns an exit event root hash for exit tree of given epoch
 func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
-	exitEvents, err := c.state.ExitEventStore.getExitEventsByEpoch(epoch)
+	exitEvents, err := c.state.CheckpointStore.getExitEventsByEpoch(epoch)
 	if err != nil {
 		return types.ZeroHash, err
 	}
@@ -375,7 +343,7 @@ func (c *checkpointManager) BuildEventRoot(epoch uint64) (types.Hash, error) {
 func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error) {
 	c.logger.Debug("Generating proof for exit", "exitID", exitID)
 
-	exitEvent, err := c.state.ExitEventStore.getExitEvent(exitID)
+	exitEvent, err := c.state.CheckpointStore.getExitEvent(exitID)
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -432,14 +400,12 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, fmt.Errorf("checkpoint block not found for exit ID %d", exitID)
 	}
 
-	var exitEventAPI contractsapi.L2StateSyncedEvent
-
-	e, err := exitEventAPI.Encode(exitEvent.L2StateSyncedEvent)
+	exitEventEncoded, err := exitEvent.L2StateSyncedEvent.Encode()
 	if err != nil {
 		return types.Proof{}, err
 	}
 
-	exitEvents, err := c.state.ExitEventStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock.Uint64())
+	exitEvents, err := c.state.CheckpointStore.getExitEventsForProof(exitEvent.EpochNumber, checkpointBlock.Uint64())
 	if err != nil {
 		return types.Proof{}, err
 	}
@@ -449,49 +415,28 @@ func (c *checkpointManager) GenerateExitProof(exitID uint64) (types.Proof, error
 		return types.Proof{}, err
 	}
 
-	leafIndex, err := tree.LeafIndex(e)
+	leafIndex, err := tree.LeafIndex(exitEventEncoded)
 	if err != nil {
 		return types.Proof{}, err
 	}
 
-	proof, err := tree.GenerateProof(e)
+	proof, err := tree.GenerateProof(exitEventEncoded)
 	if err != nil {
 		return types.Proof{}, err
 	}
 
 	c.logger.Debug("Generated proof for exit", "exitID", exitID, "leafIndex", leafIndex, "proofLen", len(proof))
 
+	exitEventHex := hex.EncodeToString(exitEventEncoded)
+
 	return types.Proof{
 		Data: proof,
 		Metadata: map[string]interface{}{
 			"LeafIndex":       leafIndex,
-			"ExitEvent":       exitEvent,
+			"ExitEvent":       exitEventHex,
 			"CheckpointBlock": checkpointBlock,
 		},
 	}, nil
-}
-
-// GenerateSlashExitProofs generates proofs per each slash exit event found in the exit events store
-func (c *checkpointManager) GenerateSlashExitProofs() ([]types.Proof, error) {
-	slashExitIDs, err := c.state.ExitEventStore.getPendingSlashExitIDs()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve pending slash exit ids: %w", err)
-	}
-
-	proofs := make([]types.Proof, 0, len(slashExitIDs))
-
-	for _, slashExitID := range slashExitIDs {
-		proof, err := c.GenerateExitProof(slashExitID)
-		if err != nil {
-			c.logger.Info(fmt.Sprintf("failed to create a proof for slash exit event (ID=%d): %v", slashExitID, err))
-
-			continue
-		}
-
-		proofs = append(proofs, proof)
-	}
-
-	return proofs, nil
 }
 
 // createExitTree creates an exit event merkle tree from provided exit events
@@ -499,9 +444,8 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	numOfEvents := len(exitEvents)
 	data := make([][]byte, numOfEvents)
 
-	var exitEventAPI contractsapi.L2StateSyncedEvent
 	for i := 0; i < numOfEvents; i++ {
-		b, err := exitEventAPI.Encode(exitEvents[i].L2StateSyncedEvent)
+		b, err := exitEvents[i].L2StateSyncedEvent.Encode()
 		if err != nil {
 			return nil, err
 		}
@@ -512,43 +456,28 @@ func createExitTree(exitEvents []*ExitEvent) (*merkle.MerkleTree, error) {
 	return merkle.NewMerkleTree(data)
 }
 
-// parseEvent parses event (either exit or slashed event) from the provided log
-func parseEvent(h *types.Header, l *ethgo.Log) (contractsapi.EventAbi, bool, error) {
-	var (
-		exitEvent    ExitEvent
-		slashedEvent contractsapi.SlashedEvent
-	)
-
-	switch l.Topics[0] {
-	case exitEvent.Sig():
-		extra, err := GetIbftExtra(h.ExtraData)
-		if err != nil {
-			return nil, false,
-				fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
-		}
-
-		epoch := extra.Checkpoint.EpochNumber
-		block := h.Number
-
-		if extra.Validators != nil {
-			// exit events that happened in epoch ending blocks,
-			// should be added to the tree of the next epoch
-			epoch++
-			block++
-		}
-
-		event, err := decodeExitEvent(l, epoch, block)
-		if err != nil {
-			return nil, false, err
-		}
-
-		return event, true, nil
-
-	case slashedEvent.Sig():
-		matches, err := slashedEvent.ParseLog(l)
-
-		return &slashedEvent, matches, err
+// parseExitEvent parses exit event from provided log
+func parseExitEvent(h *types.Header, l *ethgo.Log) (*ExitEvent, bool, error) {
+	extra, err := GetIbftExtra(h.ExtraData)
+	if err != nil {
+		return nil, false,
+			fmt.Errorf("could not get header extra on exit event parsing. Error: %w", err)
 	}
 
-	return nil, false, nil
+	epoch := extra.Checkpoint.EpochNumber
+	block := h.Number
+
+	if extra.Validators != nil {
+		// exit events that happened in epoch ending blocks,
+		// should be added to the tree of the next epoch
+		epoch++
+		block++
+	}
+
+	event, err := decodeExitEvent(l, epoch, block)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return event, true, nil
 }

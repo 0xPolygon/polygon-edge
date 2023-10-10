@@ -11,6 +11,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/ethgo"
 )
 
 type testWSRequest struct {
@@ -114,7 +115,7 @@ func TestWS_Response(t *testing.T) {
 		_, err = srv.SendRawTx(ctx, &framework.PreparedTransaction{
 			From:     preminedAccounts[0].address,
 			To:       &preminedAccounts[1].address,
-			GasPrice: big.NewInt(1000000000),
+			GasPrice: ethgo.Gwei(1),
 			Gas:      1000000,
 			Value:    big.NewInt(10000),
 		}, preminedAccounts[0].key)

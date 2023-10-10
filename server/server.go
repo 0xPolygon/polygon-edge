@@ -12,26 +12,21 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/ethgo"
-	"google.golang.org/grpc"
-
-	"github.com/0xPolygon/polygon-edge/archive"
-	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
+	consensusPolyBFT "github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/forkmanager"
+	"github.com/0xPolygon/polygon-edge/gasprice"
+
+	"github.com/0xPolygon/polygon-edge/archive"
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/statesyncrelayer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/crypto"
-	"github.com/0xPolygon/polygon-edge/forkmanager"
-	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
@@ -46,6 +41,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validate"
+	"github.com/hashicorp/go-hclog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -217,33 +217,45 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	// apply allow list contracts deployer genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
-		m.config.Chain.Params.ContractDeployerAllowList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.ContractDeployerAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListContractsAddr,
+			m.config.Chain.Params.ContractDeployerAllowList)
+	}
 
 	// apply block list contracts deployer genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
-		m.config.Chain.Params.ContractDeployerBlockList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.ContractDeployerBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListContractsAddr,
+			m.config.Chain.Params.ContractDeployerBlockList)
+	}
 
 	// apply transactions execution allow list genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
-		m.config.Chain.Params.TransactionsAllowList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.TransactionsAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListTransactionsAddr,
+			m.config.Chain.Params.TransactionsAllowList)
+	}
 
 	// apply transactions execution block list genesis data
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
-		m.config.Chain.Params.TransactionsBlockList, m.config.Chain.Params.AccessListsOwner)
+	if m.config.Chain.Params.TransactionsBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListTransactionsAddr,
+			m.config.Chain.Params.TransactionsBlockList)
+	}
 
-	// apply bridge allow list genesis data (owner is omitted for bridge allow list)
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
-		m.config.Chain.Params.BridgeAllowList, m.config.Chain.Params.AccessListsOwner)
+	// apply bridge allow list genesis data
+	if m.config.Chain.Params.BridgeAllowList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.AllowListBridgeAddr,
+			m.config.Chain.Params.BridgeAllowList)
+	}
 
-	// apply bridge block list genesis data (owner is omitted for bridge block list)
-	addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
-		m.config.Chain.Params.BridgeBlockList, m.config.Chain.Params.AccessListsOwner)
+	// apply bridge block list genesis data
+	if m.config.Chain.Params.BridgeBlockList != nil {
+		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
+			m.config.Chain.Params.BridgeBlockList)
+	}
 
 	var initialStateRoot = types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {
-		polyBFTConfig, err := polyCommon.GetPolyBFTConfig(config.Chain)
+		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
 		if err != nil {
 			return nil, err
 		}
@@ -573,6 +585,7 @@ func (s *Server) setupConsensus() error {
 			SecretsManager:        s.secretsManager,
 			BlockTime:             uint64(blockTime.Seconds()),
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
+			MetricsInterval:       s.config.MetricsInterval,
 		},
 	)
 
@@ -618,7 +631,7 @@ func (s *Server) setupRelayer() error {
 		return fmt.Errorf("failed to create account from secret: %w", err)
 	}
 
-	polyBFTConfig, err := polyCommon.GetPolyBFTConfig(s.config.Chain)
+	polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(s.config.Chain)
 	if err != nil {
 		return fmt.Errorf("failed to extract polybft config: %w", err)
 	}
@@ -635,6 +648,7 @@ func (s *Server) setupRelayer() error {
 		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		s.config.RelayerTrackerPollInterval,
 	)
 
 	// start relayer
@@ -715,6 +729,7 @@ func (j *jsonRPCHub) ApplyTxn(
 	header *types.Header,
 	txn *types.Transaction,
 	override types.StateOverride,
+	nonPayable bool,
 ) (result *runtime.ExecutionResult, err error) {
 	blockCreator, err := j.GetConsensus().GetBlockCreator(header)
 	if err != nil {
@@ -731,6 +746,8 @@ func (j *jsonRPCHub) ApplyTxn(
 			return
 		}
 	}
+
+	transition.SetNonPayable(nonPayable)
 
 	result, err = transition.Apply(txn)
 

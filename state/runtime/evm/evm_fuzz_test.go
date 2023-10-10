@@ -61,6 +61,10 @@ func (m *mockHostF) SetState(addr types.Address, key types.Hash, value types.Has
 	return
 }
 
+func (m *mockHostF) SetNonPayable(nonPayable bool) {
+	return
+}
+
 func (m *mockHostF) GetBalance(addr types.Address) *big.Int {
 	if b, ok := m.balances[addr]; !ok {
 		m.balances[addr] = big.NewInt(0)

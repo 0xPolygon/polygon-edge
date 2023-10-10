@@ -189,20 +189,12 @@ func main() {
 			"EIP1559Burn",
 		},
 		{
-			"child/NetworkParams.sol",
-			"NetworkParams",
+			"lib/GenesisProxy.sol",
+			"GenesisProxy",
 		},
 		{
-			"child/ForkParams.sol",
-			"ForkParams",
-		},
-		{
-			"child/governance/ChildGovernor.sol",
-			"ChildGovernor",
-		},
-		{
-			"child/governance/ChildTimelock.sol",
-			"ChildTimelock",
+			"../@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol",
+			"TransparentUpgradeableProxy",
 		},
 	}
 

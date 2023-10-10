@@ -10,7 +10,6 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -54,7 +53,7 @@ type blockchainBackend interface {
 	GetHeaderByHash(hash types.Hash) (*types.Header, bool)
 
 	// GetSystemState creates a new instance of SystemState interface
-	GetSystemState(provider contract.Provider) common.SystemState
+	GetSystemState(provider contract.Provider) SystemState
 
 	SubscribeEvents() blockchain.Subscription
 
@@ -175,7 +174,7 @@ func (p *blockchainWrapper) NewBlockBuilder(
 }
 
 // GetSystemState is an implementation of blockchainBackend interface
-func (p *blockchainWrapper) GetSystemState(provider contract.Provider) common.SystemState {
+func (p *blockchainWrapper) GetSystemState(provider contract.Provider) SystemState {
 	return NewSystemState(contracts.ValidatorSetContract, contracts.StateReceiverContract, provider)
 }
 

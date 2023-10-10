@@ -26,6 +26,7 @@ type EventTracker struct {
 	subscriber            eventSubscription
 	logger                hcf.Logger
 	numBlockConfirmations uint64 // minimal number of child blocks required for the parent block to be considered final
+	pollInterval          time.Duration
 }
 
 func NewEventTracker(
@@ -36,6 +37,7 @@ func NewEventTracker(
 	numBlockConfirmations uint64,
 	startBlock uint64,
 	logger hcf.Logger,
+	pollInterval time.Duration,
 ) *EventTracker {
 	return &EventTracker{
 		dbPath:                dbPath,
@@ -45,6 +47,7 @@ func NewEventTracker(
 		numBlockConfirmations: numBlockConfirmations,
 		startBlock:            startBlock,
 		logger:                logger.Named("event_tracker"),
+		pollInterval:          pollInterval,
 	}
 }
 
@@ -53,7 +56,8 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		"contract", e.contractAddr,
 		"JSON RPC address", e.rpcEndpoint,
 		"num block confirmations", e.numBlockConfirmations,
-		"start block", e.startBlock)
+		"start block", e.startBlock,
+		"poll interval", e.pollInterval)
 
 	provider, err := jsonrpc.NewClient(e.rpcEndpoint)
 	if err != nil {
@@ -70,7 +74,13 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		blockMaxBacklog = minBlockMaxBacklog
 	}
 
-	blockTracker := blocktracker.NewBlockTracker(provider.Eth(), blocktracker.WithBlockMaxBacklog(blockMaxBacklog))
+	jsonBlockTracker := blocktracker.NewJSONBlockTracker(provider.Eth())
+	jsonBlockTracker.PollInterval = e.pollInterval
+	blockTracker := blocktracker.NewBlockTracker(
+		provider.Eth(),
+		blocktracker.WithBlockMaxBacklog(blockMaxBacklog),
+		blocktracker.WithTracker(jsonBlockTracker),
+	)
 
 	go func() {
 		<-ctx.Done()

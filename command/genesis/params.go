@@ -16,7 +16,8 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
 	stakingHelper "github.com/0xPolygon/polygon-edge/helper/staking"
 	"github.com/0xPolygon/polygon-edge/server"
@@ -25,27 +26,23 @@ import (
 )
 
 const (
-	dirFlag                   = "dir"
-	nameFlag                  = "name"
-	premineFlag               = "premine"
-	chainIDFlag               = "chain-id"
-	epochSizeFlag             = "epoch-size"
-	epochRewardFlag           = "epoch-reward"
-	blockGasLimitFlag         = "block-gas-limit"
-	burnContractFlag          = "burn-contract"
-	posFlag                   = "pos"
-	minValidatorCount         = "min-validator-count"
-	maxValidatorCount         = "max-validator-count"
-	nativeTokenConfigFlag     = "native-token-config"
-	rewardTokenCodeFlag       = "reward-token-code"
-	rewardWalletFlag          = "reward-wallet"
-	checkpointIntervalFlag    = "checkpoint-interval"
-	withdrawalWaitPeriodFlag  = "withdrawal-wait-period"
-	voteDelayFlag             = "vote-delay"
-	votePeriodFlag            = "vote-period"
-	voteProposalThresholdFlag = "vote-proposal-threshold"
-	governorAdminFlag         = "governor-admin"
-	proposalQuorumFlag        = "proposal-quorum"
+	dirFlag                      = "dir"
+	nameFlag                     = "name"
+	premineFlag                  = "premine"
+	chainIDFlag                  = "chain-id"
+	epochSizeFlag                = "epoch-size"
+	epochRewardFlag              = "epoch-reward"
+	blockGasLimitFlag            = "block-gas-limit"
+	burnContractFlag             = "burn-contract"
+	genesisBaseFeeConfigFlag     = "base-fee-config"
+	posFlag                      = "pos"
+	minValidatorCount            = "min-validator-count"
+	maxValidatorCount            = "max-validator-count"
+	nativeTokenConfigFlag        = "native-token-config"
+	rewardTokenCodeFlag          = "reward-token-code"
+	rewardWalletFlag             = "reward-wallet"
+	blockTrackerPollIntervalFlag = "block-tracker-poll-interval"
+	proxyContractsAdminFlag      = "proxy-contracts-admin"
 
 	defaultNativeTokenName     = "Polygon"
 	defaultNativeTokenSymbol   = "MATIC"
@@ -70,8 +67,10 @@ var (
 		"(<name:symbol:decimals count:mintable flag:[mintable token owner address]>)")
 	errRewardWalletAmountZero   = errors.New("reward wallet amount can not be zero or negative")
 	errReserveAccMustBePremined = errors.New("it is mandatory to premine reserve account (0x0 address)")
-	errInvalidVotingPeriod      = errors.New("voting period can not be zero")
-	errInvalidGovernorAdmin     = errors.New("governor admin address must be defined")
+	errBlockTrackerPollInterval = errors.New("block tracker poll interval must be greater than 0")
+	errBaseFeeChangeDenomZero   = errors.New("base fee change denominator must be greater than 0")
+	errBaseFeeEMZero            = errors.New("base fee elasticity multiplier must be greater than 0")
+	errBaseFeeZero              = errors.New("base fee  must be greater than 0")
 )
 
 type genesisParams struct {
@@ -91,7 +90,9 @@ type genesisParams struct {
 	blockGasLimit uint64
 	isPos         bool
 
-	burnContract string
+	burnContract        string
+	baseFeeConfig       string
+	parsedBaseFeeConfig *baseFeeInfo
 
 	minNumValidators uint64
 	maxNumValidators uint64
@@ -130,10 +131,9 @@ type genesisParams struct {
 	bridgeAllowListEnabled           []string
 	bridgeBlockListAdmin             []string
 	bridgeBlockListEnabled           []string
-	accessListsOwner                 string
 
 	nativeTokenConfigRaw string
-	nativeTokenConfig    *common.TokenConfig
+	nativeTokenConfig    *polybft.TokenConfig
 
 	premineInfos []*premineInfo
 
@@ -141,21 +141,19 @@ type genesisParams struct {
 	rewardTokenCode string
 	rewardWallet    string
 
-	checkpointInterval   uint64
-	withdrawalWaitPeriod uint64
+	blockTrackerPollInterval time.Duration
 
-	// governance
-	voteDelay         string
-	votingPeriod      string
-	proposalThreshold string
-	proposalQuorum    uint64
-	governorAdmin     string
+	proxyContractsAdmin string
 }
 
 func (p *genesisParams) validateFlags() error {
 	// Check if the consensusRaw is supported
 	if !server.ConsensusSupported(p.consensusRaw) {
 		return errUnsupportedConsensus
+	}
+
+	if err := p.validateGenesisBaseFeeConfig(); err != nil {
+		return err
 	}
 
 	// Check if validator information is set at all
@@ -186,7 +184,7 @@ func (p *genesisParams) validateFlags() error {
 			return err
 		}
 
-		if err := p.validateGovernorAdminAddr(); err != nil {
+		if err := p.validateProxyContractsAdmin(); err != nil {
 			return err
 		}
 	}
@@ -430,8 +428,9 @@ func (p *genesisParams) initGenesisConfig() error {
 
 	// burn contract can be set only for non mintable native token
 	if p.isBurnContractEnabled() {
-		chainConfig.Genesis.BaseFee = command.DefaultGenesisBaseFee
-		chainConfig.Genesis.BaseFeeEM = command.DefaultGenesisBaseFeeEM
+		chainConfig.Genesis.BaseFee = p.parsedBaseFeeConfig.baseFee
+		chainConfig.Genesis.BaseFeeEM = p.parsedBaseFeeConfig.baseFeeEM
+		chainConfig.Genesis.BaseFeeChangeDenom = p.parsedBaseFeeConfig.baseFeeChangeDenom
 		chainConfig.Params.BurnContract = make(map[uint64]types.Address, 1)
 
 		burnContractInfo, err := parseBurnContractInfo(p.burnContract)
@@ -535,10 +534,11 @@ func (p *genesisParams) validatePremineInfo() error {
 	return errReserveAccMustBePremined
 }
 
-// validateGovernorAdminAddr validates governor admin address
-func (p *genesisParams) validateGovernorAdminAddr() error {
-	if err := types.IsValidAddress(p.governorAdmin); err != nil {
-		return fmt.Errorf("governor admin address is not valid: %w", err)
+// validateBlockTrackerPollInterval validates block tracker block interval
+// which can not be 0
+func (p *genesisParams) validateBlockTrackerPollInterval() error {
+	if p.blockTrackerPollInterval == 0 {
+		return helper.ErrBlockTrackerPollInterval
 	}
 
 	return nil
@@ -568,6 +568,50 @@ func (p *genesisParams) validateBurnContract() error {
 	return nil
 }
 
+func (p *genesisParams) validateGenesisBaseFeeConfig() error {
+	if p.baseFeeConfig == "" {
+		return errors.New("invalid input(empty string) for genesis base fee config flag")
+	}
+
+	baseFeeInfo, err := parseBaseFeeConfig(p.baseFeeConfig)
+	if err != nil {
+		return fmt.Errorf("failed to parse base fee config: %w, provided value %s", err, p.baseFeeConfig)
+	}
+
+	p.parsedBaseFeeConfig = baseFeeInfo
+
+	if baseFeeInfo.baseFee == 0 {
+		return errBaseFeeZero
+	}
+
+	if baseFeeInfo.baseFeeEM == 0 {
+		return errBaseFeeEMZero
+	}
+
+	if baseFeeInfo.baseFeeChangeDenom == 0 {
+		return errBaseFeeChangeDenomZero
+	}
+
+	return nil
+}
+
+func (p *genesisParams) validateProxyContractsAdmin() error {
+	if strings.TrimSpace(p.proxyContractsAdmin) == "" {
+		return errors.New("proxy contracts admin address must be set")
+	}
+
+	proxyContractsAdminAddr := types.StringToAddress(p.proxyContractsAdmin)
+	if proxyContractsAdminAddr == types.ZeroAddress {
+		return errors.New("proxy contracts admin address must not be zero address")
+	}
+
+	if proxyContractsAdminAddr == contracts.SystemCaller {
+		return errors.New("proxy contracts admin address must not be system caller address")
+	}
+
+	return nil
+}
+
 // isBurnContractEnabled returns true in case burn contract info is provided
 func (p *genesisParams) isBurnContractEnabled() bool {
 	return p.burnContract != ""
@@ -576,7 +620,7 @@ func (p *genesisParams) isBurnContractEnabled() bool {
 // extractNativeTokenMetadata parses provided native token metadata (such as name, symbol and decimals count)
 func (p *genesisParams) extractNativeTokenMetadata() error {
 	if p.nativeTokenConfigRaw == "" {
-		p.nativeTokenConfig = &common.TokenConfig{
+		p.nativeTokenConfig = &polybft.TokenConfig{
 			Name:       defaultNativeTokenName,
 			Symbol:     defaultNativeTokenSymbol,
 			Decimals:   defaultNativeTokenDecimals,
@@ -627,7 +671,7 @@ func (p *genesisParams) extractNativeTokenMetadata() error {
 		owner = types.StringToAddress(strings.TrimSpace(params[4]))
 	}
 
-	p.nativeTokenConfig = &common.TokenConfig{
+	p.nativeTokenConfig = &polybft.TokenConfig{
 		Name:       name,
 		Symbol:     symbol,
 		Decimals:   uint8(decimals),

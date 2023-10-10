@@ -47,8 +47,14 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 
 	require.True(t, signature.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet))
 
+	rawSig, err := signature.Marshal()
+	require.NoError(t, err)
+
 	t.Run("Wrong public key", func(t *testing.T) {
 		t.Parallel()
+
+		sigTemp, err := UnmarshalSignature(rawSig)
+		require.NoError(t, err)
 
 		for i := 0; i < 100; i++ {
 			x, randomG2, err := bn256.RandomG2(rand.Reader)
@@ -56,11 +62,11 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 
 			publicKey := blsKey.PublicKey()
 			publicKey.g2.Add(publicKey.g2, randomG2) // change public key g2 point
-			require.False(t, signature.Verify(publicKey, validTestMsg, DomainValidatorSet))
+			require.False(t, sigTemp.Verify(publicKey, validTestMsg, DomainValidatorSet))
 
 			publicKey = blsKey.PublicKey()
 			publicKey.g2.ScalarMult(publicKey.g2, x) // change public key g2 point
-			require.False(t, signature.Verify(publicKey, validTestMsg, DomainValidatorSet))
+			require.False(t, sigTemp.Verify(publicKey, validTestMsg, DomainValidatorSet))
 		}
 	})
 
@@ -70,11 +76,14 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 		msgCopy := make([]byte, len(validTestMsg))
 		copy(msgCopy, validTestMsg)
 
+		sigTemp, err := UnmarshalSignature(rawSig)
+		require.NoError(t, err)
+
 		for i := 0; i < len(msgCopy); i++ {
 			b := msgCopy[i]
 			msgCopy[i] = b + 1
 
-			require.False(t, signature.Verify(blsKey.PublicKey(), msgCopy, DomainValidatorSet))
+			require.False(t, sigTemp.Verify(blsKey.PublicKey(), msgCopy, DomainValidatorSet))
 			msgCopy[i] = b
 		}
 	})
@@ -86,16 +95,13 @@ func Test_VerifySignature_NegativeCases(t *testing.T) {
 			x, randomG1, err := bn256.RandomG1(rand.Reader)
 			require.NoError(t, err)
 
-			raw, err := signature.Marshal()
-			require.NoError(t, err)
-
-			sigCopy, err := UnmarshalSignature(raw)
+			sigCopy, err := UnmarshalSignature(rawSig)
 			require.NoError(t, err)
 
 			sigCopy.g1.Add(sigCopy.g1, randomG1) // change signature
 			require.False(t, sigCopy.Verify(blsKey.PublicKey(), validTestMsg, DomainValidatorSet))
 
-			sigCopy, err = UnmarshalSignature(raw)
+			sigCopy, err = UnmarshalSignature(rawSig)
 			require.NoError(t, err)
 
 			sigCopy.g1.ScalarMult(sigCopy.g1, x) // change signature

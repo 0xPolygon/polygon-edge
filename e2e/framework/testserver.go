@@ -349,7 +349,7 @@ func (t *TestServer) GenerateGenesis() error {
 
 	// add base fee
 	if t.Config.BaseFee != 0 {
-		args = append(args, "--base-fee", *common.EncodeUint64(t.Config.BaseFee))
+		args = append(args, "--base-fee-config", *common.EncodeUint64(t.Config.BaseFee))
 	}
 
 	// add burn contracts
@@ -571,8 +571,8 @@ func (t *TestServer) DeployContract(
 }
 
 const (
-	DefaultGasPrice = 1879048192 // 0x70000000
-	DefaultGasLimit = 5242880    // 0x500000
+	DefaultGasPrice = 10e9    // 0x2540BE400
+	DefaultGasLimit = 5242880 // 0x500000
 )
 
 type PreparedTransaction struct {

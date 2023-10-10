@@ -51,18 +51,4 @@ func TestBridgeEndpoint(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, resp))
 	require.Nil(t, resp.Error)
 	require.NotNil(t, resp.Result)
-
-	msg = []byte(`{
-		"method": "bridge_getPendingSlashProofs",
-		"params": [],
-		"id": 1
-	}`)
-
-	data, err = dispatcher.HandleWs(msg, mockConnection)
-	require.NoError(t, err)
-
-	resp = new(SuccessResponse)
-	require.NoError(t, json.Unmarshal(data, resp))
-	require.Nil(t, resp.Error)
-	require.NotNil(t, resp.Result)
 }

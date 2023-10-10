@@ -13,7 +13,7 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
 
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/e2e-polybft/framework"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
@@ -28,7 +28,7 @@ func TestE2E_TxPool_Transfer(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender.Address())),
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBurnContract(&polyCommon.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}))
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}))
 	defer cluster.Stop()
 
 	cluster.WaitForReady(t)
@@ -104,7 +104,7 @@ func TestE2E_TxPool_Transfer_Linear(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, premine.Address())),
 		framework.WithPremine(types.Address(premine.Address())),
-		framework.WithBurnContract(&polyCommon.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 
@@ -239,7 +239,7 @@ func TestE2E_TxPool_BroadcastTransactions(t *testing.T) {
 	cluster := framework.NewTestCluster(t, 5,
 		framework.WithNativeTokenConfig(fmt.Sprintf(nativeTokenMintableTestCfg, sender.Address())),
 		framework.WithPremine(types.Address(sender.Address())),
-		framework.WithBurnContract(&polyCommon.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
+		framework.WithBurnContract(&polybft.BurnContractInfo{BlockNumber: 0, Address: types.ZeroAddress}),
 	)
 	defer cluster.Stop()
 

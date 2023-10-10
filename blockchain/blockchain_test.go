@@ -1096,7 +1096,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
 			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
-				return emptyHeader, nil
+				return emptyHeader.Copy(), nil
 			})
 		}
 
@@ -1110,7 +1110,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		// Create a dummy block whose parent hash will
 		// not match the computed parent hash
 		block := &types.Block{
-			Header: emptyHeader,
+			Header: emptyHeader.Copy(),
 		}
 
 		assert.ErrorIs(t, blockchain.verifyBlockParent(block), ErrParentHashMismatch)
@@ -1122,7 +1122,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
 			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
-				return emptyHeader, nil
+				return emptyHeader.Copy(), nil
 			})
 		}
 
@@ -1149,7 +1149,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
 			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
-				return emptyHeader, nil
+				return emptyHeader.Copy(), nil
 			})
 		}
 
@@ -1164,7 +1164,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		block := &types.Block{
 			Header: &types.Header{
 				Number:     10,
-				ParentHash: emptyHeader.Hash,
+				ParentHash: emptyHeader.Copy().Hash,
 			},
 		}
 
@@ -1180,7 +1180,7 @@ func TestBlockchain_VerifyBlockParent(t *testing.T) {
 		// Set up the storage callback
 		storageCallback := func(storage *storage.MockStorage) {
 			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
-				return emptyHeader, nil
+				return emptyHeader.Copy(), nil
 			})
 		}
 
@@ -1286,7 +1286,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 		storageCallback := func(storage *storage.MockStorage) {
 			// This is used for parent fetching
 			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
-				return emptyHeader, nil
+				return emptyHeader.Copy(), nil
 			})
 		}
 
@@ -1326,7 +1326,7 @@ func TestBlockchain_VerifyBlockBody(t *testing.T) {
 		storageCallback := func(storage *storage.MockStorage) {
 			// This is used for parent fetching
 			storage.HookReadHeader(func(hash types.Hash) (*types.Header, error) {
-				return emptyHeader, nil
+				return emptyHeader.Copy(), nil
 			})
 		}
 
@@ -1385,12 +1385,13 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 	}
 
 	for i, test := range tests {
+		i := i
 		test := test
 
-		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+		t.Run(fmt.Sprintf("test case #%d", i+1), func(t *testing.T) {
 			t.Parallel()
 
-			blockchain := Blockchain{
+			blockchain := &Blockchain{
 				config: &chain.Chain{
 					Params: &chain.Params{
 						Forks: &chain.Forks{
@@ -1398,7 +1399,8 @@ func TestBlockchain_CalculateBaseFee(t *testing.T) {
 						},
 					},
 					Genesis: &chain.Genesis{
-						BaseFeeEM: test.elasticityMultiplier,
+						BaseFeeEM:          test.elasticityMultiplier,
+						BaseFeeChangeDenom: chain.BaseFeeChangeDenom,
 					},
 				},
 			}

@@ -78,10 +78,6 @@ func (q *accountQueue) push(tx *types.Transaction) {
 
 // peek returns the first transaction from the queue without removing it.
 func (q *accountQueue) peek() *types.Transaction {
-	if q.length() == 0 {
-		return nil
-	}
-
 	return q.queue.Peek()
 }
 

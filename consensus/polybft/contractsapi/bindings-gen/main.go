@@ -77,7 +77,7 @@ func main() {
 		{
 			"CheckpointManager",
 			gensc.CheckpointManager,
-			false,
+			true,
 			[]string{
 				"submit",
 				"initialize",
@@ -383,13 +383,11 @@ func main() {
 				"commitEpoch",
 				"unstake",
 				"initialize",
-				"slash",
 			},
 			[]string{
 				"Transfer",
 				"WithdrawalRegistered",
 				"Withdrawal",
-				"Slashed",
 			},
 		},
 		{
@@ -412,64 +410,20 @@ func main() {
 			[]string{},
 		},
 		{
-			"NetworkParams",
-			gensc.NetworkParams,
+			"GenesisProxy",
+			gensc.GenesisProxy,
 			false,
 			[]string{
-				"initialize",
-				"setNewEpochSize",
-				"setNewSprintSize",
+				"protectSetUpProxy",
+				"setUpProxy",
 			},
-			[]string{
-				"NewCheckpointBlockInterval",
-				"NewEpochSize",
-				"NewEpochReward",
-				"NewMinValidatorSetSize",
-				"NewMaxValidatorSetSize",
-				"NewWithdrawalWaitPeriod",
-				"NewBlockTime",
-				"NewBlockTimeDrift",
-				"NewVotingDelay",
-				"NewVotingPeriod",
-				"NewProposalThreshold",
-				"NewSprintSize",
-			},
+			[]string{},
 		},
 		{
-			"ForkParams",
-			gensc.ForkParams,
-			false,
-			[]string{
-				"initialize",
-			},
-			[]string{
-				"NewFeature",
-				"UpdatedFeature",
-			},
-		},
-		{
-			"ChildGovernor",
-			gensc.ChildGovernor,
-			false,
-			[]string{
-				"initialize",
-				"propose",
-				"execute",
-				"castVote",
-				"state",
-				"queue",
-			},
-			[]string{
-				"ProposalCreated",
-			},
-		},
-		{
-			"ChildTimelock",
-			gensc.ChildTimelock,
-			false,
-			[]string{
-				"initialize",
-			},
+			"TransparentUpgradeableProxy",
+			gensc.TransparentUpgradeableProxy,
+			true,
+			[]string{},
 			[]string{},
 		},
 	}
@@ -487,14 +441,19 @@ func main() {
 			// There could be two objects with the same name in the generated JSON ABI (hardhat bug).
 			// This case can be fixed by specifying a function signature instead of just name
 			// e.g. "myFunc(address,bool,uint256)" instead of just "myFunc"
-			var method *abi.Method
+			var (
+				method              *abi.Method
+				resolvedBySignature = false
+			)
+
 			if signatureFunctionFormat.MatchString(methodRaw) {
 				method = c.artifact.Abi.GetMethodBySignature(methodRaw)
+				resolvedBySignature = true
 			} else {
 				method = c.artifact.Abi.GetMethod(methodRaw)
 			}
 
-			if err := generateFunction(generatedData, c.contractName, method); err != nil {
+			if err := generateFunction(generatedData, c.contractName, method, resolvedBySignature); err != nil {
 				log.Fatal(err)
 			}
 		}
@@ -591,12 +550,10 @@ func generateType(generatedData *generatedData, name string, obj *abi.Type, res 
 
 			typ = "[" + strconv.Itoa(elem.Size()) + "]" + nestedType
 		} else if elem.Kind() == abi.KindAddress {
-			// for address use the native `types.Address` type instead of `ethgo.Address`
+			// for address use the native `types.Address` type instead of `ethgo.Address`. Note that
+			// this only works for simple types and not for []address inputs. This is good enough since
+			// there are no kinds like that in our smart contracts.
 			typ = "types.Address"
-		} else if (elem.Kind() == abi.KindArray || elem.Kind() == abi.KindSlice) &&
-			elem.Elem().Kind() == abi.KindAddress {
-			// for address slice or arrays use the native `types.Address` type instead of `ethgo.Address`
-			typ = "[]types.Address"
 		} else {
 			// for the rest of the types use the go type returned by abi
 			typ = elem.GoType().String()
@@ -692,8 +649,8 @@ func (*{{.TName}}) Sig() ethgo.Hash {
 	return {{.ContractName}}.Abi.Events["{{.Name}}"].ID()
 }
 
-func (*{{.TName}}) Encode(inputs interface{}) ([]byte, error) {
-	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode(inputs)
+func ({{.Sig}} *{{.TName}}) Encode() ([]byte, error) {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.Encode({{.Sig}})
 }
 
 func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
@@ -702,7 +659,12 @@ func ({{.Sig}} *{{.TName}}) ParseLog(log *ethgo.Log) (bool, error) {
 	}
 
 	return true, decodeEvent({{.ContractName}}.Abi.Events["{{.Name}}"], log, {{.Sig}})
-}`
+}
+
+func ({{.Sig}} *{{.TName}}) Decode(input []byte) error {
+	return {{.ContractName}}.Abi.Events["{{.Name}}"].Inputs.DecodeStruct(input, &{{.Sig}})
+}
+`
 
 	inputs := map[string]interface{}{
 		"Structs":      res,
@@ -769,7 +731,8 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 }
 
 // generateFunction generates code for smart contract function and its parameters
-func generateFunction(generatedData *generatedData, contractName string, method *abi.Method) error {
+func generateFunction(generatedData *generatedData, contractName string,
+	method *abi.Method, fnSigResolution bool) error {
 	methodName := fmt.Sprintf(functionNameFormat, strings.Title(method.Name+contractName))
 	res := []string{}
 
@@ -779,22 +742,28 @@ func generateFunction(generatedData *generatedData, contractName string, method 
 	}
 
 	// write encode/decode functions
-	tmplStr := `
-{{range .Structs}}
-	{{.}}
-{{ end }}
 
-func ({{.Sig}} *{{.TName}}) Sig() []byte {
-	return {{.ContractName}}.Abi.Methods["{{.Name}}"].ID()
-}
+	tmplString := `
+	{{range .Structs}}
+		{{.}}
+	{{ end }}
+	
+	func ({{.Sig}} *{{.TName}}) Sig() []byte {
+		return {{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"].ID()
+	}
+	
+	func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
+		return {{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"].Encode({{.Sig}})
+	}
+	
+	func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
+		return decodeMethod({{.ContractName}}.Abi.{{.MethodGetter}}["{{.Name}}"], buf, {{.Sig}})
+	}`
 
-func ({{.Sig}} *{{.TName}}) EncodeAbi() ([]byte, error) {
-	return {{.ContractName}}.Abi.Methods["{{.Name}}"].Encode({{.Sig}})
-}
-
-func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
-	return decodeMethod({{.ContractName}}.Abi.Methods["{{.Name}}"], buf, {{.Sig}})
-}`
+	methodGetter := "Methods"
+	if fnSigResolution {
+		methodGetter = "MethodsBySignature"
+	}
 
 	inputs := map[string]interface{}{
 		"Structs":      res,
@@ -802,9 +771,14 @@ func ({{.Sig}} *{{.TName}}) DecodeAbi(buf []byte) error {
 		"Name":         method.Name,
 		"ContractName": contractName,
 		"TName":        strings.Title(methodName),
+		"MethodGetter": methodGetter,
 	}
 
-	renderedString, err := renderTmpl(tmplStr, inputs)
+	if fnSigResolution {
+		inputs["Name"] = method.Sig()
+	}
+
+	renderedString, err := renderTmpl(tmplString, inputs)
 	if err != nil {
 		return err
 	}

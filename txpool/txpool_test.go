@@ -12,6 +12,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/tests"
@@ -19,10 +24,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -31,14 +32,6 @@ const (
 	defaultMaxSlots           uint64 = 4096
 	defaultMaxAccountEnqueued uint64 = 128
 	validGasLimit             uint64 = 4712350
-)
-
-var (
-	forks = (&chain.Forks{
-		chain.Homestead: chain.NewFork(0),
-		chain.Istanbul:  chain.NewFork(0),
-		chain.London:    chain.NewFork(0),
-	})
 )
 
 // addresses used in tests
@@ -90,7 +83,7 @@ func newTestPoolWithSlots(maxSlots uint64, mockStore ...store) (*TxPool, error) 
 
 	return NewTxPool(
 		hclog.NewNullLogger(),
-		forks,
+		getDefaultEnabledForks(),
 		storeToUse,
 		nil,
 		nil,
@@ -150,9 +143,35 @@ func TestAddTxErrors(t *testing.T) {
 		tx := newTx(defaultAddr, 0, 1)
 		tx.Type = types.StateTx
 
-		assert.ErrorIs(t,
-			pool.addTx(local, signTx(tx)),
-			ErrInvalidTxType,
+		err := pool.addTx(local, signTx(tx))
+
+		assert.ErrorContains(t,
+			err,
+			ErrInvalidTxType.Error(),
+		)
+		assert.ErrorContains(t,
+			err,
+			"state transactions are not expected to be added to the pool",
+		)
+	})
+
+	t.Run("ErrTxTypeNotSupported London hardfork not enabled", func(t *testing.T) {
+		t.Parallel()
+		pool := setupPool()
+		pool.forks.RemoveFork(chain.London)
+
+		tx := newTx(defaultAddr, 0, 1)
+		tx.Type = types.DynamicFeeTx
+
+		err := pool.addTx(local, signTx(tx))
+
+		assert.ErrorContains(t,
+			err,
+			ErrTxTypeNotSupported.Error(),
+		)
+		assert.ErrorContains(t,
+			err,
+			"london hardfork is not enabled",
 		)
 	})
 
@@ -324,7 +343,7 @@ func TestAddTxErrors(t *testing.T) {
 
 		assert.ErrorIs(t,
 			pool.addTx(local, tx),
-			ErrUnderpriced,
+			ErrReplacementUnderpriced,
 		)
 	})
 
@@ -635,7 +654,7 @@ func TestDropKnownGossipTx(t *testing.T) {
 
 	// send tx as gossip (will be discarded)
 	assert.ErrorIs(t,
-		pool.addTx(gossip, tx),
+		pool.addTx(gossip, tx.Copy()),
 		ErrAlreadyKnown,
 	)
 
@@ -845,7 +864,7 @@ func TestAddTx(t *testing.T) {
 			// check the account nonce before promoting
 			assert.Equal(t, uint64(0), pool.accounts.get(addr1).getNonce())
 
-			assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+			assert.ErrorIs(t, pool.addTx(local, tx1), ErrReplacementUnderpriced)
 
 			//	execute the enqueue handlers
 			<-pool.promoteReqCh
@@ -919,7 +938,7 @@ func TestAddTx(t *testing.T) {
 				pool.gauge.read(),
 			)
 
-			assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
+			assert.ErrorIs(t, pool.addTx(local, tx1), ErrReplacementUnderpriced)
 
 			acc := pool.accounts.get(addr1)
 			acc.nonceToTx.lock()
@@ -2136,7 +2155,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input larger than the TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks = chain.AllForksEnabled
+		pool.forks = chain.AllForksEnabled.Copy()
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize+1)
 		_, err := rand.Read(input)
@@ -2155,7 +2174,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("tx input the same as TxPoolMaxInitCodeSize", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks = chain.AllForksEnabled
+		pool.forks = chain.AllForksEnabled.Copy()
 
 		input := make([]byte, state.TxPoolMaxInitCodeSize)
 		_, err := rand.Read(input)
@@ -2164,6 +2183,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 		tx := newTx(defaultAddr, 0, 1)
 		tx.To = nil
 		tx.Input = input
+		tx.GasPrice = new(big.Int).SetUint64(pool.GetBaseFee())
 
 		assert.NoError(t,
 			pool.validateTx(signTx(tx)),
@@ -2278,7 +2298,7 @@ func Test_TxPool_validateTx(t *testing.T) {
 	t.Run("eip-1559 tx placed without eip-1559 fork enabled", func(t *testing.T) {
 		t.Parallel()
 		pool := setupPool()
-		pool.forks = chain.AllForksEnabled
+		pool.forks = chain.AllForksEnabled.Copy()
 		pool.forks.RemoveFork(chain.London)
 
 		tx := newTx(defaultAddr, 0, 1)
@@ -2612,10 +2632,10 @@ func TestResetAccounts_Enqueued(t *testing.T) {
 				newTx(addr1, 4, 1),
 			},
 			addr2: {
-				newTx(addr2, 3, 1),
-				newTx(addr2, 4, 1),
-				newTx(addr2, 5, 1),
-				newTx(addr2, 6, 1),
+				newTx(addr2, 3, 3),
+				newTx(addr2, 4, 3),
+				newTx(addr2, 5, 3),
+				newTx(addr2, 6, 3),
 			},
 			addr3: {
 				newTx(addr3, 7, 1),
@@ -3527,7 +3547,7 @@ func TestAddTxsInOrder(t *testing.T) {
 
 	wg.Wait()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(100 * time.Millisecond)
 
 	pool.Close()
 
@@ -3535,8 +3555,16 @@ func TestAddTxsInOrder(t *testing.T) {
 		acc := pool.accounts.get(addrtx.addr)
 		require.NotNil(t, acc)
 
-		assert.Equal(t, uint64(0), acc.enqueued.length())
-		assert.Equal(t, len(acc.nonceToTx.mapping), int(acc.promoted.length()))
+		acc.enqueued.lock(false)
+		enqueuedCount := acc.enqueued.length()
+		acc.enqueued.unlock()
+
+		acc.promoted.lock(false)
+		promotedCount := acc.promoted.length()
+		acc.promoted.unlock()
+
+		assert.Equal(t, uint64(0), enqueuedCount)
+		assert.Len(t, acc.nonceToTx.mapping, int(promotedCount))
 	}
 }
 
@@ -3679,7 +3707,7 @@ func TestAddTx_TxReplacement(t *testing.T) {
 
 	assert.ErrorIs(t, pool.addTx(local, tx1), ErrUnderpriced)
 	assert.ErrorIs(t, pool.addTx(local, tx2), ErrUnderpriced)
-	assert.ErrorIs(t, pool.addTx(local, tx3), ErrUnderpriced)
+	assert.ErrorIs(t, pool.addTx(local, tx3), ErrReplacementUnderpriced)
 	assert.ErrorIs(t, pool.addTx(local, tx4), ErrUnderpriced)
 
 	// Success
@@ -3695,6 +3723,16 @@ func TestAddTx_TxReplacement(t *testing.T) {
 	assert.Equal(t, ac2.nonceToTx.mapping[secondAccountNonce], tx1)
 	assert.Equal(t, ac1.enqueued.queue[0], tx2)
 	assert.Equal(t, ac2.enqueued.queue[0], tx1)
+}
+
+// getDefaultEnabledForks returns hardcoded set of forks
+// that are enabled by default from the genesis block
+func getDefaultEnabledForks() *chain.Forks {
+	return &chain.Forks{
+		chain.Homestead: chain.NewFork(0),
+		chain.Istanbul:  chain.NewFork(0),
+		chain.London:    chain.NewFork(0),
+	}
 }
 
 func BenchmarkAddTxTime(b *testing.B) {

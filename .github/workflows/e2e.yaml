@@ -1,6 +1,10 @@
 ---
-name: E2E tests
+name: IBFT E2E tests
 on:  # yamllint disable-line rule:truthy
+  push:
+    branches:
+      - main
+      - develop
   workflow_dispatch:
   workflow_call:
     outputs:

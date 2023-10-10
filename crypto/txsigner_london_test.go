@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -118,8 +119,8 @@ func Test_LondonSigner_Sender(t *testing.T) {
 			tx: &types.Transaction{
 				Type:      types.DynamicFeeTx,
 				GasPrice:  big.NewInt(1000000402),
-				GasTipCap: big.NewInt(1000000000),
-				GasFeeCap: big.NewInt(10000000000),
+				GasTipCap: ethgo.Gwei(1),
+				GasFeeCap: ethgo.Gwei(10),
 				Gas:       21000,
 				To:        &to,
 				Value:     big.NewInt(100000000000000),

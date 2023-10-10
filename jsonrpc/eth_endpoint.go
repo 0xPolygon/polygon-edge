@@ -26,6 +26,9 @@ type ethTxPoolStore interface {
 
 	// GetNonce returns the next nonce for this address
 	GetNonce(addr types.Address) uint64
+
+	// GetBaseFee returns the current base fee of TxPool
+	GetBaseFee() uint64
 }
 
 type Account struct {
@@ -63,7 +66,12 @@ type ethBlockchainStore interface {
 	GetAvgGasPrice() *big.Int
 
 	// ApplyTxn applies a transaction object to the blockchain
-	ApplyTxn(header *types.Header, txn *types.Transaction, override types.StateOverride) (*runtime.ExecutionResult, error)
+	ApplyTxn(
+		header *types.Header,
+		txn *types.Transaction,
+		override types.StateOverride,
+		nonPayable bool,
+	) (*runtime.ExecutionResult, error)
 
 	// GetSyncProgression retrieves the current sync progression, if any
 	GetSyncProgression() *progress.Progression
@@ -390,14 +398,53 @@ func (e *Eth) GetStorageAt(
 	return argBytesPtr(result), nil
 }
 
-// GasPrice returns the average gas price based on the last x blocks
-// taking into consideration operator defined price limit
+// GasPrice exposes "getGasPrice"'s function logic to public RPC interface
 func (e *Eth) GasPrice() (interface{}, error) {
+	gasPrice, err := e.getGasPrice()
+	if err != nil {
+		return nil, err
+	}
+
+	return argUint64(gasPrice), nil
+}
+
+// getGasPrice returns the average gas price based on the last x blocks
+// taking into consideration operator defined price limit
+func (e *Eth) getGasPrice() (uint64, error) {
+	// Return --price-limit flag defined value if it is greater than avgGasPrice/baseFee+priorityFee
+	if e.store.GetForksInTime(e.store.Header().Number).London {
+		priorityFee, err := e.store.MaxPriorityFeePerGas()
+		if err != nil {
+			return 0, err
+		}
+
+		return common.Max(e.priceLimit, priorityFee.Uint64()+e.store.GetBaseFee()), nil
+	}
+
 	// Fetch average gas price in uint64
 	avgGasPrice := e.store.GetAvgGasPrice().Uint64()
 
-	// Return --price-limit flag defined value if it is greater than avgGasPrice
-	return argUint64(common.Max(e.priceLimit, avgGasPrice)), nil
+	return common.Max(e.priceLimit, avgGasPrice), nil
+}
+
+// fillTransactionGasPrice fills transaction gas price if no provided
+func (e *Eth) fillTransactionGasPrice(tx *types.Transaction) error {
+	if tx.GetGasPrice(e.store.GetBaseFee()).BitLen() > 0 {
+		return nil
+	}
+
+	estimatedGasPrice, err := e.getGasPrice()
+	if err != nil {
+		return err
+	}
+
+	if tx.Type == types.DynamicFeeTx {
+		tx.GasFeeCap = new(big.Int).SetUint64(estimatedGasPrice)
+	} else {
+		tx.GasPrice = new(big.Int).SetUint64(estimatedGasPrice)
+	}
+
+	return nil
 }
 
 type overrideAccount struct {
@@ -448,9 +495,15 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 	if err != nil {
 		return nil, err
 	}
+
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
 	if transaction.Gas == 0 {
 		transaction.Gas = header.GasLimit
+	}
+
+	// Force transaction gas price if empty
+	if err = e.fillTransactionGasPrice(transaction); err != nil {
+		return nil, err
 	}
 
 	var override types.StateOverride
@@ -462,7 +515,7 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 	}
 
 	// The return value of the execution is saved in the transition (returnValue field)
-	result, err := e.store.ApplyTxn(header, transaction, override)
+	result, err := e.store.ApplyTxn(header, transaction, override, true)
 	if err != nil {
 		return nil, err
 	}
@@ -495,6 +548,11 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	// testTransaction should execute tx with nonce always set to the current expected nonce for the account
 	transaction, err := DecodeTxn(arg, header.Number, e.store, true)
 	if err != nil {
+		return nil, err
+	}
+
+	// Force transaction gas price if empty
+	if err = e.fillTransactionGasPrice(transaction); err != nil {
 		return nil, err
 	}
 
@@ -599,11 +657,17 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Run the transaction with the specified gas value.
-	// Returns a status indicating if the transaction failed and the accompanying error
-	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
+	// Returns a status indicating if the transaction failed, return value (data), and the accompanying error
+	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, interface{}, error) {
+		var data interface{}
+
 		transaction.Gas = gas
 
-		result, applyErr := e.store.ApplyTxn(header, transaction, nil)
+		result, applyErr := e.store.ApplyTxn(header, transaction, nil, false)
+
+		if result != nil {
+			data = []byte(hex.EncodeToString(result.ReturnValue))
+		}
 
 		if applyErr != nil {
 			// Check the application error.
@@ -612,10 +676,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
-				return true, nil
+				return true, data, nil
 			}
 
-			return true, applyErr
+			return true, data, applyErr
 		}
 
 		// Check if an out of gas error happened during EVM execution
@@ -624,30 +688,30 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
-				return true, nil
+				return true, data, nil
 			}
 
 			if isEVMRevertError(result.Err) {
 				// The EVM reverted during execution, attempt to extract the
 				// error message and return it
-				return true, constructErrorFromRevert(result)
+				return true, data, constructErrorFromRevert(result)
 			}
 
-			return true, result.Err
+			return true, data, result.Err
 		}
 
-		return false, nil
+		return false, nil, nil
 	}
 
 	// Start the binary search for the lowest possible gas price
 	for lowEnd < highEnd {
 		mid := lowEnd + ((highEnd - lowEnd) >> 1) // (lowEnd + highEnd) / 2 can overflow
 
-		failed, testErr := testTransaction(mid, true)
+		failed, retVal, testErr := testTransaction(mid, true)
 		if testErr != nil && !isEVMRevertError(testErr) {
 			// Reverts are ignored in the binary search, but are checked later on
 			// during the execution for the optimal gas limit found
-			return 0, testErr
+			return retVal, testErr
 		}
 
 		if failed {
@@ -660,10 +724,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Check if the highEnd is a good value to make the transaction pass
-	failed, err := testTransaction(highEnd, false)
+	failed, retVal, err := testTransaction(highEnd, false)
 	if failed {
 		// The transaction shouldn't fail, for whatever reason, at highEnd
-		return 0, fmt.Errorf(
+		return retVal, fmt.Errorf(
 			"unable to apply transaction even for the highest gas limit %d: %w",
 			highEnd,
 			err,

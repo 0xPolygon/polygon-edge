@@ -16,6 +16,7 @@ func TestPrivate_Marshal(t *testing.T) {
 	// marshal public key
 	privateKeyMarshalled, err := blsKey.Marshal()
 	require.NoError(t, err)
+
 	// recover private and public key
 	blsKeyUnmarshalled, err := UnmarshalPrivateKey(privateKeyMarshalled)
 	require.NoError(t, err)

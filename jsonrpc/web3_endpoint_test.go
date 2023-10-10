@@ -2,6 +2,7 @@ package jsonrpc
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/0xPolygon/polygon-edge/versioning"
@@ -61,11 +62,12 @@ func TestWeb3EndpointClientVersion(t *testing.T) {
 
 	assert.NoError(t, expectJSONResult(resp, &res))
 	assert.Contains(t, res,
-		fmt.Sprintf(
-			clientVersionTemplate,
+		fmt.Sprintf("%s/%s/%s-%s/%s",
 			chainName,
-			chainID,
 			versioning.Version,
+			runtime.GOOS,
+			runtime.GOARCH,
+			runtime.Version(),
 		),
 	)
 }

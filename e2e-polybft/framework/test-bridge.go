@@ -19,7 +19,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
 	rootHelper "github.com/0xPolygon/polygon-edge/command/rootchain/helper"
 	"github.com/0xPolygon/polygon-edge/command/rootchain/server"
-	polyCommon "github.com/0xPolygon/polygon-edge/consensus/polybft/common"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -306,7 +306,7 @@ func (t *TestBridge) cmdRun(args ...string) error {
 
 // deployRootchainContracts deploys and initializes rootchain contracts
 func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
-	polybftConfig, err := polyCommon.LoadPolyBFTConfig(genesisPath)
+	polybftConfig, err := polybft.LoadPolyBFTConfig(genesisPath)
 	if err != nil {
 		return err
 	}
@@ -316,6 +316,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 		"deploy",
 		"--stake-manager", polybftConfig.Bridge.StakeManagerAddr.String(),
 		"--stake-token", polybftConfig.Bridge.StakeTokenAddr.String(),
+		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
 		"--genesis", genesisPath,
 		"--test",
 	}
@@ -328,7 +329,7 @@ func (t *TestBridge) deployRootchainContracts(genesisPath string) error {
 }
 
 // fundRootchainValidators sends predefined amount of tokens to rootchain validators
-func (t *TestBridge) fundRootchainValidators(polybftConfig polyCommon.PolyBFTConfig) error {
+func (t *TestBridge) fundRootchainValidators(polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial rootchain funding of genesis validators: %w", err)
@@ -351,7 +352,7 @@ func (t *TestBridge) fundRootchainValidators(polybftConfig polyCommon.PolyBFTCon
 }
 
 func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
-	polybftConfig polyCommon.PolyBFTConfig) error {
+	polybftConfig polybft.PolyBFTConfig) error {
 	addressesAsString := make([]string, len(validatorAddresses))
 	for i := 0; i < len(validatorAddresses); i++ {
 		addressesAsString[i] = validatorAddresses[i].String()
@@ -373,7 +374,7 @@ func (t *TestBridge) whitelistValidators(validatorAddresses []types.Address,
 	return nil
 }
 
-func (t *TestBridge) registerGenesisValidators(polybftConfig polyCommon.PolyBFTConfig) error {
+func (t *TestBridge) registerGenesisValidators(polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on whitelist of genesis validators: %w", err)
@@ -409,7 +410,7 @@ func (t *TestBridge) registerGenesisValidators(polybftConfig polyCommon.PolyBFTC
 	return g.Wait()
 }
 
-func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polyCommon.PolyBFTConfig) error {
+func (t *TestBridge) initialStakingOfGenesisValidators(polybftConfig polybft.PolyBFTConfig) error {
 	validatorSecrets, err := genesis.GetValidatorKeyFiles(t.clusterConfig.TmpDir, t.clusterConfig.ValidatorPrefix)
 	if err != nil {
 		return fmt.Errorf("could not get validator secrets on initial staking of genesis validators: %w", err)
@@ -458,7 +459,7 @@ func (t *TestBridge) getStakeAmount(validatorIndex int) *big.Int {
 	return t.clusterConfig.StakeAmounts[validatorIndex]
 }
 
-func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polyCommon.PolyBFTConfig) error {
+func (t *TestBridge) finalizeGenesis(genesisPath string, polybftConfig polybft.PolyBFTConfig) error {
 	args := []string{
 		"polybft",
 		"supernet",
@@ -519,6 +520,7 @@ func (t *TestBridge) deployStakeManager(genesisPath string) error {
 		"stake-manager-deploy",
 		"--jsonrpc", t.JSONRPCAddr(),
 		"--genesis", genesisPath,
+		"--proxy-contracts-admin", t.clusterConfig.GetProxyContractsAdmin(),
 		"--test",
 	}
 

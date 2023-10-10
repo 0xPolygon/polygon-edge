@@ -20,6 +20,10 @@ type withdrawRewardResult struct {
 }
 
 func (w *withdrawRewardsParams) validateFlags() error {
+	if _, err := helper.ParseJSONRPCAddress(w.jsonRPC); err != nil {
+		return fmt.Errorf("failed to parse json rpc address. Error: %w", err)
+	}
+
 	return sidechainHelper.ValidateSecretFlags(w.accountDir, w.accountConfig)
 }
 
