@@ -142,24 +142,9 @@ func (ssr *stateSyncRelayerImpl) PostBlock(req *PostBlockRequest) error {
 		state = &StateSyncRelayerStateData{LastBlockNumber: 0}
 	}
 
-	for state.LastBlockNumber+1 < req.FullBlock.Block.Header.Number {
-		state.LastBlockNumber++
-
-		events, err := ssr.eventsGetter.getEvents(state.LastBlockNumber)
-		if err != nil {
-			return fmt.Errorf("state sync relayer: %w", err)
-		}
-
-		if err = ssr.state.StateSyncStore.insertStateSyncRelayerStateData(state, getConvertedEvents(events)); err != nil {
-			return fmt.Errorf("state sync relayer insert state failed: %w", err)
-		}
-
-		ssr.logger.Info("state sync relayer updated state", "block", state.LastBlockNumber)
-	}
-
-	events, err := ssr.eventsGetter.getEventsFromReceipts(req.FullBlock.Block.Header, req.FullBlock.Receipts)
+	events, err := ssr.eventsGetter.getFromBlocks(state.LastBlockNumber, req.FullBlock)
 	if err != nil {
-		return err
+		return fmt.Errorf("state sync relayer: %w", err)
 	}
 
 	state.LastBlockNumber = req.FullBlock.Block.Number()
