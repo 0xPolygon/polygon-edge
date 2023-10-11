@@ -111,7 +111,12 @@ func newStateSyncManager(logger hclog.Logger, state *State, config *stateSyncCon
 		isValidLogFn: func(l *types.Log) bool {
 			return l.Address == contracts.StateReceiverContract
 		},
-		parseEventFn: parseStateSyncResultEvent,
+		parseEventFn: func(h *types.Header, l *ethgo.Log) (*contractsapi.StateSyncResultEvent, bool, error) {
+			var stateSyncResultEvent contractsapi.StateSyncResultEvent
+			matches, err := stateSyncResultEvent.ParseLog(l)
+
+			return &stateSyncResultEvent, matches, err
+		},
 	}
 
 	return &stateSyncManager{
@@ -633,17 +638,4 @@ func (s *stateSyncManager) multicast(msg interface{}) {
 	if err != nil {
 		s.logger.Warn("failed to gossip bridge message", "err", err)
 	}
-}
-
-// parseStateSyncResultEvent parses StateSyncResult event from the provided log
-func parseStateSyncResultEvent(h *types.Header, l *ethgo.Log) (*contractsapi.StateSyncResultEvent, bool, error) {
-	var stateSyncResultEvent contractsapi.StateSyncResultEvent
-
-	if len(l.Topics) == 0 || l.Topics[0] != stateSyncResultEvent.Sig() {
-		return nil, false, nil
-	}
-
-	matches, err := stateSyncResultEvent.ParseLog(l)
-
-	return &stateSyncResultEvent, matches, err
 }

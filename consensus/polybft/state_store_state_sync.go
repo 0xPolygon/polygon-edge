@@ -5,8 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/hashicorp/go-hclog"
-
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	bolt "go.etcd.io/bbolt"
@@ -44,8 +42,7 @@ stateSyncProofs/
 */
 
 type StateSyncStore struct {
-	db     *bolt.DB
-	logger hclog.Logger
+	db *bolt.DB
 }
 
 // initialize creates necessary buckets in DB if they don't already exist
@@ -89,11 +86,11 @@ func (s *StateSyncStore) removeStateSyncEventsAndProofs(stateSyncEventIDs []uint
 			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
 
 			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				s.logger.Info(fmt.Sprintf("failed to remove state sync event (ID=%d): %v", stateSyncEventID, err))
+				return fmt.Errorf("failed to remove state sync event (ID=%d): %v", stateSyncEventID, err)
 			}
 
 			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
-				s.logger.Info(fmt.Sprintf("failed to remove state sync event proof (ID=%d): %v", stateSyncEventID, err))
+				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %v", stateSyncEventID, err)
 			}
 		}
 
