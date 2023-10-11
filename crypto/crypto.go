@@ -369,18 +369,6 @@ func BLSSecretKeyToPubkeyBytes(key *bls_sig.SecretKey) ([]byte, error) {
 	return marshalled, nil
 }
 
-// BytesToBLSPublicKey decodes given hex string and returns BLS Public Key
-func BytesToBLSPublicKey(input string) (*bls_sig.PublicKey, error) {
-	// The key file on disk should be encoded in Base64,
-	// so it must be decoded before it can be parsed by ParsePrivateKey
-	decoded, err := hex.DecodeString(input)
-	if err != nil {
-		return nil, err
-	}
-
-	return UnmarshalBLSPublicKey(decoded)
-}
-
 // UnmarshalBLSPublicKey unmarshal bytes data into BLS Public Key
 func UnmarshalBLSPublicKey(input []byte) (*bls_sig.PublicKey, error) {
 	pk := &bls_sig.PublicKey{}
