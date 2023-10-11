@@ -40,22 +40,6 @@ func CreateRandomBlsKeys(total int) ([]*PrivateKey, error) {
 	return blsKeys, nil
 }
 
-// MarshalMessageToBigInt marshalls message into two big ints
-// first we must convert message bytes to point and than for each coordinate we create big int
-func MarshalMessageToBigInt(message, domain []byte) ([2]*big.Int, error) {
-	point, err := hashToPoint(message, domain)
-	if err != nil {
-		return [2]*big.Int{}, err
-	}
-
-	buf := point.Marshal()
-
-	return [2]*big.Int{
-		new(big.Int).SetBytes(buf[0:32]),
-		new(big.Int).SetBytes(buf[32:64]),
-	}, nil
-}
-
 // MakeKOSKSignature creates KOSK signature which prevents rogue attack
 func MakeKOSKSignature(privateKey *PrivateKey, address types.Address,
 	chainID int64, domain []byte, supernetManagerAddr types.Address) (*Signature, error) {
