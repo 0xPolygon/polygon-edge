@@ -226,7 +226,7 @@ func (ip *initParams) getResult(
 				return nil, err
 			}
 
-			res.BLSPrivateKey = hex.EncodeToString(blspk)
+			res.BLSPrivateKey = string(blspk)
 		}
 	}
 
