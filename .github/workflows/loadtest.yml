@@ -9,8 +9,7 @@ on:  # yamllint disable-line rule:truthy
         type: choice
         options:
           - ubuntu-latest
-          - devnet
-          - testnet
+          - loadtester
       environment:
         description: The environment to run against
         required: false
@@ -60,7 +59,7 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   run_k6:
     environment: ${{ inputs.environment }}
-    runs-on: ubuntu-latest
+    runs-on: "${{ inputs.runner }}"
     outputs:
       loadtest_output_success: ${{ steps.run_k6_success.outputs.test_output }}
     steps:
@@ -71,10 +70,15 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - id: random-number-generator
+        run: echo "random-number=$(echo $RANDOM)" >> $GITHUB_OUTPUT
+        shell: bash
       
       - uses: datadog/agent-github-action@v1.3
         with:
           api_key: ${{ secrets.DD_API_KEY }}
+          container_name: "datadog-agent-${{ steps.random-number-generator.outputs.random-number }}"
       
       - name: Install xk6
         run: |

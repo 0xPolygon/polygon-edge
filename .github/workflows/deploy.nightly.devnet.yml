@@ -234,7 +234,7 @@ jobs:
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
-      runner: devnet
+      runner: loadtester
       environment: ${{ inputs.environment }}
       scenario: multiple_EOA
       duration: ${{ inputs.duration }}
@@ -249,7 +249,7 @@ jobs:
       DD_API_KEY: ${{ secrets.DD_API_KEY }}
       LOADTEST_MNEMONIC: ${{ secrets.LOADTEST_MNEMONIC }}
     with:
-      runner: devnet
+      runner: loadtester
       environment: ${{ inputs.environment }}
       scenario: multiple_ERC20
       duration: ${{ inputs.duration }}
