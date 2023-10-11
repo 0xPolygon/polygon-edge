@@ -55,7 +55,7 @@ type NodeType int
 
 const (
 	None      NodeType = 0
-	Validator NodeType = 1 << iota
+	Validator NodeType = 1
 	Relayer   NodeType = 2
 )
 
