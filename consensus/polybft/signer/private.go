@@ -21,7 +21,8 @@ func NewZeroPrivateKey() *PrivateKey {
 	}
 }
 
-// UnmarshalPrivateKey unmarshals the private key from the given byte slice
+// UnmarshalPrivateKey unmarshals the private key from the given byte slice.
+// This function supports both raw big int string and hex-encoded big int string.
 func UnmarshalPrivateKey(data []byte) (*PrivateKey, error) {
 	pk := NewZeroPrivateKey()
 
