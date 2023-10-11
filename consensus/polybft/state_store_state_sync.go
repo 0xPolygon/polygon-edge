@@ -86,11 +86,11 @@ func (s *StateSyncStore) removeStateSyncEventsAndProofs(stateSyncEventIDs []uint
 			stateSyncEventIDKey := common.EncodeUint64ToBytes(stateSyncEventID)
 
 			if err := eventsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event (ID=%d): %v", stateSyncEventID, err)
+				return fmt.Errorf("failed to remove state sync event (ID=%d): %w", stateSyncEventID, err)
 			}
 
 			if err := proofsBucket.Delete(stateSyncEventIDKey); err != nil {
-				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %v", stateSyncEventID, err)
+				return fmt.Errorf("failed to remove state sync event proof (ID=%d): %w", stateSyncEventID, err)
 			}
 		}
 
